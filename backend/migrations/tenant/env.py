@@ -22,9 +22,9 @@ from sqlalchemy import engine_from_config, pool, text
 from app.core.settings import get_settings
 from app.shared.db.base import Base
 
-# Tenant-schema ORM model imports are added by the modules that own them
-# (audit) — see migrations/tenant/README. Hand-written migrations do not
-# need them; they are required only for `--autogenerate`.
+# Register every tenant-schema ORM model with `Base.metadata` so future
+# `--autogenerate` runs see them.
+import app.modules.audit.models  # noqa: E402, F401
 
 config = context.config
 if config.config_file_name is not None:

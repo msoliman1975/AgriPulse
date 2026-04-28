@@ -9,63 +9,18 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.logging import get_logger
+from app.modules.audit import AuditService, get_audit_service
 from app.modules.tenancy.bootstrap import AlembicTenantMigrator, TenantSchemaMigrator
 from app.modules.tenancy.events import TenantCreatedV1
 from app.modules.tenancy.repository import TenantRepository
 from app.shared.db.ids import schema_name_for, uuid7
 from app.shared.eventbus import EventBus, get_default_bus
-
-# `AsyncSession` import is type-only to keep the Protocol module-import-light.
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402  (re-exported for typing)
-
-
-class AuditRecorder(Protocol):
-    """Subset of the audit module's interface that tenancy depends on.
-
-    Defined here (not imported from `app.modules.audit`) so the tenancy
-    module has zero compile-time dependency on audit. The concrete
-    implementation is injected at app startup.
-    """
-
-    async def record(
-        self,
-        *,
-        event_type: str,
-        actor_user_id: UUID | None,
-        subject_kind: str,
-        subject_id: UUID,
-        details: dict[str, Any],
-        farm_id: UUID | None = None,
-        correlation_id: UUID | None = None,
-    ) -> None: ...
-
-
-class _NoopAuditRecorder:
-    """Default until the audit module is wired. Logs but does not persist."""
-
-    def __init__(self) -> None:
-        self._log = get_logger(__name__)
-
-    async def record(
-        self,
-        *,
-        event_type: str,
-        actor_user_id: UUID | None,
-        subject_kind: str,
-        subject_id: UUID,
-        details: dict[str, Any],
-        farm_id: UUID | None = None,
-        correlation_id: UUID | None = None,
-    ) -> None:
-        self._log.warning(
-            "audit_noop_recorder",
-            event_type=event_type,
-            subject_id=str(subject_id),
-        )
 
 
 class TenantService(Protocol):
@@ -145,13 +100,13 @@ class TenantServiceImpl:
         self,
         session: AsyncSession,
         *,
-        audit_recorder: AuditRecorder | None = None,
+        audit_service: AuditService | None = None,
         event_bus: EventBus | None = None,
         migrator: TenantSchemaMigrator | None = None,
     ) -> None:
         self._session = session
         self._repo = TenantRepository(session)
-        self._audit = audit_recorder or _NoopAuditRecorder()
+        self._audit = audit_service or get_audit_service()
         self._bus = event_bus or get_default_bus()
         self._migrator = migrator or AlembicTenantMigrator()
         self._log = get_logger(__name__)
@@ -206,6 +161,7 @@ class TenantServiceImpl:
         await asyncio.to_thread(self._migrator.bootstrap, schema_name)
 
         await self._audit.record(
+            tenant_schema=schema_name,
             event_type="tenancy.tenant_created",
             actor_user_id=actor_user_id,
             subject_kind="tenant",
@@ -252,14 +208,14 @@ class TenantServiceImpl:
 def get_tenant_service(
     session: AsyncSession,
     *,
-    audit_recorder: AuditRecorder | None = None,
+    audit_service: AuditService | None = None,
     event_bus: EventBus | None = None,
     migrator: TenantSchemaMigrator | None = None,
 ) -> TenantService:
     """Factory used by routers and Celery tasks."""
     return TenantServiceImpl(
         session,
-        audit_recorder=audit_recorder,
+        audit_service=audit_service,
         event_bus=event_bus,
         migrator=migrator,
     )
