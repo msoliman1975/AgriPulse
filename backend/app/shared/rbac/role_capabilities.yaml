@@ -1,0 +1,267 @@
+# role_capabilities.yaml — role → capability mapping.
+#
+# Roles are the eight in ARCHITECTURE.md § 7.1 plus BillingAdmin and
+# PlatformSupport from data_model § 4.5 / § 4.7. Resolution order at
+# request time (PlatformRole → TenantRole → FarmScope, first match wins)
+# lives in check.py, not here.
+#
+# Every capability listed must be defined in capabilities.yaml; loading
+# the registry validates this. The literal "*" grants every capability and
+# is reserved for PlatformAdmin.
+
+roles:
+
+  # ---- Platform-scoped ------------------------------------------------
+
+  PlatformAdmin:
+    description: MissionAgre staff with full cross-tenant control.
+    capabilities:
+      - "*"
+
+  PlatformSupport:
+    description: Read-only platform-wide access for support staff.
+    capabilities:
+      - platform.read
+      - tenant.read
+      - subscription.read
+      - user.read
+      - audit.read
+      - farm.read
+      - block.read
+      - imagery.read
+      - index.read
+      - weather.read
+      - signal.read
+      - alert.read
+      - alert_rule.read
+      - recommendation.read
+      - decision_tree.read
+      - analytics.read
+
+  # ---- Tenant-scoped --------------------------------------------------
+
+  TenantOwner:
+    description: Tenant super-admin; exactly one per tenant.
+    capabilities:
+      - tenant.read
+      - tenant.update
+      - tenant.manage_settings
+      - tenant.transfer_ownership
+      - subscription.read
+      - subscription.manage
+      - user.read
+      - user.invite
+      - user.update
+      - user.suspend
+      - user.delete
+      - role.assign_tenant
+      - role.assign_farm
+      - farm.read
+      - farm.create
+      - farm.update
+      - farm.delete
+      - block.read
+      - block.create
+      - block.update_geometry
+      - block.update_metadata
+      - block.delete
+      - crop_assignment.create
+      - crop_assignment.update
+      - crop_assignment.delete
+      - imagery.read
+      - imagery.refresh
+      - index.read
+      - index.compute_custom
+      - weather.read
+      - signal.read
+      - signal.define
+      - signal.record
+      - alert.read
+      - alert.acknowledge
+      - alert.resolve
+      - alert.snooze
+      - alert_rule.read
+      - alert_rule.manage
+      - recommendation.read
+      - recommendation.act
+      - decision_tree.read
+      - irrigation.record
+      - fertilization.record
+      - scouting.record
+      - analytics.read
+      - analytics.export
+      - notification.read_inbox
+      - notification.manage_templates
+      - audit.read
+
+  TenantAdmin:
+    description: Tenant admin; everything in the tenant except billing changes
+      and ownership transfer.
+    capabilities:
+      - tenant.read
+      - tenant.update
+      - tenant.manage_settings
+      - subscription.read
+      - user.read
+      - user.invite
+      - user.update
+      - user.suspend
+      - user.delete
+      - role.assign_tenant
+      - role.assign_farm
+      - farm.read
+      - farm.create
+      - farm.update
+      - farm.delete
+      - block.read
+      - block.create
+      - block.update_geometry
+      - block.update_metadata
+      - block.delete
+      - crop_assignment.create
+      - crop_assignment.update
+      - crop_assignment.delete
+      - imagery.read
+      - imagery.refresh
+      - index.read
+      - index.compute_custom
+      - weather.read
+      - signal.read
+      - signal.define
+      - signal.record
+      - alert.read
+      - alert.acknowledge
+      - alert.resolve
+      - alert.snooze
+      - alert_rule.read
+      - alert_rule.manage
+      - recommendation.read
+      - recommendation.act
+      - decision_tree.read
+      - irrigation.record
+      - fertilization.record
+      - scouting.record
+      - analytics.read
+      - analytics.export
+      - notification.read_inbox
+      - notification.manage_templates
+      - audit.read
+
+  BillingAdmin:
+    description: Subscription and billing only.
+    capabilities:
+      - tenant.read
+      - subscription.read
+      - subscription.manage
+      - notification.read_inbox
+
+  # ---- Farm-scoped ----------------------------------------------------
+
+  FarmManager:
+    description: Full management of an assigned farm (granted per farm).
+    capabilities:
+      - role.assign_farm
+      - farm.read
+      - farm.update
+      - block.read
+      - block.create
+      - block.update_geometry
+      - block.update_metadata
+      - block.delete
+      - crop_assignment.create
+      - crop_assignment.update
+      - crop_assignment.delete
+      - imagery.read
+      - imagery.refresh
+      - index.read
+      - index.compute_custom
+      - weather.read
+      - signal.read
+      - signal.record
+      - alert.read
+      - alert.acknowledge
+      - alert.resolve
+      - alert.snooze
+      - alert_rule.read
+      - recommendation.read
+      - recommendation.act
+      - irrigation.record
+      - fertilization.record
+      - scouting.record
+      - analytics.read
+      - analytics.export
+      - notification.read_inbox
+
+  Agronomist:
+    description: Agronomic decisions on an assigned farm; no geometry edits.
+    capabilities:
+      - farm.read
+      - block.read
+      - imagery.read
+      - imagery.refresh
+      - index.read
+      - index.compute_custom
+      - weather.read
+      - signal.read
+      - signal.record
+      - alert.read
+      - alert.acknowledge
+      - alert.resolve
+      - alert.snooze
+      - alert_rule.read
+      - recommendation.read
+      - recommendation.act
+      - irrigation.record
+      - fertilization.record
+      - scouting.record
+      - analytics.read
+      - analytics.export
+      - notification.read_inbox
+
+  FieldOperator:
+    description: Field operations and observation logging on an assigned farm.
+    capabilities:
+      - farm.read
+      - block.read
+      - imagery.read
+      - index.read
+      - weather.read
+      - signal.read
+      - signal.record
+      - alert.read
+      - alert.acknowledge
+      - recommendation.read
+      - irrigation.record
+      - fertilization.record
+      - scouting.record
+      - analytics.read
+      - notification.read_inbox
+
+  Scout:
+    description: Observation logging only on an assigned farm.
+    capabilities:
+      - farm.read
+      - block.read
+      - imagery.read
+      - index.read
+      - weather.read
+      - signal.read
+      - signal.record
+      - alert.read
+      - recommendation.read
+      - scouting.record
+      - notification.read_inbox
+
+  Viewer:
+    description: Read-only view of an assigned farm.
+    capabilities:
+      - farm.read
+      - block.read
+      - imagery.read
+      - index.read
+      - weather.read
+      - signal.read
+      - alert.read
+      - recommendation.read
+      - analytics.read
+      - notification.read_inbox
