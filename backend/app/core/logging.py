@@ -35,9 +35,7 @@ from structlog.stdlib import (
 from app.core.settings import get_settings
 
 
-def _add_service(
-    _: Any, __: str, event_dict: MutableMapping[str, Any]
-) -> MutableMapping[str, Any]:
+def _add_service(_: Any, __: str, event_dict: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
     event_dict.setdefault("service", get_settings().service_name)
     return event_dict
 
