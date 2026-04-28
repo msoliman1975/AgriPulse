@@ -19,6 +19,7 @@ from app.core.errors import install_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.observability import configure_tracing, instrument_app
 from app.core.settings import get_settings
+from app.shared.auth import AuthMiddleware
 from app.shared.correlation import CorrelationIdMiddleware
 
 
@@ -58,12 +59,15 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
-    # Outermost custom middleware so every request — including those that
-    # 401 in auth — has a correlation ID bound for logs and traces.
+    # Starlette wraps middleware in reverse order of addition: the LAST
+    # add_middleware call becomes the outermost layer. Correlation must
+    # run before auth so a 401 from invalid JWT still carries a
+    # correlation ID in logs and the response header.
+    app.add_middleware(AuthMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
 
-    # NOTE: auth middleware + module routers are registered in subsequent
-    # commits within PR 2 once shared/auth and modules/ exist.
+    # NOTE: module routers are registered in subsequent commits within
+    # PR 2 once modules/ exist.
 
     install_exception_handlers(app)
     instrument_app(app)
