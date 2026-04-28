@@ -1,0 +1,85 @@
+version: 2
+
+updates:
+  # GitHub Actions used by every workflow.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Cairo
+    labels: [dependencies, github-actions]
+    open-pull-requests-limit: 5
+
+  # Backend (Python).
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Cairo
+    labels: [dependencies, backend, python]
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "fastapi"
+          - "pydantic*"
+          - "sqlalchemy"
+          - "alembic"
+          - "celery"
+          - "redis"
+          - "structlog"
+          - "opentelemetry-*"
+          - "prometheus-*"
+      python-dev:
+        patterns:
+          - "pytest*"
+          - "ruff"
+          - "black"
+          - "mypy"
+          - "import-linter"
+
+  # Frontend (npm/pnpm; Dependabot reads pnpm via the npm ecosystem).
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Cairo
+    labels: [dependencies, frontend, javascript]
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
+      tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "eslint*"
+          - "prettier"
+          - "@typescript-eslint/*"
+          - "typescript"
+
+  # Container base images, looked up per Dockerfile.
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
+  - package-ecosystem: docker
+    directory: /tile-server
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
