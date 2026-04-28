@@ -17,6 +17,7 @@ from app.shared.db.base import Base
 # Register every public-schema ORM model with `Base.metadata` so future
 # `--autogenerate` runs see them. Hand-written migrations do not need
 # this, but it is cheap to keep the registry warm.
+import app.modules.iam.models  # noqa: E402, F401
 import app.modules.tenancy.models  # noqa: E402, F401
 
 config = context.config
