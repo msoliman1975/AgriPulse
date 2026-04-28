@@ -16,19 +16,15 @@ down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# Extensions are created in `public`. CloudNativePG / vanilla Postgres both
-# accept `IF NOT EXISTS` so reruns are idempotent. pgaudit is configured at
-# the cluster level (shared_preload_libraries); the extension just exposes
-# its functions.
+# Required extensions for the public schema. Reruns are idempotent.
+# pgstac (imagery module, later prompt) and pgaudit (cluster-level audit,
+# replaced by triggers per data_model § 13.3) are intentionally NOT here —
+# they are added by their own migrations once those modules ship.
 _EXTENSIONS = (
     "pgcrypto",
     "citext",
     "postgis",
     "timescaledb",
-    # pgstac is created from its own schema by the pgstac image; do it here
-    # so a fresh dev cluster works without extra steps.
-    "pgstac",
-    "pgaudit",
 )
 
 # uuid_generate_v7 — RFC 9562 draft 04 layout. Postgres 17 will ship a
@@ -86,9 +82,6 @@ $$;
 
 def upgrade() -> None:
     for ext in _EXTENSIONS:
-        # pgstac/pgaudit may be unavailable on developer machines; allow opting
-        # out via a session GUC for local-only environments. CI runs with all
-        # extensions present.
         op.execute(f'CREATE EXTENSION IF NOT EXISTS "{ext}"')
     op.execute(_UUID_V7_FN)
     op.execute(_TOUCH_FN)
