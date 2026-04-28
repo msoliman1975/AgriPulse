@@ -411,9 +411,7 @@ def downgrade() -> None:
     op.drop_index("ix_farm_scopes_membership_active", table_name="farm_scopes")
     op.drop_index("uq_farm_scopes_active", table_name="farm_scopes")
     op.drop_table("farm_scopes")
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_single_tenant_owner ON public.tenant_role_assignments"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_single_tenant_owner ON public.tenant_role_assignments")
     op.execute("DROP FUNCTION IF EXISTS public.check_single_tenant_owner()")
     op.drop_index("uq_tenant_role_assignments_active", table_name="tenant_role_assignments")
     op.drop_table("tenant_role_assignments")
@@ -422,9 +420,7 @@ def downgrade() -> None:
     )
     op.drop_index("ix_tenant_memberships_tenant_status", table_name="tenant_memberships")
     op.drop_table("tenant_memberships")
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_user_preferences_updated_at ON public.user_preferences"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_user_preferences_updated_at ON public.user_preferences")
     op.drop_table("user_preferences")
     op.execute("DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users")
     op.drop_index("ix_users_status_active", table_name="users")

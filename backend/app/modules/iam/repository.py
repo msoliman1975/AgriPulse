@@ -31,9 +31,7 @@ class UserRepository:
     async def get_preferences(self, user_id: UUID) -> UserPreferences | None:
         return await self._session.get(UserPreferences, user_id)
 
-    async def get_platform_roles(
-        self, user_id: UUID
-    ) -> Sequence[PlatformRoleAssignment]:
+    async def get_platform_roles(self, user_id: UUID) -> Sequence[PlatformRoleAssignment]:
         stmt = select(PlatformRoleAssignment).where(
             PlatformRoleAssignment.user_id == user_id,
             PlatformRoleAssignment.revoked_at.is_(None),

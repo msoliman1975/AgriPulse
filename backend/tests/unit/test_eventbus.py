@@ -73,7 +73,9 @@ def test_async_subscriber_dispatches_via_dispatcher() -> None:
     assert payload["name"] == "x"
 
 
-def test_async_without_dispatcher_warns_but_does_not_raise(caplog: pytest.LogCaptureFixture) -> None:
+def test_async_without_dispatcher_warns_but_does_not_raise(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     bus = EventBus()
 
     @bus.subscribe(SampleCreatedV1, mode="async")

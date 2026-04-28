@@ -11,7 +11,7 @@ ambient session is on `public`, e.g., from the tenancy admin endpoint).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -68,30 +68,27 @@ class AuditServiceImpl:
             actor_kind = "system"
 
         event_id = uuid7()
-        when = datetime.now(timezone.utc)
+        when = datetime.now(UTC)
 
         factory = AsyncSessionLocal()
-        async with factory() as session:
-            async with session.begin():
-                await session.execute(
-                    text(f"SET LOCAL search_path TO {safe_schema}, public")
+        async with factory() as session, session.begin():
+            await session.execute(text(f"SET LOCAL search_path TO {safe_schema}, public"))
+            session.add(
+                AuditEvent(
+                    time=when,
+                    id=event_id,
+                    event_type=event_type,
+                    actor_user_id=actor_user_id,
+                    actor_kind=actor_kind,
+                    correlation_id=correlation_id,
+                    subject_kind=subject_kind,
+                    subject_id=subject_id,
+                    farm_id=farm_id,
+                    details=details,
+                    client_ip=client_ip,
+                    user_agent=user_agent,
                 )
-                session.add(
-                    AuditEvent(
-                        time=when,
-                        id=event_id,
-                        event_type=event_type,
-                        actor_user_id=actor_user_id,
-                        actor_kind=actor_kind,
-                        correlation_id=correlation_id,
-                        subject_kind=subject_kind,
-                        subject_id=subject_id,
-                        farm_id=farm_id,
-                        details=details,
-                        client_ip=client_ip,
-                        user_agent=user_agent,
-                    )
-                )
+            )
 
         self._log.info(
             "audit_recorded",
@@ -121,4 +118,4 @@ def set_audit_service(impl: AuditService | None) -> None:
 
 # AsyncSession imported only to keep type-checkers happy when the
 # Protocol type-hints reference it indirectly.
-_ = AsyncSession  # noqa: B015
+_ = AsyncSession

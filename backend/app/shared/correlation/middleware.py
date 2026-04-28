@@ -18,7 +18,8 @@ import uuid
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
-from opentelemetry import baggage, context as otel_context
+from opentelemetry import baggage
+from opentelemetry import context as otel_context
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, unbind_contextvars
 

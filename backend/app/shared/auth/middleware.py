@@ -30,9 +30,8 @@ from app.shared.auth.context import (
 from app.shared.auth.jwt import InvalidTokenError, JWTValidator, get_default_validator
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Iterable
+    from collections.abc import Iterable
 
-    from starlette.responses import Response
     from starlette.types import ASGIApp
 
 
@@ -223,4 +222,4 @@ def get_current_context(request: Request) -> RequestContext:
 
 
 # Suppress an unused-import warning when running with strict mypy.
-_ = get_settings  # noqa: F841
+_ = get_settings

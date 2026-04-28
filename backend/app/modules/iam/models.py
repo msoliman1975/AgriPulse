@@ -36,12 +36,8 @@ class User(Base, TimestampedMixin):
     full_name: Mapped[str] = mapped_column(Text, nullable=False)
     phone: Mapped[str | None] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'active'")
-    )
-    last_login_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class UserPreferences(Base):
@@ -54,12 +50,8 @@ class UserPreferences(Base):
         primary_key=True,
     )
     language: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'en'"))
-    numerals: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'western'")
-    )
-    unit_system: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'feddan'")
-    )
+    numerals: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'western'"))
+    unit_system: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'feddan'"))
     timezone: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'Africa/Cairo'")
     )
@@ -96,15 +88,11 @@ class TenantMembership(Base, TimestampedMixin):
         ForeignKey("public.tenants.id", ondelete="CASCADE"),
         nullable=False,
     )
-    status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'active'")
-    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
     invited_by: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("public.users.id"), nullable=True
     )
-    joined_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class TenantRoleAssignment(Base):
@@ -126,9 +114,7 @@ class TenantRoleAssignment(Base):
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class FarmScope(Base):
@@ -151,9 +137,7 @@ class FarmScope(Base):
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PlatformRoleAssignment(Base):
@@ -175,6 +159,4 @@ class PlatformRoleAssignment(Base):
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

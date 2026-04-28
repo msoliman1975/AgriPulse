@@ -72,9 +72,7 @@ def test_jwks_cache_raises_when_key_still_missing_after_refresh() -> None:
 
 
 def test_jwks_cache_raises_on_empty_jwks() -> None:
-    cache = JWKSCache(
-        "https://kc/jwks", ttl_seconds=3600, http_client=_fake_client({"keys": []})
-    )
+    cache = JWKSCache("https://kc/jwks", ttl_seconds=3600, http_client=_fake_client({"keys": []}))
     with pytest.raises(InvalidTokenError, match="JWKS is empty"):
         cache.get_key("anything")
 
@@ -85,9 +83,7 @@ def test_validator_rejects_token_without_kid_header() -> None:
         ttl_seconds=3600,
         http_client=_fake_client({"keys": [{"kid": "k1", "kty": "RSA", "n": "x", "e": "AQAB"}]}),
     )
-    validator = JWTValidator(
-        issuer="https://kc/realms/r", audience="api", jwks_cache=cache
-    )
+    validator = JWTValidator(issuer="https://kc/realms/r", audience="api", jwks_cache=cache)
     # A garbage string fails before we ever look up the key — we just
     # care that any failure is wrapped as InvalidTokenError.
     with pytest.raises(InvalidTokenError):

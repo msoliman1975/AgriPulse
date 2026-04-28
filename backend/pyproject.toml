@@ -102,6 +102,10 @@ ignore = [
   "PLR0913", # too-many-arguments (FastAPI deps make this noisy)
   "S101",    # asserts are fine in tests
   "S104",    # binding 0.0.0.0 is fine in containers
+  "B008",    # Depends(...) in default values is the FastAPI idiom
+  "PLW0603", # module-level singletons (engine, validator) need `global`
+  "RUF012",  # SQLAlchemy ORM __table_args__ is a mutable class attr by design
+  "PLR2004", # magic-value comparisons; too noisy on short numeric checks
 ]
 
 [tool.ruff.lint.per-file-ignores]

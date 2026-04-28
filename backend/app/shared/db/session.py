@@ -95,7 +95,7 @@ async def dispose_engine() -> None:
             _engine = None
 
 
-def AsyncSessionLocal() -> async_sessionmaker[AsyncSession]:  # noqa: N802
+def AsyncSessionLocal() -> async_sessionmaker[AsyncSession]:
     """Session factory. Lower-cased call sites match SQLAlchemy idioms."""
     return async_sessionmaker(
         bind=get_engine(),
@@ -124,10 +124,9 @@ async def _set_search_path(session: AsyncSession, tenant_schema: str | None) -> 
 
 async def _yield_session(tenant_schema: str | None) -> AsyncIterator[AsyncSession]:
     factory = AsyncSessionLocal()
-    async with factory() as session:
-        async with session.begin():
-            await _set_search_path(session, tenant_schema)
-            yield session
+    async with factory() as session, session.begin():
+        await _set_search_path(session, tenant_schema)
+        yield session
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:

@@ -55,8 +55,7 @@ class Settings(BaseSettings):
     keycloak_issuer: str = "https://keycloak.dev.missionagre.local/realms/missionagre"
     keycloak_audience: str = "missionagre-api"
     keycloak_jwks_url: str = (
-        "https://keycloak.dev.missionagre.local/realms/missionagre"
-        "/protocol/openid-connect/certs"
+        "https://keycloak.dev.missionagre.local/realms/missionagre" "/protocol/openid-connect/certs"
     )
     keycloak_jwks_cache_ttl_seconds: int = 3600
 

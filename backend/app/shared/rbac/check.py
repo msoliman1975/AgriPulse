@@ -83,9 +83,7 @@ class CapabilityRegistry:
         )
 
     @classmethod
-    def from_yaml(
-        cls, capabilities_yaml: str, role_capabilities_yaml: str
-    ) -> CapabilityRegistry:
+    def from_yaml(cls, capabilities_yaml: str, role_capabilities_yaml: str) -> CapabilityRegistry:
         caps_doc = yaml.safe_load(capabilities_yaml) or {}
         roles_doc = yaml.safe_load(role_capabilities_yaml) or {}
 
@@ -100,9 +98,7 @@ class CapabilityRegistry:
         compiled: dict[str, frozenset[str]] = {}
         for role_name, body in role_caps_raw.items():
             if not isinstance(body, dict):
-                raise ValueError(
-                    f"role_capabilities.yaml: '{role_name}' must be a mapping"
-                )
+                raise ValueError(f"role_capabilities.yaml: '{role_name}' must be a mapping")
             caps = body.get("capabilities") or []
             if not isinstance(caps, list):
                 raise ValueError(
@@ -180,9 +176,7 @@ def has_capability(
 
     Pass an explicit `registry` from tests; production code lets it default.
     """
-    return (registry or get_default_registry()).has_capability(
-        context, capability, farm_id=farm_id
-    )
+    return (registry or get_default_registry()).has_capability(context, capability, farm_id=farm_id)
 
 
 def requires_capability(
@@ -213,9 +207,7 @@ def requires_capability(
     ) -> RequestContext:
         farm_id: UUID | None = None
         if farm_id_param is not None:
-            raw = request.path_params.get(farm_id_param) or request.query_params.get(
-                farm_id_param
-            )
+            raw = request.path_params.get(farm_id_param) or request.query_params.get(farm_id_param)
             if raw is not None:
                 try:
                     farm_id = UUID(str(raw))

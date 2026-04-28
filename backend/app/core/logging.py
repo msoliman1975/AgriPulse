@@ -57,7 +57,11 @@ def configure_logging() -> None:
         StackInfoRenderer(),
         format_exc_info,
         CallsiteParameterAdder(
-            parameters={CallsiteParameter.MODULE, CallsiteParameter.FUNC_NAME, CallsiteParameter.LINENO}
+            parameters={
+                CallsiteParameter.MODULE,
+                CallsiteParameter.FUNC_NAME,
+                CallsiteParameter.LINENO,
+            }
         ),
     ]
 

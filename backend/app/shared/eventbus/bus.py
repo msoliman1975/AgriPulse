@@ -59,9 +59,7 @@ class CeleryDispatcher(Protocol):
     handler by ``handler_name`` and runs it on the deserialized payload.
     """
 
-    def __call__(
-        self, *, handler_name: str, event_name: str, payload: dict[str, Any]
-    ) -> None: ...
+    def __call__(self, *, handler_name: str, event_name: str, payload: dict[str, Any]) -> None: ...
 
 
 HandlerCallable = Callable[[Any], None]
@@ -120,18 +118,14 @@ class EventBus:
     ) -> None:
         """Explicit registration. Equivalent to the decorator."""
         if not hasattr(event_cls, "event_name"):
-            raise TypeError(
-                f"{event_cls.__name__} must declare a class-level 'event_name'"
-            )
+            raise TypeError(f"{event_cls.__name__} must declare a class-level 'event_name'")
         if mode == "async" and inspect.iscoroutinefunction(handler):
             raise TypeError(
                 f"Async-mode handler {_qualname(handler)} must be a sync "
                 "function — Celery executes handlers synchronously in a worker."
             )
 
-        self._handlers.setdefault(event_cls, []).append(
-            Subscription(handler=handler, mode=mode)
-        )
+        self._handlers.setdefault(event_cls, []).append(Subscription(handler=handler, mode=mode))
         self._events_by_name[event_cls.event_name] = event_cls
         self._handlers_by_name[_qualname(handler)] = handler
 

@@ -64,9 +64,7 @@ async def test_create_tenant_bootstraps_schema_and_audits(
     # Tenant schema exists with the audit_events hypertable.
     schema_exists = (
         await admin_session.execute(
-            text(
-                "SELECT count(*) FROM information_schema.schemata WHERE schema_name = :s"
-            ),
+            text("SELECT count(*) FROM information_schema.schemata WHERE schema_name = :s"),
             {"s": result.schema_name},
         )
     ).scalar_one()

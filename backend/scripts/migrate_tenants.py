@@ -79,9 +79,7 @@ def _migrate_one(tenant: TenantRecord, *, dry_run: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", help="Migrate just this tenant (by slug).")
-    parser.add_argument(
-        "--dry-run", action="store_true", help="List actions without executing."
-    )
+    parser.add_argument("--dry-run", action="store_true", help="List actions without executing.")
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -109,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         try:
             _migrate_one(tenant, dry_run=args.dry_run)
-        except Exception as exc:  # noqa: BLE001 — we want to keep going
+        except Exception as exc:
             logger.error("failed: %s — %s", tenant.slug, exc)
             failures.append((tenant, exc))
 

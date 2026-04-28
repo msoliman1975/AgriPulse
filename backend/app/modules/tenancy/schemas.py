@@ -15,7 +15,7 @@ _SLUG_RE = re.compile(r"^[a-z0-9-]{3,32}$")
 class CreateTenantRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    slug: str = Field(description="URL-safe identifier, 3–32 chars, [a-z0-9-].")
+    slug: str = Field(description="URL-safe identifier, 3-32 chars, [a-z0-9-].")
     name: str = Field(min_length=1, max_length=255, description="Display name.")
     contact_email: EmailStr
     legal_name: str | None = None

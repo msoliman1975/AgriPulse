@@ -20,11 +20,10 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 
+import app
 from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.shared.db.session import sanitize_tenant_schema
-
-import app
 
 # Repo-root alembic.ini; `app/__init__.py` lives at backend/app/, so two
 # parents up (../..) lands on backend/ where alembic.ini sits.

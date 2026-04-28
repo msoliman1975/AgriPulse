@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -82,7 +82,7 @@ class TenantRepository:
         sub = TenantSubscription(
             tenant_id=tenant_id,
             tier=tier,
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             is_current=True,
             feature_flags=feature_flags or {},
             created_by=actor_user_id,

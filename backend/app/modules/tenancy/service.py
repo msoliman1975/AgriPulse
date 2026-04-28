@@ -8,7 +8,7 @@ Other modules depend on the `TenantService` Protocol, never on
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -40,7 +40,7 @@ class TenantService(Protocol):
         initial_tier: str = "free",
         actor_user_id: UUID | None = None,
         correlation_id: UUID | None = None,
-    ) -> "TenantCreatedResult": ...
+    ) -> TenantCreatedResult: ...
 
 
 class TenantCreatedResult:
@@ -145,9 +145,7 @@ class TenantServiceImpl:
             default_unit_system=default_unit_system,
             actor_user_id=actor_user_id,
         )
-        await self._repo.insert_settings(
-            tenant_id=tenant_id, actor_user_id=actor_user_id
-        )
+        await self._repo.insert_settings(tenant_id=tenant_id, actor_user_id=actor_user_id)
         await self._repo.insert_subscription(
             tenant_id=tenant_id,
             tier=initial_tier,
@@ -180,7 +178,7 @@ class TenantServiceImpl:
                 slug=slug,
                 schema_name=schema_name,
                 contact_email=contact_email,
-                created_at=tenant.created_at or datetime.now(timezone.utc),
+                created_at=tenant.created_at or datetime.now(UTC),
                 actor_user_id=actor_user_id,
             )
         )
@@ -201,7 +199,7 @@ class TenantServiceImpl:
             default_locale=default_locale,
             default_unit_system=default_unit_system,
             status=tenant.status,
-            created_at=tenant.created_at or datetime.now(timezone.utc),
+            created_at=tenant.created_at or datetime.now(UTC),
         )
 
 

@@ -33,9 +33,7 @@ _log = get_logger(__name__)
 
 
 @shared_task(name="eventbus.dispatch", bind=False, ignore_result=True)
-def eventbus_dispatch(
-    handler_name: str, event_name: str, payload: dict[str, Any]
-) -> None:
+def eventbus_dispatch(handler_name: str, event_name: str, payload: dict[str, Any]) -> None:
     """Re-hydrate an event and run a single async-mode subscriber."""
     bus = get_default_bus()
     event_cls = bus.resolve_event(event_name)
@@ -48,9 +46,7 @@ def eventbus_dispatch(
     )
 
 
-def celery_dispatcher(
-    *, handler_name: str, event_name: str, payload: dict[str, Any]
-) -> None:
+def celery_dispatcher(*, handler_name: str, event_name: str, payload: dict[str, Any]) -> None:
     """Implements the CeleryDispatcher Protocol against `eventbus_dispatch`.
 
     Wired into the bus from the app/celery startup code via

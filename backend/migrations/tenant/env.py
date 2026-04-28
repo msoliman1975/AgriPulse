@@ -19,12 +19,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool, text
 
-from app.core.settings import get_settings
-from app.shared.db.base import Base
-
 # Register every tenant-schema ORM model with `Base.metadata` so future
 # `--autogenerate` runs see them.
-import app.modules.audit.models  # noqa: E402, F401
+import app.modules.audit.models
+from app.core.settings import get_settings
+from app.shared.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:
@@ -40,9 +39,7 @@ def _resolve_schema() -> str:
     x_args = context.get_x_argument(as_dictionary=True)
     schema = x_args.get("schema")
     if not schema:
-        raise RuntimeError(
-            "tenant migrations require -x schema=tenant_<uuid> on the CLI"
-        )
+        raise RuntimeError("tenant migrations require -x schema=tenant_<uuid> on the CLI")
     if not _SCHEMA_RE.fullmatch(schema):
         raise RuntimeError(f"Invalid tenant schema name: {schema!r}")
     return schema

@@ -4,8 +4,8 @@ from app.shared.eventbus.bus import (
     CeleryDispatcher,
     Event,
     EventBus,
-    Subscription,
     SubscriberMode,
+    Subscription,
     get_default_bus,
 )
 

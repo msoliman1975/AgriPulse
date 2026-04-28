@@ -25,17 +25,11 @@ async def test_tenant_a_cannot_see_tenant_b_audit_via_search_path(
     admin_session: AsyncSession,
 ) -> None:
     service = get_tenant_service(admin_session)
-    a = await service.create_tenant(
-        slug="iso-a", name="A", contact_email="a@a.test"
-    )
-    b = await service.create_tenant(
-        slug="iso-b", name="B", contact_email="b@b.test"
-    )
+    a = await service.create_tenant(slug="iso-a", name="A", contact_email="a@a.test")
+    b = await service.create_tenant(slug="iso-b", name="B", contact_email="b@b.test")
 
     # Insert one extra audit row in B's schema.
-    await admin_session.execute(
-        text(f"SET LOCAL search_path TO {b.schema_name}, public")
-    )
+    await admin_session.execute(text(f"SET LOCAL search_path TO {b.schema_name}, public"))
     await admin_session.execute(
         text(
             "INSERT INTO audit_events ("
@@ -48,18 +42,12 @@ async def test_tenant_a_cannot_see_tenant_b_audit_via_search_path(
 
     # Open a fresh session for A and pin its search_path.
     factory = AsyncSessionLocal()
-    async with factory() as session:
-        async with session.begin():
+    async with factory() as session, session.begin():
+        await session.execute(text(f"SET LOCAL search_path TO {a.schema_name}, public"))
+        count_a = (
             await session.execute(
-                text(f"SET LOCAL search_path TO {a.schema_name}, public")
+                text("SELECT count(*) FROM audit_events " "WHERE event_type = 'test.b_only'")
             )
-            count_a = (
-                await session.execute(
-                    text(
-                        "SELECT count(*) FROM audit_events "
-                        "WHERE event_type = 'test.b_only'"
-                    )
-                )
-            ).scalar_one()
+        ).scalar_one()
 
     assert count_a == 0  # A's audit_events does not contain B's row

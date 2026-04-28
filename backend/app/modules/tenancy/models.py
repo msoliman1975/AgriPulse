@@ -36,12 +36,8 @@ class Tenant(Base, TimestampedMixin):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     legal_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     tax_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    country_code: Mapped[str] = mapped_column(
-        CHAR(2), nullable=False, server_default=text("'EG'")
-    )
-    default_locale: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'en'")
-    )
+    country_code: Mapped[str] = mapped_column(CHAR(2), nullable=False, server_default=text("'EG'"))
+    default_locale: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'en'"))
     default_timezone: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'Africa/Cairo'")
     )
@@ -57,9 +53,7 @@ class Tenant(Base, TimestampedMixin):
     logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     branding_color: Mapped[str | None] = mapped_column(Text, nullable=True)
     schema_name: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'active'")
-    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
 
 
 class TenantSubscription(Base, TimestampedMixin):
@@ -79,9 +73,7 @@ class TenantSubscription(Base, TimestampedMixin):
     tier: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    is_current: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("FALSE")
-    )
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     feature_flags: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")

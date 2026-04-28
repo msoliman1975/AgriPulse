@@ -62,8 +62,7 @@ class UserServiceImpl:
             last_login_at=user.last_login_at,
             preferences=prefs_resp,
             platform_roles=[
-                PlatformRoleResponse(role=r.role, granted_at=r.granted_at)
-                for r in platform_roles
+                PlatformRoleResponse(role=r.role, granted_at=r.granted_at) for r in platform_roles
             ],
             tenant_memberships=[
                 TenantMembershipResponse(
@@ -73,16 +72,13 @@ class UserServiceImpl:
                     status=membership.status,
                     joined_at=membership.joined_at,
                     tenant_roles=[
-                        TenantRoleResponse(role=r.role, granted_at=r.granted_at)
-                        for r in roles
+                        TenantRoleResponse(role=r.role, granted_at=r.granted_at) for r in roles
                     ],
                 )
                 for membership, tenant, roles in memberships
             ],
             farm_scopes=[
-                FarmScopeResponse(
-                    farm_id=s.farm_id, role=s.role, granted_at=s.granted_at
-                )
+                FarmScopeResponse(farm_id=s.farm_id, role=s.role, granted_at=s.granted_at)
                 for s in farm_scopes
             ],
         )

@@ -8,7 +8,6 @@ covered by a separate Keycloak-container test in a later prompt.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -17,7 +16,6 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
-from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.modules.iam.router import router as iam_router
