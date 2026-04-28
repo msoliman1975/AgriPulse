@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel an in-progress run when a new commit is pushed to the same PR/branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          # No `cache: pip` here — it requires a requirements.txt or
+          # pyproject.toml to exist to hash for the cache key. Backend's
+          # pyproject.toml lands in PR 2; the pre-commit env cache below
+          # is the one that actually matters at this stage.
+
+      - name: Install pre-commit
+        run: pip install pre-commit==3.8.0
+
+      - name: Restore pre-commit env cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  # Placeholder jobs so branch-protection required-checks can be configured
+  # in PR 5 with the names already wired. Each will be replaced with real
+  # work in the corresponding later PR.
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "backend job is wired up in PR 2"
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "frontend job is wired up in PR 3"
+
+  helm:
+    name: helm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "helm job is wired up in PR 4"
+
+  containers:
+    name: containers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "container build job is wired up in PR 5"

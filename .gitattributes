@@ -1,0 +1,44 @@
+# Default: normalize text files to LF in the repo on commit.
+* text=auto eol=lf
+
+# Explicit text files (LF).
+*.py        text eol=lf
+*.pyi       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.toml      text eol=lf
+*.ini       text eol=lf
+*.md        text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.scss      text eol=lf
+*.sql       text eol=lf
+*.sh        text eol=lf
+*.tf        text eol=lf
+*.tfvars    text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+
+# Windows-only — never normalize.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary — never diff or merge.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       text eol=lf
+*.pdf       binary
+*.tif       binary
+*.tiff      binary
+*.zip       binary
+*.gz        binary
+*.tgz       binary
