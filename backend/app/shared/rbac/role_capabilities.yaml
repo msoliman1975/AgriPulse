@@ -10,7 +10,6 @@
 # is reserved for PlatformAdmin.
 
 roles:
-
   # ---- Platform-scoped ------------------------------------------------
 
   PlatformAdmin:

@@ -130,6 +130,10 @@ disallow_any_generics = true
 ignore_missing_imports = false
 plugins = ["pydantic.mypy"]
 exclude = ["migrations/", "tests/", "build/", "dist/"]
+# structlog and jose APIs leak Any across many calls; rather than litter
+# the codebase with type: ignore at every wrapper, drop the no-any-return
+# check globally. The strict-mode signature checks remain.
+disable_error_code = ["no-any-return"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -138,6 +142,8 @@ module = [
   "prometheus_fastapi_instrumentator.*",
   "opentelemetry.*",
   "testcontainers.*",
+  "structlog.*",
+  "jose.*",
 ]
 ignore_missing_imports = true
 

@@ -20,7 +20,6 @@
 # See ARCHITECTURE.md § 7 and data_model.md § 4.
 
 capabilities:
-
   # --- Platform admin --------------------------------------------------
   platform.read:
     description: Read platform-wide resources (tenant list, system status).

@@ -32,7 +32,7 @@ from app.shared.eventbus import get_default_bus
 _log = get_logger(__name__)
 
 
-@shared_task(name="eventbus.dispatch", bind=False, ignore_result=True)
+@shared_task(name="eventbus.dispatch", bind=False, ignore_result=True)  # type: ignore[misc]
 def eventbus_dispatch(handler_name: str, event_name: str, payload: dict[str, Any]) -> None:
     """Re-hydrate an event and run a single async-mode subscriber."""
     bus = get_default_bus()
