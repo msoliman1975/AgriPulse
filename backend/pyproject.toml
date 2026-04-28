@@ -173,4 +173,332 @@ exclude_lines = [
 ]
 
 # --- import-linter ----------------------------------------------------------
-# Contracts live in .importlinter at backend/ root for separation.
+# Module boundaries per ARCHITECTURE.md § 6.1: each module exposes only
+# `service.py` and `events.py`; all other submodules are private. Cross-
+# module imports must go through the service Protocol.
+
+[tool.importlinter]
+root_packages = ["app"]
+
+[[tool.importlinter.contracts]]
+name = "shared and core cannot import domain modules"
+type = "forbidden"
+source_modules = ["app.shared", "app.core"]
+forbidden_modules = ["app.modules"]
+
+# One contract per module: forbid every other module from importing this
+# module's private submodules (repository, models, router, schemas,
+# bootstrap, internal helpers). `service` and `events` are public.
+
+[[tool.importlinter.contracts]]
+name = "tenancy internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.tenancy.repository",
+  "app.modules.tenancy.models",
+  "app.modules.tenancy.router",
+  "app.modules.tenancy.schemas",
+  "app.modules.tenancy.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "iam internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.iam.repository",
+  "app.modules.iam.models",
+  "app.modules.iam.router",
+  "app.modules.iam.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "audit internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.audit.models",
+]
+
+# The remaining 10 modules are placeholders today; the contracts still
+# apply so any later code that violates them fails CI on the first push.
+
+[[tool.importlinter.contracts]]
+name = "farms internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.farms.repository",
+  "app.modules.farms.models",
+  "app.modules.farms.router",
+  "app.modules.farms.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "imagery internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.imagery.repository",
+  "app.modules.imagery.models",
+  "app.modules.imagery.router",
+  "app.modules.imagery.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "indices internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.indices.repository",
+  "app.modules.indices.models",
+  "app.modules.indices.router",
+  "app.modules.indices.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "weather internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.weather.repository",
+  "app.modules.weather.models",
+  "app.modules.weather.router",
+  "app.modules.weather.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "signals internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.signals.repository",
+  "app.modules.signals.models",
+  "app.modules.signals.router",
+  "app.modules.signals.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "alerts internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.alerts.repository",
+  "app.modules.alerts.models",
+  "app.modules.alerts.router",
+  "app.modules.alerts.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "recommendations internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.recommendations.repository",
+  "app.modules.recommendations.models",
+  "app.modules.recommendations.router",
+  "app.modules.recommendations.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "notifications internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.notifications.repository",
+  "app.modules.notifications.models",
+  "app.modules.notifications.router",
+  "app.modules.notifications.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "analytics internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.analytics.repository",
+  "app.modules.analytics.models",
+  "app.modules.analytics.router",
+  "app.modules.analytics.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "forecasting internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+]
+forbidden_modules = [
+  "app.modules.forecasting.repository",
+  "app.modules.forecasting.models",
+  "app.modules.forecasting.router",
+  "app.modules.forecasting.schemas",
+]
