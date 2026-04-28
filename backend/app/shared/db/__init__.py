@@ -1,6 +1,7 @@
 """Database session management, base ORM, and column conventions."""
 
 from app.shared.db.base import Base, TimestampedMixin, mapper_registry, naming_convention
+from app.shared.db.ids import schema_name_for, uuid7
 from app.shared.db.session import (
     AsyncSessionLocal,
     Engine,
@@ -23,4 +24,6 @@ __all__ = [
     "mapper_registry",
     "naming_convention",
     "sanitize_tenant_schema",
+    "schema_name_for",
+    "uuid7",
 ]

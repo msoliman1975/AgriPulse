@@ -66,8 +66,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
 
-    # NOTE: module routers are registered in subsequent commits within
-    # PR 2 once modules/ exist.
+    _register_module_routers(app)
 
     install_exception_handlers(app)
     instrument_app(app)
@@ -78,3 +77,13 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": settings.service_name}
 
     return app
+
+
+def _register_module_routers(app: FastAPI) -> None:
+    """Mount each domain module's router. Imports are local to keep the
+    factory's import graph thin in environments that do not need the
+    full app (e.g., a Celery worker importing only `app.core.settings`).
+    """
+    from app.modules.tenancy.router import router as tenancy_router
+
+    app.include_router(tenancy_router)

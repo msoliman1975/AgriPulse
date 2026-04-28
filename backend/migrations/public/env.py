@@ -14,9 +14,10 @@ from sqlalchemy import engine_from_config, pool
 from app.core.settings import get_settings
 from app.shared.db.base import Base
 
-# Public-schema ORM model imports are added by the modules that own them
-# (tenancy, iam) — see migrations/public/README. Hand-written migrations
-# do not need them; they are required only for `--autogenerate`.
+# Register every public-schema ORM model with `Base.metadata` so future
+# `--autogenerate` runs see them. Hand-written migrations do not need
+# this, but it is cheap to keep the registry warm.
+import app.modules.tenancy.models  # noqa: E402, F401
 
 config = context.config
 if config.config_file_name is not None:
