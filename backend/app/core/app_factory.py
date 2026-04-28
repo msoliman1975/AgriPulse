@@ -19,6 +19,7 @@ from app.core.errors import install_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.observability import configure_tracing, instrument_app
 from app.core.settings import get_settings
+from app.shared.correlation import CorrelationIdMiddleware
 
 
 @asynccontextmanager
@@ -57,8 +58,12 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
-    # NOTE: correlation/auth middlewares + module routers are registered in
-    # subsequent commits within PR 2 once shared/ and modules/ exist.
+    # Outermost custom middleware so every request — including those that
+    # 401 in auth — has a correlation ID bound for logs and traces.
+    app.add_middleware(CorrelationIdMiddleware)
+
+    # NOTE: auth middleware + module routers are registered in subsequent
+    # commits within PR 2 once shared/auth and modules/ exist.
 
     install_exception_handlers(app)
     instrument_app(app)
