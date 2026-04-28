@@ -42,15 +42,57 @@ jobs:
       - name: Run pre-commit
         run: pre-commit run --all-files --show-diff-on-failure
 
-  # Placeholder jobs so branch-protection required-checks can be configured
-  # in PR 5 with the names already wired. Each will be replaced with real
-  # work in the corresponding later PR.
   backend:
     name: backend
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
     steps:
-      - run: echo "backend job is wired up in PR 2"
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.4"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Create venv and install dependencies
+        run: |
+          uv venv .venv
+          # uv sync needs a lockfile; without one we resolve from pyproject.
+          if [ -f uv.lock ]; then
+            uv sync --frozen --extra dev
+          else
+            uv pip install --python .venv/bin/python -e ".[dev]"
+          fi
+
+      - name: ruff
+        run: uv run --python .venv/bin/python ruff check .
+
+      - name: black --check
+        run: uv run --python .venv/bin/python black --check .
+
+      - name: mypy
+        run: uv run --python .venv/bin/python mypy app workers
+
+      - name: import-linter
+        run: uv run --python .venv/bin/python lint-imports
+
+      - name: pytest unit
+        run: uv run --python .venv/bin/python pytest tests/unit -m "not integration"
+
+      - name: pytest integration
+        # Requires Docker daemon for testcontainers. ubuntu-24.04 ships
+        # Docker; we just need to be able to talk to it.
+        run: uv run --python .venv/bin/python pytest tests/integration -m integration
+        env:
+          # testcontainers occasionally needs the runtime to find its
+          # ryuk reaper image; keep defaults.
+          TESTCONTAINERS_RYUK_DISABLED: "false"
 
   frontend:
     name: frontend

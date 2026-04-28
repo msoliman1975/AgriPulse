@@ -55,8 +55,9 @@ repos:
           - sqlalchemy>=2
           - types-PyYAML
         args: [--config-file=backend/pyproject.toml]
-        # Don't fail PR 1 — backend/ doesn't exist yet. PR 2 wires this up.
-        stages: [manual]
+        # Run on push, not on every commit — type-checking on a partial
+        # tree is noisy.
+        stages: [pre-push]
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
