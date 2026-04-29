@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 5
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
           # Need history to find the commit the CI run was for.
