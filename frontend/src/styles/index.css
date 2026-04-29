@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: theme("colors.sand.50");
+    color: theme("colors.slate.800");
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    border-radius: theme("borderRadius.lg");
+    background-color: #ffffff;
+    box-shadow: theme("boxShadow.card");
+    padding: theme("spacing.6");
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: theme("borderRadius.md");
+    padding: theme("spacing.2") theme("spacing.4");
+    font-size: theme("fontSize.sm");
+    font-weight: 500;
+    transition: background-color 150ms ease;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    background-color: theme("colors.brand.600");
+    color: #ffffff;
+  }
+
+  .btn-primary:hover {
+    background-color: theme("colors.brand.700");
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: theme("colors.slate.700");
+  }
+
+  .btn-ghost:hover {
+    background-color: theme("colors.slate.100");
+  }
+}

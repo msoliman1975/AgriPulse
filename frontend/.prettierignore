@@ -1,0 +1,6 @@
+# Generated / managed by tooling — let the tool own the format.
+pnpm-lock.yaml
+package.json
+node_modules
+dist
+coverage

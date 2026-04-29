@@ -42,7 +42,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-After PR 2 lands, the backend `pyproject.toml` will pin `uv` as the package manager. After PR 3, `pnpm` is required for the frontend.
+After PR 2 lands, the backend `pyproject.toml` will pin `uv` as the package manager. After PR 3, `pnpm` (via `corepack enable`) is required for the frontend — see [`frontend/README.md`](frontend/README.md).
 
 ## Local services (Postgres, Redis, Keycloak, MinIO)
 
