@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VIRTUAL_ENV=/opt/venv
 
 # uv installer pins are kept here so reproducible builds don't drift.
-COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /usr/local/bin/
 
 WORKDIR /build
 COPY pyproject.toml ./

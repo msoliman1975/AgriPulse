@@ -1,0 +1,49 @@
+name: security
+
+on:
+  pull_request:
+    branches: [main]
+
+# This workflow surfaces dependency vulnerabilities at PR time and is
+# distinct from the broader `ci` pipeline so a CVE-only failure is easy
+# to spot and triage. It does NOT block merge yet — once we have a
+# false-positive baseline, flip `fail-on-severity` from `comment` to
+# `high` and add this job to the required-checks list.
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: dependency-review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Review dependencies introduced by this PR
+        uses: actions/dependency-review-action@v4
+        with:
+          # Block merge on `high`/`critical` CVEs once the baseline is clean.
+          # For now, comment-only so PR authors see the report without
+          # being gated.
+          comment-summary-in-pr: on-failure
+          fail-on-severity: high
+          # First-party + permissive licences. Tighten as we go.
+          allow-licenses: >-
+            MIT,
+            Apache-2.0,
+            BSD-2-Clause,
+            BSD-3-Clause,
+            ISC,
+            CC0-1.0,
+            0BSD,
+            Unlicense,
+            MPL-2.0,
+            Python-2.0,
+            CC-BY-4.0
