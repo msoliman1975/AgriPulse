@@ -1,0 +1,65 @@
+# All Keycloak configuration goes through the bitnami sub-chart's values.
+# We only override what production-shape requires. Defaults that are fine
+# (PodDisruptionBudget, NetworkPolicy, ServiceMonitor) we leave alone.
+
+keycloak:
+  # Two replicas with the standard postgresql sub-chart wiring.
+  replicaCount: 2
+  production: true
+  proxy: edge # Behind NGINX ingress with TLS termination.
+
+  auth:
+    # The bootstrap admin password is created in AWS Secrets Manager and
+    # synced via ExternalSecret; the bitnami chart references the secret
+    # by name through `existingSecret`.
+    existingSecret: missionagre-keycloak-admin
+    passwordSecretKey: admin_password
+
+  # Realm import: bake the missionagre realm into a ConfigMap and mount
+  # it. The same realm we ship in infra/dev/compose.yaml; the staging
+  # and production overlays substitute their own realm export.
+  extraStartupArgs: "--import-realm"
+  extraVolumes:
+    - name: realm-import
+      configMap:
+        name: missionagre-keycloak-realm
+  extraVolumeMounts:
+    - name: realm-import
+      mountPath: /opt/bitnami/keycloak/data/import
+      readOnly: true
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: keycloak.dev.missionagre.local
+    tls: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+  # Use the operator-managed Postgres rather than the bundled bitnami DB.
+  externalDatabase:
+    host: missionagre-pg-rw
+    port: 5432
+    database: keycloak
+    user: keycloak
+    existingSecret: missionagre-keycloak-db
+    existingSecretPasswordKey: password
+  postgresql:
+    enabled: false
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  pdb:
+    create: true
+    minAvailable: 1

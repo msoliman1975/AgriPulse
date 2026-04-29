@@ -1,0 +1,75 @@
+# kube-prometheus-stack overrides. Pre-provisioned dashboards live in
+# infra/argocd/platform-values/grafana-dashboards/ and are mounted into
+# Grafana via additionalConfigMap discovery (label-driven).
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 30GiB
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+grafana:
+  defaultDashboardsTimezone: Africa/Cairo
+  adminPassword: "" # comes via External Secret, not values file
+  admin:
+    existingSecret: missionagre-grafana-admin
+    userKey: username
+    passwordKey: password
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 10Gi
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+    hosts:
+      - grafana.dev.missionagre.local
+    tls:
+      - hosts:
+          - grafana.dev.missionagre.local
+        secretName: missionagre-grafana-tls
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+      searchNamespace: ALL
+
+# Components we don't run (kube-state-metrics + node-exporter we keep).
+kubeApiServer:
+  enabled: true
+kubeControllerManager:
+  enabled: false # not exposed on managed EKS
+kubeScheduler:
+  enabled: false # not exposed on managed EKS
+kubeEtcd:
+  enabled: false # not exposed on managed EKS

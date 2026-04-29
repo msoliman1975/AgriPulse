@@ -1,0 +1,109 @@
+# Default values for the missionagre-shared chart. Per-env overrides live
+# in infra/argocd/overlays/<env>/values.yaml so dev/staging/prod diverge
+# only in things that genuinely differ (domain names, S3 buckets, etc.).
+
+# ---------------------------------------------------------------------------
+# Common labels applied by every templates/_labels.tpl include.
+# ---------------------------------------------------------------------------
+labels:
+  partOf: missionagre
+
+# ---------------------------------------------------------------------------
+# cert-manager ClusterIssuer.
+# ---------------------------------------------------------------------------
+certManager:
+  enabled: true
+  # Two issuers ship by default: Let's Encrypt staging (for development
+  # validation) and prod (used in staging + production envs).
+  acme:
+    email: ops@missionagre.io
+    staging:
+      enabled: true
+      name: letsencrypt-staging
+      server: https://acme-staging-v02.api.letsencrypt.org/directory
+    prod:
+      enabled: true
+      name: letsencrypt-prod
+      server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      # http01 ingress solver via NGINX. Cluster envs that need DNS-01
+      # (wildcard certs) override `solvers` per env.
+      - http01:
+          ingress:
+            class: nginx
+
+# ---------------------------------------------------------------------------
+# External Secrets Operator integration.
+# ---------------------------------------------------------------------------
+# A ClusterSecretStore wired to AWS Secrets Manager; per-service charts
+# emit ExternalSecret resources pointing at it.
+externalSecrets:
+  enabled: true
+  clusterSecretStore:
+    name: aws-secretsmanager
+    region: me-south-1
+    # IRSA role assumed by the ESO controller pod. Created in
+    # infra/terraform/iam.tf and consumed here by name.
+    serviceAccount:
+      name: external-secrets
+      namespace: external-secrets
+
+# ---------------------------------------------------------------------------
+# CloudNativePG Cluster.
+# ---------------------------------------------------------------------------
+postgresCluster:
+  enabled: true
+  name: missionagre-pg
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4-bookworm
+  storage:
+    size: 100Gi
+    storageClass: gp3
+  walStorage:
+    size: 30Gi
+    storageClass: gp3
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 8Gi
+  # Extensions enabled at first init.
+  postInitSQL:
+    - "CREATE EXTENSION IF NOT EXISTS postgis;"
+    - "CREATE EXTENSION IF NOT EXISTS postgis_topology;"
+    - "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+    - "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+    - "CREATE EXTENSION IF NOT EXISTS citext;"
+    - "CREATE EXTENSION IF NOT EXISTS pgaudit;"
+  # Postgres-wide config; tenant migrations are in
+  # backend/migrations/{public,tenant}/ and apply via the API pod's
+  # init container.
+  postgresql:
+    parameters:
+      shared_preload_libraries: "timescaledb,pgaudit"
+      max_connections: "200"
+      log_statement: "ddl"
+  # Backup target. Bucket and KMS key are provisioned by Terraform; the
+  # ApplicationSet overlay sets the per-env bucket name.
+  backup:
+    enabled: true
+    barmanObjectStore:
+      destinationPath: s3://missionagre-pg-backups-CHANGEME
+      s3Credentials:
+        inheritFromIAMRole: true
+      wal:
+        compression: gzip
+        maxParallel: 4
+    retentionPolicy: "30d"
+
+# ---------------------------------------------------------------------------
+# Namespace-scoped ConfigMap shared by every service chart.
+# ---------------------------------------------------------------------------
+appConfig:
+  serviceName: missionagre
+  region: me-south-1
+  log:
+    level: INFO
+    format: json

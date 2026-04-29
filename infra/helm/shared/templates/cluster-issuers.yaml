@@ -1,0 +1,36 @@
+{{- if .Values.certManager.enabled }}
+{{- if .Values.certManager.acme.staging.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.certManager.acme.staging.name }}
+  labels:
+    {{- include "missionagre.shared.labels" . | nindent 4 }}
+spec:
+  acme:
+    email: {{ .Values.certManager.acme.email | quote }}
+    server: {{ .Values.certManager.acme.staging.server | quote }}
+    privateKeySecretRef:
+      name: {{ printf "%s-key" .Values.certManager.acme.staging.name }}
+    solvers:
+      {{- toYaml .Values.certManager.acme.solvers | nindent 6 }}
+{{- end }}
+{{- if .Values.certManager.acme.prod.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.certManager.acme.prod.name }}
+  labels:
+    {{- include "missionagre.shared.labels" . | nindent 4 }}
+spec:
+  acme:
+    email: {{ .Values.certManager.acme.email | quote }}
+    server: {{ .Values.certManager.acme.prod.server | quote }}
+    privateKeySecretRef:
+      name: {{ printf "%s-key" .Values.certManager.acme.prod.name }}
+    solvers:
+      {{- toYaml .Values.certManager.acme.solvers | nindent 6 }}
+{{- end }}
+{{- end }}

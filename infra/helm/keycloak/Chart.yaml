@@ -1,0 +1,25 @@
+apiVersion: v2
+name: missionagre-keycloak
+description: |
+  Thin umbrella over the upstream Bitnami keycloak chart. We never roll
+  our own Keycloak HA topology — the upstream chart handles the database,
+  cache, ingress, and HPA, and our values overrides pin the realm import,
+  the database connection, and the issuer host.
+
+  Run `helm dependency update infra/helm/keycloak` before linting or
+  templating; CI does this automatically.
+type: application
+version: 0.1.0
+appVersion: "26.0.8"
+kubeVersion: ">=1.28.0"
+maintainers:
+  - name: msoliman1975
+keywords:
+  - missionagre
+  - keycloak
+  - oidc
+
+dependencies:
+  - name: keycloak
+    version: 24.4.x
+    repository: https://charts.bitnami.com/bitnami

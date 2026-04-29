@@ -1,0 +1,53 @@
+{{- if .Values.postgresCluster.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgresCluster.name }}
+  labels:
+    {{- include "missionagre.shared.labels" . | nindent 4 }}
+spec:
+  description: MissionAgre primary Postgres cluster (CloudNativePG-managed).
+  imageName: {{ .Values.postgresCluster.imageName | quote }}
+  instances: {{ .Values.postgresCluster.instances }}
+
+  bootstrap:
+    initdb:
+      database: missionagre
+      owner: missionagre
+      postInitSQL:
+        {{- range .Values.postgresCluster.postInitSQL }}
+        - {{ . | quote }}
+        {{- end }}
+
+  storage:
+    size: {{ .Values.postgresCluster.storage.size }}
+    storageClass: {{ .Values.postgresCluster.storage.storageClass | quote }}
+
+  walStorage:
+    size: {{ .Values.postgresCluster.walStorage.size }}
+    storageClass: {{ .Values.postgresCluster.walStorage.storageClass | quote }}
+
+  resources:
+    {{- toYaml .Values.postgresCluster.resources | nindent 4 }}
+
+  postgresql:
+    parameters:
+      {{- range $k, $v := .Values.postgresCluster.postgresql.parameters }}
+      {{ $k }}: {{ $v | quote }}
+      {{- end }}
+
+  {{- if .Values.postgresCluster.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      destinationPath: {{ .Values.postgresCluster.backup.barmanObjectStore.destinationPath | quote }}
+      s3Credentials:
+        inheritFromIAMRole: {{ .Values.postgresCluster.backup.barmanObjectStore.s3Credentials.inheritFromIAMRole }}
+      wal:
+        compression: {{ .Values.postgresCluster.backup.barmanObjectStore.wal.compression | quote }}
+        maxParallel: {{ .Values.postgresCluster.backup.barmanObjectStore.wal.maxParallel }}
+    retentionPolicy: {{ .Values.postgresCluster.backup.retentionPolicy | quote }}
+  {{- end }}
+
+  monitoring:
+    enablePodMonitor: true
+{{- end }}
