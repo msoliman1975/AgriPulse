@@ -66,9 +66,10 @@ repos:
         # Frontend has its own pinned Prettier (frontend/prettier.config.js,
         # printWidth 100) and runs `pnpm format:check` in the frontend CI
         # job. The mirrored Prettier here uses defaults and would fight that
-        # config — keep it scoped to non-frontend YAML and Markdown only.
-        files: '\.ya?ml$|^(README|docs/.+)\.md$'
-        exclude: '^(infra/helm/.*/templates/.*\.ya?ml|frontend/.*)$'
+        # config — keep it scoped to YAML only (matches the pre-PR-3
+        # behaviour for everything outside frontend/).
+        files: '\.ya?ml$'
+        exclude: '^infra/helm/.*/templates/.*\.ya?ml$'
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.15.0
