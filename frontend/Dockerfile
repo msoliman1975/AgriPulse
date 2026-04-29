@@ -3,7 +3,7 @@
 # --- Builder ----------------------------------------------------------------
 # pnpm via corepack (bundled with Node 20+). pnpm-lock.yaml is the cache key
 # so the dependency layer is reused across non-dependency changes.
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 ENV CI=1 PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 
