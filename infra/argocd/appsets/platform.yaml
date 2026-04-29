@@ -37,18 +37,18 @@ spec:
             chartVersion: 4.11.3
   template:
     metadata:
-      name: 'platform-{{.name}}'
+      name: "platform-{{.name}}"
       labels:
         app.kubernetes.io/part-of: missionagre-platform
     spec:
       project: default
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{.namespace}}'
+        namespace: "{{.namespace}}"
       sources:
-        - repoURL: '{{.repoURL}}'
-          targetRevision: '{{.chartVersion}}'
-          chart: '{{.chart}}'
+        - repoURL: "{{.repoURL}}"
+          targetRevision: "{{.chartVersion}}"
+          chart: "{{.chart}}"
           helm:
             valueFiles:
               - $values/infra/argocd/platform-values/{{.name}}.yaml

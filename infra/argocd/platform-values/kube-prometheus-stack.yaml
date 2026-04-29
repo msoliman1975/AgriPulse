@@ -32,7 +32,7 @@ alertmanager:
 
 grafana:
   defaultDashboardsTimezone: Africa/Cairo
-  adminPassword: ""           # comes via External Secret, not values file
+  adminPassword: "" # comes via External Secret, not values file
   admin:
     existingSecret: missionagre-grafana-admin
     userKey: username
@@ -68,8 +68,8 @@ grafana:
 kubeApiServer:
   enabled: true
 kubeControllerManager:
-  enabled: false        # not exposed on managed EKS
+  enabled: false # not exposed on managed EKS
 kubeScheduler:
-  enabled: false        # not exposed on managed EKS
+  enabled: false # not exposed on managed EKS
 kubeEtcd:
-  enabled: false        # not exposed on managed EKS
+  enabled: false # not exposed on managed EKS

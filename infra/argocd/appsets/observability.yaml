@@ -38,7 +38,7 @@ spec:
             chartVersion: 4.5.0
   template:
     metadata:
-      name: 'observability-{{.name}}'
+      name: "observability-{{.name}}"
       labels:
         app.kubernetes.io/part-of: missionagre-observability
     spec:
@@ -47,9 +47,9 @@ spec:
         server: https://kubernetes.default.svc
         namespace: observability
       sources:
-        - repoURL: '{{.repoURL}}'
-          targetRevision: '{{.chartVersion}}'
-          chart: '{{.chart}}'
+        - repoURL: "{{.repoURL}}"
+          targetRevision: "{{.chartVersion}}"
+          chart: "{{.chart}}"
           helm:
             valueFiles:
               - $values/infra/argocd/platform-values/{{.name}}.yaml

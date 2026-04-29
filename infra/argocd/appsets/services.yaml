@@ -35,27 +35,27 @@ spec:
                   prune: "false"
   template:
     metadata:
-      name: '{{.chart}}-{{.env}}'
+      name: "{{.chart}}-{{.env}}"
       labels:
         app.kubernetes.io/part-of: missionagre
-        missionagre.io/env: '{{.env}}'
-        missionagre.io/chart: '{{.chart}}'
+        missionagre.io/env: "{{.env}}"
+        missionagre.io/chart: "{{.chart}}"
     spec:
       project: default
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{.namespace}}'
+        namespace: "{{.namespace}}"
       source:
         repoURL: https://github.com/msoliman1975/MissionAgre.git
         targetRevision: HEAD
-        path: 'infra/helm/{{.chart}}'
+        path: "infra/helm/{{.chart}}"
         helm:
           valueFiles:
-            - 'values.yaml'
-            - '../../argocd/overlays/{{.env}}/values.yaml'
+            - "values.yaml"
+            - "../../argocd/overlays/{{.env}}/values.yaml"
       syncPolicy:
         automated:
-          prune: '{{.prune}}'
+          prune: "{{.prune}}"
           selfHeal: true
         syncOptions:
           - ServerSideApply=true

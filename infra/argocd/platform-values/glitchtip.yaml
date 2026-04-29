@@ -25,6 +25,6 @@ ingress:
       secretName: missionagre-glitchtip-tls
 
 postgresql:
-  enabled: false       # use the cluster CNPG instance
+  enabled: false # use the cluster CNPG instance
 redis:
-  enabled: true        # bundled small Redis is fine
+  enabled: true # bundled small Redis is fine
