@@ -3,7 +3,7 @@
 # --- Builder ----------------------------------------------------------------
 # Resolves and installs dependencies into a virtualenv that the runtime stage
 # copies as-is. uv is used as the package manager per ARCHITECTURE.md § 3.1.
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -36,7 +36,7 @@ COPY scripts ./scripts
 RUN uv pip install --python "$VIRTUAL_ENV/bin/python" --no-deps .
 
 # --- Runtime ----------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
