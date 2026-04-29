@@ -65,6 +65,14 @@ def create_engine() -> AsyncEngine:
 
     Production code should call `get_engine()` to reuse the singleton.
     Tests may call this directly when they need an isolated engine.
+
+    `prepared_statement_cache_size=0` disables asyncpg's per-connection
+    statement cache. With caching, asyncpg occasionally serializes UUID
+    parameters via the un-padded hex of `uuid.int` (a known interaction
+    with SQLAlchemy 2.x's parameter rebinding) which Postgres rejects
+    as "invalid input syntax for type uuid". Cost is minor — Postgres
+    parses each statement once instead of caching. Revisit if profiling
+    shows it as hot.
     """
     settings = get_settings()
     return create_async_engine(
@@ -74,6 +82,7 @@ def create_engine() -> AsyncEngine:
         pool_pre_ping=True,
         echo=settings.database_echo,
         future=True,
+        connect_args={"prepared_statement_cache_size": 0},
     )
 
 

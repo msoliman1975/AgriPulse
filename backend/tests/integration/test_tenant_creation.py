@@ -7,20 +7,10 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.integration
-
-
-def _uuid_param(name: str) -> bindparam:
-    """Bind a UUID parameter with an explicit type so asyncpg's binary
-    codec sends it as 16 raw bytes rather than as the un-padded hex of
-    `uuid.int`. Without the type hint, asyncpg can drop leading zeros
-    on Python uuid.UUID objects under SQLAlchemy 2.x.
-    """
-    return bindparam(name, type_=PG_UUID(as_uuid=True))
 
 
 @pytest.mark.asyncio
@@ -43,23 +33,21 @@ async def test_create_tenant_bootstraps_schema_and_audits(
     assert result.schema_name == schema_name_for(result.tenant_id)
     assert result.status == "active"
 
+    tid_str = str(result.tenant_id)
+
     # Tenant row, settings row, current subscription should all exist.
     row = (
         await admin_session.execute(
-            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid").bindparams(
-                _uuid_param("tid")
-            ),
-            {"tid": result.tenant_id},
+            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid::uuid"),
+            {"tid": tid_str},
         )
     ).one()
     assert row.slug == "acme-test"
 
     settings_count = (
         await admin_session.execute(
-            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid").bindparams(
-                _uuid_param("tid")
-            ),
-            {"tid": result.tenant_id},
+            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid::uuid"),
+            {"tid": tid_str},
         )
     ).scalar_one()
     assert settings_count == 1
@@ -68,9 +56,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
         await admin_session.execute(
             text(
                 "SELECT count(*) FROM public.tenant_subscriptions "
-                "WHERE tenant_id = :tid AND is_current = TRUE"
-            ).bindparams(_uuid_param("tid")),
-            {"tid": result.tenant_id},
+                "WHERE tenant_id = :tid::uuid AND is_current = TRUE"
+            ),
+            {"tid": tid_str},
         )
     ).scalar_one()
     assert sub_count == 1
@@ -101,9 +89,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
         await admin_session.execute(
             text(
                 "SELECT count(*) FROM audit_events "
-                "WHERE event_type = 'tenancy.tenant_created' AND subject_id = :tid"
-            ).bindparams(_uuid_param("tid")),
-            {"tid": result.tenant_id},
+                "WHERE event_type = 'tenancy.tenant_created' AND subject_id = :tid::uuid"
+            ),
+            {"tid": tid_str},
         )
     ).scalar_one()
     assert audit_count == 1
