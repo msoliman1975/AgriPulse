@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "MissionAgre",
+    "tagline": "Satellite-driven farm management"
+  },
+  "nav": {
+    "home": "Home",
+    "me": "My profile",
+    "skipToContent": "Skip to main content"
+  },
+  "shell": {
+    "languageToggle": "Language",
+    "languageEnglish": "English",
+    "languageArabic": "العربية",
+    "unitToggle": "Area unit",
+    "unitFeddan": "Feddan",
+    "unitAcre": "Acre",
+    "unitHectare": "Hectare",
+    "userMenu": "Account menu",
+    "signOut": "Sign out"
+  },
+  "home": {
+    "welcome": "Welcome",
+    "comingSoon": "Features coming soon."
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "unauthorized": "Your session has ended. Sign in again.",
+    "forbidden": "You do not have permission to perform this action.",
+    "notFound": "We could not find what you were looking for."
+  },
+  "actions": {
+    "retry": "Retry",
+    "close": "Close",
+    "loading": "Loading…"
+  }
+}

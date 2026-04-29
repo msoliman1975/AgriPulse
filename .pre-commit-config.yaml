@@ -63,7 +63,12 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
-        files: '^(frontend/.*\.(ts|tsx|js|jsx|json|css|scss|html|md)|.*\.ya?ml)$'
+        # Frontend has its own pinned Prettier (frontend/prettier.config.js,
+        # printWidth 100) and runs `pnpm format:check` in the frontend CI
+        # job. The mirrored Prettier here uses defaults and would fight that
+        # config — keep it scoped to YAML only (matches the pre-PR-3
+        # behaviour for everything outside frontend/).
+        files: '\.ya?ml$'
         exclude: '^infra/helm/.*/templates/.*\.ya?ml$'
 
   - repo: https://github.com/pre-commit/mirrors-eslint
@@ -71,7 +76,13 @@ repos:
     hooks:
       - id: eslint
         files: '^frontend/.*\.(ts|tsx|js|jsx)$'
-        # Frontend doesn't exist in PR 1. PR 3 promotes this to push stage.
+        # Frontend ESLint requires the project's exact node_modules + the
+        # tsconfig.app.json typescript-eslint reads for type-checked rules.
+        # Pre-commit's mirrored hook runs in an isolated environment that
+        # cannot reach those, so authoritative linting happens in the
+        # `frontend` CI job (`pnpm lint`). Run manually with
+        # `pre-commit run eslint --hook-stage manual --files <paths>` if
+        # you want a quick local check.
         stages: [manual]
 
   - repo: https://github.com/zricethezav/gitleaks

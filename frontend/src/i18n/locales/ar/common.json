@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "ميشن أجري",
+    "tagline": "إدارة المزارع المعتمدة على الأقمار الصناعية"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "me": "ملفي الشخصي",
+    "skipToContent": "تخطّي إلى المحتوى الرئيسي"
+  },
+  "shell": {
+    "languageToggle": "اللغة",
+    "languageEnglish": "English",
+    "languageArabic": "العربية",
+    "unitToggle": "وحدة المساحة",
+    "unitFeddan": "فدّان",
+    "unitAcre": "فدّان أمريكي",
+    "unitHectare": "هكتار",
+    "userMenu": "قائمة الحساب",
+    "signOut": "تسجيل الخروج"
+  },
+  "home": {
+    "welcome": "مرحبًا",
+    "comingSoon": "الميزات قادمة قريبًا."
+  },
+  "errors": {
+    "generic": "حدث خطأ ما. حاول مرة أخرى.",
+    "unauthorized": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
+    "forbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "notFound": "تعذّر العثور على ما تبحث عنه."
+  },
+  "actions": {
+    "retry": "إعادة المحاولة",
+    "close": "إغلاق",
+    "loading": "جارٍ التحميل…"
+  }
+}

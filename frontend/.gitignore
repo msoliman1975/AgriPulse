@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+
+# Coverage / test
+coverage/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+
+# Local env overrides — .env.development is committed (dev defaults).
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.development
