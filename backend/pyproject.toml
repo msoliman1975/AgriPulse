@@ -1,0 +1,538 @@
+[project]
+name = "missionagre-backend"
+version = "0.1.0"
+description = "MissionAgre backend — multi-tenant farm management API."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+authors = [{ name = "MissionAgre" }]
+
+dependencies = [
+  # Web framework
+  "fastapi>=0.115,<0.116",
+  "uvicorn[standard]>=0.32,<0.33",
+  "pydantic[email]>=2.9,<3",
+  "pydantic-settings>=2.6,<3",
+
+  # Database
+  "sqlalchemy[asyncio]>=2.0.36,<2.1",
+  "asyncpg>=0.30,<0.31",
+  "psycopg[binary]>=3.2,<3.3",   # used by Alembic in sync mode
+  "alembic>=1.14,<1.15",
+  "geoalchemy2>=0.16,<0.17",
+
+  # Background work
+  "celery>=5.4,<5.5",
+  "redis>=5.2,<5.3",
+
+  # Auth
+  "python-jose[cryptography]>=3.3,<3.4",
+  "httpx>=0.27,<0.28",
+
+  # RBAC config + general YAML
+  "pyyaml>=6.0,<6.1",
+
+  # Observability
+  "structlog>=24.4,<25",
+  "opentelemetry-api>=1.28,<2",
+  "opentelemetry-sdk>=1.28,<2",
+  "opentelemetry-exporter-otlp>=1.28,<2",
+  "opentelemetry-instrumentation-fastapi>=0.49b0,<1",
+  "opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1",
+  "opentelemetry-instrumentation-celery>=0.49b0,<1",
+  "opentelemetry-instrumentation-httpx>=0.49b0,<1",
+  "opentelemetry-instrumentation-asgi>=0.49b0,<1",
+  "prometheus-fastapi-instrumentator>=7.0,<8",
+]
+
+[project.optional-dependencies]
+dev = [
+  # Test runner
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<2",
+  "pytest-cov>=6.0,<7",
+  "anyio>=4.6,<5",
+  "freezegun>=1.5,<2",
+  "testcontainers[postgres,redis]>=4.8,<5",
+
+  # Lint / format / type
+  "ruff>=0.7,<0.8",
+  "black>=24.10,<25",
+  "mypy>=1.13,<2",
+  "import-linter>=2.1,<3",
+
+  # Stubs
+  "types-PyYAML>=6,<7",
+  "types-python-jose>=3,<4",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# --- uv ---------------------------------------------------------------------
+[tool.uv]
+dev-dependencies = []  # already in optional [dev] above
+
+# --- ruff -------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["migrations/*/versions"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",     # pycodestyle / pyflakes
+  "I",                # isort
+  "B",                # bugbear
+  "C4",               # comprehensions
+  "UP",               # pyupgrade
+  "SIM",              # simplify
+  "TID",              # tidy imports
+  "RUF",              # ruff-specific
+  "PT",               # pytest
+  "S",                # bandit (security)
+  "PL",               # pylint subset
+]
+ignore = [
+  "E501",   # line length handled by formatter
+  "PLR0913", # too-many-arguments (FastAPI deps make this noisy)
+  "S101",    # asserts are fine in tests
+  "S104",    # binding 0.0.0.0 is fine in containers
+  "B008",    # Depends(...) in default values is the FastAPI idiom
+  "PLW0603", # module-level singletons (engine, validator) need `global`
+  "RUF012",  # SQLAlchemy ORM __table_args__ is a mutable class attr by design
+  "PLR2004", # magic-value comparisons; too noisy on short numeric checks
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S105", "S106", "S311", "PLR2004"]
+"migrations/**/*.py" = ["E402", "F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "workers"]
+
+# --- black ------------------------------------------------------------------
+[tool.black]
+target-version = ["py312"]
+line-length = 100
+
+# --- mypy -------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_any_generics = true
+ignore_missing_imports = false
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/", "tests/", "build/", "dist/"]
+# structlog and jose APIs leak Any across many calls; rather than litter
+# the codebase with type: ignore at every wrapper, drop the no-any-return
+# check globally. The strict-mode signature checks remain.
+disable_error_code = ["no-any-return"]
+
+[[tool.mypy.overrides]]
+module = [
+  "celery.*",
+  "geoalchemy2.*",
+  "prometheus_fastapi_instrumentator.*",
+  "opentelemetry.*",
+  "testcontainers.*",
+  "structlog.*",
+  "jose.*",
+]
+ignore_missing_imports = true
+
+# --- pytest -----------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Reuse one event loop across the whole session so the SQLAlchemy async
+# engine (built once in the integration conftest) is not bound to a loop
+# that pytest closes after the first test.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--cov=app",
+  "--cov-report=term-missing",
+  "--cov-report=xml",
+]
+markers = [
+  "integration: integration tests that require Postgres/Redis containers",
+  "slow: tests that take more than 5 seconds",
+]
+filterwarnings = [
+  "error",
+  "ignore::DeprecationWarning:pkg_resources.*",
+  # testcontainers 4.x emits a DeprecationWarning at import time about its
+  # own deprecated decorator; harmless for our use.
+  "ignore::DeprecationWarning:testcontainers.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = ["migrations/*", "tests/*", "app/main.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "@overload",
+]
+
+# --- import-linter ----------------------------------------------------------
+# Module boundaries per ARCHITECTURE.md § 6.1: each module exposes only
+# `service.py` and `events.py`; all other submodules are private. Cross-
+# module imports must go through the service Protocol.
+
+[tool.importlinter]
+root_packages = ["app"]
+
+[[tool.importlinter.contracts]]
+name = "shared cannot import domain modules"
+type = "forbidden"
+source_modules = ["app.shared"]
+forbidden_modules = ["app.modules"]
+# `app.core` is the wiring layer — `app_factory` imports module routers
+# explicitly. That is the one allowed direction; everything else under
+# core (errors, settings, observability, logging) stays pure.
+
+# One contract per module: forbid every other module from importing this
+# module's private submodules (repository, models, router, schemas,
+# bootstrap, internal helpers). `service` and `events` are public.
+
+[[tool.importlinter.contracts]]
+name = "tenancy internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.tenancy.repository",
+  "app.modules.tenancy.models",
+  "app.modules.tenancy.router",
+  "app.modules.tenancy.schemas",
+  "app.modules.tenancy.bootstrap",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "iam internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.iam.repository",
+  "app.modules.iam.models",
+  "app.modules.iam.router",
+  "app.modules.iam.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "audit internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.audit.models",
+]
+allow_indirect_imports = true
+
+# The remaining 10 modules are placeholders today; the contracts still
+# apply so any later code that violates them fails CI on the first push.
+
+[[tool.importlinter.contracts]]
+name = "farms internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.farms.repository",
+  "app.modules.farms.models",
+  "app.modules.farms.router",
+  "app.modules.farms.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "imagery internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.imagery.repository",
+  "app.modules.imagery.models",
+  "app.modules.imagery.router",
+  "app.modules.imagery.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "indices internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.indices.repository",
+  "app.modules.indices.models",
+  "app.modules.indices.router",
+  "app.modules.indices.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "weather internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.weather.repository",
+  "app.modules.weather.models",
+  "app.modules.weather.router",
+  "app.modules.weather.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "signals internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.signals.repository",
+  "app.modules.signals.models",
+  "app.modules.signals.router",
+  "app.modules.signals.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "alerts internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.alerts.repository",
+  "app.modules.alerts.models",
+  "app.modules.alerts.router",
+  "app.modules.alerts.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "recommendations internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.recommendations.repository",
+  "app.modules.recommendations.models",
+  "app.modules.recommendations.router",
+  "app.modules.recommendations.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "notifications internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.notifications.repository",
+  "app.modules.notifications.models",
+  "app.modules.notifications.router",
+  "app.modules.notifications.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "analytics internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.analytics.repository",
+  "app.modules.analytics.models",
+  "app.modules.analytics.router",
+  "app.modules.analytics.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "forecasting internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+]
+forbidden_modules = [
+  "app.modules.forecasting.repository",
+  "app.modules.forecasting.models",
+  "app.modules.forecasting.router",
+  "app.modules.forecasting.schemas",
+]
+allow_indirect_imports = true

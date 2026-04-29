@@ -1,0 +1,265 @@
+# capabilities.yaml — canonical capability list for MissionAgre RBAC.
+#
+# Naming: "<resource>.<action>". `<resource>` is the noun owning the data;
+# `<action>` is what is being done to/with it. Capability names are stable
+# strings — add new ones, never rename existing ones.
+#
+# Fields:
+#   description : human-readable, audit-friendly summary
+#   scope       : which JWT layer can grant this capability
+#                   - platform : only PlatformRole grants
+#                   - tenant   : TenantRole or PlatformRole grants
+#                   - farm     : FarmScope, TenantRole, or PlatformRole grants
+#                 The resolver in check.py treats `scope` as documentation;
+#                 enforcement uses role_capabilities.yaml.
+#   status      : active = a route enforces this capability today
+#                 stub   = reserved for a module not yet built (data_model
+#                          documents the resource; the route will appear
+#                          in a later prompt)
+#
+# See ARCHITECTURE.md § 7 and data_model.md § 4.
+
+capabilities:
+  # --- Platform admin --------------------------------------------------
+  platform.read:
+    description: Read platform-wide resources (tenant list, system status).
+    scope: platform
+    status: active
+  platform.manage_tenants:
+    description: Create, suspend, restore, or delete tenants.
+    scope: platform
+    status: active
+  platform.impersonate_tenant:
+    description: Issue a support-scoped token for a tenant. Always audited.
+    scope: platform
+    status: stub
+
+  # --- Tenant ----------------------------------------------------------
+  tenant.read:
+    description: Read tenant profile, plan, and settings.
+    scope: tenant
+    status: active
+  tenant.update:
+    description: Update tenant profile (name, contact, locale defaults).
+    scope: tenant
+    status: active
+  tenant.manage_settings:
+    description: Edit tenant-level settings (cloud-cover thresholds, defaults).
+    scope: tenant
+    status: active
+  tenant.transfer_ownership:
+    description: Reassign the single TenantOwner role.
+    scope: tenant
+    status: active
+
+  # --- Subscription / billing ------------------------------------------
+  subscription.read:
+    description: Read the active subscription, plan, and invoice history.
+    scope: tenant
+    status: active
+  subscription.manage:
+    description: Change plan or payment method, cancel or reactivate.
+    scope: tenant
+    status: active
+
+  # --- IAM (users, roles, scopes) --------------------------------------
+  user.read:
+    description: List users in the tenant and read their profiles.
+    scope: tenant
+    status: active
+  user.invite:
+    description: Invite a new user to the tenant.
+    scope: tenant
+    status: active
+  user.update:
+    description: Edit a user's profile (name, phone) within the tenant.
+    scope: tenant
+    status: active
+  user.suspend:
+    description: Suspend or reactivate a user's tenant membership.
+    scope: tenant
+    status: active
+  user.delete:
+    description: Hard-delete a user from the tenant (GDPR-style).
+    scope: tenant
+    status: active
+  role.assign_tenant:
+    description: Grant or revoke a tenant-wide role.
+    scope: tenant
+    status: active
+  role.assign_farm:
+    description: Grant or revoke a farm-scoped role.
+    scope: farm
+    status: active
+
+  # --- Farms / blocks --------------------------------------------------
+  farm.read:
+    description: View farm metadata and the farm's block list.
+    scope: farm
+    status: stub
+  farm.create:
+    description: Create a new farm in the tenant.
+    scope: tenant
+    status: stub
+  farm.update:
+    description: Edit farm metadata (name, governorate, contact).
+    scope: farm
+    status: stub
+  farm.delete:
+    description: Soft-delete a farm.
+    scope: farm
+    status: stub
+  block.read:
+    description: View block metadata, geometry, and crop assignments.
+    scope: farm
+    status: stub
+  block.create:
+    description: Create a new block in a farm.
+    scope: farm
+    status: stub
+  block.update_geometry:
+    description: Edit a block's polygon geometry.
+    scope: farm
+    status: stub
+  block.update_metadata:
+    description: Edit non-geometry block fields (name, soil, irrigation).
+    scope: farm
+    status: stub
+  block.delete:
+    description: Soft-delete a block.
+    scope: farm
+    status: stub
+  crop_assignment.create:
+    description: Assign a crop to a block for a season.
+    scope: farm
+    status: stub
+  crop_assignment.update:
+    description: Edit an existing crop assignment.
+    scope: farm
+    status: stub
+  crop_assignment.delete:
+    description: Remove a crop assignment.
+    scope: farm
+    status: stub
+
+  # --- Imagery & indices -----------------------------------------------
+  imagery.read:
+    description: View imagery metadata and request rendered tiles.
+    scope: farm
+    status: stub
+  imagery.refresh:
+    description: Trigger an on-demand imagery refresh for a block.
+    scope: farm
+    status: stub
+  index.read:
+    description: View pre-computed and aggregated index values.
+    scope: farm
+    status: stub
+  index.compute_custom:
+    description: Run a custom on-demand index calculation.
+    scope: farm
+    status: stub
+
+  # --- Weather ---------------------------------------------------------
+  weather.read:
+    description: View weather observations, forecasts, and derived signals.
+    scope: farm
+    status: stub
+
+  # --- Custom signals --------------------------------------------------
+  signal.read:
+    description: View signal definitions and observations.
+    scope: farm
+    status: stub
+  signal.define:
+    description: Create or edit a custom signal definition.
+    scope: tenant
+    status: stub
+  signal.record:
+    description: Record an observation against an existing signal.
+    scope: farm
+    status: stub
+
+  # --- Alerts ----------------------------------------------------------
+  alert.read:
+    description: View open and historical alerts.
+    scope: farm
+    status: stub
+  alert.acknowledge:
+    description: Acknowledge an open alert.
+    scope: farm
+    status: stub
+  alert.resolve:
+    description: Mark an alert resolved (with optional comment).
+    scope: farm
+    status: stub
+  alert.snooze:
+    description: Snooze an alert for a defined window.
+    scope: farm
+    status: stub
+  alert_rule.read:
+    description: View alert rule definitions.
+    scope: farm
+    status: stub
+  alert_rule.manage:
+    description: Create, edit, or delete alert rules.
+    scope: tenant
+    status: stub
+
+  # --- Recommendations -------------------------------------------------
+  recommendation.read:
+    description: View recommendations.
+    scope: farm
+    status: stub
+  recommendation.act:
+    description: Apply, dismiss, or defer a recommendation.
+    scope: farm
+    status: stub
+  decision_tree.read:
+    description: View decision tree definitions.
+    scope: tenant
+    status: stub
+  decision_tree.manage:
+    description: Author or publish decision trees (platform-authored).
+    scope: platform
+    status: stub
+
+  # --- Operational records ---------------------------------------------
+  irrigation.record:
+    description: Log an irrigation event.
+    scope: farm
+    status: stub
+  fertilization.record:
+    description: Log a fertilization event.
+    scope: farm
+    status: stub
+  scouting.record:
+    description: Log a scouting observation (notes, photos).
+    scope: farm
+    status: stub
+
+  # --- Analytics & reports ---------------------------------------------
+  analytics.read:
+    description: View dashboards, charts, and aggregations.
+    scope: farm
+    status: stub
+  analytics.export:
+    description: Download bulk exports (CSV, GeoTIFF).
+    scope: farm
+    status: stub
+
+  # --- Notifications ---------------------------------------------------
+  notification.read_inbox:
+    description: Read one's own in-app notification inbox.
+    scope: tenant
+    status: stub
+  notification.manage_templates:
+    description: Edit notification templates.
+    scope: tenant
+    status: stub
+
+  # --- Audit -----------------------------------------------------------
+  audit.read:
+    description: Read the tenant's audit log.
+    scope: tenant
+    status: active
