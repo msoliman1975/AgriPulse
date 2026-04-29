@@ -26,6 +26,9 @@ RUN uv venv "$VIRTUAL_ENV" \
  && uv sync --frozen --no-dev --no-install-project
 
 # Re-install with the project sources so editable-install metadata is correct.
+# pyproject.toml's `readme = "README.md"` makes hatchling require the file
+# at build time, so it ships into the builder layer alongside the source.
+COPY README.md ./
 COPY app ./app
 COPY workers ./workers
 COPY migrations ./migrations
