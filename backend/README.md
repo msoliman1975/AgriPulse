@@ -2,6 +2,38 @@
 
 FastAPI service for MissionAgre.
 
+## Local services
+
+Postgres, Redis, Keycloak, and MinIO run in containers via the dev compose
+stack; the Python backend, Celery workers, and the React frontend all run
+natively against them. See ADR
+[`docs/decisions/0002-local-dev-services-in-compose.md`](../docs/decisions/0002-local-dev-services-in-compose.md)
+for context.
+
+```bash
+# from the repo root
+docker compose -f infra/dev/compose.yaml up -d         # bring services up
+docker compose -f infra/dev/compose.yaml ps            # verify health
+docker compose -f infra/dev/compose.yaml logs -f keycloak  # tail one service
+docker compose -f infra/dev/compose.yaml down          # stop, keep volumes
+docker compose -f infra/dev/compose.yaml down -v       # stop AND wipe data
+```
+
+| Service   | URL                       | Credentials                     |
+|-----------|---------------------------|---------------------------------|
+| Postgres  | `localhost:5432`          | `missionagre / missionagre`     |
+| Redis     | `localhost:6379`          | (no auth in dev)                |
+| Keycloak  | http://localhost:8080     | admin: `admin / admin`          |
+| MinIO API | http://localhost:9000     | `missionagre / missionagre-dev` |
+| MinIO UI  | http://localhost:9001     | `missionagre / missionagre-dev` |
+
+The stack pre-provisions a Keycloak realm `missionagre` with client
+`missionagre-api` and a dev user `dev@missionagre.local` (password `dev`),
+and creates two MinIO buckets (`missionagre-imagery`, `missionagre-uploads`).
+
+> Tested with Rancher Desktop in dockerd (moby) mode on Windows; works the
+> same on Docker Desktop and on Podman with compose support.
+
 ## Local setup
 
 ```bash
@@ -10,7 +42,8 @@ uv sync --extra dev
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env with your local Postgres/Redis/Keycloak URLs
+# .env defaults already match infra/dev/compose.yaml — edit only if you
+# changed ports or credentials.
 
 # 3. Run migrations against the public schema
 uv run alembic -c migrations/public/alembic.ini upgrade head

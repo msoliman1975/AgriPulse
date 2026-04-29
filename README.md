@@ -44,6 +44,18 @@ pre-commit run --all-files
 
 After PR 2 lands, the backend `pyproject.toml` will pin `uv` as the package manager. After PR 3, `pnpm` is required for the frontend.
 
+## Local services (Postgres, Redis, Keycloak, MinIO)
+
+Stateful dependencies run in containers via `infra/dev/compose.yaml`. Application code (Python, React) runs natively on the host. See ADR [`docs/decisions/0002-local-dev-services-in-compose.md`](docs/decisions/0002-local-dev-services-in-compose.md).
+
+```bash
+docker compose -f infra/dev/compose.yaml up -d        # start
+docker compose -f infra/dev/compose.yaml down         # stop, keep volumes
+docker compose -f infra/dev/compose.yaml down -v      # stop + wipe data
+```
+
+Endpoints when up: Postgres `localhost:5432`, Redis `localhost:6379`, Keycloak http://localhost:8080 (admin / admin), MinIO API http://localhost:9000 / console http://localhost:9001 (`missionagre` / `missionagre-dev`). Full table and dev credentials in [`backend/README.md`](backend/README.md). Tested with Rancher Desktop on Windows in dockerd (moby) mode; works on Docker Desktop and Podman compose too.
+
 ## Branching and commits
 
 - Trunk-based: short-lived feature branches off `main`, squash-merged.
