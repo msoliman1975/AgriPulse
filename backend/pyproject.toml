@@ -152,6 +152,11 @@ ignore_missing_imports = true
 minversion = "8.0"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Reuse one event loop across the whole session so the SQLAlchemy async
+# engine (built once in the integration conftest) is not bound to a loop
+# that pytest closes after the first test.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 addopts = [
   "-ra",
   "--strict-markers",

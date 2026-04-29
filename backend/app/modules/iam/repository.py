@@ -6,7 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.iam.models import (
@@ -70,8 +71,8 @@ class UserRepository:
             await self._session.execute(
                 text(
                     "SELECT id, slug, name FROM public.tenants "
-                    "WHERE id = ANY(:ids) AND deleted_at IS NULL"
-                ),
+                    "WHERE id IN :ids AND deleted_at IS NULL"
+                ).bindparams(bindparam("ids", type_=PG_UUID(as_uuid=True), expanding=True)),
                 {"ids": list(tenant_ids)},
             )
         ).all()
