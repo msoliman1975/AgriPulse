@@ -11,7 +11,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.tenancy.service import get_tenant_service
@@ -35,6 +36,9 @@ async def test_tenant_a_cannot_see_tenant_b_audit_via_search_path(
             "INSERT INTO audit_events ("
             "  time, id, event_type, actor_kind, subject_kind, subject_id, details"
             ") VALUES (now(), :id, 'test.b_only', 'system', 'tenant', :sid, '{}'::jsonb)"
+        ).bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+            bindparam("sid", type_=PG_UUID(as_uuid=True)),
         ),
         {"id": uuid4(), "sid": b.tenant_id},
     )

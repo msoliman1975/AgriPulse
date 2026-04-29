@@ -13,7 +13,8 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -70,7 +71,7 @@ async def test_me_returns_profile_preferences_memberships_scopes(
         text(
             "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
             "VALUES (:id, :sub, :email, :name)"
-        ),
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
         {
             "id": user_id,
             "sub": f"kc-{user_id}",
@@ -82,7 +83,7 @@ async def test_me_returns_profile_preferences_memberships_scopes(
         text(
             "INSERT INTO public.user_preferences (user_id, language, unit_system) "
             "VALUES (:id, 'ar', 'acre')"
-        ),
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
         {"id": user_id},
     )
     membership_id = uuid4()
@@ -90,6 +91,10 @@ async def test_me_returns_profile_preferences_memberships_scopes(
         text(
             "INSERT INTO public.tenant_memberships (id, user_id, tenant_id, status) "
             "VALUES (:mid, :uid, :tid, 'active')"
+        ).bindparams(
+            bindparam("mid", type_=PG_UUID(as_uuid=True)),
+            bindparam("uid", type_=PG_UUID(as_uuid=True)),
+            bindparam("tid", type_=PG_UUID(as_uuid=True)),
         ),
         {"mid": membership_id, "uid": user_id, "tid": tenant.tenant_id},
     )
@@ -97,7 +102,7 @@ async def test_me_returns_profile_preferences_memberships_scopes(
         text(
             "INSERT INTO public.tenant_role_assignments (membership_id, role) "
             "VALUES (:mid, 'TenantAdmin')"
-        ),
+        ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
         {"mid": membership_id},
     )
     farm_id = uuid4()
@@ -105,6 +110,9 @@ async def test_me_returns_profile_preferences_memberships_scopes(
         text(
             "INSERT INTO public.farm_scopes (membership_id, farm_id, role) "
             "VALUES (:mid, :fid, 'FarmManager')"
+        ).bindparams(
+            bindparam("mid", type_=PG_UUID(as_uuid=True)),
+            bindparam("fid", type_=PG_UUID(as_uuid=True)),
         ),
         {"mid": membership_id, "fid": farm_id},
     )

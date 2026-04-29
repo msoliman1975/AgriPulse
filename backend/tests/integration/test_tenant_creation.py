@@ -7,10 +7,20 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.integration
+
+
+def _uuid_param(name: str) -> bindparam:
+    """Bind a UUID parameter with an explicit type so asyncpg's binary
+    codec sends it as 16 raw bytes rather than as the un-padded hex of
+    `uuid.int`. Without the type hint, asyncpg can drop leading zeros
+    on Python uuid.UUID objects under SQLAlchemy 2.x.
+    """
+    return bindparam(name, type_=PG_UUID(as_uuid=True))
 
 
 @pytest.mark.asyncio
@@ -36,7 +46,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
     # Tenant row, settings row, current subscription should all exist.
     row = (
         await admin_session.execute(
-            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid"),
+            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid").bindparams(
+                _uuid_param("tid")
+            ),
             {"tid": result.tenant_id},
         )
     ).one()
@@ -44,7 +56,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
 
     settings_count = (
         await admin_session.execute(
-            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid"),
+            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid").bindparams(
+                _uuid_param("tid")
+            ),
             {"tid": result.tenant_id},
         )
     ).scalar_one()
@@ -55,7 +69,7 @@ async def test_create_tenant_bootstraps_schema_and_audits(
             text(
                 "SELECT count(*) FROM public.tenant_subscriptions "
                 "WHERE tenant_id = :tid AND is_current = TRUE"
-            ),
+            ).bindparams(_uuid_param("tid")),
             {"tid": result.tenant_id},
         )
     ).scalar_one()
@@ -88,7 +102,7 @@ async def test_create_tenant_bootstraps_schema_and_audits(
             text(
                 "SELECT count(*) FROM audit_events "
                 "WHERE event_type = 'tenancy.tenant_created' AND subject_id = :tid"
-            ),
+            ).bindparams(_uuid_param("tid")),
             {"tid": result.tenant_id},
         )
     ).scalar_one()
