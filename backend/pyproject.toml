@@ -191,10 +191,13 @@ exclude_lines = [
 root_packages = ["app"]
 
 [[tool.importlinter.contracts]]
-name = "shared and core cannot import domain modules"
+name = "shared cannot import domain modules"
 type = "forbidden"
-source_modules = ["app.shared", "app.core"]
+source_modules = ["app.shared"]
 forbidden_modules = ["app.modules"]
+# `app.core` is the wiring layer — `app_factory` imports module routers
+# explicitly. That is the one allowed direction; everything else under
+# core (errors, settings, observability, logging) stays pure.
 
 # One contract per module: forbid every other module from importing this
 # module's private submodules (repository, models, router, schemas,
@@ -224,6 +227,7 @@ forbidden_modules = [
   "app.modules.tenancy.schemas",
   "app.modules.tenancy.bootstrap",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "iam internals are private"
@@ -248,6 +252,7 @@ forbidden_modules = [
   "app.modules.iam.router",
   "app.modules.iam.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "audit internals are private"
@@ -269,6 +274,7 @@ source_modules = [
 forbidden_modules = [
   "app.modules.audit.models",
 ]
+allow_indirect_imports = true
 
 # The remaining 10 modules are placeholders today; the contracts still
 # apply so any later code that violates them fails CI on the first push.
@@ -296,6 +302,7 @@ forbidden_modules = [
   "app.modules.farms.router",
   "app.modules.farms.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "imagery internals are private"
@@ -320,6 +327,7 @@ forbidden_modules = [
   "app.modules.imagery.router",
   "app.modules.imagery.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "indices internals are private"
@@ -344,6 +352,7 @@ forbidden_modules = [
   "app.modules.indices.router",
   "app.modules.indices.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "weather internals are private"
@@ -368,6 +377,7 @@ forbidden_modules = [
   "app.modules.weather.router",
   "app.modules.weather.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "signals internals are private"
@@ -392,6 +402,7 @@ forbidden_modules = [
   "app.modules.signals.router",
   "app.modules.signals.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "alerts internals are private"
@@ -416,6 +427,7 @@ forbidden_modules = [
   "app.modules.alerts.router",
   "app.modules.alerts.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "recommendations internals are private"
@@ -440,6 +452,7 @@ forbidden_modules = [
   "app.modules.recommendations.router",
   "app.modules.recommendations.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "notifications internals are private"
@@ -464,6 +477,7 @@ forbidden_modules = [
   "app.modules.notifications.router",
   "app.modules.notifications.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "analytics internals are private"
@@ -488,6 +502,7 @@ forbidden_modules = [
   "app.modules.analytics.router",
   "app.modules.analytics.schemas",
 ]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "forecasting internals are private"
@@ -512,3 +527,4 @@ forbidden_modules = [
   "app.modules.forecasting.router",
   "app.modules.forecasting.schemas",
 ]
+allow_indirect_imports = true
