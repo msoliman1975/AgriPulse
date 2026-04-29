@@ -68,22 +68,30 @@ updates:
           - "typescript"
 
   # Container base images, looked up per Dockerfile.
-  # Only the backend Dockerfile exists today; entries for /frontend and
-  # /tile-server are commented out until those Dockerfiles land (PR 3 and
-  # PR 4 respectively). PR 5 re-enables them. Without this, Dependabot's
-  # weekly run silently fails on the missing files.
   - package-ecosystem: docker
     directory: /backend
     schedule:
       interval: weekly
     labels: [dependencies, docker]
-  # - package-ecosystem: docker
-  #   directory: /frontend
-  #   schedule:
-  #     interval: weekly
-  #   labels: [dependencies, docker]
-  # - package-ecosystem: docker
-  #   directory: /tile-server
-  #   schedule:
-  #     interval: weekly
-  #   labels: [dependencies, docker]
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
+  - package-ecosystem: docker
+    directory: /tile-server
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
+
+  # Terraform: tracks required_providers in versions.tf and pinned module
+  # versions in our .tf files (terraform-aws-modules/{vpc,eks,iam}/aws).
+  - package-ecosystem: terraform
+    directory: /infra/terraform
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Cairo
+    labels: [dependencies, terraform]
+    open-pull-requests-limit: 5

@@ -16,7 +16,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # App source.
-COPY tsconfig.json tsconfig.app.json tsconfig.node.json ./
+COPY tsconfig.json tsconfig.app.json tsconfig.node.json global.d.ts ./
 COPY vite.config.ts vitest.config.ts tailwind.config.ts postcss.config.js ./
 COPY index.html ./
 COPY src ./src
