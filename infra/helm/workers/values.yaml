@@ -1,8 +1,9 @@
 image:
   repository: ghcr.io/msoliman1975/missionagre/api
-  tag: ""           # Empty → falls back to .Chart.AppVersion. Workers
-                    # share the API image to keep migrations and code
-                    # paths in lockstep.
+  tag:
+    "" # Empty → falls back to .Chart.AppVersion. Workers
+    # share the API image to keep migrations and code
+    # paths in lockstep.
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -49,7 +50,7 @@ externalSecret:
     name: aws-secretsmanager
     kind: ClusterSecretStore
   remoteRef:
-    key: missionagre/api      # Same secret as API; keeps DB password in sync.
+    key: missionagre/api # Same secret as API; keeps DB password in sync.
   data:
     - secretKey: DATABASE_PASSWORD
       property: database_password
@@ -103,10 +104,10 @@ workloads:
         cpu: "2"
         memory: 4Gi
     pdb:
-      enabled: false        # Singleton-ish; PDB would block evictions.
+      enabled: false # Singleton-ish; PDB would block evictions.
   beat:
     enabled: true
-    replicaCount: 1         # Beat is a true singleton.
+    replicaCount: 1 # Beat is a true singleton.
     command:
       - celery
       - --app
@@ -127,7 +128,12 @@ workloads:
 probes:
   liveness:
     exec:
-      command: ["sh", "-c", "celery --app workers.light.main:celery_app inspect ping -d celery@$HOSTNAME || true"]
+      command:
+        [
+          "sh",
+          "-c",
+          "celery --app workers.light.main:celery_app inspect ping -d celery@$HOSTNAME || true",
+        ]
     initialDelaySeconds: 30
     periodSeconds: 60
     timeoutSeconds: 10

@@ -37,7 +37,7 @@ podAnnotations: {}
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 101            # nginx-unprivileged default
+  runAsUser: 101 # nginx-unprivileged default
   fsGroup: 101
   seccompProfile:
     type: RuntimeDefault

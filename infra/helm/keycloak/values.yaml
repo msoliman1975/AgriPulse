@@ -6,7 +6,7 @@ keycloak:
   # Two replicas with the standard postgresql sub-chart wiring.
   replicaCount: 2
   production: true
-  proxy: edge          # Behind NGINX ingress with TLS termination.
+  proxy: edge # Behind NGINX ingress with TLS termination.
 
   auth:
     # The bootstrap admin password is created in AWS Secrets Manager and

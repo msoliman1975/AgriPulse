@@ -1,6 +1,6 @@
 image:
   repository: ghcr.io/msoliman1975/missionagre/api
-  tag: ""           # Empty → falls back to .Chart.AppVersion in the Deployment.
+  tag: "" # Empty → falls back to .Chart.AppVersion in the Deployment.
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -11,7 +11,7 @@ revisionHistoryLimit: 5
 
 serviceAccount:
   create: true
-  name: ""           # Empty → "{{ Release.Name }}-api"
+  name: "" # Empty → "{{ Release.Name }}-api"
   annotations: {}
 
 service:
@@ -38,7 +38,7 @@ resources:
     memory: 512Mi
 
 podAnnotations:
-  prometheus.io/scrape: "false"   # ServiceMonitor handles scraping.
+  prometheus.io/scrape: "false" # ServiceMonitor handles scraping.
 
 podSecurityContext:
   runAsNonRoot: true
@@ -121,7 +121,7 @@ pdb:
   minAvailable: 1
 
 networkPolicy:
-  enabled: false   # Enabled per-env in the production overlay.
+  enabled: false # Enabled per-env in the production overlay.
 
 nodeSelector: {}
 tolerations: []
