@@ -35,7 +35,9 @@ _TIMESCALE_IMAGE = "timescale/timescaledb-ha:pg16"
 def postgres_container() -> Iterator[object]:
     if PostgresContainer is None:  # pragma: no cover
         pytest.skip("testcontainers not installed")
-    container = PostgresContainer(_TIMESCALE_IMAGE, driver=None)
+    # `driver="psycopg"` matches our psycopg[binary] dep — without it
+    # testcontainers falls back to psycopg2 for its readiness probe.
+    container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg")
     container.with_env("POSTGRES_DB", "missionagre_test")
     container.start()
     try:
