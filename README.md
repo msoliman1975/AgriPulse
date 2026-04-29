@@ -75,9 +75,9 @@ Endpoints when up: Postgres `localhost:5432`, Redis `localhost:6379`, Keycloak h
 
 `.github/workflows/argocd-sync.yml` opens a follow-up PR after every successful `main` build, bumping `image.tag` in the dev overlay so ArgoCD picks up the new images.
 
-`.github/workflows/security.yml` runs `actions/dependency-review-action` on PRs and fails on `high`/`critical` CVEs.
-
 Branch protection on `main` is set by `scripts/setup-branch-protection.sh` (re-run any time the required-checks list changes).
+
+> Dependabot security advisories are active for this repo. PR-time `actions/dependency-review-action` requires GitHub Advanced Security; we can wire it back in once GHAS is enabled or the repo goes public.
 
 ## License
 

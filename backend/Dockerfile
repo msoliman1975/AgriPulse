@@ -17,12 +17,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /usr/local/bin/
 
 WORKDIR /build
-COPY pyproject.toml ./
-COPY uv.lock* ./
+COPY pyproject.toml uv.lock ./
 
+# uv.lock is committed (revision 3); always take the deterministic
+# `--frozen` path. No bash process-substitution fallback — the default
+# /bin/sh in python-slim is dash, which can't parse `<(...)`.
 RUN uv venv "$VIRTUAL_ENV" \
- && uv sync --frozen --no-dev --no-install-project 2>/dev/null \
-    || uv pip install --python "$VIRTUAL_ENV/bin/python" -r <(uv pip compile pyproject.toml --no-deps --no-header --quiet)
+ && uv sync --frozen --no-dev --no-install-project
 
 # Re-install with the project sources so editable-install metadata is correct.
 COPY app ./app
