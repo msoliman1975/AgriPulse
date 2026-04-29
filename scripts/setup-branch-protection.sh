@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
-# Apply MissionAgre's branch-protection ruleset to `main`.
+# Apply MissionAgre's branch-protection ruleset to `main` via the GitHub
+# Rulesets API. Rulesets are the modern replacement for classic branch
+# protection and work on free private repos — classic branch protection
+# requires GitHub Pro / Team.
 #
 # Run once per repo, then any time the required-checks list changes.
-# Requires `gh auth status` to be active for an account with admin
-# rights on msoliman1975/MissionAgre.
+# Requires `gh auth status` for an account with admin rights on the repo.
 #
 # Usage:
 #     scripts/setup-branch-protection.sh                # apply
 #     scripts/setup-branch-protection.sh --dry-run      # show payload only
 #     OWNER=foo REPO=bar scripts/setup-branch-protection.sh
 #
-# Idempotent — re-running with the same payload yields no diff.
+# Idempotent: if a ruleset named "$RULESET_NAME" already exists, this
+# updates it in place (PUT against its ID); otherwise it creates a new
+# one (POST). No-op-on-no-change is the API's responsibility.
 
 set -euo pipefail
 
 OWNER="${OWNER:-msoliman1975}"
 REPO="${REPO:-MissionAgre}"
-BRANCH="${BRANCH:-main}"
+RULESET_NAME="${RULESET_NAME:-main-branch-protection}"
 DRY_RUN=0
 
 for arg in "$@"; do
@@ -27,8 +31,7 @@ for arg in "$@"; do
 done
 
 # Required-checks list. Names must exactly match the `name:` field on
-# each job in .github/workflows/ci.yml. The `containers` job is included
-# so a failed image build blocks merge once it goes green at least once.
+# each job in .github/workflows/ci.yml.
 REQUIRED_CHECKS=(
     "pre-commit"
     "backend"
@@ -38,39 +41,53 @@ REQUIRED_CHECKS=(
     "containers"
 )
 
-# Build the JSON payload. Hand-rolled to keep the script jq-free; the
-# REQUIRED_CHECKS array is the only dynamic input.
-contexts_json="$(
-    printf '"%s",' "${REQUIRED_CHECKS[@]}" | sed 's/,$//'
-)"
+# Build the contexts JSON array for the required_status_checks rule.
+contexts_json=""
+for c in "${REQUIRED_CHECKS[@]}"; do
+    contexts_json="${contexts_json}{\"context\":\"${c}\"},"
+done
+contexts_json="${contexts_json%,}"
 
 PAYLOAD=$(cat <<EOF
 {
-    "required_status_checks": {
-        "strict": false,
-        "contexts": [${contexts_json}]
+    "name": "${RULESET_NAME}",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+        "ref_name": {
+            "include": ["~DEFAULT_BRANCH"],
+            "exclude": []
+        }
     },
-    "enforce_admins": false,
-    "required_pull_request_reviews": {
-        "dismiss_stale_reviews": true,
-        "require_code_owner_reviews": true,
-        "required_approving_review_count": 1,
-        "require_last_push_approval": false
-    },
-    "restrictions": null,
-    "required_linear_history": true,
-    "allow_force_pushes": false,
-    "allow_deletions": false,
-    "block_creations": false,
-    "required_conversation_resolution": true,
-    "lock_branch": false,
-    "allow_fork_syncing": false
+    "rules": [
+        {"type": "deletion"},
+        {"type": "non_fast_forward"},
+        {"type": "required_linear_history"},
+        {
+            "type": "pull_request",
+            "parameters": {
+                "required_approving_review_count": 1,
+                "dismiss_stale_reviews_on_push": true,
+                "require_code_owner_review": true,
+                "require_last_push_approval": false,
+                "required_review_thread_resolution": true
+            }
+        },
+        {
+            "type": "required_status_checks",
+            "parameters": {
+                "strict_required_status_checks_policy": false,
+                "required_status_checks": [${contexts_json}]
+            }
+        }
+    ],
+    "bypass_actors": []
 }
 EOF
 )
 
 echo "Repo: ${OWNER}/${REPO}"
-echo "Branch: ${BRANCH}"
+echo "Ruleset: ${RULESET_NAME}"
 echo "Required checks: ${REQUIRED_CHECKS[*]}"
 echo
 
@@ -84,13 +101,31 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
-echo "Applying branch protection..."
+# Look up an existing ruleset with the same name; PUT to update if found,
+# POST to create otherwise.
+EXISTING_ID=$(
+    gh api "repos/${OWNER}/${REPO}/rulesets" \
+        -H "Accept: application/vnd.github+json" \
+        --jq ".[] | select(.name == \"${RULESET_NAME}\") | .id" 2>/dev/null \
+        || true
+)
+
+if [ -n "${EXISTING_ID}" ]; then
+    echo "Updating existing ruleset id=${EXISTING_ID}..."
+    METHOD="PUT"
+    URL="repos/${OWNER}/${REPO}/rulesets/${EXISTING_ID}"
+else
+    echo "Creating new ruleset..."
+    METHOD="POST"
+    URL="repos/${OWNER}/${REPO}/rulesets"
+fi
+
 echo "$PAYLOAD" | gh api \
-    --method PUT \
+    --method "$METHOD" \
     -H "Accept: application/vnd.github+json" \
-    "repos/${OWNER}/${REPO}/branches/${BRANCH}/protection" \
+    "$URL" \
     --input -
 
 echo
 echo "Done. Verify at:"
-echo "  https://github.com/${OWNER}/${REPO}/settings/branches"
+echo "  https://github.com/${OWNER}/${REPO}/rules"

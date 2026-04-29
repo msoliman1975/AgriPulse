@@ -75,7 +75,9 @@ Endpoints when up: Postgres `localhost:5432`, Redis `localhost:6379`, Keycloak h
 
 `.github/workflows/argocd-sync.yml` opens a follow-up PR after every successful `main` build, bumping `image.tag` in the dev overlay so ArgoCD picks up the new images.
 
-Branch protection on `main` is set by `scripts/setup-branch-protection.sh` (re-run any time the required-checks list changes).
+Branch protection on `main` is set by `scripts/setup-branch-protection.sh` (re-run any time the required-checks list changes). The script targets the modern Rulesets API.
+
+> ⚠️ GitHub's free tier blocks both classic branch protection and Rulesets on private repos. The script is ready to run; applying it requires either upgrading to GitHub Pro/Team or making the repo public. Until then, `main` is protected by convention only — squash-merge and one reviewer enforced through PR-author discipline.
 
 > Dependabot security advisories are active for this repo. PR-time `actions/dependency-review-action` requires GitHub Advanced Security; we can wire it back in once GHAS is enabled or the repo goes public.
 
