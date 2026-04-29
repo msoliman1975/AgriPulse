@@ -167,6 +167,9 @@ markers = [
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning:pkg_resources.*",
+  # testcontainers 4.x emits a DeprecationWarning at import time about its
+  # own deprecated decorator; harmless for our use.
+  "ignore::DeprecationWarning:testcontainers.*",
 ]
 
 [tool.coverage.run]
