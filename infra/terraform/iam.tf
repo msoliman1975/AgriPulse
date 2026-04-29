@@ -14,7 +14,7 @@ data "aws_caller_identity" "current" {}
 # --- Backend API ----------------------------------------------------------
 module "iam_role_api" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "missionagre-${var.environment}-api"
 
@@ -37,7 +37,7 @@ module "iam_role_api" {
 # --- Workers --------------------------------------------------------------
 module "iam_role_workers" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "missionagre-${var.environment}-workers"
 
@@ -60,7 +60,7 @@ module "iam_role_workers" {
 # --- Tile server (read-only) ---------------------------------------------
 module "iam_role_tile_server" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "missionagre-${var.environment}-tile-server"
 
@@ -81,7 +81,7 @@ module "iam_role_tile_server" {
 # --- External Secrets Operator -------------------------------------------
 module "iam_role_external_secrets" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "missionagre-${var.environment}-external-secrets"
 
@@ -102,7 +102,7 @@ module "iam_role_external_secrets" {
 # --- CloudNativePG backup ------------------------------------------------
 module "iam_role_cnpg" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "missionagre-${var.environment}-cnpg"
 
