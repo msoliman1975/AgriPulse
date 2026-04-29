@@ -27,7 +27,7 @@ RUN pnpm build
 # --- Runtime ----------------------------------------------------------------
 # Static-served via nginx. The image is unprivileged (nginx-unprivileged
 # variant) to satisfy K8s SecurityContext.runAsNonRoot=true policies.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 
 # nginx-unprivileged listens on 8080 by default; ARCHITECTURE.md § 3.2 sits
 # behind NGINX Ingress, so the in-pod port doesn't need to be 80.
