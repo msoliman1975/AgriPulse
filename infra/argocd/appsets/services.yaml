@@ -1,0 +1,63 @@
+---
+# Generates one Application per (service chart × environment). Six charts ×
+# three environments = 18 Applications. Each Application uses the chart at
+# `infra/helm/<chart>` and overlays `infra/argocd/overlays/<env>/values.yaml`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: missionagre-services
+  namespace: argocd
+spec:
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - chart: shared
+                - chart: api
+                - chart: workers
+                - chart: tile-server
+                - chart: frontend
+                - chart: keycloak
+          - list:
+              elements:
+                - env: dev
+                  namespace: missionagre
+                  autoSync: "true"
+                  prune: "true"
+                - env: staging
+                  namespace: missionagre
+                  autoSync: "true"
+                  prune: "false"
+                - env: production
+                  namespace: missionagre
+                  autoSync: "false"
+                  prune: "false"
+  template:
+    metadata:
+      name: '{{.chart}}-{{.env}}'
+      labels:
+        app.kubernetes.io/part-of: missionagre
+        missionagre.io/env: '{{.env}}'
+        missionagre.io/chart: '{{.chart}}'
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.namespace}}'
+      source:
+        repoURL: https://github.com/msoliman1975/MissionAgre.git
+        targetRevision: HEAD
+        path: 'infra/helm/{{.chart}}'
+        helm:
+          valueFiles:
+            - 'values.yaml'
+            - '../../argocd/overlays/{{.env}}/values.yaml'
+      syncPolicy:
+        automated:
+          prune: '{{.prune}}'
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true

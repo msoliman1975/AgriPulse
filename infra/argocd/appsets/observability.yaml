@@ -1,0 +1,65 @@
+---
+# Observability stack — Prometheus + Grafana via kube-prometheus-stack,
+# Loki + Promtail for logs, Tempo for traces, GlitchTip for errors.
+# Per-chart values live next to this file in
+# infra/argocd/platform-values/<name>.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: missionagre-observability
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: kube-prometheus-stack
+            chart: kube-prometheus-stack
+            repoURL: https://prometheus-community.github.io/helm-charts
+            chartVersion: 65.5.1
+
+          - name: loki
+            chart: loki
+            repoURL: https://grafana.github.io/helm-charts
+            chartVersion: 6.18.0
+
+          - name: promtail
+            chart: promtail
+            repoURL: https://grafana.github.io/helm-charts
+            chartVersion: 6.16.6
+
+          - name: tempo
+            chart: tempo
+            repoURL: https://grafana.github.io/helm-charts
+            chartVersion: 1.10.3
+
+          - name: glitchtip
+            chart: glitchtip
+            repoURL: https://gitlab.com/api/v4/projects/16325141/packages/helm/stable
+            chartVersion: 4.5.0
+  template:
+    metadata:
+      name: 'observability-{{.name}}'
+      labels:
+        app.kubernetes.io/part-of: missionagre-observability
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: observability
+      sources:
+        - repoURL: '{{.repoURL}}'
+          targetRevision: '{{.chartVersion}}'
+          chart: '{{.chart}}'
+          helm:
+            valueFiles:
+              - $values/infra/argocd/platform-values/{{.name}}.yaml
+        - repoURL: https://github.com/msoliman1975/MissionAgre.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true

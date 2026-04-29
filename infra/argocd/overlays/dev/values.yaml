@@ -1,0 +1,40 @@
+# dev environment overrides for the missionagre-services ApplicationSet.
+# Values here override `infra/helm/<chart>/values.yaml` defaults.
+
+# Common knobs across charts.
+labels:
+  partOf: missionagre
+
+# Smaller footprint, single-AZ tolerable.
+replicaCount: 1
+
+# Hosts use the dev wildcard; cert-manager issues against the staging
+# Let's Encrypt directory so we don't burn prod rate limits.
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  host: api.dev.missionagre.local
+
+# Dev DB is the same cluster CNPG instance, just smaller.
+postgresCluster:
+  instances: 1
+  storage:
+    size: 20Gi
+  walStorage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+# Tighter resources across services in dev.
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

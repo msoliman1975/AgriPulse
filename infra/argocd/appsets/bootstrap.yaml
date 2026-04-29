@@ -1,0 +1,29 @@
+---
+# AppOfApps. Apply once into the `argocd` namespace; ArgoCD then creates
+# the three child ApplicationSets which spawn the per-env Applications.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: missionagre-bootstrap
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  source:
+    repoURL: https://github.com/msoliman1975/MissionAgre.git
+    targetRevision: HEAD
+    path: infra/argocd/appsets
+    directory:
+      recurse: false
+      include: "{services.yaml,platform.yaml,observability.yaml}"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

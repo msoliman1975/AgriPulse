@@ -1,0 +1,64 @@
+---
+# Cluster operators — installed once per cluster from upstream Helm
+# repositories. We do not vendor these; pin versions here and let
+# Dependabot bump them. Per-operator values live in
+# infra/argocd/platform-values/<name>.yaml so they stay readable.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: missionagre-platform
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: cert-manager
+            namespace: cert-manager
+            chart: cert-manager
+            repoURL: https://charts.jetstack.io
+            chartVersion: v1.16.2
+
+          - name: external-secrets
+            namespace: external-secrets
+            chart: external-secrets
+            repoURL: https://charts.external-secrets.io
+            chartVersion: 0.10.7
+
+          - name: cnpg
+            namespace: cnpg-system
+            chart: cloudnative-pg
+            repoURL: https://cloudnative-pg.github.io/charts
+            chartVersion: 0.22.1
+
+          - name: ingress-nginx
+            namespace: ingress-nginx
+            chart: ingress-nginx
+            repoURL: https://kubernetes.github.io/ingress-nginx
+            chartVersion: 4.11.3
+  template:
+    metadata:
+      name: 'platform-{{.name}}'
+      labels:
+        app.kubernetes.io/part-of: missionagre-platform
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.namespace}}'
+      sources:
+        - repoURL: '{{.repoURL}}'
+          targetRevision: '{{.chartVersion}}'
+          chart: '{{.chart}}'
+          helm:
+            valueFiles:
+              - $values/infra/argocd/platform-values/{{.name}}.yaml
+        - repoURL: https://github.com/msoliman1975/MissionAgre.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true

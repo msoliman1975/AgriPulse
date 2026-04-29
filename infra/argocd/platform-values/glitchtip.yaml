@@ -1,0 +1,30 @@
+# GlitchTip (open-source Sentry alternative) per ARCHITECTURE.md § 3.3.
+# Database is the cluster Postgres (CloudNativePG); Redis comes from the
+# upstream chart's bundled instance.
+env:
+  DATABASE_URL_FROM:
+    secretKeyRef:
+      name: missionagre-glitchtip-db
+      key: url
+  SECRET_KEY_FROM:
+    secretKeyRef:
+      name: missionagre-glitchtip-secrets
+      key: secret_key
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  hosts:
+    - host: errors.dev.missionagre.local
+      paths: [{ path: /, pathType: Prefix }]
+  tls:
+    - hosts:
+        - errors.dev.missionagre.local
+      secretName: missionagre-glitchtip-tls
+
+postgresql:
+  enabled: false       # use the cluster CNPG instance
+redis:
+  enabled: true        # bundled small Redis is fine

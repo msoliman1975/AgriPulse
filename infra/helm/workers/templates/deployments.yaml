@@ -1,0 +1,82 @@
+{{- range $name, $workload := .Values.workloads -}}
+{{- if $workload.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-%s" (include "missionagre-workers.fullname" $) $name }}
+  labels:
+    {{- include "missionagre-workers.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ printf "worker-%s" $name }}
+spec:
+  replicas: {{ $workload.replicaCount }}
+  revisionHistoryLimit: {{ $.Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "missionagre-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
+  strategy:
+    {{- if eq $name "beat" }}
+    type: Recreate
+    {{- else }}
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "missionagre-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "missionagre-workers.serviceAccountName" $ }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: {{ include "missionagre-workers.imageRef" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command:
+            {{- toYaml $workload.command | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: missionagre-app-config
+            - configMapRef:
+                name: {{ include "missionagre-workers.fullname" $ }}
+            {{- if $.Values.externalSecret.enabled }}
+            - secretRef:
+                name: {{ include "missionagre-workers.fullname" $ }}-secrets
+            {{- end }}
+          resources:
+            {{- toYaml $workload.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.containerSecurityContext | nindent 12 }}
+          {{- if and (ne $name "beat") $.Values.probes.liveness }}
+          livenessProbe:
+            {{- toYaml $.Values.probes.liveness | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

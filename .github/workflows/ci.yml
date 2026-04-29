@@ -147,9 +147,74 @@ jobs:
   helm:
     name: helm
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - run: echo "helm job is wired up in PR 4"
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Add chart repos for dependencies
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+
+      - name: helm dependency build (charts with dependencies)
+        run: |
+          for chart in infra/helm/keycloak; do
+            if [ -f "${chart}/Chart.yaml" ] && grep -q '^dependencies:' "${chart}/Chart.yaml"; then
+              echo "::group::dependency build ${chart}"
+              helm dependency build "${chart}"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: helm lint
+        run: |
+          for chart in infra/helm/*/; do
+            echo "::group::lint ${chart}"
+            helm lint "${chart}"
+            echo "::endgroup::"
+          done
+
+      - name: helm template (smoke render)
+        run: |
+          for chart in infra/helm/*/; do
+            name=$(basename "${chart}")
+            echo "::group::template ${name}"
+            helm template "${name}" "${chart}" >/dev/null
+            echo "::endgroup::"
+          done
+
+  infra-tf:
+    name: infra-tf
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        # Inject a placeholder environment value so the variable validation
+        # block accepts a single canonical value during validation.
+        run: terraform validate
+        env:
+          TF_VAR_environment: dev
 
   containers:
     name: containers
