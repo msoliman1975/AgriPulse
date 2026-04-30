@@ -2,20 +2,24 @@
 
 Run:  celery -A workers.beat.main beat --loglevel=INFO
 
-The schedule itself is empty for now. Future prompts wire periodic
-tasks (alert evaluation every 15 min, recommendation evaluation
-daily, imagery polling at provider cadence) by adding entries to
-`app.conf.beat_schedule`.
+Schedules live here so they're discoverable in one file. Cadence values
+that matter operationally are sourced from settings, so dev clusters
+can run faster than production without touching code.
 """
 
 from __future__ import annotations
 
+from app.core.settings import get_settings
 from workers.celery_factory import build_celery
 
 app = build_celery("beat")
 
+_settings = get_settings()
+
 app.conf.beat_schedule = {
-    # No schedules yet. Each domain module that needs periodic work
-    # contributes its own entry from its `service.py` startup hook
-    # (added in subsequent prompts).
+    "farms.farm_scope_consistency_check": {
+        "task": "farms.farm_scope_consistency_check",
+        "schedule": float(_settings.farm_scope_consistency_check_seconds),
+        "options": {"queue": "light"},
+    },
 }
