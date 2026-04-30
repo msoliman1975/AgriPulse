@@ -14,6 +14,7 @@ from sqlalchemy import engine_from_config, pool
 # Register every public-schema ORM model with `Base.metadata` so future
 # `--autogenerate` runs see them. Hand-written migrations do not need
 # this, but it is cheap to keep the registry warm.
+import app.modules.farms.models
 import app.modules.iam.models
 import app.modules.tenancy.models
 from app.core.settings import get_settings

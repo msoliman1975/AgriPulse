@@ -26,7 +26,10 @@ roles:
       - user.read
       - audit.read
       - farm.read
+      - farm.member.read
+      - farm.attachment.read
       - block.read
+      - block.attachment.read
       - imagery.read
       - index.read
       - weather.read
@@ -59,11 +62,16 @@ roles:
       - farm.create
       - farm.update
       - farm.delete
+      - farm.member.read
+      - farm.attachment.read
+      - farm.attachment.write
       - block.read
       - block.create
       - block.update_geometry
       - block.update_metadata
       - block.delete
+      - block.attachment.read
+      - block.attachment.write
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
@@ -112,11 +120,16 @@ roles:
       - farm.create
       - farm.update
       - farm.delete
+      - farm.member.read
+      - farm.attachment.read
+      - farm.attachment.write
       - block.read
       - block.create
       - block.update_geometry
       - block.update_metadata
       - block.delete
+      - block.attachment.read
+      - block.attachment.write
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
@@ -162,11 +175,16 @@ roles:
       - role.assign_farm
       - farm.read
       - farm.update
+      - farm.member.read
+      - farm.attachment.read
+      - farm.attachment.write
       - block.read
       - block.create
       - block.update_geometry
       - block.update_metadata
       - block.delete
+      - block.attachment.read
+      - block.attachment.write
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
@@ -195,7 +213,10 @@ roles:
     description: Agronomic decisions on an assigned farm; no geometry edits.
     capabilities:
       - farm.read
+      - farm.attachment.read
       - block.read
+      - block.attachment.read
+      - crop_assignment.update
       - imagery.read
       - imagery.refresh
       - index.read
@@ -221,7 +242,11 @@ roles:
     description: Field operations and observation logging on an assigned farm.
     capabilities:
       - farm.read
+      - farm.attachment.read
+      - farm.attachment.write
       - block.read
+      - block.attachment.read
+      - block.attachment.write
       - imagery.read
       - index.read
       - weather.read
@@ -240,7 +265,9 @@ roles:
     description: Observation logging only on an assigned farm.
     capabilities:
       - farm.read
+      - farm.attachment.read
       - block.read
+      - block.attachment.read
       - imagery.read
       - index.read
       - weather.read
@@ -255,7 +282,9 @@ roles:
     description: Read-only view of an assigned farm.
     capabilities:
       - farm.read
+      - farm.attachment.read
       - block.read
+      - block.attachment.read
       - imagery.read
       - index.read
       - weather.read
