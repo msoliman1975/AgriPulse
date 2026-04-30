@@ -1,7 +1,7 @@
 """Integration tests: per-farm RBAC enforcement.
 
-  * Viewer on farm A cannot edit farm A.
-  * FarmManager on farm A cannot edit farm B (404 — not 403).
+* Viewer on farm A cannot edit farm A.
+* FarmManager on farm A cannot edit farm B (404 — not 403).
 """
 
 from __future__ import annotations
