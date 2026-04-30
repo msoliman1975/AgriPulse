@@ -96,51 +96,71 @@ capabilities:
   farm.read:
     description: View farm metadata and the farm's block list.
     scope: farm
-    status: stub
+    status: active
   farm.create:
     description: Create a new farm in the tenant.
     scope: tenant
-    status: stub
+    status: active
   farm.update:
-    description: Edit farm metadata (name, governorate, contact).
+    description: Edit farm metadata (name, governorate, contact, geometry).
     scope: farm
-    status: stub
+    status: active
   farm.delete:
-    description: Soft-delete a farm.
+    description: Soft-archive a farm.
     scope: farm
-    status: stub
+    status: active
+  farm.member.read:
+    description: List members assigned to a specific farm.
+    scope: farm
+    status: active
+  farm.attachment.read:
+    description: View a farm's photos and documents.
+    scope: farm
+    status: active
+  farm.attachment.write:
+    description: Upload or remove a farm's photos and documents.
+    scope: farm
+    status: active
   block.read:
     description: View block metadata, geometry, and crop assignments.
     scope: farm
-    status: stub
+    status: active
   block.create:
     description: Create a new block in a farm.
     scope: farm
-    status: stub
+    status: active
   block.update_geometry:
     description: Edit a block's polygon geometry.
     scope: farm
-    status: stub
+    status: active
   block.update_metadata:
     description: Edit non-geometry block fields (name, soil, irrigation).
     scope: farm
-    status: stub
+    status: active
   block.delete:
-    description: Soft-delete a block.
+    description: Soft-archive a block.
     scope: farm
-    status: stub
+    status: active
+  block.attachment.read:
+    description: View a block's photos and documents.
+    scope: farm
+    status: active
+  block.attachment.write:
+    description: Upload or remove a block's photos and documents.
+    scope: farm
+    status: active
   crop_assignment.create:
     description: Assign a crop to a block for a season.
     scope: farm
-    status: stub
+    status: active
   crop_assignment.update:
     description: Edit an existing crop assignment.
     scope: farm
-    status: stub
+    status: active
   crop_assignment.delete:
     description: Remove a crop assignment.
     scope: farm
-    status: stub
+    status: active
 
   # --- Imagery & indices -----------------------------------------------
   imagery.read:

@@ -84,8 +84,10 @@ def _register_module_routers(app: FastAPI) -> None:
     factory's import graph thin in environments that do not need the
     full app (e.g., a Celery worker importing only `app.core.settings`).
     """
+    from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.tenancy.router import router as tenancy_router
 
     app.include_router(iam_router)
     app.include_router(tenancy_router)
+    app.include_router(farms_router)

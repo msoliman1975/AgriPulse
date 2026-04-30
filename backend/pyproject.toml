@@ -309,6 +309,10 @@ forbidden_modules = [
   "app.modules.farms.models",
   "app.modules.farms.router",
   "app.modules.farms.schemas",
+  "app.modules.farms.subscribers",
+  "app.modules.farms.geometry",
+  "app.modules.farms.auto_grid",
+  "app.modules.farms.errors",
 ]
 allow_indirect_imports = true
 
