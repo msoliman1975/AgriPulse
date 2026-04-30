@@ -7,8 +7,12 @@ from decimal import Decimal
 from uuid import uuid4
 
 from app.modules.farms.events import (
+    BlockAttachmentDeletedV1,
+    BlockAttachmentUploadedV1,
     BlockBoundaryChangedV1,
     BlockCreatedV1,
+    FarmAttachmentDeletedV1,
+    FarmAttachmentUploadedV1,
     FarmCreatedV1,
     FarmMemberAssignedV1,
 )
@@ -74,3 +78,27 @@ def test_event_is_frozen() -> None:
 
     with pytest.raises((AttributeError, TypeError, ValueError)):
         ev.code = "Y"  # type: ignore[misc]
+
+
+def test_attachment_event_names_are_versioned() -> None:
+    farm_up = FarmAttachmentUploadedV1(
+        attachment_id=uuid4(),
+        farm_id=uuid4(),
+        kind="photo",
+        size_bytes=1024,
+        content_type="image/jpeg",
+    )
+    farm_del = FarmAttachmentDeletedV1(attachment_id=uuid4(), farm_id=uuid4())
+    block_up = BlockAttachmentUploadedV1(
+        attachment_id=uuid4(),
+        block_id=uuid4(),
+        kind="photo",
+        size_bytes=1024,
+        content_type="image/jpeg",
+    )
+    block_del = BlockAttachmentDeletedV1(attachment_id=uuid4(), block_id=uuid4())
+
+    assert farm_up.event_name == "farms.farm_attachment_uploaded.v1"
+    assert farm_del.event_name == "farms.farm_attachment_deleted.v1"
+    assert block_up.event_name == "farms.block_attachment_uploaded.v1"
+    assert block_del.event_name == "farms.block_attachment_deleted.v1"

@@ -765,6 +765,255 @@ class FarmsRepository:
             for r in result.all()
         ]
 
+    # ---- Attachments -----------------------------------------------
+
+    async def insert_farm_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        farm_id: UUID,
+        kind: str,
+        s3_key: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point_ewkt: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        # Confirm the farm exists in this tenant — otherwise a presigned
+        # PUT URL would let a caller scribble objects under arbitrary keys.
+        if (await self.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        stmt = text(
+            """
+            INSERT INTO farm_attachments (
+                id, farm_id, kind, s3_key, original_filename, content_type, size_bytes,
+                caption, taken_at, geo_point, created_by, updated_by
+            ) VALUES (
+                :id, :farm_id, :kind, :s3_key, :filename, :content_type, :size,
+                :caption, :taken_at,
+                CASE WHEN :geo IS NULL THEN NULL ELSE ST_GeomFromEWKT(:geo) END,
+                :actor, :actor
+            )
+            RETURNING id, created_at, updated_at
+            """
+        ).bindparams(_bind_uuid("id"), _bind_uuid("farm_id"), _bind_uuid("actor"))
+        result = await self._tenant.execute(
+            stmt,
+            {
+                "id": attachment_id,
+                "farm_id": farm_id,
+                "kind": kind,
+                "s3_key": s3_key,
+                "filename": original_filename,
+                "content_type": content_type,
+                "size": size_bytes,
+                "caption": caption,
+                "taken_at": taken_at,
+                "geo": geo_point_ewkt,
+                "actor": actor_user_id,
+            },
+        )
+        row = result.one()
+        return {
+            "id": row.id,
+            "owner_kind": "farm",
+            "owner_id": farm_id,
+            "kind": kind,
+            "s3_key": s3_key,
+            "original_filename": original_filename,
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "caption": caption,
+            "taken_at": taken_at,
+            "geo_point": None,  # client provided EWKT only; full re-fetch on list/get
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+
+    async def insert_block_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        block_id: UUID,
+        kind: str,
+        s3_key: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point_ewkt: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        block_exists = await self._tenant.execute(
+            select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
+        )
+        if block_exists.first() is None:
+            raise BlockNotFoundError(block_id)
+
+        stmt = text(
+            """
+            INSERT INTO block_attachments (
+                id, block_id, kind, s3_key, original_filename, content_type, size_bytes,
+                caption, taken_at, geo_point, created_by, updated_by
+            ) VALUES (
+                :id, :block_id, :kind, :s3_key, :filename, :content_type, :size,
+                :caption, :taken_at,
+                CASE WHEN :geo IS NULL THEN NULL ELSE ST_GeomFromEWKT(:geo) END,
+                :actor, :actor
+            )
+            RETURNING id, created_at, updated_at
+            """
+        ).bindparams(_bind_uuid("id"), _bind_uuid("block_id"), _bind_uuid("actor"))
+        result = await self._tenant.execute(
+            stmt,
+            {
+                "id": attachment_id,
+                "block_id": block_id,
+                "kind": kind,
+                "s3_key": s3_key,
+                "filename": original_filename,
+                "content_type": content_type,
+                "size": size_bytes,
+                "caption": caption,
+                "taken_at": taken_at,
+                "geo": geo_point_ewkt,
+                "actor": actor_user_id,
+            },
+        )
+        row = result.one()
+        return {
+            "id": row.id,
+            "owner_kind": "block",
+            "owner_id": block_id,
+            "kind": kind,
+            "s3_key": s3_key,
+            "original_filename": original_filename,
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "caption": caption,
+            "taken_at": taken_at,
+            "geo_point": None,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+
+    async def list_farm_attachments(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(
+                FarmAttachment.id,
+                FarmAttachment.farm_id,
+                FarmAttachment.kind,
+                FarmAttachment.s3_key,
+                FarmAttachment.original_filename,
+                FarmAttachment.content_type,
+                FarmAttachment.size_bytes,
+                FarmAttachment.caption,
+                FarmAttachment.taken_at,
+                func.ST_AsGeoJSON(FarmAttachment.geo_point).label("geo_point_geojson"),
+                FarmAttachment.created_at,
+                FarmAttachment.updated_at,
+            )
+            .where(FarmAttachment.farm_id == farm_id, FarmAttachment.deleted_at.is_(None))
+            .order_by(FarmAttachment.created_at.desc(), FarmAttachment.id.desc())
+        )
+        rows = (await self._tenant.execute(stmt)).all()
+        return [_attachment_row_to_dict(r, owner_kind="farm", owner_id=r.farm_id) for r in rows]
+
+    async def list_block_attachments(self, *, block_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(
+                BlockAttachment.id,
+                BlockAttachment.block_id,
+                BlockAttachment.kind,
+                BlockAttachment.s3_key,
+                BlockAttachment.original_filename,
+                BlockAttachment.content_type,
+                BlockAttachment.size_bytes,
+                BlockAttachment.caption,
+                BlockAttachment.taken_at,
+                func.ST_AsGeoJSON(BlockAttachment.geo_point).label("geo_point_geojson"),
+                BlockAttachment.created_at,
+                BlockAttachment.updated_at,
+            )
+            .where(BlockAttachment.block_id == block_id, BlockAttachment.deleted_at.is_(None))
+            .order_by(BlockAttachment.created_at.desc(), BlockAttachment.id.desc())
+        )
+        rows = (await self._tenant.execute(stmt)).all()
+        return [_attachment_row_to_dict(r, owner_kind="block", owner_id=r.block_id) for r in rows]
+
+    async def get_farm_attachment(self, *, attachment_id: UUID) -> dict[str, Any] | None:
+        stmt = select(
+            FarmAttachment.id,
+            FarmAttachment.farm_id,
+            FarmAttachment.kind,
+            FarmAttachment.s3_key,
+            FarmAttachment.original_filename,
+            FarmAttachment.content_type,
+            FarmAttachment.size_bytes,
+            FarmAttachment.caption,
+            FarmAttachment.taken_at,
+            func.ST_AsGeoJSON(FarmAttachment.geo_point).label("geo_point_geojson"),
+            FarmAttachment.created_at,
+            FarmAttachment.updated_at,
+        ).where(FarmAttachment.id == attachment_id, FarmAttachment.deleted_at.is_(None))
+        row = (await self._tenant.execute(stmt)).first()
+        if row is None:
+            return None
+        return _attachment_row_to_dict(row, owner_kind="farm", owner_id=row.farm_id)
+
+    async def get_block_attachment(self, *, attachment_id: UUID) -> dict[str, Any] | None:
+        stmt = select(
+            BlockAttachment.id,
+            BlockAttachment.block_id,
+            BlockAttachment.kind,
+            BlockAttachment.s3_key,
+            BlockAttachment.original_filename,
+            BlockAttachment.content_type,
+            BlockAttachment.size_bytes,
+            BlockAttachment.caption,
+            BlockAttachment.taken_at,
+            func.ST_AsGeoJSON(BlockAttachment.geo_point).label("geo_point_geojson"),
+            BlockAttachment.created_at,
+            BlockAttachment.updated_at,
+        ).where(BlockAttachment.id == attachment_id, BlockAttachment.deleted_at.is_(None))
+        row = (await self._tenant.execute(stmt)).first()
+        if row is None:
+            return None
+        return _attachment_row_to_dict(row, owner_kind="block", owner_id=row.block_id)
+
+    async def soft_delete_farm_attachment(
+        self, *, attachment_id: UUID, actor_user_id: UUID | None
+    ) -> bool:
+        result = await self._tenant.execute(
+            update(FarmAttachment)
+            .where(FarmAttachment.id == attachment_id, FarmAttachment.deleted_at.is_(None))
+            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+        )
+        # CursorResult exposes rowcount; cast keeps mypy happy under strict.
+        from sqlalchemy.engine import CursorResult
+
+        cursor_result: CursorResult[Any] = result  # type: ignore[assignment]
+        return (cursor_result.rowcount or 0) > 0
+
+    async def soft_delete_block_attachment(
+        self, *, attachment_id: UUID, actor_user_id: UUID | None
+    ) -> bool:
+        result = await self._tenant.execute(
+            update(BlockAttachment)
+            .where(BlockAttachment.id == attachment_id, BlockAttachment.deleted_at.is_(None))
+            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+        )
+        # CursorResult exposes rowcount; cast keeps mypy happy under strict.
+        from sqlalchemy.engine import CursorResult
+
+        cursor_result: CursorResult[Any] = result  # type: ignore[assignment]
+        return (cursor_result.rowcount or 0) > 0
+
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -861,6 +1110,24 @@ def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
         "notes": bc.notes,
         "created_at": bc.created_at,
         "updated_at": bc.updated_at,
+    }
+
+
+def _attachment_row_to_dict(row: Any, *, owner_kind: str, owner_id: UUID) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "owner_kind": owner_kind,
+        "owner_id": owner_id,
+        "kind": row.kind,
+        "s3_key": row.s3_key,
+        "original_filename": row.original_filename,
+        "content_type": row.content_type,
+        "size_bytes": row.size_bytes,
+        "caption": row.caption,
+        "taken_at": row.taken_at,
+        "geo_point": _decode_geojson(row.geo_point_geojson),
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
     }
 
 

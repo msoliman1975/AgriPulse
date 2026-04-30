@@ -23,11 +23,15 @@ from app.modules.farms.errors import (
 )
 from app.modules.farms.events import (
     BlockArchivedV1,
+    BlockAttachmentDeletedV1,
+    BlockAttachmentUploadedV1,
     BlockBoundaryChangedV1,
     BlockCreatedV1,
     BlockCropAssignedV1,
     BlockUpdatedV1,
     FarmArchivedV1,
+    FarmAttachmentDeletedV1,
+    FarmAttachmentUploadedV1,
     FarmBoundaryChangedV1,
     FarmCreatedV1,
     FarmMemberAssignedV1,
@@ -37,6 +41,13 @@ from app.modules.farms.events import (
 from app.modules.farms.repository import FarmsRepository
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
+from app.shared.storage import (
+    PresignedDownload,
+    StorageClient,
+    StorageObjectMissingError,
+    build_attachment_key,
+    get_storage_client,
+)
 
 # Conversion factors per data_model § 1.5.
 _M2_PER_FEDDAN = Decimal("4200.83")
@@ -236,6 +247,86 @@ class FarmService(Protocol):
 
     async def list_members(self, *, farm_id: UUID) -> list[dict[str, Any]]: ...
 
+    async def init_farm_attachment_upload(
+        self,
+        *,
+        farm_id: UUID,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        tenant_id: UUID,
+    ) -> dict[str, Any]: ...
+
+    async def finalize_farm_attachment(
+        self,
+        *,
+        farm_id: UUID,
+        attachment_id: UUID,
+        s3_key: str,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point: dict[str, Any] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def list_farm_attachments(self, *, farm_id: UUID) -> list[dict[str, Any]]: ...
+
+    async def delete_farm_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> None: ...
+
+    async def init_block_attachment_upload(
+        self,
+        *,
+        block_id: UUID,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        tenant_id: UUID,
+    ) -> dict[str, Any]: ...
+
+    async def finalize_block_attachment(
+        self,
+        *,
+        block_id: UUID,
+        attachment_id: UUID,
+        s3_key: str,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point: dict[str, Any] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def list_block_attachments(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
+
+    async def delete_block_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> None: ...
+
 
 # ---------- Implementation --------------------------------------------------
 
@@ -248,12 +339,14 @@ class FarmServiceImpl:
         public_session: AsyncSession,
         audit_service: AuditService | None = None,
         event_bus: EventBus | None = None,
+        storage_client: StorageClient | None = None,
     ) -> None:
         self._tenant_session = tenant_session
         self._public_session = public_session
         self._repo = FarmsRepository(tenant_session, public_session=public_session)
         self._audit = audit_service or get_audit_service()
         self._bus = event_bus or get_default_bus()
+        self._storage = storage_client or get_storage_client()
         self._log = get_logger(__name__)
 
     # ---- Farms ------------------------------------------------------
@@ -797,6 +890,359 @@ class FarmServiceImpl:
             raise FarmNotFoundError(farm_id)
         return await self._repo.list_farm_members(farm_id=farm_id)
 
+    # ---- Attachments -------------------------------------------------
+
+    async def init_farm_attachment_upload(
+        self,
+        *,
+        farm_id: UUID,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        tenant_id: UUID,
+    ) -> dict[str, Any]:
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+        attachment_id = uuid7()
+        s3_key = build_attachment_key(
+            tenant_id=tenant_id,
+            owner_kind="farms",
+            owner_id=farm_id,
+            attachment_id=attachment_id,
+            original_filename=original_filename,
+        )
+        upload = self._storage.presign_upload(
+            key=s3_key, content_type=content_type, content_length=size_bytes
+        )
+        return {
+            "attachment_id": attachment_id,
+            "s3_key": s3_key,
+            "upload_url": upload.url,
+            "upload_headers": upload.headers,
+            "expires_at": upload.expires_at,
+        }
+
+    async def finalize_farm_attachment(
+        self,
+        *,
+        farm_id: UUID,
+        attachment_id: UUID,
+        s3_key: str,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point: dict[str, Any] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        head = self._verify_uploaded_object(
+            s3_key=s3_key, expected_size=size_bytes, expected_content_type=content_type
+        )
+        del head  # only use is the missing-object signal
+
+        geo_ewkt = _geo_point_to_ewkt(geo_point)
+        row = await self._repo.insert_farm_attachment(
+            attachment_id=attachment_id,
+            farm_id=farm_id,
+            kind=kind,
+            s3_key=s3_key,
+            original_filename=original_filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            caption=caption,
+            taken_at=taken_at,
+            geo_point_ewkt=geo_ewkt,
+            actor_user_id=actor_user_id,
+        )
+        await self._tenant_session.flush()
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.farm_attachment_uploaded",
+            actor_user_id=actor_user_id,
+            subject_kind="farm_attachment",
+            subject_id=attachment_id,
+            farm_id=farm_id,
+            details={
+                "kind": kind,
+                "size_bytes": size_bytes,
+                "content_type": content_type,
+                "original_filename": original_filename,
+            },
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            FarmAttachmentUploadedV1(
+                attachment_id=attachment_id,
+                farm_id=farm_id,
+                kind=kind,
+                size_bytes=size_bytes,
+                content_type=content_type,
+                actor_user_id=actor_user_id,
+            )
+        )
+        return self._stamp_download_url(row)
+
+    async def list_farm_attachments(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+        rows = await self._repo.list_farm_attachments(farm_id=farm_id)
+        return [self._stamp_download_url(r) for r in rows]
+
+    async def delete_farm_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        existing = await self._repo.get_farm_attachment(attachment_id=attachment_id)
+        if existing is None:
+            from app.modules.farms.errors import (
+                FarmAttachmentNotFoundError,  # local import — see errors.py
+            )
+
+            raise FarmAttachmentNotFoundError(attachment_id)
+        deleted = await self._repo.soft_delete_farm_attachment(
+            attachment_id=attachment_id, actor_user_id=actor_user_id
+        )
+        if not deleted:
+            from app.modules.farms.errors import FarmAttachmentNotFoundError
+
+            raise FarmAttachmentNotFoundError(attachment_id)
+        # Best-effort: remove the S3 object. If it never existed we don't
+        # care; audit still gets the row.
+        try:
+            self._storage.delete_object(key=existing["s3_key"])
+        except StorageObjectMissingError:
+            self._log.info(
+                "farm_attachment.s3_object_missing_on_delete",
+                attachment_id=str(attachment_id),
+                s3_key=existing["s3_key"],
+            )
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.farm_attachment_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="farm_attachment",
+            subject_id=attachment_id,
+            farm_id=existing["owner_id"],
+            details={"s3_key": existing["s3_key"]},
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            FarmAttachmentDeletedV1(
+                attachment_id=attachment_id,
+                farm_id=existing["owner_id"],
+                actor_user_id=actor_user_id,
+            )
+        )
+
+    async def init_block_attachment_upload(
+        self,
+        *,
+        block_id: UUID,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        tenant_id: UUID,
+    ) -> dict[str, Any]:
+        block = await self._repo.get_block_by_id(block_id)
+        if block is None:
+            raise BlockNotFoundError(block_id)
+        attachment_id = uuid7()
+        s3_key = build_attachment_key(
+            tenant_id=tenant_id,
+            owner_kind="blocks",
+            owner_id=block_id,
+            attachment_id=attachment_id,
+            original_filename=original_filename,
+        )
+        upload = self._storage.presign_upload(
+            key=s3_key, content_type=content_type, content_length=size_bytes
+        )
+        return {
+            "attachment_id": attachment_id,
+            "s3_key": s3_key,
+            "upload_url": upload.url,
+            "upload_headers": upload.headers,
+            "expires_at": upload.expires_at,
+        }
+
+    async def finalize_block_attachment(
+        self,
+        *,
+        block_id: UUID,
+        attachment_id: UUID,
+        s3_key: str,
+        kind: str,
+        original_filename: str,
+        content_type: str,
+        size_bytes: int,
+        caption: str | None,
+        taken_at: Any,
+        geo_point: dict[str, Any] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        self._verify_uploaded_object(
+            s3_key=s3_key, expected_size=size_bytes, expected_content_type=content_type
+        )
+        geo_ewkt = _geo_point_to_ewkt(geo_point)
+        row = await self._repo.insert_block_attachment(
+            attachment_id=attachment_id,
+            block_id=block_id,
+            kind=kind,
+            s3_key=s3_key,
+            original_filename=original_filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            caption=caption,
+            taken_at=taken_at,
+            geo_point_ewkt=geo_ewkt,
+            actor_user_id=actor_user_id,
+        )
+        await self._tenant_session.flush()
+
+        # Block-attachment audits also carry the parent farm_id so audit
+        # filtering by farm picks them up.
+        block_meta = await self._repo.get_block_by_id(block_id)
+        farm_id = block_meta["farm_id"] if block_meta else None
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_attachment_uploaded",
+            actor_user_id=actor_user_id,
+            subject_kind="block_attachment",
+            subject_id=attachment_id,
+            farm_id=farm_id,
+            details={
+                "block_id": str(block_id),
+                "kind": kind,
+                "size_bytes": size_bytes,
+                "content_type": content_type,
+                "original_filename": original_filename,
+            },
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            BlockAttachmentUploadedV1(
+                attachment_id=attachment_id,
+                block_id=block_id,
+                kind=kind,
+                size_bytes=size_bytes,
+                content_type=content_type,
+                actor_user_id=actor_user_id,
+            )
+        )
+        return self._stamp_download_url(row)
+
+    async def list_block_attachments(self, *, block_id: UUID) -> list[dict[str, Any]]:
+        if (await self._repo.get_block_by_id(block_id)) is None:
+            raise BlockNotFoundError(block_id)
+        rows = await self._repo.list_block_attachments(block_id=block_id)
+        return [self._stamp_download_url(r) for r in rows]
+
+    async def delete_block_attachment(
+        self,
+        *,
+        attachment_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        existing = await self._repo.get_block_attachment(attachment_id=attachment_id)
+        if existing is None:
+            from app.modules.farms.errors import BlockAttachmentNotFoundError
+
+            raise BlockAttachmentNotFoundError(attachment_id)
+        deleted = await self._repo.soft_delete_block_attachment(
+            attachment_id=attachment_id, actor_user_id=actor_user_id
+        )
+        if not deleted:
+            from app.modules.farms.errors import BlockAttachmentNotFoundError
+
+            raise BlockAttachmentNotFoundError(attachment_id)
+        try:
+            self._storage.delete_object(key=existing["s3_key"])
+        except StorageObjectMissingError:
+            self._log.info(
+                "block_attachment.s3_object_missing_on_delete",
+                attachment_id=str(attachment_id),
+                s3_key=existing["s3_key"],
+            )
+
+        block_meta = await self._repo.get_block_by_id(existing["owner_id"])
+        farm_id = block_meta["farm_id"] if block_meta else None
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_attachment_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="block_attachment",
+            subject_id=attachment_id,
+            farm_id=farm_id,
+            details={"s3_key": existing["s3_key"], "block_id": str(existing["owner_id"])},
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            BlockAttachmentDeletedV1(
+                attachment_id=attachment_id,
+                block_id=existing["owner_id"],
+                actor_user_id=actor_user_id,
+            )
+        )
+
+    # ---- Internal helpers --------------------------------------------
+
+    def _verify_uploaded_object(
+        self, *, s3_key: str, expected_size: int, expected_content_type: str
+    ) -> dict[str, Any]:
+        try:
+            head = self._storage.head_object(key=s3_key)
+        except StorageObjectMissingError as exc:
+            from app.modules.farms.errors import AttachmentUploadMissingError
+
+            raise AttachmentUploadMissingError(s3_key) from exc
+        actual_size = int(head.get("ContentLength", 0))
+        actual_ct = str(head.get("ContentType", ""))
+        if actual_size != expected_size or actual_ct.lower() != expected_content_type.lower():
+            from app.modules.farms.errors import AttachmentUploadMismatchError
+
+            raise AttachmentUploadMismatchError(
+                s3_key=s3_key,
+                expected_size=expected_size,
+                actual_size=actual_size,
+                expected_content_type=expected_content_type,
+                actual_content_type=actual_ct,
+            )
+        return head
+
+    def _stamp_download_url(self, row: dict[str, Any]) -> dict[str, Any]:
+        presigned: PresignedDownload = self._storage.presign_download(key=row["s3_key"])
+        out = dict(row)
+        out["download_url"] = presigned.url
+        out["download_url_expires_at"] = presigned.expires_at
+        return out
+
+
+def _geo_point_to_ewkt(geo_point: dict[str, Any] | None) -> str | None:
+    if geo_point is None:
+        return None
+    coords = geo_point.get("coordinates") or [0.0, 0.0]
+    lon = float(coords[0])
+    lat = float(coords[1])
+    return f"SRID=4326;POINT({lon} {lat})"
+
 
 def get_farm_service(
     *,
@@ -804,6 +1250,7 @@ def get_farm_service(
     public_session: AsyncSession,
     audit_service: AuditService | None = None,
     event_bus: EventBus | None = None,
+    storage_client: StorageClient | None = None,
 ) -> FarmService:
     """Factory used by routers and Celery tasks."""
     return FarmServiceImpl(
@@ -811,4 +1258,5 @@ def get_farm_service(
         public_session=public_session,
         audit_service=audit_service,
         event_bus=event_bus,
+        storage_client=storage_client,
     )

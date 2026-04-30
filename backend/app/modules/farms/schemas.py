@@ -323,3 +323,81 @@ class FarmMemberResponse(BaseModel):
     role: FarmRoleName
     granted_at: datetime
     revoked_at: datetime | None
+
+
+# ---------- Attachments -----------------------------------------------------
+
+# Cap aligned with prompt-02 § PR-C: 25 MB is enough for high-res phone
+# photos and PDF documents without inviting bulk-data uploads.
+ATTACHMENT_MAX_BYTES: int = 25 * 1024 * 1024
+
+
+class AttachmentUploadInitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: AttachmentKind
+    original_filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=128)
+    size_bytes: int = Field(gt=0, le=ATTACHMENT_MAX_BYTES)
+
+
+class AttachmentUploadInitResponse(BaseModel):
+    """Response from `init`: client uses these fields to PUT to S3 directly."""
+
+    attachment_id: UUID
+    s3_key: str
+    upload_url: str
+    upload_headers: dict[str, str]
+    expires_at: datetime
+
+
+class AttachmentFinalizeRequest(BaseModel):
+    """Body of the post-upload finalize call.
+
+    `attachment_id` and `s3_key` come from the init response; the client
+    echoes both. The remaining fields populate the row.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    attachment_id: UUID
+    s3_key: str
+    kind: AttachmentKind
+    original_filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=128)
+    size_bytes: int = Field(gt=0, le=ATTACHMENT_MAX_BYTES)
+    caption: str | None = Field(default=None, max_length=2000)
+    taken_at: datetime | None = None
+    geo_point: dict[str, Any] | None = Field(default=None, description="GeoJSON Point (SRID 4326).")
+
+    @field_validator("geo_point")
+    @classmethod
+    def _validate_point(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if value.get("type") != "Point":
+            raise ValueError("geo_point must be a GeoJSON Point")
+        coords = value.get("coordinates")
+        if not isinstance(coords, list) or len(coords) < 2:
+            raise ValueError("geo_point.coordinates must be [lon, lat]")
+        return value
+
+
+class AttachmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    owner_kind: Literal["farm", "block"]
+    owner_id: UUID
+    kind: AttachmentKind
+    s3_key: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    caption: str | None
+    taken_at: datetime | None
+    geo_point: dict[str, Any] | None
+    download_url: str
+    download_url_expires_at: datetime
+    created_at: datetime
+    updated_at: datetime
