@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 // safe so RTL mirroring happens automatically.
 export function SideNav(): ReactNode {
   const { t } = useTranslation("common");
+  const { t: tFarms } = useTranslation("farms");
 
   const linkClass = ({ isActive }: { isActive: boolean }): string =>
     [
@@ -23,6 +24,11 @@ export function SideNav(): ReactNode {
         <li>
           <NavLink to="/" end className={linkClass}>
             {t("nav.home")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/farms" className={linkClass}>
+            {tFarms("nav.farms")}
           </NavLink>
         </li>
         <li>

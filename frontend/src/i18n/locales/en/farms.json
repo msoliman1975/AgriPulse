@@ -1,0 +1,197 @@
+{
+  "nav": {
+    "farms": "Farms"
+  },
+  "list": {
+    "heading": "Farms",
+    "createButton": "New farm",
+    "empty": "No farms yet. Create your first one.",
+    "columns": {
+      "code": "Code",
+      "name": "Name",
+      "governorate": "Governorate",
+      "area": "Area",
+      "status": "Status",
+      "blocks": "Blocks"
+    },
+    "filters": {
+      "status": "Status",
+      "governorate": "Governorate",
+      "tag": "Tag",
+      "includeArchived": "Include archived",
+      "all": "All"
+    },
+    "loadMore": "Load more"
+  },
+  "detail": {
+    "blocksTab": "Blocks",
+    "membersTab": "Members",
+    "infoTab": "Info",
+    "edit": "Edit",
+    "archive": "Archive",
+    "addBlock": "Add block",
+    "autoGrid": "Auto-grid blocks",
+    "noBlocks": "This farm has no blocks yet.",
+    "loading": "Loading farm…"
+  },
+  "form": {
+    "code": "Code",
+    "codeHelp": "Short reference, unique within tenant. Letters, digits, dashes, underscores.",
+    "name": "Name",
+    "description": "Description",
+    "governorate": "Governorate",
+    "district": "District",
+    "nearestCity": "Nearest city",
+    "addressLine": "Address",
+    "farmType": "Farm type",
+    "ownershipType": "Ownership",
+    "primaryWaterSource": "Primary water source",
+    "establishedDate": "Established date",
+    "tags": "Tags",
+    "tagsHelp": "Comma-separated.",
+    "boundary": "Farm boundary",
+    "boundaryHelp": "Draw the farm outline on the map or upload a GeoJSON / Shapefile / KML file.",
+    "submitCreate": "Create farm",
+    "submitUpdate": "Save changes",
+    "cancel": "Cancel",
+    "blockCode": "Block code",
+    "blockName": "Block name",
+    "blockBoundary": "Block boundary",
+    "irrigationSystem": "Irrigation system",
+    "irrigationSource": "Irrigation source",
+    "soilTexture": "Soil texture",
+    "salinityClass": "Salinity",
+    "soilPh": "Soil pH",
+    "notes": "Notes",
+    "submitBlockCreate": "Create block",
+    "submitBlockUpdate": "Save block",
+    "errors": {
+      "codeRequired": "Code is required.",
+      "codePattern": "Code must be alphanumeric with dashes or underscores.",
+      "nameRequired": "Name is required.",
+      "boundaryRequired": "Draw or upload a boundary first.",
+      "boundaryInvalid": "Boundary is not a valid polygon.",
+      "boundarySelfIntersect": "Boundary self-intersects.",
+      "boundaryOutOfEgypt": "Boundary is outside Egypt's bounding box."
+    }
+  },
+  "farmType": {
+    "commercial": "Commercial",
+    "research": "Research",
+    "contract": "Contract"
+  },
+  "ownershipType": {
+    "owned": "Owned",
+    "leased": "Leased",
+    "partnership": "Partnership",
+    "other": "Other"
+  },
+  "waterSource": {
+    "well": "Well",
+    "canal": "Canal",
+    "nile": "Nile",
+    "desalinated": "Desalinated",
+    "rainfed": "Rainfed",
+    "mixed": "Mixed"
+  },
+  "irrigationSystem": {
+    "drip": "Drip",
+    "micro_sprinkler": "Micro-sprinkler",
+    "pivot": "Pivot",
+    "furrow": "Furrow",
+    "flood": "Flood",
+    "surface": "Surface",
+    "none": "None"
+  },
+  "soilTexture": {
+    "sandy": "Sandy",
+    "sandy_loam": "Sandy loam",
+    "loam": "Loam",
+    "clay_loam": "Clay loam",
+    "clay": "Clay",
+    "silty_loam": "Silty loam",
+    "silty_clay": "Silty clay"
+  },
+  "salinity": {
+    "non_saline": "Non-saline",
+    "slightly_saline": "Slightly saline",
+    "moderately_saline": "Moderately saline",
+    "strongly_saline": "Strongly saline"
+  },
+  "status": {
+    "active": "Active",
+    "archived": "Archived",
+    "fallow": "Fallow",
+    "abandoned": "Abandoned",
+    "under_preparation": "Under preparation"
+  },
+  "members": {
+    "heading": "Members",
+    "membershipId": "Membership ID",
+    "role": "Role",
+    "grantedAt": "Granted at",
+    "assign": "Assign member",
+    "revoke": "Revoke",
+    "empty": "No members assigned to this farm yet.",
+    "submit": "Assign"
+  },
+  "roles": {
+    "FarmManager": "Farm Manager",
+    "Agronomist": "Agronomist",
+    "FieldOperator": "Field Operator",
+    "Scout": "Scout",
+    "Viewer": "Viewer"
+  },
+  "block": {
+    "detailHeading": "Block",
+    "edit": "Edit block",
+    "archive": "Archive block",
+    "currentCrop": "Current crop",
+    "noCrop": "No crop assigned.",
+    "assignCrop": "Assign crop",
+    "history": "Crop history",
+    "season": "Season",
+    "plantingDate": "Planting date",
+    "expectedHarvestStart": "Expected harvest start",
+    "expectedHarvestEnd": "Expected harvest end",
+    "submit": "Assign crop",
+    "variety": "Variety",
+    "noVariety": "— none —",
+    "back": "Back to farm"
+  },
+  "autoGrid": {
+    "heading": "Auto-grid blocks",
+    "cellSize": "Cell size (meters)",
+    "compute": "Compute candidates",
+    "candidates": "Candidates",
+    "select": "Select",
+    "commit": "Create selected blocks",
+    "empty": "Compute candidates to see options.",
+    "back": "Back to farm"
+  },
+  "area": {
+    "feddan": "feddan",
+    "acre": "acre",
+    "hectare": "hectare"
+  },
+  "aoi": {
+    "uploadLabel": "Upload AOI file (GeoJSON / Shapefile zip / KML)",
+    "drop": "Drop a file here or click to choose.",
+    "remove": "Remove",
+    "tooLarge": "File is larger than 10 MB.",
+    "unsupported": "Unsupported file type.",
+    "invalid": "File is not valid.",
+    "empty": "File contains no features.",
+    "pickFeature": "Pick the feature(s) to use:",
+    "useAsBoundary": "Use as boundary",
+    "useAsBlock": "Use as candidate block"
+  },
+  "actions": {
+    "confirmArchive": "Archive this item? It can be restored later.",
+    "yes": "Yes",
+    "no": "No",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "error": "Could not save changes."
+  }
+}

@@ -1,3 +1,6 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
+@import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,5 +60,29 @@
 
   .btn-ghost:hover {
     background-color: theme("colors.slate.100");
+  }
+
+  .input {
+    display: block;
+    width: 100%;
+    border-radius: theme("borderRadius.md");
+    border: 1px solid theme("colors.slate.300");
+    padding: theme("spacing.2") theme("spacing.3");
+    font-size: theme("fontSize.sm");
+    color: theme("colors.slate.800");
+    background: #ffffff;
+  }
+
+  .input:focus {
+    outline: 2px solid theme("colors.brand.500");
+    outline-offset: 1px;
+  }
+
+  .label {
+    display: block;
+    font-size: theme("fontSize.xs");
+    font-weight: 500;
+    color: theme("colors.slate.700");
+    margin-block-end: theme("spacing.1");
   }
 }

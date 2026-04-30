@@ -36,6 +36,8 @@ from app.modules.farms.schemas import (
     BlockDetailResponse,
     BlockResponse,
     BlockUpdateRequest,
+    CropResponse,
+    CropVarietyResponse,
     FarmCreateRequest,
     FarmDetailResponse,
     FarmMemberAssignRequest,
@@ -808,3 +810,34 @@ async def _peek_block_attachment(
     if repo is None:
         return None
     return await repo.get_block_attachment(attachment_id=attachment_id)
+
+
+# ---------- Crop catalog (read-only) ---------------------------------------
+
+
+@router.get(
+    "/crops",
+    response_model=list[CropResponse],
+    summary="List active crops in the public catalog.",
+)
+async def list_crops(
+    category: str | None = Query(default=None),
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_crops(category=category)
+
+
+@router.get(
+    "/crops/{crop_id}/varieties",
+    response_model=list[CropVarietyResponse],
+    summary="List active varieties for a crop.",
+)
+async def list_crop_varieties(
+    crop_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_crop_varieties(crop_id=crop_id)

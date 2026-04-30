@@ -69,7 +69,10 @@ repos:
         # config — keep it scoped to YAML only (matches the pre-PR-3
         # behaviour for everything outside frontend/).
         files: '\.ya?ml$'
-        exclude: '^infra/helm/.*/templates/.*\.ya?ml$'
+        # Excludes:
+        #   - Helm chart templates (Go-templated, not valid YAML to prettier).
+        #   - pnpm-lock.yaml (machine-generated; pnpm owns the format).
+        exclude: '^(infra/helm/.*/templates/.*\.ya?ml|.*/pnpm-lock\.yaml)$'
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.15.0

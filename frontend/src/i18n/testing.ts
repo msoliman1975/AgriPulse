@@ -3,8 +3,10 @@ import { initReactI18next } from "react-i18next";
 
 import enCommon from "./locales/en/common.json";
 import enAuth from "./locales/en/auth.json";
+import enFarms from "./locales/en/farms.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
+import arFarms from "./locales/ar/farms.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -17,13 +19,13 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
   if (!initialized) {
     await i18n.use(initReactI18next).init({
       resources: {
-        en: { common: enCommon, auth: enAuth },
-        ar: { common: arCommon, auth: arAuth },
+        en: { common: enCommon, auth: enAuth, farms: enFarms },
+        ar: { common: arCommon, auth: arAuth, farms: arFarms },
       },
       lng: language,
       fallbackLng: "en",
       defaultNS: "common",
-      ns: ["common", "auth"],
+      ns: ["common", "auth", "farms"],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },
     });

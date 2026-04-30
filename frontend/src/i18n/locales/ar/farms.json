@@ -1,0 +1,197 @@
+{
+  "nav": {
+    "farms": "المزارع"
+  },
+  "list": {
+    "heading": "المزارع",
+    "createButton": "مزرعة جديدة",
+    "empty": "لا توجد مزارع بعد. أنشئ أول مزرعة.",
+    "columns": {
+      "code": "الرمز",
+      "name": "الاسم",
+      "governorate": "المحافظة",
+      "area": "المساحة",
+      "status": "الحالة",
+      "blocks": "القطع"
+    },
+    "filters": {
+      "status": "الحالة",
+      "governorate": "المحافظة",
+      "tag": "وسم",
+      "includeArchived": "إظهار المؤرشفة",
+      "all": "الكل"
+    },
+    "loadMore": "عرض المزيد"
+  },
+  "detail": {
+    "blocksTab": "القطع",
+    "membersTab": "الأعضاء",
+    "infoTab": "البيانات",
+    "edit": "تعديل",
+    "archive": "أرشفة",
+    "addBlock": "إضافة قطعة",
+    "autoGrid": "تقسيم آلي إلى شبكة",
+    "noBlocks": "لا توجد قطع في هذه المزرعة بعد.",
+    "loading": "جارٍ تحميل المزرعة…"
+  },
+  "form": {
+    "code": "الرمز",
+    "codeHelp": "رمز قصير فريد داخل المستأجر. حروف وأرقام وشَرَط (-) أو شَرَط سفلية (_).",
+    "name": "الاسم",
+    "description": "الوصف",
+    "governorate": "المحافظة",
+    "district": "المركز",
+    "nearestCity": "أقرب مدينة",
+    "addressLine": "العنوان",
+    "farmType": "نوع المزرعة",
+    "ownershipType": "نوع الملكية",
+    "primaryWaterSource": "مصدر المياه الأساسي",
+    "establishedDate": "تاريخ الإنشاء",
+    "tags": "الوسوم",
+    "tagsHelp": "افصل بين الوسوم بفواصل.",
+    "boundary": "حدود المزرعة",
+    "boundaryHelp": "ارسم حدود المزرعة على الخريطة أو ارفع ملف GeoJSON أو Shapefile أو KML.",
+    "submitCreate": "إنشاء المزرعة",
+    "submitUpdate": "حفظ التغييرات",
+    "cancel": "إلغاء",
+    "blockCode": "رمز القطعة",
+    "blockName": "اسم القطعة",
+    "blockBoundary": "حدود القطعة",
+    "irrigationSystem": "نظام الري",
+    "irrigationSource": "مصدر الري",
+    "soilTexture": "قوام التربة",
+    "salinityClass": "الملوحة",
+    "soilPh": "حموضة التربة",
+    "notes": "ملاحظات",
+    "submitBlockCreate": "إنشاء القطعة",
+    "submitBlockUpdate": "حفظ القطعة",
+    "errors": {
+      "codeRequired": "الرمز مطلوب.",
+      "codePattern": "يجب أن يحتوي الرمز على حروف وأرقام فقط مع شَرَطات.",
+      "nameRequired": "الاسم مطلوب.",
+      "boundaryRequired": "ارسم أو ارفع الحدود أولًا.",
+      "boundaryInvalid": "الحدود ليست مضلعًا صحيحًا.",
+      "boundarySelfIntersect": "الحدود تتقاطع مع نفسها.",
+      "boundaryOutOfEgypt": "الحدود خارج النطاق الجغرافي لمصر."
+    }
+  },
+  "farmType": {
+    "commercial": "تجارية",
+    "research": "بحثية",
+    "contract": "تعاقدية"
+  },
+  "ownershipType": {
+    "owned": "ملك",
+    "leased": "إيجار",
+    "partnership": "شراكة",
+    "other": "أخرى"
+  },
+  "waterSource": {
+    "well": "بئر",
+    "canal": "ترعة",
+    "nile": "النيل",
+    "desalinated": "تحلية",
+    "rainfed": "أمطار",
+    "mixed": "مختلط"
+  },
+  "irrigationSystem": {
+    "drip": "تنقيط",
+    "micro_sprinkler": "رشاش دقيق",
+    "pivot": "محوري",
+    "furrow": "حُزم",
+    "flood": "غمر",
+    "surface": "سطحي",
+    "none": "لا يوجد"
+  },
+  "soilTexture": {
+    "sandy": "رملية",
+    "sandy_loam": "طمي رملي",
+    "loam": "طميية",
+    "clay_loam": "طمي طيني",
+    "clay": "طينية",
+    "silty_loam": "طمي غريني",
+    "silty_clay": "طينية غرينية"
+  },
+  "salinity": {
+    "non_saline": "غير ملحية",
+    "slightly_saline": "قليلة الملوحة",
+    "moderately_saline": "متوسطة الملوحة",
+    "strongly_saline": "شديدة الملوحة"
+  },
+  "status": {
+    "active": "نشطة",
+    "archived": "مؤرشفة",
+    "fallow": "بور",
+    "abandoned": "مهجورة",
+    "under_preparation": "قيد الإعداد"
+  },
+  "members": {
+    "heading": "الأعضاء",
+    "membershipId": "معرّف العضوية",
+    "role": "الدور",
+    "grantedAt": "تاريخ المنح",
+    "assign": "تعيين عضو",
+    "revoke": "إلغاء",
+    "empty": "لا يوجد أعضاء معينون لهذه المزرعة بعد.",
+    "submit": "تعيين"
+  },
+  "roles": {
+    "FarmManager": "مدير المزرعة",
+    "Agronomist": "مهندس زراعي",
+    "FieldOperator": "مشغل حقل",
+    "Scout": "مراقب",
+    "Viewer": "مشاهد"
+  },
+  "block": {
+    "detailHeading": "القطعة",
+    "edit": "تعديل القطعة",
+    "archive": "أرشفة القطعة",
+    "currentCrop": "المحصول الحالي",
+    "noCrop": "لا يوجد محصول مُعيَّن.",
+    "assignCrop": "تعيين محصول",
+    "history": "سجل المحاصيل",
+    "season": "الموسم",
+    "plantingDate": "تاريخ الزراعة",
+    "expectedHarvestStart": "بداية الحصاد المتوقع",
+    "expectedHarvestEnd": "نهاية الحصاد المتوقع",
+    "submit": "تعيين المحصول",
+    "variety": "الصنف",
+    "noVariety": "— لا يوجد —",
+    "back": "العودة إلى المزرعة"
+  },
+  "autoGrid": {
+    "heading": "تقسيم آلي إلى شبكة",
+    "cellSize": "حجم الخلية (بالمتر)",
+    "compute": "احسب المرشحات",
+    "candidates": "المرشحات",
+    "select": "اختيار",
+    "commit": "إنشاء القطع المختارة",
+    "empty": "احسب المرشحات لرؤية الخيارات.",
+    "back": "العودة إلى المزرعة"
+  },
+  "area": {
+    "feddan": "فدان",
+    "acre": "فدان دولي",
+    "hectare": "هكتار"
+  },
+  "aoi": {
+    "uploadLabel": "ارفع ملف الحدود (GeoJSON / Shapefile zip / KML)",
+    "drop": "اسحب الملف هنا أو انقر للاختيار.",
+    "remove": "إزالة",
+    "tooLarge": "حجم الملف أكبر من 10 ميجابايت.",
+    "unsupported": "نوع الملف غير مدعوم.",
+    "invalid": "الملف غير صالح.",
+    "empty": "الملف لا يحتوي على معالم.",
+    "pickFeature": "اختر المعلم(المعالم) المطلوبة:",
+    "useAsBoundary": "استخدامه كحدود",
+    "useAsBlock": "استخدامه كقطعة مرشحة"
+  },
+  "actions": {
+    "confirmArchive": "هل تريد أرشفة هذا العنصر؟ يمكن استعادته لاحقًا.",
+    "yes": "نعم",
+    "no": "لا",
+    "saving": "جارٍ الحفظ…",
+    "saved": "تم الحفظ.",
+    "error": "تعذّر حفظ التغييرات."
+  }
+}

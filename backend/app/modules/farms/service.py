@@ -327,6 +327,10 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> None: ...
 
+    async def list_crops(self, *, category: str | None = None) -> list[dict[str, Any]]: ...
+
+    async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]: ...
+
 
 # ---------- Implementation --------------------------------------------------
 
@@ -1233,6 +1237,12 @@ class FarmServiceImpl:
         out["download_url"] = presigned.url
         out["download_url_expires_at"] = presigned.expires_at
         return out
+
+    async def list_crops(self, *, category: str | None = None) -> list[dict[str, Any]]:
+        return await self._repo.list_crops(category=category)
+
+    async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]:
+        return await self._repo.list_crop_varieties(crop_id=crop_id)
 
 
 def _geo_point_to_ewkt(geo_point: dict[str, Any] | None) -> str | None:

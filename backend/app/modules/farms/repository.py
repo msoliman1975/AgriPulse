@@ -645,6 +645,49 @@ class FarmsRepository:
         await self._tenant.flush()
         return _block_crop_to_dict(bc)
 
+    async def list_crops(
+        self, *, category: str | None = None, include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        stmt = select(Crop)
+        if not include_inactive:
+            stmt = stmt.where(Crop.is_active.is_(True))
+        if category is not None:
+            stmt = stmt.where(Crop.category == category)
+        stmt = stmt.order_by(Crop.name_en)
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "code": r.code,
+                "name_en": r.name_en,
+                "name_ar": r.name_ar,
+                "scientific_name": r.scientific_name,
+                "category": r.category,
+                "is_perennial": r.is_perennial,
+                "default_growing_season_days": r.default_growing_season_days,
+                "relevant_indices": list(r.relevant_indices or []),
+            }
+            for r in rows
+        ]
+
+    async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(CropVariety)
+            .where(CropVariety.crop_id == crop_id, CropVariety.is_active.is_(True))
+            .order_by(CropVariety.name_en)
+        )
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "crop_id": r.crop_id,
+                "code": r.code,
+                "name_en": r.name_en,
+                "name_ar": r.name_ar,
+            }
+            for r in rows
+        ]
+
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         stmt = (
             select(BlockCrop)
