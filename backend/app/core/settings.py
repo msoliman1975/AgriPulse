@@ -77,6 +77,12 @@ class Settings(BaseSettings):
     s3_path_style: bool = True
     s3_presign_expires_seconds: int = 900
 
+    # --- Periodic jobs ---------------------------------------------------
+    # Cross-schema FK consistency check for `public.farm_scopes` ↔
+    # `tenant_<id>.farms`. Hourly is enough — orphans only happen when a
+    # farm is hard-deleted, which is operationally rare.
+    farm_scope_consistency_check_seconds: int = 3600
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 
