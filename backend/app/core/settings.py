@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
 
+    # --- Object storage (S3-compatible) ----------------------------------
+    s3_endpoint_url: str | None = "http://localhost:9000"
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str = "missionagre"
+    s3_secret_access_key: str = "missionagre-dev"
+    s3_bucket_uploads: str = "missionagre-uploads"
+    s3_path_style: bool = True
+    s3_presign_expires_seconds: int = 900
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 

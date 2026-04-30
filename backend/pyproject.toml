@@ -29,6 +29,9 @@ dependencies = [
   "python-jose[cryptography]>=3.3,<3.4",
   "httpx>=0.27,<0.28",
 
+  # Object storage (S3-compatible)
+  "boto3>=1.35,<2",
+
   # RBAC config + general YAML
   "pyyaml>=6.0,<6.1",
 
@@ -144,6 +147,8 @@ module = [
   "testcontainers.*",
   "structlog.*",
   "jose.*",
+  "boto3.*",
+  "botocore.*",
 ]
 ignore_missing_imports = true
 

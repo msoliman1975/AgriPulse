@@ -133,3 +133,68 @@ class FarmMemberAlreadyAssignedError(APIError):
                 "role": role,
             },
         )
+
+
+class FarmAttachmentNotFoundError(APIError):
+    def __init__(self, attachment_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Farm attachment not found",
+            detail=f"No farm attachment with id {attachment_id} in this tenant.",
+            type_=f"{_TYPE_BASE}/farm-attachment-not-found",
+            extras={"attachment_id": str(attachment_id)},
+        )
+
+
+class BlockAttachmentNotFoundError(APIError):
+    def __init__(self, attachment_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Block attachment not found",
+            detail=f"No block attachment with id {attachment_id} in this tenant.",
+            type_=f"{_TYPE_BASE}/block-attachment-not-found",
+            extras={"attachment_id": str(attachment_id)},
+        )
+
+
+class AttachmentUploadMissingError(APIError):
+    """Finalize was called but the S3 object isn't there."""
+
+    def __init__(self, s3_key: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Attachment upload missing",
+            detail="The S3 object for this attachment was not found. Re-upload before finalizing.",
+            type_=f"{_TYPE_BASE}/attachment-upload-missing",
+            extras={"s3_key": s3_key},
+        )
+
+
+class AttachmentUploadMismatchError(APIError):
+    """Uploaded object's size or content-type doesn't match what init declared."""
+
+    def __init__(
+        self,
+        *,
+        s3_key: str,
+        expected_size: int,
+        actual_size: int,
+        expected_content_type: str,
+        actual_content_type: str,
+    ) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Attachment upload mismatch",
+            detail=(
+                "The uploaded object's size or content-type differs from what "
+                "was declared at init. Re-upload with matching values."
+            ),
+            type_=f"{_TYPE_BASE}/attachment-upload-mismatch",
+            extras={
+                "s3_key": s3_key,
+                "expected_size": expected_size,
+                "actual_size": actual_size,
+                "expected_content_type": expected_content_type,
+                "actual_content_type": actual_content_type,
+            },
+        )

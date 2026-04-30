@@ -11,12 +11,16 @@ See ARCHITECTURE.md § 6 (module map) and data_model.md § 5.
 
 from app.modules.farms.events import (
     BlockArchivedV1,
+    BlockAttachmentDeletedV1,
+    BlockAttachmentUploadedV1,
     BlockBoundaryChangedV1,
     BlockCreatedV1,
     BlockCropAssignedV1,
     BlockCropUpdatedV1,
     BlockUpdatedV1,
     FarmArchivedV1,
+    FarmAttachmentDeletedV1,
+    FarmAttachmentUploadedV1,
     FarmBoundaryChangedV1,
     FarmCreatedV1,
     FarmMemberAssignedV1,
@@ -27,12 +31,16 @@ from app.modules.farms.service import FarmService, get_farm_service
 
 __all__ = [
     "BlockArchivedV1",
+    "BlockAttachmentDeletedV1",
+    "BlockAttachmentUploadedV1",
     "BlockBoundaryChangedV1",
     "BlockCreatedV1",
     "BlockCropAssignedV1",
     "BlockCropUpdatedV1",
     "BlockUpdatedV1",
     "FarmArchivedV1",
+    "FarmAttachmentDeletedV1",
+    "FarmAttachmentUploadedV1",
     "FarmBoundaryChangedV1",
     "FarmCreatedV1",
     "FarmMemberAssignedV1",

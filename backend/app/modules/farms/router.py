@@ -24,6 +24,10 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.farms.schemas import (
+    AttachmentFinalizeRequest,
+    AttachmentResponse,
+    AttachmentUploadInitRequest,
+    AttachmentUploadInitResponse,
     AutoGridRequest,
     AutoGridResponse,
     BlockCreateRequest,
@@ -545,3 +549,262 @@ async def list_members(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_members(farm_id=farm_id)
+
+
+# ---------- Attachments ----------------------------------------------------
+
+
+def _require_tenant_id(context: RequestContext) -> UUID:
+    if context.tenant_id is None:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Tenant context required",
+            detail="This endpoint requires a tenant-scoped JWT.",
+            type_="https://missionagre.io/problems/tenant-required",
+        )
+    return context.tenant_id
+
+
+@router.post(
+    "/farms/{farm_id}/attachments:init",
+    response_model=AttachmentUploadInitResponse,
+    summary="Begin a farm-attachment upload (returns a presigned PUT URL).",
+)
+async def init_farm_attachment(
+    farm_id: UUID,
+    payload: AttachmentUploadInitRequest,
+    context: RequestContext = Depends(
+        requires_capability("farm.attachment.write", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    tenant_id = _require_tenant_id(context)
+    return await service.init_farm_attachment_upload(
+        farm_id=farm_id,
+        kind=payload.kind,
+        original_filename=payload.original_filename,
+        content_type=payload.content_type,
+        size_bytes=payload.size_bytes,
+        tenant_id=tenant_id,
+    )
+
+
+@router.post(
+    "/farms/{farm_id}/attachments",
+    response_model=AttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Finalize a farm-attachment upload after the S3 PUT succeeded.",
+)
+async def finalize_farm_attachment(
+    farm_id: UUID,
+    payload: AttachmentFinalizeRequest,
+    request: Request,
+    context: RequestContext = Depends(
+        requires_capability("farm.attachment.write", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.finalize_farm_attachment(
+        farm_id=farm_id,
+        attachment_id=payload.attachment_id,
+        s3_key=payload.s3_key,
+        kind=payload.kind,
+        original_filename=payload.original_filename,
+        content_type=payload.content_type,
+        size_bytes=payload.size_bytes,
+        caption=payload.caption,
+        taken_at=payload.taken_at,
+        geo_point=payload.geo_point,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.get(
+    "/farms/{farm_id}/attachments",
+    response_model=list[AttachmentResponse],
+    summary="List farm attachments.",
+)
+async def list_farm_attachments(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("farm.attachment.read", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_farm_attachments(farm_id=farm_id)
+
+
+@router.delete(
+    "/farms/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete a farm attachment (soft) and remove the S3 object.",
+)
+async def delete_farm_attachment(
+    attachment_id: UUID,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> None:
+    from app.modules.farms.errors import FarmAttachmentNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    # Per-farm RBAC: read the row, check the owning farm.
+    existing = await _peek_farm_attachment(service, attachment_id)
+    if existing is None or not has_capability(
+        context, "farm.attachment.write", farm_id=existing["owner_id"]
+    ):
+        raise FarmAttachmentNotFoundError(attachment_id)
+    await service.delete_farm_attachment(
+        attachment_id=attachment_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.post(
+    "/blocks/{block_id}/attachments:init",
+    response_model=AttachmentUploadInitResponse,
+    summary="Begin a block-attachment upload (returns a presigned PUT URL).",
+)
+async def init_block_attachment(
+    block_id: UUID,
+    payload: AttachmentUploadInitRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    _ensure_tenant(context)
+    tenant_id = _require_tenant_id(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.attachment.write", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+    return await service.init_block_attachment_upload(
+        block_id=block_id,
+        kind=payload.kind,
+        original_filename=payload.original_filename,
+        content_type=payload.content_type,
+        size_bytes=payload.size_bytes,
+        tenant_id=tenant_id,
+    )
+
+
+@router.post(
+    "/blocks/{block_id}/attachments",
+    response_model=AttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Finalize a block-attachment upload after the S3 PUT succeeded.",
+)
+async def finalize_block_attachment(
+    block_id: UUID,
+    payload: AttachmentFinalizeRequest,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.attachment.write", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+    return await service.finalize_block_attachment(
+        block_id=block_id,
+        attachment_id=payload.attachment_id,
+        s3_key=payload.s3_key,
+        kind=payload.kind,
+        original_filename=payload.original_filename,
+        content_type=payload.content_type,
+        size_bytes=payload.size_bytes,
+        caption=payload.caption,
+        taken_at=payload.taken_at,
+        geo_point=payload.geo_point,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.get(
+    "/blocks/{block_id}/attachments",
+    response_model=list[AttachmentResponse],
+    summary="List block attachments.",
+)
+async def list_block_attachments(
+    block_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.attachment.read", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+    return await service.list_block_attachments(block_id=block_id)
+
+
+@router.delete(
+    "/blocks/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Delete a block attachment (soft) and remove the S3 object.",
+)
+async def delete_block_attachment(
+    attachment_id: UUID,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> None:
+    from app.modules.farms.errors import BlockAttachmentNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    existing = await _peek_block_attachment(service, attachment_id)
+    if existing is None:
+        raise BlockAttachmentNotFoundError(attachment_id)
+    block = await service.get_block(
+        block_id=existing["owner_id"], preferred_unit=context.preferred_unit
+    )
+    if not has_capability(context, "block.attachment.write", farm_id=block["farm_id"]):
+        raise BlockAttachmentNotFoundError(attachment_id)
+    await service.delete_block_attachment(
+        attachment_id=attachment_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+async def _peek_farm_attachment(service: FarmService, attachment_id: UUID) -> dict[str, Any] | None:
+    """Read just enough of the attachment row to resolve its owning farm.
+
+    Bypasses the public service surface — uses the underlying repo so we
+    don't presign a download URL on a row we're about to delete.
+    """
+    repo = getattr(service, "_repo", None)
+    if repo is None:
+        return None
+    return await repo.get_farm_attachment(attachment_id=attachment_id)
+
+
+async def _peek_block_attachment(
+    service: FarmService, attachment_id: UUID
+) -> dict[str, Any] | None:
+    repo = getattr(service, "_repo", None)
+    if repo is None:
+        return None
+    return await repo.get_block_attachment(attachment_id=attachment_id)

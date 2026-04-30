@@ -136,3 +136,41 @@ class FarmMemberRevokedV1(Event):
     membership_id: UUID
     farm_id: UUID
     actor_user_id: UUID | None = None
+
+
+class FarmAttachmentUploadedV1(Event):
+    event_name: ClassVar[str] = "farms.farm_attachment_uploaded.v1"
+
+    attachment_id: UUID
+    farm_id: UUID
+    kind: str
+    size_bytes: int
+    content_type: str
+    actor_user_id: UUID | None = None
+
+
+class FarmAttachmentDeletedV1(Event):
+    event_name: ClassVar[str] = "farms.farm_attachment_deleted.v1"
+
+    attachment_id: UUID
+    farm_id: UUID
+    actor_user_id: UUID | None = None
+
+
+class BlockAttachmentUploadedV1(Event):
+    event_name: ClassVar[str] = "farms.block_attachment_uploaded.v1"
+
+    attachment_id: UUID
+    block_id: UUID
+    kind: str
+    size_bytes: int
+    content_type: str
+    actor_user_id: UUID | None = None
+
+
+class BlockAttachmentDeletedV1(Event):
+    event_name: ClassVar[str] = "farms.block_attachment_deleted.v1"
+
+    attachment_id: UUID
+    block_id: UUID
+    actor_user_id: UUID | None = None
