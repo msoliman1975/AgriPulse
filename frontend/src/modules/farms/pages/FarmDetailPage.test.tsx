@@ -31,6 +31,17 @@ vi.mock("@/api/blocks", () => ({
   listBlocks: listBlocksMock,
 }));
 
+vi.mock("@/api/attachments", () => ({
+  listFarmAttachments: vi.fn().mockResolvedValue([]),
+  listBlockAttachments: vi.fn().mockResolvedValue([]),
+  initFarmAttachment: vi.fn(),
+  finalizeFarmAttachment: vi.fn(),
+  deleteFarmAttachment: vi.fn(),
+  initBlockAttachment: vi.fn(),
+  finalizeBlockAttachment: vi.fn(),
+  deleteBlockAttachment: vi.fn(),
+}));
+
 describe("FarmDetailPage", () => {
   beforeEach(() => {
     getFarmMock.mockReset();

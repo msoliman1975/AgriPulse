@@ -193,5 +193,36 @@
     "saving": "Saving…",
     "saved": "Saved.",
     "error": "Could not save changes."
+  },
+  "attachments": {
+    "heading": "Attachments",
+    "empty": "No attachments yet.",
+    "uploadHeading": "Upload attachment",
+    "fileLabel": "File",
+    "kindLabel": "Kind",
+    "captionLabel": "Caption",
+    "submit": "Upload",
+    "uploading": "Uploading…",
+    "delete": "Delete",
+    "confirmDelete": "Delete this attachment? The file will be removed from storage.",
+    "download": "Download",
+    "size": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    },
+    "uploadedAt": "Uploaded {{when}}",
+    "kind": {
+      "photo": "Photo",
+      "deed": "Deed",
+      "soil_test_report": "Soil test report",
+      "map": "Map",
+      "other": "Other"
+    },
+    "errors": {
+      "tooLarge": "File is larger than 25 MB.",
+      "uploadFailed": "Upload failed.",
+      "fileRequired": "Choose a file to upload.",
+      "kindRequired": "Pick a kind."
+    }
   }
 }

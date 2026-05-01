@@ -16,6 +16,16 @@ vi.mock("@/api/crops", () => ({
   listCrops: vi.fn().mockResolvedValue([]),
   listCropVarieties: vi.fn().mockResolvedValue([]),
 }));
+vi.mock("@/api/attachments", () => ({
+  listFarmAttachments: vi.fn().mockResolvedValue([]),
+  listBlockAttachments: vi.fn().mockResolvedValue([]),
+  initFarmAttachment: vi.fn(),
+  finalizeFarmAttachment: vi.fn(),
+  deleteFarmAttachment: vi.fn(),
+  initBlockAttachment: vi.fn(),
+  finalizeBlockAttachment: vi.fn(),
+  deleteBlockAttachment: vi.fn(),
+}));
 
 const getBlockMock = vi.hoisted(() => vi.fn());
 vi.mock("@/api/blocks", () => ({

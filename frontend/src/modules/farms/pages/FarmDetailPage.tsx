@@ -8,6 +8,7 @@ import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
+import { AttachmentsTab } from "../components/AttachmentsTab";
 import { MapPreview } from "../components/MapPreview";
 
 export function FarmDetailPage(): JSX.Element {
@@ -118,6 +119,8 @@ export function FarmDetailPage(): JSX.Element {
           </ul>
         )}
       </div>
+
+      <AttachmentsTab ownerKind="farm" ownerId={farm.id} farmId={farm.id} />
 
       <div className="card">
         <Link to={`/farms/${farm.id}/members`} className="text-brand-700 underline">
