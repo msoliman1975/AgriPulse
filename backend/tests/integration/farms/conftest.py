@@ -6,11 +6,9 @@ new farms tables). The `_StubAuth` middleware then mounts the farms
 router on a fresh FastAPI app with a hand-crafted RequestContext so
 each test exercises the route path end-to-end without Keycloak.
 
-NOTE: every test is currently `@pytest.mark.skip` because of a known
-asyncpg + SQLAlchemy 2.x UUID-encoding interaction in this harness — see
-`tests/integration/test_me_flow.py` for the exact reason. The tests
-remain in tree as executable specs; they are unblocked by the
-follow-up that tracks down the encoding path.
+`install_exception_handlers` is called on every test app so that
+`APIError` instances raised by the routes turn into RFC 7807
+problem+json responses (matching production wiring).
 """
 
 from __future__ import annotations
@@ -22,6 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.core.errors import install_exception_handlers
 from app.modules.farms.router import router as farms_router
 from app.shared.auth.context import (
     FarmRole,
@@ -53,6 +52,7 @@ class StubAuth:
 def build_app(context: RequestContext) -> FastAPI:
     """Mount only the farms router with a stubbed auth middleware."""
     app = FastAPI()
+    install_exception_handlers(app)
     app.include_router(farms_router)
     app.add_middleware(StubAuth, context=context)
     return app

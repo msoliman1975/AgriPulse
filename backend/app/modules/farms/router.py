@@ -13,9 +13,13 @@ and is acceptable for the current consistency requirements: audit failures
 are logged loudly but do not roll back the operation, and farm_scopes
 inconsistencies are caught by the cross-schema FK consistency-check job
 that PR-C will add.
-"""
 
-from __future__ import annotations
+Note: this module deliberately does NOT use ``from __future__ import
+annotations``. FastAPI/Pydantic v2's TypeAdapter cannot resolve string
+annotations like ``request: Request`` and silently demotes them to
+required query parameters, which breaks OpenAPI generation and POST
+route validation.
+"""
 
 from typing import Any
 from uuid import UUID

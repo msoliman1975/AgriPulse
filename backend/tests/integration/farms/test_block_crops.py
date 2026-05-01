@@ -19,10 +19,7 @@ from app.shared.auth.context import TenantRole
 
 from .conftest import build_app, make_context
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(reason="asyncpg+UUID encoding issue — see test_me_flow.py."),
-]
+pytestmark = [pytest.mark.integration]
 
 
 def _polygon(lon: float, lat: float, side: float = 0.001) -> dict[str, object]:

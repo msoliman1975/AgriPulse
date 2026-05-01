@@ -79,11 +79,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        # Pin search_path for the duration of this migration run. The schema
-        # itself is created by the tenancy bootstrap, *not* by Alembic — so
-        # the schema must already exist when this env runs.
-        connection.execute(text(f"SET search_path TO {schema}, public"))
-
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -94,6 +89,13 @@ def run_migrations_online() -> None:
             compare_server_default=True,
         )
         with context.begin_transaction():
+            # Pin search_path INSIDE the alembic-owned transaction. Doing it
+            # before begin_transaction() under SQLAlchemy 2.x's auto-begin
+            # would silently demote alembic's begin to a SAVEPOINT, and
+            # release-of-savepoint isn't a real commit — the DDL would be
+            # rolled back on connection close. (Discovered while re-enabling
+            # integration tests against a live Postgres.)
+            connection.execute(text(f"SET search_path TO {schema}, public"))
             context.run_migrations()
 
 

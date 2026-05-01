@@ -19,7 +19,11 @@ Resolution order on every request, per ARCHITECTURE.md § 7:
 First match wins; otherwise PermissionDeniedError (HTTP 403).
 """
 
-from __future__ import annotations
+# NOTE: deliberately NO `from __future__ import annotations`. The
+# inner `_check` dependency below uses `request: Request`, and FastAPI
+# can't resolve string annotations to the FastAPI Request injection —
+# it would silently demote the parameter to a query param and break
+# every route that depends on this factory.
 
 from collections.abc import Callable
 from functools import lru_cache
@@ -76,14 +80,14 @@ class CapabilityRegistry:
     @classmethod
     def from_files(
         cls, capabilities_path: Path, role_capabilities_path: Path
-    ) -> CapabilityRegistry:
+    ) -> "CapabilityRegistry":
         return cls.from_yaml(
             capabilities_path.read_text(encoding="utf-8"),
             role_capabilities_path.read_text(encoding="utf-8"),
         )
 
     @classmethod
-    def from_yaml(cls, capabilities_yaml: str, role_capabilities_yaml: str) -> CapabilityRegistry:
+    def from_yaml(cls, capabilities_yaml: str, role_capabilities_yaml: str) -> "CapabilityRegistry":
         caps_doc = yaml.safe_load(capabilities_yaml) or {}
         roles_doc = yaml.safe_load(role_capabilities_yaml) or {}
 
@@ -160,7 +164,7 @@ class CapabilityRegistry:
 
 
 @lru_cache(maxsize=1)
-def get_default_registry() -> CapabilityRegistry:
+def get_default_registry() -> "CapabilityRegistry":
     """Singleton registry loaded from the bundled YAML files."""
     return CapabilityRegistry.from_files(_CAPABILITIES_FILE, _ROLE_CAPABILITIES_FILE)
 
@@ -170,7 +174,7 @@ def has_capability(
     capability: str,
     *,
     farm_id: UUID | None = None,
-    registry: CapabilityRegistry | None = None,
+    registry: "CapabilityRegistry | None" = None,
 ) -> bool:
     """Module-level convenience over the default registry.
 
