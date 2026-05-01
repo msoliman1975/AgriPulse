@@ -15,17 +15,7 @@ from app.shared.auth.context import TenantRole
 
 from .conftest import build_app, make_context
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(
-        reason=(
-            "asyncpg + SQLAlchemy 2.x sends UUID parameters as un-padded hex of "
-            "uuid.int under our test harness; Postgres rejects them as invalid "
-            "uuid syntax. Test code is kept in tree until the encoding path "
-            "fix lands."
-        )
-    ),
-]
+pytestmark = [pytest.mark.integration]
 
 
 def _square(lon: float, lat: float, side: float = 0.005) -> dict[str, object]:

@@ -7,20 +7,11 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(
-        reason=(
-            "asyncpg + SQLAlchemy 2.x sends UUID parameters as un-padded hex of "
-            "uuid.int under our test harness; Postgres rejects them as invalid "
-            "uuid syntax. Test code is kept in tree for the follow-up PR that "
-            "tracks down the encoding path."
-        )
-    ),
-]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.mark.asyncio
@@ -43,21 +34,28 @@ async def test_create_tenant_bootstraps_schema_and_audits(
     assert result.schema_name == schema_name_for(result.tenant_id)
     assert result.status == "active"
 
-    tid_str = str(result.tenant_id)
+    # Bind the UUID via SQLAlchemy's typed bindparam — the previous
+    # `:tid::uuid` form combined the bindparam name with a Postgres cast
+    # and parsed as a syntax error.
+    tid_bind = bindparam("tid", type_=PG_UUID(as_uuid=True))
 
     # Tenant row, settings row, current subscription should all exist.
     row = (
         await admin_session.execute(
-            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid::uuid"),
-            {"tid": tid_str},
+            text("SELECT slug, schema_name, status FROM public.tenants WHERE id = :tid").bindparams(
+                tid_bind
+            ),
+            {"tid": result.tenant_id},
         )
     ).one()
     assert row.slug == "acme-test"
 
     settings_count = (
         await admin_session.execute(
-            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid::uuid"),
-            {"tid": tid_str},
+            text(
+                "SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": result.tenant_id},
         )
     ).scalar_one()
     assert settings_count == 1
@@ -66,9 +64,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
         await admin_session.execute(
             text(
                 "SELECT count(*) FROM public.tenant_subscriptions "
-                "WHERE tenant_id = :tid::uuid AND is_current = TRUE"
-            ),
-            {"tid": tid_str},
+                "WHERE tenant_id = :tid AND is_current = TRUE"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": result.tenant_id},
         )
     ).scalar_one()
     assert sub_count == 1
@@ -93,15 +91,17 @@ async def test_create_tenant_bootstraps_schema_and_audits(
     ).scalar_one()
     assert audit_table == 1
 
-    # Audit event written to the new tenant's audit_events.
-    await admin_session.execute(text(f"SET LOCAL search_path TO {result.schema_name}, public"))
+    # Audit event written to the new tenant's audit_events. Use SET (not
+    # SET LOCAL) so the search_path survives the implicit transaction
+    # boundary inside admin_session.
+    await admin_session.execute(text(f"SET search_path TO {result.schema_name}, public"))
     audit_count = (
         await admin_session.execute(
             text(
                 "SELECT count(*) FROM audit_events "
-                "WHERE event_type = 'tenancy.tenant_created' AND subject_id = :tid::uuid"
-            ),
-            {"tid": tid_str},
+                "WHERE event_type = 'tenancy.tenant_created' AND subject_id = :tid"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": result.tenant_id},
         )
     ).scalar_one()
     assert audit_count == 1

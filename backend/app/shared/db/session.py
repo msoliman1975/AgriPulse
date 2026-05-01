@@ -18,12 +18,16 @@ Tenant schema name is validated via `sanitize_tenant_schema` to prevent
 SQL injection through the JWT claim.
 """
 
-from __future__ import annotations
+# NOTE: deliberately NO `from __future__ import annotations`. The
+# `get_db_session` dependency below uses `request: Request`, and FastAPI
+# can't resolve string annotations to the FastAPI Request injection —
+# it would silently demote the parameter to a query param.
 
 import re
 import threading
-from typing import TYPE_CHECKING
+from collections.abc import AsyncIterator
 
+from fastapi import Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -33,12 +37,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.sql import text
 
 from app.core.settings import get_settings
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from fastapi import Request
-
 
 # Public name kept for typing in module imports.
 Engine = AsyncEngine

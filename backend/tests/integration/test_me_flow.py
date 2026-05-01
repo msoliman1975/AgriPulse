@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.core.errors import install_exception_handlers
 from app.modules.iam.router import router as iam_router
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import (
@@ -29,16 +30,7 @@ from app.shared.auth.context import (
     TenantRole,
 )
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(
-        reason=(
-            "asyncpg + SQLAlchemy 2.x sends UUID parameters as un-padded hex of "
-            "uuid.int under our test harness; Postgres rejects them as invalid "
-            "uuid syntax. Test code is kept in tree for the follow-up PR."
-        )
-    ),
-]
+pytestmark = [pytest.mark.integration]
 
 
 class _StubAuth:
@@ -58,6 +50,7 @@ class _StubAuth:
 
 def _build_app(context: RequestContext) -> FastAPI:
     app = FastAPI()
+    install_exception_handlers(app)
     app.include_router(iam_router)
     app.add_middleware(_StubAuth, context=context)
     return app

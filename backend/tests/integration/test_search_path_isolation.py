@@ -18,16 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(
-        reason=(
-            "asyncpg + SQLAlchemy 2.x sends UUID parameters as un-padded hex of "
-            "uuid.int under our test harness; Postgres rejects them as invalid "
-            "uuid syntax. Test code is kept in tree for the follow-up PR."
-        )
-    ),
-]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.mark.asyncio
@@ -35,8 +26,11 @@ async def test_tenant_a_cannot_see_tenant_b_audit_via_search_path(
     admin_session: AsyncSession,
 ) -> None:
     service = get_tenant_service(admin_session)
-    a = await service.create_tenant(slug="iso-a", name="A", contact_email="a@a.test")
-    b = await service.create_tenant(slug="iso-b", name="B", contact_email="b@b.test")
+    # `farms/test_isolation.py` also uses iso-a/iso-b. Pick distinct slugs
+    # so the testcontainers Postgres (shared across the session) doesn't
+    # collide on `tenants.slug` when both files run.
+    a = await service.create_tenant(slug="searchpath-a", name="A", contact_email="a@a.test")
+    b = await service.create_tenant(slug="searchpath-b", name="B", contact_email="b@b.test")
 
     # Insert one extra audit row in B's schema.
     await admin_session.execute(text(f"SET LOCAL search_path TO {b.schema_name}, public"))

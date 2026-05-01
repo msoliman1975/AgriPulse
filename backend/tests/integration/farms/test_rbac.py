@@ -19,10 +19,7 @@ from app.shared.auth.context import FarmRole, FarmScope, TenantRole
 
 from .conftest import build_app, make_context
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(reason="asyncpg+UUID encoding issue — see test_me_flow.py."),
-]
+pytestmark = [pytest.mark.integration]
 
 
 def _multipolygon(lon: float, lat: float, side: float = 0.005) -> dict[str, object]:
@@ -51,7 +48,10 @@ async def _seed_user(session: AsyncSession, *, tenant_id, user_id) -> None:
         {
             "id": user_id,
             "sub": f"kc-{user_id}",
-            "email": "u@rbac.test",
+            # Each user needs a distinct email — the table has a unique
+            # constraint and the same helper is called for the admin and
+            # the viewer in the same test.
+            "email": f"{user_id}@rbac.test",
             "name": "U",
         },
     )

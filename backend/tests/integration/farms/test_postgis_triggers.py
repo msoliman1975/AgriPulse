@@ -16,10 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.tenancy.service import get_tenant_service
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(reason="asyncpg+UUID encoding issue — see test_me_flow.py for context."),
-]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.mark.asyncio
@@ -42,7 +39,9 @@ async def test_farm_trigger_computes_centroid_and_area(
         "31.0 30.0, 31.005 30.0, 31.005 30.005, 31.0 30.005, 31.0 30.0"
         ")))"
     )
-    await admin_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+    # Use SET (session-scope) so the search_path survives the commit
+    # below; SET LOCAL is per-transaction.
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
     await admin_session.execute(
         text(
             "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, "
@@ -55,13 +54,18 @@ async def test_farm_trigger_computes_centroid_and_area(
     )
     await admin_session.commit()
 
+    # The two queries below interpolate `schema`, the tenant schema
+    # name fresh from `tenancy.create_tenant(...)`. It's validated by
+    # `sanitize_tenant_schema` so the f-string here isn't a real
+    # injection vector — disable S608 for these two reads.
+    sql = (
+        "SELECT ST_X(centroid) AS lon, ST_Y(centroid) AS lat, area_m2, "  # noqa: S608
+        "ST_SRID(boundary_utm) AS utm_srid "
+        f"FROM {schema}.farms WHERE id = :id"
+    )
     row = (
         await admin_session.execute(
-            text(
-                "SELECT ST_X(centroid) AS lon, ST_Y(centroid) AS lat, area_m2, "
-                "ST_SRID(boundary_utm) AS utm_srid "
-                "FROM farms WHERE id = :id"
-            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            text(sql).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": farm_id},
         )
     ).one()
@@ -87,7 +91,7 @@ async def test_block_trigger_computes_aoi_hash(admin_session: AsyncSession) -> N
 
     farm_id = uuid4()
     block_id = uuid4()
-    await admin_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
     await admin_session.execute(
         text(
             "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, "
@@ -125,11 +129,10 @@ async def test_block_trigger_computes_aoi_hash(admin_session: AsyncSession) -> N
     )
     await admin_session.commit()
 
+    sql = f"SELECT aoi_hash, area_m2 FROM {schema}.blocks WHERE id = :id"  # noqa: S608
     row = (
         await admin_session.execute(
-            text("SELECT aoi_hash, area_m2 FROM blocks WHERE id = :id").bindparams(
-                bindparam("id", type_=PG_UUID(as_uuid=True))
-            ),
+            text(sql).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": block_id},
         )
     ).one()
