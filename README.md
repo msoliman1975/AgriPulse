@@ -13,6 +13,16 @@ Every change touches one of these. Read before opening a PR.
 
 The first two files are binding. If something you're about to write contradicts them, stop and open an ADR.
 
+## Modules
+
+Each backend domain module gets its own reference doc once it ships. On-call runbooks live alongside.
+
+| Module | Reference | Runbook |
+|---|---|---|
+| `farms` | [`docs/modules/farms.md`](docs/modules/farms.md) | [`docs/runbooks/farms.md`](docs/runbooks/farms.md) |
+
+Other modules (`imagery`, `indices`, `weather`, `signals`, `alerts`, `recommendations`, `notifications`, `analytics`, `audit`, `iam`, `tenancy`) ship in later prompts and will be added here as they land.
+
 ## Layout
 
 ```
