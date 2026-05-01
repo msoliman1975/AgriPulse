@@ -193,5 +193,36 @@
     "saving": "جارٍ الحفظ…",
     "saved": "تم الحفظ.",
     "error": "تعذّر حفظ التغييرات."
+  },
+  "attachments": {
+    "heading": "المرفقات",
+    "empty": "لا توجد مرفقات بعد.",
+    "uploadHeading": "رفع مرفق",
+    "fileLabel": "الملف",
+    "kindLabel": "النوع",
+    "captionLabel": "وصف",
+    "submit": "رفع",
+    "uploading": "جارٍ الرفع…",
+    "delete": "حذف",
+    "confirmDelete": "هل تريد حذف هذا المرفق؟ سيُحذف الملف من التخزين.",
+    "download": "تنزيل",
+    "size": {
+      "kb": "{{value}} كيلوبايت",
+      "mb": "{{value}} ميجابايت"
+    },
+    "uploadedAt": "تم الرفع {{when}}",
+    "kind": {
+      "photo": "صورة",
+      "deed": "عقد",
+      "soil_test_report": "تقرير تحليل تربة",
+      "map": "خريطة",
+      "other": "أخرى"
+    },
+    "errors": {
+      "tooLarge": "حجم الملف أكبر من 25 ميجابايت.",
+      "uploadFailed": "فشل الرفع.",
+      "fileRequired": "اختر ملفًا للرفع.",
+      "kindRequired": "اختر النوع."
+    }
   }
 }

@@ -8,6 +8,7 @@ import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
+import { AttachmentsTab } from "../components/AttachmentsTab";
 import { CropPicker } from "../components/CropPicker";
 import { MapPreview } from "../components/MapPreview";
 
@@ -204,6 +205,8 @@ export function BlockDetailPage(): JSX.Element {
           </ul>
         )}
       </div>
+
+      <AttachmentsTab ownerKind="block" ownerId={block.id} farmId={farmId} />
     </div>
   );
 }
