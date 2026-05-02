@@ -59,7 +59,7 @@ async def test_farm_trigger_computes_centroid_and_area(
     # `sanitize_tenant_schema` so the f-string here isn't a real
     # injection vector — disable S608 for these two reads.
     sql = (
-        "SELECT ST_X(centroid) AS lon, ST_Y(centroid) AS lat, area_m2, "  # noqa: S608
+        "SELECT ST_X(centroid) AS lon, ST_Y(centroid) AS lat, area_m2, "
         "ST_SRID(boundary_utm) AS utm_srid "
         f"FROM {schema}.farms WHERE id = :id"
     )
@@ -129,7 +129,7 @@ async def test_block_trigger_computes_aoi_hash(admin_session: AsyncSession) -> N
     )
     await admin_session.commit()
 
-    sql = f"SELECT aoi_hash, area_m2 FROM {schema}.blocks WHERE id = :id"  # noqa: S608
+    sql = f"SELECT aoi_hash, area_m2 FROM {schema}.blocks WHERE id = :id"
     row = (
         await admin_session.execute(
             text(sql).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),

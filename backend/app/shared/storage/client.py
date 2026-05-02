@@ -78,6 +78,14 @@ class StorageClient(Protocol):
 
     def delete_object(self, *, key: str) -> None: ...
 
+    def put_object(
+        self,
+        *,
+        key: str,
+        body: bytes,
+        content_type: str,
+    ) -> None: ...
+
 
 class _Boto3StorageClient:
     """Concrete boto3 implementation. Internal — consumers use StorageClient."""
@@ -164,6 +172,27 @@ class _Boto3StorageClient:
         # S3 deletes are idempotent — but we surface the missing-object
         # signal so audit can log it.
         self._client.delete_object(Bucket=self._bucket, Key=key)
+
+    def put_object(
+        self,
+        *,
+        key: str,
+        body: bytes,
+        content_type: str,
+    ) -> None:
+        """Server-side upload — used by Celery workers writing imagery COGs.
+
+        Presigned URLs are the right pattern when the client (browser
+        or mobile app) holds the bytes. The Celery worker holds the
+        bytes itself, so a single boto3 call is simpler and skips the
+        round-trip the presigned-PUT pattern requires.
+        """
+        self._client.put_object(
+            Bucket=self._bucket,
+            Key=key,
+            Body=body,
+            ContentType=content_type,
+        )
 
 
 @lru_cache(maxsize=1)

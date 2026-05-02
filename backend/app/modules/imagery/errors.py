@@ -82,3 +82,20 @@ class SubscriptionAlreadyExistsError(APIError):
             detail="An active subscription for this block and product already exists.",
             type_="https://missionagre.io/problems/imagery/subscription-conflict",
         )
+
+
+class BlockNotVisibleError(APIError):
+    """404 surfaced by imagery routes when the caller has no scope on the block.
+
+    Equivalent of the farms module's BlockNotFoundError, but imagery
+    cannot import it (module-boundary contract). Same problem-type URI
+    so the frontend treats them identically.
+    """
+
+    def __init__(self, block_id: str | None = None) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Block not found",
+            detail=(f"No block with id {block_id}" if block_id else "Block not found."),
+            type_="https://missionagre.io/problems/farms/block-not-found",
+        )
