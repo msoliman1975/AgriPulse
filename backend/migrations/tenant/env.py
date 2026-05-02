@@ -23,6 +23,8 @@ from sqlalchemy import engine_from_config, pool, text
 # `--autogenerate` runs see them.
 import app.modules.audit.models
 import app.modules.farms.models
+import app.modules.imagery.models
+import app.modules.indices.models
 from app.core.settings import get_settings
 from app.shared.db.base import Base
 

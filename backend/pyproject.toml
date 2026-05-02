@@ -21,6 +21,14 @@ dependencies = [
   "alembic>=1.14,<1.15",
   "geoalchemy2>=0.16,<0.17",
 
+  # STAC catalog. We bootstrap pgstac as plain SQL via pypgstac (no
+  # server-side extension binary required) — see the public 0007
+  # migration. Pinned to the 0.8.x line that ships with STAC API 1.0.
+  # `psycopg-pool` is consumed by pypgstac's PgstacDB connection helper
+  # but not pinned by the package's own metadata, so we list it here.
+  "pypgstac>=0.8.5,<0.9",
+  "psycopg-pool>=3.2,<4",
+
   # Background work
   "celery>=5.4,<5.5",
   "redis>=5.2,<5.3",
@@ -180,6 +188,15 @@ filterwarnings = [
   # testcontainers 4.x emits a DeprecationWarning at import time about its
   # own deprecated decorator; harmless for our use.
   "ignore::DeprecationWarning:testcontainers.*",
+  # pypgstac pins `python-dateutil ==2.8.*`, which calls the deprecated
+  # `datetime.utcfromtimestamp` at module import time. We don't use the
+  # offending API ourselves; ignore until pypgstac upstream updates the
+  # pin (tracked at stac-utils/pgstac).
+  "ignore::DeprecationWarning:dateutil.*",
+  # pypgstac.db opens a psycopg_pool.ConnectionPool without the explicit
+  # `open=` arg that newer psycopg-pool versions warn about. We don't
+  # use ConnectionPool elsewhere; ignore until pypgstac fixes it.
+  "ignore::DeprecationWarning:psycopg_pool.*",
 ]
 
 [tool.coverage.run]

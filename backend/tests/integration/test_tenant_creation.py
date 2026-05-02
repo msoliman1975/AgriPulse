@@ -52,9 +52,9 @@ async def test_create_tenant_bootstraps_schema_and_audits(
 
     settings_count = (
         await admin_session.execute(
-            text(
-                "SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid"
-            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            text("SELECT count(*) FROM public.tenant_settings WHERE tenant_id = :tid").bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True))
+            ),
             {"tid": result.tenant_id},
         )
     ).scalar_one()

@@ -119,6 +119,17 @@ async def _set_search_path(session: AsyncSession, tenant_schema: str | None) -> 
     never from URL paths or query parameters. This function is the single
     point at which `tenant_schema` ever reaches SQL — `sanitize_tenant_schema`
     must be the only origin of valid schema names.
+
+    For tenant sessions we additionally set two custom GUCs that RLS
+    policies read (data_model § 6.6 + § 15.3):
+
+      * `app.current_tenant_id`        — sanitized schema name,
+      * `app.tenant_collection_prefix` — the LIKE pattern used by the
+                                         pgstac.items RLS policy.
+
+    Both are session-local and scoped to the current transaction. Setting
+    them here means every tenant-scoped query inherits them; admin
+    sessions (search_path = public) get neither.
     """
     if tenant_schema is None:
         await session.execute(text("SET LOCAL search_path TO public"))
@@ -127,6 +138,17 @@ async def _set_search_path(session: AsyncSession, tenant_schema: str | None) -> 
     safe = sanitize_tenant_schema(tenant_schema)
     # Identifiers in PostgreSQL do not bind as params; sanitize then literal.
     await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
+    # set_config(name, value, is_local=true) — equivalent to `SET LOCAL`
+    # for custom GUCs, but accepts the value as a bound parameter so we
+    # don't have to interpolate strings into SQL ourselves.
+    await session.execute(
+        text("SELECT set_config('app.current_tenant_id', :v, TRUE)"),
+        {"v": safe},
+    )
+    await session.execute(
+        text("SELECT set_config('app.tenant_collection_prefix', :v, TRUE)"),
+        {"v": f"{safe}__%"},
+    )
 
 
 async def _yield_session(tenant_schema: str | None) -> AsyncIterator[AsyncSession]:
