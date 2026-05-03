@@ -16,7 +16,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, select, text, update
+from sqlalchemy import and_, bindparam, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -206,6 +206,89 @@ class ImageryRepository:
         )
 
     # ---- Ingestion jobs -----------------------------------------------
+
+    async def list_ingestion_jobs_for_block(
+        self,
+        *,
+        block_id: UUID,
+        from_datetime: datetime | None,
+        to_datetime: datetime | None,
+        cursor: datetime | None,
+        limit: int,
+    ) -> tuple[tuple[dict[str, Any], ...], datetime | None]:
+        """Cursor-paginated by scene_datetime (DESC).
+
+        Cursor is the last seen scene_datetime; the next page asks for
+        rows strictly older. Returns ``(items, next_cursor)`` —
+        ``next_cursor`` is None on the last page.
+        """
+        clauses = ["block_id = :block_id"]
+        params: dict[str, Any] = {"block_id": block_id}
+        if from_datetime is not None:
+            clauses.append("scene_datetime >= :from_dt")
+            params["from_dt"] = from_datetime
+        if to_datetime is not None:
+            clauses.append("scene_datetime <= :to_dt")
+            params["to_dt"] = to_datetime
+        if cursor is not None:
+            clauses.append("scene_datetime < :cursor")
+            params["cursor"] = cursor
+        params["limit"] = limit + 1  # over-fetch by one to detect next page
+        where_sql = " AND ".join(clauses)
+        # `where_sql` is composed from a closed set of column names below;
+        # every value bind goes through SQLAlchemy `text(...)` parameters.
+        sql = " ".join(
+            (
+                "SELECT id, subscription_id, block_id, product_id, scene_id,",
+                "scene_datetime, requested_at, started_at, completed_at,",
+                "status, cloud_cover_pct, valid_pixel_pct, error_message,",
+                "stac_item_id, assets_written",
+                "FROM imagery_ingestion_jobs",
+                "WHERE",
+                where_sql,
+                "ORDER BY scene_datetime DESC",
+                "LIMIT :limit",
+            )
+        )
+        rows = (
+            (
+                await self._session.execute(
+                    text(sql).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        items = [dict(r) for r in rows]
+        next_cursor: datetime | None = None
+        if len(items) > limit:
+            # Drop the over-fetched row and emit its predecessor as the cursor.
+            items = items[:limit]
+            next_cursor = items[-1]["scene_datetime"]
+        return tuple(items), next_cursor
+
+    async def list_products(self) -> tuple[dict[str, Any], ...]:
+        """Read public.imagery_products joined with the provider for /api/v1/config."""
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        "SELECT pr.id AS product_id, pr.code AS product_code, "
+                        "pr.name AS product_name, pr.bands, pr.supported_indices, "
+                        "p.code AS provider_code "
+                        "FROM public.imagery_products pr "
+                        "JOIN public.imagery_providers p ON p.id = pr.provider_id "
+                        "WHERE pr.is_active = TRUE AND pr.deleted_at IS NULL "
+                        "  AND p.is_active = TRUE "
+                        "ORDER BY pr.code"
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
 
     async def get_ingestion_job(self, job_id: UUID) -> dict[str, Any]:
         row = (

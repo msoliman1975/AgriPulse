@@ -29,6 +29,8 @@ from app.modules.imagery.events import (
 )
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
+    ConfigResponse,
+    ImageryConfigEntry,
     IngestionJobRead,
     SubscriptionCreate,
     SubscriptionRead,
@@ -84,6 +86,8 @@ class ImageryService(Protocol):
         cursor: str | None = None,
         limit: int = 50,
     ) -> tuple[tuple[IngestionJobRead, ...], str | None]: ...
+
+    async def get_config(self) -> ConfigResponse: ...
 
 
 class ImageryServiceImpl:
@@ -235,10 +239,62 @@ class ImageryServiceImpl:
         cursor: str | None = None,
         limit: int = 50,
     ) -> tuple[tuple[IngestionJobRead, ...], str | None]:
-        # Full implementation lands in PR-C alongside the GET /scenes
-        # endpoint. PR-B keeps the Protocol method signature stable so
-        # the router can already declare it.
-        raise NotImplementedError("Scene listing lands in PR-C")
+        cursor_dt = _decode_scene_cursor(cursor)
+        rows, next_cursor_dt = await self._repo.list_ingestion_jobs_for_block(
+            block_id=block_id,
+            from_datetime=from_datetime,
+            to_datetime=to_datetime,
+            cursor=cursor_dt,
+            limit=limit,
+        )
+        items = tuple(IngestionJobRead.model_validate(r) for r in rows)
+        next_cursor = _encode_scene_cursor(next_cursor_dt) if next_cursor_dt else None
+        return items, next_cursor
+
+    async def get_config(self) -> ConfigResponse:
+        """GET /api/v1/config payload — tile-server URL + product hints."""
+        from app.core.settings import get_settings
+
+        settings = get_settings()
+        products = await self._repo.list_products()
+        return ConfigResponse(
+            tile_server_base_url=settings.tile_server_base_url,
+            cloud_cover_visualization_max_pct=(settings.imagery_cloud_cover_visualization_max_pct),
+            cloud_cover_aggregation_max_pct=(settings.imagery_cloud_cover_aggregation_max_pct),
+            products=tuple(
+                ImageryConfigEntry(
+                    product_id=p["product_id"],
+                    product_code=p["product_code"],
+                    product_name=p["product_name"],
+                    bands=tuple(p["bands"]),
+                    supported_indices=tuple(p["supported_indices"]),
+                )
+                for p in products
+            ),
+        )
+
+
+# --- Cursor helpers (datetime-based for scene listing) ---------------------
+
+
+def _encode_scene_cursor(dt: datetime) -> str:
+    """ISO-8601 encoded datetime; base64 to keep it opaque on the wire."""
+    import base64
+
+    return base64.urlsafe_b64encode(dt.isoformat().encode()).decode().rstrip("=")
+
+
+def _decode_scene_cursor(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    import base64
+
+    padded = value + "=" * (-len(value) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(padded).decode()
+        return datetime.fromisoformat(raw)
+    except (ValueError, UnicodeDecodeError):
+        return None
 
 
 def get_imagery_service(

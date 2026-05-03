@@ -133,13 +133,16 @@ async def upsert_item(
     *,
     item_doc: dict[str, Any],
 ) -> None:
-    """Insert (or update) one STAC item via pypgstac.
+    """Insert or update one STAC item via pypgstac.
 
-    pgstac's ``create_items`` accepts a JSONB array; we always pass a
-    single-element array because ingestion is per-scene. Re-running with
-    the same ``id`` overwrites — that's the contract.
+    pgstac's ``create_items`` is INSERT-only and raises on duplicate
+    id. ``upsert_items`` is INSERT … ON CONFLICT DO UPDATE — exactly
+    the contract we need so the imagery pipeline can call this once
+    after ``register_stac_item`` (raw_bands only) and again after
+    ``compute_indices`` (raw_bands + six index assets) without the
+    second call colliding.
     """
     await session.execute(
-        text("SELECT pgstac.create_items(:doc)").bindparams(bindparam("doc", type_=JSONB)),
+        text("SELECT pgstac.upsert_items(:doc)").bindparams(bindparam("doc", type_=JSONB)),
         {"doc": [item_doc]},
     )
