@@ -21,6 +21,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.core.errors import install_exception_handlers
 from app.modules.farms.router import router as farms_router
 from app.modules.imagery.router import router as imagery_router
+from app.modules.indices.router import router as indices_router
 from app.shared.auth.context import (
     FarmRole,
     FarmScope,
@@ -51,6 +52,7 @@ def build_app(context: RequestContext) -> FastAPI:
     install_exception_handlers(app)
     app.include_router(farms_router)
     app.include_router(imagery_router)
+    app.include_router(indices_router)
     app.add_middleware(StubAuth, context=context)
     return app
 

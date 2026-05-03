@@ -154,10 +154,15 @@ async def test_full_pipeline_succeeds_end_to_end(
     capture = _patch_provider_and_storage(monkeypatch, scenes=scenes)
 
     # Stub `.delay()` so we can drive the chain manually.
-    from app.modules.imagery.tasks import acquire_scene, register_stac_item
+    from app.modules.imagery.tasks import (
+        acquire_scene,
+        compute_indices,
+        register_stac_item,
+    )
 
     monkeypatch.setattr(acquire_scene, "delay", lambda *a, **k: None)
     monkeypatch.setattr(register_stac_item, "delay", lambda *a, **k: None)
+    monkeypatch.setattr(compute_indices, "delay", lambda *a, **k: None)
 
     try:
         # Discover.
@@ -234,10 +239,15 @@ async def test_pipeline_idempotent_on_rerun(
         ),
     )
     capture = _patch_provider_and_storage(monkeypatch, scenes=scenes)
-    from app.modules.imagery.tasks import acquire_scene, register_stac_item
+    from app.modules.imagery.tasks import (
+        acquire_scene,
+        compute_indices,
+        register_stac_item,
+    )
 
     monkeypatch.setattr(acquire_scene, "delay", lambda *a, **k: None)
     monkeypatch.setattr(register_stac_item, "delay", lambda *a, **k: None)
+    monkeypatch.setattr(compute_indices, "delay", lambda *a, **k: None)
 
     try:
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
