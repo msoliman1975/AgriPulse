@@ -197,6 +197,11 @@ filterwarnings = [
   # `open=` arg that newer psycopg-pool versions warn about. We don't
   # use ConnectionPool elsewhere; ignore until pypgstac fixes it.
   "ignore::DeprecationWarning:psycopg_pool.*",
+  # asyncpg's connection close path leaves socket FDs to be GC'd; on
+  # Linux CI those surface as PytestUnraisableExceptionWarning during
+  # session teardown. They aren't from any test we control and don't
+  # affect the result count — ignore.
+  "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.coverage.run]
