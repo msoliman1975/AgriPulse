@@ -21,15 +21,19 @@ Pydantic v2's TypeAdapter cannot resolve string annotations like
 parameters, breaking POST validation.
 """
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.imagery.errors import BlockNotVisibleError
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
+    ConfigResponse,
+    CursorPage,
+    IngestionJobRead,
     RefreshResponse,
     SubscriptionCreate,
     SubscriptionRead,
@@ -38,6 +42,7 @@ from app.modules.imagery.service import ImageryService, get_imagery_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_db_session
+from app.shared.pagination import clamp_limit
 from app.shared.rbac.check import has_capability
 
 router = APIRouter(prefix="/api/v1", tags=["imagery"])
@@ -195,3 +200,59 @@ async def trigger_refresh(
         "queued_subscription_ids": queued,
         "correlation_id": str(cid) if cid else None,
     }
+
+
+# --- Scenes (read) --------------------------------------------------------
+
+
+@router.get(
+    "/blocks/{block_id}/scenes",
+    response_model=CursorPage[IngestionJobRead],
+    summary="List ingested scenes for a block.",
+)
+async def list_scenes(
+    block_id: UUID,
+    cursor: str | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=200),
+    from_datetime: datetime | None = Query(default=None, alias="from"),
+    to_datetime: datetime | None = Query(default=None, alias="to"),
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    service: ImageryService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
+    if not has_capability(context, "imagery.read", farm_id=farm_id):
+        raise BlockNotVisibleError(str(block_id))
+    items, next_cursor = await service.list_scenes(
+        block_id=block_id,
+        from_datetime=from_datetime,
+        to_datetime=to_datetime,
+        cursor=cursor,
+        limit=clamp_limit(limit),
+    )
+    return {"items": list(items), "next_cursor": next_cursor}
+
+
+# --- Tenant config --------------------------------------------------------
+
+
+@router.get(
+    "/config",
+    response_model=ConfigResponse,
+    summary="Tile-server URL + per-tenant imagery configuration.",
+)
+async def get_config(
+    context: RequestContext = Depends(get_current_context),
+    service: ImageryService = Depends(_service),
+) -> dict[str, Any]:
+    """Bootstrap payload the SPA fetches on app load.
+
+    No per-farm gate — the JWT already proves a tenant scope, and the
+    response carries no block-level data. Routes that need stricter
+    isolation (scene URLs, raster tile templates) gate themselves
+    elsewhere.
+    """
+    _ensure_tenant(context)
+    response = await service.get_config()
+    return response.model_dump(mode="json")

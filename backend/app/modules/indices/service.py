@@ -1,13 +1,10 @@
-"""IndicesService Protocol + skeleton implementation.
+"""IndicesService Protocol + concrete impl.
 
 The imagery pipeline calls `record_aggregate_row(...)` per index per
 ingested scene; the API surface calls `get_timeseries(...)`. Both go
 through this Protocol so the imagery module never reaches into
 indices' tables, and the API surface never reaches into the imagery
 module's tables.
-
-PR-A lands the contract; PR-C fills in the bodies (alongside the
-`computation.py` library that produces the per-index COGs and stats).
 """
 
 from __future__ import annotations
@@ -17,8 +14,13 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logging import get_logger
+from app.modules.indices.repository import IndicesRepository
 from app.modules.indices.schemas import (
     IndexCatalogEntry,
+    IndexTimeseriesPoint,
     IndexTimeseriesResponse,
     TimeseriesGranularity,
 )
@@ -57,21 +59,20 @@ class IndicesService(Protocol):
         valid_pixel_count: int,
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
-    ) -> None:
-        """Upsert one row into block_index_aggregates.
-
-        Idempotent: re-running with the same
-        (time, block_id, index_code, product_id) tuple is a no-op,
-        leveraging the unique constraint declared in migration 0003.
-        """
-        ...
+    ) -> None: ...
 
 
 class IndicesServiceImpl:
-    """Skeleton — real implementation lands in PR-C."""
+    """Concrete service. One per request — receives a tenant-scoped session."""
+
+    def __init__(self, *, tenant_session: AsyncSession) -> None:
+        self._session = tenant_session
+        self._repo = IndicesRepository(tenant_session)
+        self._log = get_logger(__name__)
 
     async def list_catalog(self) -> tuple[IndexCatalogEntry, ...]:
-        raise NotImplementedError("Implemented in PR-C")
+        rows = await self._repo.list_catalog()
+        return tuple(IndexCatalogEntry.model_validate(r) for r in rows)
 
     async def get_timeseries(
         self,
@@ -82,7 +83,30 @@ class IndicesServiceImpl:
         to_datetime: datetime | None = None,
         granularity: TimeseriesGranularity = "daily",
     ) -> IndexTimeseriesResponse:
-        raise NotImplementedError("Implemented in PR-C")
+        rows = await self._repo.get_timeseries(
+            block_id=block_id,
+            index_code=index_code,
+            granularity=granularity,
+            from_datetime=from_datetime,
+            to_datetime=to_datetime,
+        )
+        points = tuple(
+            IndexTimeseriesPoint(
+                time=r["bucket_time"],
+                mean=r.get("mean"),
+                min=r.get("min"),
+                max=r.get("max"),
+                valid_pixels=r.get("valid_pixels"),
+                valid_pixel_pct=r.get("valid_pixel_pct"),
+            )
+            for r in rows
+        )
+        return IndexTimeseriesResponse(
+            block_id=block_id,
+            index_code=index_code,
+            granularity=granularity,
+            points=points,
+        )
 
     async def record_aggregate_row(
         self,
@@ -103,4 +127,25 @@ class IndicesServiceImpl:
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
     ) -> None:
-        raise NotImplementedError("Implemented in PR-C")
+        await self._repo.upsert_aggregate_row(
+            time=time,
+            block_id=block_id,
+            index_code=index_code,
+            product_id=product_id,
+            stac_item_id=stac_item_id,
+            mean=mean,
+            min_value=min_value,
+            max_value=max_value,
+            p10=p10,
+            p50=p50,
+            p90=p90,
+            std_dev=std_dev,
+            valid_pixel_count=valid_pixel_count,
+            total_pixel_count=total_pixel_count,
+            cloud_cover_pct=cloud_cover_pct,
+        )
+
+
+def get_indices_service(*, tenant_session: AsyncSession) -> IndicesService:
+    """Factory used by the router's FastAPI dependency."""
+    return IndicesServiceImpl(tenant_session=tenant_session)

@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -45,6 +46,7 @@ from app.modules.imagery.errors import (
     SentinelHubNotConfiguredError,
 )
 from app.modules.imagery.events import (
+    IndexAggregatedV1,
     IngestionFailedV1,
     SceneDiscoveredV1,
     SceneIngestedV1,
@@ -559,7 +561,195 @@ async def _register_stac_item_async(
         farm_id=block["farm_id"],
         details={"stac_item_id": item_id},
     )
+
+    # Chain compute_indices — runs on the heavy queue (rasterio reads
+    # are CPU + IO heavy). Failure here doesn't roll back the
+    # registration; the job stays `succeeded` and a separate retry
+    # tool can re-trigger compute on demand (P2).
+    compute_indices.delay(str(job_id), tenant_schema, assets_written[0])
+
     return {"job_id": str(job_id), "status": "succeeded", "stac_item_id": item_id}
+
+
+# --- compute_indices --------------------------------------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.compute_indices",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def compute_indices(job_id: str, tenant_schema: str, raw_bands_key_str: str) -> dict[str, Any]:
+    return asyncio.run(_compute_indices_async(UUID(job_id), tenant_schema, raw_bands_key_str))
+
+
+async def _compute_indices_async(
+    job_id: UUID,
+    tenant_schema: str,
+    raw_bands_key_str: str,
+) -> dict[str, Any]:
+    """Read raw_bands COG, compute six indices, write per-index COGs + aggregates.
+
+    All IO routes through the same DI seams as `acquire_scene` so unit
+    tests can swap the storage backend. The rasterio reader / writer
+    is local to this task — keeps the import graph thin for processes
+    that don't need rasterio (the API + light worker).
+    """
+    bus = get_default_bus()
+    storage = _get_storage()
+
+    # Step 1: load job + block + product context.
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        try:
+            job = await repo.get_ingestion_job(job_id)
+        except IngestionJobNotFoundError:
+            return {"job_id": str(job_id), "status": "missing"}
+        if job["status"] != "succeeded" or job["stac_item_id"] is None:
+            return {"job_id": str(job_id), "status": job["status"], "noop": True}
+        block = await repo.get_block_boundary(job["block_id"])
+        if block is None:
+            return {"job_id": str(job_id), "status": "block_missing"}
+        product = await _lookup_product(session, job["product_id"])
+
+    # Step 2: read raw COG, compute indices, write per-index COGs.
+    # Local import — pulls rasterio/numpy only into the heavy worker.
+    from app.modules.imagery._rasterio_io import (
+        compute_and_write_indices,
+        load_raw_bands_and_aggregate,
+    )
+
+    bucket = storage.bucket
+    raw_uri = f"s3://{bucket}/{raw_bands_key_str}"
+    try:
+        bands_arrays, aoi_mask, profile = load_raw_bands_and_aggregate(
+            raw_uri,
+            band_names=tuple(product["bands"]),
+            aoi_geojson_utm36n=block["boundary_utm_geojson"],
+        )
+        index_aggregates, index_keys = compute_and_write_indices(
+            bands_arrays=bands_arrays,
+            aoi_mask=aoi_mask,
+            profile=profile,
+            storage=storage,
+            provider_code=product["provider_code"],
+            product_code=product["code"],
+            scene_id=job["scene_id"],
+            aoi_hash=block["aoi_hash"],
+        )
+    except Exception as exc:
+        bus.publish(IngestionFailedV1(job_id=job_id, error=f"compute_indices_failed: {exc}"))
+        await _record_audit(
+            tenant_schema=tenant_schema,
+            event_type="imagery.ingestion_failed",
+            subject_id=job_id,
+            farm_id=block["farm_id"],
+            details={"reason": "compute_indices_failed", "error": str(exc)},
+        )
+        return {"job_id": str(job_id), "status": "compute_failed"}
+
+    # Step 3: insert one block_index_aggregates row per index; refresh
+    # the pgstac item with merged assets.
+    from app.modules.indices.service import get_indices_service
+
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        indices_service = get_indices_service(tenant_session=session)
+        for index_code, agg in index_aggregates.items():
+            await indices_service.record_aggregate_row(
+                time=job["scene_datetime"],
+                block_id=job["block_id"],
+                index_code=index_code,
+                product_id=job["product_id"],
+                stac_item_id=job["stac_item_id"],
+                mean=agg.mean,
+                min_value=agg.min,
+                max_value=agg.max,
+                p10=agg.p10,
+                p50=agg.p50,
+                p90=agg.p90,
+                std_dev=agg.std_dev,
+                valid_pixel_count=agg.valid_pixel_count,
+                total_pixel_count=agg.total_pixel_count,
+                cloud_cover_pct=job["cloud_cover_pct"],
+            )
+
+        # Refresh pgstac.items with the merged asset map.
+        from app.modules.imagery.pgstac import (
+            build_item_doc,
+            collection_id_for,
+            upsert_item,
+        )
+
+        collection_id = collection_id_for(tenant_schema, product["code"])
+        merged_assets = {
+            "raw_bands": {
+                "href": f"s3://{bucket}/{raw_bands_key_str}",
+                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                "roles": ["data"],
+                "bands": list(product["bands"]),
+            },
+        }
+        for index_code, key in index_keys.items():
+            merged_assets[index_code] = {
+                "href": f"s3://{bucket}/{key}",
+                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                "roles": ["data", "index"],
+                "title": index_code.upper(),
+            }
+        bbox = _bbox_from_geojson(block["boundary_geojson"])
+        item_doc = build_item_doc(
+            collection_id=collection_id,
+            item_id=job["stac_item_id"],
+            geometry_geojson=block["boundary_geojson"],
+            bbox=bbox,
+            scene_datetime_iso=_iso(job["scene_datetime"]),
+            assets=merged_assets,
+            properties={
+                "eo:cloud_cover": (
+                    float(job["cloud_cover_pct"]) if job["cloud_cover_pct"] is not None else None
+                ),
+                "missionagre:scene_id": job["scene_id"],
+                "missionagre:aoi_hash": block["aoi_hash"],
+            },
+        )
+        await upsert_item(session, item_doc=item_doc)
+
+    # Step 4: emit one IndexAggregatedV1 per index, audit the batch.
+    for index_code, agg in index_aggregates.items():
+        bus.publish(
+            IndexAggregatedV1(
+                block_id=job["block_id"],
+                index_code=index_code,
+                time=job["scene_datetime"],
+                valid_pixel_pct=_valid_pct(agg),
+            )
+        )
+    await _record_audit(
+        tenant_schema=tenant_schema,
+        event_type="imagery.indices_computed",
+        subject_id=job_id,
+        farm_id=block["farm_id"],
+        details={
+            "stac_item_id": job["stac_item_id"],
+            "indices": list(index_aggregates.keys()),
+        },
+    )
+    return {
+        "job_id": str(job_id),
+        "status": "indices_computed",
+        "indices": list(index_aggregates.keys()),
+    }
+
+
+def _valid_pct(agg: Any) -> Decimal | None:
+    if agg.total_pixel_count == 0:
+        return None
+    pct = Decimal(agg.valid_pixel_count) * Decimal(100) / Decimal(agg.total_pixel_count)
+    return pct.quantize(Decimal("0.01"))
 
 
 # --- discover_active_subscriptions (Beat sweep) -----------------------------
