@@ -5,9 +5,13 @@ import { initReactI18next } from "react-i18next";
 import enCommon from "./locales/en/common.json";
 import enAuth from "./locales/en/auth.json";
 import enFarms from "./locales/en/farms.json";
+import enImagery from "./locales/en/imagery.json";
+import enIndices from "./locales/en/indices.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
+import arImagery from "./locales/ar/imagery.json";
+import arIndices from "./locales/ar/indices.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -18,8 +22,20 @@ export const DEFAULT_LANGUAGE: SupportedLanguage = "en";
 // loaded eagerly at this scope (the bundle is small). Future modules add
 // their own namespaces lazily via i18next-http-backend.
 const resources = {
-  en: { common: enCommon, auth: enAuth, farms: enFarms },
-  ar: { common: arCommon, auth: arAuth, farms: arFarms },
+  en: {
+    common: enCommon,
+    auth: enAuth,
+    farms: enFarms,
+    imagery: enImagery,
+    indices: enIndices,
+  },
+  ar: {
+    common: arCommon,
+    auth: arAuth,
+    farms: arFarms,
+    imagery: arImagery,
+    indices: arIndices,
+  },
 } as const;
 
 void i18n
@@ -30,7 +46,7 @@ void i18n
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGES],
     defaultNS: "common",
-    ns: ["common", "auth", "farms"],
+    ns: ["common", "auth", "farms", "imagery", "indices"],
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],

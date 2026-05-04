@@ -5,6 +5,9 @@ import { useTranslation } from "react-i18next";
 import { archiveBlock, getBlock, type BlockDetail } from "@/api/blocks";
 import { assignBlockCrop, listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
 import { isApiError } from "@/api/errors";
+import { ImageryPanel } from "@/modules/imagery/components/ImageryPanel";
+import { SubscriptionsTab } from "@/modules/imagery/components/SubscriptionsTab";
+import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
@@ -19,6 +22,8 @@ export function BlockDetailPage(): JSX.Element {
   const canEdit = useCapability("block.update_metadata", { farmId });
   const canArchive = useCapability("block.delete", { farmId });
   const canAssignCrop = useCapability("crop_assignment.create", { farmId });
+  const canReadImagery = useCapability("imagery.read", { farmId });
+  const canReadIndex = useCapability("index.read", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
   const [history, setHistory] = useState<BlockCropAssignment[]>([]);
@@ -207,6 +212,19 @@ export function BlockDetailPage(): JSX.Element {
       </div>
 
       <AttachmentsTab ownerKind="block" ownerId={block.id} farmId={farmId} />
+
+      {canReadImagery ? (
+        <ImageryPanel
+          blockId={block.id}
+          farmId={farmId}
+          geometry={block.boundary}
+          aoiHash={block.aoi_hash ?? undefined}
+        />
+      ) : null}
+
+      {canReadIndex ? <IndexTrendChart blockId={block.id} /> : null}
+
+      {canReadImagery ? <SubscriptionsTab blockId={block.id} farmId={farmId} /> : null}
     </div>
   );
 }

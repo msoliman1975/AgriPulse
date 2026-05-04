@@ -153,6 +153,8 @@ async def test_config_returns_tile_server_url_and_products(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert "tile_server_base_url" in body
+    assert "s3_bucket" in body
+    assert body["s3_bucket"]
     assert body["cloud_cover_visualization_max_pct"] == 60
     assert body["cloud_cover_aggregation_max_pct"] == 20
     products = body["products"]

@@ -20,7 +20,12 @@ export type Capability =
   | "farm.attachment.read"
   | "farm.attachment.write"
   | "block.attachment.read"
-  | "block.attachment.write";
+  | "block.attachment.write"
+  | "imagery.read"
+  | "imagery.refresh"
+  | "imagery.subscription.manage"
+  | "index.read"
+  | "index.compute_custom";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -31,7 +36,13 @@ export type FarmRole = "FarmManager" | "Agronomist" | "FieldOperator" | "Scout" 
 // in the resolver.
 export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = {
   PlatformAdmin: new Set<Capability | "*">(["*"]),
-  PlatformSupport: new Set<Capability>(["farm.read", "farm.member.read", "block.read"]),
+  PlatformSupport: new Set<Capability>([
+    "farm.read",
+    "farm.member.read",
+    "block.read",
+    "imagery.read",
+    "index.read",
+  ]),
   TenantOwner: tenantWideCaps(),
   TenantAdmin: tenantWideCaps(),
   FarmManager: new Set<Capability>([
@@ -51,6 +62,11 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "crop_assignment.create",
     "crop_assignment.update",
     "crop_assignment.delete",
+    "imagery.read",
+    "imagery.refresh",
+    "imagery.subscription.manage",
+    "index.read",
+    "index.compute_custom",
   ]),
   Agronomist: new Set<Capability>([
     "farm.read",
@@ -58,6 +74,10 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.read",
     "block.attachment.read",
     "crop_assignment.update",
+    "imagery.read",
+    "imagery.refresh",
+    "index.read",
+    "index.compute_custom",
   ]),
   FieldOperator: new Set<Capability>([
     "farm.read",
@@ -66,18 +86,24 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.read",
     "block.attachment.read",
     "block.attachment.write",
+    "imagery.read",
+    "index.read",
   ]),
   Scout: new Set<Capability>([
     "farm.read",
     "farm.attachment.read",
     "block.read",
     "block.attachment.read",
+    "imagery.read",
+    "index.read",
   ]),
   Viewer: new Set<Capability>([
     "farm.read",
     "farm.attachment.read",
     "block.read",
     "block.attachment.read",
+    "imagery.read",
+    "index.read",
   ]),
 };
 
@@ -101,6 +127,11 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "crop_assignment.create",
     "crop_assignment.update",
     "crop_assignment.delete",
+    "imagery.read",
+    "imagery.refresh",
+    "imagery.subscription.manage",
+    "index.read",
+    "index.compute_custom",
   ]);
 }
 

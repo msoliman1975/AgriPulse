@@ -1,0 +1,32 @@
+{
+  "trend": {
+    "heading": "اتجاه المؤشر",
+    "loading": "جارٍ تحميل السلسلة الزمنية…",
+    "error": "تعذر تحميل السلسلة الزمنية: {{message}}",
+    "empty": "لا توجد نقاط بيانات بعد. ابدأ باستيعاب مشهد أولاً."
+  },
+  "controls": {
+    "indexLabel": "المؤشر",
+    "granularityLabel": "الفاصل الزمني",
+    "daily": "يومي",
+    "weekly": "أسبوعي"
+  },
+  "axis": {
+    "time": "التاريخ",
+    "value": "قيمة المؤشر"
+  },
+  "tooltip": {
+    "mean": "المتوسط",
+    "min": "الحد الأدنى",
+    "max": "الحد الأقصى",
+    "validPixels": "البكسلات الصالحة"
+  },
+  "names": {
+    "ndvi": "NDVI",
+    "ndwi": "NDWI",
+    "evi": "EVI",
+    "savi": "SAVI",
+    "ndre": "NDRE",
+    "gndvi": "GNDVI"
+  }
+}
