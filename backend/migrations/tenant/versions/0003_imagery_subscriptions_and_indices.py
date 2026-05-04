@@ -413,27 +413,18 @@ def downgrade() -> None:
 
     # Continuous aggregates and their refresh policies.
     op.execute(
-        "SELECT remove_continuous_aggregate_policy("
-        "'block_index_weekly', if_exists => TRUE)"
+        "SELECT remove_continuous_aggregate_policy(" "'block_index_weekly', if_exists => TRUE)"
     )
     op.execute("DROP MATERIALIZED VIEW IF EXISTS block_index_weekly")
     op.execute(
-        "SELECT remove_continuous_aggregate_policy("
-        "'block_index_daily', if_exists => TRUE)"
+        "SELECT remove_continuous_aggregate_policy(" "'block_index_daily', if_exists => TRUE)"
     )
     op.execute("DROP MATERIALIZED VIEW IF EXISTS block_index_daily")
 
     # Hypertable.
-    op.execute(
-        "SELECT remove_compression_policy("
-        "'block_index_aggregates', if_exists => TRUE)"
-    )
-    op.drop_index(
-        "ix_block_index_aggregates_stac_item", table_name="block_index_aggregates"
-    )
-    op.drop_index(
-        "ix_block_index_aggregates_index_time", table_name="block_index_aggregates"
-    )
+    op.execute("SELECT remove_compression_policy(" "'block_index_aggregates', if_exists => TRUE)")
+    op.drop_index("ix_block_index_aggregates_stac_item", table_name="block_index_aggregates")
+    op.drop_index("ix_block_index_aggregates_index_time", table_name="block_index_aggregates")
     op.drop_index(
         "ix_block_index_aggregates_block_time_index",
         table_name="block_index_aggregates",

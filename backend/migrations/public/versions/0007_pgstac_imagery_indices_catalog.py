@@ -82,8 +82,7 @@ def _bootstrap_pgstac() -> None:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            "pgstac bootstrap failed.\n"
-            f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            "pgstac bootstrap failed.\n" f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
 
 
@@ -194,9 +193,7 @@ def upgrade() -> None:
             name="fk_imagery_products_provider_id_imagery_providers",
             ondelete="RESTRICT",
         ),
-        sa.UniqueConstraint(
-            "provider_id", "code", name="uq_imagery_products_provider_id_code"
-        ),
+        sa.UniqueConstraint("provider_id", "code", name="uq_imagery_products_provider_id_code"),
         sa.CheckConstraint(
             "cost_tier IN ('free','low','medium','high','premium')",
             name="ck_imagery_products_cost_tier",
