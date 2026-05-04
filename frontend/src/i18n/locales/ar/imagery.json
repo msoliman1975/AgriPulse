@@ -1,0 +1,52 @@
+{
+  "panel": {
+    "heading": "الصور الفضائية",
+    "description": "أحدث صورة فضائية لهذه القطعة.",
+    "loading": "جارٍ تحميل المشاهد…",
+    "error": "تعذر تحميل الصور: {{message}}",
+    "empty": "لم تتم معالجة أي مشاهد لهذه القطعة بعد.",
+    "noConfig": "إعدادات الصور غير متوفرة."
+  },
+  "scenePicker": {
+    "label": "المشهد",
+    "placeholder": "اختر مشهدًا",
+    "cloudCover": "{{value}}٪ غيوم",
+    "ingestedOn": "تم الاستيعاب في {{date}}"
+  },
+  "refresh": {
+    "button": "تحديث الصور",
+    "busy": "جارٍ بدء التحديث…",
+    "queued": "تم وضع {{count}} اشتراك في قائمة التحديث",
+    "queued_other": "تم وضع {{count}} اشتراكات في قائمة التحديث",
+    "noActive": "لا توجد اشتراكات نشطة للتحديث.",
+    "denied": "ليست لديك صلاحية لتحديث الصور."
+  },
+  "legend": {
+    "title": "مؤشر الغطاء النباتي (NDVI)",
+    "low": "منخفض",
+    "mid": "متوسط",
+    "high": "غطاء كثيف"
+  },
+  "subscriptions": {
+    "heading": "اشتراكات الصور",
+    "empty": "لا توجد اشتراكات على هذه القطعة بعد.",
+    "subscribeButton": "اشترك في Sentinel-2 L2A",
+    "subscribing": "جارٍ الاشتراك…",
+    "revokeButton": "إلغاء الاشتراك",
+    "revoking": "جارٍ الإلغاء…",
+    "productLabel": "المنتج",
+    "createdAt": "تم الاشتراك في {{date}}",
+    "lastIngest": "آخر استيعاب ناجح: {{date}}",
+    "neverIngested": "آخر استيعاب ناجح: لا يوجد",
+    "alreadySubscribed": "يوجد اشتراك نشط لهذا المنتج بالفعل.",
+    "denied": "ليست لديك صلاحية لإدارة الاشتراكات."
+  },
+  "status": {
+    "pending": "قيد الانتظار",
+    "running": "قيد التنفيذ",
+    "succeeded": "ناجح",
+    "failed": "فاشل",
+    "skipped_cloud": "تم التخطي (غيوم)",
+    "skipped_duplicate": "تم التخطي (مكرر)"
+  }
+}

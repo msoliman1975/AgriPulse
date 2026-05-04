@@ -4,9 +4,13 @@ import { initReactI18next } from "react-i18next";
 import enCommon from "./locales/en/common.json";
 import enAuth from "./locales/en/auth.json";
 import enFarms from "./locales/en/farms.json";
+import enImagery from "./locales/en/imagery.json";
+import enIndices from "./locales/en/indices.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
+import arImagery from "./locales/ar/imagery.json";
+import arIndices from "./locales/ar/indices.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -19,13 +23,25 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
   if (!initialized) {
     await i18n.use(initReactI18next).init({
       resources: {
-        en: { common: enCommon, auth: enAuth, farms: enFarms },
-        ar: { common: arCommon, auth: arAuth, farms: arFarms },
+        en: {
+          common: enCommon,
+          auth: enAuth,
+          farms: enFarms,
+          imagery: enImagery,
+          indices: enIndices,
+        },
+        ar: {
+          common: arCommon,
+          auth: arAuth,
+          farms: arFarms,
+          imagery: arImagery,
+          indices: arIndices,
+        },
       },
       lng: language,
       fallbackLng: "en",
       defaultNS: "common",
-      ns: ["common", "auth", "farms"],
+      ns: ["common", "auth", "farms", "imagery", "indices"],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },
     });

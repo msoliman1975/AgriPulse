@@ -139,6 +139,7 @@ class ConfigResponse(BaseModel):
     """
 
     tile_server_base_url: str
+    s3_bucket: str
     cloud_cover_visualization_max_pct: int
     cloud_cover_aggregation_max_pct: int
     products: tuple[ImageryConfigEntry, ...]
