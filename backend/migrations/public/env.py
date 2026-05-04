@@ -16,6 +16,8 @@ from sqlalchemy import engine_from_config, pool
 # this, but it is cheap to keep the registry warm.
 import app.modules.farms.models
 import app.modules.iam.models
+import app.modules.imagery.models
+import app.modules.indices.models
 import app.modules.tenancy.models
 from app.core.settings import get_settings
 from app.shared.db.base import Base
@@ -66,6 +68,13 @@ def run_migrations_online() -> None:
             include_schemas=False,
             compare_type=True,
             compare_server_default=True,
+            # One transaction per migration. Required by 0007's pgstac
+            # bootstrap: pgstac does `CREATE EXTENSION btree_gist`, which
+            # blocks on row locks held by any earlier migration whose
+            # transaction is still open. With per-migration transactions,
+            # each prior migration commits before the next begins, so the
+            # bootstrap sees a clean catalog state.
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()

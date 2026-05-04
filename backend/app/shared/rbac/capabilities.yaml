@@ -166,19 +166,23 @@ capabilities:
   imagery.read:
     description: View imagery metadata and request rendered tiles.
     scope: farm
-    status: stub
+    status: active
   imagery.refresh:
     description: Trigger an on-demand imagery refresh for a block.
     scope: farm
-    status: stub
+    status: active
+  imagery.subscription.manage:
+    description: Subscribe a block to an imagery product or revoke a subscription.
+    scope: farm
+    status: active
   index.read:
     description: View pre-computed and aggregated index values.
     scope: farm
-    status: stub
+    status: active
   index.compute_custom:
     description: Run a custom on-demand index calculation.
     scope: farm
-    status: stub
+    status: active
 
   # --- Weather ---------------------------------------------------------
   weather.read:
