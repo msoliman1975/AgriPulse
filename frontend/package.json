@@ -39,7 +39,7 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^15.4.0",
     "react-oidc-context": "^3.2.0",
-    "react-router-dom": "^6.28.1",
+    "react-router-dom": "^7.14.2",
     "recharts": "^2.13.3",
     "shpjs": "^6.1.0"
   },
