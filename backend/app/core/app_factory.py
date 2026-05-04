@@ -86,8 +86,19 @@ def _register_module_routers(app: FastAPI) -> None:
     """
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
+    from app.modules.imagery.router import router as imagery_router
+    from app.modules.imagery.subscribers import (
+        register_subscribers as register_imagery_subscribers,
+    )
     from app.modules.tenancy.router import router as tenancy_router
+    from app.shared.eventbus import get_default_bus
 
     app.include_router(iam_router)
     app.include_router(tenancy_router)
     app.include_router(farms_router)
+    app.include_router(imagery_router)
+
+    # Cross-module event subscribers — registered once per process.
+    # Imagery's subscriber listens for BlockBoundaryChangedV1 from
+    # farms and resets cached scenes accordingly.
+    register_imagery_subscribers(get_default_bus())

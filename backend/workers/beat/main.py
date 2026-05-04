@@ -22,4 +22,13 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.farm_scope_consistency_check_seconds),
         "options": {"queue": "light"},
     },
+    # Sweep every active subscription whose last attempt is older than
+    # its cadence and enqueue `imagery.discover_scenes`. The actual
+    # SH calls + acquisitions happen on the heavy worker queue; this
+    # task just walks the catalog.
+    "imagery.discover_active_subscriptions": {
+        "task": "imagery.discover_active_subscriptions",
+        "schedule": float(_settings.imagery_discover_active_subscriptions_seconds),
+        "options": {"queue": "light"},
+    },
 }

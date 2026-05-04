@@ -17,13 +17,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /usr/local/bin/
 
 WORKDIR /build
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
+# uv.lock is optional; copy it if present so the deterministic
+# `uv sync --frozen` path is taken when a maintainer has regenerated
+# the lock. Otherwise `uv pip install` resolves directly from pyproject.
+COPY uv.loc[k] ./
 
-# uv.lock is committed (revision 3); always take the deterministic
-# `--frozen` path. No bash process-substitution fallback — the default
-# /bin/sh in python-slim is dash, which can't parse `<(...)`.
+# /bin/sh is dash in python-slim — no process substitution. Use a
+# plain `if` test on the file's existence.
 RUN uv venv "$VIRTUAL_ENV" \
- && uv sync --frozen --no-dev --no-install-project
+ && if [ -f uv.lock ]; then \
+        uv sync --frozen --no-dev --no-install-project ; \
+    else \
+        uv pip compile pyproject.toml -o /tmp/requirements.txt \
+        && uv pip install --python "$VIRTUAL_ENV/bin/python" -r /tmp/requirements.txt ; \
+    fi
 
 # Re-install with the project sources so editable-install metadata is correct.
 # pyproject.toml's `readme = "README.md"` makes hatchling require the file
