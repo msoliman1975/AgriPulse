@@ -12,6 +12,9 @@ vi.mock("react-oidc-context", () => ({
   useAuth: () => ({ user: { access_token: null } }),
 }));
 vi.mock("@/modules/farms/components/MapPreview", () => ({ MapPreview: () => null }));
+vi.mock("@/modules/imagery/components/ImageryPanel", () => ({ ImageryPanel: () => null }));
+vi.mock("@/modules/imagery/components/SubscriptionsTab", () => ({ SubscriptionsTab: () => null }));
+vi.mock("@/modules/indices/components/IndexTrendChart", () => ({ IndexTrendChart: () => null }));
 vi.mock("@/api/crops", () => ({
   listCrops: vi.fn().mockResolvedValue([]),
   listCropVarieties: vi.fn().mockResolvedValue([]),

@@ -1,0 +1,32 @@
+{
+  "trend": {
+    "heading": "Index trend",
+    "loading": "Loading time-series…",
+    "error": "Could not load time-series: {{message}}",
+    "empty": "No data points yet. Ingest a scene first."
+  },
+  "controls": {
+    "indexLabel": "Index",
+    "granularityLabel": "Granularity",
+    "daily": "Daily",
+    "weekly": "Weekly"
+  },
+  "axis": {
+    "time": "Date",
+    "value": "Index value"
+  },
+  "tooltip": {
+    "mean": "Mean",
+    "min": "Min",
+    "max": "Max",
+    "validPixels": "Valid pixels"
+  },
+  "names": {
+    "ndvi": "NDVI",
+    "ndwi": "NDWI",
+    "evi": "EVI",
+    "savi": "SAVI",
+    "ndre": "NDRE",
+    "gndvi": "GNDVI"
+  }
+}

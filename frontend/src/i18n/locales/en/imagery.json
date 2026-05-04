@@ -1,0 +1,52 @@
+{
+  "panel": {
+    "heading": "Imagery",
+    "description": "Latest satellite scene for this block.",
+    "loading": "Loading scenes…",
+    "error": "Could not load imagery: {{message}}",
+    "empty": "No scenes ingested yet for this block.",
+    "noConfig": "Imagery configuration unavailable."
+  },
+  "scenePicker": {
+    "label": "Scene",
+    "placeholder": "Select a scene",
+    "cloudCover": "{{value}}% cloud",
+    "ingestedOn": "ingested {{date}}"
+  },
+  "refresh": {
+    "button": "Refresh imagery",
+    "busy": "Triggering refresh…",
+    "queued": "Queued {{count}} subscription for refresh",
+    "queued_other": "Queued {{count}} subscriptions for refresh",
+    "noActive": "No active subscriptions to refresh.",
+    "denied": "You do not have permission to trigger imagery refresh."
+  },
+  "legend": {
+    "title": "NDVI",
+    "low": "Sparse",
+    "mid": "Moderate",
+    "high": "Dense canopy"
+  },
+  "subscriptions": {
+    "heading": "Imagery subscriptions",
+    "empty": "No subscriptions on this block yet.",
+    "subscribeButton": "Subscribe to Sentinel-2 L2A",
+    "subscribing": "Subscribing…",
+    "revokeButton": "Revoke",
+    "revoking": "Revoking…",
+    "productLabel": "Product",
+    "createdAt": "Subscribed {{date}}",
+    "lastIngest": "Last successful: {{date}}",
+    "neverIngested": "Last successful: never",
+    "alreadySubscribed": "An active subscription for this product already exists.",
+    "denied": "You do not have permission to manage subscriptions."
+  },
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "skipped_cloud": "Skipped (cloud)",
+    "skipped_duplicate": "Skipped (duplicate)"
+  }
+}

@@ -259,6 +259,9 @@ class ImageryServiceImpl:
         products = await self._repo.list_products()
         return ConfigResponse(
             tile_server_base_url=settings.tile_server_base_url,
+            # Bucket name surfaced so the SPA can build `s3://bucket/key`
+            # tile URLs to pass to TiTiler. PR-D Q1.
+            s3_bucket=settings.s3_bucket_uploads,
             cloud_cover_visualization_max_pct=(settings.imagery_cloud_cover_visualization_max_pct),
             cloud_cover_aggregation_max_pct=(settings.imagery_cloud_cover_aggregation_max_pct),
             products=tuple(
