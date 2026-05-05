@@ -1,27 +1,57 @@
-"""Bootstrap a tenant + dev user + Keycloak claim mappers for local dev.
+"""Bootstrap a tenant + user(s) + Keycloak claim mappers for local dev.
 
-What this does end-to-end so first sign-in just works:
+Two run modes:
 
-  1. Pull `dev@missionagre.local` from Keycloak's Admin REST API and
-     read its `sub` UUID.
-  2. Create a tenant via the in-process tenancy service (which also
+  1. **Default** — creates the dev-tenant + the seeded `dev@missionagre.local`
+     as TenantAdmin. Idempotent. Run this once after `compose up`.
+
+         python -m scripts.dev_bootstrap
+
+  2. **Add user** — creates an additional Keycloak user and attaches it
+     to the dev-tenant with a chosen tenant role and/or farm-scoped role.
+     Useful for testing per-farm RBAC paths (Viewer can't refresh,
+     Agronomist can't manage subscriptions, etc.).
+
+         python -m scripts.dev_bootstrap \\
+             --user-email alice@local --password alice \\
+             --tenant-role Agronomist
+
+         python -m scripts.dev_bootstrap \\
+             --user-email bob@local --password bob \\
+             --farm-id 019df... --farm-role Viewer
+
+Notes
+-----
+
+There is no production admin frontend yet for user management — that
+ships in a later prompt. Until then this script is the canonical
+"create another user" path on the dev cluster. Production is expected
+to wire SCIM / a self-serve invite flow against Keycloak; the realm's
+sign-up form is disabled deliberately.
+
+What each mode does
+~~~~~~~~~~~~~~~~~~~
+
+Default mode:
+
+  1. Creates a tenant via the in-process tenancy service (which also
      bootstraps the per-tenant schema + runs the tenant migrations).
-  3. Insert a `public.users` row whose `id` matches the Keycloak `sub`,
-     plus a tenant_membership and a TenantAdmin role assignment.
-  4. Patch the Keycloak user's attributes with `tenant_id` + `tenant_role`
-     so the JWT carries them.
-  5. Add `oidc-usermodel-attribute-mapper` protocol mappers to the
-     `missionagre-api` client so those attributes appear as JWT claims.
+  2. Reads `dev@missionagre.local`'s Keycloak `sub` UUID via the Admin
+     REST API.
+  3. Inserts a `public.users` row matching the sub plus
+     `tenant_memberships` + `tenant_role_assignments` (TenantAdmin).
+  4. Flips `unmanagedAttributePolicy` to ENABLED on the realm so
+     custom attributes survive Keycloak 26's user-profile filter.
+  5. Sets `tenant_id` and `tenant_role` user attributes.
+  6. Adds two `oidc-usermodel-attribute-mapper` protocol mappers to
+     the `missionagre-api` client.
 
-Re-running is idempotent — each step skips if it's already done. After
-running this, restart the API so its JWKS cache is fresh, then sign in
-on the SPA.
+Add-user mode performs only the user-side steps (2-5) plus the new
+`farm_scopes` row when `--farm-id` is provided. The realm-level config
+is assumed to be in place from a prior default run.
 
-Usage (from backend/ with .venv activated):
+Environment variables (all optional):
 
-    python -m scripts.dev_bootstrap
-
-Environment variables read:
   KEYCLOAK_BASE_URL    default http://localhost:8080
   KEYCLOAK_REALM       default missionagre
   KEYCLOAK_ADMIN       default admin
@@ -32,6 +62,7 @@ Environment variables read:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import sys
@@ -57,6 +88,12 @@ DEV_USER_EMAIL = os.getenv("DEV_USER_EMAIL", "dev@missionagre.local")
 DEV_TENANT_SLUG = os.getenv("DEV_TENANT_SLUG", "dev-tenant")
 CLIENT_ID = "missionagre-api"
 
+VALID_TENANT_ROLES = {"TenantOwner", "TenantAdmin", "BillingAdmin"}
+VALID_FARM_ROLES = {"FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"}
+
+
+# --- Keycloak Admin API helpers --------------------------------------------
+
 
 def kc_admin_token(client: httpx.Client) -> str:
     resp = client.post(
@@ -72,7 +109,7 @@ def kc_admin_token(client: httpx.Client) -> str:
     return str(resp.json()["access_token"])
 
 
-def kc_get_user(client: httpx.Client, token: str, email: str) -> dict[str, Any]:
+def kc_get_user(client: httpx.Client, token: str, email: str) -> dict[str, Any] | None:
     resp = client.get(
         f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
         params={"email": email, "exact": "true"},
@@ -80,9 +117,39 @@ def kc_get_user(client: httpx.Client, token: str, email: str) -> dict[str, Any]:
     )
     resp.raise_for_status()
     users = resp.json()
-    if not users:
-        raise RuntimeError(f"Keycloak user {email!r} not found")
-    return dict(users[0])
+    return dict(users[0]) if users else None
+
+
+def kc_create_user(
+    client: httpx.Client,
+    token: str,
+    *,
+    email: str,
+    password: str,
+    full_name: str,
+) -> dict[str, Any]:
+    """Create a new realm user with credentials. Returns the created user dict."""
+    body = {
+        "username": email,
+        "email": email,
+        "emailVerified": True,
+        "enabled": True,
+        "firstName": full_name.split()[0] if full_name else "Dev",
+        "lastName": " ".join(full_name.split()[1:]) or "User",
+        "credentials": [{"type": "password", "value": password, "temporary": False}],
+    }
+    resp = client.post(
+        f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
+        headers={"Authorization": f"Bearer {token}"},
+        json=body,
+    )
+    if resp.status_code not in (201, 409):
+        resp.raise_for_status()
+    # 409 means the user exists; fall through to fetch.
+    found = kc_get_user(client, token, email)
+    if found is None:  # defensive
+        raise RuntimeError(f"Could not create or find Keycloak user {email!r}")
+    return found
 
 
 def kc_enable_unmanaged_attributes(client: httpx.Client, token: str) -> None:
@@ -162,6 +229,7 @@ def kc_add_attribute_mapper(
     user_attribute: str,
     claim_name: str,
     json_type: str = "String",
+    multivalued: bool = False,
 ) -> None:
     body = {
         "name": name,
@@ -175,7 +243,7 @@ def kc_add_attribute_mapper(
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true",
-            "multivalued": "false",
+            "multivalued": "true" if multivalued else "false",
         },
     }
     resp = client.post(
@@ -188,17 +256,22 @@ def kc_add_attribute_mapper(
         resp.raise_for_status()
 
 
+# --- DB writers -------------------------------------------------------------
+
+
 async def upsert_user_record(
     *,
     user_id: UUID,
     email: str,
     full_name: str,
     tenant_id: UUID,
-    tenant_role: str,
+    tenant_role: str | None,
+    farm_id: UUID | None = None,
+    farm_role: str | None = None,
 ) -> None:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
-        # public.users
+        # public.users — keycloak_subject mirrors id (same UUID).
         await session.execute(
             text(
                 """
@@ -212,7 +285,7 @@ async def upsert_user_record(
             {"id": user_id, "sub": str(user_id), "email": email, "name": full_name},
         )
 
-        # tenant membership (idempotent on (user_id, tenant_id))
+        # tenant_memberships
         existing_mem = (
             await session.execute(
                 text(
@@ -243,17 +316,49 @@ async def upsert_user_record(
         else:
             membership_id = UUID(str(existing_mem))
 
-        # role assignment (idempotent on (membership_id, role))
-        await session.execute(
-            text(
-                """
-                INSERT INTO public.tenant_role_assignments (membership_id, role)
-                VALUES (:mid, :role)
-                ON CONFLICT DO NOTHING
-                """
-            ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
-            {"mid": membership_id, "role": tenant_role},
-        )
+        if tenant_role is not None:
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO public.tenant_role_assignments (membership_id, role)
+                    VALUES (:mid, :role)
+                    ON CONFLICT DO NOTHING
+                    """
+                ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+                {"mid": membership_id, "role": tenant_role},
+            )
+
+        if farm_id is not None and farm_role is not None:
+            existing_scope = (
+                await session.execute(
+                    text(
+                        "SELECT id FROM public.farm_scopes "
+                        "WHERE membership_id = :mid AND farm_id = :fid"
+                    ).bindparams(
+                        bindparam("mid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"mid": membership_id, "fid": farm_id},
+                )
+            ).scalar_one_or_none()
+            if existing_scope is None:
+                await session.execute(
+                    text(
+                        "INSERT INTO public.farm_scopes "
+                        "(id, membership_id, farm_id, role) "
+                        "VALUES (:sid, :mid, :fid, :role)"
+                    ).bindparams(
+                        bindparam("sid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("mid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {
+                        "sid": uuid4(),
+                        "mid": membership_id,
+                        "fid": farm_id,
+                        "role": farm_role,
+                    },
+                )
 
 
 async def ensure_tenant() -> TenantCreatedResult:
@@ -292,7 +397,6 @@ async def ensure_tenant() -> TenantCreatedResult:
                 contact_email="ops@dev-tenant.local",
             )
         except SlugAlreadyExistsError:
-            # Race; try the read path again.
             existing = (
                 await session.execute(
                     text(
@@ -316,20 +420,26 @@ async def ensure_tenant() -> TenantCreatedResult:
             )
 
 
-async def main() -> None:
+# --- Top-level flows --------------------------------------------------------
+
+
+async def bootstrap_default() -> None:
     print(f"Bootstrapping dev environment ({DEV_USER_EMAIL} -> {DEV_TENANT_SLUG})\n")
 
-    # 1. Tenant first — gives us a UUID to attach to the user.
     tenant = await ensure_tenant()
     print(f"  tenant: {tenant.tenant_id}  ({tenant.schema_name})")
 
-    # 2. Keycloak admin work — fetch the user's sub, set attributes, add mappers.
     with httpx.Client(timeout=30.0) as client:
         token = kc_admin_token(client)
         kc_enable_unmanaged_attributes(client, token)
         print("  keycloak: unmanagedAttributePolicy = ENABLED")
 
         user = kc_get_user(client, token, DEV_USER_EMAIL)
+        if user is None:
+            raise RuntimeError(
+                f"Keycloak user {DEV_USER_EMAIL!r} not found — re-import the realm "
+                f"or run with --user-email <email> to create one."
+            )
         kc_user_id = user["id"]
         user_uuid = UUID(kc_user_id)
         print(f"  keycloak sub: {kc_user_id}")
@@ -348,10 +458,10 @@ async def main() -> None:
         client_uuid = kc_get_client_uuid(client, token)
         existing = kc_existing_mappers(client, token, client_uuid)
         for spec in (
-            ("tenant_id-mapper", "tenant_id", "tenant_id", "String"),
-            ("tenant_role-mapper", "tenant_role", "tenant_role", "String"),
+            ("tenant_id-mapper", "tenant_id", "tenant_id", "String", False),
+            ("tenant_role-mapper", "tenant_role", "tenant_role", "String", False),
         ):
-            name, user_attr, claim, jt = spec
+            name, user_attr, claim, jt, mv = spec
             if name in existing:
                 continue
             kc_add_attribute_mapper(
@@ -362,10 +472,10 @@ async def main() -> None:
                 user_attribute=user_attr,
                 claim_name=claim,
                 json_type=jt,
+                multivalued=mv,
             )
             print(f"  keycloak mapper added: {name}")
 
-    # 3. Insert/refresh the DB user record + role assignment.
     await upsert_user_record(
         user_id=user_uuid,
         email=DEV_USER_EMAIL,
@@ -380,6 +490,105 @@ async def main() -> None:
         "the new claim mappers populate the access token."
     )
 
+
+async def bootstrap_extra_user(
+    *,
+    email: str,
+    password: str,
+    full_name: str,
+    tenant_role: str | None,
+    farm_id: UUID | None,
+    farm_role: str | None,
+) -> None:
+    print(f"Provisioning extra user: {email}")
+    if tenant_role is not None and tenant_role not in VALID_TENANT_ROLES:
+        raise SystemExit(
+            f"--tenant-role={tenant_role!r}; expected one of {sorted(VALID_TENANT_ROLES)}"
+        )
+    if farm_role is not None and farm_role not in VALID_FARM_ROLES:
+        raise SystemExit(f"--farm-role={farm_role!r}; expected one of {sorted(VALID_FARM_ROLES)}")
+    if farm_role is not None and farm_id is None:
+        raise SystemExit("--farm-role requires --farm-id")
+
+    # Read the dev-tenant; fail loudly if the operator hasn't run the
+    # default bootstrap first (we need a tenant + the realm-level
+    # config to be in place).
+    tenant = await ensure_tenant()
+    print(f"  tenant: {tenant.tenant_id}")
+
+    with httpx.Client(timeout=30.0) as client:
+        token = kc_admin_token(client)
+        user = kc_create_user(
+            client,
+            token,
+            email=email,
+            password=password,
+            full_name=full_name,
+        )
+        kc_user_id = user["id"]
+        user_uuid = UUID(kc_user_id)
+        print(f"  keycloak sub: {kc_user_id}")
+
+        attrs: dict[str, list[str]] = {"tenant_id": [str(tenant.tenant_id)]}
+        if tenant_role is not None:
+            attrs["tenant_role"] = [tenant_role]
+        kc_set_user_attributes(client, token, kc_user_id, attrs)
+        print(f"  keycloak attributes set: {sorted(attrs)}")
+
+    await upsert_user_record(
+        user_id=user_uuid,
+        email=email,
+        full_name=full_name,
+        tenant_id=tenant.tenant_id,
+        tenant_role=tenant_role,
+        farm_id=farm_id,
+        farm_role=farm_role,
+    )
+    print("  db: users / tenant_memberships / role assignments upserted")
+    print(
+        f"\nDone. Sign in as {email} / {password!r} to test "
+        f"(remember to fully sign out the previous user via the SPA's user menu)."
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument("--user-email", help="Add an extra user with this email.")
+    p.add_argument("--password", default="dev", help="Password for the new user (default: dev).")
+    p.add_argument("--full-name", default="Test User", help="Display name for the new user.")
+    p.add_argument(
+        "--tenant-role",
+        choices=sorted(VALID_TENANT_ROLES),
+        help="Tenant-wide role for the new user.",
+    )
+    p.add_argument(
+        "--farm-id",
+        type=lambda s: UUID(s),
+        help="Grant a farm-scoped role on this farm UUID.",
+    )
+    p.add_argument(
+        "--farm-role",
+        choices=sorted(VALID_FARM_ROLES),
+        help="Farm-scoped role to grant on --farm-id.",
+    )
+    return p.parse_args()
+
+
+async def main() -> None:
+    args = parse_args()
+    if args.user_email is None:
+        await bootstrap_default()
+    else:
+        await bootstrap_extra_user(
+            email=args.user_email,
+            password=args.password,
+            full_name=args.full_name,
+            tenant_role=args.tenant_role,
+            farm_id=args.farm_id,
+            farm_role=args.farm_role,
+        )
     await dispose_engine()
 
 
