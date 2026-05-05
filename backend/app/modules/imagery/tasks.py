@@ -28,7 +28,7 @@ sync). Errors emit `IngestionFailedV1`, audit, and set `status='failed'`.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -63,11 +63,37 @@ from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.storage import raw_bands_key
 from app.shared.db.ids import uuid7
-from app.shared.db.session import AsyncSessionLocal, sanitize_tenant_schema
+from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 from app.shared.eventbus import get_default_bus
 from app.shared.storage import StorageClient, get_storage_client
 
 _log = get_logger(__name__)
+
+
+def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
+    """Wrap a task body's `asyncio.run` so the global async engine is
+    disposed after each task.
+
+    Each Celery task creates a fresh event loop via `asyncio.run`. Our
+    async engine is a module-level singleton; without disposal between
+    tasks, asyncpg connections retained by the pool reference the
+    previous (now-closed) loop, and the next task's pool checkout fails
+    with `RuntimeError: Event loop is closed` → AttributeError on the
+    proactor's `send`. Disposing at the end of each task forces the
+    next one to rebuild the pool inside its own loop.
+
+    Engine creation is cheap (asyncpg lazily connects), so per-task
+    disposal is acceptable for our workload size. A per-worker engine
+    bound to a long-lived loop would be the next-step optimisation.
+    """
+
+    async def _runner() -> T:
+        try:
+            return await coro
+        finally:
+            await dispose_engine()
+
+    return asyncio.run(_runner())
 
 
 # --- DI seams (overridable in tests) ---------------------------------------
@@ -173,7 +199,7 @@ async def _record_audit(
 )
 def discover_scenes(subscription_id: str, tenant_schema: str) -> dict[str, int]:
     """Beat- or refresh-driven entry point for one subscription."""
-    return asyncio.run(_discover_scenes_async(UUID(subscription_id), tenant_schema))
+    return _run_task(_discover_scenes_async(UUID(subscription_id), tenant_schema))
 
 
 async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> dict[str, int]:
@@ -208,9 +234,15 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
             else settings.imagery_cloud_cover_visualization_max_pct
         )
 
-        provider = _provider_factory()
+        # SentinelHubProvider raises SentinelHubNotConfiguredError from
+        # its constructor when credentials are empty, so the factory
+        # call must live inside the try/except — otherwise the task
+        # dies before the synthetic failed-job marker is written and the
+        # UI shows nothing.
+        provider: ImageryProvider | None = None
         try:
             try:
+                provider = _provider_factory()
                 scenes = await provider.discover(
                     aoi_geojson=block["boundary_geojson"],
                     product_code=product["code"],
@@ -263,7 +295,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
         finally:
             # Provider holds an httpx client; close it eagerly so each
             # task call is hermetic.
-            if hasattr(provider, "aclose"):
+            if provider is not None and hasattr(provider, "aclose"):
                 await provider.aclose()
 
         # Insert pending jobs for new scenes; mark over-cap scenes as
@@ -362,7 +394,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
     queue="heavy",
 )
 def acquire_scene(job_id: str, tenant_schema: str) -> dict[str, Any]:
-    return asyncio.run(_acquire_scene_async(UUID(job_id), tenant_schema))
+    return _run_task(_acquire_scene_async(UUID(job_id), tenant_schema))
 
 
 async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, Any]:
@@ -452,7 +484,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
 def register_stac_item(
     job_id: str, tenant_schema: str, assets_written: list[str]
 ) -> dict[str, Any]:
-    return asyncio.run(_register_stac_item_async(UUID(job_id), tenant_schema, assets_written))
+    return _run_task(_register_stac_item_async(UUID(job_id), tenant_schema, assets_written))
 
 
 async def _register_stac_item_async(
@@ -581,7 +613,7 @@ async def _register_stac_item_async(
     queue="heavy",
 )
 def compute_indices(job_id: str, tenant_schema: str, raw_bands_key_str: str) -> dict[str, Any]:
-    return asyncio.run(_compute_indices_async(UUID(job_id), tenant_schema, raw_bands_key_str))
+    return _run_task(_compute_indices_async(UUID(job_id), tenant_schema, raw_bands_key_str))
 
 
 async def _compute_indices_async(
@@ -761,7 +793,7 @@ def _valid_pct(agg: Any) -> Decimal | None:
     ignore_result=True,
 )
 def discover_active_subscriptions() -> dict[str, int]:
-    return asyncio.run(_discover_active_subscriptions_async())
+    return _run_task(_discover_active_subscriptions_async())
 
 
 async def _discover_active_subscriptions_async() -> dict[str, int]:
