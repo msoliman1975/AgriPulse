@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import { AuthCallback } from "@/auth/AuthCallback";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { AuthSync } from "@/auth/AuthSync";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
@@ -29,10 +30,14 @@ export function App(): ReactNode {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              {/* The OIDC callback URL is handled internally by react-oidc-context;
-                we just need a route that renders so the provider can finish the
-                code exchange. AppShell is fine — onSigninCallback strips the
-                query params right after. */}
+              {/* /auth/callback MUST live outside ProtectedRoute. The
+                  user lands here unauthenticated (with `?code=...` in
+                  the URL); react-oidc-context exchanges the code for
+                  tokens asynchronously. If ProtectedRoute saw the
+                  unauth-yet state and bounced to /login, /login would
+                  signinRedirect to Keycloak, Keycloak would round-trip
+                  back to /auth/callback — a redirect loop. */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route
                 element={
                   <ProtectedRoute>
@@ -51,7 +56,6 @@ export function App(): ReactNode {
                 <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
-                <Route path="/auth/callback" element={<Navigate to="/" replace />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
