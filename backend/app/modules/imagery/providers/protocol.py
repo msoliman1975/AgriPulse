@@ -78,6 +78,7 @@ class ImageryProvider(Protocol):
         self,
         *,
         scene_id: str,
+        scene_datetime: datetime,
         product_code: str,
         aoi_geojson_utm36n: dict[str, Any],
         bands: tuple[str, ...],
@@ -87,5 +88,9 @@ class ImageryProvider(Protocol):
         The AOI is supplied in UTM 36N (EPSG:32636) — that's the storage
         CRS per ARCHITECTURE.md § 9. Provider adapters that prefer a
         different CRS internally are responsible for re-projecting.
+
+        ``scene_datetime`` lets adapters whose APIs filter by time
+        window (e.g. Sentinel Hub Process) target a specific scene
+        without parsing ``scene_id``.
         """
         ...

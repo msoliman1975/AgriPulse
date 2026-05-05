@@ -430,6 +430,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
         try:
             result = await provider.fetch(
                 scene_id=job["scene_id"],
+                scene_datetime=job["scene_datetime"],
                 product_code=product["code"],
                 aoi_geojson_utm36n=block["boundary_utm_geojson"],
                 bands=tuple(product["bands"]),

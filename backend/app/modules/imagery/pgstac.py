@@ -118,12 +118,17 @@ async def ensure_collection(
 ) -> None:
     """Create the collection if absent. Idempotent.
 
-    pypgstac's ``create_collection`` is upsert-by-id, so re-running is
-    a no-op once the row exists.
+    pgstac ships both ``create_collection`` (INSERT, raises on duplicate)
+    and ``upsert_collection`` (INSERT … ON CONFLICT DO UPDATE). When the
+    pipeline fans out — many `register_stac_item` tasks racing for the
+    same tenant — only one wins the create; the rest hit
+    UniqueViolation, which dirties the txn and turns every subsequent
+    statement into ``InFailedSQLTransactionError``. ``upsert_collection``
+    closes that race entirely.
     """
     doc = build_collection_doc(collection_id=collection_id, product_code=product_code)
     await session.execute(
-        text("SELECT pgstac.create_collection(:doc)").bindparams(bindparam("doc", type_=JSONB)),
+        text("SELECT pgstac.upsert_collection(:doc)").bindparams(bindparam("doc", type_=JSONB)),
         {"doc": doc},
     )
 
