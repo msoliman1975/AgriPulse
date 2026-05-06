@@ -8,7 +8,7 @@ import {
   revokeSubscription,
   type Subscription,
 } from "@/api/imagery";
-import { useConfig } from "@/config/ConfigContext";
+import { useOptionalConfig } from "@/config/ConfigContext";
 import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
@@ -29,7 +29,7 @@ interface Props {
  */
 export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
   const { t } = useTranslation("imagery");
-  const config = useConfig();
+  const { config } = useOptionalConfig();
   const canManage = useCapability("imagery.subscription.manage", { farmId });
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -38,9 +38,11 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
   const [busy, setBusy] = useState(false);
 
   const s2Product = useMemo(
-    () => config.products.find((p) => p.product_code === "s2_l2a") ?? null,
-    [config.products],
+    () => config?.products.find((p) => p.product_code === "s2_l2a") ?? null,
+    [config],
   );
+
+  const products = config?.products ?? [];
 
   const reload = async (): Promise<void> => {
     setLoading(true);
@@ -116,7 +118,7 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
             <li key={sub.id} className="flex items-center justify-between py-2">
               <div className="text-sm">
                 <p className="font-medium text-slate-800">
-                  {t("subscriptions.productLabel")}: {productLabel(sub.product_id, config.products)}
+                  {t("subscriptions.productLabel")}: {productLabel(sub.product_id, products)}
                 </p>
                 <p className="text-slate-600">
                   {t("subscriptions.createdAt", { date: dateFmt.format(new Date(sub.created_at)) })}

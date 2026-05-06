@@ -39,6 +39,15 @@ def create_app() -> FastAPI:
     configure_logging()
     configure_tracing()
 
+    # Construct a publisher-side Celery app so `@shared_task.delay(...)`
+    # calls from API endpoints (e.g. POST /imagery/refresh) resolve to
+    # our configured Redis broker. Without this, the implicit default
+    # app falls through to `amqp://localhost:5672` and 500s with
+    # `Connection refused` when the API tries to enqueue work.
+    from workers.celery_factory import build_publisher
+
+    build_publisher()
+
     settings = get_settings()
 
     app = FastAPI(

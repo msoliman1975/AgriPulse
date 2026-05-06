@@ -4,7 +4,7 @@ import type { Geometry } from "geojson";
 
 import { isApiError } from "@/api/errors";
 import { listScenes, triggerRefresh, type IngestionJob } from "@/api/imagery";
-import { useConfig } from "@/config/ConfigContext";
+import { useOptionalConfig } from "@/config/ConfigContext";
 import { useCapability } from "@/rbac/useCapability";
 import { Legend } from "./Legend";
 import { NDVIMap } from "./NDVIMap";
@@ -27,7 +27,7 @@ interface Props {
  */
 export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX.Element {
   const { t } = useTranslation("imagery");
-  const config = useConfig();
+  const { config, loading: configLoading, error: configError } = useOptionalConfig();
   const canRefresh = useCapability("imagery.refresh", { farmId });
 
   const [scenes, setScenes] = useState<IngestionJob[]>([]);
@@ -65,6 +65,7 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
   );
 
   const tileUrlTemplate = useMemo<string | null>(() => {
+    if (config === null) return null;
     if (selected === null || aoiHash === undefined) return null;
     if (selected.stac_item_id === null) return null;
     // stac_item_id format: provider/product/scene/aoi (PR-B/C). Parse
@@ -107,6 +108,26 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
   };
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }), []);
+
+  // Config still loading or failed — render the shell so the rest of
+  // the page (the map vector AOI, etc.) doesn't disappear behind a
+  // thrown error from useConfig.
+  if (config === null) {
+    return (
+      <section className="card space-y-3" aria-label={t("panel.heading")}>
+        <h2 className="text-lg font-semibold text-slate-800">{t("panel.heading")}</h2>
+        {configError ? (
+          <p role="alert" className="text-sm text-red-700">
+            {t("panel.error", { message: configError })}
+          </p>
+        ) : configLoading ? (
+          <p role="status">{t("panel.loading")}</p>
+        ) : (
+          <p className="text-sm text-slate-600">{t("panel.noConfig")}</p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="card space-y-3" aria-label={t("panel.heading")}>

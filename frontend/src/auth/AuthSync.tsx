@@ -10,9 +10,16 @@ import { setAccessToken, setSignInRedirect } from "./token";
 export function AuthSync(): null {
   const auth = useAuth();
 
-  useEffect(() => {
-    setAccessToken(auth.user?.access_token ?? null);
-  }, [auth.user]);
+  // Write the token synchronously during render rather than from a
+  // useEffect. Children's effects in the same commit fire AFTER ours,
+  // but a child mount's first render reads `getAccessToken()` from the
+  // axios request interceptor *before* AuthSync's effect would have
+  // run on the previous commit — producing a "Missing bearer token"
+  // 401 on whichever child fetched first. Writing during render means
+  // the registry is current the moment any child reads it. The target
+  // is a plain module variable, not React state, so this side-effect
+  // is safe under concurrent rendering / StrictMode double-invoke.
+  setAccessToken(auth.user?.access_token ?? null);
 
   useEffect(() => {
     setSignInRedirect(() => {

@@ -186,10 +186,12 @@ class SentinelHubProvider:
                 "limit": 100,
             }
             if max_cloud_cover_pct is not None:
-                # Sentinel Hub uses a `query` extension; cloud cover lives
-                # under `eo:cloud_cover`. The catalog returns scenes with
-                # cloud_cover ≤ the bound.
-                payload["query"] = {"eo:cloud_cover": {"lte": max_cloud_cover_pct}}
+                # Sentinel Hub's STAC catalog rejects the legacy `query`
+                # extension with a 400 ("problematic key 'query'") and
+                # only accepts the CQL2 filter extension. cql2-text is
+                # the simpler form for a single comparison.
+                payload["filter-lang"] = "cql2-text"
+                payload["filter"] = f"eo:cloud_cover<={max_cloud_cover_pct}"
             if next_cursor is not None:
                 payload["next"] = next_cursor
 
@@ -197,6 +199,11 @@ class SentinelHubProvider:
                 self._catalog_url,
                 json_body=payload,
                 token=token,
+                # Sentinel Hub's STAC Catalog rejects `Accept: application/json`
+                # with 406 Not Acceptable. The STAC spec mandates
+                # `application/geo+json` for FeatureCollection responses, and
+                # SH enforces it strictly.
+                accept="application/geo+json",
             )
             body = response.json()
             features = body.get("features", []) or []
@@ -219,6 +226,7 @@ class SentinelHubProvider:
         self,
         *,
         scene_id: str,
+        scene_datetime: datetime,
         product_code: str,
         aoi_geojson_utm36n: dict[str, Any],
         bands: tuple[str, ...],
@@ -245,6 +253,18 @@ class SentinelHubProvider:
         sh_band_list = [_SH_BAND_NAMES[b] for b in bands]
         evalscript = _build_multiband_evalscript(sh_band_list)
 
+        # Sentinel Hub Process API requires ISO 8601 timestamps in
+        # `timeRange.from`/`to`. A 24h window around `scene_datetime`
+        # is tight enough that only the target scene matches but loose
+        # enough to absorb the second-resolution catalog vs scene-id
+        # rounding (the id encodes minutes; the datetime carries
+        # seconds).
+        from datetime import timedelta
+
+        scene_dt_utc = scene_datetime.astimezone(UTC)
+        window_from = (scene_dt_utc - timedelta(hours=12)).isoformat()
+        window_to = (scene_dt_utc + timedelta(hours=12)).isoformat()
+
         payload = {
             "input": {
                 "bounds": {
@@ -255,14 +275,7 @@ class SentinelHubProvider:
                     {
                         "type": "sentinel-2-l2a",
                         "dataFilter": {
-                            "timeRange": {
-                                # Sentinel Hub matches a scene within
-                                # this range; using the exact scene id
-                                # in `previewMode` would also work but
-                                # the catalog already gave us the date.
-                                "from": scene_id,
-                                "to": scene_id,
-                            },
+                            "timeRange": {"from": window_from, "to": window_to},
                             "mosaickingOrder": "leastCC",
                         },
                     }

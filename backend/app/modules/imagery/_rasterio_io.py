@@ -18,6 +18,9 @@ shapely off the import path of the API and the light worker.
 from __future__ import annotations
 
 import io
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
@@ -26,8 +29,10 @@ from numpy.typing import NDArray
 from rasterio.features import geometry_mask
 from rasterio.io import MemoryFile
 from rasterio.profiles import default_gtiff_profile
+from rasterio.session import AWSSession
 from shapely.geometry import shape
 
+from app.core.settings import get_settings
 from app.modules.imagery.storage import build_asset_key
 from app.modules.indices.computation import (
     IndexAggregates,
@@ -35,6 +40,48 @@ from app.modules.indices.computation import (
     compute_all_indices,
 )
 from app.shared.storage import StorageClient
+
+
+@contextmanager
+def _gdal_s3_env() -> Iterator[None]:
+    """Configure GDAL's ``/vsis3/`` driver from our boto3-style settings.
+
+    Rasterio refuses to accept ``AWS_*`` keyword arguments to
+    ``rasterio.Env`` when boto3 is installed — it raises
+    "GDAL's AWS config options can not be directly set". Auth has to
+    flow through ``rasterio.session.AWSSession``; the *endpoint* knobs
+    (``AWS_S3_ENDPOINT``, ``AWS_HTTPS``, ``AWS_VIRTUAL_HOSTING``) still
+    have to reach GDAL, and the cleanest way is via the process env.
+    We restore the prior values on exit so this stays hermetic.
+    """
+    settings = get_settings()
+    extras: dict[str, str] = {}
+    if settings.s3_endpoint_url:
+        scheme, _, host = settings.s3_endpoint_url.partition("://")
+        if not host:
+            host = scheme
+            scheme = "https"
+        extras["AWS_S3_ENDPOINT"] = host
+        extras["AWS_HTTPS"] = "YES" if scheme == "https" else "NO"
+    extras["AWS_VIRTUAL_HOSTING"] = "FALSE" if settings.s3_path_style else "TRUE"
+    extras["AWS_REGION"] = settings.s3_region
+
+    saved = {k: os.environ.get(k) for k in extras}
+    os.environ.update(extras)
+    try:
+        session = AWSSession(
+            aws_access_key_id=settings.s3_access_key_id,
+            aws_secret_access_key=settings.s3_secret_access_key,
+            region_name=settings.s3_region,
+        )
+        with rasterio.Env(session=session):
+            yield
+    finally:
+        for key, prior in saved.items():
+            if prior is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prior
 
 
 def load_raw_bands_and_aggregate(
@@ -49,7 +96,7 @@ def load_raw_bands_and_aggregate(
     a rasterio profile suitable for re-using as the per-index COG
     write profile (count=1, dtype=float32).
     """
-    with rasterio.Env(AWS_VIRTUAL_HOSTING="FALSE"), rasterio.open(raw_uri) as ds:
+    with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
         if ds.count != len(band_names):
             raise ValueError(
                 f"raw COG has {ds.count} bands; expected {len(band_names)} " f"({band_names!r})"
