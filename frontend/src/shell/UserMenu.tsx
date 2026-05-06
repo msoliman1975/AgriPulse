@@ -18,14 +18,17 @@ export function UserMenu(): ReactNode {
   };
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-slate-700" data-testid="user-display-name">
+    <div className="flex items-center gap-2">
+      <span
+        className="hidden text-sm text-slate-700 sm:inline"
+        data-testid="user-display-name"
+      >
         {displayName}
       </span>
       <button
         type="button"
         onClick={onSignOut}
-        className="btn-ghost px-3 py-1 text-xs"
+        className="btn-ghost px-2 py-1 text-xs"
         aria-label={t("shell.userMenu")}
       >
         {t("shell.signOut")}

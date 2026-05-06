@@ -3,7 +3,7 @@ import { Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { Header } from "./Header";
-import { SideNav } from "./SideNav";
+import { TenantTree } from "./TenantTree";
 
 export function AppShell(): ReactNode {
   const { t } = useTranslation("common");
@@ -16,9 +16,9 @@ export function AppShell(): ReactNode {
         {t("nav.skipToContent")}
       </a>
       <Header />
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6">
-        <SideNav />
-        <main id="main-content" className="flex-1">
+      <div className="flex w-full flex-1 gap-0">
+        <TenantTree />
+        <main id="main-content" className="flex-1 overflow-x-hidden px-4 py-6">
           <Outlet />
         </main>
       </div>
