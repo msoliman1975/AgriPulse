@@ -62,3 +62,20 @@ def build_celery(queue: QueueName) -> Celery:
         enable_utc=True,
     )
     return app
+
+
+def build_publisher() -> Celery:
+    """Construct a publisher-side Celery app for the FastAPI process.
+
+    Without this, `@shared_task` decorators resolve to Celery's implicit
+    default app — which has no broker configured and silently falls
+    through to amqp://localhost:5672. Calls to `task.delay(...)` from
+    the API process then 500 with `kombu.exceptions.OperationalError:
+    Connection refused`.
+
+    Constructing a Celery instance has the side effect of becoming
+    `current_app`, which is what `@shared_task` resolves through. The
+    queue name we pass is the publisher-side default — task fan-out
+    relies on `task_routes` (not configured yet) for per-task targeting.
+    """
+    return build_celery("light")

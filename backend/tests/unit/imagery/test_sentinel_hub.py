@@ -187,6 +187,7 @@ async def test_fetch_returns_multiband_cog_bytes(
         )
         result = await configured_provider.fetch(
             scene_id="2026-01-15T08:30:00Z",
+            scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
             aoi_geojson_utm36n={
                 "type": "Polygon",
@@ -227,6 +228,7 @@ async def test_fetch_5xx_retries_then_succeeds(
         )
         result = await configured_provider.fetch(
             scene_id="abc",
+            scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
             aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
             bands=("red", "nir"),
@@ -249,6 +251,7 @@ async def test_fetch_4xx_does_not_retry(
         with pytest.raises(httpx.HTTPStatusError):
             await configured_provider.fetch(
                 scene_id="abc",
+                scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
                 product_code="s2_l2a",
                 aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
                 bands=("red",),
