@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useAuth } from "react-oidc-context";
 
 import { getConfig, type ConfigResponse } from "@/api/config";
 
@@ -28,6 +29,8 @@ interface ConfigProviderProps {
 }
 
 export function ConfigProvider({ children, value }: ConfigProviderProps): JSX.Element {
+  const auth = useAuth();
+  const accessToken = auth.user?.access_token;
   const [config, setConfig] = useState<ConfigResponse | null>(value ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +51,13 @@ export function ConfigProvider({ children, value }: ConfigProviderProps): JSX.El
   useEffect(() => {
     if (value !== undefined) return; // tests pre-seed
     if (config !== null) return; // already loaded
+    // /v1/config is auth-protected. If we fire it before the OIDC user
+    // has loaded, the axios 401 interceptor would kick the user back
+    // through signinRedirect on every page reload — looking like an
+    // auth-server flicker loop.
+    if (!accessToken) return;
     void load();
-  }, [config, load, value]);
+  }, [accessToken, config, load, value]);
 
   return (
     <ConfigContext.Provider value={{ config, loading, error, reload: () => void load() }}>

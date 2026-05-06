@@ -29,7 +29,15 @@ apiClient.interceptors.response.use(
     // 401 → kick the user back through the OIDC flow. The interceptor
     // never throws on unauthenticated calls because the redirect itself
     // unmounts the React tree.
-    if (error.response?.status === 401) {
+    //
+    // Only redirect when the failing request actually carried a Bearer
+    // token. A 401 on an anonymous request means we fired before the
+    // OIDC user finished loading — redirecting in that case bounces
+    // through Keycloak silent-renew and back, looking like a flicker
+    // loop on the home page. Callers gate their requests on token
+    // presence; this is the defensive layer.
+    const hadAuthHeader = Boolean(error.config?.headers?.Authorization);
+    if (error.response?.status === 401 && hadAuthHeader) {
       triggerSignInRedirect();
     }
 

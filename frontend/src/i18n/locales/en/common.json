@@ -5,8 +5,8 @@
   },
   "nav": {
     "home": "Home",
-    "me": "My profile",
-    "skipToContent": "Skip to main content"
+    "skipToContent": "Skip to main content",
+    "noTenants": "No tenants yet."
   },
   "shell": {
     "languageToggle": "Language",
@@ -17,7 +17,26 @@
     "unitAcre": "Acre",
     "unitHectare": "Hectare",
     "userMenu": "Account menu",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "settingsTitle": "Settings",
+    "preferences": "Preferences",
+    "alertsTitle": "Alerts",
+    "alertsEmpty": "No alerts yet. They will appear here once the alerts service is wired.",
+    "alertsCount": "{{count}} unread alerts",
+    "tenantStatus": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "pending": "Pending"
+    }
+  },
+  "tenant": {
+    "metadata": "Tenant info",
+    "id": "Tenant ID",
+    "slug": "Slug",
+    "status": "Status",
+    "joinedAt": "Joined",
+    "roles": "Roles",
+    "switchToView": "Switch to this tenant to view its farms."
   },
   "home": {
     "welcome": "Welcome",

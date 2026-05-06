@@ -5,8 +5,8 @@
   },
   "nav": {
     "home": "الرئيسية",
-    "me": "ملفي الشخصي",
-    "skipToContent": "تخطّي إلى المحتوى الرئيسي"
+    "skipToContent": "تخطّي إلى المحتوى الرئيسي",
+    "noTenants": "لا توجد مؤسسات بعد."
   },
   "shell": {
     "languageToggle": "اللغة",
@@ -17,7 +17,26 @@
     "unitAcre": "فدّان أمريكي",
     "unitHectare": "هكتار",
     "userMenu": "قائمة الحساب",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "settingsTitle": "الإعدادات",
+    "preferences": "التفضيلات",
+    "alertsTitle": "التنبيهات",
+    "alertsEmpty": "لا توجد تنبيهات بعد. ستظهر هنا بمجرد ربط خدمة التنبيهات.",
+    "alertsCount": "{{count}} تنبيه غير مقروء",
+    "tenantStatus": {
+      "active": "نشط",
+      "suspended": "معلّق",
+      "pending": "قيد المراجعة"
+    }
+  },
+  "tenant": {
+    "metadata": "بيانات المؤسسة",
+    "id": "معرّف المؤسسة",
+    "slug": "المعرّف المختصر",
+    "status": "الحالة",
+    "joinedAt": "تاريخ الانضمام",
+    "roles": "الأدوار",
+    "switchToView": "بدّل إلى هذه المؤسسة لعرض مزارعها."
   },
   "home": {
     "welcome": "مرحبًا",

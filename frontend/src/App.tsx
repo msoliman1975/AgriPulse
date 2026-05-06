@@ -10,7 +10,7 @@ import { PrefsProvider } from "@/prefs/PrefsContext";
 import { AppShell } from "@/shell/AppShell";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
-import { MePage } from "@/pages/MePage";
+import { TenantDetailPage } from "@/pages/TenantDetailPage";
 import { FarmListPage } from "@/modules/farms/pages/FarmListPage";
 import { FarmCreatePage } from "@/modules/farms/pages/FarmCreatePage";
 import { FarmDetailPage } from "@/modules/farms/pages/FarmDetailPage";
