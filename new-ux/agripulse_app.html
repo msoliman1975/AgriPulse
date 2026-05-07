@@ -1,0 +1,1613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AgriPulse — Insights + Plan</title>
+<style>
+  :root {
+    --bg: #f7f6f1;
+    --panel: #ffffff;
+    --ink: #1f2420;
+    --muted: #6c7268;
+    --line: #e8e5db;
+    --primary: #356b30;
+    --primary-soft: #dceadb;
+    --accent: #1f6f9a;
+    --warn: #c98a18;
+    --warn-soft: #f7e7c2;
+    --crit: #b24430;
+    --crit-soft: #f3d2c9;
+    --good: #4f8e4a;
+
+    --plant: #4f8e4a;
+    --fert: #1f6f9a;
+    --spray: #8d4ab0;
+    --prune: #c98a18;
+    --harv: #b24430;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 18px rgba(20,40,15,.06);
+  }
+  * { box-sizing: border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family: -apple-system, "Segoe UI", Inter, Roboto, system-ui, sans-serif; font-size:14px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color:inherit; text-decoration:none; }
+
+  /* ================= Shared top bar ================= */
+  header.top { display:flex; align-items:center; padding:0 24px; height:60px; gap:14px;
+    background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:600; }
+  .brand .dot { width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,#5fa44e,#2f5e2b); }
+  .crumbs { color:var(--muted); display:flex; align-items:center; gap:8px; font-size:13px; }
+  .crumbs strong { color:var(--ink); font-weight:600; }
+  .top .spacer { flex:1; }
+  .seg { display:inline-flex; padding:3px; background:#efeee6; border-radius:10px; }
+  .seg button { border:none; background:transparent; padding:6px 12px; border-radius:7px; font-weight:500; color:var(--muted); }
+  .seg button.active { background:#fff; color:var(--ink); box-shadow:var(--shadow); }
+  .icon-btn { width:34px; height:34px; border-radius:8px; border:1px solid var(--line); background:#fff;
+    display:inline-flex; align-items:center; justify-content:center; }
+  .avatar { width:30px; height:30px; border-radius:50%; background:#cfd8c8; display:inline-flex; align-items:center;
+    justify-content:center; font-weight:600; }
+  .btn { padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; font-weight:500; }
+  .btn.primary { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .btn.primary:hover { background:#27521e; }
+
+  /* ================= Layout ================= */
+  .layout { display:grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 60px); }
+  nav.side { padding:16px 12px; border-right:1px solid var(--line); background:var(--panel);
+    position:sticky; top:60px; align-self:start; height:calc(100vh - 60px); overflow:auto; }
+  nav.side .group { font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; padding:14px 10px 6px; }
+  nav.side a { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; color:var(--ink); font-weight:500; }
+  nav.side a:hover { background:#f3f1e9; }
+  nav.side a.active { background:var(--primary-soft); color:var(--primary); }
+  nav.side a .count { margin-left:auto; font-size:11px; background:#efeee6; color:var(--muted); padding:1px 7px; border-radius:999px; }
+  nav.side a.active .count { background:#fff; color:var(--primary); }
+
+  /* ================= View root ================= */
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* ================= Insights view ================= */
+  main.insights { padding:20px 24px 60px 24px; }
+  main.insights h1 { font-size:22px; margin:0 0 4px 0; }
+  .subhead { color:var(--muted); margin-bottom:18px; font-size:13px; }
+
+  .row { display:grid; gap:16px; }
+  .cards4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .cards2 { grid-template-columns: 2fr 1fr; }
+  .stack { display:flex; flex-direction:column; gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px;
+    box-shadow:var(--shadow); }
+  .card h3 { margin:0 0 2px 0; font-size:14px; }
+  .card .hint { color:var(--muted); font-size:12px; }
+
+  .kpi .v { font-size:28px; font-weight:600; letter-spacing:-.01em; margin-top:2px; }
+  .kpi .delta { font-size:12px; padding:2px 8px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; font-weight:600; }
+  .kpi .delta.up { background:var(--primary-soft); color:var(--primary); }
+  .kpi .delta.down { background:var(--crit-soft); color:var(--crit); }
+  .kpi .delta.flat { background:#eef0e9; color:var(--muted); }
+  .kpi .row2 { display:flex; align-items:flex-end; justify-content:space-between; }
+  .kpi svg.spark { width:90px; height:30px; }
+  .kpi.clickable { cursor:pointer; transition: transform .12s, box-shadow .12s; }
+  .kpi.clickable:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 10px 24px rgba(20,40,15,.08); }
+
+  .alerts .item { display:grid; grid-template-columns: 8px 32px 1fr auto; gap:12px; align-items:flex-start;
+    padding:12px 0; border-top:1px solid var(--line); }
+  .alerts .item:first-child { border-top:none; padding-top:6px; }
+  .sev-bar { width:4px; min-height:36px; border-radius:4px; margin-top:2px; }
+  .sev-bar.crit { background:var(--crit); }
+  .sev-bar.warn { background:var(--warn); }
+  .sev-bar.info { background:var(--accent); }
+  .ico-circle { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .ico-circle.crit { background:var(--crit-soft); color:var(--crit); }
+  .ico-circle.warn { background:var(--warn-soft); color:var(--warn); }
+  .ico-circle.info { background:#dceaf3; color:var(--accent); }
+  .alerts .meta { display:flex; gap:10px; margin-top:4px; color:var(--muted); font-size:12px; flex-wrap:wrap; }
+  .alerts .t { font-weight:600; }
+  .alerts .d { font-size:13px; color:var(--muted); margin-top:2px; }
+  .alerts .item button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:5px 10px; font-size:12px; }
+
+  .lu-grid { display:grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 90px; gap:8px; align-items:center; padding:10px 8px;
+    border-radius:10px; }
+  .lu-grid + .lu-grid { border-top:1px solid var(--line); }
+  .lu-grid:hover { background:#faf9f3; }
+  .lu-grid .name { font-weight:600; }
+  .lu-grid .name .sub { font-weight:400; color:var(--muted); font-size:12px; margin-top:2px; }
+  .progress { width:100%; height:6px; border-radius:6px; background:#eef0e9; overflow:hidden; }
+  .progress > span { display:block; height:100%; background:linear-gradient(90deg, #84b078, #356b30); }
+  .pill { display:inline-flex; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .pill.ok { background:var(--primary-soft); color:var(--primary); }
+  .pill.warn { background:var(--warn-soft); color:#7a560a; }
+  .pill.crit { background:var(--crit-soft); color:#7a2616; }
+
+  .legend-line { display:flex; gap:12px; font-size:12px; color:var(--muted); margin-top:8px; }
+  .legend-line span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  .legend-line .a::before { background:var(--good); }
+  .legend-line .b::before { background:var(--accent); }
+  .legend-line .c::before { background:#b89143; }
+
+  .mini-map { background:#eef2e7; border-radius:12px; height:200px; position:relative; overflow:hidden; }
+  .mini-map .grid { position:absolute; inset:0; background-image:
+      linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,.04) 1px, transparent 1px);
+    background-size: 24px 24px; }
+
+  .act .row-act { display:flex; gap:10px; padding:10px 0; border-top:1px dashed var(--line); align-items:center; cursor:pointer; }
+  .act .row-act:first-child { border-top:none; }
+  .act .row-act:hover { background:#faf9f3; border-radius:6px; }
+  .act .when { width:64px; text-align:center; flex:0 0 auto; }
+  .act .when .d { font-weight:700; font-size:18px; }
+  .act .when .m { font-size:11px; color:var(--muted); text-transform:uppercase; }
+  .act .what { flex:1; }
+  .act .what .t { font-weight:600; }
+  .act .what .s { color:var(--muted); font-size:12px; }
+  .act .tag { font-size:11px; padding:2px 7px; border-radius:999px; background:#eef0e9; color:var(--muted); }
+
+  /* ================= Plan view ================= */
+  main.plan { display:grid; grid-template-rows: 56px 1fr; min-height: calc(100vh - 60px); }
+
+  .plan-toolbar { display:flex; align-items:center; gap:10px; padding:0 18px;
+    background:var(--panel); border-bottom:1px solid var(--line); }
+  .filter-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px;
+    border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--ink); font-weight:500; font-size:12px; }
+  .filter-chip.active { background:var(--primary-soft); color:var(--primary); border-color:#cfe2c8; }
+  .filter-chip .sw { width:9px; height:9px; border-radius:50%; }
+  .plan-toolbar .spacer { flex:1; }
+  .stat-mini { display:flex; gap:4px; align-items:baseline; padding:4px 10px;
+    border-radius:8px; background:#efeee6; font-size:12px; }
+  .stat-mini b { font-weight:700; }
+  .stat-mini span { color:var(--muted); font-size:11px; }
+
+  .plan-body { display:grid; grid-template-columns: 280px 1fr 340px; min-height:0; }
+
+  .plan-side { background:var(--panel); border-right:1px solid var(--line); overflow:auto; }
+  .plan-side .group-h { padding:14px 16px 6px; font-size:11px; color:var(--muted); letter-spacing:.05em; text-transform:uppercase; }
+  .plan-side .lu { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; }
+  .plan-side .lu:hover { background:#faf8ef; }
+  .plan-side .lu.active { background:var(--primary-soft); }
+  .plan-side .lu .icon { width:14px; height:14px; border-radius:4px; flex:0 0 auto; }
+  .plan-side .lu .nm { font-weight:600; }
+  .plan-side .lu .sub { color:var(--muted); font-size:11px; margin-top:2px; }
+  .plan-side .lu .stage { margin-left:auto; font-size:10px; padding:2px 7px; border-radius:999px;
+    background:#fff; color:var(--muted); border:1px solid var(--line); }
+
+  .tl-wrap { background:var(--bg); position:relative; overflow:auto; }
+  .tl-grid { position:relative; min-width: 1200px; }
+  .month-row { display:grid; grid-template-columns: 200px repeat(8, 1fr); position:sticky; top:0; z-index:3; background:var(--bg); }
+  .month-row .mh { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    color:var(--muted); font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
+  .month-row .mh.label { background:var(--panel); font-weight:600; color:var(--ink); }
+  .week-row { display:grid; grid-template-columns: 200px repeat(8, 1fr); position:sticky; top:36px; z-index:3;
+    background:var(--bg); border-bottom:1px solid var(--line); }
+  .week-row .w { padding:6px 4px; font-size:10px; color:var(--muted); text-align:center; border-right:1px solid var(--line);
+    background:var(--panel); }
+  .week-row .w.lbl { background:var(--bg); border:none; }
+
+  .lane { display:grid; grid-template-columns: 200px 1fr; border-bottom:1px solid var(--line); position:relative; }
+  .lane.hidden { display:none; }
+  .lane .lhead { padding:10px 12px; background:var(--panel); border-right:1px solid var(--line); position:sticky; left:0; z-index:2; }
+  .lane .lhead .nm { font-weight:600; }
+  .lane .lhead .sub { color:var(--muted); font-size:11px; margin-top:2px; }
+  .lane .stripes { position:relative; height:60px;
+    background: repeating-linear-gradient(90deg, transparent 0 calc((100% / 32) - 1px), rgba(0,0,0,.05) calc((100% / 32) - 1px) calc(100% / 32));
+  }
+  .lane.selected { background:rgba(255,243,214,.35); }
+  .lane.selected .lhead { background:#fff7e0; }
+
+  .bar { position:absolute; top:14px; height:32px; border-radius:8px; padding:6px 10px;
+    color:#fff; font-weight:600; font-size:12px; cursor:pointer; box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:6px; overflow:hidden; transition: transform .1s, box-shadow .1s, opacity .1s; }
+  .bar:hover { transform:translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,.1), 0 8px 16px rgba(0,0,0,.12); }
+  .bar.is-selected { outline: 2px solid var(--ink); outline-offset: 2px; z-index:2; }
+  .bar.plant { background:var(--plant); }
+  .bar.fert  { background:var(--fert); }
+  .bar.spray { background:var(--spray); }
+  .bar.prune { background:var(--prune); }
+  .bar.harv  { background:var(--harv); }
+  .bar.draft { opacity:.55; border:1px dashed rgba(255,255,255,.7); }
+  .bar.hidden-type { display:none; }
+  .bar small { opacity:.85; font-weight:500; }
+
+  .today { position:absolute; top:0; bottom:0; width:2px; background:#1f6f9a; z-index:2; }
+  .today::before { content:"Today · May 6"; position:absolute; top:-30px; left:6px;
+    background:var(--accent); color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; white-space:nowrap; }
+
+  .plan-detail { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column;
+    overflow:auto; }
+  .plan-detail .h { padding:16px 18px 8px; border-bottom:1px solid var(--line); }
+  .plan-detail .h .row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .plan-detail .h h3 { margin:0; font-size:16px; }
+  .plan-detail .h .sub { color:var(--muted); margin-top:4px; font-size:12px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px;
+    font-size:11px; font-weight:600; }
+  .badge.plant { background:var(--primary-soft); color:var(--primary); }
+  .badge.spray { background:#ece1f3; color:#6f338d; }
+  .badge.fert { background:#dceaf3; color:var(--accent); }
+  .badge.prune { background:#fff3d6; color:#7a560a; }
+  .badge.harv { background:var(--crit-soft); color:#7a2616; }
+  .badge.scheduled { background:#fff3d6; color:#7a560a; }
+  .badge.completed { background:var(--primary-soft); color:var(--primary); }
+  .plan-detail .body { padding:14px 18px; overflow:auto; flex:1; }
+  .kv { display:grid; grid-template-columns: 110px 1fr; row-gap:6px; column-gap:10px; font-size:13px; }
+  .kv dt { color:var(--muted); }
+  .kv dd { margin:0; }
+  .mini-card { border:1px solid var(--line); border-radius:10px; padding:12px; margin-top:14px; background:#fff; }
+  .mini-card h5 { margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .check-row { display:flex; gap:10px; align-items:flex-start; padding:6px 0; font-size:13px; }
+  .check-row .b { width:14px; height:14px; border-radius:4px; border:1.5px solid var(--line); flex:0 0 auto; margin-top:2px; cursor:pointer; }
+  .check-row .b.done { background:var(--primary); border-color:var(--primary); position:relative; }
+  .check-row .b.done::after { content:""; position:absolute; left:3px; top:0; width:5px; height:9px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .empty-detail { color:var(--muted); font-size:13px; padding:30px 18px; text-align:center; }
+
+  /* ===== Growth stage band ===== */
+  .stage-band { position:absolute; left:0; right:0; bottom:3px; height:5px; display:flex;
+    border-radius:3px; overflow:hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
+  .stage-band > span { height:100%; display:block; cursor:help; transition: filter .1s; }
+  .stage-band > span:hover { filter: brightness(0.88); }
+  .stage-band .seg-flow  { background:#f0c75b; }
+  .stage-band .seg-frset { background:#b8d4a3; }
+  .stage-band .seg-frdev { background:#84b078; }
+  .stage-band .seg-ripen { background:#d6a546; }
+  .stage-band .seg-harv  { background:#c46b50; }
+  .stage-band .seg-post  { background:#cfd1ca; }
+  .stage-band .seg-current { box-shadow: inset 0 0 0 2px rgba(0,0,0,.35); }
+
+  .stage-legend { display:flex; gap:14px; align-items:center; margin-left:14px; padding-left:14px;
+    border-left:1px solid var(--line); font-size:11px; color:var(--muted); flex-wrap:wrap; }
+  .stage-legend .leg { display:inline-flex; align-items:center; gap:5px; }
+  .stage-legend .sw { width:10px; height:6px; border-radius:2px; display:inline-block; }
+
+  /* ===== Conflict overlay ===== */
+  .conflict-svg { position:absolute; inset:0; pointer-events:none; overflow:visible; z-index:1; }
+  .conflict-svg .conflict-path { stroke:var(--warn); stroke-width:1.5; stroke-dasharray:4 3;
+    fill:none; vector-effect:non-scaling-stroke; }
+  .conflict-pin { position:absolute; transform:translate(-50%, -50%); width:20px; height:20px;
+    border-radius:50%; background:var(--warn); color:#fff; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; cursor:help; z-index:3;
+    box-shadow: 0 2px 6px rgba(0,0,0,.18), 0 0 0 3px #fff; }
+  .conflict-pin:hover { background:#a6730e; }
+
+  /* ===== Modal: New activity ===== */
+  .modal-overlay { position:fixed; inset:0; background:rgba(20,30,15,.45); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--panel); border-radius:14px; box-shadow:0 30px 60px rgba(0,0,0,.25);
+    width:600px; max-width:96vw; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; }
+  .modal-head { padding:16px 22px; border-bottom:1px solid var(--line); display:flex;
+    align-items:center; justify-content:space-between; }
+  .modal-head h3 { margin:0; font-size:16px; }
+  .modal-head .x { width:30px; height:30px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; font-size:18px; color:var(--muted); }
+
+  .modal-steps { display:flex; gap:8px; padding:12px 22px; align-items:center;
+    border-bottom:1px solid var(--line); background:#faf9f3; }
+  .modal-step-pill { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+  .modal-step-pill .num { width:22px; height:22px; border-radius:50%; background:#efeee6;
+    color:var(--muted); display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:11px; }
+  .modal-step-pill.done .num { background:var(--primary); color:#fff; }
+  .modal-step-pill.active { color:var(--ink); font-weight:600; }
+  .modal-step-pill.active .num { background:var(--ink); color:#fff; }
+  .modal-step-pill .bar2 { width:18px; height:1px; background:var(--line); }
+
+  .modal-body { padding:20px 22px; overflow:auto; flex:1; min-height:280px; }
+  .modal-foot { padding:12px 18px; border-top:1px solid var(--line); display:flex;
+    justify-content:space-between; align-items:center; gap:8px; }
+  .modal-step { display:none; }
+  .modal-step.active { display:block; animation: fade .15s ease-out; }
+  @keyframes fade { from { opacity:0; transform: translateY(2px); } to { opacity:1; transform:none; } }
+  .modal-step .helper { color:var(--muted); margin-bottom:14px; font-size:13px; }
+
+  .type-cards { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .type-card { padding:14px 8px; border-radius:10px; border:1px solid var(--line); background:#fff;
+    cursor:pointer; text-align:center; transition: border-color .1s, box-shadow .1s; }
+  .type-card:hover { border-color:#cfd0c2; }
+  .type-card.selected { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-soft); }
+  .type-card .sw { width:18px; height:18px; border-radius:5px; margin:0 auto 8px; }
+  .type-card .nm { font-weight:600; font-size:13px; }
+  .type-card .desc { font-size:10px; color:var(--muted); margin-top:3px; line-height:1.3; }
+
+  .lu-chip { display:inline-flex; align-items:center; gap:7px; padding:7px 12px;
+    border:1px solid var(--line); border-radius:999px; background:#fff; cursor:pointer;
+    font-size:13px; margin:4px 6px 4px 0; font-weight:500; }
+  .lu-chip .sw { width:10px; height:10px; border-radius:3px; }
+  .lu-chip .sw.round { border-radius:50%; }
+  .lu-chip:hover { border-color:#cfd0c2; }
+  .lu-chip.selected { background:var(--primary-soft); border-color:#cfe2c8; color:var(--primary); }
+  .lu-chip .area { color:var(--muted); font-size:11px; font-weight:400; }
+  .lu-chip.selected .area { color:var(--primary); }
+
+  .field { margin-top:14px; }
+  .field:first-child { margin-top:0; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; }
+  .field input, .field select, .field textarea { width:100%; padding:8px 10px; border:1px solid var(--line);
+    border-radius:8px; font:inherit; background:#fff; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--primary);
+    box-shadow:0 0 0 3px var(--primary-soft); }
+  .field textarea { min-height:60px; resize:vertical; }
+  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .summary-box { margin-top:8px; border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+    background:#faf9f3; }
+  .summary-box .h { font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:8px; }
+  .summary-list { list-style:none; padding:0; margin:0; }
+  .summary-list li { display:flex; justify-content:space-between; padding:6px 0;
+    border-top:1px dashed var(--line); font-size:13px; gap:14px; }
+  .summary-list li:first-of-type { border-top:none; }
+  .summary-list .l { color:var(--muted); flex:0 0 auto; }
+  .summary-list .v { text-align:right; font-weight:500; }
+
+  .warning-callout { margin-top:14px; padding:10px 12px; background:var(--warn-soft);
+    border-radius:8px; color:#7a560a; font-size:13px; line-height:1.45;
+    border-left:3px solid var(--warn); }
+  .warning-callout b { color:#5a3d05; }
+
+  .modal-step-pill.disabled { opacity:.55; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><span class="dot"></span> AgriPulse</div>
+  <div class="crumbs"><span>El-Mansoura Agro</span> ›
+    <strong>Wadi El-Natrun Estate</strong>
+  </div>
+  <div class="spacer"></div>
+  <!-- Insights-only segment -->
+  <div class="seg view-only-insights">
+    <button>Today</button>
+    <button class="active">This week</button>
+    <button>Season</button>
+    <button>Custom</button>
+  </div>
+  <!-- Plan-only segment -->
+  <div class="seg view-only-plan" style="display:none">
+    <button>Day</button>
+    <button>Week</button>
+    <button class="active">Month</button>
+    <button>Season</button>
+  </div>
+  <button class="btn view-only-plan" style="display:none" onclick="goToday()">Today</button>
+  <button class="btn primary view-only-plan" style="display:none" onclick="openModal()">+ New activity</button>
+  <button class="icon-btn" title="Search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+  </button>
+  <button class="icon-btn" title="Notifications">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
+  </button>
+  <span class="avatar">MS</span>
+</header>
+
+<div class="layout">
+
+  <!-- ================ Side nav ================ -->
+  <nav class="side">
+    <div class="group">Workspace</div>
+    <a href="#" id="nav-insights" class="active" onclick="setView('insights');return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Insights
+    </a>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.5s6 6.5 6 11a6 6 0 1 1-12 0c0-4.5 6-11 6-11z"/></svg>
+      Land units
+      <span class="count">14</span>
+    </a>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86l-8.18 14a2 2 0 0 0 1.71 3h16.36a2 2 0 0 0 1.71-3l-8.18-14a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      Alerts
+      <span class="count" style="background:var(--crit-soft);color:var(--crit)">3</span>
+    </a>
+    <a href="#" id="nav-plan" onclick="setView('plan');return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Plan
+    </a>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
+      Reports
+    </a>
+
+    <div class="group">Configuration</div>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M2 6h20M2 18h20"/></svg>
+      Rules &amp; thresholds
+    </a>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Imagery &amp; weather
+    </a>
+    <a href="#" onclick="return false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+      Users &amp; roles
+    </a>
+  </nav>
+
+  <!-- ================ Insights view ================ -->
+  <main class="insights view active" id="view-insights">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <h1>Good morning, Mohamed.</h1>
+        <div class="subhead">Wadi El-Natrun Estate · 312 feddan · Mango (Keitt) · Sentinel-2 imagery refreshed 2h ago</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Export</button>
+        <button class="btn primary" onclick="setView('plan')">+ New plan</button>
+      </div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="row cards4" style="margin-top:8px">
+      <div class="card kpi">
+        <h3>Healthy units</h3>
+        <div class="row2">
+          <div class="v">9 <span style="font-size:14px;color:var(--muted)">/ 14</span></div>
+          <svg class="spark" viewBox="0 0 90 30" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--good)" stroke-width="2" points="0,18 10,16 20,14 30,15 40,12 50,10 60,11 70,9 80,8 90,7"/>
+          </svg>
+        </div>
+        <div class="hint" style="margin-top:6px"><span class="delta up">+2 vs last week</span></div>
+      </div>
+
+      <div class="card kpi">
+        <h3>Active alerts</h3>
+        <div class="row2">
+          <div class="v" style="color:var(--crit)">3</div>
+          <svg class="spark" viewBox="0 0 90 30" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--crit)" stroke-width="2" points="0,22 10,20 20,22 30,18 40,15 50,12 60,10 70,9 80,8 90,7"/>
+          </svg>
+        </div>
+        <div class="hint" style="margin-top:6px"><span class="delta down">+1 since yesterday</span></div>
+      </div>
+
+      <div class="card kpi">
+        <h3>Avg NDVI</h3>
+        <div class="row2">
+          <div class="v">0.71</div>
+          <svg class="spark" viewBox="0 0 90 30" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,20 10,18 20,15 30,12 40,11 50,10 60,12 70,11 80,9 90,8"/>
+          </svg>
+        </div>
+        <div class="hint" style="margin-top:6px"><span class="delta up">+4% vs baseline</span></div>
+      </div>
+
+      <div class="card kpi clickable" title="Open Plan view" onclick="setView('plan')">
+        <h3>Irrigation due</h3>
+        <div class="row2">
+          <div class="v">5 <span style="font-size:14px;color:var(--muted)">units</span></div>
+          <svg class="spark" viewBox="0 0 90 30" preserveAspectRatio="none">
+            <polyline fill="none" stroke="#1f6f9a" stroke-width="2" points="0,15 10,16 20,14 30,12 40,15 50,18 60,16 70,14 80,12 90,10"/>
+          </svg>
+        </div>
+        <div class="hint" style="margin-top:6px"><span class="delta flat">~92 mm needed</span> <span style="color:var(--accent);font-size:12px;margin-left:6px">Open Plan →</span></div>
+      </div>
+    </div>
+
+    <!-- Main 2-col -->
+    <div class="row cards2" style="margin-top:16px">
+      <div class="stack">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h3>Vegetation index trend</h3>
+              <div class="hint">NDVI / NDWI / GCI · last 90 days · all units averaged</div>
+            </div>
+            <div class="seg">
+              <button class="active">NDVI</button>
+              <button>NDWI</button>
+              <button>GCI</button>
+              <button>Compare</button>
+            </div>
+          </div>
+          <svg viewBox="0 0 800 240" style="width:100%;height:220px;margin-top:10px">
+            <g stroke="#eef0e9" stroke-width="1">
+              <line x1="40" y1="20"  x2="780" y2="20"/>
+              <line x1="40" y1="80"  x2="780" y2="80"/>
+              <line x1="40" y1="140" x2="780" y2="140"/>
+              <line x1="40" y1="200" x2="780" y2="200"/>
+            </g>
+            <g fill="var(--muted)" font-size="10" text-anchor="end">
+              <text x="36" y="24">0.85</text>
+              <text x="36" y="84">0.75</text>
+              <text x="36" y="144">0.65</text>
+              <text x="36" y="204">0.55</text>
+            </g>
+            <path d="M40,90 C150,80 280,86 400,84 C520,82 640,78 780,72 L780,110 C640,112 520,116 400,120 C280,124 150,118 40,128 Z" fill="#dceadb" opacity=".6"/>
+            <polyline fill="none" stroke="var(--good)" stroke-width="2.5" points="40,150 100,140 160,128 220,118 280,108 340,96 400,90 460,86 520,80 580,72 640,68 700,62 760,58"/>
+            <polyline fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="3 3" points="40,170 100,166 160,158 220,148 280,144 340,148 400,152 460,158 520,160 580,168 640,172 700,176 760,180"/>
+            <circle cx="760" cy="58" r="4" fill="var(--good)"/>
+            <line x1="760" y1="20" x2="760" y2="220" stroke="#bbb" stroke-dasharray="3 4"/>
+            <text x="764" y="34" font-size="11" fill="var(--muted)">refresh · today</text>
+            <g fill="var(--muted)" font-size="10" text-anchor="middle">
+              <text x="100" y="222">Feb</text><text x="220" y="222">Mar</text><text x="340" y="222">Apr</text>
+              <text x="460" y="222">May</text><text x="580" y="222">Jun</text><text x="700" y="222">Jul</text>
+            </g>
+          </svg>
+          <div class="legend-line">
+            <span class="a">NDVI (mean)</span><span class="b">NDWI (mean)</span><span class="c">5y baseline ribbon</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h3>Land unit health</h3>
+              <div class="hint">Sorted by deviation from baseline</div>
+            </div>
+            <div class="seg">
+              <button class="active">All</button>
+              <button>Blocks</button>
+              <button>Pivots</button>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 90px;gap:8px;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:0 8px 6px">
+              <div>Land unit</div><div>Stage</div><div>NDVI vs baseline</div><div>Last irrigation</div><div></div>
+            </div>
+
+            <div class="lu-grid">
+              <div class="name">Block B1 <div class="sub">Mango Keitt · 24.6 fed · drip</div></div>
+              <div>Fruit dev.</div>
+              <div>
+                <div class="pill crit">-18%</div>
+                <div class="progress" style="margin-top:6px"><span style="width:45%;background:linear-gradient(90deg,#e0a18d,#b24430)"></span></div>
+              </div>
+              <div>5 days ago<br><span style="color:var(--muted);font-size:11px">8 mm</span></div>
+              <div><button class="btn" onclick="setView('plan');selectLane('B1')">Plan</button></div>
+            </div>
+
+            <div class="lu-grid">
+              <div class="name">Pivot P2 · sector NE <div class="sub">Mango mixed · 6.7 fed · pivot</div></div>
+              <div>Fruit dev.</div>
+              <div>
+                <div class="pill warn">-9%</div>
+                <div class="progress" style="margin-top:6px"><span style="width:60%;background:linear-gradient(90deg,#e8c887,#c98a18)"></span></div>
+              </div>
+              <div>3 days ago<br><span style="color:var(--muted);font-size:11px">10 mm</span></div>
+              <div><button class="btn" onclick="setView('plan');selectLane('P2')">Plan</button></div>
+            </div>
+
+            <div class="lu-grid">
+              <div class="name">Block A2 <div class="sub">Mango Keitt · 14.5 fed · drip</div></div>
+              <div>Flowering</div>
+              <div>
+                <div class="pill warn">-7%</div>
+                <div class="progress" style="margin-top:6px"><span style="width:65%;background:linear-gradient(90deg,#e8c887,#c98a18)"></span></div>
+              </div>
+              <div>4 days ago<br><span style="color:var(--muted);font-size:11px">7 mm</span></div>
+              <div><button class="btn" onclick="setView('plan');selectLane('A2')">Plan</button></div>
+            </div>
+
+            <div class="lu-grid">
+              <div class="name">Block A1 <div class="sub">Mango Keitt · 18.0 fed · drip</div></div>
+              <div>Flowering</div>
+              <div>
+                <div class="pill ok">+6%</div>
+                <div class="progress" style="margin-top:6px"><span style="width:82%"></span></div>
+              </div>
+              <div>2 days ago<br><span style="color:var(--muted);font-size:11px">9 mm</span></div>
+              <div><button class="btn" onclick="setView('plan');selectLane('A1')">Plan</button></div>
+            </div>
+
+            <div class="lu-grid">
+              <div class="name">Pivot P1 <div class="sub">Mango Keitt · 38.0 fed · pivot</div></div>
+              <div>Fruit dev.</div>
+              <div>
+                <div class="pill ok">+4%</div>
+                <div class="progress" style="margin-top:6px"><span style="width:78%"></span></div>
+              </div>
+              <div>1 day ago<br><span style="color:var(--muted);font-size:11px">11 mm</span></div>
+              <div><button class="btn" onclick="setView('plan');selectLane('P1')">Plan</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="stack">
+        <div class="card alerts">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h3>Live alerts</h3>
+              <div class="hint">Sorted by severity</div>
+            </div>
+            <a href="#" style="font-size:12px;color:var(--accent)">View all →</a>
+          </div>
+          <div class="item">
+            <div class="sev-bar crit"></div>
+            <div class="ico-circle crit">!</div>
+            <div>
+              <div class="t">Block B1 · persistent NDVI drop</div>
+              <div class="d">3-week drop, baseline deviation -18%. Diagnosis: water stress.</div>
+              <div class="meta"><span>Rule MNG-WS-01</span> · <span>3h ago</span> · <span>Prescription ready</span></div>
+            </div>
+            <button onclick="setView('plan');selectLane('B1');selectActivityById('b1-fert-pulse')">Resolve</button>
+          </div>
+          <div class="item">
+            <div class="sev-bar warn"></div>
+            <div class="ico-circle warn">!</div>
+            <div>
+              <div class="t">Pivot P2 · sector NE underperforming</div>
+              <div class="d">NDWI variance ↑, possible emitter issue in lateral 4.</div>
+              <div class="meta"><span>Rule IRR-VAR-02</span> · <span>1d ago</span></div>
+            </div>
+            <button onclick="setView('plan');selectLane('P2')">Inspect</button>
+          </div>
+          <div class="item">
+            <div class="sev-bar warn"></div>
+            <div class="ico-circle warn">!</div>
+            <div>
+              <div class="t">Block A2 · GDD ahead of plan</div>
+              <div class="d">Flowering started 5 days early — adjust spray window.</div>
+              <div class="meta"><span>Rule PHEN-AHEAD</span> · <span>1d ago</span></div>
+            </div>
+            <button onclick="setView('plan');selectLane('A2')">Adjust</button>
+          </div>
+          <div class="item">
+            <div class="sev-bar info"></div>
+            <div class="ico-circle info">i</div>
+            <div>
+              <div class="t">Imagery refresh complete</div>
+              <div class="d">Sentinel-2 tile 36RUU ingested. 14 land units processed.</div>
+              <div class="meta"><span>System</span> · <span>2h ago</span></div>
+            </div>
+            <button>Dismiss</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h3>Farm map</h3>
+            <a href="#" style="font-size:12px;color:var(--accent)">Open full map →</a>
+          </div>
+          <div class="mini-map" style="margin-top:8px">
+            <div class="grid"></div>
+            <svg viewBox="0 0 400 200" style="position:absolute;inset:0;width:100%;height:100%">
+              <polygon points="20,30 110,28 115,90 25,95" fill="#6da062" fill-opacity=".75"/>
+              <polygon points="120,28 200,32 200,95 115,90" fill="#d6a546" fill-opacity=".75"/>
+              <circle cx="290" cy="65" r="55" fill="#6da062" fill-opacity=".75"/>
+              <polygon points="20,110 130,108 135,170 25,175" fill="#c46b50" fill-opacity=".8"/>
+              <circle cx="290" cy="150" r="40" fill="#9bb672" fill-opacity=".75"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="card act">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h3>This week's activities</h3>
+            <a href="#" style="font-size:12px;color:var(--accent)" onclick="setView('plan');return false">Plan →</a>
+          </div>
+          <div class="row-act" onclick="setView('plan');selectActivityById('b1-spray-mancozeb')">
+            <div class="when"><div class="d">07</div><div class="m">Wed</div></div>
+            <div class="what">
+              <div class="t">Foliar spray — Mancozeb 75% WP</div>
+              <div class="s">B1, B2, A1 · 1.5 g/L</div>
+            </div>
+            <span class="tag">Spraying</span>
+          </div>
+          <div class="row-act" onclick="setView('plan');selectActivityById('b1-fert-pulse')">
+            <div class="when"><div class="d">08</div><div class="m">Thu</div></div>
+            <div class="what">
+              <div class="t">Drip pulse 6 mm</div>
+              <div class="s">B1, P2-NE · scheduled</div>
+            </div>
+            <span class="tag">Irrigation</span>
+          </div>
+          <div class="row-act" onclick="setView('plan');selectLane('A1')">
+            <div class="when"><div class="d">10</div><div class="m">Sat</div></div>
+            <div class="what">
+              <div class="t">Pruning crew on site</div>
+              <div class="s">A1, A2 · 2 teams · 8h</div>
+            </div>
+            <span class="tag">Pruning</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================ Plan view ================ -->
+  <main class="plan view" id="view-plan">
+    <div class="plan-toolbar">
+      <span style="color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Filter</span>
+      <button class="filter-chip active" data-type="plant"><span class="sw" style="background:var(--plant)"></span> Planting</button>
+      <button class="filter-chip active" data-type="fert"><span class="sw" style="background:var(--fert)"></span> Fertilizing</button>
+      <button class="filter-chip active" data-type="spray"><span class="sw" style="background:var(--spray)"></span> Spraying</button>
+      <button class="filter-chip active" data-type="prune"><span class="sw" style="background:var(--prune)"></span> Pruning</button>
+      <button class="filter-chip active" data-type="harv"><span class="sw" style="background:var(--harv)"></span> Harvesting</button>
+      <button class="filter-chip" id="filter-drafts">Show drafts only</button>
+      <div class="stage-legend">
+        <span style="color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Stage</span>
+        <span class="leg"><span class="sw" style="background:#f0c75b"></span>Flower</span>
+        <span class="leg"><span class="sw" style="background:#b8d4a3"></span>Fruit set</span>
+        <span class="leg"><span class="sw" style="background:#84b078"></span>Fruit dev</span>
+        <span class="leg"><span class="sw" style="background:#d6a546"></span>Ripen</span>
+        <span class="leg"><span class="sw" style="background:#c46b50"></span>Harvest</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="stat-mini"><b>32</b><span>activities</span></div>
+      <div class="stat-mini"><b>11</b><span>completed</span></div>
+      <div class="stat-mini"><b>4</b><span>at risk</span></div>
+      <div class="stat-mini"><b>17</b><span>upcoming</span></div>
+    </div>
+
+    <div class="plan-body">
+      <!-- Land units list -->
+      <aside class="plan-side" id="planSide">
+        <div class="group-h">North orchard</div>
+        <div class="lu" data-lane="A1">
+          <span class="icon" style="background:#6da062"></span>
+          <div><div class="nm">Block A1</div><div class="sub">Mango Keitt · 18.0 fed</div></div>
+          <span class="stage">Flower</span>
+        </div>
+        <div class="lu" data-lane="A2">
+          <span class="icon" style="background:#d6a546"></span>
+          <div><div class="nm">Block A2</div><div class="sub">Mango Keitt · 14.5 fed</div></div>
+          <span class="stage">Flower</span>
+        </div>
+        <div class="lu" data-lane="B1">
+          <span class="icon" style="background:#c46b50"></span>
+          <div><div class="nm">Block B1</div><div class="sub">Mango Keitt · 24.6 fed</div></div>
+          <span class="stage">Fruit</span>
+        </div>
+        <div class="lu" data-lane="B2">
+          <span class="icon" style="background:#7aa86d"></span>
+          <div><div class="nm">Block B2</div><div class="sub">Mango Tommy · 9.8 fed</div></div>
+          <span class="stage">Fruit</span>
+        </div>
+
+        <div class="group-h">Pivots</div>
+        <div class="lu" data-lane="P1">
+          <span class="icon" style="background:#6da062;border-radius:50%"></span>
+          <div><div class="nm">Pivot P1</div><div class="sub">Mango Keitt · 38.0 fed</div></div>
+          <span class="stage">Fruit</span>
+        </div>
+        <div class="lu" data-lane="P2">
+          <span class="icon" style="background:#9bb672;border-radius:50%"></span>
+          <div><div class="nm">Pivot P2</div><div class="sub">Mango mixed · 26.7 fed</div></div>
+          <span class="stage">Mixed</span>
+        </div>
+
+        <div class="group-h">Eastern grove</div>
+        <div class="lu" data-lane="C1">
+          <span class="icon" style="background:#79a96b"></span>
+          <div><div class="nm">Block C1</div><div class="sub">Mango Tommy · 11.2 fed</div></div>
+          <span class="stage">Flower</span>
+        </div>
+      </aside>
+
+      <!-- Timeline -->
+      <div class="tl-wrap">
+        <div class="tl-grid">
+          <div class="month-row">
+            <div class="mh label">Land unit</div>
+            <div class="mh">Mar</div><div class="mh">Apr</div><div class="mh">May</div><div class="mh">Jun</div>
+            <div class="mh">Jul</div><div class="mh">Aug</div><div class="mh">Sep</div><div class="mh">Oct</div>
+          </div>
+          <div class="week-row">
+            <div class="w lbl"></div>
+            <div class="w">W10–14</div><div class="w">W14–18</div><div class="w">W18–22</div><div class="w">W22–26</div>
+            <div class="w">W26–31</div><div class="w">W31–35</div><div class="w">W35–39</div><div class="w">W39–44</div>
+          </div>
+
+          <div class="today" style="left: calc(200px + ((100% - 200px) * (2.2 / 8)));"></div>
+
+          <!-- Lanes (id matches data-lane) -->
+          <div class="lane" data-lane="A1">
+            <div class="lhead"><div class="nm">Block A1</div><div class="sub">Flower · NDVI +6%</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="a1-fert-1" data-type="fert" style="left: 4%; width: 7%;">Fert NPK <small>· 12 mar</small></div>
+              <div class="bar spray" data-id="a1-spray-bloom" data-type="spray" style="left: 16%; width: 6%;">Bloom spray</div>
+              <div class="bar prune" data-id="a1-prune" data-type="prune" style="left: 26%; width: 5%;">Prune</div>
+              <div class="bar fert" data-id="a1-fert-zn" data-type="fert" style="left: 38%; width: 7%;">Foliar Zn</div>
+              <div class="bar harv draft" data-id="a1-harv" data-type="harv" style="left: 70%; width: 16%;">Harvest window</div>
+              <div class="stage-band" title="Growth stages">
+                <span class="seg-flow"  style="width:15%" title="Flowering · Feb–Mar"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · late Mar–Apr"></span>
+                <span class="seg-frdev" style="width:40%" title="Fruit development · Apr–Aug"></span>
+                <span class="seg-ripen" style="width:15%" title="Ripening · Aug"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Sep"></span>
+                <span class="seg-post"  style="width:5%"  title="Post-harvest · Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="A2">
+            <div class="lhead"><div class="nm">Block A2</div><div class="sub">Flower · NDVI -7%</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="a2-fert-npk" data-type="fert" style="left: 4%; width: 7%;">Fert NPK</div>
+              <div class="bar spray" data-id="a2-spray-bloom" data-type="spray" style="left: 14%; width: 6%;">Bloom spray</div>
+              <div class="bar spray" data-id="a2-spray-mancozeb" data-type="spray" style="left: 22%; width: 5%;">Mancozeb</div>
+              <div class="bar prune" data-id="a2-prune" data-type="prune" style="left: 30%; width: 5%;">Prune</div>
+              <div class="bar harv draft" data-id="a2-harv" data-type="harv" style="left: 72%; width: 14%;">Harvest window</div>
+              <div class="stage-band" title="Growth stages">
+                <span class="seg-flow"  style="width:18%" title="Flowering · Feb–Mar (early — GDD ahead)"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · Apr"></span>
+                <span class="seg-frdev" style="width:38%" title="Fruit development · Apr–Aug"></span>
+                <span class="seg-ripen" style="width:14%" title="Ripening · Aug"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Sep"></span>
+                <span class="seg-post"  style="width:5%"  title="Post-harvest · Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="B1">
+            <div class="lhead"><div class="nm">Block B1</div><div class="sub" style="color:var(--crit)">Fruit · NDVI -18% ⚠</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="b1-fert-npk" data-type="fert" style="left: 6%; width: 7%;">Fert NPK</div>
+              <div class="bar spray" data-id="b1-spray-mancozeb" data-type="spray" style="left: 18%; width: 5%;">Mancozeb 75%</div>
+              <div class="bar fert" data-id="b1-fert-pulse" data-type="fert" style="left: 26%; width: 6%;">Drip pulse +25%</div>
+              <div class="bar spray" data-id="b1-spray-fol-k" data-type="spray" style="left: 36%; width: 5%;">Foliar K</div>
+              <div class="bar harv draft" data-id="b1-harv" data-type="harv" style="left: 66%; width: 18%;">Harvest window</div>
+              <!-- Conflict overlay: spray at 18-23% then drip pulse at 26-32% on same week -->
+              <svg class="conflict-svg" viewBox="0 0 100 60" preserveAspectRatio="none">
+                <path class="conflict-path" d="M 23 12 Q 24.5 1 26 12"/>
+              </svg>
+              <div class="conflict-pin" style="left:24.5%;top:3px"
+                title="Conflict: Mancozeb spray + drip pulse same week. Run irrigation AFTER spray dries (~14:00) to avoid washing product.">!</div>
+              <div class="stage-band" title="Growth stages">
+                <span class="seg-flow"  style="width:15%" title="Flowering · Feb–Mar"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · late Mar–Apr"></span>
+                <span class="seg-frdev seg-current" style="width:40%" title="Fruit development · Apr–Aug · CURRENT"></span>
+                <span class="seg-ripen" style="width:15%" title="Ripening · Aug"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Sep"></span>
+                <span class="seg-post"  style="width:5%"  title="Post-harvest · Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="B2">
+            <div class="lhead"><div class="nm">Block B2</div><div class="sub">Fruit · NDVI +9%</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="b2-fert" data-type="fert" style="left: 4%; width: 6%;">Fert</div>
+              <div class="bar spray" data-id="b2-spray-1" data-type="spray" style="left: 16%; width: 5%;">Spray</div>
+              <div class="bar spray" data-id="b2-spray-2" data-type="spray" style="left: 26%; width: 4%;">Spray</div>
+              <div class="bar harv" data-id="b2-harv" data-type="harv" style="left: 60%; width: 12%;">Harvest</div>
+              <div class="stage-band" title="Growth stages — Tommy Atkins (earlier season)">
+                <span class="seg-flow"  style="width:10%" title="Flowering · Feb"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · Mar"></span>
+                <span class="seg-frdev" style="width:30%" title="Fruit development · Mar–Jun"></span>
+                <span class="seg-ripen" style="width:15%" title="Ripening · Jun–Jul"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Jul–Aug"></span>
+                <span class="seg-post"  style="width:20%" title="Post-harvest · Aug–Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="P1">
+            <div class="lhead"><div class="nm">Pivot P1</div><div class="sub">Fruit · NDVI +4%</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="p1-fert-1" data-type="fert" style="left: 6%; width: 6%;">Fert NPK</div>
+              <div class="bar spray" data-id="p1-spray-1" data-type="spray" style="left: 18%; width: 5%;">Spray</div>
+              <div class="bar fert" data-id="p1-fert-n" data-type="fert" style="left: 28%; width: 5%;">Fert N</div>
+              <div class="bar spray" data-id="p1-spray-2" data-type="spray" style="left: 40%; width: 5%;">Spray</div>
+              <div class="bar harv draft" data-id="p1-harv" data-type="harv" style="left: 70%; width: 14%;">Harvest window</div>
+              <div class="stage-band" title="Growth stages">
+                <span class="seg-flow"  style="width:15%" title="Flowering · Feb–Mar"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · Apr"></span>
+                <span class="seg-frdev seg-current" style="width:40%" title="Fruit development · Apr–Aug · CURRENT"></span>
+                <span class="seg-ripen" style="width:15%" title="Ripening · Aug"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Sep"></span>
+                <span class="seg-post"  style="width:5%"  title="Post-harvest · Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="P2">
+            <div class="lhead"><div class="nm">Pivot P2</div><div class="sub">Mixed · sector NE -9%</div></div>
+            <div class="stripes">
+              <div class="bar fert" data-id="p2-fert" data-type="fert" style="left: 6%; width: 6%;">Fert</div>
+              <div class="bar spray" data-id="p2-spray" data-type="spray" style="left: 18%; width: 5%;">Spray</div>
+              <div class="bar prune" data-id="p2-prune" data-type="prune" style="left: 28%; width: 5%;">Pruning</div>
+              <div class="bar harv draft" data-id="p2-harv" data-type="harv" style="left: 72%; width: 14%;">Harvest window</div>
+              <div class="stage-band" title="Growth stages — mixed varieties">
+                <span class="seg-flow"  style="width:13%" title="Flowering · Feb–Mar"></span>
+                <span class="seg-frset" style="width:12%" title="Fruit set · Mar–Apr"></span>
+                <span class="seg-frdev" style="width:38%" title="Fruit development · Apr–Aug"></span>
+                <span class="seg-ripen" style="width:14%" title="Ripening · Aug"></span>
+                <span class="seg-harv"  style="width:16%" title="Harvest · Sep"></span>
+                <span class="seg-post"  style="width:7%"  title="Post-harvest · Oct"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lane" data-lane="C1">
+            <div class="lhead"><div class="nm">Block C1</div><div class="sub">Flower · NDVI +5%</div></div>
+            <div class="stripes">
+              <div class="bar plant" data-id="c1-replant" data-type="plant" style="left: 2%; width: 5%;">Replant</div>
+              <div class="bar fert" data-id="c1-fert" data-type="fert" style="left: 10%; width: 6%;">Fert</div>
+              <div class="bar spray" data-id="c1-spray" data-type="spray" style="left: 22%; width: 5%;">Spray</div>
+              <div class="bar harv draft" data-id="c1-harv" data-type="harv" style="left: 76%; width: 14%;">Harvest window</div>
+              <div class="stage-band" title="Growth stages — Tommy Atkins (earlier season)">
+                <span class="seg-flow"  style="width:10%" title="Flowering · Feb"></span>
+                <span class="seg-frset" style="width:10%" title="Fruit set · Mar"></span>
+                <span class="seg-frdev" style="width:30%" title="Fruit development · Mar–Jun"></span>
+                <span class="seg-ripen" style="width:15%" title="Ripening · Jun–Jul"></span>
+                <span class="seg-harv"  style="width:15%" title="Harvest · Jul–Aug"></span>
+                <span class="seg-post"  style="width:20%" title="Post-harvest · Aug–Oct"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail panel -->
+      <aside class="plan-detail" id="planDetail">
+        <div class="empty-detail">
+          Select an activity bar to see details, conflicts &amp; actions.
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<!-- ============ New activity modal ============ -->
+<div class="modal-overlay" id="newActivityModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal" role="dialog" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <div>
+        <h3 id="modalTitle">New activity</h3>
+        <div style="color:var(--muted);font-size:12px;margin-top:2px">Add a planned activity to the season's vegetation plan</div>
+      </div>
+      <button class="x" onclick="closeModal()" title="Close">×</button>
+    </div>
+
+    <div class="modal-steps">
+      <div class="modal-step-pill active" data-pill="1"><span class="num">1</span> Type</div>
+      <div class="bar2"></div>
+      <div class="modal-step-pill" data-pill="2"><span class="num">2</span> Land units</div>
+      <div class="bar2"></div>
+      <div class="modal-step-pill" data-pill="3"><span class="num">3</span> Schedule</div>
+      <div class="bar2"></div>
+      <div class="modal-step-pill" data-pill="4"><span class="num">4</span> Details</div>
+    </div>
+
+    <div class="modal-body">
+      <!-- Step 1: Type -->
+      <div class="modal-step active" data-step="1">
+        <div class="helper">What type of activity are you scheduling?</div>
+        <div class="type-cards">
+          <button class="type-card" data-type="plant" data-label="Planting">
+            <div class="sw" style="background:var(--plant)"></div>
+            <div class="nm">Planting</div>
+            <div class="desc">New trees or replants</div>
+          </button>
+          <button class="type-card" data-type="fert" data-label="Fertilizing">
+            <div class="sw" style="background:var(--fert)"></div>
+            <div class="nm">Fertilizing</div>
+            <div class="desc">NPK, foliar, fertigation</div>
+          </button>
+          <button class="type-card" data-type="spray" data-label="Spraying">
+            <div class="sw" style="background:var(--spray)"></div>
+            <div class="nm">Spraying</div>
+            <div class="desc">Fungicide, insecticide</div>
+          </button>
+          <button class="type-card" data-type="prune" data-label="Pruning">
+            <div class="sw" style="background:var(--prune)"></div>
+            <div class="nm">Pruning</div>
+            <div class="desc">Maintenance &amp; shaping</div>
+          </button>
+          <button class="type-card" data-type="harv" data-label="Harvesting">
+            <div class="sw" style="background:var(--harv)"></div>
+            <div class="nm">Harvesting</div>
+            <div class="desc">Picking &amp; collection</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Land units -->
+      <div class="modal-step" data-step="2">
+        <div class="helper">Which land units does this apply to? <span style="color:var(--ink)">(multi-select)</span></div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:6px 0 4px">North orchard</div>
+        <div>
+          <button class="lu-chip" data-lane="A1" data-name="Block A1"><span class="sw" style="background:#6da062"></span> Block A1 <span class="area">· 18.0 fed</span></button>
+          <button class="lu-chip" data-lane="A2" data-name="Block A2"><span class="sw" style="background:#d6a546"></span> Block A2 <span class="area">· 14.5 fed</span></button>
+          <button class="lu-chip" data-lane="B1" data-name="Block B1"><span class="sw" style="background:#c46b50"></span> Block B1 <span class="area">· 24.6 fed</span></button>
+          <button class="lu-chip" data-lane="B2" data-name="Block B2"><span class="sw" style="background:#7aa86d"></span> Block B2 <span class="area">· 9.8 fed</span></button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:14px 0 4px">Pivots</div>
+        <div>
+          <button class="lu-chip" data-lane="P1" data-name="Pivot P1"><span class="sw round" style="background:#6da062"></span> Pivot P1 <span class="area">· 38.0 fed</span></button>
+          <button class="lu-chip" data-lane="P2" data-name="Pivot P2"><span class="sw round" style="background:#9bb672"></span> Pivot P2 <span class="area">· 26.7 fed</span></button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:14px 0 4px">Eastern grove</div>
+        <div>
+          <button class="lu-chip" data-lane="C1" data-name="Block C1"><span class="sw" style="background:#79a96b"></span> Block C1 <span class="area">· 11.2 fed</span></button>
+        </div>
+      </div>
+
+      <!-- Step 3: Schedule -->
+      <div class="modal-step" data-step="3">
+        <div class="helper">When should this happen?</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="actDate" value="2026-05-08"/>
+          </div>
+          <div class="field">
+            <label>Start time</label>
+            <input type="time" id="actTime" value="06:00"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Duration</label>
+            <select id="actDuration">
+              <option value="2h">2 hours</option>
+              <option value="4h" selected>Half day (4h)</option>
+              <option value="8h">Full day (8h)</option>
+              <option value="1w">Window: 1 week</option>
+              <option value="2w">Window: 2 weeks</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Recurrence</label>
+            <select id="actRecur">
+              <option value="once" selected>One-time</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+        <div id="conflictPreview"></div>
+      </div>
+
+      <!-- Step 4: Details + Review -->
+      <div class="modal-step" data-step="4">
+        <div class="helper">Final details &amp; review</div>
+        <div class="field">
+          <label>Product / description</label>
+          <input type="text" id="actProduct" placeholder="e.g. Mancozeb 75% WP"/>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Dosage / rate</label>
+            <input type="text" id="actDosage" placeholder="e.g. 1.5 g/L"/>
+          </div>
+          <div class="field">
+            <label>Crew</label>
+            <input type="text" id="actCrew" placeholder="e.g. Ahmed M. (3 ppl)"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Notes (optional)</label>
+          <textarea id="actNotes" placeholder="Any prep, restrictions, or context..."></textarea>
+        </div>
+
+        <div class="summary-box">
+          <div class="h">Summary</div>
+          <ul class="summary-list">
+            <li><span class="l">Type</span><span class="v" id="sumType">—</span></li>
+            <li><span class="l">Land units</span><span class="v" id="sumLU">—</span></li>
+            <li><span class="l">When</span><span class="v" id="sumWhen">—</span></li>
+            <li><span class="l">Recurrence</span><span class="v" id="sumRecur">—</span></li>
+            <li><span class="l">Product</span><span class="v" id="sumProd">—</span></li>
+          </ul>
+        </div>
+        <div id="finalConflictWarning"></div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="modalBack" onclick="prevStep()" disabled>Back</button>
+        <button class="btn primary" id="modalNext" onclick="nextStep()">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ====== Activity database ======
+  const activities = {
+    'b1-spray-mancozeb': {
+      lane:'B1', laneName:'Block B1', area:'24.6 fed',
+      type:'spray', typeLabel:'Spraying', status:'scheduled',
+      title:'Mancozeb 75% WP — Block B1',
+      when:'Wed, May 7 · 06:00–10:00',
+      crew:'Crew: Ahmed M. (3 ppl)',
+      kv: [
+        ['Type','Foliar fungicide'],
+        ['Product','Mancozeb 75% WP'],
+        ['Dosage','1.5 g/L · ~600 L/feddan'],
+        ['Total','14.7 kg over 24.6 fed'],
+        ['Re-entry','24 hours'],
+        ['PHI','14 days before harvest'],
+      ],
+      reason:'Triggered by rule <b>MNG-FRT-FUNG-01</b>: humidity > 70% for 4 of last 7 days during fruit development with prior NDVI drop.',
+      checks:[
+        ['Wind forecast < 15 km/h confirmed', true],
+        ['No rain expected for 6 hours', true],
+        ['Spray equipment calibrated', false],
+        ['PPE check for crew', false],
+        ['Notify neighbouring Block B2', false],
+      ],
+      conflicts:'<span style="color:var(--warn)">⚠</span> Drip pulse on B1 is also scheduled for the same week. Run irrigation <b>after</b> spray dries (~14:00) to avoid washing product.',
+    },
+    'b1-fert-pulse': {
+      lane:'B1', laneName:'Block B1', area:'24.6 fed',
+      type:'fert', typeLabel:'Irrigation', status:'scheduled',
+      title:'Drip pulse +25% — Block B1',
+      when:'Thu, May 8 · 14:00–18:00',
+      crew:'Auto · drip controller',
+      kv:[
+        ['Type','Irrigation pulse'],
+        ['Volume','6 mm (+25% over baseline)'],
+        ['Trigger','Soil moisture < 22% · NDVI -18%'],
+        ['Stage','Fruit development'],
+        ['Recommended by','Decision engine v3'],
+        ['Approved by','M. Soliman'],
+      ],
+      reason:'Prescription from alert <b>MNG-WS-01</b>: persistent NDVI drop suggests water stress. Boosting pulse to 6 mm at the cooler end of the day.',
+      checks:[
+        ['Lateral 4 emitter inspection cleared', false],
+        ['Spray on B1 finished &amp; dried', false],
+        ['Pump capacity confirmed', true],
+      ],
+      conflicts:'<span style="color:var(--warn)">⚠</span> Mancozeb spray scheduled same week — sequence after spray window.',
+    },
+    'a1-fert-1': {
+      lane:'A1', laneName:'Block A1', area:'18.0 fed',
+      type:'fert', typeLabel:'Fertilizing', status:'completed',
+      title:'NPK base — Block A1',
+      when:'Mar 12 · completed',
+      crew:'Auto · fertigation',
+      kv:[
+        ['Type','Fertigation'],
+        ['Product','NPK 20-20-20'],
+        ['Dosage','40 kg/feddan'],
+        ['Stage','Pre-flowering'],
+      ],
+      reason:'Standard pre-flower fertilization per Keitt mango schedule.',
+      checks:[
+        ['Application logged', true],
+        ['Tank cleaned', true],
+      ],
+      conflicts:'',
+    },
+    'a1-prune': {
+      lane:'A1', laneName:'Block A1', area:'18.0 fed',
+      type:'prune', typeLabel:'Pruning', status:'scheduled',
+      title:'Maintenance pruning — Block A1',
+      when:'Sat, May 10 · 07:00–15:00',
+      crew:'2 teams · 8 ppl',
+      kv:[
+        ['Type','Maintenance prune'],
+        ['Crew size','8'],
+        ['Equipment','Pole pruners · disinfected'],
+        ['Estimated time','8h'],
+      ],
+      reason:'Scheduled per vegetation plan after bloom spray completes.',
+      checks:[
+        ['Equipment sanitisation','false'],
+        ['Disposal pile location agreed','false'],
+      ],
+      conflicts:'',
+    },
+    'a2-spray-mancozeb':{
+      lane:'A2', laneName:'Block A2', area:'14.5 fed',
+      type:'spray', typeLabel:'Spraying', status:'scheduled',
+      title:'Mancozeb spray — Block A2',
+      when:'Fri, May 9 · 06:00–09:00',
+      crew:'Crew: Ahmed M. (3 ppl)',
+      kv:[
+        ['Type','Foliar fungicide'],
+        ['Product','Mancozeb 75% WP'],
+        ['Dosage','1.5 g/L'],
+        ['Stage','Flowering — adjusted (GDD ahead)'],
+      ],
+      reason:'Window adjusted because GDD model shows flowering started 5 days early (rule PHEN-AHEAD).',
+      checks:[
+        ['Wind forecast < 15 km/h', false],
+        ['Equipment calibrated', false],
+      ],
+      conflicts:'',
+    },
+    'p2-spray':{
+      lane:'P2', laneName:'Pivot P2', area:'26.7 fed',
+      type:'spray', typeLabel:'Spraying', status:'scheduled',
+      title:'Routine spray — Pivot P2',
+      when:'Tue, May 13',
+      crew:'Pivot-mounted',
+      kv:[
+        ['Type','Pivot spray'],
+        ['Product','Copper hydroxide'],
+        ['Dosage','2 g/L'],
+        ['Stage','Mixed (sector dependent)'],
+      ],
+      reason:'Routine schedule. Sector NE flagged for inspection — verify lateral 4 before run.',
+      checks:[
+        ['Sector NE emitter inspection', false],
+        ['Tank refilled', false],
+      ],
+      conflicts:'<span style="color:var(--warn)">⚠</span> Sector NE has NDWI variance flag — inspect first.',
+    },
+  };
+
+  // ====== View switching ======
+  function setView(name){
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.getElementById('nav-insights').classList.toggle('active', name === 'insights');
+    document.getElementById('nav-plan').classList.toggle('active', name === 'plan');
+    document.querySelectorAll('.view-only-insights').forEach(el => el.style.display = name === 'insights' ? '' : 'none');
+    document.querySelectorAll('.view-only-plan').forEach(el => el.style.display = name === 'plan' ? '' : 'none');
+    if (name === 'plan') window.scrollTo({top:0, behavior:'instant'});
+  }
+
+  // ====== Lane selection ======
+  function selectLane(laneId){
+    document.querySelectorAll('.plan-side .lu').forEach(el => el.classList.toggle('active', el.dataset.lane === laneId));
+    document.querySelectorAll('.lane').forEach(el => el.classList.toggle('selected', el.dataset.lane === laneId));
+    const lane = document.querySelector('.lane[data-lane="'+laneId+'"]');
+    if (lane) lane.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  // Initial highlight: B1 (the alerted one)
+  document.addEventListener('DOMContentLoaded', () => {
+    selectLane('B1');
+    // wire side land unit clicks
+    document.querySelectorAll('.plan-side .lu').forEach(el => {
+      el.addEventListener('click', () => selectLane(el.dataset.lane));
+    });
+    // wire lane head clicks
+    document.querySelectorAll('.lane .lhead').forEach(h => {
+      h.addEventListener('click', () => selectLane(h.parentElement.dataset.lane));
+    });
+    // wire activity bars
+    document.querySelectorAll('.bar').forEach(b => {
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        selectActivityById(b.dataset.id);
+      });
+    });
+    // wire filter chips
+    document.querySelectorAll('.filter-chip[data-type]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('active');
+        applyFilters();
+      });
+    });
+    document.getElementById('filter-drafts').addEventListener('click', e => {
+      e.currentTarget.classList.toggle('active');
+      applyFilters();
+    });
+  });
+
+  function applyFilters(){
+    const active = new Set(
+      Array.from(document.querySelectorAll('.filter-chip[data-type].active'))
+        .map(c => c.dataset.type)
+    );
+    const draftsOnly = document.getElementById('filter-drafts').classList.contains('active');
+    document.querySelectorAll('.bar').forEach(b => {
+      const typeOK = active.has(b.dataset.type);
+      const draftOK = !draftsOnly || b.classList.contains('draft');
+      b.classList.toggle('hidden-type', !(typeOK && draftOK));
+    });
+  }
+
+  // ====== Activity selection ======
+  function selectActivityById(id){
+    const bar = document.querySelector('.bar[data-id="'+id+'"]');
+    if (!bar) return;
+    document.querySelectorAll('.bar.is-selected').forEach(b => b.classList.remove('is-selected'));
+    bar.classList.add('is-selected');
+    selectLane(bar.closest('.lane').dataset.lane);
+    renderDetail(id);
+  }
+
+  function renderDetail(id){
+    const a = activities[id];
+    const panel = document.getElementById('planDetail');
+    if (!a) {
+      panel.innerHTML = `
+        <div class="h">
+          <h3>Activity</h3>
+          <div class="sub">No detailed record yet for this item.</div>
+        </div>
+        <div class="body">
+          <div class="mini-card">
+            <h5>Quick edit</h5>
+            <div style="font-size:13px;color:var(--muted)">Click <b>Edit details</b> to fill product, dosage, crew, and conflicts.</div>
+            <div class="actions"><button class="btn primary">Edit details</button><button class="btn">Skip</button></div>
+          </div>
+        </div>`;
+      return;
+    }
+    const checks = (a.checks || []).map(([txt, done]) =>
+      `<div class="check-row"><span class="b ${done===true?'done':''}" onclick="this.classList.toggle('done')"></span><div>${txt}</div></div>`
+    ).join('');
+    const kv = (a.kv || []).map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+    const conflicts = a.conflicts ? `
+      <div class="mini-card">
+        <h5>Conflicts &amp; suggestions</h5>
+        <div style="font-size:13px;line-height:1.45;color:var(--muted)">${a.conflicts}</div>
+      </div>` : '';
+    panel.innerHTML = `
+      <div class="h">
+        <div class="row">
+          <span class="badge ${a.type}">${a.typeLabel}</span>
+          <span class="badge ${a.status}">${a.status[0].toUpperCase()+a.status.slice(1)}</span>
+        </div>
+        <h3 style="margin-top:8px">${a.title}</h3>
+        <div class="sub">${a.when} · ${a.crew}</div>
+      </div>
+      <div class="body">
+        <div class="mini-card">
+          <h5>Activity</h5>
+          <dl class="kv">${kv}</dl>
+        </div>
+        <div class="mini-card">
+          <h5>Why this is scheduled</h5>
+          <div style="font-size:13px;line-height:1.45">${a.reason}</div>
+        </div>
+        ${a.checks ? `<div class="mini-card"><h5>Pre-flight checklist</h5>${checks}</div>` : ''}
+        ${conflicts}
+        <div class="actions">
+          <button class="btn primary">${a.status==='completed' ? 'View log' : 'Mark complete'}</button>
+          <button class="btn">Reschedule</button>
+          <button class="btn">Skip</button>
+        </div>
+      </div>`;
+  }
+
+  function goToday(){
+    const today = document.querySelector('.today');
+    if (today) today.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+  }
+
+  // ====== New activity modal ======
+  const modalState = {
+    step: 1,
+    type: null,
+    typeLabel: null,
+    lanes: [],   // [{id,name}]
+    date: '2026-05-08',
+    time: '06:00',
+    duration: '4h',
+    recur: 'once',
+    product: '',
+    dosage: '',
+    crew: '',
+    notes: '',
+  };
+
+  function openModal(){
+    // reset state
+    Object.assign(modalState, {
+      step:1, type:null, typeLabel:null, lanes:[],
+      date:'2026-05-08', time:'06:00', duration:'4h', recur:'once',
+      product:'', dosage:'', crew:'', notes:''
+    });
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.lu-chip').forEach(c => c.classList.remove('selected'));
+    ['actProduct','actDosage','actCrew','actNotes'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('actDate').value = '2026-05-08';
+    document.getElementById('actTime').value = '06:00';
+    document.getElementById('actDuration').value = '4h';
+    document.getElementById('actRecur').value = 'once';
+    document.getElementById('newActivityModal').classList.add('open');
+    showStep(1);
+  }
+
+  function closeModal(){
+    document.getElementById('newActivityModal').classList.remove('open');
+  }
+
+  function showStep(n){
+    modalState.step = n;
+    document.querySelectorAll('.modal-step').forEach(s => {
+      s.classList.toggle('active', Number(s.dataset.step) === n);
+    });
+    document.querySelectorAll('.modal-step-pill').forEach(p => {
+      const k = Number(p.dataset.pill);
+      p.classList.toggle('active', k === n);
+      p.classList.toggle('done', k < n);
+    });
+    document.getElementById('modalBack').disabled = (n === 1);
+    const next = document.getElementById('modalNext');
+    next.textContent = (n === 4) ? 'Create activity' : 'Next';
+    next.classList.toggle('primary', true);
+
+    if (n === 3) renderConflictPreview();
+    if (n === 4) renderSummary();
+  }
+
+  function nextStep(){
+    if (!validateStep(modalState.step)) return;
+    if (modalState.step === 4) {
+      submitActivity();
+    } else {
+      showStep(modalState.step + 1);
+    }
+  }
+  function prevStep(){ if (modalState.step > 1) showStep(modalState.step - 1); }
+
+  function validateStep(n){
+    if (n === 1 && !modalState.type) {
+      flash('Pick an activity type.'); return false;
+    }
+    if (n === 2 && modalState.lanes.length === 0) {
+      flash('Pick at least one land unit.'); return false;
+    }
+    return true;
+  }
+
+  function flash(msg){
+    const next = document.getElementById('modalNext');
+    const orig = next.textContent;
+    next.textContent = msg;
+    next.style.background = 'var(--crit)';
+    next.style.borderColor = 'var(--crit)';
+    setTimeout(() => {
+      next.textContent = orig;
+      next.style.background = '';
+      next.style.borderColor = '';
+    }, 1400);
+  }
+
+  // type cards
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.type-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        modalState.type = card.dataset.type;
+        modalState.typeLabel = card.dataset.label;
+      });
+    });
+    document.querySelectorAll('.lu-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('selected');
+        const id = chip.dataset.lane;
+        const name = chip.dataset.name;
+        const i = modalState.lanes.findIndex(l => l.id === id);
+        if (i >= 0) modalState.lanes.splice(i,1);
+        else modalState.lanes.push({id, name});
+      });
+    });
+    ['actDate','actTime','actDuration','actRecur','actProduct','actDosage','actCrew','actNotes'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => {
+        modalState.date     = document.getElementById('actDate').value;
+        modalState.time     = document.getElementById('actTime').value;
+        modalState.duration = document.getElementById('actDuration').value;
+        modalState.recur    = document.getElementById('actRecur').value;
+        modalState.product  = document.getElementById('actProduct').value;
+        modalState.dosage   = document.getElementById('actDosage').value;
+        modalState.crew     = document.getElementById('actCrew').value;
+        modalState.notes    = document.getElementById('actNotes').value;
+      });
+    });
+    // Esc to close
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+  });
+
+  // ====== Conflict detection (mock) ======
+  function detectConflicts(){
+    // Mock rules — would query real activities by lane + date window
+    // 1) Spray + irrigation pulse same week on same lane
+    // 2) Spray during ripening or close to harvest (PHI)
+    const conflicts = [];
+    const isThisWeek = modalState.date >= '2026-05-04' && modalState.date <= '2026-05-10';
+
+    modalState.lanes.forEach(l => {
+      // B1 already has Mancozeb spray + drip pulse this week
+      if (l.id === 'B1' && isThisWeek) {
+        if (modalState.type === 'spray') {
+          conflicts.push(`<b>${l.name}</b>: drip pulse (+25%) is already scheduled this week. Run irrigation <b>after</b> spray dries (~14:00) so product isn't washed off.`);
+        } else if (modalState.type === 'fert') {
+          conflicts.push(`<b>${l.name}</b>: Mancozeb 75% spray is already scheduled this week. Run this fertilization/irrigation <b>after</b> 14:00 so spray has time to dry.`);
+        }
+      }
+      // C1/B2 (Tommy) entering harvest in May–Jun — flag spray for PHI
+      if ((l.id === 'C1' || l.id === 'B2') && modalState.type === 'spray' && modalState.date >= '2026-06-15') {
+        conflicts.push(`<b>${l.name}</b>: Tommy Atkins is approaching harvest (Jul–Aug). Check pre-harvest interval (PHI) for the chosen product before applying.`);
+      }
+      // A2 GDD ahead of plan
+      if (l.id === 'A2' && modalState.type === 'spray') {
+        conflicts.push(`<b>${l.name}</b>: GDD model shows flowering started 5 days early — verify the spray window is still appropriate for current stage.`);
+      }
+    });
+    return conflicts;
+  }
+
+  function renderConflictPreview(){
+    const c = detectConflicts();
+    const box = document.getElementById('conflictPreview');
+    if (!c.length) {
+      box.innerHTML = `<div style="margin-top:14px;padding:10px 12px;background:var(--primary-soft);border-radius:8px;
+        color:var(--primary);font-size:13px;border-left:3px solid var(--primary)">
+        ✓ No scheduling conflicts detected for the selected window.</div>`;
+    } else {
+      box.innerHTML = `<div class="warning-callout"><b>Possible conflicts:</b><ul style="margin:6px 0 0 18px;padding:0">
+        ${c.map(x=>`<li style="margin:4px 0">${x}</li>`).join('')}</ul></div>`;
+    }
+  }
+
+  function renderSummary(){
+    const fmtDate = d => {
+      try {
+        const dt = new Date(d + 'T00:00:00');
+        return dt.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+      } catch(e) { return d; }
+    };
+    document.getElementById('sumType').textContent  = modalState.typeLabel || '—';
+    document.getElementById('sumLU').textContent    = modalState.lanes.length
+      ? modalState.lanes.map(l=>l.name).join(', ')
+      : '—';
+    document.getElementById('sumWhen').textContent  = `${fmtDate(modalState.date)} · ${modalState.time} · ${modalState.duration}`;
+    document.getElementById('sumRecur').textContent = ({once:'One-time',weekly:'Weekly',biweekly:'Bi-weekly',monthly:'Monthly'})[modalState.recur] || modalState.recur;
+    document.getElementById('sumProd').textContent  = modalState.product || '—';
+
+    const c = detectConflicts();
+    const box = document.getElementById('finalConflictWarning');
+    box.innerHTML = c.length
+      ? `<div class="warning-callout" style="margin-top:14px"><b>⚠ ${c.length} conflict${c.length>1?'s':''} flagged.</b>
+         You can still create — the system will warn the field crew at execution time.</div>`
+      : '';
+  }
+
+  function submitActivity(){
+    // Mock: drop a new bar into the first selected lane
+    if (modalState.lanes.length === 0) return;
+    const dt = new Date(modalState.date + 'T00:00:00');
+    const start = new Date('2026-03-01');
+    const end = new Date('2026-10-31');
+    const totalMs = end - start;
+    const offsetPct = Math.max(0, Math.min(100, ((dt - start) / totalMs) * 100));
+    const widthPct = ({'2h':1.5,'4h':2,'8h':3,'1w':5,'2w':9})[modalState.duration] || 3;
+
+    modalState.lanes.forEach(l => {
+      const stripes = document.querySelector(`.lane[data-lane="${l.id}"] .stripes`);
+      if (!stripes) return;
+      const bar = document.createElement('div');
+      bar.className = `bar ${modalState.type}`;
+      const newId = `new-${Date.now()}-${l.id}`;
+      bar.dataset.id = newId;
+      bar.dataset.type = modalState.type;
+      bar.style.left = offsetPct + '%';
+      bar.style.width = widthPct + '%';
+      bar.innerHTML = `${modalState.product || modalState.typeLabel} <small>· new</small>`;
+      bar.addEventListener('click', e => { e.stopPropagation(); selectActivityById(newId); });
+      // store activity for detail panel
+      activities[newId] = {
+        lane: l.id, laneName: l.name, area: '',
+        type: modalState.type, typeLabel: modalState.typeLabel, status: 'scheduled',
+        title: `${modalState.product || modalState.typeLabel} — ${l.name}`,
+        when: `${modalState.date} · ${modalState.time} · ${modalState.duration}`,
+        crew: modalState.crew || 'Crew TBD',
+        kv: [
+          ['Type', modalState.typeLabel],
+          ['Product', modalState.product || '—'],
+          ['Dosage', modalState.dosage || '—'],
+          ['Recurrence', ({once:'One-time',weekly:'Weekly',biweekly:'Bi-weekly',monthly:'Monthly'})[modalState.recur]],
+          ['Created', 'Just now'],
+        ],
+        reason: modalState.notes || 'Manually scheduled by user.',
+        checks: [],
+        conflicts: detectConflicts().filter(c => c.includes(l.name)).join('<br>'),
+      };
+      stripes.insertBefore(bar, stripes.querySelector('.stage-band'));
+    });
+
+    closeModal();
+    // Open the new activity in the first lane
+    const firstNew = activities && Object.keys(activities).find(k => k.startsWith('new-'));
+    // pick the most recent
+    const lastId = Object.keys(activities).filter(k => k.startsWith('new-')).pop();
+    if (lastId) selectActivityById(lastId);
+  }
+</script>
+</body>
+</html>

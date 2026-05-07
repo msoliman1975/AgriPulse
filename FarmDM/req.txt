@@ -1,0 +1,38 @@
+The Critical Design Decision: LAND_UNIT Instead of Separate Block/Pivot Tables
+The most important modeling choice here is using a single LAND_UNIT table with a unit_type field that can be block, pivot, or pivot_sector — instead of separate tables for blocks and pivots. Here's why:
+A block and a pivot are both "a polygon of land within a farm that gets monitored." They share 90% of the same attributes (boundary, area, crop, irrigation method, growth stage) and 100% of the same downstream relationships (index time series, alerts, irrigation schedules, growth stage logs). The only difference is shape convention and irrigation geometry.
+unit_type values:
+  "block"         → irregular polygon, any irrigation method
+  "pivot"         → full circle, center pivot irrigation
+  "pivot_sector"  → pie-slice subdivision within a pivot
+This means every downstream feature (NDVI computation, decision engine, alerts, reports, benchmarking) works identically regardless of whether the land unit is a block or a pivot — zero code branching.
+Key Relationship Explanations
+Organization → Users (with farm-level RBAC):
+A user belongs to one org and has an org_role (admin or viewer). The USER_FARM_ROLE junction table assigns per-farm roles (manager or viewer). An org admin implicitly has access to all farms. A farm manager only sees farms they're explicitly assigned to.
+Farm → Imagery/Weather Config (one per farm, swappable):
+Each farm has its own imagery and weather configuration, pointing to a provider and tier. This is where the abstraction layer meets the data model. When you upgrade a farm from Sentinel-2 to PlanetScope, you update one row in IMAGERY_CONFIG — the application code doesn't change.
+Land Unit → Crop Variety (many-to-one):
+The CROP_VARIETY table is a reference table containing variety-specific constants: base GDD temperature, phenology model parameters, and default thresholds. This is what makes the decision engine crop-aware. When you expand beyond mango, you add rows to this table with the new crop's parameters — you don't change the engine.
+Organization → Rule Overrides (customer configuration):
+The default mango rules live in a DEFAULT_RULES table (managed by admin). Customer customizations are stored as RULE_OVERRIDE rows scoped to the org. At evaluation time, the engine merges defaults with overrides. This cleanly separates platform intelligence from customer tuning.
+Land Unit → Index Time Series (TimescaleDB hypertable):
+This is a hypertable partitioned by captured_at. Each row stores one index type for one land unit at one point in time, with pre-computed zonal statistics (mean, min, max, std deviation) and the deviation from historical baseline. This is what powers the temporal slider on the map and the trend charts.
+Vegetation Plan Integration
+For vegetation/crop plans (what to plant where, when to fertilize, spray schedules), I'd model it as:
+VEGETATION_PLAN
+  - id (PK)
+  - farm_id (FK)
+  - season_year
+  - status (draft, active, completed)
+  
+PLAN_ACTIVITY
+  - id (PK)
+  - plan_id (FK)
+  - land_unit_id (FK)
+  - activity_type (planting, fertilizing, spraying, pruning, harvesting)
+  - scheduled_date
+  - product_name (e.g., "Mancozeb 75% WP")
+  - dosage
+  - notes
+  - status (scheduled, completed, skipped)
+  - completed_at

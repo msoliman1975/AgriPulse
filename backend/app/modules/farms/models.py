@@ -54,6 +54,9 @@ class Crop(Base, TimestampedMixin):
         server_default=text("ARRAY['ndvi']::text[]"),
     )
     phenology_stages: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Platform-curated rule thresholds inherited by every variety —
+    # see `app.modules.farms.crop_thresholds.resolve` for merge rules.
+    default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -75,6 +78,13 @@ class CropVariety(Base, TimestampedMixin):
     attributes: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+    # Variety-level overrides. ``default_thresholds`` shallow-merges
+    # over the crop's ``default_thresholds`` (variety wins per key).
+    # ``phenology_stages_override``, when non-null, replaces the crop's
+    # ``phenology_stages`` wholesale — the array is too irregular to
+    # merge keywise.
+    default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -166,6 +176,19 @@ class Block(Base, TimestampedMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     aoi_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Land-unit polymorphism (PR-1 of FarmDM rollout). A Block can be a
+    # plain block (irregular polygon), a pivot (full-circle, center-pivot
+    # irrigation), or a pivot_sector (pie-slice subdivision of a pivot).
+    # parent_unit_id is required for pivot_sector and forbidden for the
+    # other two — enforced by the migration's check constraint.
+    unit_type: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'block'"))
+    parent_unit_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("blocks.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    irrigation_geometry: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
 
 class BlockCrop(Base, TimestampedMixin):
     __tablename__ = "block_crops"
@@ -194,6 +217,38 @@ class BlockCrop(Base, TimestampedMixin):
     )
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'planned'"))
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class GrowthStageLog(Base, TimestampedMixin):
+    """Append-only history of phenology transitions for a block.
+
+    `block_crops.growth_stage` carries the *current* stage; this table
+    carries the timeline. Every transition lands here — manual entries
+    from the UI, derivations from the GDD model (P2), and bulk imports.
+    """
+
+    __tablename__ = "growth_stage_logs"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("blocks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    block_crop_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("block_crops.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    stage: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'manual'"))
+    confirmed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    transition_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

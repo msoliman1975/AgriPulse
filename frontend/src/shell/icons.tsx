@@ -76,6 +76,84 @@ export function BlockIcon(props: IconProps): ReactNode {
   );
 }
 
+export function InsightsIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 3v18h18" />
+      <path d="M7 14l4-4 3 3 5-7" />
+    </svg>
+  );
+}
+
+export function PlanIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 13h6M8 17h4" />
+    </svg>
+  );
+}
+
+export function AlertsIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+      <path d="M10.3 3.7 1.8 18.4a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z" />
+    </svg>
+  );
+}
+
+export function ReportsIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
+export function LandUnitsIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 6l9-3 9 3" />
+      <path d="M3 18l9 3 9-3" />
+      <path d="M3 6v12M21 6v12M12 3v18" />
+    </svg>
+  );
+}
+
+export function RulesIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 6h18M3 12h18M3 18h12" />
+    </svg>
+  );
+}
+
+export function ImageryIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M21 15l-5-5-7 7" />
+    </svg>
+  );
+}
+
+export function UsersIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 21c0-3 3-5 6-5s6 2 6 5" />
+      <circle cx="17" cy="9" r="2" />
+      <path d="M15 21c0-2 2-3.5 4-3.5" />
+    </svg>
+  );
+}
+
 export function ChevronIcon(props: IconProps & { open?: boolean }): ReactNode {
   const { open = false, ...rest } = props;
   return (

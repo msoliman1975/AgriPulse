@@ -38,6 +38,7 @@ from app.modules.farms.models import (
     CropVariety,
     Farm,
     FarmAttachment,
+    GrowthStageLog,
 )
 
 # Allowlists for dynamic UPDATE clauses — every column name interpolated
@@ -130,6 +131,9 @@ def _row_geom_select_for_block(*, with_boundary: bool) -> tuple[Any, ...]:
         Block.notes,
         Block.tags,
         Block.status,
+        Block.unit_type,
+        Block.parent_unit_id,
+        Block.irrigation_geometry,
         Block.created_at,
         Block.updated_at,
         func.ST_AsGeoJSON(Block.centroid).label("centroid_geojson"),
@@ -379,6 +383,9 @@ class FarmsRepository:
         notes: str | None,
         tags: list[str],
         actor_user_id: UUID | None,
+        unit_type: str = "block",
+        parent_unit_id: UUID | None = None,
+        irrigation_geometry: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Confirm the farm exists in this tenant first.
         farm_exists = await self._tenant.execute(
@@ -395,6 +402,7 @@ class FarmsRepository:
                 elevation_m, irrigation_system, irrigation_source,
                 soil_texture, salinity_class, soil_ph,
                 responsible_user_id, notes, tags, status,
+                unit_type, parent_unit_id, irrigation_geometry,
                 created_by, updated_by
             )
             VALUES (
@@ -405,6 +413,7 @@ class FarmsRepository:
                 :elevation_m, :irrigation_system, :irrigation_source,
                 :soil_texture, :salinity_class, :soil_ph,
                 :responsible_user_id, :notes, :tags, 'active',
+                :unit_type, :parent_unit_id, CAST(:irrigation_geometry AS jsonb),
                 :actor, :actor
             )
             RETURNING id, created_at, area_m2, aoi_hash
@@ -414,6 +423,7 @@ class FarmsRepository:
             _bind_uuid("farm_id"),
             _bind_uuid("actor"),
             _bind_uuid("responsible_user_id"),
+            _bind_uuid("parent_unit_id"),
             _bind_text_array("tags"),
         )
         try:
@@ -434,6 +444,11 @@ class FarmsRepository:
                     "responsible_user_id": responsible_user_id,
                     "notes": notes,
                     "tags": tags,
+                    "unit_type": unit_type,
+                    "parent_unit_id": parent_unit_id,
+                    "irrigation_geometry": (
+                        json.dumps(irrigation_geometry) if irrigation_geometry is not None else None
+                    ),
                     "actor": actor_user_id,
                 },
             )
@@ -665,7 +680,11 @@ class FarmsRepository:
                 "category": r.category,
                 "is_perennial": r.is_perennial,
                 "default_growing_season_days": r.default_growing_season_days,
+                "gdd_base_temp_c": r.gdd_base_temp_c,
+                "gdd_upper_temp_c": r.gdd_upper_temp_c,
                 "relevant_indices": list(r.relevant_indices or []),
+                "phenology_stages": r.phenology_stages,
+                "default_thresholds": r.default_thresholds,
             }
             for r in rows
         ]
@@ -684,6 +703,9 @@ class FarmsRepository:
                 "code": r.code,
                 "name_en": r.name_en,
                 "name_ar": r.name_ar,
+                "attributes": dict(r.attributes or {}),
+                "default_thresholds": r.default_thresholds,
+                "phenology_stages_override": r.phenology_stages_override,
             }
             for r in rows
         ]
@@ -696,6 +718,87 @@ class FarmsRepository:
         )
         rows = (await self._tenant.execute(stmt)).scalars().all()
         return [_block_crop_to_dict(r) for r in rows]
+
+    # ---- Growth-stage logs (PR-3) -----------------------------------
+
+    async def insert_growth_stage_log(
+        self,
+        *,
+        log_id: UUID,
+        block_id: UUID,
+        block_crop_id: UUID | None,
+        stage: str,
+        source: str,
+        confirmed_by: UUID | None,
+        transition_date: datetime | None,
+        notes: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Append a transition log row.
+
+        ``transition_date=None`` falls through to the column default
+        ``now()`` so the manual path doesn't have to fabricate a clock.
+        """
+        block_exists = await self._tenant.execute(
+            select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
+        )
+        if block_exists.first() is None:
+            raise BlockNotFoundError(block_id)
+
+        log = GrowthStageLog(
+            id=log_id,
+            block_id=block_id,
+            block_crop_id=block_crop_id,
+            stage=stage,
+            source=source,
+            confirmed_by=confirmed_by,
+            notes=notes,
+            created_by=actor_user_id,
+            updated_by=actor_user_id,
+        )
+        if transition_date is not None:
+            log.transition_date = transition_date
+        self._tenant.add(log)
+        await self._tenant.flush()
+        return _growth_stage_log_to_dict(log)
+
+    async def list_growth_stage_logs(self, *, block_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(GrowthStageLog)
+            .where(
+                GrowthStageLog.block_id == block_id,
+                GrowthStageLog.deleted_at.is_(None),
+            )
+            .order_by(
+                GrowthStageLog.transition_date.desc(),
+                GrowthStageLog.id.desc(),
+            )
+        )
+        rows = (await self._tenant.execute(stmt)).scalars().all()
+        return [_growth_stage_log_to_dict(r) for r in rows]
+
+    async def update_block_crop_growth_stage(
+        self,
+        *,
+        block_crop_id: UUID,
+        stage: str,
+        transition_date: datetime,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Reflect the new stage on the current block_crops row.
+
+        Called from the service alongside `insert_growth_stage_log` so
+        the canonical "current stage" stays consistent with the log.
+        """
+        await self._tenant.execute(
+            update(BlockCrop)
+            .where(BlockCrop.id == block_crop_id)
+            .values(
+                growth_stage=stage,
+                growth_stage_updated_at=transition_date,
+                updated_by=actor_user_id,
+            )
+        )
 
     # ---- Members (cross-schema farm_scopes in `public`) -----------
 
@@ -1124,6 +1227,9 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "notes": row.notes,
         "tags": list(row.tags or []),
         "status": row.status,
+        "unit_type": row.unit_type,
+        "parent_unit_id": row.parent_unit_id,
+        "irrigation_geometry": row.irrigation_geometry,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
@@ -1153,6 +1259,21 @@ def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
         "notes": bc.notes,
         "created_at": bc.created_at,
         "updated_at": bc.updated_at,
+    }
+
+
+def _growth_stage_log_to_dict(row: GrowthStageLog) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "block_id": row.block_id,
+        "block_crop_id": row.block_crop_id,
+        "stage": row.stage,
+        "source": row.source,
+        "confirmed_by": row.confirmed_by,
+        "transition_date": row.transition_date,
+        "notes": row.notes,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
     }
 
 

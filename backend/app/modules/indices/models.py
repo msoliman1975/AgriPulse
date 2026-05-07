@@ -14,6 +14,8 @@ from sqlalchemy import (
     DateTime,
     Integer,
     Numeric,
+    PrimaryKeyConstraint,
+    SmallInteger,
     Text,
     UniqueConstraint,
     text,
@@ -101,6 +103,38 @@ class BlockIndexAggregate(Base):
     )
     cloud_cover_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     stac_item_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # Z-score against the matching `(block_id, index_code, day_of_year)`
+    # row in `block_index_baselines`. NULL when no baseline exists yet
+    # (new blocks, first-year coverage). Written at compute time, not
+    # by a trigger — see `IndicesService.record_aggregate_row`.
+    baseline_deviation: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class BlockIndexBaseline(Base):
+    """`tenant_<id>.block_index_baselines` — long-running mean ± std per
+    (block, index, day-of-year). Recomputed weekly by the indices Beat
+    sweep using ``baselines.compute_block_baselines``.
+    """
+
+    __tablename__ = "block_index_baselines"
+    __table_args__: tuple[PrimaryKeyConstraint | dict[str, object], ...] = (
+        PrimaryKeyConstraint(
+            "block_id", "index_code", "day_of_year", name="pk_block_index_baselines"
+        ),
+        {},
+    )
+
+    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    index_code: Mapped[str] = mapped_column(Text, nullable=False)
+    day_of_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    baseline_mean: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
+    baseline_std: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False)
+    sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    window_days: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("7"))
+    years_observed: Mapped[int] = mapped_column(Integer, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

@@ -168,6 +168,10 @@ Tracks the active and historical subscription state per tenant. MVP supports man
 | `is_current` | BOOLEAN | NOT NULL, DEFAULT FALSE | Exactly one current per tenant; enforced by partial unique index |
 | `notes` | TEXT | | Manual annotations from platform admin |
 | `feature_flags` | JSONB | NOT NULL, DEFAULT `'{}'` | Per-subscription overrides (`{"max_farms": 5, "imagery_provider_premium": false}`) |
+| `plan_type` | TEXT | | PR-8 — friendly plan label (e.g. `"starter"`, `"pro-mango"`); `tier` stays the canonical enum the rest of the platform conditions on. |
+| `price_per_feddan` | NUMERIC(10,2) | | PR-8 — used by the future billing UI; NULL until populated by billing admin. |
+| `trial_start` | DATE | | PR-8 — first day of the trial (inclusive). |
+| `trial_end` | DATE | CHECK `trial_end >= trial_start` | PR-8 — last day of the trial (inclusive). `is_in_trial` is computed in app code as ``trial_start <= today() <= trial_end``. |
 | audit cols | | | |
 
 **Indexes:**
@@ -353,6 +357,7 @@ The crop catalog. Curated by platform admins. About 20 entries seeded for Egypt 
 | `gdd_upper_temp_c` | NUMERIC(4,1) | | Upper cap |
 | `relevant_indices` | TEXT[] | NOT NULL, DEFAULT `ARRAY['ndvi']` | `['ndvi','ndre','ndwi']` etc. — used to pre-compute indices |
 | `phenology_stages` | JSONB | | Array of `{stage, start_gdd, end_gdd, ...}` for P2 phenology models |
+| `default_thresholds` | JSONB | | Platform-curated rule thresholds (NDVI deviation cutoffs, frost threshold, irrigation deficit triggers, etc.). Inherited by every variety; varieties may override per key. |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT TRUE | |
 | audit cols | | | |
 
@@ -372,8 +377,12 @@ Variety-level detail under a crop. Optional — most crops will have only their 
 | `name_en` | TEXT | NOT NULL | "Valencia" |
 | `name_ar` | TEXT | | |
 | `attributes` | JSONB | NOT NULL, DEFAULT `'{}'` | `{maturity_days: 240, market: 'export'}` |
+| `default_thresholds` | JSONB | | Variety-level override of `crops.default_thresholds`. Shallow-merged at read time — variety wins per key. |
+| `phenology_stages_override` | JSONB | | When non-NULL, replaces `crops.phenology_stages` wholesale for this variety (the array is too irregular to merge keywise). |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT TRUE | |
 | audit cols | | | |
+
+**Resolution helper:** `app.modules.farms.crop_thresholds.resolve_thresholds` shallow-merges `crops.default_thresholds` with `crop_varieties.default_thresholds` (variety wins). `resolve_phenology_stages` returns the variety override if set, else the crop's stages. Future alerts / recommendations / irrigation-scheduling engines (PR-5–PR-7) consult these via the helper before applying tenant-level `rule_overrides`.
 
 **Indexes:**
 - `UNIQUE (crop_id, code)`
@@ -447,6 +456,9 @@ The operational subdivision of a farm — what gets monitored, alerted, and fore
 | `tags` | TEXT[] | NOT NULL, DEFAULT `'{}'` | |
 | `notes` | TEXT | | |
 | `aoi_hash` | TEXT | NOT NULL | SHA-256 of `boundary_utm` WKT; used for idempotent imagery asset IDs |
+| `unit_type` | TEXT | NOT NULL, DEFAULT `'block'`, CHECK (`unit_type IN ('block','pivot','pivot_sector')`) | Land-unit polymorphism — see § 5.5.1 |
+| `parent_unit_id` | UUID | FK → `blocks.id` ON DELETE RESTRICT | NULL for `block`/`pivot`; required for `pivot_sector` |
+| `irrigation_geometry` | JSONB | | Provider-agnostic shape JSON for pivots/sectors: `{center: {lat, lon}, radius_m, start_angle_deg?, end_angle_deg?}` |
 | audit cols | | | |
 
 **Indexes:**
@@ -455,8 +467,32 @@ The operational subdivision of a farm — what gets monitored, alerted, and fore
 - `GiST (centroid)`
 - `INDEX (status) WHERE deleted_at IS NULL`
 - `INDEX (irrigation_system) WHERE deleted_at IS NULL`
+- `INDEX (parent_unit_id) WHERE parent_unit_id IS NOT NULL`
+
+**Constraints:**
+- `CHECK (unit_type IN ('block','pivot','pivot_sector'))`
+- `CHECK ((unit_type = 'pivot_sector' AND parent_unit_id IS NOT NULL) OR (unit_type IN ('block','pivot') AND parent_unit_id IS NULL))`
+- Cross-row invariant (enforced in service, not DB): a `pivot_sector`'s parent must be a `pivot` on the same `farm_id`.
 
 **Triggers:** same boundary triggers as `farms`. Plus: re-compute `aoi_hash` whenever `boundary` changes.
+
+#### 5.5.1 Land-unit polymorphism (`unit_type`)
+
+A `block` row models any monitored polygon under a farm. The
+`unit_type` discriminator distinguishes the three concrete kinds
+without spawning sibling tables:
+
+| `unit_type` | Shape convention | `parent_unit_id` | `irrigation_geometry` |
+|---|---|---|---|
+| `block` | Irregular polygon, any irrigation method. The default. | NULL | NULL |
+| `pivot` | Full circle (polygon-approximated), center-pivot irrigation. | NULL | `{center, radius_m}` |
+| `pivot_sector` | Pie-slice subdivision of a pivot. | FK → parent pivot's `id` | `{start_angle_deg, end_angle_deg}` |
+
+Every downstream module (imagery, weather, indices, alerts, irrigation
+schedules) treats the row identically — `block_id` is the universal
+foreign key. Pivot-aware features layer on top by reading
+`unit_type` + `irrigation_geometry`. Pivot creation UI is deferred
+beyond PR-1; the data model is in place ahead of the consumer code.
 
 ### 5.6 `block_crops` (tenant schema)
 
@@ -487,6 +523,28 @@ The current and historical crop assignments for a block. One row per season-on-b
 - `UNIQUE (block_id) WHERE is_current = TRUE`
 - `INDEX (block_id, planting_date DESC)`
 - `INDEX (crop_id)`
+
+### 5.6.1 `growth_stage_logs` (tenant schema)
+
+Append-only history of phenology transitions for a block. PR-3 of the FarmDM rollout. `block_crops.growth_stage` carries the *current* stage; this table carries the timeline so callers can render "when did this block enter flowering, who confirmed it, was it derived or manual".
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `block_id` | UUID | NOT NULL, FK → `blocks.id` ON DELETE CASCADE | |
+| `block_crop_id` | UUID | FK → `block_crops.id` ON DELETE CASCADE | NULL when the transition is recorded before any crop assignment exists. |
+| `stage` | TEXT | NOT NULL | Stage code; consumers consult `crops.phenology_stages` (or variety override) for the canonical list. |
+| `source` | TEXT | NOT NULL, DEFAULT `'manual'`, CHECK in `('manual','derived','imported')` | `manual` = UI entry; `derived` = phenology model (P2); `imported` = bulk backfill. |
+| `confirmed_by` | UUID | | Logical cross-schema FK to `public.users.id`. Stamped automatically for manual entries. |
+| `transition_date` | TIMESTAMPTZ | NOT NULL, DEFAULT `now()` | Agronomic event time, not row creation time. |
+| `notes` | TEXT | | |
+| audit cols | | | |
+
+**Indexes:**
+- `INDEX (block_id, transition_date DESC)` — primary read path (timeline).
+- `INDEX (block_crop_id) WHERE block_crop_id IS NOT NULL` — joins from a specific assignment.
+
+**Behavior:** the service-layer `record_growth_stage_transition` inserts a log row *and* mirrors the new stage onto the block's current `block_crops` row in the same transaction. The log is the source of truth; the column is the cached "current" for fast block-detail render.
 
 ### 5.7 `farm_attachments` and `block_attachments` (tenant schema)
 
@@ -670,6 +728,7 @@ Per-block, per-date, per-index summary statistics. **The most-queried table in t
 | `valid_pixel_pct` | NUMERIC(5,2) | GENERATED ALWAYS AS (`100.0 * valid_pixel_count / NULLIF(total_pixel_count, 0)`) STORED | |
 | `cloud_cover_pct` | NUMERIC(5,2) | | |
 | `stac_item_id` | TEXT | NOT NULL | Trace back to the source scene |
+| `baseline_deviation` | NUMERIC(8,4) | | Z-score of `mean` against the matching `block_index_baselines` row. NULL when no baseline exists yet. Written at insert time by `IndicesService.record_aggregate_row`. |
 | `inserted_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 **Hypertable config:**
@@ -687,6 +746,25 @@ Per-block, per-date, per-index summary statistics. **The most-queried table in t
 **Continuous aggregates** (TimescaleDB views, defined in § 14):
 - Daily mean per block per index (used by trend charts)
 - Weekly mean per block per index (used by recommendation evaluation)
+
+### 7.4 `block_index_baselines` (tenant schema)
+
+Long-running mean ± std per `(block_id, index_code, day_of_year)`, recomputed weekly by the `indices.recompute_baselines_sweep` Beat task using `app.modules.indices.baselines.compute_block_baselines`. Drives the `baseline_deviation` column on `block_index_aggregates` and is consumed by the alerts engine (PR-5) when evaluating "is this block doing well *relative to its own history*?".
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `block_id` | UUID | NOT NULL, FK → `blocks.id` ON DELETE CASCADE | |
+| `index_code` | TEXT | NOT NULL | Logical FK to `public.indices_catalog.code` |
+| `day_of_year` | SMALLINT | NOT NULL, CHECK (1..366) | DOY 366 is the leap-year Dec 31 case. |
+| `baseline_mean` | NUMERIC(8,4) | NOT NULL | Mean of historical `block_index_aggregates.mean` values within the smoothing window |
+| `baseline_std` | NUMERIC(8,4) | NOT NULL | Population std-dev. Zero indicates a flat history; deviation against zero std is reported as NULL. |
+| `sample_count` | INT | NOT NULL, CHECK (>=1) | Number of historical rows that contributed |
+| `window_days` | SMALLINT | NOT NULL, DEFAULT 7 | Smoothing window the row was computed under; the column lets the window evolve without orphaning earlier baselines |
+| `years_observed` | INT | NOT NULL | Distinct calendar years contributing to the bucket |
+| `computed_at` | TIMESTAMPTZ | NOT NULL, DEFAULT `now()` | |
+
+**Primary key:** `(block_id, index_code, day_of_year)`
+**Behavior:** the recompute task pulls every (block, index) pair with at least one aggregate row, runs `compute_block_baselines` on the in-memory history, and upserts one baseline row per DOY that meets `min_sample_count` (default 3). New blocks see no rows until they accumulate enough history. The cyclic distance treats Dec 31 ↔ Jan 1 as adjacent so wrap-around windows work as agronomists expect.
 
 ---
 
@@ -868,18 +946,112 @@ Actual recorded values. Hot path for both data entry and alert/recommendation ev
 
 ## 10. `alerts` module
 
-Tier-2 compound rule engine. Rules evaluate every 15 minutes against indices, weather, and signals.
+Two-layer rule engine: a platform-curated **default catalog** in `public`, with per-tenant **overrides** layered on top at evaluation time. Alerts are written by a Beat-driven sweep that walks every active block in every active tenant and runs each merged rule against the latest signals (`block_index_aggregates.baseline_deviation`, weather, growth stage). PR-5 of the FarmDM rollout.
+
+> The earlier draft of this section (`alert_rules` / `alert_rule_scopes` / `alerts_history`) described a richer condition-tree DSL with auto-resolution, scopes, and a hypertable history. That spec was scoped down for MVP — the catalog-plus-override pattern below is what shipped. The richer features (compound `AND`/`OR` condition trees, scope filters, history hypertable, auto-resolve) are parked as P2 and can layer on top of these tables without a rename.
 
 ### 10.1 ERD
 
 ```
-alert_rules 1 ──< alert_rule_conditions
-alert_rules 1 ──< alert_rule_scopes        -- which farms/blocks this rule covers
-alert_rules 1 ──< alerts                   -- alert lifecycle records
-alerts 1 ──< alerts_history                -- (hypertable, all transitions)
+public.default_rules 1 ──< tenant.alerts        (logical FK on rule_code)
+public.default_rules 1 ──  tenant.rule_overrides (logical FK on rule_code, ≤ 1 per tenant)
+tenant.blocks        1 ──< tenant.alerts        (FK ON DELETE CASCADE)
 ```
 
-### 10.2 `alert_rules` (tenant schema)
+### 10.2 `public.default_rules`
+
+Platform-curated rule catalog. Read by every tenant; written only by platform admins (no tenant write API). Seeded with a starter pack in migration `0012` (NDVI severe-drop, NDVI warning-drop). Conditions JSONB carries a typed predicate dispatched by `app.modules.alerts.engine`; new predicate kinds arrive by adding a row that uses the new type plus a handler in the engine.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `code` | TEXT | NOT NULL, UNIQUE | Stable rule identifier — what tenants override |
+| `name_en` | TEXT | NOT NULL | |
+| `name_ar` | TEXT | | |
+| `description_en` | TEXT | | |
+| `description_ar` | TEXT | | |
+| `severity` | TEXT | NOT NULL, DEFAULT `'warning'`, CHECK in `('info','warning','critical')` | Default severity; tenants may override |
+| `status` | TEXT | NOT NULL, DEFAULT `'active'`, CHECK in `('active','draft','retired')` | The engine evaluates only `active` rules |
+| `applies_to_crop_categories` | TEXT[] | NOT NULL, DEFAULT `'{}'` | Empty = any crop; non-empty filters by the block's current crop category |
+| `conditions` | JSONB | NOT NULL | Typed predicate; supported types in MVP: `baseline_deviation_below`, `baseline_deviation_between` |
+| `actions` | JSONB | NOT NULL | `{diagnosis_en, diagnosis_ar, prescription_en, prescription_ar}` snapshotted onto every fired alert |
+| `version` | INT | NOT NULL, DEFAULT 1 | Bumped on conditions change so consumers can detect drift |
+| audit cols | | | |
+
+**Indexes:** `UNIQUE (code)`, partial `INDEX (status) WHERE status = 'active'`
+
+### 10.3 Predicate types (MVP)
+
+```json
+// baseline_deviation_below — fires when latest baseline_deviation < threshold
+{ "type": "baseline_deviation_below", "index_code": "ndvi", "threshold": -1.5 }
+
+// baseline_deviation_between — fires when low <= baseline_deviation <= high
+{ "type": "baseline_deviation_between", "index_code": "ndvi", "low": -1.5, "high": -0.75 }
+```
+
+Adding a new predicate kind = one row in `public.default_rules` with the new `type`, plus a handler registered in `app.modules.alerts.engine._PREDICATE_DISPATCH`. Older alert rows keep working: they store the interpretation snapshot (`alerts.signal_snapshot`) at fire time.
+
+### 10.4 `tenant.rule_overrides`
+
+Per-tenant customisation of a default rule. Logical FK to `public.default_rules.code` (matches the imagery `provider_code` pattern in § 5.6.1 — cross-schema FKs stay logical). At most one effective override per rule per tenant; the partial UNIQUE on `(rule_code) WHERE deleted_at IS NULL` enforces that. The engine merges override on top of default at evaluation time — non-null override fields win per key, null fields inherit.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `rule_code` | TEXT | NOT NULL | Logical FK to `public.default_rules.code` |
+| `modified_conditions` | JSONB | | When non-null, replaces the default's `conditions` wholesale |
+| `modified_actions` | JSONB | | When non-null, replaces `actions` wholesale |
+| `modified_severity` | TEXT | CHECK NULL or in `('info','warning','critical')` | When non-null, replaces default severity |
+| `is_disabled` | BOOLEAN | NOT NULL, DEFAULT FALSE | Tenant-level kill switch — engine treats a disabled rule as absent |
+| audit cols | | | |
+
+**Indexes:** partial `UNIQUE (rule_code) WHERE deleted_at IS NULL`
+
+### 10.5 `tenant.alerts`
+
+Fired alerts. The partial UNIQUE on `(block_id, rule_code) WHERE status IN ('open','acknowledged','snoozed')` keeps the engine idempotent across re-evaluations: re-firing a rule against a block that already has an active alert is a no-op until the prior alert is resolved. The ``signal_snapshot`` captures the values that triggered, so an alert remains explainable even if the rule body has since changed.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `block_id` | UUID | NOT NULL, FK → `blocks.id` ON DELETE CASCADE | |
+| `rule_code` | TEXT | NOT NULL | Denormalised for fast list filters |
+| `severity` | TEXT | NOT NULL, CHECK in `('info','warning','critical')` | Snapshot of the merged rule's severity at fire time |
+| `status` | TEXT | NOT NULL, DEFAULT `'open'`, CHECK in `('open','acknowledged','resolved','snoozed')` | |
+| `diagnosis_en`, `diagnosis_ar` | TEXT | | Snapshot from the rule's `actions` |
+| `prescription_en`, `prescription_ar` | TEXT | | Snapshot from the rule's `actions` |
+| `signal_snapshot` | JSONB | | The values that triggered (e.g. `{baseline_deviation: "-2.0", index_code: "ndvi"}`) |
+| `acknowledged_at` / `acknowledged_by` | TIMESTAMPTZ / UUID | | Stamped by service on acknowledge |
+| `resolved_at` / `resolved_by` | TIMESTAMPTZ / UUID | | Stamped by service on resolve |
+| `snoozed_until` | TIMESTAMPTZ | | Set on snooze; cleared on ack/resolve |
+| audit cols | | | |
+
+**Indexes:**
+- partial `UNIQUE (block_id, rule_code) WHERE status IN ('open','acknowledged','snoozed')`
+- `INDEX (status, severity, created_at) WHERE status IN ('open','acknowledged')` — primary list view
+- `INDEX (block_id, created_at DESC)` — block-detail timeline
+
+**State machine:** `open → acknowledged | snoozed | resolved`. `acknowledged → resolved | snoozed`. `snoozed → acknowledged | resolved`. Any transition out of an active state clears `snoozed_until`. Resolved alerts are terminal; re-firing requires a new alert.
+
+### 10.6 Engine loop
+
+The Beat sweep `alerts.evaluate_alerts_sweep` fans out per active tenant; the per-tenant task `alerts.evaluate_alerts_for_tenant` walks every active block. For each block:
+
+1. Load the active rule catalog (`public.default_rules`) once per tenant.
+2. Load the tenant's overrides; merge with `engine.merge_rule`.
+3. Snapshot the block's signals: `latest_aggregate_per_index`, `crop_category` from the current `block_crops`.
+4. For each merged rule, dispatch on predicate `type`; insert an alert if it fires.
+
+The insertion is idempotent (partial UNIQUE), so the sweep can run as often as the operator likes without flooding the alert list. Cadence is set in `workers/beat/main.py` against `alerts_evaluate_sweep_seconds` (30 minutes in dev; nightly in production).
+
+---
+
+## 10.legacy. Earlier draft (parked as P2)
+
+The pre-PR-5 draft of this section described a richer model with `alert_rules` (full condition trees), `alert_rule_scopes`, `alerts_history` (hypertable), auto-resolution, and notification dispatch logs. Those features can layer onto the current tables without a rename — the predicate dispatch in `engine.py` is extension-friendly, and the `alerts` table has room for a `previous_alert_id` chain when we want history.
+
+### 10.legacy.1 `alert_rules` (deferred)
 
 The user-defined rule. Tier 2: compound conditions with AND/OR groups, aggregations, time windows.
 
@@ -1002,6 +1174,59 @@ Every state transition for compliance and analytics.
 - Retention: 2 years hot, then archive
 
 **Indexes:** `(farm_id, time DESC)`, `(alert_id, time)`
+
+---
+
+## 10c. `irrigation` module
+
+PR-7 of FarmDM rollout. Model-driven daily watering recommendations
+that consume the upstream stack:
+
+  * `weather_derived_daily.et0_mm_daily` (PR-C) → today's evapo-
+    transpiration demand.
+  * `weather_derived_daily.precip_mm_daily` (rolling 1-3 day window)
+    → recent rainfall offsetting the demand.
+  * Crop coefficient (Kc) resolved from `crops.phenology_stages`
+    merged with `crop_varieties.phenology_stages_override` (PR-2)
+    keyed on the block's current `block_crops.growth_stage` (PR-3).
+  * Block's `irrigation_system` selects the application-efficiency
+    factor (drip ≈ 0.90, surface ≈ 0.55).
+
+The result is a *recommendation*, not an instruction — operators apply
+or skip via the API. See ``app.modules.irrigation.engine`` for the
+full water-balance formula.
+
+### 10c.1 `irrigation_schedules` (tenant schema)
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `block_id` | UUID | NOT NULL, FK → `blocks.id` ON DELETE CASCADE | |
+| `scheduled_for` | DATE | NOT NULL | Calendar date the recommendation targets |
+| `recommended_mm` | NUMERIC(7,2) | NOT NULL, CHECK ≥ 0 | Engine output |
+| `kc_used` | NUMERIC(5,3) | | Crop coefficient resolved at compute time |
+| `et0_mm_used` | NUMERIC(7,2) | | ET₀ input snapshot |
+| `recent_precip_mm` | NUMERIC(7,2) | | Rainfall offset snapshot |
+| `growth_stage_context` | TEXT | | Stage code at compute time |
+| `soil_moisture_pct` | NUMERIC(5,2) | | Optional sensor input (P2) |
+| `status` | TEXT | NOT NULL, DEFAULT `'pending'`, CHECK in `('pending','applied','skipped')` | |
+| `applied_at` / `applied_by` | TIMESTAMPTZ / UUID | | Stamped on `apply` |
+| `applied_volume_mm` | NUMERIC(7,2) | | Actual delivered volume — may differ from `recommended_mm` |
+| `notes` | TEXT | | |
+| audit cols | | | |
+
+**Indexes:**
+- partial `UNIQUE (block_id, scheduled_for) WHERE status='pending' AND deleted_at IS NULL` — re-running the daily Beat sweep keeps the canonical pending recommendation.
+- `(block_id, scheduled_for DESC) WHERE deleted_at IS NULL` — block-detail timeline.
+- partial `(scheduled_for) WHERE status='pending' AND deleted_at IS NULL` — agronomist's "what's due today" view.
+
+**Engine loop:** `irrigation.generate_sweep` is the daily Beat task; `irrigation.generate_for_tenant(schema)` walks every active block in one tenant and inserts one pending row per (block, today). State machine: `pending → applied | skipped` (terminal). The partial UNIQUE makes the sweep idempotent.
+
+**RBAC:**
+- `irrigation.schedule.read` — view recommendations (every farm-scope role).
+- `irrigation.schedule.manage` — generate / apply / skip (Manager / Agronomist / FieldOperator).
+
+The historic `irrigation.record` capability (P0) is for the manual-only logging path; PR-7's recommendations are a *separate* signal stream, not a replacement.
 
 ---
 

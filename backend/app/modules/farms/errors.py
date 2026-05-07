@@ -82,6 +82,24 @@ class BlockCodeConflictError(APIError):
         )
 
 
+class InvalidUnitTypeError(APIError):
+    """Pivot/sector parent rules violated. Surfaces as 422.
+
+    Raised when a pivot_sector references a parent that doesn't exist,
+    isn't a pivot, or sits on a different farm — and when block/pivot
+    rows try to set parent_unit_id (which is reserved for sectors).
+    """
+
+    def __init__(self, *, reason: str, extra: dict[str, Any] | None = None) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid land-unit type or parent",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/invalid-unit-type",
+            extras=extra or {},
+        )
+
+
 class GeometryInvalidError(APIError):
     def __init__(self, reason: str, *, extra: dict[str, Any] | None = None) -> None:
         super().__init__(

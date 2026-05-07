@@ -77,11 +77,26 @@ def _wire_settings(
     os.environ["DATABASE_URL"] = async_url
     os.environ["DATABASE_SYNC_URL"] = sync_url
     os.environ["REDIS_URL"] = redis_url
+    # Point Celery broker at the test Redis so module-side `.delay()`
+    # calls — e.g. weather.fetch_weather chaining derive_weather_daily —
+    # enqueue against a reachable broker instead of falling through to
+    # the default amqp://localhost. No worker consumes the queue in the
+    # test process; tasks are direct-invoked through their `_async`
+    # cores when behavior matters.
+    os.environ["CELERY_BROKER_URL"] = redis_url
+    os.environ["CELERY_RESULT_BACKEND"] = redis_url
     os.environ["APP_ENV"] = "test"
 
     from app.core.settings import get_settings
 
     get_settings.cache_clear()
+
+    # Construct the publisher-side Celery app so `@shared_task.delay(...)`
+    # resolves to the configured broker. Without this, `current_app`
+    # is Celery's implicit default with no broker → connection refused.
+    from workers.celery_factory import build_publisher
+
+    build_publisher()
 
     # Run public migrations once for the session.
     from alembic import command

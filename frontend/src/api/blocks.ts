@@ -27,6 +27,12 @@ export type SalinityClass =
   | "strongly_saline";
 export type BlockStatus = "active" | "fallow" | "abandoned" | "under_preparation" | "archived";
 
+// Land-unit polymorphism. A "block" row may represent a plain block, a
+// pivot (full-circle, center-pivot irrigation), or a pivot_sector (a
+// pie-slice subdivision of a pivot). pivot_sector rows carry
+// parent_unit_id; the others must leave it null.
+export type UnitType = "block" | "pivot" | "pivot_sector";
+
 export interface Block {
   id: string;
   farm_id: string;
@@ -47,6 +53,9 @@ export interface Block {
   notes: string | null;
   tags: string[];
   status: BlockStatus;
+  unit_type: UnitType;
+  parent_unit_id: string | null;
+  irrigation_geometry: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +77,11 @@ export interface BlockCreatePayload {
   responsible_user_id?: string | null;
   notes?: string | null;
   tags?: string[];
+  // Defaults to 'block' on the backend; pivots/sectors require a
+  // dedicated creation flow that PR-1 does not yet expose in the UI.
+  unit_type?: UnitType;
+  parent_unit_id?: string | null;
+  irrigation_geometry?: Record<string, unknown> | null;
 }
 
 export type BlockUpdatePayload = Partial<BlockCreatePayload>;

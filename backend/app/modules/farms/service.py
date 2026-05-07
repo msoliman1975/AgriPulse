@@ -7,6 +7,7 @@ request via `get_farm_service`.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -20,6 +21,7 @@ from app.modules.farms import geometry as _geometry
 from app.modules.farms.errors import (
     BlockNotFoundError,
     FarmNotFoundError,
+    InvalidUnitTypeError,
 )
 from app.modules.farms.events import (
     BlockArchivedV1,
@@ -161,6 +163,9 @@ class FarmService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
         preferred_unit: str,
+        unit_type: str = "block",
+        parent_unit_id: UUID | None = None,
+        irrigation_geometry: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -222,6 +227,22 @@ class FarmService(Protocol):
     ) -> dict[str, Any]: ...
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
+
+    async def record_growth_stage_transition(
+        self,
+        *,
+        block_id: UUID,
+        stage: str,
+        source: str,
+        transition_date: datetime | None,
+        block_crop_id: UUID | None,
+        notes: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def list_growth_stage_logs(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
 
     async def assign_member(
         self,
@@ -549,10 +570,18 @@ class FarmServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         preferred_unit: str,
+        unit_type: str = "block",
+        parent_unit_id: UUID | None = None,
+        irrigation_geometry: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
         _geometry.validate_polygon_geojson(boundary)
         ewkt = _geometry.geojson_to_ewkt_polygon(boundary)
+        await self._validate_unit_type_and_parent(
+            farm_id=farm_id,
+            unit_type=unit_type,
+            parent_unit_id=parent_unit_id,
+        )
 
         block_id = uuid7()
         await self._repo.insert_block(
@@ -571,6 +600,9 @@ class FarmServiceImpl:
             notes=notes,
             tags=tags,
             actor_user_id=actor_user_id,
+            unit_type=unit_type,
+            parent_unit_id=parent_unit_id,
+            irrigation_geometry=irrigation_geometry,
         )
         await self._tenant_session.flush()
 
@@ -603,6 +635,62 @@ class FarmServiceImpl:
             )
         )
         return _stamp_area_unit(block, preferred_unit)
+
+    async def _validate_unit_type_and_parent(
+        self,
+        *,
+        farm_id: UUID,
+        unit_type: str,
+        parent_unit_id: UUID | None,
+    ) -> None:
+        """Enforce the cross-row invariants the DB CHECK can't.
+
+        Block-level CHECK already enforces that pivot_sector requires a
+        parent and that block/pivot must leave it null. What CHECK
+        cannot do: confirm the parent points at a *pivot* on the *same
+        farm* — both involve a second row, so we look it up.
+        """
+        if unit_type == "pivot_sector":
+            if parent_unit_id is None:
+                raise InvalidUnitTypeError(
+                    reason="pivot_sector requires parent_unit_id pointing to a pivot.",
+                    extra={"unit_type": unit_type},
+                )
+            parent = await self._repo.get_block_by_id(parent_unit_id, with_boundary=False)
+            if parent is None:
+                raise InvalidUnitTypeError(
+                    reason=f"Parent unit {parent_unit_id} not found in this tenant.",
+                    extra={"parent_unit_id": str(parent_unit_id)},
+                )
+            if parent["unit_type"] != "pivot":
+                raise InvalidUnitTypeError(
+                    reason=(
+                        f"Parent unit {parent_unit_id} has unit_type "
+                        f"{parent['unit_type']!r}; pivot_sector parent must be a pivot."
+                    ),
+                    extra={
+                        "parent_unit_id": str(parent_unit_id),
+                        "parent_unit_type": parent["unit_type"],
+                    },
+                )
+            if parent["farm_id"] != farm_id:
+                raise InvalidUnitTypeError(
+                    reason="Parent pivot must belong to the same farm as the sector.",
+                    extra={
+                        "parent_unit_id": str(parent_unit_id),
+                        "parent_farm_id": str(parent["farm_id"]),
+                        "expected_farm_id": str(farm_id),
+                    },
+                )
+        elif parent_unit_id is not None:
+            # block / pivot must not carry a parent.
+            raise InvalidUnitTypeError(
+                reason=(
+                    f"unit_type {unit_type!r} must not set parent_unit_id; "
+                    "only pivot_sector references a parent."
+                ),
+                extra={"unit_type": unit_type},
+            )
 
     async def list_blocks(
         self,
@@ -802,6 +890,91 @@ class FarmServiceImpl:
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_block_crops(block_id=block_id)
+
+    # ---- Growth-stage logs (PR-3) -----------------------------------
+
+    async def record_growth_stage_transition(
+        self,
+        *,
+        block_id: UUID,
+        stage: str,
+        source: str,
+        transition_date: datetime | None,
+        block_crop_id: UUID | None,
+        notes: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Append a transition + reflect it on the current `block_crops` row.
+
+        ``block_crop_id`` defaults to the block's current crop when not
+        supplied — that's the common case (manual UI entry). When the
+        block has no current crop, the log row still lands but isn't
+        linked to any assignment, and the canonical "current stage" on
+        block_crops is left untouched.
+        """
+        # Resolve the target block_crop. If caller didn't pin one,
+        # use whichever assignment is `is_current`.
+        target_block_crop_id: UUID | None = block_crop_id
+        if target_block_crop_id is None:
+            assignments = await self._repo.list_block_crops(block_id=block_id)
+            current = next((bc for bc in assignments if bc["is_current"]), None)
+            if current is not None:
+                target_block_crop_id = current["id"]
+
+        log_id = uuid7()
+        when = transition_date or datetime.now(UTC)
+        log = await self._repo.insert_growth_stage_log(
+            log_id=log_id,
+            block_id=block_id,
+            block_crop_id=target_block_crop_id,
+            stage=stage,
+            source=source,
+            confirmed_by=actor_user_id if source == "manual" else None,
+            transition_date=transition_date,
+            notes=notes,
+            actor_user_id=actor_user_id,
+        )
+        # Mirror the new stage onto block_crops if there's an assignment
+        # to mirror it on. The log is the source of truth; the column
+        # is the cached "current" for fast block-detail render.
+        if target_block_crop_id is not None:
+            await self._repo.update_block_crop_growth_stage(
+                block_crop_id=target_block_crop_id,
+                stage=stage,
+                transition_date=when,
+                actor_user_id=actor_user_id,
+            )
+        await self._tenant_session.flush()
+
+        block = await self._repo.get_block_by_id(block_id, with_boundary=False)
+        farm_id = block["farm_id"] if block else None
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.growth_stage_recorded",
+            actor_user_id=actor_user_id,
+            subject_kind="growth_stage_log",
+            subject_id=log_id,
+            farm_id=farm_id,
+            details={
+                "block_id": str(block_id),
+                "stage": stage,
+                "source": source,
+                "block_crop_id": (
+                    str(target_block_crop_id) if target_block_crop_id is not None else None
+                ),
+            },
+            correlation_id=correlation_id,
+        )
+        return log
+
+    async def list_growth_stage_logs(self, *, block_id: UUID) -> list[dict[str, Any]]:
+        # Block-existence check up front so callers see a 404 instead
+        # of an empty list when the block is missing.
+        if (await self._repo.get_block_by_id(block_id, with_boundary=False)) is None:
+            raise BlockNotFoundError(block_id)
+        return await self._repo.list_growth_stage_logs(block_id=block_id)
 
     # ---- Members ----------------------------------------------------
 

@@ -67,7 +67,11 @@ class CropResponse(BaseModel):
     category: str
     is_perennial: bool
     default_growing_season_days: int | None
+    gdd_base_temp_c: Decimal | None = None
+    gdd_upper_temp_c: Decimal | None = None
     relevant_indices: list[str]
+    phenology_stages: dict[str, Any] | None = None
+    default_thresholds: dict[str, Any] | None = None
 
 
 class CropVarietyResponse(BaseModel):
@@ -78,6 +82,9 @@ class CropVarietyResponse(BaseModel):
     code: str
     name_en: str
     name_ar: str | None
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
 
 
 # ---------- Farms -----------------------------------------------------------
@@ -158,6 +165,9 @@ class FarmDetailResponse(FarmResponse):
 # ---------- Blocks ----------------------------------------------------------
 
 
+UnitType = Literal["block", "pivot", "pivot_sector"]
+
+
 class BlockCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -173,6 +183,18 @@ class BlockCreateRequest(BaseModel):
     responsible_user_id: UUID | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
+    # Land-unit polymorphism: defaults to plain `block` so existing
+    # creation flows work unchanged. `pivot_sector` requires
+    # `parent_unit_id`; `block` and `pivot` must leave it null.
+    unit_type: UnitType = "block"
+    parent_unit_id: UUID | None = None
+    irrigation_geometry: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Provider-agnostic JSON for pivot/sector geometry: "
+            "`{center: {lat, lon}, radius_m, start_angle_deg?, end_angle_deg?}`."
+        ),
+    )
 
     @field_validator("code")
     @classmethod
@@ -196,6 +218,7 @@ class BlockUpdateRequest(BaseModel):
     responsible_user_id: UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
+    irrigation_geometry: dict[str, Any] | None = None
 
 
 class BlockResponse(BaseModel):
@@ -220,6 +243,9 @@ class BlockResponse(BaseModel):
     notes: str | None
     tags: list[str]
     status: BlockStatus
+    unit_type: UnitType
+    parent_unit_id: UUID | None
+    irrigation_geometry: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
 
@@ -299,6 +325,44 @@ class BlockCropResponse(BaseModel):
     growth_stage_updated_at: datetime | None
     is_current: bool
     status: BlockCropStatus
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------- Growth-stage logs ----------------------------------------------
+
+GrowthStageSource = Literal["manual", "derived", "imported"]
+
+
+class GrowthStageTransitionRequest(BaseModel):
+    """POST /api/v1/blocks/{block_id}/growth-stages body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage: str = Field(min_length=1, max_length=64)
+    source: GrowthStageSource = "manual"
+    transition_date: datetime | None = None
+    block_crop_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Optionally link the transition to a specific crop assignment. "
+            "Defaults to the block's current crop if any."
+        ),
+    )
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class GrowthStageLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    block_id: UUID
+    block_crop_id: UUID | None
+    stage: str
+    source: GrowthStageSource
+    confirmed_by: UUID | None
+    transition_date: datetime
     notes: str | None
     created_at: datetime
     updated_at: datetime

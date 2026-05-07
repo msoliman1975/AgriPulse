@@ -49,6 +49,10 @@ dependencies = [
   # RBAC config + general YAML
   "pyyaml>=6.0,<6.1",
 
+  # Lat/lon -> IANA timezone, used by weather to bucket hourly data
+  # into "days" in the farm's local timezone.
+  "timezonefinder>=6.5,<7",
+
   # Observability
   "structlog>=24.4,<25",
   "opentelemetry-api>=1.28,<2",
@@ -465,6 +469,7 @@ source_modules = [
   "app.modules.indices",
   "app.modules.weather",
   "app.modules.signals",
+  "app.modules.plans",
   "app.modules.recommendations",
   "app.modules.notifications",
   "app.modules.analytics",
@@ -475,6 +480,59 @@ forbidden_modules = [
   "app.modules.alerts.models",
   "app.modules.alerts.router",
   "app.modules.alerts.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "plans internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.irrigation",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.plans.repository",
+  "app.modules.plans.models",
+  "app.modules.plans.router",
+  "app.modules.plans.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "irrigation internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.plans",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+]
+forbidden_modules = [
+  "app.modules.irrigation.repository",
+  "app.modules.irrigation.models",
+  "app.modules.irrigation.router",
+  "app.modules.irrigation.schemas",
 ]
 allow_indirect_imports = true
 

@@ -7,11 +7,13 @@ import enAuth from "./locales/en/auth.json";
 import enFarms from "./locales/en/farms.json";
 import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
+import enWeather from "./locales/en/weather.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
 import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
+import arWeather from "./locales/ar/weather.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -28,6 +30,7 @@ const resources = {
     farms: enFarms,
     imagery: enImagery,
     indices: enIndices,
+    weather: enWeather,
   },
   ar: {
     common: arCommon,
@@ -35,6 +38,7 @@ const resources = {
     farms: arFarms,
     imagery: arImagery,
     indices: arIndices,
+    weather: arWeather,
   },
 } as const;
 
@@ -46,7 +50,7 @@ void i18n
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGES],
     defaultNS: "common",
-    ns: ["common", "auth", "farms", "imagery", "indices"],
+    ns: ["common", "auth", "farms", "imagery", "indices", "weather"],
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],

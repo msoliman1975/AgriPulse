@@ -93,6 +93,7 @@ def _register_module_routers(app: FastAPI) -> None:
     factory's import graph thin in environments that do not need the
     full app (e.g., a Celery worker importing only `app.core.settings`).
     """
+    from app.modules.alerts.router import router as alerts_router
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
@@ -100,7 +101,10 @@ def _register_module_routers(app: FastAPI) -> None:
         register_subscribers as register_imagery_subscribers,
     )
     from app.modules.indices.router import router as indices_router
+    from app.modules.irrigation.router import router as irrigation_router
+    from app.modules.plans.router import router as plans_router
     from app.modules.tenancy.router import router as tenancy_router
+    from app.modules.weather.router import router as weather_router
     from app.shared.eventbus import get_default_bus
 
     app.include_router(iam_router)
@@ -108,6 +112,10 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(farms_router)
     app.include_router(imagery_router)
     app.include_router(indices_router)
+    app.include_router(weather_router)
+    app.include_router(alerts_router)
+    app.include_router(plans_router)
+    app.include_router(irrigation_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from

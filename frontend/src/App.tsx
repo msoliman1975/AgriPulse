@@ -1,3 +1,4 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -20,6 +21,14 @@ import { BlockCreatePage } from "@/modules/farms/pages/BlockCreatePage";
 import { BlockAutoGridPage } from "@/modules/farms/pages/BlockAutoGridPage";
 import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
+import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
+import { PlanPage } from "@/modules/plan/pages/PlanPage";
+import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
+import { ReportsPage } from "@/modules/reports/pages/ReportsPage";
+import { RulesConfigPage } from "@/modules/config/pages/RulesConfigPage";
+import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherConfigPage";
+import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
+import { queryClient } from "@/queries/client";
 
 export function App(): ReactNode {
   return (
@@ -44,15 +53,19 @@ export function App(): ReactNode {
                       `getConfig()` doesn't fire on the first commit (when
                       auth.user is still null on hard refresh). That race
                       surfaced as 401 "Missing bearer token" on the very
-                      first /api/v1/config call. */}
+                      first /api/v1/config call.
+                      QueryClientProvider lives here too so the cache is
+                      shared across every farm-scoped page. */}
                   <ConfigProvider>
-                    <AppShell />
+                    <QueryClientProvider client={queryClient}>
+                      <AppShell />
+                    </QueryClientProvider>
                   </ConfigProvider>
                 </ProtectedRoute>
               }
             >
               <Route path="/" element={<HomePage />} />
-              <Route path="/me" element={<MePage />} />
+              <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/farms" element={<FarmListPage />} />
               <Route path="/farms/new" element={<FarmCreatePage />} />
               <Route path="/farms/:farmId" element={<FarmDetailPage />} />
@@ -62,6 +75,15 @@ export function App(): ReactNode {
               <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
               <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
               <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
+              {/* AgriPulse new IA — farm-scoped routes (UX_SPEC §3 +
+                  IMPLEMENTATION_PLAN §3). */}
+              <Route path="/insights/:farmId" element={<InsightsPage />} />
+              <Route path="/plan/:farmId" element={<PlanPage />} />
+              <Route path="/alerts/:farmId" element={<AlertsPage />} />
+              <Route path="/reports/:farmId" element={<ReportsPage />} />
+              <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
+              <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
+              <Route path="/config/users/:farmId" element={<UsersConfigPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

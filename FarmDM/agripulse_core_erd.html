@@ -1,0 +1,210 @@
+<style>
+#erd { overflow-x: auto; }
+#erd svg { min-width: 600px; }
+#erd svg.erDiagram .divider path { stroke-opacity: 0.5; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+</style>
+<div id="erd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  ORGANIZATION ||--o{ FARM : owns
+  ORGANIZATION ||--o{ USER : has
+  ORGANIZATION ||--o{ SUBSCRIPTION : has
+  ORGANIZATION ||--o{ RULE_OVERRIDE : customizes
+
+  FARM ||--o{ LAND_UNIT : contains
+  FARM }o--|| WEATHER_CONFIG : uses
+  FARM }o--|| IMAGERY_CONFIG : uses
+
+  LAND_UNIT ||--o{ GROWTH_STAGE_LOG : tracks
+  LAND_UNIT ||--o{ INDEX_TIMESERIES : has
+  LAND_UNIT ||--o{ ALERT : receives
+  LAND_UNIT ||--o{ IRRIGATION_SCHEDULE : has
+  LAND_UNIT }o--|| CROP_VARIETY : grows
+
+  USER ||--o{ USER_FARM_ROLE : assigned
+  USER_FARM_ROLE }o--|| FARM : scoped_to
+
+  ORGANIZATION {
+    uuid id PK
+    string name
+    string country
+    string language_pref
+    string status
+    timestamp created_at
+  }
+
+  FARM {
+    uuid id PK
+    uuid org_id FK
+    string name
+    geometry boundary
+    float elevation_m
+    float area_feddans
+    timestamp created_at
+  }
+
+  LAND_UNIT {
+    uuid id PK
+    uuid farm_id FK
+    string name
+    string unit_type
+    geometry boundary
+    float area_feddans
+    uuid crop_variety_id FK
+    int planting_year
+    string rootstock
+    string irrigation_method
+    string soil_type
+    string current_growth_stage
+    timestamp created_at
+  }
+
+  USER {
+    uuid id PK
+    uuid org_id FK
+    string email
+    string name
+    string phone
+    string language_pref
+    string org_role
+    boolean is_active
+  }
+
+  USER_FARM_ROLE {
+    uuid id PK
+    uuid user_id FK
+    uuid farm_id FK
+    string role
+  }
+
+  CROP_VARIETY {
+    uuid id PK
+    string crop_type
+    string variety_name
+    float base_gdd_temp
+    jsonb phenology_model
+    jsonb default_thresholds
+  }
+
+  SUBSCRIPTION {
+    uuid id PK
+    uuid org_id FK
+    string plan_type
+    float price_per_feddan
+    date trial_start
+    date trial_end
+    string status
+  }
+
+  IMAGERY_CONFIG {
+    uuid id PK
+    uuid farm_id FK
+    string provider
+    string tier
+    int backfill_years
+    jsonb provider_credentials
+  }
+
+  WEATHER_CONFIG {
+    uuid id PK
+    uuid farm_id FK
+    string provider
+    jsonb provider_settings
+    int forecast_days
+  }
+
+  RULE_OVERRIDE {
+    uuid id PK
+    uuid org_id FK
+    string rule_id
+    jsonb modified_conditions
+    jsonb modified_actions
+    string modified_by
+    timestamp modified_at
+  }
+
+  GROWTH_STAGE_LOG {
+    uuid id PK
+    uuid land_unit_id FK
+    string stage
+    string source
+    uuid confirmed_by FK
+    timestamp transition_date
+  }
+
+  INDEX_TIMESERIES {
+    uuid land_unit_id FK
+    timestamp captured_at
+    string index_type
+    float mean_value
+    float min_value
+    float max_value
+    float std_dev
+    float baseline_deviation
+  }
+
+  ALERT {
+    uuid id PK
+    uuid land_unit_id FK
+    string rule_id
+    string severity
+    string status
+    string diagnosis
+    string prescription
+    timestamp created_at
+    timestamp resolved_at
+  }
+
+  IRRIGATION_SCHEDULE {
+    uuid id PK
+    uuid land_unit_id FK
+    float soil_moisture_pct
+    float recommended_mm
+    string growth_stage_context
+    timestamp scheduled_for
+    string status
+  }
+`);
+document.getElementById('erd').innerHTML = svg;
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>

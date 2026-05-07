@@ -1,0 +1,46 @@
+<svg width="3200" height="800" viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+  
+  <!-- Icon circle -->
+  <circle cx="100" cy="95" r="82" fill="#0F6E56" opacity="0.1"/>
+  <circle cx="100" cy="95" r="82" fill="none" stroke="#1D9E75" stroke-width="2.5"/>
+
+  <!-- Full mango leaf -->
+  <path d="M100 20 
+           Q120 40 130 62 
+           Q140 84 138 104 
+           Q135 124 125 140 
+           Q115 152 100 160 
+           Q85 152 75 140 
+           Q65 124 62 104 
+           Q60 84 70 62 
+           Q80 40 100 20Z" 
+        fill="#1D9E75" stroke="#04342C" stroke-width="1.8"/>
+
+  <!-- Midrib -->
+  <path d="M100 26 L100 155" fill="none" stroke="#085041" stroke-width="1.2" opacity="0.35"/>
+
+  <!-- Lateral veins -->
+  <path d="M100 45 Q92 50 84 60" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 45 Q108 50 116 60" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 65 Q90 71 80 84" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 65 Q110 71 120 84" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 85 Q88 92 76 105" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 85 Q112 92 124 105" fill="none" stroke="#085041" stroke-width="0.9" opacity="0.28"/>
+  <path d="M100 105 Q90 110 80 122" fill="none" stroke="#085041" stroke-width="0.8" opacity="0.25"/>
+  <path d="M100 105 Q110 110 120 122" fill="none" stroke="#085041" stroke-width="0.8" opacity="0.25"/>
+  <path d="M100 125 Q94 130 88 138" fill="none" stroke="#085041" stroke-width="0.7" opacity="0.22"/>
+  <path d="M100 125 Q106 130 112 138" fill="none" stroke="#085041" stroke-width="0.7" opacity="0.22"/>
+
+  <!-- Stem -->
+  <path d="M100 160 Q101 168 103 175" fill="none" stroke="#04342C" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Pulse contained in circle -->
+  <path d="M22 98 L62 98 L72 82 L82 112 L100 72 L118 108 L126 92 L140 98 L178 96" fill="none" stroke="#E24B4A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Wordmark: Agri.Pulse -->
+  <text x="210" y="88" font-family="'Helvetica Neue', 'Arial', sans-serif" font-size="52" font-weight="600" fill="#2C2C2A" letter-spacing="-1">Agri</text>
+  <text x="320" y="88" font-family="'Helvetica Neue', 'Arial', sans-serif" font-size="52" font-weight="600" fill="#1D9E75" letter-spacing="-1">.Pulse</text>
+
+  <!-- Slogan -->
+  <text x="212" y="120" font-family="'Helvetica Neue', 'Arial', sans-serif" font-size="18" font-weight="400" fill="#5F5E5A" letter-spacing="0.5">See it before your trees show it</text>
+</svg>

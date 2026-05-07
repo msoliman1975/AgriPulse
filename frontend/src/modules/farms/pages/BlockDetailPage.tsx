@@ -8,6 +8,8 @@ import { isApiError } from "@/api/errors";
 import { ImageryPanel } from "@/modules/imagery/components/ImageryPanel";
 import { SubscriptionsTab } from "@/modules/imagery/components/SubscriptionsTab";
 import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
+import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
+import { WeatherSubscriptionsTab } from "@/modules/weather/components/WeatherSubscriptionsTab";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
@@ -24,6 +26,7 @@ export function BlockDetailPage(): JSX.Element {
   const canAssignCrop = useCapability("crop_assignment.create", { farmId });
   const canReadImagery = useCapability("imagery.read", { farmId });
   const canReadIndex = useCapability("index.read", { farmId });
+  const canReadWeather = useCapability("weather.read", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
   const [history, setHistory] = useState<BlockCropAssignment[]>([]);
@@ -106,9 +109,16 @@ export function BlockDetailPage(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-brand-800">
-            {t("block.detailHeading")} {block.code}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-brand-800">
+              {t("block.detailHeading")} {block.code}
+            </h1>
+            {block.unit_type !== "block" ? (
+              <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                {t(`block.unitType.${block.unit_type}`)}
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm text-slate-600">
             <AreaDisplay areaM2={Number(block.area_m2)} /> ·{" "}
             {block.irrigation_system ? t(`irrigationSystem.${block.irrigation_system}`) : "—"}
@@ -225,6 +235,12 @@ export function BlockDetailPage(): JSX.Element {
       {canReadIndex ? <IndexTrendChart blockId={block.id} /> : null}
 
       {canReadImagery ? <SubscriptionsTab blockId={block.id} farmId={farmId} /> : null}
+
+      {canReadWeather ? <WeatherForecastPanel blockId={block.id} farmId={farmId} /> : null}
+
+      {canReadWeather ? (
+        <WeatherSubscriptionsTab blockId={block.id} farmId={farmId} />
+      ) : null}
     </div>
   );
 }

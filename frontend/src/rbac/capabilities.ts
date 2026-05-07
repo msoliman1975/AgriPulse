@@ -25,7 +25,21 @@ export type Capability =
   | "imagery.refresh"
   | "imagery.subscription.manage"
   | "index.read"
-  | "index.compute_custom";
+  | "index.compute_custom"
+  | "weather.read"
+  | "weather.refresh"
+  | "weather.subscription.manage"
+  | "alert.read"
+  | "alert.acknowledge"
+  | "alert.resolve"
+  | "alert.snooze"
+  | "alert_rule.read"
+  | "alert_rule.manage"
+  | "plan.read"
+  | "plan.manage"
+  | "plan_activity.complete"
+  | "irrigation.schedule.read"
+  | "irrigation.schedule.manage";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -42,6 +56,11 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.read",
     "imagery.read",
     "index.read",
+    "weather.read",
+    "alert.read",
+    "alert_rule.read",
+    "plan.read",
+    "irrigation.schedule.read",
   ]),
   TenantOwner: tenantWideCaps(),
   TenantAdmin: tenantWideCaps(),
@@ -67,6 +86,20 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.subscription.manage",
     "index.read",
     "index.compute_custom",
+    "weather.read",
+    "weather.refresh",
+    "weather.subscription.manage",
+    "alert.read",
+    "alert.acknowledge",
+    "alert.resolve",
+    "alert.snooze",
+    "alert_rule.read",
+    "alert_rule.manage",
+    "plan.read",
+    "plan.manage",
+    "plan_activity.complete",
+    "irrigation.schedule.read",
+    "irrigation.schedule.manage",
   ]),
   Agronomist: new Set<Capability>([
     "farm.read",
@@ -78,6 +111,19 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.refresh",
     "index.read",
     "index.compute_custom",
+    "weather.read",
+    "weather.refresh",
+    "alert.read",
+    "alert.acknowledge",
+    "alert.resolve",
+    "alert.snooze",
+    "alert_rule.read",
+    "alert_rule.manage",
+    "plan.read",
+    "plan.manage",
+    "plan_activity.complete",
+    "irrigation.schedule.read",
+    "irrigation.schedule.manage",
   ]),
   FieldOperator: new Set<Capability>([
     "farm.read",
@@ -88,6 +134,11 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.attachment.write",
     "imagery.read",
     "index.read",
+    "weather.read",
+    "alert.read",
+    "plan.read",
+    "plan_activity.complete",
+    "irrigation.schedule.read",
   ]),
   Scout: new Set<Capability>([
     "farm.read",
@@ -96,6 +147,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.attachment.read",
     "imagery.read",
     "index.read",
+    "weather.read",
+    "alert.read",
+    "plan.read",
   ]),
   Viewer: new Set<Capability>([
     "farm.read",
@@ -104,6 +158,10 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "block.attachment.read",
     "imagery.read",
     "index.read",
+    "weather.read",
+    "alert.read",
+    "plan.read",
+    "irrigation.schedule.read",
   ]),
 };
 
@@ -132,6 +190,20 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "imagery.subscription.manage",
     "index.read",
     "index.compute_custom",
+    "weather.read",
+    "weather.refresh",
+    "weather.subscription.manage",
+    "alert.read",
+    "alert.acknowledge",
+    "alert.resolve",
+    "alert.snooze",
+    "alert_rule.read",
+    "alert_rule.manage",
+    "plan.read",
+    "plan.manage",
+    "plan_activity.complete",
+    "irrigation.schedule.read",
+    "irrigation.schedule.manage",
   ]);
 }
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import date as date_type
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -10,9 +12,11 @@ from sqlalchemy import (
     ARRAY,
     CHAR,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     Text,
     text,
 )
@@ -78,6 +82,11 @@ class TenantSubscription(Base, TimestampedMixin):
     feature_flags: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+    # PR-8: subscription enrichment.
+    plan_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price_per_feddan: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    trial_start: Mapped[date_type | None] = mapped_column(Date, nullable=True)
+    trial_end: Mapped[date_type | None] = mapped_column(Date, nullable=True)
 
 
 class TenantSettings(Base, TimestampedMixin):

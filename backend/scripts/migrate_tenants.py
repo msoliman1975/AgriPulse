@@ -50,7 +50,7 @@ def _list_tenants(only_slug: str | None) -> list[TenantRecord]:
               FROM public.tenants
              WHERE deleted_at IS NULL
                AND status <> 'archived'
-               AND (:only IS NULL OR slug = :only)
+               AND (CAST(:only AS text) IS NULL OR slug = CAST(:only AS text))
              ORDER BY created_at
             """
         )

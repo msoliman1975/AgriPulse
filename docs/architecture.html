@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MissionAgre — Architecture</title>
+<style>
+  :root{
+    --bg:#0e1116; --surface:#161b22; --surface-2:#1c232c; --border:#2a323d;
+    --text:#e6edf3; --muted:#9aa4b2; --accent:#7ee787; --accent-2:#79c0ff;
+    --warn:#f0883e; --danger:#f85149; --code:#c9d1d9;
+    --tenant:#a371f7; --public:#79c0ff; --mixed:#d2a8ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent-2)}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+  header.hero{
+    border:1px solid var(--border);border-radius:12px;
+    background:linear-gradient(135deg,#1c2330,#11161d);
+    padding:28px 28px 24px;margin-bottom:28px
+  }
+  header.hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.4px}
+  header.hero .sub{color:var(--muted);font-size:14px}
+  header.hero .meta{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;color:var(--muted);font-size:12.5px}
+  header.hero .meta b{color:var(--text);font-weight:600}
+  nav.toc{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 16px;
+    margin:18px 0 0;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface)
+  }
+  nav.toc a{display:block;padding:4px 0;color:var(--text);text-decoration:none;font-size:13px}
+  nav.toc a:hover{color:var(--accent-2)}
+  nav.toc a::before{content:"›";color:var(--muted);margin-right:8px}
+  section{margin:36px 0}
+  section > h2{
+    font-size:20px;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px
+  }
+  section > h2 .num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:6px;background:var(--surface-2);
+    color:var(--accent);font-size:12.5px;font-weight:700;border:1px solid var(--border)
+  }
+  h3{font-size:15px;margin:22px 0 8px;color:var(--text)}
+  p{margin:8px 0}
+  .muted{color:var(--muted)}
+  .grid{display:grid;gap:14px}
+  .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .grid.cols-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px
+  }
+  .card h4{margin:0 0 6px;font-size:13.5px;letter-spacing:.2px;color:var(--accent)}
+  .card .body{font-size:13px;color:var(--muted)}
+  .card .body b{color:var(--text);font-weight:600}
+  ul.tight{margin:6px 0 0 18px;padding:0}
+  ul.tight li{margin:3px 0}
+  .pill{
+    display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;
+    background:var(--surface-2);border:1px solid var(--border);color:var(--muted);margin-right:4px
+  }
+  .pill.public{color:var(--public);border-color:#1f3a5a}
+  .pill.tenant{color:var(--tenant);border-color:#3b2a5e}
+  .pill.mixed{color:var(--mixed);border-color:#3a2c52}
+  .pill.warn{color:var(--warn);border-color:#5a3a18}
+  .pill.ok{color:var(--accent);border-color:#1f4429}
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tbody tr:hover{background:var(--surface)}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--code)}
+  code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:12.5px}
+  pre{
+    background:#0b0f14;border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;margin:10px 0;overflow:auto;font-size:12.5px;line-height:1.5
+  }
+  /* layered-architecture diagram */
+  .stack-diagram{display:grid;gap:10px;margin:10px 0}
+  .layer{
+    border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);
+    position:relative
+  }
+  .layer h5{margin:0 0 6px;font-size:13px;color:var(--accent-2);letter-spacing:.2px}
+  .layer .row{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+    padding:6px 10px;font-size:12.5px
+  }
+  .chip b{color:var(--text)}
+  .chip span{color:var(--muted)}
+  .arrow{
+    text-align:center;color:var(--muted);font-size:18px;line-height:1
+  }
+  /* module grid */
+  .modules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .module{
+    border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--surface);
+    display:flex;flex-direction:column;gap:6px
+  }
+  .module .name{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .module .name b{font-size:13.5px}
+  .module .desc{font-size:12.5px;color:var(--muted)}
+  /* request flow */
+  .flow{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0
+  }
+  .flow .step{
+    border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface);
+    font-size:12.5px;color:var(--muted)
+  }
+  .flow .step b{display:block;color:var(--text);font-size:13px;margin-bottom:2px}
+  /* RBAC table accents */
+  .role-tag{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--accent-2)}
+  /* footnote / callout */
+  .callout{
+    border-left:3px solid var(--accent);background:rgba(126,231,135,.05);
+    padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;margin:10px 0
+  }
+  .callout.warn{border-color:var(--warn);background:rgba(240,136,62,.06)}
+  .callout.danger{border-color:var(--danger);background:rgba(248,81,73,.06)}
+  footer{color:var(--muted);font-size:12.5px;margin-top:48px;border-top:1px solid var(--border);padding-top:16px}
+  @media print{
+    body{background:#fff;color:#111}
+    .card,.layer,.module,.chip,.flow .step,nav.toc,header.hero{
+      background:#fff !important;border-color:#ccc !important;color:#111 !important
+    }
+    a{color:#0366d6}
+    pre{background:#f6f8fa;color:#24292e}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>MissionAgre — Platform Architecture</h1>
+  <div class="sub">Multi-tenant satellite-driven farm management SaaS for Egyptian agribusinesses.</div>
+  <div class="meta">
+    <span><b>Repo:</b> msoliman1975/MissionAgre</span>
+    <span><b>Region:</b> AWS me-south-1 (Bahrain)</span>
+    <span><b>MVP target:</b> 1–3 tenants, 6-week build</span>
+    <span><b>Year-3 target:</b> ~500 tenants, ~25K blocks</span>
+    <span><b>Source of truth:</b> docs/ARCHITECTURE.md, docs/data_model.md</span>
+  </div>
+
+  <nav class="toc">
+    <a href="#overview">1. Overview & pillars</a>
+    <a href="#stack">2. Technology stack</a>
+    <a href="#layout">3. Repository layout</a>
+    <a href="#runtime">4. Runtime topology</a>
+    <a href="#tenancy">5. Tenancy model</a>
+    <a href="#modules">6. Backend modules</a>
+    <a href="#rbac">7. RBAC</a>
+    <a href="#api">8. API conventions</a>
+    <a href="#imagery">9. Imagery pipeline</a>
+    <a href="#alerts">10. Alerts & recommendations</a>
+    <a href="#data">11. Data model</a>
+    <a href="#frontend">12. Frontend</a>
+    <a href="#deploy">13. Deployment & CI/CD</a>
+    <a href="#observability">14. Observability</a>
+    <a href="#oos">15. Out of scope</a>
+  </nav>
+</header>
+
+<!-- 1. OVERVIEW -->
+<section id="overview">
+  <h2><span class="num">1</span> Overview &amp; pillars</h2>
+  <p>
+    MissionAgre is a cloud-native SaaS that lets commercial agribusinesses in Egypt monitor crop health,
+    irrigation, and weather using satellite imagery, weather forecasts, and custom signals; with rules-based
+    alerting and explainable agronomic recommendations. The platform is a <b>modular monolith</b> backend
+    plus a single-page web frontend and a dedicated tile server, deployed on Kubernetes.
+  </p>
+
+  <div class="grid cols-3">
+    <div class="card"><h4>Multi-tenant</h4>
+      <div class="body">Bridge model: shared infra, <b>schema-per-tenant</b> in a single Postgres. Tenant resolved from JWT claim, never URL.</div></div>
+    <div class="card"><h4>Cloud-portable</h4>
+      <div class="body">Kubernetes (EKS), CloudNativePG, MinIO/S3 abstraction, no AWS-locked managed services in the core.</div></div>
+    <div class="card"><h4>Capability RBAC</h4>
+      <div class="body">Eight roles, three-layer scope resolution (platform → tenant → farm). Code uses <code>@requires_capability</code>.</div></div>
+    <div class="card"><h4>i18n + RTL</h4>
+      <div class="body">English + Arabic at launch, logical CSS, react-i18next, language &amp; unit preferences per user.</div></div>
+    <div class="card"><h4>Egypt-native</h4>
+      <div class="body">Feddan as primary unit, governorate geography, salinity-aware soil, Nile/canal/well water sources.</div></div>
+    <div class="card"><h4>Subscription</h4>
+      <div class="body">Manual invoicing in MVP; Stripe/Paymob in P2.</div></div>
+  </div>
+
+  <div class="callout">
+    <b>Binding rule.</b> Anything in this document that contradicts <code>docs/ARCHITECTURE.md</code> or
+    <code>docs/data_model.md</code> is wrong. New decisions go through ADRs in <code>docs/decisions/</code> first.
+  </div>
+</section>
+
+<!-- 2. STACK -->
+<section id="stack">
+  <h2><span class="num">2</span> Technology stack</h2>
+
+  <div class="stack-diagram">
+    <div class="layer">
+      <h5>Client</h5>
+      <div class="row">
+        <div class="chip"><b>React 18</b> <span>· TypeScript 5 · Vite</span></div>
+        <div class="chip"><b>Tailwind</b> <span>+ RTL plugin</span></div>
+        <div class="chip"><b>react-i18next</b></div>
+        <div class="chip"><b>MapLibre GL</b> <span>+ deck.gl</span></div>
+        <div class="chip"><b>Recharts</b></div>
+      </div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="layer">
+      <h5>Edge &amp; identity</h5>
+      <div class="row">
+        <div class="chip"><b>NGINX Ingress</b> <span>· cert-manager · WAF + Shield Std.</span></div>
+        <div class="chip"><b>Keycloak</b> <span>single realm · tenant_id JWT claim</span></div>
+      </div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="layer">
+      <h5>Application</h5>
+      <div class="row">
+        <div class="chip"><b>FastAPI</b> <span>Python 3.12 · Pydantic v2</span></div>
+        <div class="chip"><b>SQLAlchemy 2.x</b> <span>async · Alembic</span></div>
+        <div class="chip"><b>Celery 5.x</b> <span>light + heavy queues · Beat</span></div>
+        <div class="chip"><b>TiTiler</b> <span>COG → XYZ/WMTS</span></div>
+        <div class="chip"><b>SSE</b> <span>live alerts</span></div>
+      </div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="layer">
+      <h5>Data &amp; storage</h5>
+      <div class="row">
+        <div class="chip"><b>PostgreSQL 16</b> <span>PostGIS · TimescaleDB · pgstac · pgaudit</span></div>
+        <div class="chip"><b>Redis 7</b> <span>cache · Celery broker · SSE pub/sub</span></div>
+        <div class="chip"><b>S3-compatible</b> <span>boto3 · MinIO in dev</span></div>
+      </div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="layer">
+      <h5>Platform</h5>
+      <div class="row">
+        <div class="chip"><b>EKS</b> <span>dev · staging · production</span></div>
+        <div class="chip"><b>CloudNativePG</b> <span>primary + standby · PITR to S3</span></div>
+        <div class="chip"><b>ArgoCD</b> <span>GitOps · Helm per service</span></div>
+        <div class="chip"><b>External Secrets</b> <span>→ AWS Secrets Manager</span></div>
+        <div class="chip"><b>Prometheus · Loki · Tempo · Grafana · GlitchTip</b></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Deliberately rejected</h3>
+  <p class="muted">
+    Django/Flask, Mapbox GL JS, Mongo/DynamoDB/ClickHouse for primary storage, gRPC, Kafka/NATS,
+    OpenFGA/Cerbos/OPA, Auth0/Cognito, Apache Superset (MVP), Helm umbrella charts.
+    Reintroducing any of these requires an ADR.
+  </p>
+</section>
+
+<!-- 3. LAYOUT -->
+<section id="layout">
+  <h2><span class="num">3</span> Repository layout</h2>
+<pre>MissionAgre/
+├── backend/
+│   ├── app/
+│   │   ├── modules/         # one folder per module (§ 6)
+│   │   ├── shared/          # _shared/conditions, _shared/db, _shared/auth_utils
+│   │   ├── core/            # config, logging, observability, FastAPI app factory
+│   │   └── main.py
+│   ├── workers/             # light/, heavy/, beat/, tasks/, celery_factory.py
+│   ├── migrations/          # public/ + tenant/ (custom per-tenant runner)
+│   └── tests/               # unit · integration · e2e
+├── frontend/                # React 18 / TS / Vite — modules/, shared/, i18n/
+├── tile-server/             # TiTiler image with config overrides
+├── infra/
+│   ├── helm/                # api · workers · tile-server · frontend · keycloak · shared
+│   ├── argocd/              # ApplicationSet manifests
+│   ├── terraform/           # AWS bootstrap (VPC, EKS, S3, KMS)
+│   └── dev/                 # docker compose for local stateful services
+├── docs/                    # ARCHITECTURE.md, data_model.md, runbooks/, decisions/
+├── prompts/                 # Claude Code session prompts and roadmap
+├── scripts/
+└── .github/                 # workflows, CODEOWNERS, templates, Dependabot
+</pre>
+  <p class="muted">
+    Monorepo, single <code>main</code>, trunk-based development. Feature branches live &lt;2 days,
+    squash-merge into <code>main</code>. Each top-level folder owns its Dockerfile and CI job.
+  </p>
+</section>
+
+<!-- 4. RUNTIME -->
+<section id="runtime">
+  <h2><span class="num">4</span> Runtime topology</h2>
+
+  <h3>Components in a single cluster</h3>
+  <div class="grid cols-3">
+    <div class="card"><h4>frontend</h4><div class="body">Static React build served by NGINX, behind ingress.</div></div>
+    <div class="card"><h4>api</h4><div class="body">FastAPI app, autoscaled. Exposes <code>/api/v1</code> + SSE stream.</div></div>
+    <div class="card"><h4>workers (light)</h4><div class="body">Short Celery tasks: alert evaluation, notifications, audit fanout.</div></div>
+    <div class="card"><h4>workers (heavy)</h4><div class="body">Long Celery tasks: Sentinel Hub fetch, COG generation, index aggregation.</div></div>
+    <div class="card"><h4>beat</h4><div class="body">Single replica scheduler — imagery polling, 15-min alert evaluation, daily recommendations.</div></div>
+    <div class="card"><h4>tile-server</h4><div class="body">TiTiler reading COGs from S3, reprojecting UTM 36N → Web Mercator.</div></div>
+    <div class="card"><h4>postgres</h4><div class="body">CloudNativePG: 1 primary + 1 standby. PostGIS, TimescaleDB, pgstac, pgaudit.</div></div>
+    <div class="card"><h4>redis</h4><div class="body">Cache + Celery broker + SSE pub/sub (single instance, three roles).</div></div>
+    <div class="card"><h4>keycloak</h4><div class="body">Single realm, JWT issuer. Separate DB.</div></div>
+    <div class="card"><h4>object storage</h4><div class="body">S3 (prod) / MinIO (dev). COGs, exports, backups.</div></div>
+  </div>
+
+  <h3>Authenticated request lifecycle</h3>
+  <div class="flow">
+    <div class="step"><b>1. Ingress</b>NGINX terminates TLS, generates <code>X-Correlation-ID</code>, applies per-tenant rate limiting.</div>
+    <div class="step"><b>2. Auth</b>FastAPI middleware verifies Keycloak JWT, extracts <code>tenant_id</code> + scopes.</div>
+    <div class="step"><b>3. Tenant routing</b><code>SET LOCAL search_path TO tenant_&lt;id&gt;, public</code> on the request transaction.</div>
+    <div class="step"><b>4. Capability check</b><code>@requires_capability("…", farm_id=…)</code> resolves PlatformRole → TenantRole → FarmScope.</div>
+    <div class="step"><b>5. Module service</b>Domain logic via Protocol; cross-module via DI or in-proc event bus.</div>
+    <div class="step"><b>6. Persistence</b>SQLAlchemy 2 async; RLS as defense-in-depth on shared tables.</div>
+    <div class="step"><b>7. Async fanout</b>Sync handlers in-request; async handlers dispatched to Celery with correlation header.</div>
+    <div class="step"><b>8. Response</b>JSON / RFC 7807 problem; SSE for live alerts on <code>/api/v1/me/alerts/stream</code>.</div>
+  </div>
+</section>
+
+<!-- 5. TENANCY -->
+<section id="tenancy">
+  <h2><span class="num">5</span> Tenancy model</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>Schema layout</h4>
+      <div class="body">
+        <p><span class="pill public">public</span> shared catalogs, tenants, users, RBAC, pgstac.</p>
+        <p><span class="pill tenant">tenant_&lt;uuid&gt;</span> all tenant-owned data: farms, blocks, indices aggregates, alerts.</p>
+        <p>Cross-schema FKs are <b>logical</b>, not declarative — the app enforces them; a periodic consistency-check job logs orphans.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Resolution</h4>
+      <div class="body">
+        <p>Tenant resolved <b>only</b> from the JWT <code>tenant_id</code> claim. URL paths and query parameters are never authoritative.</p>
+        <p>FastAPI middleware sets <code>search_path</code> per transaction. RLS policies on shared tables that contain tenant FKs back this up.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Migrations</h3>
+  <p class="muted">
+    Two Alembic trees: <code>migrations/public/</code> for the shared schema and
+    <code>migrations/tenant/</code> applied per-tenant by a custom runner so new tenants get a clean schema and existing
+    tenants are upgraded in lock-step.
+  </p>
+</section>
+
+<!-- 6. MODULES -->
+<section id="modules">
+  <h2><span class="num">6</span> Backend modules</h2>
+
+  <p class="muted">
+    Modular monolith — twelve modules under <code>backend/app/modules/</code> (forecasting is out of scope for MVP).
+    Each module exposes only <code>service.py</code> (Protocol + impl) and <code>events.py</code> (versioned Pydantic events).
+    Cross-module imports of <code>repository</code>/<code>domain</code> are forbidden; <b>import-linter</b> enforces this in CI.
+    The single allowed shared layer is <code>app/shared/</code> (DB session helpers, auth utilities, the conditions library
+    used by both <code>alerts</code> and <code>recommendations</code>).
+  </p>
+
+  <div class="modules">
+    <div class="module"><div class="name"><b>iam</b><span class="pill public">public</span></div><div class="desc">Auth integration, RBAC enforcement, user CRUD.</div></div>
+    <div class="module"><div class="name"><b>tenancy</b><span class="pill public">public</span></div><div class="desc">Tenant context, schema routing, subscription state.</div></div>
+    <div class="module"><div class="name"><b>farms</b><span class="pill tenant">tenant</span></div><div class="desc">Farms, blocks, AOI, crop assignments, auto-grid blocking.</div></div>
+    <div class="module"><div class="name"><b>imagery</b><span class="pill mixed">mixed</span></div><div class="desc">Provider abstraction, STAC catalog (pgstac), raster ops, COG storage.</div></div>
+    <div class="module"><div class="name"><b>indices</b><span class="pill tenant">tenant</span></div><div class="desc">Index computation, hypertable aggregation jobs.</div></div>
+    <div class="module"><div class="name"><b>weather</b><span class="pill tenant">tenant</span></div><div class="desc">Provider integration, derived signals.</div></div>
+    <div class="module"><div class="name"><b>signals</b><span class="pill tenant">tenant</span></div><div class="desc">Custom user-defined signals (manual sensors / observations).</div></div>
+    <div class="module"><div class="name"><b>alerts</b><span class="pill tenant">tenant</span></div><div class="desc">Tier-2 compound rules, lifecycle, cooldown via uniqueness.</div></div>
+    <div class="module"><div class="name"><b>recommendations</b><span class="pill mixed">mixed</span></div><div class="desc">YAML decision-tree engine, explainable, daily evaluation.</div></div>
+    <div class="module"><div class="name"><b>analytics</b><span class="pill tenant">views</span></div><div class="desc">TimescaleDB continuous aggregates, dashboard endpoints.</div></div>
+    <div class="module"><div class="name"><b>notifications</b><span class="pill tenant">tenant</span></div><div class="desc">Email, in-app SSE, signed-HMAC webhooks.</div></div>
+    <div class="module"><div class="name"><b>audit</b><span class="pill tenant">tenant</span></div><div class="desc">Domain events + sensitive-data audit log (hypertable).</div></div>
+  </div>
+
+  <h3>Inter-module communication</h3>
+  <ul class="tight">
+    <li><b>Commands</b> (give me X, do Y): call the target module's service Protocol via DI.</li>
+    <li><b>Reactions</b> (X happened, multiple modules want to know): publish to the in-process event bus; sync handlers run in-request, async handlers dispatch through Celery.</li>
+  </ul>
+</section>
+
+<!-- 7. RBAC -->
+<section id="rbac">
+  <h2><span class="num">7</span> RBAC</h2>
+
+  <p>Capabilities are the unit of authorization, not roles. Capabilities live in
+    <code>backend/app/shared/rbac/capabilities.yaml</code>; role mappings in
+    <code>role_capabilities.yaml</code>. Code uses
+    <code>@requires_capability("alert.acknowledge", farm_id=…)</code> — never <code>if role == "…"</code>.</p>
+
+  <table>
+    <thead><tr><th>Role</th><th>Scope</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="role-tag">PlatformAdmin</span></td><td>Platform</td><td>Anthropic-equivalent: our team.</td></tr>
+      <tr><td><span class="role-tag">TenantOwner</span></td><td>Tenant</td><td>Customer super-admin, exactly one per tenant.</td></tr>
+      <tr><td><span class="role-tag">TenantAdmin</span></td><td>Tenant</td><td>Customer admin.</td></tr>
+      <tr><td><span class="role-tag">FarmManager</span></td><td>Farm</td><td>Manages farm + blocks.</td></tr>
+      <tr><td><span class="role-tag">Agronomist</span></td><td>Farm</td><td>Agronomic actions; cannot edit geometry.</td></tr>
+      <tr><td><span class="role-tag">FieldOperator</span></td><td>Farm</td><td>Operational records (irrigation, fertilization).</td></tr>
+      <tr><td><span class="role-tag">Scout</span></td><td>Farm</td><td>Observations + photos only.</td></tr>
+      <tr><td><span class="role-tag">Viewer</span></td><td>Farm</td><td>Read-only.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>JWT claim shape</h3>
+<pre>{
+  "sub": "&lt;user-uuid&gt;",
+  "tenant_id": "&lt;tenant-uuid&gt;",
+  "tenant_role": "TenantAdmin | null",
+  "platform_role": "PlatformAdmin | null",
+  "farm_scopes": [{ "farm_id": "&lt;uuid&gt;", "role": "FarmManager" }],
+  "preferred_language": "en | ar",
+  "preferred_unit": "feddan | acre | hectare"
+}</pre>
+  <p class="muted">Resolution order: PlatformRole → TenantRole → FarmScope (first match wins). Token TTL 15 min ⇒ revocation latency. Redis-backed scope lookup is a P2 upgrade.</p>
+</section>
+
+<!-- 8. API -->
+<section id="api">
+  <h2><span class="num">8</span> API conventions</h2>
+
+  <div class="grid cols-2">
+    <div class="card"><h4>Surface</h4><div class="body">REST + OpenAPI 3.x. All endpoints under <code>/api/v1/...</code>. SSE on <code>/api/v1/me/alerts/stream</code>. Tile server on <code>/tiles/{collection}/{z}/{x}/{y}.png</code>.</div></div>
+    <div class="card"><h4>Tenancy</h4><div class="body">Tenant <b>never</b> appears in URL or query — always from JWT. Per-request <code>SET LOCAL search_path</code>.</div></div>
+    <div class="card"><h4>Encoding</h4><div class="body">JSON keys snake_case. Timestamps RFC 3339. Areas in <code>m²</code> on the wire; client converts to feddan/acre/hectare for display.</div></div>
+    <div class="card"><h4>Pagination</h4><div class="body">Cursor-based — <code>?limit=50&amp;cursor=&lt;opaque&gt;</code>. No offset pagination.</div></div>
+    <div class="card"><h4>Errors</h4><div class="body">RFC 7807 <code>application/problem+json</code>.</div></div>
+    <div class="card"><h4>Idempotency</h4><div class="body">Optional <code>Idempotency-Key</code> header on state-changing endpoints, stored in Redis 24 h.</div></div>
+  </div>
+</section>
+
+<!-- 9. IMAGERY -->
+<section id="imagery">
+  <h2><span class="num">9</span> Imagery pipeline</h2>
+
+  <div class="grid cols-2">
+    <div class="card"><h4>Provider</h4><div class="body">Sentinel Hub Process API behind <code>SentinelHubProvider</code>. Adapter pattern leaves room for a future <code>Sentinel2OpenDataProvider</code> and <code>PlanetScopeProvider</code>.</div></div>
+    <div class="card"><h4>Indices</h4><div class="body"><b>Hybrid</b>: six standard indices (NDVI, NDWI, EVI, SAVI, NDRE, GNDVI) precomputed and stored as COGs + aggregated to TimescaleDB; custom indices computed on-demand.</div></div>
+    <div class="card"><h4>Storage / projection</h4><div class="body">COGs in object storage in UTM 36N (EPSG:32636); web tiles served in Web Mercator (EPSG:3857) by TiTiler reprojecting on the fly.</div></div>
+    <div class="card"><h4>STAC</h4><div class="body"><code>pgstac</code> inside the same Postgres instance — no separate STAC server.</div></div>
+    <div class="card"><h4>Cloud thresholds</h4><div class="body">60 % for visualization, 20 % for index aggregation; per-tenant overrides supported.</div></div>
+    <div class="card"><h4>Retention</h4><div class="body">90 days S3 Standard, then S3 Glacier Instant Retrieval via lifecycle rule.</div></div>
+    <div class="card"><h4>Idempotency</h4><div class="body">Deterministic asset IDs: <code>{provider}/{product}/{scene_id}/{aoi_hash}/{index_or_band}.tif</code>.</div></div>
+    <div class="card"><h4>Triggers</h4><div class="body">Celery Beat scheduled polling + on-demand refresh button. No webhooks in MVP.</div></div>
+  </div>
+
+  <h3>Pipeline stages</h3>
+  <div class="flow">
+    <div class="step"><b>Subscribe</b>API records imagery subscriptions for AOIs.</div>
+    <div class="step"><b>Poll</b>Beat polls Sentinel Hub by AOI/cadence.</div>
+    <div class="step"><b>Fetch</b>Heavy worker downloads scene, generates per-index COGs.</div>
+    <div class="step"><b>Catalog</b>Upserts STAC items in pgstac with deterministic IDs.</div>
+    <div class="step"><b>Aggregate</b>Computes per-block stats → TimescaleDB hypertable.</div>
+    <div class="step"><b>Serve</b>TiTiler streams tiles; API exposes scenes &amp; timeseries; frontend overlays on MapLibre.</div>
+  </div>
+</section>
+
+<!-- 10. ALERTS -->
+<section id="alerts">
+  <h2><span class="num">10</span> Alerts &amp; recommendations</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>Alerts</h4>
+      <div class="body">
+        <ul class="tight">
+          <li><b>Tier-2 compound rules</b> (AND/OR groups, time windows, deltas, trends). No arbitrary scripted rules.</li>
+          <li><b>Pull-based evaluation</b> every 15 min via Celery Beat.</li>
+          <li>Lifecycle: <code>open → acknowledged → resolved</code> (or <code>snoozed → open</code>, or <code>auto_resolved</code>).</li>
+          <li>Channels: in-app (SSE), email (SMTP), webhook (HMAC). <b>No SMS</b> until P2.</li>
+          <li>Cooldown enforced structurally by uniqueness of open alerts per <code>(rule, farm, block)</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Recommendations</h4>
+      <div class="body">
+        <ul class="tight">
+          <li>Hand-authored YAML decision trees per crop, versioned and immutable once published.</li>
+          <li><b>Daily per-block</b> evaluation — slower-moving than alerts.</li>
+          <li>Explainability mandatory: every recommendation carries <code>tree_path</code> plus <code>text_en</code>/<code>text_ar</code>.</li>
+          <li>Lifecycle: <code>open → applied | dismissed | deferred | expired</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Single source of truth.</b> The condition evaluator lives in
+    <code>backend/app/shared/conditions/</code> and is shared by <code>alerts</code> and
+    <code>recommendations</code>. Never reimplement.
+  </div>
+</section>
+
+<!-- 11. DATA MODEL -->
+<section id="data">
+  <h2><span class="num">11</span> Data model</h2>
+
+  <p class="muted">
+    Around 40 tables + 7 TimescaleDB hypertables + ~10 continuous aggregates / views, plus pgstac.
+    UUID v7 primary keys everywhere. Soft delete (<code>deleted_at</code>) is the default.
+    Areas in <b>m²</b> as <code>NUMERIC(14,2)</code> — never store <code>area_feddan</code> / <code>area_acre</code> / <code>area_ha</code>.
+    Geometries in WGS84 (4326); a parallel <code>geometry_utm</code> column holds UTM 36N for area math.
+  </p>
+
+  <table>
+    <thead><tr><th>§</th><th>Module</th><th>Schema</th><th>Tables</th><th>Hypertables</th><th>Notable extensions</th></tr></thead>
+    <tbody>
+      <tr><td>3</td><td>tenancy</td><td><span class="pill public">public</span></td><td>3</td><td>0</td><td>—</td></tr>
+      <tr><td>4</td><td>iam</td><td><span class="pill public">public</span></td><td>6</td><td>0</td><td>—</td></tr>
+      <tr><td>5</td><td>farms</td><td><span class="pill tenant">tenant</span></td><td>7</td><td>0</td><td>PostGIS</td></tr>
+      <tr><td>6</td><td>imagery</td><td><span class="pill mixed">mixed</span></td><td>4</td><td>0</td><td>pgstac</td></tr>
+      <tr><td>7</td><td>indices</td><td><span class="pill tenant">tenant</span></td><td>2</td><td>1</td><td>TimescaleDB</td></tr>
+      <tr><td>8</td><td>weather</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>2</td><td>TimescaleDB</td></tr>
+      <tr><td>9</td><td>signals</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>1</td><td>TimescaleDB</td></tr>
+      <tr><td>10</td><td>alerts</td><td><span class="pill tenant">tenant</span></td><td>5</td><td>1</td><td>—</td></tr>
+      <tr><td>11</td><td>recommendations</td><td><span class="pill mixed">mixed</span></td><td>4</td><td>1</td><td>—</td></tr>
+      <tr><td>12</td><td>notifications</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>0</td><td>—</td></tr>
+      <tr><td>13</td><td>audit</td><td><span class="pill tenant">tenant</span></td><td>2</td><td>1</td><td>TimescaleDB · pgaudit</td></tr>
+      <tr><td>14</td><td>analytics</td><td><span class="pill tenant">views</span></td><td>0</td><td>—</td><td>continuous aggregates</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Conventions</h3>
+  <ul class="tight">
+    <li>Tables <code>snake_case_plural</code>, columns <code>snake_case_singular</code>, FKs <code>&lt;table_singular&gt;_id</code>.</li>
+    <li>Booleans <code>is_*</code> / <code>has_*</code>. Timestamps <code>&lt;verb&gt;_at</code>.</li>
+    <li>Enums stored as <code>TEXT</code> with a <code>CHECK</code> constraint, not native PG <code>ENUM</code>.</li>
+    <li>Audit columns on every domain table: <code>created_at/by</code>, <code>updated_at/by</code> (trigger-maintained), <code>deleted_at</code>.</li>
+    <li>Hypertable chunk interval: 7 days (high-volume), 30 days (low-volume); compression after 30 days.</li>
+    <li>Reference enum source of truth: <code>public.reference_enums</code>.</li>
+  </ul>
+</section>
+
+<!-- 12. FRONTEND -->
+<section id="frontend">
+  <h2><span class="num">12</span> Frontend</h2>
+
+  <div class="grid cols-2">
+    <div class="card"><h4>Structure</h4><div class="body">
+      <code>src/modules/*</code> mirrors backend modules (currently <code>farms</code>, <code>imagery</code>, <code>indices</code>);
+      <code>shell/</code> for app chrome, <code>auth/</code> for OIDC handoff, <code>rbac/</code> for capability gates,
+      <code>prefs/</code> for user preferences, <code>i18n/</code> for locale namespaces.
+    </div></div>
+    <div class="card"><h4>Map &amp; charts</h4><div class="body">
+      MapLibre GL + deck.gl for AOI/blocks and tile overlays from the tile-server; Recharts for index trend lines and time series.
+    </div></div>
+    <div class="card"><h4>i18n / RTL</h4><div class="body">
+      react-i18next with JSON namespaces per module, lazy-loaded. Root <code>dir="rtl"</code> toggle, logical CSS properties
+      (<code>margin-inline-start</code> not <code>margin-left</code>), Tailwind RTL plugin. Western (0–9) numerals; Gregorian only.
+      Crops carry both <code>name_en</code> and <code>name_ar</code> as data, not translations.
+    </div></div>
+    <div class="card"><h4>State</h4><div class="body">
+      Server cache via <code>api/</code> hooks; SSE channel for live alerts; user prefs in <code>prefs/</code> drive the unit toggle (m² → feddan/acre/ha) at the presentation layer only.
+    </div></div>
+  </div>
+</section>
+
+<!-- 13. DEPLOY -->
+<section id="deploy">
+  <h2><span class="num">13</span> Deployment &amp; CI/CD</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>CI — GitHub Actions</h4>
+      <div class="body">
+        <ul class="tight">
+          <li><b>pre-commit</b> — repo-wide hooks (ruff, black, prettier, gitleaks, …).</li>
+          <li><b>backend</b> — <code>uv sync --frozen</code>, ruff, black, mypy, import-linter, pytest (unit + integration).</li>
+          <li><b>frontend</b> — <code>pnpm install --frozen-lockfile</code>, eslint, tsc, prettier, vitest, build.</li>
+          <li><b>helm</b> — <code>helm dependency build</code> + lint + template per chart.</li>
+          <li><b>infra-tf</b> — <code>terraform fmt</code> + <code>init -backend=false</code> + <code>validate</code>.</li>
+          <li><b>containers</b> — matrix build of <code>api</code>, <code>workers</code>, <code>tile-server</code>, <code>frontend</code>; merge to <code>main</code> pushes <code>ghcr.io/msoliman1975/missionagre/&lt;name&gt;:&lt;sha&gt;</code> + <code>latest</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h4>CD — ArgoCD</h4>
+      <div class="body">
+        <p>ArgoCD reads Helm charts in <code>infra/helm/*</code> and ApplicationSets in <code>infra/argocd/*</code>.
+          A follow-up PR (<code>argocd-sync.yml</code>) bumps <code>image.tag</code> in the dev overlay after every successful main build.</p>
+        <p>GitHub Environments: <b>dev</b> (auto), <b>staging</b> (auto + smoke tests), <b>production</b> (manual approval).</p>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Branching</h4>
+      <div class="body">
+        Trunk-based off <code>main</code>. Conventional Commits.
+        Branch protection: PR review, all checks green, linear history (squash-only),
+        conversations resolved, no force-push.
+      </div>
+    </div>
+    <div class="card">
+      <h4>Local dev</h4>
+      <div class="body">
+        Stateful deps (Postgres, Redis, Keycloak, MinIO) via <code>infra/dev/compose.yaml</code>.
+        Application code (Python, React) runs natively on host. See ADR 0002.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 14. OBSERVABILITY -->
+<section id="observability">
+  <h2><span class="num">14</span> Observability</h2>
+
+  <div class="grid cols-4">
+    <div class="card"><h4>Metrics</h4><div class="body">Prometheus + <code>prometheus-fastapi-instrumentator</code>; RED metrics on every endpoint and worker task.</div></div>
+    <div class="card"><h4>Logs</h4><div class="body">Structured JSON via <code>structlog</code> → Loki. Mandatory fields: timestamp, level, service, correlation_id, tenant_id, user_id (when known). No PII.</div></div>
+    <div class="card"><h4>Traces</h4><div class="body">OpenTelemetry auto-instrumentation for FastAPI, SQLAlchemy, Celery, requests, httpx → Tempo. Custom spans around index computation and alert evaluation.</div></div>
+    <div class="card"><h4>Errors</h4><div class="body">GlitchTip (open-source Sentry alternative). Single Grafana pane fronts metrics + logs + traces.</div></div>
+  </div>
+
+  <p class="muted">
+    Correlation ID generated at the NGINX ingress (<code>X-Correlation-ID</code>) and propagated through every internal call,
+    Celery task headers, and external HTTP requests. Log retention: 30 days hot in Loki, 90 days warm in S3, 1 year cold archive.
+  </p>
+</section>
+
+<!-- 15. OUT OF SCOPE -->
+<section id="oos">
+  <h2><span class="num">15</span> Out of scope (MVP)</h2>
+  <div class="callout warn">
+    The following must not appear during MVP development without an explicit ADR:
+  </div>
+  <ul class="tight">
+    <li>Yield/harvest forecasting</li>
+    <li>Mobile offline-first app</li>
+    <li>IoT sensor ingestion (only manual signals in MVP)</li>
+    <li><code>ExternalAdvisor</code> cross-tenant role</li>
+    <li>Equipment, inventory, financial modules</li>
+    <li>Real billing engine (Stripe / Paymob)</li>
+    <li>Compliance reports (GlobalGAP, FSMA)</li>
+    <li>ML-based field auto-detection (only grid-based auto-blocking)</li>
+    <li>Higher-resolution imagery (Planet, Airbus)</li>
+    <li>SMS notifications</li>
+    <li>Apache Superset</li>
+    <li>Self-managed Sentinel-2 pipeline (only Sentinel Hub API in MVP)</li>
+  </ul>
+</section>
+
+<footer>
+  Generated from <code>docs/ARCHITECTURE.md</code>, <code>docs/data_model.md</code>, <code>README.md</code>,
+  and the current state of <code>backend/</code>, <code>frontend/</code>, and <code>infra/</code>.
+  Standalone HTML — no external assets, no JavaScript. Open in any browser or print to PDF.
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "panel": {
+    "heading": "الطقس",
+    "description": "توقعات 5 أيام لـ {{farmName}} بتوقيت {{timezone}}.",
+    "descriptionFallback": "توقعات 5 أيام بتوقيت {{timezone}}.",
+    "loading": "جارٍ تحميل التوقعات…",
+    "empty": "لا توجد بيانات توقعات بعد — اشترك ثم حدِّث لجلب البيانات.",
+    "error": "تعذّر تحميل التوقعات: {{message}}",
+    "issuedAt": "صدرت التوقعات في {{date}}",
+    "neverIssued": "لم تصدر توقعات بعد",
+    "farmCaption": "بيانات الطقس مرتبطة بالمزرعة؛ جميع الحقول داخل نفس المزرعة تشترك في هذه التوقعات."
+  },
+  "day": {
+    "today": "اليوم",
+    "tomorrow": "غدًا",
+    "high": "العظمى",
+    "low": "الصغرى",
+    "precip": "الأمطار",
+    "precipChance": "احتمال"
+  },
+  "refresh": {
+    "button": "تحديث الطقس",
+    "busy": "جارٍ التحديث…",
+    "queued": "تم إرسال طلب جلب الطقس",
+    "noActive": "لا توجد اشتراكات نشطة لتحديثها.",
+    "denied": "ليس لديك صلاحية لتحديث الطقس."
+  },
+  "subscriptions": {
+    "heading": "اشتراكات الطقس",
+    "empty": "لا توجد اشتراكات على هذا الحقل بعد.",
+    "subscribeButton": "اشترك في Open-Meteo",
+    "subscribing": "جارٍ الاشتراك…",
+    "revokeButton": "إلغاء",
+    "revoking": "جارٍ الإلغاء…",
+    "providerLabel": "المزود",
+    "createdAt": "تم الاشتراك في {{date}}",
+    "lastIngest": "آخر جلب ناجح: {{date}}",
+    "neverIngested": "آخر جلب ناجح: لا يوجد",
+    "alreadySubscribed": "يوجد اشتراك نشط لهذا المزود بالفعل.",
+    "denied": "ليس لديك صلاحية لإدارة الاشتراكات."
+  },
+  "providers": {
+    "open_meteo": "Open-Meteo"
+  }
+}

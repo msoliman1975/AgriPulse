@@ -100,6 +100,45 @@ class Settings(BaseSettings):
     sentinel_hub_catalog_url: str = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/search"
     sentinel_hub_process_url: str = "https://services.sentinel-hub.com/api/v1/process"
 
+    # --- Open-Meteo (weather provider) -----------------------------------
+    # Free public endpoints; no auth required. Override via env if you
+    # ever stand up the commercial / self-hosted variant.
+    open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
+    open_meteo_archive_url: str = "https://archive-api.open-meteo.com/v1/archive"
+
+    # Default cadence applied when `weather_subscriptions.cadence_hours`
+    # is NULL. 3h x 24h/day = 8 fetches/farm/day, comfortably under
+    # Open-Meteo's free-tier 10k req/day cap even with hundreds of farms.
+    weather_default_cadence_hours: int = 3
+
+    # Hour counts the ingestion task asks the provider for per fetch.
+    # 48h past covers two days of "observations" (Open-Meteo updates the
+    # past hourly model output every cycle, so re-fetching past entries
+    # corrects them); 120h forecast = 5 days, the agronomy sweet spot.
+    weather_past_hours: int = 48
+    weather_forecast_hours: int = 120
+
+    # Sweep cadence for the Beat task that walks active subscriptions
+    # and enqueues `weather.fetch_weather`. 15 min in dev so a fresh
+    # subscription returns observations within one Beat cycle.
+    weather_discover_active_subscriptions_seconds: int = 900
+
+    # Cadence for `indices.recompute_baselines_sweep`. Weekly in
+    # production; one hour in dev so a fresh tenant sees baselines
+    # land within a Beat cycle of getting their first imagery scenes.
+    indices_baseline_recompute_seconds: int = 3600
+
+    # Cadence for `alerts.evaluate_alerts_sweep`. Nightly in production;
+    # 30 minutes in dev so a freshly-ingested scene flips into alerts
+    # within one Beat cycle.
+    alerts_evaluate_sweep_seconds: int = 1800
+
+    # Cadence for `irrigation.generate_sweep`. Once per day suffices
+    # in production (recommendations target a calendar day); hourly in
+    # dev for fast iteration. The partial UNIQUE on schedules keeps
+    # re-runs within the same day from duplicating.
+    irrigation_generate_sweep_seconds: int = 3600
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md § 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`

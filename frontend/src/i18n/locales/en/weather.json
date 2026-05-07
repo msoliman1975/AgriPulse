@@ -1,0 +1,45 @@
+{
+  "panel": {
+    "heading": "Weather",
+    "description": "5-day forecast for {{farmName}} in {{timezone}}.",
+    "descriptionFallback": "5-day forecast in {{timezone}}.",
+    "loading": "Loading forecast…",
+    "empty": "No forecast data yet — subscribe and refresh to fetch.",
+    "error": "Could not load forecast: {{message}}",
+    "issuedAt": "Forecast issued {{date}}",
+    "neverIssued": "No forecast issuance yet",
+    "farmCaption": "Weather data is keyed at the farm level; every block on the same farm shares this forecast."
+  },
+  "day": {
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "high": "High",
+    "low": "Low",
+    "precip": "Precip",
+    "precipChance": "Chance"
+  },
+  "refresh": {
+    "button": "Refresh weather",
+    "busy": "Triggering refresh…",
+    "queued": "Queued weather fetch",
+    "noActive": "No active subscriptions to refresh.",
+    "denied": "You do not have permission to trigger weather refresh."
+  },
+  "subscriptions": {
+    "heading": "Weather subscriptions",
+    "empty": "No subscriptions on this block yet.",
+    "subscribeButton": "Subscribe to Open-Meteo",
+    "subscribing": "Subscribing…",
+    "revokeButton": "Revoke",
+    "revoking": "Revoking…",
+    "providerLabel": "Provider",
+    "createdAt": "Subscribed {{date}}",
+    "lastIngest": "Last successful: {{date}}",
+    "neverIngested": "Last successful: never",
+    "alreadySubscribed": "An active subscription for this provider already exists.",
+    "denied": "You do not have permission to manage subscriptions."
+  },
+  "providers": {
+    "open_meteo": "Open-Meteo"
+  }
+}

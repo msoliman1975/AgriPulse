@@ -19,14 +19,16 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "workers.tasks",
     "app.modules.audit",
     "app.modules.notifications",
-    "app.modules.alerts",
     "app.modules.recommendations",
-    "app.modules.indices",
     # Celery's `include=` imports the literal module name — packages are
     # NOT recursed. Point at the submodule that owns the @shared_task
     # decorators so Beat-dispatched tasks resolve on workers.
     "app.modules.imagery.tasks",
+    "app.modules.indices.tasks",
+    "app.modules.weather.tasks",
     "app.modules.farms.tasks",
+    "app.modules.alerts.tasks",
+    "app.modules.irrigation.tasks",
 )
 
 

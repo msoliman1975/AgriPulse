@@ -48,6 +48,8 @@ from app.modules.farms.schemas import (
     FarmMemberResponse,
     FarmResponse,
     FarmUpdateRequest,
+    GrowthStageLogResponse,
+    GrowthStageTransitionRequest,
 )
 from app.modules.farms.service import FarmService, get_farm_service
 from app.shared.auth.context import RequestContext
@@ -264,6 +266,9 @@ async def create_block(
         responsible_user_id=payload.responsible_user_id,
         notes=payload.notes,
         tags=payload.tags,
+        unit_type=payload.unit_type,
+        parent_unit_id=payload.parent_unit_id,
+        irrigation_geometry=payload.irrigation_geometry,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         preferred_unit=context.preferred_unit,
@@ -475,6 +480,66 @@ async def list_block_crops(
         raise BlockNotFoundError(block_id)
 
     return await service.list_block_crops(block_id=block_id)
+
+
+# ---------- Growth-stage logs ----------------------------------------------
+
+
+@router.post(
+    "/blocks/{block_id}/growth-stages",
+    response_model=GrowthStageLogResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record a phenology transition for a block.",
+)
+async def record_growth_stage(
+    block_id: UUID,
+    payload: GrowthStageTransitionRequest,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    # crop_assignment.update is the closest existing capability — a stage
+    # change is editing the active assignment's growth state. The
+    # alerts/recs gates are too narrow; geometry capabilities are too broad.
+    if not has_capability(context, "crop_assignment.update", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+
+    return await service.record_growth_stage_transition(
+        block_id=block_id,
+        stage=payload.stage,
+        source=payload.source,
+        transition_date=payload.transition_date,
+        block_crop_id=payload.block_crop_id,
+        notes=payload.notes,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.get(
+    "/blocks/{block_id}/growth-stages",
+    response_model=list[GrowthStageLogResponse],
+    summary="List the phenology transition timeline for a block.",
+)
+async def list_growth_stages(
+    block_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.read", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+
+    return await service.list_growth_stage_logs(block_id=block_id)
 
 
 # ---------- Members ---------------------------------------------------------

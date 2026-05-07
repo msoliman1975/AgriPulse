@@ -17,6 +17,11 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.modules.indices.baselines import (
+    HistoryRow,
+    compute_baseline_deviation,
+    compute_block_baselines,
+)
 from app.modules.indices.repository import IndicesRepository
 from app.modules.indices.schemas import (
     IndexCatalogEntry,
@@ -60,6 +65,14 @@ class IndicesService(Protocol):
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
     ) -> None: ...
+
+    async def recompute_block_index_baselines(
+        self,
+        *,
+        block_id: UUID,
+        index_code: str,
+        window_days: int = 7,
+    ) -> int: ...
 
 
 class IndicesServiceImpl:
@@ -127,6 +140,21 @@ class IndicesServiceImpl:
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
     ) -> None:
+        # Baseline-deviation lookup: matched baseline row → z-score.
+        # Missing baseline (new block) or zero std (flat history) → NULL.
+        # The lookup is one indexed row per call; cheap.
+        baseline_deviation: Decimal | None = None
+        if mean is not None:
+            doy = time.timetuple().tm_yday
+            row = await self._repo.get_baseline(
+                block_id=block_id, index_code=index_code, day_of_year=doy
+            )
+            if row is not None:
+                baseline_deviation = compute_baseline_deviation(
+                    value=mean,
+                    baseline_mean=row["baseline_mean"],
+                    baseline_std=row["baseline_std"],
+                )
         await self._repo.upsert_aggregate_row(
             time=time,
             block_id=block_id,
@@ -143,7 +171,41 @@ class IndicesServiceImpl:
             valid_pixel_count=valid_pixel_count,
             total_pixel_count=total_pixel_count,
             cloud_cover_pct=cloud_cover_pct,
+            baseline_deviation=baseline_deviation,
         )
+
+    async def recompute_block_index_baselines(
+        self,
+        *,
+        block_id: UUID,
+        index_code: str,
+        window_days: int = 7,
+    ) -> int:
+        """Recompute every DOY baseline for one (block, index) pair.
+
+        Returns the number of baseline rows written. Called by the
+        weekly Beat sweep; safe to invoke ad-hoc from a backfill
+        helper because the upsert is idempotent.
+        """
+        history = await self._repo.get_history_for_block_index(
+            block_id=block_id, index_code=index_code
+        )
+        rows = compute_block_baselines(
+            (HistoryRow(time=r["time"], mean=r["mean"]) for r in history),
+            window_days=window_days,
+        )
+        for row in rows:
+            await self._repo.upsert_baseline(
+                block_id=block_id,
+                index_code=index_code,
+                day_of_year=row.day_of_year,
+                baseline_mean=row.baseline_mean,
+                baseline_std=row.baseline_std,
+                sample_count=row.sample_count,
+                window_days=window_days,
+                years_observed=row.years_observed,
+            )
+        return len(rows)
 
 
 def get_indices_service(*, tenant_session: AsyncSession) -> IndicesService:

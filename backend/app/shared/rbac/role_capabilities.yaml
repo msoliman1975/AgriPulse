@@ -36,6 +36,7 @@ roles:
       - signal.read
       - alert.read
       - alert_rule.read
+      - plan.read
       - recommendation.read
       - decision_tree.read
       - analytics.read
@@ -81,6 +82,8 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather.refresh
+      - weather.subscription.manage
       - signal.read
       - signal.define
       - signal.record
@@ -90,6 +93,11 @@ roles:
       - alert.snooze
       - alert_rule.read
       - alert_rule.manage
+      - plan.read
+      - plan.manage
+      - plan_activity.complete
+      - irrigation.schedule.read
+      - irrigation.schedule.manage
       - recommendation.read
       - recommendation.act
       - decision_tree.read
@@ -140,6 +148,8 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather.refresh
+      - weather.subscription.manage
       - signal.read
       - signal.define
       - signal.record
@@ -149,6 +159,11 @@ roles:
       - alert.snooze
       - alert_rule.read
       - alert_rule.manage
+      - plan.read
+      - plan.manage
+      - plan_activity.complete
+      - irrigation.schedule.read
+      - irrigation.schedule.manage
       - recommendation.read
       - recommendation.act
       - decision_tree.read
@@ -196,6 +211,8 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather.refresh
+      - weather.subscription.manage
       - signal.read
       - signal.record
       - alert.read
@@ -203,6 +220,11 @@ roles:
       - alert.resolve
       - alert.snooze
       - alert_rule.read
+      - plan.read
+      - plan.manage
+      - plan_activity.complete
+      - irrigation.schedule.read
+      - irrigation.schedule.manage
       - recommendation.read
       - recommendation.act
       - irrigation.record
@@ -225,6 +247,7 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather.refresh
       - signal.read
       - signal.record
       - alert.read
@@ -232,6 +255,10 @@ roles:
       - alert.resolve
       - alert.snooze
       - alert_rule.read
+      - plan.read
+      - plan_activity.complete
+      - irrigation.schedule.read
+      - irrigation.schedule.manage
       - recommendation.read
       - recommendation.act
       - irrigation.record
@@ -257,6 +284,9 @@ roles:
       - signal.record
       - alert.read
       - alert.acknowledge
+      - plan.read
+      - plan_activity.complete
+      - irrigation.schedule.read
       - recommendation.read
       - irrigation.record
       - fertilization.record
@@ -277,6 +307,8 @@ roles:
       - signal.read
       - signal.record
       - alert.read
+      - plan.read
+      - irrigation.schedule.read
       - recommendation.read
       - scouting.record
       - notification.read_inbox
@@ -293,6 +325,8 @@ roles:
       - weather.read
       - signal.read
       - alert.read
+      - plan.read
+      - irrigation.schedule.read
       - recommendation.read
       - analytics.read
       - notification.read_inbox

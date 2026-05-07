@@ -188,7 +188,15 @@ capabilities:
   weather.read:
     description: View weather observations, forecasts, and derived signals.
     scope: farm
-    status: stub
+    status: active
+  weather.refresh:
+    description: Trigger an on-demand weather refresh for a block.
+    scope: farm
+    status: active
+  weather.subscription.manage:
+    description: Subscribe a block to a weather provider or revoke a subscription.
+    scope: farm
+    status: active
 
   # --- Custom signals --------------------------------------------------
   signal.read:
@@ -204,31 +212,55 @@ capabilities:
     scope: farm
     status: stub
 
+  # --- Vegetation plans ------------------------------------------------
+  plan.read:
+    description: View vegetation plans + scheduled activities.
+    scope: farm
+    status: active
+  plan.manage:
+    description: Create, edit, or archive vegetation plans + their activities.
+    scope: farm
+    status: active
+  plan_activity.complete:
+    description: Mark a scheduled activity as completed or skipped.
+    scope: farm
+    status: active
+
+  # --- Irrigation schedules --------------------------------------------
+  irrigation.schedule.read:
+    description: View model-driven irrigation recommendations.
+    scope: farm
+    status: active
+  irrigation.schedule.manage:
+    description: Generate / apply / skip irrigation recommendations.
+    scope: farm
+    status: active
+
   # --- Alerts ----------------------------------------------------------
   alert.read:
     description: View open and historical alerts.
     scope: farm
-    status: stub
+    status: active
   alert.acknowledge:
     description: Acknowledge an open alert.
     scope: farm
-    status: stub
+    status: active
   alert.resolve:
     description: Mark an alert resolved (with optional comment).
     scope: farm
-    status: stub
+    status: active
   alert.snooze:
     description: Snooze an alert for a defined window.
     scope: farm
-    status: stub
+    status: active
   alert_rule.read:
     description: View alert rule definitions.
     scope: farm
-    status: stub
+    status: active
   alert_rule.manage:
     description: Create, edit, or delete alert rules.
     scope: tenant
-    status: stub
+    status: active
 
   # --- Recommendations -------------------------------------------------
   recommendation.read:

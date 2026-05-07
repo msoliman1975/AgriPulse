@@ -157,7 +157,12 @@
     "submit": "Assign crop",
     "variety": "Variety",
     "noVariety": "— none —",
-    "back": "Back to farm"
+    "back": "Back to farm",
+    "unitType": {
+      "block": "Block",
+      "pivot": "Pivot",
+      "pivot_sector": "Pivot sector"
+    }
   },
   "autoGrid": {
     "heading": "Auto-grid blocks",

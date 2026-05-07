@@ -62,12 +62,18 @@ class IndicesRepository:
         valid_pixel_count: int,
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
+        baseline_deviation: Decimal | None = None,
     ) -> None:
         """Insert one row into block_index_aggregates; idempotent on rerun.
 
         ``valid_pixel_pct`` is GENERATED in the DB so we don't pass it.
         Conflict on the unique key is a no-op — re-running computation
         for the same scene must not produce a duplicate row.
+
+        ``baseline_deviation`` (PR-4) is the z-score against
+        ``block_index_baselines``; the service layer computes it
+        before calling here. NULL is fine for new blocks without
+        history.
         """
         await self._session.execute(
             text(
@@ -76,12 +82,12 @@ class IndicesRepository:
                     time, block_id, index_code, product_id,
                     mean, "min", "max", p10, p50, p90, std_dev,
                     valid_pixel_count, total_pixel_count,
-                    cloud_cover_pct, stac_item_id
+                    cloud_cover_pct, stac_item_id, baseline_deviation
                 ) VALUES (
                     :time, :block_id, :index_code, :product_id,
                     :mean, :min_value, :max_value, :p10, :p50, :p90, :std_dev,
                     :valid_pixel_count, :total_pixel_count,
-                    :cloud_cover_pct, :stac_item_id
+                    :cloud_cover_pct, :stac_item_id, :baseline_deviation
                 )
                 ON CONFLICT (time, block_id, index_code, product_id)
                 DO NOTHING
@@ -106,9 +112,141 @@ class IndicesRepository:
                 "total_pixel_count": total_pixel_count,
                 "cloud_cover_pct": cloud_cover_pct,
                 "stac_item_id": stac_item_id,
+                "baseline_deviation": baseline_deviation,
             },
         )
         await self._session.flush()
+
+    # ---- Baselines (PR-4) ----------------------------------------------
+
+    async def get_history_for_block_index(
+        self, *, block_id: UUID, index_code: str
+    ) -> tuple[dict[str, Any], ...]:
+        """Every aggregate row's (time, mean) for a (block, index) pair.
+
+        Used by the recompute task; volume is bounded by the imagery
+        ingestion cadence x block lifespan (~hundreds to a few thousand
+        rows per block-index over multiple years), which is fine to load
+        in memory for the rolling-window math.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT time, mean
+                        FROM block_index_aggregates
+                        WHERE block_id = :block_id
+                          AND index_code = :index_code
+                          AND mean IS NOT NULL
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id, "index_code": index_code},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def get_baseline(
+        self, *, block_id: UUID, index_code: str, day_of_year: int
+    ) -> dict[str, Any] | None:
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                    SELECT block_id, index_code, day_of_year,
+                           baseline_mean, baseline_std,
+                           sample_count, window_days, years_observed,
+                           computed_at
+                    FROM block_index_baselines
+                    WHERE block_id = :block_id
+                      AND index_code = :index_code
+                      AND day_of_year = :doy
+                    """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id, "index_code": index_code, "doy": day_of_year},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def upsert_baseline(
+        self,
+        *,
+        block_id: UUID,
+        index_code: str,
+        day_of_year: int,
+        baseline_mean: Decimal,
+        baseline_std: Decimal,
+        sample_count: int,
+        window_days: int,
+        years_observed: int,
+    ) -> None:
+        """Insert or replace one baseline row.
+
+        ``ON CONFLICT (block_id, index_code, day_of_year) DO UPDATE``
+        — the recompute task overwrites the previous values, including
+        when the smoothing window changes.
+        """
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO block_index_baselines (
+                    block_id, index_code, day_of_year,
+                    baseline_mean, baseline_std,
+                    sample_count, window_days, years_observed,
+                    computed_at
+                ) VALUES (
+                    :block_id, :index_code, :doy,
+                    :mean, :std,
+                    :sample_count, :window_days, :years_observed,
+                    now()
+                )
+                ON CONFLICT (block_id, index_code, day_of_year) DO UPDATE SET
+                    baseline_mean = EXCLUDED.baseline_mean,
+                    baseline_std = EXCLUDED.baseline_std,
+                    sample_count = EXCLUDED.sample_count,
+                    window_days = EXCLUDED.window_days,
+                    years_observed = EXCLUDED.years_observed,
+                    computed_at = now()
+                """
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            {
+                "block_id": block_id,
+                "index_code": index_code,
+                "doy": day_of_year,
+                "mean": baseline_mean,
+                "std": baseline_std,
+                "sample_count": sample_count,
+                "window_days": window_days,
+                "years_observed": years_observed,
+            },
+        )
+
+    async def list_distinct_block_index_pairs(
+        self,
+    ) -> tuple[tuple[UUID, str], ...]:
+        """Every (block_id, index_code) combo with at least one aggregate.
+
+        Beat sweep iterates this list to recompute baselines per pair.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT DISTINCT block_id, index_code
+                    FROM block_index_aggregates
+                    WHERE mean IS NOT NULL
+                    """
+                )
+            )
+        ).all()
+        return tuple((row.block_id, row.index_code) for row in rows)
 
     async def get_timeseries(
         self,
