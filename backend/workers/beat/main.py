@@ -66,4 +66,14 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.irrigation_generate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Recommendations engine: walk every active block per tenant and
+    # evaluate every active decision tree against the latest signals.
+    # Idempotent on the partial UNIQUE `(block_id, tree_id) WHERE
+    # state='open'` — re-running while a prior recommendation is still
+    # open is a no-op.
+    "recommendations.evaluate_sweep": {
+        "task": "recommendations.evaluate_sweep",
+        "schedule": float(_settings.recommendations_evaluate_sweep_seconds),
+        "options": {"queue": "light"},
+    },
 }

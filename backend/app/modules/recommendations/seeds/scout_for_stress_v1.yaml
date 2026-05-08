@@ -1,0 +1,103 @@
+# scout_for_stress_v1 — recommend on-foot scouting when NDVI signals
+# stress on a block.
+#
+# Intentionally crop-agnostic (crop_code: null) — every leafy crop
+# benefits from the same baseline-deviation signal. The thresholds
+# match the alert thresholds (-1.5 σ critical, -0.5..-1.5 σ warning)
+# so an alert and a scouting recommendation surface together when the
+# block is in trouble.
+
+code: scout_for_stress_v1
+name_en: Scout for stress
+name_ar: فحص حقلي للإجهاد
+description_en: >-
+  When a block's NDVI drops below its own seasonal baseline, queue a
+  scouting visit. Critical priority for severe drops (≥1.5 σ); warning
+  priority for moderate drops (0.5..1.5 σ).
+description_ar: >-
+  عند انخفاض NDVI لحقل ما عن المعدل الموسمي الخاص به، حدّد زيارة فحص
+  حقلية. أولوية حرجة للانخفاضات الحادة (1.5 σ فأكثر) وتحذيرية للمتوسطة
+  (0.5..1.5 σ).
+
+crop_code: null
+applicable_regions: []
+
+root: root
+nodes:
+  root:
+    label_en: Is NDVI below its seasonal baseline?
+    label_ar: هل NDVI أقل من المعدل الموسمي؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right: -0.5
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the drop severe (≥ 1.5 σ)?
+    label_ar: هل الانخفاض حاد (≥ 1.5 انحراف معياري)؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right: -1.5
+    on_match: leaf_scout_critical
+    on_miss: leaf_scout_warning
+
+  leaf_scout_critical:
+    label_en: Severe stress — scout within 24h
+    label_ar: إجهاد حاد — فحص خلال 24 ساعة
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.85
+      valid_for_hours: 72
+      parameters:
+        priority: high
+        within_hours: 24
+      text_en: >-
+        Severe NDVI drop on this block. Schedule a field scouting visit
+        within 24 hours to identify the cause (water, pest, disease,
+        nutrition).
+      text_ar: >-
+        تراجع حاد في NDVI على هذا الحقل. حدّد زيارة فحص حقلية خلال 24
+        ساعة لتحديد السبب (ري، آفات، أمراض، تغذية).
+
+  leaf_scout_warning:
+    label_en: Moderate stress — scout within 72h
+    label_ar: إجهاد متوسط — فحص خلال 72 ساعة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        within_hours: 72
+      text_en: >-
+        NDVI is below the historical baseline. Add this block to your
+        next routine scouting round (within 72 hours).
+      text_ar: >-
+        NDVI أقل من المعدل التاريخي. أضف هذا الحقل إلى جولة الفحص
+        الروتينية التالية (خلال 72 ساعة).
+
+  leaf_no_action:
+    label_en: No action — NDVI within baseline
+    label_ar: لا إجراء — NDVI ضمن المعدل
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        NDVI is within the seasonal baseline; no scouting recommended at
+        this time.
+      text_ar: NDVI ضمن المعدل الموسمي؛ لا توصية بالفحص حاليًا.

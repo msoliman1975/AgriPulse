@@ -28,6 +28,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """App lifespan — startup and shutdown bookkeeping."""
     log = get_logger(__name__)
     log.info("app_startup", env=get_settings().app_env)
+    # Sync decision-tree YAML files into the public catalog so a fresh
+    # process picks up authored changes without a manual migration. The
+    # loader is idempotent — same content on disk → no DB writes.
+    try:
+        from app.modules.recommendations.loader import sync_from_disk
+        from app.shared.db.session import AsyncSessionLocal
+
+        factory = AsyncSessionLocal()
+        async with factory() as session:
+            await sync_from_disk(session)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("decision_trees_sync_failed", error=str(exc))
     try:
         yield
     finally:

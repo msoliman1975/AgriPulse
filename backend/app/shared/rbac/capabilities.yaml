@@ -266,15 +266,15 @@ capabilities:
   recommendation.read:
     description: View recommendations.
     scope: farm
-    status: stub
+    status: active
   recommendation.act:
     description: Apply, dismiss, or defer a recommendation.
     scope: farm
-    status: stub
+    status: active
   decision_tree.read:
     description: View decision tree definitions.
     scope: tenant
-    status: stub
+    status: active
   decision_tree.manage:
     description: Author or publish decision trees (platform-authored).
     scope: platform

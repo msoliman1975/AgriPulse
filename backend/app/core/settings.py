@@ -139,6 +139,13 @@ class Settings(BaseSettings):
     # re-runs within the same day from duplicating.
     irrigation_generate_sweep_seconds: int = 3600
 
+    # Cadence for `recommendations.evaluate_sweep`. Daily in production
+    # — decision trees consume slow-moving signals (NDVI baselines).
+    # Hourly in dev so a fresh aggregate triggers a recommendation
+    # within one Beat cycle. Partial UNIQUE on (block_id, tree_id)
+    # WHERE state='open' keeps re-runs idempotent.
+    recommendations_evaluate_sweep_seconds: int = 3600
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md § 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`
