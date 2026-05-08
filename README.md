@@ -1,6 +1,8 @@
 # MissionAgre
 
-Multi-tenant satellite-driven farm management SaaS for Egyptian agribusinesses.
+Multi-tenant satellite-driven farm management SaaS for Egyptian agribusinesses, branded **Agri.Pulse** in the UI.
+
+> New here? Read [`docs/onboarding.md`](docs/onboarding.md) — it walks you from `git clone` to "first sign-in works locally" in ~30 minutes, then points at the rest of this README for context.
 
 ## Read these first
 
@@ -13,15 +15,22 @@ Every change touches one of these. Read before opening a PR.
 
 The first two files are binding. If something you're about to write contradicts them, stop and open an ADR.
 
+## Status
+
+Slices 1–5 are shipped — farms, imagery + indices, weather, alerts + notifications, recommendations, signals, dashboards. Slice 6 (Polish) is in progress: i18n completeness, runbooks, e2e suite. See [`prompts/roadmap.md`](prompts/roadmap.md) for the deliverable list.
+
 ## Modules
 
-Each backend domain module gets its own reference doc once it ships. On-call runbooks live alongside.
+Backend domain modules and their on-call runbooks.
 
 | Module | Reference | Runbook |
 |---|---|---|
 | `farms` | [`docs/modules/farms.md`](docs/modules/farms.md) | [`docs/runbooks/farms.md`](docs/runbooks/farms.md) |
-
-Other modules (`imagery`, `indices`, `weather`, `signals`, `alerts`, `recommendations`, `notifications`, `analytics`, `audit`, `iam`, `tenancy`) ship in later prompts and will be added here as they land.
+| `imagery` + `indices` | (in `docs/ARCHITECTURE.md` § 5–7) | [`docs/runbooks/imagery-pipeline-failure.md`](docs/runbooks/imagery-pipeline-failure.md) |
+| `alerts` + `recommendations` | (data_model § 10–11) | [`docs/runbooks/alert-evaluator-stuck.md`](docs/runbooks/alert-evaluator-stuck.md) |
+| `notifications` | — | [`docs/runbooks/notifications.md`](docs/runbooks/notifications.md) |
+| `tenancy` + `iam` | (data_model § 3–4) | [`docs/runbooks/tenant-onboarding.md`](docs/runbooks/tenant-onboarding.md) · [`docs/runbooks/tenant-offboarding.md`](docs/runbooks/tenant-offboarding.md) |
+| Platform infra | — | [`docs/runbooks/postgres-failover.md`](docs/runbooks/postgres-failover.md) · [`docs/runbooks/keycloak-reset.md`](docs/runbooks/keycloak-reset.md) · [`docs/runbooks/local-stack-bootstrap.md`](docs/runbooks/local-stack-bootstrap.md) · [`docs/runbooks/deploy-aws.md`](docs/runbooks/deploy-aws.md) |
 
 ## Layout
 
