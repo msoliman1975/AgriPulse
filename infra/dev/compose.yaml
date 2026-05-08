@@ -118,6 +118,17 @@ services:
         echo "minio buckets ready: missionagre-imagery, missionagre-uploads"
     restart: "no"
 
+  # MailHog — local SMTP capture for the notifications email channel
+  # (PR-S4-D of Slice 4). Backend talks to :1025; visit :8025 in a
+  # browser to read what got sent.
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: missionagre-mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web UI
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:

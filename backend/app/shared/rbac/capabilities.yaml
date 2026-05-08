@@ -308,7 +308,11 @@ capabilities:
   notification.read_inbox:
     description: Read one's own in-app notification inbox.
     scope: tenant
-    status: stub
+    status: active
+  notification.write_inbox:
+    description: Mark one's own inbox items read or archived.
+    scope: tenant
+    status: active
   notification.manage_templates:
     description: Edit notification templates.
     scope: tenant

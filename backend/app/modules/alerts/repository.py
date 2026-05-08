@@ -306,9 +306,7 @@ class AlertsRepository:
         # `sets` entries are static SQL literals picked from the closed
         # set above; no caller-supplied identifiers reach the SQL.
         await self._tenant.execute(
-            text(
-                f"UPDATE alerts SET {', '.join(sets)} WHERE id = :id"  # noqa: S608
-            ).bindparams(
+            text(f"UPDATE alerts SET {', '.join(sets)} WHERE id = :id").bindparams(  # noqa: S608
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
             ),
@@ -350,6 +348,17 @@ class AlertsRepository:
             }
             for row in rows
         }
+
+    async def get_block_farm_id(self, *, block_id: UUID) -> UUID | None:
+        row = (
+            await self._tenant.execute(
+                text(
+                    "SELECT farm_id FROM blocks WHERE id = :block_id " "  AND deleted_at IS NULL"
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                {"block_id": block_id},
+            )
+        ).first()
+        return row.farm_id if row is not None else None
 
     async def get_block_crop_category(self, *, block_id: UUID) -> str | None:
         """Look up the block's *current* crop's category.

@@ -151,6 +151,26 @@ class Settings(BaseSettings):
     # never hard-codes the URL. Local dev: TiTiler on host port 8001.
     tile_server_base_url: str = "http://localhost:8001"
 
+    # --- SMTP (notifications email channel, PR-S4-D) ---------------------
+    # Local dev: MailHog from infra/dev/compose.yaml on localhost:1025
+    # (no auth, no TLS). Cluster envs override via ExternalSecret.
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = False
+    smtp_from: str = "Agri.Pulse <noreply@agripulse.local>"
+    smtp_timeout_seconds: float = 10.0
+
+    # --- Webhook channel (PR-S4-E) ---------------------------------------
+    # Per-tenant ``webhook_endpoint_url`` is the receiver URL; the HMAC
+    # secret in production resolves through KMS (the per-tenant
+    # ``webhook_signing_secret_kms_key`` row), but dev has no KMS — so
+    # ``webhook_dev_secret`` is the fallback when no KMS key is wired.
+    # Empty string disables the dev fallback (failed signature).
+    webhook_dev_secret: str = "dev-only-not-for-prod"
+    webhook_timeout_seconds: float = 5.0
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 

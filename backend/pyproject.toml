@@ -635,3 +635,22 @@ forbidden_modules = [
   "app.modules.forecasting.schemas",
 ]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+# `app.shared.conditions` is the public face of the condition language.
+# Modules consume it through the package root only; the evaluator,
+# models, and context internals are not stable cross-module API.
+name = "shared.conditions internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+]
+forbidden_modules = [
+  "app.shared.conditions.evaluator",
+  "app.shared.conditions.models",
+  "app.shared.conditions.context",
+  "app.shared.conditions.errors",
+]
+allow_indirect_imports = true

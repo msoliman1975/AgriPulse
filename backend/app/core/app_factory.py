@@ -102,6 +102,10 @@ def _register_module_routers(app: FastAPI) -> None:
     )
     from app.modules.indices.router import router as indices_router
     from app.modules.irrigation.router import router as irrigation_router
+    from app.modules.notifications.router import router as notifications_router
+    from app.modules.notifications.subscribers import (
+        register_subscribers as register_notifications_subscribers,
+    )
     from app.modules.plans.router import router as plans_router
     from app.modules.tenancy.router import router as tenancy_router
     from app.modules.weather.router import router as weather_router
@@ -116,8 +120,12 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(alerts_router)
     app.include_router(plans_router)
     app.include_router(irrigation_router)
+    app.include_router(notifications_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from
-    # farms and resets cached scenes accordingly.
-    register_imagery_subscribers(get_default_bus())
+    # farms and resets cached scenes accordingly. Notifications listens
+    # for AlertOpenedV1 and fans out per-channel dispatches.
+    bus = get_default_bus()
+    register_imagery_subscribers(bus)
+    register_notifications_subscribers(bus)

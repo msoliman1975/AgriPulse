@@ -107,6 +107,7 @@ roles:
       - analytics.read
       - analytics.export
       - notification.read_inbox
+      - notification.write_inbox
       - notification.manage_templates
       - audit.read
 
@@ -173,6 +174,7 @@ roles:
       - analytics.read
       - analytics.export
       - notification.read_inbox
+      - notification.write_inbox
       - notification.manage_templates
       - audit.read
 
@@ -183,6 +185,7 @@ roles:
       - subscription.read
       - subscription.manage
       - notification.read_inbox
+      - notification.write_inbox
 
   # ---- Farm-scoped ----------------------------------------------------
 
@@ -233,6 +236,7 @@ roles:
       - analytics.read
       - analytics.export
       - notification.read_inbox
+      - notification.write_inbox
 
   Agronomist:
     description: Agronomic decisions on an assigned farm; no geometry edits.
@@ -267,6 +271,7 @@ roles:
       - analytics.read
       - analytics.export
       - notification.read_inbox
+      - notification.write_inbox
 
   FieldOperator:
     description: Field operations and observation logging on an assigned farm.
@@ -293,6 +298,7 @@ roles:
       - scouting.record
       - analytics.read
       - notification.read_inbox
+      - notification.write_inbox
 
   Scout:
     description: Observation logging only on an assigned farm.
@@ -312,6 +318,7 @@ roles:
       - recommendation.read
       - scouting.record
       - notification.read_inbox
+      - notification.write_inbox
 
   Viewer:
     description: Read-only view of an assigned farm.
@@ -330,3 +337,4 @@ roles:
       - recommendation.read
       - analytics.read
       - notification.read_inbox
+      - notification.write_inbox

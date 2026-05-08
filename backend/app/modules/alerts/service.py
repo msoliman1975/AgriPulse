@@ -129,6 +129,7 @@ class AlertsServiceImpl:
         overrides = {o["rule_code"]: o for o in await self._repo.list_overrides()}
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
         crop_category = await self._repo.get_block_crop_category(block_id=block_id)
+        farm_id = await self._repo.get_block_farm_id(block_id=block_id)
         signals = BlockSignals(
             block_id=str(block_id),
             crop_category=crop_category,
@@ -190,6 +191,13 @@ class AlertsServiceImpl:
                     rule_code=candidate.rule_code,
                     severity=candidate.severity,
                     created_at=datetime.now(UTC),
+                    tenant_schema=tenant_schema,
+                    farm_id=farm_id,
+                    diagnosis_en=candidate.diagnosis_en,
+                    diagnosis_ar=candidate.diagnosis_ar,
+                    prescription_en=candidate.prescription_en,
+                    prescription_ar=candidate.prescription_ar,
+                    signal_snapshot=candidate.signal_snapshot,
                 )
             )
 

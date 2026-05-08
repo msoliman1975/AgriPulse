@@ -24,6 +24,9 @@ Predicate types currently supported:
 
   * ``baseline_deviation_below`` — ``signals.baseline_deviation < threshold``
   * ``baseline_deviation_between`` — ``low <= signals.baseline_deviation <= high``
+  * ``condition_tree`` — arbitrary tree from ``app.shared.conditions``;
+    delegates to its evaluator, which reads from a ``ConditionContext``
+    derived from the same ``BlockSignals`` snapshot.
 """
 
 from __future__ import annotations
@@ -32,6 +35,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
+
+from app.shared.conditions import ConditionContext
+from app.shared.conditions import evaluate as _evaluate_tree
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,11 +171,32 @@ def _predicate_baseline_deviation_between(
     return fired, snapshot
 
 
+def _predicate_condition_tree(
+    conditions: dict[str, Any], signals: BlockSignals
+) -> tuple[bool, dict[str, Any]]:
+    """Delegate to the shared condition-tree evaluator.
+
+    Rule body shape: ``{"type": "condition_tree", "tree": {...}}``. The
+    evaluator is permissive on malformed trees — returns ``(False, {})``
+    rather than raising — so a typo'd rule doesn't break a sweep.
+    """
+    tree = conditions.get("tree")
+    if not isinstance(tree, dict):
+        return False, {}
+    ctx = ConditionContext.from_block_signals(
+        block_id=signals.block_id,
+        crop_category=signals.crop_category,
+        latest_index_aggregates=signals.latest_index_aggregates,
+    )
+    return _evaluate_tree(tree, ctx)
+
+
 _PREDICATE_DISPATCH: dict[
     str, Callable[[dict[str, Any], BlockSignals], tuple[bool, dict[str, Any]]]
 ] = {
     "baseline_deviation_below": _predicate_baseline_deviation_below,
     "baseline_deviation_between": _predicate_baseline_deviation_between,
+    "condition_tree": _predicate_condition_tree,
 }
 
 
