@@ -9,7 +9,7 @@ from datetime import date as date_type
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.irrigation.errors import IrrigationScheduleNotFoundError
@@ -109,9 +109,13 @@ async def apply_or_skip(
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
     if payload.action == "apply" and payload.applied_volume_mm is None:
-        raise HTTPException(
+        from app.core.errors import APIError
+
+        raise APIError(
             status_code=status.HTTP_400_BAD_REQUEST,
+            title="Missing required field",
             detail="`applied_volume_mm` is required when action='apply'.",
+            type_="https://missionagre.io/problems/irrigation-missing-volume",
         )
     return await service.transition(
         schedule_id=schedule_id,

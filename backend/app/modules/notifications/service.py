@@ -21,6 +21,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.audit import AuditService, get_audit_service
 from app.modules.notifications.repository import NotificationsRepository
 
 
@@ -35,7 +36,9 @@ class NotificationsService(Protocol):
 
     async def get_inbox_item(self, *, item_id: UUID, user_id: UUID) -> dict[str, Any] | None: ...
 
-    async def transition_inbox_item(self, *, item_id: UUID, user_id: UUID, action: str) -> bool: ...
+    async def transition_inbox_item(
+        self, *, item_id: UUID, user_id: UUID, action: str, tenant_schema: str
+    ) -> bool: ...
 
 
 class NotificationsServiceImpl:
@@ -44,12 +47,14 @@ class NotificationsServiceImpl:
         *,
         tenant_session: AsyncSession,
         public_session: AsyncSession,
+        audit_service: AuditService | None = None,
     ) -> None:
         self._tenant = tenant_session
         self._public = public_session
         self._repo = NotificationsRepository(
             tenant_session=tenant_session, public_session=public_session
         )
+        self._audit = audit_service or get_audit_service()
 
     async def list_inbox(
         self, *, user_id: UUID, include_archived: bool = False, limit: int = 100
@@ -64,10 +69,25 @@ class NotificationsServiceImpl:
     async def get_inbox_item(self, *, item_id: UUID, user_id: UUID) -> dict[str, Any] | None:
         return await self._repo.get_inbox_item(item_id=item_id, user_id=user_id)
 
-    async def transition_inbox_item(self, *, item_id: UUID, user_id: UUID, action: str) -> bool:
-        return await self._repo.transition_inbox_item(
+    async def transition_inbox_item(
+        self, *, item_id: UUID, user_id: UUID, action: str, tenant_schema: str
+    ) -> bool:
+        changed = await self._repo.transition_inbox_item(
             item_id=item_id, user_id=user_id, action=action
         )
+        # Only emit an audit row when state actually flipped — re-marking
+        # an already-read item read is a UI no-op, not a meaningful event.
+        if changed:
+            await self._audit.record(
+                tenant_schema=tenant_schema,
+                event_type=f"notifications.inbox_{action}",
+                actor_user_id=user_id,
+                subject_kind="inbox_item",
+                subject_id=item_id,
+                farm_id=None,
+                details={"action": action},
+            )
+        return changed
 
 
 def get_notifications_service(

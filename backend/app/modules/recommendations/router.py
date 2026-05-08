@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,9 +135,13 @@ async def transition_recommendation(
         if v
     )
     if chosen != 1:
-        raise HTTPException(
+        from app.core.errors import APIError
+
+        raise APIError(
             status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid transition payload",
             detail="Exactly one of `apply`, `dismiss`, `defer_until` must be set.",
+            type_="https://missionagre.io/problems/recommendation-invalid-transition",
         )
     if payload.apply:
         action = "apply"
