@@ -43,7 +43,13 @@
   },
   "home": {
     "welcome": "Welcome",
-    "comingSoon": "Features coming soon."
+    "comingSoon": "Features coming soon.",
+    "noFarmsTitle": "No farms yet",
+    "noFarmsBody": "Create your first farm to start tracking blocks, imagery, alerts, and recommendations.",
+    "createFirstFarm": "Create your first farm"
+  },
+  "farmSwitcher": {
+    "newFarm": "+ New farm"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

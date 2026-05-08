@@ -12,6 +12,13 @@ vi.mock("@/api/farms", () => ({
   listFarms: vi.fn(() => Promise.resolve({ items: [], total: 0 })),
 }));
 
+// `useCapability` reads from `react-oidc-context` for JWT claims; default
+// to a no-claims user so the empty-state CTA stays hidden in the legacy
+// "Welcome / coming soon" assertion. Individual tests override.
+vi.mock("react-oidc-context", () => ({
+  useAuth: () => ({ user: null }),
+}));
+
 function renderWithProviders(node: ReactNode): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(

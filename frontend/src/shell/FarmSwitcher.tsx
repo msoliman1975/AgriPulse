@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { listFarms } from "@/api/farms";
+import { useCapability } from "@/rbac/useCapability";
 import { ChevronIcon } from "./icons";
 
 const PINNED_PREFIXES = ["/insights/", "/plan/", "/alerts/", "/reports/", "/config/"];
@@ -15,6 +17,8 @@ export function FarmSwitcher(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation("common");
+  const canCreateFarm = useCapability("farm.create");
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -62,7 +66,18 @@ export function FarmSwitcher(): ReactNode {
   };
 
   if (farms.length === 0) {
-    return <span className="text-sm text-ap-muted">No farms yet</span>;
+    if (canCreateFarm) {
+      return (
+        <button
+          type="button"
+          onClick={() => navigate("/farms/new")}
+          className="rounded-md bg-ap-primary px-2 py-1 text-sm font-medium text-white hover:bg-ap-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
+        >
+          {t("home.createFirstFarm")}
+        </button>
+      );
+    }
+    return <span className="text-sm text-ap-muted">{t("home.noFarmsTitle")}</span>;
   }
 
   return (
@@ -102,6 +117,21 @@ export function FarmSwitcher(): ReactNode {
               </button>
             );
           })}
+          {canCreateFarm ? (
+            <>
+              <div role="separator" className="my-1 border-t border-ap-line" />
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/farms/new");
+                }}
+                className="flex w-full items-center rounded-md px-3 py-2 text-start text-sm font-medium text-ap-primary hover:bg-ap-line/40"
+              >
+                {t("farmSwitcher.newFarm")}
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
