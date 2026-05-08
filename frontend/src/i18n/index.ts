@@ -15,6 +15,7 @@ import enAlerts from "./locales/en/alerts.json";
 import enRules from "./locales/en/rules.json";
 import enImageryWeatherConfig from "./locales/en/imageryWeatherConfig.json";
 import enAdmin from "./locales/en/admin.json";
+import enDecisionTrees from "./locales/en/decisionTrees.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -28,6 +29,7 @@ import arAlerts from "./locales/ar/alerts.json";
 import arRules from "./locales/ar/rules.json";
 import arImageryWeatherConfig from "./locales/ar/imageryWeatherConfig.json";
 import arAdmin from "./locales/ar/admin.json";
+import arDecisionTrees from "./locales/ar/decisionTrees.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -52,6 +54,7 @@ const resources = {
     rules: enRules,
     imageryWeatherConfig: enImageryWeatherConfig,
     admin: enAdmin,
+    decisionTrees: enDecisionTrees,
   },
   ar: {
     common: arCommon,
@@ -67,6 +70,7 @@ const resources = {
     rules: arRules,
     imageryWeatherConfig: arImageryWeatherConfig,
     admin: arAdmin,
+    decisionTrees: arDecisionTrees,
   },
 } as const;
 
@@ -92,6 +96,7 @@ void i18n
       "rules",
       "imageryWeatherConfig",
       "admin",
+      "decisionTrees",
     ],
     interpolation: { escapeValue: false },
     detection: {

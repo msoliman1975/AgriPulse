@@ -164,6 +164,15 @@ export function SideNav(): ReactNode {
           disabled={!hasFarm}
           activePathPrefix="/config/signals/"
         />
+        {isPlatformAdmin ? (
+          <SideNavItem
+            to={hasFarm ? `/config/decision-trees/${farmSegment}` : "#"}
+            label="Decision trees"
+            icon={<RecommendationsIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/config/decision-trees/"
+          />
+        ) : null}
         <SideNavItem
           to={hasFarm ? `/config/users/${farmSegment}` : "#"}
           label="Users & roles"

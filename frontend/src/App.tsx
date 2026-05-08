@@ -31,6 +31,9 @@ import { SignalsLogPage } from "@/modules/signals/pages/SignalsLogPage";
 import { RulesConfigPage } from "@/modules/config/pages/RulesConfigPage";
 import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherConfigPage";
 import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
+import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
+import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
+import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
 import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
@@ -94,6 +97,18 @@ export function App(): ReactNode {
               <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
               <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
               <Route path="/config/users/:farmId" element={<UsersConfigPage />} />
+              <Route
+                path="/config/decision-trees/:farmId"
+                element={<DecisionTreeListPage />}
+              />
+              <Route
+                path="/config/decision-trees/:farmId/new"
+                element={<DecisionTreeCreatePage />}
+              />
+              <Route
+                path="/config/decision-trees/:farmId/:code"
+                element={<DecisionTreeEditorPage />}
+              />
               {/* Platform admin tree — capability gate sits inside AdminLayout. */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="tenants" replace />} />
