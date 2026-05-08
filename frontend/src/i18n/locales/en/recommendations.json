@@ -1,0 +1,47 @@
+{
+  "page": {
+    "title": "Recommendations",
+    "subtitle": "Decision-tree outputs from the daily evaluator. Apply, dismiss, or defer.",
+    "loadFailed": "Failed to load recommendations.",
+    "emptyOpen": "Nothing recommended right now — the evaluator runs daily.",
+    "empty": "No recommendations in this view."
+  },
+  "tabs": {
+    "open": "Open",
+    "deferred": "Deferred",
+    "applied": "Applied",
+    "dismissed": "Dismissed",
+    "all": "All"
+  },
+  "tabsLabel": "Filter by state",
+  "row": {
+    "expiresIn": "expires {{when}}",
+    "deferredUntil": "deferred until {{when}}",
+    "confidence": "confidence {{percent}}%",
+    "explainShow": "Why this?",
+    "explainHide": "Hide reasoning"
+  },
+  "actions": {
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "defer24": "Defer 24h",
+    "defer24Title": "Defer for 24 hours"
+  },
+  "path": {
+    "match": "match",
+    "noMatch": "no match",
+    "leaf": "leaf"
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
+  },
+  "state": {
+    "open": "open",
+    "applied": "applied",
+    "dismissed": "dismissed",
+    "deferred": "deferred",
+    "expired": "expired"
+  }
+}

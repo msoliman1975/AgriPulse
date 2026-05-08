@@ -1,5 +1,6 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import {
@@ -11,6 +12,7 @@ import {
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useCreateSignalObservation,
@@ -20,6 +22,7 @@ import {
 
 export function SignalsLogPage(): ReactNode {
   const farmId = useActiveFarmId();
+  const { t } = useTranslation("signals");
   const canRecord = useCapability("signal.record", { farmId });
   const { data: defs, isLoading: defsLoading } = useSignalDefinitions();
   const [selectedDefId, setSelectedDefId] = useState<string | null>(null);
@@ -48,19 +51,15 @@ export function SignalsLogPage(): ReactNode {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">Signals log</h1>
-        <p className="mt-1 text-sm text-ap-muted">
-          Record manual observations from the field. They feed alerts and
-          recommendations and live in the dashboard.
-        </p>
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("log.title")}</h1>
+        <p className="mt-1 text-sm text-ap-muted">{t("log.subtitle")}</p>
       </header>
 
       {defsLoading ? (
         <Skeleton className="h-64 w-full rounded-xl" />
       ) : !defs || defs.length === 0 ? (
         <div className="rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
-          No signal definitions yet. Ask a tenant admin to define one in
-          Configuration → Signals.
+          {t("log.noDefinitions")}
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
@@ -71,7 +70,7 @@ export function SignalsLogPage(): ReactNode {
                   <button
                     type="button"
                     onClick={() => setSelectedDefId(d.id)}
-                    className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-ap-line/40 ${
+                    className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-ap-line/40 ${
                       selectedDefId === d.id
                         ? "bg-ap-primary-soft text-ap-primary"
                         : "text-ap-ink"
@@ -93,8 +92,7 @@ export function SignalsLogPage(): ReactNode {
                 <RecordForm key={selectedDef.id} defn={selectedDef} farmId={farmId} />
               ) : (
                 <div className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-muted">
-                  You need the <code className="font-mono">signal.record</code>{" "}
-                  capability on this farm to log observations.
+                  {t("log.missingCapability", { capability: "signal.record" })}
                 </div>
               )
             ) : null}
@@ -117,6 +115,7 @@ function RecordForm({
   defn: SignalDefinition;
   farmId: string;
 }): ReactNode {
+  const { t } = useTranslation("signals");
   const create = useCreateSignalObservation();
   const [valueText, setValueText] = useState("");
   const [valueBool, setValueBool] = useState(false);
@@ -139,7 +138,7 @@ function RecordForm({
       const latNum = Number.parseFloat(lat);
       const lonNum = Number.parseFloat(lon);
       if (Number.isNaN(latNum) || Number.isNaN(lonNum)) {
-        setError("Latitude and longitude must be numeric.");
+        setError(t("log.form.errorLatLon"));
         return;
       }
       payload.value_geopoint = { latitude: latNum, longitude: lonNum };
@@ -169,8 +168,7 @@ function RecordForm({
       setFile(null);
     } catch (err) {
       setUploading(false);
-      const message =
-        err instanceof Error ? err.message : "Failed to record observation.";
+      const message = err instanceof Error ? err.message : t("log.form.errorGeneric");
       setError(message);
     }
   };
@@ -182,8 +180,12 @@ function RecordForm({
     >
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
-        <Pill kind="info">{defn.value_kind}</Pill>
-        {defn.unit ? <span className="text-xs text-ap-muted">unit: {defn.unit}</span> : null}
+        <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
+        {defn.unit ? (
+          <span className="text-xs text-ap-muted">
+            {t("config.row.unit", { unit: defn.unit })}
+          </span>
+        ) : null}
       </div>
       <ValueInput
         defn={defn}
@@ -197,7 +199,7 @@ function RecordForm({
         setLon={setLon}
       />
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-ap-muted">Notes (optional)</span>
+        <span className="text-xs font-medium text-ap-muted">{t("log.form.notes")}</span>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -207,9 +209,7 @@ function RecordForm({
       </label>
       {defn.attachment_allowed ? (
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-ap-muted">
-            Photo (optional, max 20MB)
-          </span>
+          <span className="text-xs font-medium text-ap-muted">{t("log.form.photo")}</span>
           <input
             type="file"
             accept="image/*"
@@ -225,7 +225,11 @@ function RecordForm({
           disabled={create.isPending || uploading}
           className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
         >
-          {uploading ? "Uploading…" : create.isPending ? "Recording…" : "Record"}
+          {uploading
+            ? t("log.form.uploading")
+            : create.isPending
+              ? t("log.form.recording")
+              : t("log.form.record")}
         </button>
       </div>
     </form>
@@ -253,9 +257,16 @@ function ValueInput({
   lon: string;
   setLon: (v: string) => void;
 }): ReactNode {
+  const { t } = useTranslation("signals");
   if (defn.value_kind === "numeric") {
     return (
-      <Field label={`Value${defn.unit ? ` (${defn.unit})` : ""}`}>
+      <Field
+        label={
+          defn.unit
+            ? t("log.form.valueWithUnit", { unit: defn.unit })
+            : t("log.form.value")
+        }
+      >
         <input
           required
           inputMode="decimal"
@@ -268,7 +279,7 @@ function ValueInput({
   }
   if (defn.value_kind === "categorical") {
     return (
-      <Field label="Value">
+      <Field label={t("log.form.value")}>
         <select
           required
           value={valueText}
@@ -276,7 +287,7 @@ function ValueInput({
           className={inputCls}
         >
           <option value="" disabled>
-            Pick one…
+            {t("log.form.pickOne")}
           </option>
           {(defn.categorical_values ?? []).map((v) => (
             <option key={v} value={v}>
@@ -289,7 +300,7 @@ function ValueInput({
   }
   if (defn.value_kind === "event") {
     return (
-      <Field label="Description">
+      <Field label={t("log.form.description")}>
         <input
           required
           maxLength={500}
@@ -302,7 +313,7 @@ function ValueInput({
   }
   if (defn.value_kind === "boolean") {
     return (
-      <Field label="Value">
+      <Field label={t("log.form.value")}>
         <label className="inline-flex items-center gap-2">
           <input
             type="checkbox"
@@ -317,7 +328,7 @@ function ValueInput({
   // geopoint
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label="Latitude">
+      <Field label={t("log.form.lat")}>
         <input
           required
           inputMode="decimal"
@@ -326,7 +337,7 @@ function ValueInput({
           className={inputCls}
         />
       </Field>
-      <Field label="Longitude">
+      <Field label={t("log.form.lon")}>
         <input
           required
           inputMode="decimal"
@@ -352,6 +363,8 @@ function ObservationList({
     : never;
   definitionFilter: string | undefined;
 }): ReactNode {
+  const { t } = useTranslation("signals");
+  const dateLocale = useDateLocale();
   const filtered = definitionFilter
     ? observations.filter((o) => o.signal_definition_id === definitionFilter)
     : observations;
@@ -359,7 +372,7 @@ function ObservationList({
     <div className="rounded-xl border border-ap-line bg-ap-panel">
       <div className="flex items-center justify-between border-b border-ap-line px-4 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-ap-muted">
-          Recent observations
+          {t("log.list.heading")}
         </span>
         <span className="text-xs text-ap-muted">{filtered.length}</span>
       </div>
@@ -369,9 +382,7 @@ function ObservationList({
           <Skeleton className="h-10 w-full" />
         </div>
       ) : filtered.length === 0 ? (
-        <p className="p-6 text-center text-xs text-ap-muted">
-          No observations yet for this signal.
-        </p>
+        <p className="p-6 text-center text-xs text-ap-muted">{t("log.list.empty")}</p>
       ) : (
         <ul className="divide-y divide-ap-line">
           {filtered.map((o) => (
@@ -379,8 +390,11 @@ function ObservationList({
               <span className="font-mono text-xs text-ap-muted">{o.signal_code}</span>
               <span className="font-medium text-ap-ink">{formatValue(o)}</span>
               {o.notes ? <span className="text-xs text-ap-muted">— {o.notes}</span> : null}
-              <span className="ml-auto text-[11px] text-ap-muted">
-                {formatDistanceToNow(parseISO(o.time), { addSuffix: true })}
+              <span className="ms-auto text-[11px] text-ap-muted">
+                {formatDistanceToNow(parseISO(o.time), {
+                  addSuffix: true,
+                  locale: dateLocale,
+                })}
               </span>
               {o.attachment_download_url ? (
                 <a
@@ -389,7 +403,7 @@ function ObservationList({
                   rel="noreferrer"
                   className="text-[11px] font-medium text-ap-primary hover:underline"
                 >
-                  photo ↗
+                  {t("log.list.photo")}
                 </a>
               ) : null}
             </li>

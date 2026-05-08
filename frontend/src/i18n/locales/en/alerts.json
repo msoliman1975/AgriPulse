@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "Alerts",
+    "subtitle": "Surfaced from the alerts engine — review, acknowledge, resolve.",
+    "loadFailed": "Failed to load alerts.",
+    "emptyOpen": "All clear — nothing needs your attention.",
+    "empty": "No alerts in this view."
+  },
+  "tabs": {
+    "open": "Open",
+    "acknowledged": "Acknowledged",
+    "snoozed": "Snoozed",
+    "resolved": "Resolved",
+    "all": "All"
+  },
+  "tabsLabel": "Filter by status",
+  "row": {
+    "ackedAgo": "Acked {{when}}",
+    "resolvedAgo": "Resolved {{when}}"
+  },
+  "actions": {
+    "openInPlan": "Open in Plan",
+    "ack": "Ack",
+    "resolve": "Resolve"
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
+  },
+  "status": {
+    "open": "open",
+    "acknowledged": "acknowledged",
+    "resolved": "resolved",
+    "snoozed": "snoozed"
+  }
+}

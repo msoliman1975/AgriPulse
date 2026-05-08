@@ -1,0 +1,47 @@
+{
+  "page": {
+    "title": "التوصيات",
+    "subtitle": "نتائج شجرة القرار من المُقيِّم اليومي. طبّق، ارفض، أو أجّل.",
+    "loadFailed": "فشل تحميل التوصيات.",
+    "emptyOpen": "لا توصيات حاليًا — يعمل المُقيِّم يوميًا.",
+    "empty": "لا توصيات في هذا العرض."
+  },
+  "tabs": {
+    "open": "مفتوحة",
+    "deferred": "مؤجَّلة",
+    "applied": "مطبَّقة",
+    "dismissed": "مرفوضة",
+    "all": "الكل"
+  },
+  "tabsLabel": "تصفية حسب الحالة",
+  "row": {
+    "expiresIn": "تنتهي {{when}}",
+    "deferredUntil": "مؤجَّلة حتى {{when}}",
+    "confidence": "الثقة {{percent}}%",
+    "explainShow": "لماذا هذا؟",
+    "explainHide": "إخفاء السبب"
+  },
+  "actions": {
+    "apply": "تطبيق",
+    "dismiss": "رفض",
+    "defer24": "تأجيل ٢٤س",
+    "defer24Title": "تأجيل لمدة ٢٤ ساعة"
+  },
+  "path": {
+    "match": "مطابق",
+    "noMatch": "غير مطابق",
+    "leaf": "ورقة"
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "state": {
+    "open": "مفتوحة",
+    "applied": "مطبَّقة",
+    "dismissed": "مرفوضة",
+    "deferred": "مؤجَّلة",
+    "expired": "منتهية"
+  }
+}

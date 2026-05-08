@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { useEffect, useState } from "react";
@@ -9,6 +10,7 @@ import { getFarm } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { AlertsFeedCard } from "../components/AlertsFeedCard";
@@ -21,6 +23,8 @@ import { UpcomingActivitiesCard } from "../components/UpcomingActivitiesCard";
 export function InsightsPage(): ReactNode {
   const farmId = useActiveFarmId();
   const navigate = useNavigate();
+  const { t } = useTranslation("insights");
+  const dateLocale = useDateLocale();
   const { data: farm, isLoading } = useQuery({
     queryKey: ["farms", "detail", farmId] as const,
     queryFn: () => getFarm(farmId!),
@@ -49,7 +53,7 @@ export function InsightsPage(): ReactNode {
     return <Navigate to="/" replace />;
   }
 
-  const greeting = greetingForHour(new Date().getHours());
+  const greeting = t(`greeting.${greetingKeyForHour(new Date().getHours())}`);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4">
@@ -75,7 +79,7 @@ export function InsightsPage(): ReactNode {
                     {" · "}
                     {Number(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
                     {" · "}
-                    {format(new Date(), "EEEE, MMMM d")}
+                    {format(new Date(), "EEEE, MMMM d", { locale: dateLocale })}
                   </>
                 ) : null}
               </>
@@ -88,7 +92,7 @@ export function InsightsPage(): ReactNode {
           onClick={() => navigate(`/plan/${farmId}`)}
           className="inline-flex items-center gap-1 rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
         >
-          + New plan
+          {t("page.newPlan")}
         </button>
       </header>
 
@@ -116,9 +120,9 @@ export function InsightsPage(): ReactNode {
   );
 }
 
-function greetingForHour(hour: number): string {
-  if (hour < 5) return "Good evening";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+function greetingKeyForHour(hour: number): "morning" | "afternoon" | "evening" {
+  if (hour < 5) return "evening";
+  if (hour < 12) return "morning";
+  if (hour < 18) return "afternoon";
+  return "evening";
 }

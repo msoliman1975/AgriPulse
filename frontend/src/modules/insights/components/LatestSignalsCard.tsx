@@ -1,9 +1,11 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { SignalObservation } from "@/api/signals";
 import { Skeleton } from "@/components/Skeleton";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useSignalObservations } from "@/queries/signals";
 
 interface Props {
@@ -19,6 +21,8 @@ interface Props {
  */
 export function LatestSignalsCard({ farmId, limit = 5 }: Props): ReactNode {
   const navigate = useNavigate();
+  const { t } = useTranslation("insights");
+  const dateLocale = useDateLocale();
   const { data, isLoading, isError } = useSignalObservations({
     farm_id: farmId,
     limit,
@@ -26,13 +30,13 @@ export function LatestSignalsCard({ farmId, limit = 5 }: Props): ReactNode {
   return (
     <section className="rounded-xl border border-ap-line bg-ap-panel">
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-2">
-        <h2 className="text-sm font-semibold text-ap-ink">Latest signals</h2>
+        <h2 className="text-sm font-semibold text-ap-ink">{t("latestSignals.heading")}</h2>
         <button
           type="button"
           onClick={() => navigate(`/signals/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
-          Log →
+          {t("latestSignals.logLink")}
         </button>
       </header>
       {isLoading ? (
@@ -41,22 +45,20 @@ export function LatestSignalsCard({ farmId, limit = 5 }: Props): ReactNode {
           <Skeleton className="h-8 w-full" />
         </div>
       ) : isError ? (
-        <p className="p-4 text-sm text-ap-crit">Failed to load signal observations.</p>
+        <p className="p-4 text-sm text-ap-crit">{t("latestSignals.loadFailed")}</p>
       ) : !data || data.length === 0 ? (
-        <p className="p-6 text-center text-xs text-ap-muted">
-          No signal observations on this farm yet.
-        </p>
+        <p className="p-6 text-center text-xs text-ap-muted">{t("latestSignals.empty")}</p>
       ) : (
         <ul className="divide-y divide-ap-line">
           {data.map((o) => (
-            <li
-              key={o.id}
-              className="flex items-center gap-2 px-4 py-2 text-sm"
-            >
+            <li key={o.id} className="flex items-center gap-2 px-4 py-2 text-sm">
               <span className="font-mono text-[11px] text-ap-muted">{o.signal_code}</span>
               <span className="font-medium text-ap-ink">{formatValue(o)}</span>
-              <span className="ml-auto text-[11px] text-ap-muted">
-                {formatDistanceToNow(parseISO(o.time), { addSuffix: true })}
+              <span className="ms-auto text-[11px] text-ap-muted">
+                {formatDistanceToNow(parseISO(o.time), {
+                  addSuffix: true,
+                  locale: dateLocale,
+                })}
               </span>
             </li>
           ))}

@@ -1,0 +1,37 @@
+{
+  "page": {
+    "title": "التنبيهات",
+    "subtitle": "صادرة من محرك التنبيهات — راجِع، أقرّ، أو حلّ.",
+    "loadFailed": "فشل تحميل التنبيهات.",
+    "emptyOpen": "كل شيء على ما يرام — لا شيء يستوجب الانتباه.",
+    "empty": "لا تنبيهات في هذا العرض."
+  },
+  "tabs": {
+    "open": "مفتوحة",
+    "acknowledged": "مُقرَّة",
+    "snoozed": "مؤجَّلة",
+    "resolved": "محلولة",
+    "all": "الكل"
+  },
+  "tabsLabel": "تصفية حسب الحالة",
+  "row": {
+    "ackedAgo": "أُقِرّت {{when}}",
+    "resolvedAgo": "حُلَّت {{when}}"
+  },
+  "actions": {
+    "openInPlan": "افتح في الخطة",
+    "ack": "إقرار",
+    "resolve": "حلّ"
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "status": {
+    "open": "مفتوحة",
+    "acknowledged": "مُقرَّة",
+    "resolved": "محلولة",
+    "snoozed": "مؤجَّلة"
+  }
+}

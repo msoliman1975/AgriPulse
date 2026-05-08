@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import type {
@@ -51,6 +52,7 @@ const EMPTY_FORM: FormState = {
 
 export function SignalsConfigPage(): ReactNode {
   const farmId = useActiveFarmId();
+  const { t } = useTranslation("signals");
   const canDefine = useCapability("signal.define");
   const { data, isLoading, isError } = useSignalDefinitions(true);
   const createMut = useCreateSignalDefinition();
@@ -94,11 +96,8 @@ export function SignalsConfigPage(): ReactNode {
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">Custom signals</h1>
-          <p className="mt-1 text-sm text-ap-muted">
-            Define data streams your team can record from the field — soil
-            moisture, scout pest counts, irrigation events.
-          </p>
+          <h1 className="text-2xl font-semibold text-ap-ink">{t("config.title")}</h1>
+          <p className="mt-1 text-sm text-ap-muted">{t("config.subtitle")}</p>
         </div>
         {canDefine ? (
           <button
@@ -106,7 +105,7 @@ export function SignalsConfigPage(): ReactNode {
             onClick={() => setShowForm((s) => !s)}
             className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
           >
-            {showForm ? "Cancel" : "New definition"}
+            {showForm ? t("config.cancel") : t("config.newDefinition")}
           </button>
         ) : null}
       </header>
@@ -117,26 +116,26 @@ export function SignalsConfigPage(): ReactNode {
           className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Code (stable identifier)">
+            <Field label={t("config.form.code")}>
               <input
                 required
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="soil_moisture"
+                placeholder={t("config.form.codePlaceholder")}
                 pattern="^[a-z0-9][a-z0-9_-]*$"
                 className={inputCls}
               />
             </Field>
-            <Field label="Display name">
+            <Field label={t("config.form.name")}>
               <input
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Soil moisture"
+                placeholder={t("config.form.namePlaceholder")}
                 className={inputCls}
               />
             </Field>
-            <Field label="Value kind">
+            <Field label={t("config.form.valueKind")}>
               <select
                 value={form.value_kind}
                 onChange={(e) =>
@@ -146,23 +145,23 @@ export function SignalsConfigPage(): ReactNode {
               >
                 {VALUE_KINDS.map((k) => (
                   <option key={k} value={k}>
-                    {k}
+                    {t(`valueKind.${k}`)}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Unit (numeric only)">
+            <Field label={t("config.form.unit")}>
               <input
                 value={form.unit}
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                placeholder="%"
+                placeholder={t("config.form.unitPlaceholder")}
                 className={inputCls}
                 disabled={form.value_kind !== "numeric"}
               />
             </Field>
             {form.value_kind === "numeric" ? (
               <>
-                <Field label="Min">
+                <Field label={t("config.form.min")}>
                   <input
                     inputMode="decimal"
                     value={form.value_min}
@@ -170,7 +169,7 @@ export function SignalsConfigPage(): ReactNode {
                     className={inputCls}
                   />
                 </Field>
-                <Field label="Max">
+                <Field label={t("config.form.max")}>
                   <input
                     inputMode="decimal"
                     value={form.value_max}
@@ -181,26 +180,29 @@ export function SignalsConfigPage(): ReactNode {
               </>
             ) : null}
             {form.value_kind === "categorical" ? (
-              <Field label="Categories (comma-separated)" className="sm:col-span-2">
+              <Field
+                label={t("config.form.categoricalValues")}
+                className="sm:col-span-2"
+              >
                 <input
                   required
                   value={form.categorical_values}
                   onChange={(e) =>
                     setForm({ ...form, categorical_values: e.target.value })
                   }
-                  placeholder="absent, low, medium, high"
+                  placeholder={t("config.form.categoricalPlaceholder")}
                   className={inputCls}
                 />
               </Field>
             ) : null}
-            <Field label="Description (optional)" className="sm:col-span-2">
+            <Field label={t("config.form.description")} className="sm:col-span-2">
               <input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 className={inputCls}
               />
             </Field>
-            <Field label="Allow photo attachment" className="sm:col-span-2">
+            <Field label={t("config.form.attachmentAllowed")} className="sm:col-span-2">
               <label className="inline-flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -209,14 +211,14 @@ export function SignalsConfigPage(): ReactNode {
                     setForm({ ...form, attachment_allowed: e.target.checked })
                   }
                 />
-                <span>Field operators can attach a photo when recording</span>
+                <span>{t("config.form.attachmentHint")}</span>
               </label>
             </Field>
           </div>
           <div className="mt-3 flex items-center justify-end gap-2">
             {createMut.isError ? (
               <span className="text-xs text-ap-crit">
-                {(createMut.error as Error)?.message ?? "Save failed"}
+                {(createMut.error as Error)?.message ?? t("config.form.saveFailed")}
               </span>
             ) : null}
             <button
@@ -224,7 +226,7 @@ export function SignalsConfigPage(): ReactNode {
               disabled={createMut.isPending}
               className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
             >
-              {createMut.isPending ? "Saving…" : "Save"}
+              {createMut.isPending ? t("config.form.saving") : t("config.form.save")}
             </button>
           </div>
         </form>
@@ -237,11 +239,10 @@ export function SignalsConfigPage(): ReactNode {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">Failed to load definitions.</p>
+          <p className="p-4 text-sm text-ap-crit">{t("config.loadFailed")}</p>
         ) : !data || data.length === 0 ? (
           <p className="p-12 text-center text-sm text-ap-muted">
-            No signals defined yet — start with one for the data your team
-            already records.
+            {t("config.empty")}
           </p>
         ) : (
           <ul className="divide-y divide-ap-line">
@@ -274,6 +275,7 @@ function DefinitionRow({
   onArchive: () => void;
   onToggleActive: () => void;
 }): ReactNode {
+  const { t } = useTranslation("signals");
   const valueRange = useMemo(() => {
     if (defn.value_kind !== "numeric") return null;
     if (defn.value_min === null && defn.value_max === null) return null;
@@ -286,21 +288,27 @@ function DefinitionRow({
           <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
           <span className="font-mono text-[11px] text-ap-muted">{defn.code}</span>
           <Pill kind={defn.is_active ? "ok" : "neutral"}>
-            {defn.is_active ? "active" : "inactive"}
+            {defn.is_active ? t("config.row.active") : t("config.row.inactive")}
           </Pill>
-          <Pill kind="info">{defn.value_kind}</Pill>
-          {defn.attachment_allowed ? <Pill kind="neutral">photos</Pill> : null}
+          <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
+          {defn.attachment_allowed ? (
+            <Pill kind="neutral">{t("config.row.photos")}</Pill>
+          ) : null}
         </div>
         {defn.description ? (
           <p className="mt-1 text-sm text-ap-muted">{defn.description}</p>
         ) : null}
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ap-muted">
           {defn.value_kind === "numeric" && defn.unit ? (
-            <span>unit: {defn.unit}</span>
+            <span>{t("config.row.unit", { unit: defn.unit })}</span>
           ) : null}
-          {valueRange ? <span>range: {valueRange}</span> : null}
+          {valueRange ? (
+            <span>{t("config.row.range", { range: valueRange })}</span>
+          ) : null}
           {defn.categorical_values ? (
-            <span>values: {defn.categorical_values.join(", ")}</span>
+            <span>
+              {t("config.row.values", { values: defn.categorical_values.join(", ") })}
+            </span>
           ) : null}
         </div>
       </div>
@@ -311,14 +319,14 @@ function DefinitionRow({
             onClick={onToggleActive}
             className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
           >
-            {defn.is_active ? "Deactivate" : "Activate"}
+            {defn.is_active ? t("config.row.deactivate") : t("config.row.activate")}
           </button>
           <button
             type="button"
             onClick={onArchive}
             className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
           >
-            Archive
+            {t("config.row.archive")}
           </button>
         </div>
       ) : null}

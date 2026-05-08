@@ -1,0 +1,73 @@
+{
+  "config": {
+    "title": "Custom signals",
+    "subtitle": "Define data streams your team can record from the field — soil moisture, scout pest counts, irrigation events.",
+    "newDefinition": "New definition",
+    "cancel": "Cancel",
+    "loadFailed": "Failed to load definitions.",
+    "empty": "No signals defined yet — start with one for the data your team already records.",
+    "form": {
+      "code": "Code (stable identifier)",
+      "codePlaceholder": "soil_moisture",
+      "name": "Display name",
+      "namePlaceholder": "Soil moisture",
+      "valueKind": "Value kind",
+      "unit": "Unit (numeric only)",
+      "unitPlaceholder": "%",
+      "min": "Min",
+      "max": "Max",
+      "categoricalValues": "Categories (comma-separated)",
+      "categoricalPlaceholder": "absent, low, medium, high",
+      "description": "Description (optional)",
+      "attachmentAllowed": "Allow photo attachment",
+      "attachmentHint": "Field operators can attach a photo when recording",
+      "save": "Save",
+      "saving": "Saving…",
+      "saveFailed": "Save failed"
+    },
+    "row": {
+      "active": "active",
+      "inactive": "inactive",
+      "photos": "photos",
+      "unit": "unit: {{unit}}",
+      "range": "range: {{range}}",
+      "values": "values: {{values}}",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "archive": "Archive"
+    }
+  },
+  "log": {
+    "title": "Signals log",
+    "subtitle": "Record manual observations from the field. They feed alerts and recommendations and live in the dashboard.",
+    "noDefinitions": "No signal definitions yet. Ask a tenant admin to define one in Configuration → Signals.",
+    "missingCapability": "You need the {{capability}} capability on this farm to log observations.",
+    "form": {
+      "value": "Value",
+      "valueWithUnit": "Value ({{unit}})",
+      "description": "Description",
+      "pickOne": "Pick one…",
+      "lat": "Latitude",
+      "lon": "Longitude",
+      "notes": "Notes (optional)",
+      "photo": "Photo (optional, max 20MB)",
+      "uploading": "Uploading…",
+      "recording": "Recording…",
+      "record": "Record",
+      "errorLatLon": "Latitude and longitude must be numeric.",
+      "errorGeneric": "Failed to record observation."
+    },
+    "list": {
+      "heading": "Recent observations",
+      "empty": "No observations yet for this signal.",
+      "photo": "photo ↗"
+    }
+  },
+  "valueKind": {
+    "numeric": "numeric",
+    "categorical": "categorical",
+    "event": "event",
+    "boolean": "boolean",
+    "geopoint": "geopoint"
+  }
+}

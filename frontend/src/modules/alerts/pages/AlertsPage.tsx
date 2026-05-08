@@ -1,5 +1,6 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import type { Alert, AlertSeverity, AlertStatus } from "@/api/alerts";
@@ -7,15 +8,16 @@ import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { useAlerts, useTransitionAlert } from "@/queries/alerts";
 
-const STATUS_TABS: ReadonlyArray<{ value: AlertStatus | "all"; label: string }> = [
-  { value: "open", label: "Open" },
-  { value: "acknowledged", label: "Acknowledged" },
-  { value: "snoozed", label: "Snoozed" },
-  { value: "resolved", label: "Resolved" },
-  { value: "all", label: "All" },
+const STATUS_TAB_VALUES: ReadonlyArray<AlertStatus | "all"> = [
+  "open",
+  "acknowledged",
+  "snoozed",
+  "resolved",
+  "all",
 ];
 
 const SEV_KIND: Record<AlertSeverity, "info" | "warn" | "crit"> = {
@@ -26,6 +28,7 @@ const SEV_KIND: Record<AlertSeverity, "info" | "warn" | "crit"> = {
 
 export function AlertsPage(): ReactNode {
   const farmId = useActiveFarmId();
+  const { t } = useTranslation("alerts");
   const [tab, setTab] = useState<AlertStatus | "all">("open");
   const canAck = useCapability("alert.acknowledge", { farmId });
   const canResolve = useCapability("alert.resolve", { farmId });
@@ -43,14 +46,12 @@ export function AlertsPage(): ReactNode {
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">Alerts</h1>
-          <p className="mt-1 text-sm text-ap-muted">
-            Surfaced from the alerts engine — review, acknowledge, resolve.
-          </p>
+          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
+          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
         </div>
         <SegmentedControl
-          ariaLabel="Filter by status"
-          items={STATUS_TABS.map((s) => ({ value: s.value, label: s.label }))}
+          ariaLabel={t("tabsLabel")}
+          items={STATUS_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
           value={tab}
           onChange={(v) => setTab(v)}
         />
@@ -64,12 +65,10 @@ export function AlertsPage(): ReactNode {
             <Skeleton className="h-16 w-full" />
           </div>
         ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">Failed to load alerts.</p>
+          <p className="p-4 text-sm text-ap-crit">{t("page.loadFailed")}</p>
         ) : !data || data.length === 0 ? (
           <p className="p-12 text-center text-sm text-ap-muted">
-            {tab === "open"
-              ? "All clear — nothing needs your attention."
-              : "No alerts in this view."}
+            {tab === "open" ? t("page.emptyOpen") : t("page.empty")}
           </p>
         ) : (
           <ul className="divide-y divide-ap-line">
@@ -106,6 +105,8 @@ interface RowProps {
 
 function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProps): ReactNode {
   const navigate = useNavigate();
+  const { t } = useTranslation("alerts");
+  const dateLocale = useDateLocale();
   const isTerminal = a.status === "resolved";
   return (
     <li className="flex items-start gap-3 p-4">
@@ -124,9 +125,9 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
           <span className="text-sm font-medium text-ap-ink">
             {a.diagnosis_en ?? a.rule_code}
           </span>
-          <Pill kind={SEV_KIND[a.severity]}>{a.severity}</Pill>
+          <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
           <Pill kind={a.status === "resolved" ? "ok" : a.status === "open" ? "crit" : "neutral"}>
-            {a.status}
+            {t(`status.${a.status}`)}
           </Pill>
         </div>
         {a.prescription_en ? (
@@ -135,12 +136,22 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">{a.rule_code}</span>
           <span>·</span>
-          <span>{formatDistanceToNow(parseISO(a.created_at), { addSuffix: true })}</span>
+          <span>
+            {formatDistanceToNow(parseISO(a.created_at), {
+              addSuffix: true,
+              locale: dateLocale,
+            })}
+          </span>
           {a.acknowledged_at ? (
             <>
               <span>·</span>
               <span>
-                Acked {formatDistanceToNow(parseISO(a.acknowledged_at), { addSuffix: true })}
+                {t("row.ackedAgo", {
+                  when: formatDistanceToNow(parseISO(a.acknowledged_at), {
+                    addSuffix: true,
+                    locale: dateLocale,
+                  }),
+                })}
               </span>
             </>
           ) : null}
@@ -148,7 +159,12 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
             <>
               <span>·</span>
               <span>
-                Resolved {formatDistanceToNow(parseISO(a.resolved_at), { addSuffix: true })}
+                {t("row.resolvedAgo", {
+                  when: formatDistanceToNow(parseISO(a.resolved_at), {
+                    addSuffix: true,
+                    locale: dateLocale,
+                  }),
+                })}
               </span>
             </>
           ) : null}
@@ -168,7 +184,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
           }}
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
         >
-          Open in Plan
+          {t("actions.openInPlan")}
         </button>
         {!isTerminal ? (
           <div className="flex gap-1">
@@ -178,7 +194,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
                 onClick={onAck}
                 className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
               >
-                Ack
+                {t("actions.ack")}
               </button>
             ) : null}
             {canResolve ? (
@@ -187,7 +203,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
                 onClick={onResolve}
                 className="rounded-md bg-ap-primary px-2 py-1 text-xs font-medium text-white hover:bg-ap-primary/90"
               >
-                Resolve
+                {t("actions.resolve")}
               </button>
             ) : null}
           </div>

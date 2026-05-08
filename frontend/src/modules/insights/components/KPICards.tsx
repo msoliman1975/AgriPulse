@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useAlerts } from "@/queries/alerts";
@@ -28,6 +29,7 @@ function plusDaysIso(days: number): string {
 
 export function KPICards({ farmId }: Props): ReactNode {
   const navigate = useNavigate();
+  const { t } = useTranslation("insights");
 
   const blocksQuery = useQuery({
     queryKey: ["blocks", "list", farmId] as const,
@@ -64,12 +66,12 @@ export function KPICards({ farmId }: Props): ReactNode {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       <KPICard
-        title="Land units"
+        title={t("kpi.landUnits.title")}
         value={blocksQuery.isLoading ? <Skeleton className="h-8 w-12" /> : totalBlocks}
-        hint="Active blocks in this farm"
+        hint={t("kpi.landUnits.hint")}
       />
       <KPICard
-        title="Active alerts"
+        title={t("kpi.alerts.title")}
         value={
           alertsQuery.isLoading ? (
             <Skeleton className="h-8 w-12" />
@@ -79,64 +81,81 @@ export function KPICards({ farmId }: Props): ReactNode {
             </span>
           )
         }
-        hint={openAlertCount === 0 ? "All clear" : "Sorted by severity"}
+        hint={
+          openAlertCount === 0
+            ? t("kpi.alerts.hintAllClear")
+            : t("kpi.alerts.hintHasAlerts")
+        }
         delta={
           openAlertCount > 0 ? (
-            <Pill kind="crit">needs attention</Pill>
+            <Pill kind="crit">{t("kpi.alerts.deltaCrit")}</Pill>
           ) : (
-            <Pill kind="ok">healthy</Pill>
+            <Pill kind="ok">{t("kpi.alerts.deltaOk")}</Pill>
           )
         }
         onClick={() => navigate(`/alerts/${farmId}`)}
       />
       <KPICard
-        title="Open recommendations"
+        title={t("kpi.recommendations.title")}
         value={
           recsQuery.isLoading ? <Skeleton className="h-8 w-12" /> : openRecCount
         }
-        hint={openRecCount === 0 ? "Nothing pending" : "Apply, dismiss, or defer"}
+        hint={
+          openRecCount === 0
+            ? t("kpi.recommendations.hintEmpty")
+            : t("kpi.recommendations.hintHas")
+        }
         onClick={() => navigate(`/recommendations/${farmId}`)}
       />
       <KPICard
-        title="Upcoming activities"
+        title={t("kpi.upcoming.title")}
         value={calendarQuery.isLoading ? <Skeleton className="h-8 w-12" /> : upcomingCount}
-        hint="Next 7 days, across all plans"
+        hint={t("kpi.upcoming.hint")}
       />
       <KPICard
-        title="Irrigation due"
+        title={t("kpi.irrigation.title")}
         value={irrigationQuery.isLoading ? <Skeleton className="h-8 w-12" /> : dueCount}
         hint={
           totalMm !== undefined && dueCount > 0
-            ? `${totalMm.toFixed(1)} mm total recommended`
-            : "Pending recommendations"
+            ? t("kpi.irrigation.hintTotal", { mm: totalMm.toFixed(1) })
+            : t("kpi.irrigation.hintEmpty")
         }
         onClick={() => navigate(`/plan/${farmId}`)}
       />
       <KPICard
-        title="Latest signal"
+        title={t("kpi.latestSignal.title")}
         value={
           signalsQuery.isLoading ? (
             <Skeleton className="h-8 w-12" />
           ) : latestSignalAt ? (
-            relativeShort(latestSignalAt)
+            renderRelativeShort(latestSignalAt, t)
           ) : (
-            "—"
+            t("kpi.latestSignal.valueEmpty")
           )
         }
-        hint={latestSignalAt ? "Most recent observation" : "No observations yet"}
+        hint={
+          latestSignalAt
+            ? t("kpi.latestSignal.hintHas")
+            : t("kpi.latestSignal.hintEmpty")
+        }
         onClick={() => navigate(`/signals/${farmId}`)}
       />
     </div>
   );
 }
 
-function relativeShort(iso: string): string {
+// `t` is the i18next TFunction; using `ReturnType` keeps the type
+// branded with the "insights" namespace so TS still validates keys.
+function renderRelativeShort(
+  iso: string,
+  t: ReturnType<typeof useTranslation<"insights">>["t"],
+): string {
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.round(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return t("kpi.latestSignal.justNow");
+  if (min < 60) return t("kpi.latestSignal.minutesAgo", { n: min });
   const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("kpi.latestSignal.hoursAgo", { n: hr });
   const d = Math.round(hr / 24);
-  return `${d}d ago`;
+  return t("kpi.latestSignal.daysAgo", { n: d });
 }

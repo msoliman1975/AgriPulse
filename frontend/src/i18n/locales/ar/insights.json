@@ -1,0 +1,53 @@
+{
+  "page": {
+    "newPlan": "+ خطة جديدة"
+  },
+  "greeting": {
+    "morning": "صباح الخير",
+    "afternoon": "مساء الخير",
+    "evening": "مساء الخير"
+  },
+  "kpi": {
+    "landUnits": {
+      "title": "الوحدات الأرضية",
+      "hint": "الحقول النشطة في هذه المزرعة"
+    },
+    "alerts": {
+      "title": "التنبيهات النشطة",
+      "hintAllClear": "كل شيء على ما يرام",
+      "hintHasAlerts": "مرتَّبة حسب الخطورة",
+      "deltaCrit": "يستوجب الانتباه",
+      "deltaOk": "سليم"
+    },
+    "recommendations": {
+      "title": "التوصيات المفتوحة",
+      "hintEmpty": "لا شيء معلَّق",
+      "hintHas": "طبّق، ارفض، أو أجّل"
+    },
+    "upcoming": {
+      "title": "الأنشطة القادمة",
+      "hint": "الأيام السبعة القادمة عبر جميع الخطط"
+    },
+    "irrigation": {
+      "title": "ري مستحق",
+      "hintTotal": "{{mm}} ملم إجمالي موصى به",
+      "hintEmpty": "توصيات معلَّقة"
+    },
+    "latestSignal": {
+      "title": "آخر إشارة",
+      "hintHas": "أحدث ملاحظة",
+      "hintEmpty": "لا ملاحظات بعد",
+      "valueEmpty": "—",
+      "justNow": "الآن",
+      "minutesAgo": "منذ {{n}} د",
+      "hoursAgo": "منذ {{n}} س",
+      "daysAgo": "منذ {{n}} ي"
+    }
+  },
+  "latestSignals": {
+    "heading": "أحدث الإشارات",
+    "logLink": "السجل ←",
+    "loadFailed": "فشل تحميل ملاحظات الإشارات.",
+    "empty": "لا ملاحظات إشارات في هذه المزرعة بعد."
+  }
+}

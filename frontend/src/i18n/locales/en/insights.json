@@ -1,0 +1,53 @@
+{
+  "page": {
+    "newPlan": "+ New plan"
+  },
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening"
+  },
+  "kpi": {
+    "landUnits": {
+      "title": "Land units",
+      "hint": "Active blocks in this farm"
+    },
+    "alerts": {
+      "title": "Active alerts",
+      "hintAllClear": "All clear",
+      "hintHasAlerts": "Sorted by severity",
+      "deltaCrit": "needs attention",
+      "deltaOk": "healthy"
+    },
+    "recommendations": {
+      "title": "Open recommendations",
+      "hintEmpty": "Nothing pending",
+      "hintHas": "Apply, dismiss, or defer"
+    },
+    "upcoming": {
+      "title": "Upcoming activities",
+      "hint": "Next 7 days, across all plans"
+    },
+    "irrigation": {
+      "title": "Irrigation due",
+      "hintTotal": "{{mm}} mm total recommended",
+      "hintEmpty": "Pending recommendations"
+    },
+    "latestSignal": {
+      "title": "Latest signal",
+      "hintHas": "Most recent observation",
+      "hintEmpty": "No observations yet",
+      "valueEmpty": "—",
+      "justNow": "just now",
+      "minutesAgo": "{{n}}m ago",
+      "hoursAgo": "{{n}}h ago",
+      "daysAgo": "{{n}}d ago"
+    }
+  },
+  "latestSignals": {
+    "heading": "Latest signals",
+    "logLink": "Log →",
+    "loadFailed": "Failed to load signal observations.",
+    "empty": "No signal observations on this farm yet."
+  }
+}

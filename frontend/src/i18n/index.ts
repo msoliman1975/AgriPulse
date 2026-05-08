@@ -8,12 +8,20 @@ import enFarms from "./locales/en/farms.json";
 import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
 import enWeather from "./locales/en/weather.json";
+import enRecommendations from "./locales/en/recommendations.json";
+import enSignals from "./locales/en/signals.json";
+import enInsights from "./locales/en/insights.json";
+import enAlerts from "./locales/en/alerts.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
 import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
 import arWeather from "./locales/ar/weather.json";
+import arRecommendations from "./locales/ar/recommendations.json";
+import arSignals from "./locales/ar/signals.json";
+import arInsights from "./locales/ar/insights.json";
+import arAlerts from "./locales/ar/alerts.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -31,6 +39,10 @@ const resources = {
     imagery: enImagery,
     indices: enIndices,
     weather: enWeather,
+    recommendations: enRecommendations,
+    signals: enSignals,
+    insights: enInsights,
+    alerts: enAlerts,
   },
   ar: {
     common: arCommon,
@@ -39,6 +51,10 @@ const resources = {
     imagery: arImagery,
     indices: arIndices,
     weather: arWeather,
+    recommendations: arRecommendations,
+    signals: arSignals,
+    insights: arInsights,
+    alerts: arAlerts,
   },
 } as const;
 
@@ -50,7 +66,18 @@ void i18n
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGES],
     defaultNS: "common",
-    ns: ["common", "auth", "farms", "imagery", "indices", "weather"],
+    ns: [
+      "common",
+      "auth",
+      "farms",
+      "imagery",
+      "indices",
+      "weather",
+      "recommendations",
+      "signals",
+      "insights",
+      "alerts",
+    ],
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],
