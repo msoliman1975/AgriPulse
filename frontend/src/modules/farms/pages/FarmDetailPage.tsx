@@ -6,6 +6,7 @@ import { archiveFarm, getFarm, type FarmDetail } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
+import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
 import { AttachmentsTab } from "../components/AttachmentsTab";
@@ -18,6 +19,7 @@ export function FarmDetailPage(): JSX.Element {
   const canEdit = useCapability("farm.update", { farmId });
   const canArchive = useCapability("farm.delete", { farmId });
   const canCreateBlock = useCapability("block.create", { farmId });
+  const canReadWeather = useCapability("weather.read", { farmId });
 
   const [farm, setFarm] = useState<FarmDetail | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -89,6 +91,14 @@ export function FarmDetailPage(): JSX.Element {
       <div className="card">
         <MapPreview geometry={farm.boundary} />
       </div>
+
+      {canReadWeather && blocks.length > 0 ? (
+        <WeatherForecastPanel
+          blockId={blocks[0].id}
+          farmId={farm.id}
+          farmName={farm.name}
+        />
+      ) : null}
 
       <div className="card">
         <div className="flex items-center justify-between">
