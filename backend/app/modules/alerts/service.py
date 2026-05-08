@@ -42,6 +42,7 @@ from app.modules.alerts.events import (
 )
 from app.modules.alerts.repository import AlertsRepository
 from app.modules.audit import AuditService, get_audit_service
+from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
@@ -131,10 +132,15 @@ class AlertsServiceImpl:
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
         crop_category = await self._repo.get_block_crop_category(block_id=block_id)
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
-        # Load weather snapshot only when the block has a resolvable
-        # farm — otherwise the loader's farm_id query is meaningless.
+        # Load weather + signals snapshots only when the block has a
+        # resolvable farm — both loaders need it for their join keys.
         weather = (
             await load_weather_snapshot(self._tenant, farm_id=farm_id)
+            if farm_id is not None
+            else None
+        )
+        signal_snapshot = (
+            await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
             if farm_id is not None
             else None
         )
@@ -143,6 +149,7 @@ class AlertsServiceImpl:
             crop_category=crop_category,
             latest_index_aggregates=latest,
             weather=weather,
+            signals=signal_snapshot,
         )
 
         rules_evaluated = 0

@@ -22,13 +22,18 @@ Design choices worth knowing:
     sweep. This mirrors the existing predicates' behavior.
 """
 
-from app.shared.conditions.context import ConditionContext, WeatherSnapshot
+from app.shared.conditions.context import (
+    ConditionContext,
+    SignalEntry,
+    WeatherSnapshot,
+)
 from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.evaluator import evaluate
 
 __all__ = [
     "ConditionContext",
     "ConditionParseError",
+    "SignalEntry",
     "WeatherSnapshot",
     "evaluate",
 ]

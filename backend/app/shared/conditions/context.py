@@ -30,6 +30,34 @@ class IndicesEntry:
     baseline_deviation: Decimal | None
 
 
+# Allowed keys for a signals value-ref. ``value_kind`` on the underlying
+# definition picks which one is non-null; the parser doesn't know the
+# kind, so it accepts any of these and the resolver returns ``None`` for
+# the wrong one.
+SIGNAL_KEYS: tuple[str, ...] = (
+    "value_numeric",
+    "value_categorical",
+    "value_event",
+    "value_boolean",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SignalEntry:
+    """Latest observation for one signal that applies to the block.
+
+    ``value_*`` are mutually exclusive — exactly one is non-null per
+    the signal_definitions row's ``value_kind``. Predicates that read
+    the wrong key get ``None`` and short-circuit to no-match.
+    """
+
+    time: datetime
+    value_numeric: Decimal | None = None
+    value_categorical: str | None = None
+    value_event: str | None = None
+    value_boolean: bool | None = None
+
+
 # Allowed scope keys for a weather value-ref. Keep in lock-step with
 # ``WeatherSnapshot`` field names below — ``parse_value_ref`` validates
 # against this tuple.
@@ -86,7 +114,7 @@ class ConditionContext:
     block_attributes: dict[str, Any] = field(default_factory=dict)
     indices: dict[str, IndicesEntry] = field(default_factory=dict)
     weather: WeatherSnapshot | None = None
-    # Slice 5 still to add: signals: dict[str, Any] | None = None
+    signals: dict[str, SignalEntry] = field(default_factory=dict)
 
     @classmethod
     def from_block_signals(
@@ -97,12 +125,13 @@ class ConditionContext:
         latest_index_aggregates: dict[str, dict[str, Any]],
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
+        signals: dict[str, SignalEntry] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
-        engine already loads. Adapter so the alerts service doesn't
-        change signature. ``weather`` is optional — services that don't
-        load it pass ``None`` and the evaluator returns ``False`` for
-        any weather-referencing predicate.
+        engine already loads. ``weather`` and ``signals`` are optional —
+        services that don't load them pass ``None`` / ``{}`` and the
+        evaluator returns ``False`` for any predicate that references
+        them (permissive on missing data).
         """
         indices: dict[str, IndicesEntry] = {}
         for code, row in latest_index_aggregates.items():
@@ -117,6 +146,7 @@ class ConditionContext:
             block_attributes=dict(block_attributes or {}),
             indices=indices,
             weather=weather,
+            signals=signals or {},
         )
 
 

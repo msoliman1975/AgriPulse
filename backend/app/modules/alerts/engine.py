@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from app.shared.conditions import ConditionContext, WeatherSnapshot
+from app.shared.conditions import ConditionContext, SignalEntry, WeatherSnapshot
 from app.shared.conditions import evaluate as _evaluate_tree
 
 
@@ -69,6 +69,9 @@ class BlockSignals:
     the alerts service skips the weather load (e.g. tests, on-demand
     eval that doesn't care about weather rules) — predicates that
     reference weather refs branch to ``on_miss``."""
+    signals: dict[str, SignalEntry] | None = None
+    """Latest observation per applicable signal_code. ``None`` is
+    treated as "loader skipped" — same permissive semantics as weather."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +196,7 @@ def _predicate_condition_tree(
         crop_category=signals.crop_category,
         latest_index_aggregates=signals.latest_index_aggregates,
         weather=signals.weather,
+        signals=signals.signals,
     )
     return _evaluate_tree(tree, ctx)
 

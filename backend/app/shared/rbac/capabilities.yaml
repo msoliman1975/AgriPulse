@@ -202,15 +202,15 @@ capabilities:
   signal.read:
     description: View signal definitions and observations.
     scope: farm
-    status: stub
+    status: active
   signal.define:
     description: Create or edit a custom signal definition.
     scope: tenant
-    status: stub
+    status: active
   signal.record:
     description: Record an observation against an existing signal.
     scope: farm
-    status: stub
+    status: active
 
   # --- Vegetation plans ------------------------------------------------
   plan.read:

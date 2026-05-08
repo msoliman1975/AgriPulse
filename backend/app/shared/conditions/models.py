@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from app.shared.conditions.context import WEATHER_SCOPES
+from app.shared.conditions.context import SIGNAL_KEYS, WEATHER_SCOPES
 from app.shared.conditions.errors import ConditionParseError
 
 INDICES_KEYS: tuple[str, ...] = ("mean", "baseline_deviation")
@@ -54,7 +54,22 @@ class WeatherValueRef:
     field: str
 
 
-ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef
+@dataclass(frozen=True, slots=True)
+class SignalsValueRef:
+    """``{"source":"signals","code":"soil_moisture","key":"value_numeric"}``
+
+    ``code`` is the tenant-scoped ``signal_definitions.code`` —
+    matched against the snapshot's keys. ``key`` defaults to
+    ``value_numeric`` (the most common predicate target) and must be
+    one of ``SIGNAL_KEYS``.
+    """
+
+    source: Literal["signals"]
+    code: str
+    key: str  # one of SIGNAL_KEYS
+
+
+ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef | SignalsValueRef
 
 
 def parse_value_ref(raw: Any) -> ValueRef:
@@ -88,4 +103,12 @@ def parse_value_ref(raw: Any) -> ValueRef:
         if not isinstance(field_, str) or not field_:
             raise ConditionParseError("weather ref missing 'field'")
         return WeatherValueRef(source="weather", scope=scope, field=field_)
+    if source == "signals":
+        code = raw.get("code")
+        if not isinstance(code, str) or not code:
+            raise ConditionParseError("signals ref missing 'code'")
+        key = raw.get("key", "value_numeric")
+        if key not in SIGNAL_KEYS:
+            raise ConditionParseError(f"signals ref 'key' must be one of {SIGNAL_KEYS}")
+        return SignalsValueRef(source="signals", code=code, key=key)
     raise ConditionParseError(f"unknown value-ref source {source!r}")

@@ -43,6 +43,7 @@ from app.modules.recommendations.events import (
     RecommendationOpenedV1,
 )
 from app.modules.recommendations.repository import RecommendationsRepository
+from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.conditions import ConditionContext
 from app.shared.db.ids import uuid7
@@ -132,15 +133,19 @@ class RecommendationsServiceImpl:
                 "recommendations_opened": 0,
             }
 
-        # Pull weather once per evaluation pass; the loader returns an
-        # all-None snapshot when the farm has no provider data yet, so
-        # weather predicates fail closed without spurious fires.
+        # Pull weather + signals once per evaluation pass. Both loaders
+        # return empty data when the block has no provider/observation
+        # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
+        signals = await load_signals_snapshot(
+            self._tenant, block_id=block_id, farm_id=farm_id
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
             latest_index_aggregates=latest,
             weather=weather,
+            signals=signals,
         )
 
         trees_evaluated = 0

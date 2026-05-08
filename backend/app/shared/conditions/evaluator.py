@@ -39,6 +39,7 @@ from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
     IndicesValueRef,
+    SignalsValueRef,
     ValueRef,
     WeatherValueRef,
     parse_value_ref,
@@ -139,6 +140,11 @@ def _resolve(ref: ValueRef, ctx: ConditionContext) -> Any:
         if scope_dict is None:
             return None
         return scope_dict.get(ref.field)
+    if isinstance(ref, SignalsValueRef):
+        entry = ctx.signals.get(ref.code)
+        if entry is None:
+            return None
+        return getattr(entry, ref.key, None)
     return None
 
 
@@ -147,6 +153,8 @@ def _ref_key(ref: ValueRef) -> str:
         return f"indices.{ref.index_code}.{ref.key}"
     if isinstance(ref, WeatherValueRef):
         return f"weather.{ref.scope}.{ref.field}"
+    if isinstance(ref, SignalsValueRef):
+        return f"signals.{ref.code}.{ref.key}"
     return f"block.{ref.field}"
 
 
