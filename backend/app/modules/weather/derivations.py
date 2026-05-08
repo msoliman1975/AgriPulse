@@ -126,9 +126,9 @@ def aggregate_one_day(rows: Sequence[HourlyRow], on_date: date_type) -> DailyDer
         temp_min_c=temp_min,
         temp_max_c=temp_max,
         temp_mean_c=temp_mean,
-        precip_mm_daily=precip_total.quantize(Decimal("0.01"))
-        if precip_total is not None
-        else None,
+        precip_mm_daily=(
+            precip_total.quantize(Decimal("0.01")) if precip_total is not None else None
+        ),
         et0_mm_daily=et0_total.quantize(Decimal("0.01")) if et0_total is not None else None,
         gdd_base10=gdd_base10.quantize(Decimal("0.01")) if gdd_base10 is not None else None,
         gdd_base15=gdd_base15.quantize(Decimal("0.01")) if gdd_base15 is not None else None,

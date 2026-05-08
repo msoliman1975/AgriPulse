@@ -80,24 +80,30 @@ export interface FarmListParams {
   include_archived?: boolean;
 }
 
+// Backend serializes area_m2 / area_value as Decimal (JSON string). Coerce
+// to number at the boundary so render code can call .toFixed() etc.
+function normalizeFarm<T extends { area_m2: unknown; area_value: unknown }>(f: T): T {
+  return { ...f, area_m2: Number(f.area_m2 ?? 0), area_value: Number(f.area_value ?? 0) };
+}
+
 export async function listFarms(params: FarmListParams = {}): Promise<CursorPage<Farm>> {
   const { data } = await apiClient.get<CursorPage<Farm>>("/v1/farms", { params });
-  return data;
+  return { ...data, items: data.items.map(normalizeFarm) };
 }
 
 export async function getFarm(farmId: string): Promise<FarmDetail> {
   const { data } = await apiClient.get<FarmDetail>(`/v1/farms/${farmId}`);
-  return data;
+  return normalizeFarm(data);
 }
 
 export async function createFarm(payload: FarmCreatePayload): Promise<FarmDetail> {
   const { data } = await apiClient.post<FarmDetail>("/v1/farms", payload);
-  return data;
+  return normalizeFarm(data);
 }
 
 export async function updateFarm(farmId: string, payload: FarmUpdatePayload): Promise<FarmDetail> {
   const { data } = await apiClient.patch<FarmDetail>(`/v1/farms/${farmId}`, payload);
-  return data;
+  return normalizeFarm(data);
 }
 
 export async function archiveFarm(farmId: string): Promise<void> {

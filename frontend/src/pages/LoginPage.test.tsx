@@ -31,7 +31,7 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Sign in to MissionAgre" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sign in to Agri.Pulse" })).toBeInTheDocument();
     expect(document.documentElement.getAttribute("dir")).toBe("ltr");
   });
 
@@ -42,7 +42,7 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "تسجيل الدخول إلى ميشن أجري" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "تسجيل الدخول إلى أجري.بَلس" })).toBeInTheDocument();
     expect(document.documentElement.getAttribute("dir")).toBe("rtl");
   });
 });

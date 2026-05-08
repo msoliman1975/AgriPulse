@@ -85,9 +85,9 @@ def _hourly_fc(
         time=datetime.fromisoformat(iso_utc).replace(tzinfo=UTC),
         air_temp_c=Decimal(str(temp)),
         precipitation_mm=Decimal(str(precip)),
-        precipitation_probability_pct=Decimal(str(precip_prob))
-        if precip_prob is not None
-        else None,
+        precipitation_probability_pct=(
+            Decimal(str(precip_prob)) if precip_prob is not None else None
+        ),
     )
 
 

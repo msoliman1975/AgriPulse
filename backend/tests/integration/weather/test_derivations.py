@@ -165,9 +165,8 @@ def test_cumulative_gdd_resets_at_year_boundary() -> None:
 def test_rolling_precip_window_inclusive() -> None:
     """7-day window includes the target date and the prior 6 days."""
     by_day = {
-        date(2026, 5, 6) - timedelta(days=offset): _daily(
-            date(2026, 5, 6) - timedelta(days=offset), precip=1.0
-        )
+        date(2026, 5, 6)
+        - timedelta(days=offset): _daily(date(2026, 5, 6) - timedelta(days=offset), precip=1.0)
         for offset in range(10)
     }
     total = rolling_precip_total(by_day, date(2026, 5, 6), window_days=7)

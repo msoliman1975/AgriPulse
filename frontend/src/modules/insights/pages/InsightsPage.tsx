@@ -30,11 +30,17 @@ export function InsightsPage(): ReactNode {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">
-            {greeting}.
-          </h1>
-          <p className="mt-1 text-sm text-ap-muted">
+        <div className="flex items-start gap-3">
+          <img
+            src="/agripulse-mark.png"
+            alt="Agri.Pulse"
+            className="h-12 w-12 shrink-0 object-contain"
+          />
+          <div>
+            <h1 className="text-2xl font-semibold text-ap-ink">
+              {greeting}.
+            </h1>
+            <div className="mt-1 text-sm text-ap-muted">
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-64" />
             ) : (
@@ -43,14 +49,15 @@ export function InsightsPage(): ReactNode {
                 {farm ? (
                   <>
                     {" · "}
-                    {(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
+                    {Number(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
                     {" · "}
                     {format(new Date(), "EEEE, MMMM d")}
                   </>
                 ) : null}
               </>
             )}
-          </p>
+            </div>
+          </div>
         </div>
         <button
           type="button"

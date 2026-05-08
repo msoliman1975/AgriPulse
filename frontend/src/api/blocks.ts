@@ -105,17 +105,23 @@ export interface AutoGridResponse {
   candidates: AutoGridCandidate[];
 }
 
+// Backend serializes area_m2 / area_value as Decimal (JSON string). Coerce
+// to number at the boundary so render code can call .toFixed() etc.
+function normalizeBlock<T extends { area_m2: unknown; area_value: unknown }>(b: T): T {
+  return { ...b, area_m2: Number(b.area_m2 ?? 0), area_value: Number(b.area_value ?? 0) };
+}
+
 export async function listBlocks(
   farmId: string,
   params: BlockListParams = {},
 ): Promise<CursorPage<Block>> {
   const { data } = await apiClient.get<CursorPage<Block>>(`/v1/farms/${farmId}/blocks`, { params });
-  return data;
+  return { ...data, items: data.items.map(normalizeBlock) };
 }
 
 export async function getBlock(blockId: string): Promise<BlockDetail> {
   const { data } = await apiClient.get<BlockDetail>(`/v1/blocks/${blockId}`);
-  return data;
+  return normalizeBlock(data);
 }
 
 export async function createBlock(
@@ -123,7 +129,7 @@ export async function createBlock(
   payload: BlockCreatePayload,
 ): Promise<BlockDetail> {
   const { data } = await apiClient.post<BlockDetail>(`/v1/farms/${farmId}/blocks`, payload);
-  return data;
+  return normalizeBlock(data);
 }
 
 export async function updateBlock(
@@ -131,7 +137,7 @@ export async function updateBlock(
   payload: BlockUpdatePayload,
 ): Promise<BlockDetail> {
   const { data } = await apiClient.patch<BlockDetail>(`/v1/blocks/${blockId}`, payload);
-  return data;
+  return normalizeBlock(data);
 }
 
 export async function archiveBlock(blockId: string): Promise<void> {
