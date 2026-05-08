@@ -3,12 +3,18 @@ import { format } from "date-fns";
 import type { ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
+import { useEffect, useState } from "react";
+
 import { getFarm } from "@/api/farms";
+import { listBlocks, type Block } from "@/api/blocks";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
+import { useCapability } from "@/rbac/useCapability";
+import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { AlertsFeedCard } from "../components/AlertsFeedCard";
 import { KPICards } from "../components/KPICards";
 import { LandUnitHealthTable } from "../components/LandUnitHealthTable";
+import { LatestSignalsCard } from "../components/LatestSignalsCard";
 import { TrendChartCard } from "../components/TrendChartCard";
 import { UpcomingActivitiesCard } from "../components/UpcomingActivitiesCard";
 
@@ -20,6 +26,24 @@ export function InsightsPage(): ReactNode {
     queryFn: () => getFarm(farmId!),
     enabled: Boolean(farmId),
   });
+  const canReadWeather = useCapability("weather.read", { farmId });
+
+  // Pull the farm's first block so we can mount the WeatherForecastPanel,
+  // which keys on block_id but resolves to the farm's centroid internally.
+  const [firstBlock, setFirstBlock] = useState<Block | null>(null);
+  useEffect(() => {
+    if (!farmId) return;
+    let cancelled = false;
+    void listBlocks(farmId)
+      .then((page) => {
+        if (cancelled) return;
+        setFirstBlock(page.items[0] ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [farmId]);
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -73,10 +97,18 @@ export function InsightsPage(): ReactNode {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <TrendChartCard farmId={farmId} />
+          {canReadWeather && firstBlock ? (
+            <WeatherForecastPanel
+              blockId={firstBlock.id}
+              farmId={farmId}
+              farmName={farm?.name ?? null}
+            />
+          ) : null}
           <LandUnitHealthTable farmId={farmId} />
         </div>
         <div className="flex flex-col gap-4">
           <AlertsFeedCard farmId={farmId} />
+          <LatestSignalsCard farmId={farmId} />
           <UpcomingActivitiesCard farmId={farmId} />
         </div>
       </div>

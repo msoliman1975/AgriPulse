@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useAlerts } from "@/queries/alerts";
 import { useIrrigationSchedules } from "@/queries/irrigation";
 import { useCalendar } from "@/queries/plans";
+import { useRecommendations } from "@/queries/recommendations";
+import { useSignalObservations } from "@/queries/signals";
 import { KPICard } from "@/components/KPICard";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
@@ -53,8 +55,14 @@ export function KPICards({ farmId }: Props): ReactNode {
   const calendarQuery = useCalendar(farmId, today, weekOut);
   const upcomingCount = calendarQuery.data?.activities.length ?? 0;
 
+  const recsQuery = useRecommendations({ farm_id: farmId, state: "open" });
+  const openRecCount = recsQuery.data?.length ?? 0;
+
+  const signalsQuery = useSignalObservations({ farm_id: farmId, limit: 1 });
+  const latestSignalAt = signalsQuery.data?.[0]?.time;
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       <KPICard
         title="Land units"
         value={blocksQuery.isLoading ? <Skeleton className="h-8 w-12" /> : totalBlocks}
@@ -79,6 +87,15 @@ export function KPICards({ farmId }: Props): ReactNode {
             <Pill kind="ok">healthy</Pill>
           )
         }
+        onClick={() => navigate(`/alerts/${farmId}`)}
+      />
+      <KPICard
+        title="Open recommendations"
+        value={
+          recsQuery.isLoading ? <Skeleton className="h-8 w-12" /> : openRecCount
+        }
+        hint={openRecCount === 0 ? "Nothing pending" : "Apply, dismiss, or defer"}
+        onClick={() => navigate(`/recommendations/${farmId}`)}
       />
       <KPICard
         title="Upcoming activities"
@@ -95,6 +112,31 @@ export function KPICards({ farmId }: Props): ReactNode {
         }
         onClick={() => navigate(`/plan/${farmId}`)}
       />
+      <KPICard
+        title="Latest signal"
+        value={
+          signalsQuery.isLoading ? (
+            <Skeleton className="h-8 w-12" />
+          ) : latestSignalAt ? (
+            relativeShort(latestSignalAt)
+          ) : (
+            "—"
+          )
+        }
+        hint={latestSignalAt ? "Most recent observation" : "No observations yet"}
+        onClick={() => navigate(`/signals/${farmId}`)}
+      />
     </div>
   );
+}
+
+function relativeShort(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.round(hr / 24);
+  return `${d}d ago`;
 }
