@@ -8,6 +8,7 @@ import {
   InsightsIcon,
   LandUnitsIcon,
   PlanIcon,
+  RecommendationsIcon,
   ReportsIcon,
   RulesIcon,
   UsersIcon,
@@ -103,6 +104,13 @@ export function SideNav(): ReactNode {
           icon={<AlertsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/alerts/"
+        />
+        <SideNavItem
+          to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
+          label="Recommendations"
+          icon={<RecommendationsIcon className="h-4 w-4" />}
+          disabled={!hasFarm}
+          activePathPrefix="/recommendations/"
         />
         <SideNavItem
           to={hasFarm ? `/plan/${farmSegment}` : "#"}

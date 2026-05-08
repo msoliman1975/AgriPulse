@@ -24,6 +24,7 @@ import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { PlanPage } from "@/modules/plan/pages/PlanPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
+import { RecommendationsPage } from "@/modules/recommendations/pages/RecommendationsPage";
 import { ReportsPage } from "@/modules/reports/pages/ReportsPage";
 import { RulesConfigPage } from "@/modules/config/pages/RulesConfigPage";
 import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherConfigPage";
@@ -80,6 +81,7 @@ export function App(): ReactNode {
               <Route path="/insights/:farmId" element={<InsightsPage />} />
               <Route path="/plan/:farmId" element={<PlanPage />} />
               <Route path="/alerts/:farmId" element={<AlertsPage />} />
+              <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />
               <Route path="/reports/:farmId" element={<ReportsPage />} />
               <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
               <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />

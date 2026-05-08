@@ -105,6 +105,17 @@ export function AlertsIcon(props: IconProps): ReactNode {
   );
 }
 
+export function RecommendationsIcon(props: IconProps): ReactNode {
+  // Lightbulb — "here's an idea, act on it" affordance.
+  return (
+    <svg {...base(props)}>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7c.6.6 1 1.4 1 2.3v1h6v-1c0-.9.4-1.7 1-2.3A7 7 0 0 0 12 2Z" />
+    </svg>
+  );
+}
+
 export function ReportsIcon(props: IconProps): ReactNode {
   return (
     <svg {...base(props)}>

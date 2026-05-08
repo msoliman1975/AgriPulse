@@ -39,7 +39,10 @@ export type Capability =
   | "plan.manage"
   | "plan_activity.complete"
   | "irrigation.schedule.read"
-  | "irrigation.schedule.manage";
+  | "irrigation.schedule.manage"
+  | "recommendation.read"
+  | "recommendation.act"
+  | "decision_tree.read";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -61,6 +64,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "alert_rule.read",
     "plan.read",
     "irrigation.schedule.read",
+    "recommendation.read",
+    "decision_tree.read",
   ]),
   TenantOwner: tenantWideCaps(),
   TenantAdmin: tenantWideCaps(),
@@ -100,6 +105,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_activity.complete",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
+    "recommendation.read",
+    "recommendation.act",
   ]),
   Agronomist: new Set<Capability>([
     "farm.read",
@@ -124,6 +131,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_activity.complete",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
+    "recommendation.read",
+    "recommendation.act",
   ]),
   FieldOperator: new Set<Capability>([
     "farm.read",
@@ -139,6 +148,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "irrigation.schedule.read",
+    "recommendation.read",
   ]),
   Scout: new Set<Capability>([
     "farm.read",
@@ -150,6 +160,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "weather.read",
     "alert.read",
     "plan.read",
+    "recommendation.read",
   ]),
   Viewer: new Set<Capability>([
     "farm.read",
@@ -162,6 +173,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "alert.read",
     "plan.read",
     "irrigation.schedule.read",
+    "recommendation.read",
   ]),
 };
 
@@ -204,6 +216,9 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "plan_activity.complete",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
+    "recommendation.read",
+    "recommendation.act",
+    "decision_tree.read",
   ]);
 }
 
