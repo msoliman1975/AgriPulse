@@ -205,7 +205,11 @@ class NotificationsRepository:
                 },
             )
         except IntegrityError as exc:
-            if "uq_notification_dispatches_alert_chan_user_active" in str(exc):
+            msg = str(exc)
+            if (
+                "uq_notification_dispatches_alert_chan_user_active" in msg
+                or "uq_notification_dispatches_rec_chan_user_active" in msg
+            ):
                 return False
             raise
         return True

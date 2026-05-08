@@ -35,6 +35,7 @@ from app.modules.notifications.events import InboxItemCreatedV1
 from app.modules.notifications.smtp import SmtpSendError, send_email
 from app.modules.notifications.templates import render
 from app.modules.notifications.webhook import WebhookSendError, send_webhook
+from app.modules.recommendations.events import RecommendationOpenedV1
 from app.shared.db.session import sanitize_tenant_schema
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.realtime import publish_to_user
@@ -261,7 +262,8 @@ def _build_render_ctx(
 def _insert_dispatch(
     session: Session,
     *,
-    alert_id: UUID,
+    alert_id: UUID | None = None,
+    recommendation_id: UUID | None = None,
     template_code: str,
     locale: str,
     channel: str,
@@ -276,21 +278,23 @@ def _insert_dispatch(
     # rolls back the inner transaction. Without this, a constraint
     # violation aborts the outer transaction and every subsequent query
     # fails with "current transaction is aborted". This matters when
-    # the handler runs twice for the same alert (e.g. duplicate
+    # the handler runs twice for the same source row (e.g. duplicate
     # subscriber registration in tests, or re-evaluation of a still-
-    # firing rule before the prior alert is resolved).
+    # active rule/tree before the prior row is resolved).
+    if (alert_id is None) == (recommendation_id is None):
+        raise ValueError("exactly one of alert_id / recommendation_id must be set")
     sp = session.begin_nested()
     try:
         session.execute(
             text(
                 """
                 INSERT INTO notification_dispatches (
-                    alert_id, template_code, locale, channel,
+                    alert_id, recommendation_id, template_code, locale, channel,
                     recipient_user_id, recipient_address,
                     status, rendered_subject, rendered_body, error,
                     sent_at
                 ) VALUES (
-                    :alert_id, :code, :loc, :chan,
+                    :alert_id, :rec_id, :code, :loc, :chan,
                     :uid, :addr,
                     :status, :rs, :rb, :err,
                     CASE WHEN :status = 'sent' THEN now() ELSE NULL END
@@ -299,6 +303,7 @@ def _insert_dispatch(
             ),
             {
                 "alert_id": alert_id,
+                "rec_id": recommendation_id,
                 "code": template_code,
                 "loc": locale,
                 "chan": channel,
@@ -313,7 +318,11 @@ def _insert_dispatch(
         sp.commit()
     except IntegrityError as exc:
         sp.rollback()
-        if "uq_notification_dispatches_alert_chan_user_active" in str(exc):
+        msg = str(exc)
+        if (
+            "uq_notification_dispatches_alert_chan_user_active" in msg
+            or "uq_notification_dispatches_rec_chan_user_active" in msg
+        ):
             return False
         raise
     return True
@@ -323,26 +332,30 @@ def _insert_inbox_item(
     session: Session,
     *,
     user_id: UUID,
-    alert_id: UUID,
+    alert_id: UUID | None = None,
+    recommendation_id: UUID | None = None,
     severity: str | None,
     title: str,
     body: str,
     link_url: str | None,
 ) -> UUID:
+    if (alert_id is None) == (recommendation_id is None):
+        raise ValueError("exactly one of alert_id / recommendation_id must be set")
     item_id = uuid4()
     session.execute(
         text(
             """
             INSERT INTO in_app_inbox (
-                id, user_id, alert_id, severity, title, body, link_url,
+                id, user_id, alert_id, recommendation_id, severity, title, body, link_url,
                 created_at, updated_at
-            ) VALUES (:id, :uid, :alert_id, :sev, :title, :body, :link, now(), now())
+            ) VALUES (:id, :uid, :alert_id, :rec_id, :sev, :title, :body, :link, now(), now())
             """
         ),
         {
             "id": item_id,
             "uid": user_id,
             "alert_id": alert_id,
+            "rec_id": recommendation_id,
             "sev": severity,
             "title": title,
             "body": body,
@@ -841,14 +854,518 @@ def _on_alert_opened(event: AlertOpenedV1) -> None:
         )
 
 
+# =====================================================================
+# Recommendations fan-out — parallel to the alerts handler above.
+# =====================================================================
+
+
+def _load_decision_tree(session: Session, tree_code: str) -> dict[str, Any] | None:
+    row = (
+        session.execute(
+            text(
+                "SELECT name_en, name_ar FROM public.decision_trees "
+                "WHERE code = :c AND deleted_at IS NULL"
+            ),
+            {"c": tree_code},
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row is not None else None
+
+
+def _build_render_ctx_for_recommendation(
+    *,
+    rec: dict[str, Any],
+    tree: dict[str, Any] | None,
+    locale: str,
+    tenant_id: UUID,
+) -> dict[str, Any]:
+    """Variables exposed to the recommendation template renderer."""
+    is_ar = locale == "ar"
+    severity_label = (
+        {
+            "info": "Info",
+            "warning": "Warning",
+            "critical": "Critical",
+        }
+        .get(rec["severity"], rec["severity"])
+        .upper()
+    )
+    text_localized = rec.get("text_ar") if is_ar else rec.get("text_en")
+    tree_name = (
+        (tree.get("name_ar") if is_ar else tree.get("name_en"))
+        if tree is not None
+        else rec["tree_code"]
+    ) or rec["tree_code"]
+    return {
+        "tenant_id": str(tenant_id),
+        "recommendation_id": str(rec["recommendation_id"]),
+        "block_id": str(rec["block_id"]),
+        "block_code": rec.get("block_code"),
+        "farm_id": str(rec["farm_id"]),
+        "farm_name": rec.get("farm_name"),
+        "tree_code": rec["tree_code"],
+        "tree_name": tree_name,
+        "action_type": rec["action_type"],
+        "severity": rec["severity"],
+        "severity_label": severity_label,
+        "text": text_localized or "",
+        "fired_at": rec["created_at"].isoformat() if rec.get("created_at") else "",
+        "evaluation_snapshot_json": json.dumps(rec.get("evaluation_snapshot") or {}),
+        "link_url": f"/recommendations/{rec['farm_id']}?recommendation={rec['recommendation_id']}",
+    }
+
+
+def _dispatch_rec_channel_for_user(
+    session: Session,
+    *,
+    event: RecommendationOpenedV1,
+    user: dict[str, Any],
+    channel: str,
+    locale: str,
+    effective_channels: list[str],
+    tenant_id: UUID,
+    rec: dict[str, Any],
+    tree: dict[str, Any] | None,
+) -> InboxItemCreatedV1 | None:
+    """Per-(user, channel) fan-out for a recommendation. Returns the
+    inbox event when in_app inserted a row so the caller can publish to
+    SSE after commit.
+    """
+    if channel not in effective_channels:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel=channel,
+            recipient_user_id=user["user_id"],
+            recipient_address=user.get("email") if channel == "email" else None,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=None,
+            error="channel disabled by tenant or user",
+        )
+        return None
+
+    template = _load_template(
+        session, template_code="recommendation_opened", locale=locale, channel=channel
+    )
+    if template is None:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel=channel,
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="failed",
+            rendered_subject=None,
+            rendered_body=None,
+            error="template not found",
+        )
+        return None
+
+    ctx = _build_render_ctx_for_recommendation(
+        rec=rec, tree=tree, locale=locale, tenant_id=tenant_id
+    )
+    subject = render(template["subject"], ctx)
+    body = render(template["body"], ctx)
+
+    if channel == "in_app":
+        item_id = _insert_inbox_item(
+            session,
+            user_id=user["user_id"],
+            recommendation_id=event.recommendation_id,
+            severity=rec["severity"],
+            title=subject,
+            body=body,
+            link_url=ctx["link_url"],
+        )
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel="in_app",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="sent",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=None,
+        )
+        return InboxItemCreatedV1(
+            inbox_item_id=item_id,
+            user_id=user["user_id"],
+            tenant_id=tenant_id,
+            recommendation_id=event.recommendation_id,
+            severity=rec["severity"],
+            title=subject,
+            body=body,
+            link_url=ctx["link_url"],
+            created_at=event.created_at,
+        )
+
+    # email
+    _send_rec_email_channel(
+        session,
+        event=event,
+        user=user,
+        locale=locale,
+        subject=subject,
+        body=body,
+        body_html=template.get("body_html"),
+    )
+    return None
+
+
+def _send_rec_email_channel(
+    session: Session,
+    *,
+    event: RecommendationOpenedV1,
+    user: dict[str, Any],
+    locale: str,
+    subject: str,
+    body: str,
+    body_html: str | None,
+) -> None:
+    address = user.get("email")
+    if not address:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error="user has no email address",
+        )
+        return
+
+    try:
+        send_email(
+            to_address=address,
+            subject=subject,
+            body_text=body,
+            body_html=body_html,
+        )
+    except SmtpSendError as exc:
+        _log.warning(
+            "rec_email_send_failed",
+            recommendation_id=str(event.recommendation_id),
+            user_id=str(user["user_id"]),
+            error=str(exc),
+        )
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=address,
+            status="failed",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=str(exc)[:1000],
+        )
+        return
+
+    _insert_dispatch(
+        session,
+        recommendation_id=event.recommendation_id,
+        template_code="recommendation_opened",
+        locale=locale,
+        channel="email",
+        recipient_user_id=user["user_id"],
+        recipient_address=address,
+        status="sent",
+        rendered_subject=subject,
+        rendered_body=body,
+        error=None,
+    )
+
+
+def _dispatch_rec_webhook_once(
+    session: Session,
+    *,
+    event: RecommendationOpenedV1,
+    tenant_channels: list[str],
+    tenant_id: UUID,
+    rec: dict[str, Any],
+    tree: dict[str, Any] | None,
+) -> None:
+    """Single per-recommendation webhook dispatch, mirroring the alerts
+    webhook path. The body is the structured JSON event itself; we
+    render the template's body for parity in the dispatch audit log.
+    """
+    if "webhook" not in tenant_channels:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=None,
+            error="channel disabled by tenant",
+        )
+        return
+
+    webhook_url, kms_key = _load_webhook_target(session, tenant_id)
+    webhook_secret = _resolve_webhook_secret(kms_key)
+    template = _load_template(
+        session,
+        template_code="recommendation_opened",
+        locale=_DEFAULT_LOCALE,
+        channel="webhook",
+    )
+    if template is None:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=webhook_url,
+            status="failed",
+            rendered_subject=None,
+            rendered_body=None,
+            error="template not found",
+        )
+        return
+
+    ctx = _build_render_ctx_for_recommendation(
+        rec=rec, tree=tree, locale=_DEFAULT_LOCALE, tenant_id=tenant_id
+    )
+    if not webhook_url:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=None,
+            error="tenant has no webhook_endpoint_url",
+        )
+        return
+    if not webhook_secret:
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=webhook_url,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=None,
+            error="no signing secret configured (KMS not wired and webhook_dev_secret empty)",
+        )
+        return
+
+    rendered = render(template["body"], ctx)
+    delivery_id = uuid4()
+    payload = {
+        "event": "recommendation.opened",
+        "delivery_id": str(delivery_id),
+        "tenant_id": ctx.get("tenant_id"),
+        "recommendation_id": str(event.recommendation_id),
+        "block_id": str(event.block_id),
+        "farm_id": str(event.farm_id),
+        "tree_code": event.tree_code,
+        "tree_version": event.tree_version,
+        "action_type": event.action_type,
+        "severity": event.severity,
+        "fired_at": event.created_at.isoformat(),
+        "evaluation_snapshot": event.evaluation_snapshot or {},
+    }
+
+    try:
+        result = send_webhook(
+            url=webhook_url,
+            secret=webhook_secret,
+            event_name="recommendation.opened",
+            delivery_id=delivery_id,
+            body=payload,
+        )
+    except WebhookSendError as exc:
+        _log.warning(
+            "rec_webhook_send_failed",
+            recommendation_id=str(event.recommendation_id),
+            url=webhook_url,
+            error=str(exc),
+        )
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=webhook_url,
+            status="failed",
+            rendered_subject=None,
+            rendered_body=rendered,
+            error=str(exc)[:1000],
+        )
+        return
+
+    _insert_dispatch(
+        session,
+        recommendation_id=event.recommendation_id,
+        template_code="recommendation_opened",
+        locale=_DEFAULT_LOCALE,
+        channel="webhook",
+        recipient_user_id=None,
+        recipient_address=webhook_url,
+        status="sent",
+        rendered_subject=f"HTTP {result.status_code}",
+        rendered_body=rendered,
+        error=None,
+    )
+
+
+def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
+    """Fan out an opened recommendation to every (user, channel) pair
+    the tenant has subscribed to. Mirrors ``_on_alert_opened``."""
+    schema = event.tenant_schema
+    if schema is None:
+        _log.warning(
+            "recommendation_opened_missing_tenant_schema",
+            recommendation_id=str(event.recommendation_id),
+        )
+        return
+    try:
+        sanitize_tenant_schema(schema)
+    except ValueError:
+        _log.warning("recommendation_opened_invalid_tenant_schema", schema=schema)
+        return
+
+    factory = _session_factory()
+    bus = get_default_bus()
+    with factory() as session:
+        session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+        tenant_id = _resolve_tenant_id(session, schema)
+        if tenant_id is None:
+            _log.warning("recommendation_opened_tenant_not_found", schema=schema)
+            return
+
+        names = (
+            _load_block_and_farm(session, block_id=event.block_id, farm_id=event.farm_id) or {}
+        )
+        rec: dict[str, Any] = {
+            "recommendation_id": event.recommendation_id,
+            "block_id": event.block_id,
+            "farm_id": event.farm_id,
+            "tree_code": event.tree_code,
+            "tree_version": event.tree_version,
+            "action_type": event.action_type,
+            "severity": event.severity,
+            "text_en": event.text_en,
+            "text_ar": event.text_ar,
+            "evaluation_snapshot": event.evaluation_snapshot,
+            "created_at": event.created_at,
+            "block_code": names.get("block_code"),
+            "farm_code": names.get("farm_code"),
+            "farm_name": names.get("farm_name"),
+        }
+
+        tree = _load_decision_tree(session, event.tree_code)
+        tenant_channels = _load_tenant_channels(session, tenant_id)
+        recipients = _load_recipients(session, farm_id=event.farm_id, tenant_id=tenant_id)
+
+        if not recipients:
+            _log.info(
+                "recommendation_opened_no_recipients",
+                recommendation_id=str(event.recommendation_id),
+                farm_id=str(event.farm_id),
+            )
+            session.commit()
+            return
+
+        inbox_events: list[InboxItemCreatedV1] = []
+        for user in recipients:
+            user_channels = list(user.get("notification_channels") or ["in_app"])
+            effective = [
+                c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS
+            ]
+            locale = user.get("locale") or _DEFAULT_LOCALE
+            for channel in _PER_USER_CHANNELS:
+                inbox = _dispatch_rec_channel_for_user(
+                    session,
+                    event=event,
+                    user=user,
+                    channel=channel,
+                    locale=locale,
+                    effective_channels=effective,
+                    tenant_id=tenant_id,
+                    rec=rec,
+                    tree=tree,
+                )
+                if inbox is not None:
+                    inbox_events.append(inbox)
+
+        _dispatch_rec_webhook_once(
+            session,
+            event=event,
+            tenant_channels=tenant_channels,
+            tenant_id=tenant_id,
+            rec=rec,
+            tree=tree,
+        )
+        session.commit()
+
+    for ev in inbox_events:
+        bus.publish(ev)
+        publish_to_user(
+            tenant_id=ev.tenant_id,
+            user_id=ev.user_id,
+            payload={
+                "id": str(ev.inbox_item_id),
+                "recommendation_id": (
+                    str(ev.recommendation_id) if ev.recommendation_id else None
+                ),
+                "severity": ev.severity,
+                "title": ev.title,
+                "body": ev.body,
+                "link_url": ev.link_url,
+                "created_at": ev.created_at.isoformat(),
+            },
+        )
+
+
 def register_subscribers(bus: EventBus) -> None:
     """Register notifications' cross-module event handlers.
 
     Idempotent — safe to call multiple times (tests do this when they
-    import the module repeatedly across the same process). Returns
-    early if our handler is already attached to ``AlertOpenedV1``.
+    import the module repeatedly across the same process).
     """
-    for sub in bus.handlers_for(AlertOpenedV1):
-        if sub.handler is _on_alert_opened:
-            return
-    bus.register(AlertOpenedV1, _on_alert_opened, mode="sync")
+    has_alert_handler = any(
+        sub.handler is _on_alert_opened for sub in bus.handlers_for(AlertOpenedV1)
+    )
+    if not has_alert_handler:
+        bus.register(AlertOpenedV1, _on_alert_opened, mode="sync")
+
+    has_rec_handler = any(
+        sub.handler is _on_recommendation_opened
+        for sub in bus.handlers_for(RecommendationOpenedV1)
+    )
+    if not has_rec_handler:
+        bus.register(RecommendationOpenedV1, _on_recommendation_opened, mode="sync")
