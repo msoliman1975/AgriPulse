@@ -98,9 +98,9 @@ class TenantUsersService:
                            COALESCE(
                                (
                                  SELECT array_agg(role)
-                                   FROM public.tenant_role_assignments
-                                  WHERE membership_id = m.id
-                                    AND deleted_at IS NULL
+                                   FROM public.tenant_role_assignments tra
+                                  WHERE tra.membership_id = m.id
+                                    AND tra.revoked_at IS NULL
                                ),
                                ARRAY[]::text[]
                            ) AS tenant_roles
