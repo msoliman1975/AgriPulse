@@ -4,12 +4,19 @@ import {
   type Alert,
   type AlertTransitionPayload,
   type ListAlertsParams,
+  type RuleOverrideUpsertPayload,
+  type TenantRule,
+  type TenantRuleCreatePayload,
+  type TenantRuleUpdatePayload,
+  createTenantRule,
+  deleteTenantRule,
   listAlerts,
   listDefaultRules,
   listRuleOverrides,
+  listTenantRules,
   transitionAlert,
+  updateTenantRule,
   upsertRuleOverride,
-  type RuleOverrideUpsertPayload,
 } from "@/api/alerts";
 
 export function useAlerts(params: ListAlertsParams = {}) {
@@ -50,6 +57,48 @@ export function useUpsertRuleOverride() {
     mutationFn: ({ ruleCode, payload }) => upsertRuleOverride(ruleCode, payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["alert_rules", "overrides"] });
+    },
+  });
+}
+
+export function useTenantRules() {
+  return useQuery({
+    queryKey: ["alert_rules", "tenant"] as const,
+    queryFn: listTenantRules,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateTenantRule() {
+  const qc = useQueryClient();
+  return useMutation<TenantRule, Error, TenantRuleCreatePayload>({
+    mutationFn: createTenantRule,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["alert_rules", "tenant"] });
+    },
+  });
+}
+
+export function useUpdateTenantRule() {
+  const qc = useQueryClient();
+  return useMutation<
+    TenantRule,
+    Error,
+    { code: string; payload: TenantRuleUpdatePayload }
+  >({
+    mutationFn: ({ code, payload }) => updateTenantRule(code, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["alert_rules", "tenant"] });
+    },
+  });
+}
+
+export function useDeleteTenantRule() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: deleteTenantRule,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["alert_rules", "tenant"] });
     },
   });
 }

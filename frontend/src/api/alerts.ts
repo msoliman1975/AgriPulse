@@ -114,3 +114,73 @@ export async function evaluateBlock(
   }>(`/v1/blocks/${blockId}/alerts:evaluate`);
   return data;
 }
+
+// --- Tenant-authored rules ------------------------------------------------
+
+export interface TenantRule {
+  id: string;
+  code: string;
+  name_en: string;
+  name_ar: string | null;
+  description_en: string | null;
+  description_ar: string | null;
+  severity: AlertSeverity;
+  status: "active" | "draft" | "retired";
+  applies_to_crop_categories: string[];
+  conditions: Record<string, unknown>;
+  actions: Record<string, unknown>;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TenantRuleCreatePayload {
+  code: string;
+  name_en: string;
+  name_ar?: string | null;
+  description_en?: string | null;
+  description_ar?: string | null;
+  severity?: AlertSeverity;
+  applies_to_crop_categories?: string[];
+  conditions: Record<string, unknown>;
+  actions: Record<string, unknown>;
+}
+
+export interface TenantRuleUpdatePayload {
+  name_en?: string;
+  name_ar?: string | null;
+  description_en?: string | null;
+  description_ar?: string | null;
+  severity?: AlertSeverity;
+  status?: "active" | "draft" | "retired";
+  applies_to_crop_categories?: string[];
+  conditions?: Record<string, unknown>;
+  actions?: Record<string, unknown>;
+}
+
+export async function listTenantRules(): Promise<TenantRule[]> {
+  const { data } = await apiClient.get<TenantRule[]>("/v1/rules/tenant");
+  return data;
+}
+
+export async function createTenantRule(
+  payload: TenantRuleCreatePayload,
+): Promise<TenantRule> {
+  const { data } = await apiClient.post<TenantRule>("/v1/rules/tenant", payload);
+  return data;
+}
+
+export async function updateTenantRule(
+  code: string,
+  payload: TenantRuleUpdatePayload,
+): Promise<TenantRule> {
+  const { data } = await apiClient.patch<TenantRule>(
+    `/v1/rules/tenant/${code}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteTenantRule(code: string): Promise<void> {
+  await apiClient.delete(`/v1/rules/tenant/${code}`);
+}

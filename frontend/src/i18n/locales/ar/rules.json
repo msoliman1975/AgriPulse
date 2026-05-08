@@ -41,5 +41,40 @@
     "active": "نشطة",
     "draft": "مسودة",
     "retired": "متقاعدة"
+  },
+  "tabs": {
+    "platform": "افتراضيات المنصة",
+    "tenant": "قواعد المؤسسة"
+  },
+  "tenant": {
+    "newButton": "قاعدة جديدة",
+    "empty": "لا قواعد للمؤسسة بعد — أنشئ قاعدة لتعريف تنبيه مخصَّص.",
+    "row": {
+      "tenantBadge": "مؤسسة",
+      "edit": "تعديل",
+      "delete": "حذف"
+    }
+  },
+  "form": {
+    "title": "قاعدة جديدة",
+    "editTitle": "تعديل قاعدة",
+    "code": "الرمز",
+    "codeHint": "فريد داخل المؤسسة وكتالوج المنصة. لا يمكن تغييره لاحقًا.",
+    "codePlaceholder": "high_temp_warning",
+    "name_en": "الاسم (إنجليزي)",
+    "name_ar": "الاسم (عربي، اختياري)",
+    "description_en": "الوصف (إنجليزي، اختياري)",
+    "description_ar": "الوصف (عربي، اختياري)",
+    "severity": "الخطورة",
+    "appliesToCrops": "ينطبق على المحاصيل (مفصولة بفواصل، فارغ = الكل)",
+    "conditions": "JSON الشروط",
+    "conditionsHint": "البنية العليا `{type: condition_tree, tree: {...}}`.",
+    "actions": "JSON الإجراءات",
+    "actionsHint": "كائن يحوي diagnosis_en وdiagnosis_ar وprescription_en وprescription_ar.",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "saveFailed": "فشل الحفظ",
+    "cancel": "إلغاء",
+    "invalidJson": "الشروط والإجراءات يجب أن تكون JSON صالح."
   }
 }
