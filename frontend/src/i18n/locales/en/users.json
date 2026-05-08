@@ -1,0 +1,52 @@
+{
+  "page": {
+    "title": "Users & roles",
+    "subtitle": "Tenant-level users and their tenant-wide roles. Per-farm role assignments live on each farm's Members page.",
+    "loadFailed": "Failed to load users.",
+    "empty": "No users in this tenant yet.",
+    "newButton": "Invite user",
+    "missingCapability": "You need the {{capability}} capability to manage users."
+  },
+  "table": {
+    "name": "Name",
+    "email": "Email",
+    "tenantRoles": "Tenant roles",
+    "status": "Status",
+    "lastLogin": "Last login",
+    "actions": "Actions"
+  },
+  "row": {
+    "active": "active",
+    "suspended": "suspended",
+    "archived": "archived",
+    "pendingProvisioning": "pending provisioning",
+    "never": "never",
+    "edit": "Edit",
+    "suspend": "Suspend",
+    "reactivate": "Reactivate",
+    "delete": "Delete"
+  },
+  "invite": {
+    "title": "Invite user",
+    "email": "Email",
+    "fullName": "Full name",
+    "phone": "Phone (optional)",
+    "tenantRole": "Tenant role",
+    "save": "Send invite",
+    "saving": "Inviting…",
+    "saveFailed": "Invite failed",
+    "cancel": "Cancel",
+    "successProvisioned": "Invite sent — Keycloak welcome email queued.",
+    "successPending": "User created in DB; Keycloak provisioning is offline. Operator will provision via kcadm.sh."
+  },
+  "edit": {
+    "title": "Edit user",
+    "fullName": "Full name",
+    "phone": "Phone",
+    "language": "Language",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveFailed": "Save failed",
+    "cancel": "Cancel"
+  }
+}

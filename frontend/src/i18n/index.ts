@@ -14,6 +14,7 @@ import enInsights from "./locales/en/insights.json";
 import enAlerts from "./locales/en/alerts.json";
 import enRules from "./locales/en/rules.json";
 import enImageryWeatherConfig from "./locales/en/imageryWeatherConfig.json";
+import enUsers from "./locales/en/users.json";
 import enAdmin from "./locales/en/admin.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
 import arCommon from "./locales/ar/common.json";
@@ -28,6 +29,7 @@ import arInsights from "./locales/ar/insights.json";
 import arAlerts from "./locales/ar/alerts.json";
 import arRules from "./locales/ar/rules.json";
 import arImageryWeatherConfig from "./locales/ar/imageryWeatherConfig.json";
+import arUsers from "./locales/ar/users.json";
 import arAdmin from "./locales/ar/admin.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
 
@@ -55,6 +57,7 @@ const resources = {
     imageryWeatherConfig: enImageryWeatherConfig,
     admin: enAdmin,
     decisionTrees: enDecisionTrees,
+    users: enUsers,
   },
   ar: {
     common: arCommon,
@@ -71,6 +74,7 @@ const resources = {
     imageryWeatherConfig: arImageryWeatherConfig,
     admin: arAdmin,
     decisionTrees: arDecisionTrees,
+    users: arUsers,
   },
 } as const;
 
@@ -97,6 +101,7 @@ void i18n
       "imageryWeatherConfig",
       "admin",
       "decisionTrees",
+      "users",
     ],
     interpolation: { escapeValue: false },
     detection: {

@@ -13,6 +13,11 @@ vi.mock("@/api/farmMembers", () => ({
   assignFarmMember: vi.fn(),
   revokeFarmMember: vi.fn(),
 }));
+// `useTenantUsers` is a TanStack hook that needs a QueryClient — mock
+// it inline so the test util can stay framework-agnostic.
+vi.mock("@/queries/users", () => ({
+  useTenantUsers: () => ({ data: [], isLoading: false, isError: false }),
+}));
 
 describe("FarmMembersPage", () => {
   it("renders in English (LTR)", async () => {
