@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Rules & thresholds",
+    "subtitle": "Per-rule overrides, severity tweaks, and kill-switches. Defaults are platform-curated; overrides apply tenant-wide.",
+    "loadFailed": "Failed to load rule catalog.",
+    "empty": "No rules in the catalog yet."
+  },
+  "table": {
+    "rule": "Rule",
+    "severity": "Severity",
+    "status": "Status",
+    "actions": "Actions",
+    "appliesAll": "all crops",
+    "appliesSome": "{{categories}}"
+  },
+  "row": {
+    "default": "default",
+    "overridden": "overridden",
+    "disabled": "disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "expand": "Show details",
+    "collapse": "Hide details",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saveFailed": "Save failed",
+    "reset": "Reset to default",
+    "resetting": "Resetting…",
+    "severityOverride": "Override severity",
+    "severityNone": "Use default ({{severity}})",
+    "conditionsHeader": "Conditions",
+    "actionsHeader": "Actions",
+    "missingCapability": "You need the {{capability}} capability to edit rules."
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
+  },
+  "status": {
+    "active": "active",
+    "draft": "draft",
+    "retired": "retired"
+  }
+}

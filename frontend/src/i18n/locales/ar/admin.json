@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "section": "الإدارة",
+    "tenants": "المستأجرون"
+  },
+  "guard": {
+    "forbiddenTitle": "خاص بمسؤول المنصة",
+    "forbiddenBody": "ليس لديك صلاحية لإدارة المستأجرين. سجّل الدخول بحساب PlatformAdmin."
+  },
+  "tenants": {
+    "list": {
+      "title": "المستأجرون",
+      "subtitle": "إنشاء أو تعليق أو استعادة أو حذف مستأجري العملاء.",
+      "newButton": "مستأجر جديد",
+      "searchPlaceholder": "ابحث بالمعرّف أو الاسم…",
+      "filterAll": "الكل",
+      "empty": "لا يوجد مستأجرون مطابقون.",
+      "loading": "جارٍ تحميل المستأجرين…",
+      "errorTitle": "تعذّر تحميل المستأجرين",
+      "headers": {
+        "slug": "المعرّف",
+        "name": "الاسم",
+        "status": "الحالة",
+        "contact": "جهة الاتصال",
+        "created": "تاريخ الإنشاء"
+      },
+      "pagination": {
+        "showing": "عرض {{first}}–{{last}} من {{total}}",
+        "prev": "السابق",
+        "next": "التالي"
+      }
+    },
+    "create": {
+      "title": "مستأجر جديد",
+      "subtitle": "تجهيز مستأجر مع مالك أولي.",
+      "comingSoon": "سيظهر معالج إنشاء المستأجر هنا في PR-E."
+    },
+    "detail": {
+      "title": "تفاصيل المستأجر",
+      "subtitle": "الملف، الإعدادات، وإجراءات دورة الحياة.",
+      "comingSoon": "ستظهر إجراءات دورة الحياة (تعليق/استعادة/حذف/إزالة) هنا في PR-F.",
+      "back": "العودة إلى المستأجرين",
+      "loading": "جارٍ تحميل المستأجر…",
+      "errorTitle": "تعذّر تحميل المستأجر",
+      "profileTitle": "الملف",
+      "settingsTitle": "الإعدادات",
+      "subscriptionTitle": "الاشتراك",
+      "auditTitle": "النشاط الأخير",
+      "auditEmpty": "لم يتم تسجيل أي أحداث على مستوى المنصة بعد.",
+      "fields": {
+        "id": "معرّف المستأجر",
+        "slug": "المعرّف",
+        "schema": "الـ schema",
+        "contactEmail": "البريد الإلكتروني",
+        "contactPhone": "الهاتف",
+        "locale": "اللغة الافتراضية",
+        "unitSystem": "وحدة المساحة الافتراضية",
+        "timezone": "المنطقة الزمنية",
+        "currency": "العملة",
+        "country": "الدولة",
+        "tier": "الفئة",
+        "planType": "الخطة",
+        "startedAt": "بدأ في",
+        "expiresAt": "ينتهي في",
+        "trialWindow": "تجربة",
+        "cloudCoverViz": "نسبة الغيوم (العرض)",
+        "cloudCoverAnalysis": "نسبة الغيوم (التحليل)",
+        "imageryCadence": "تكرار الصور (ساعات)",
+        "alertChannels": "قنوات التنبيه",
+        "webhookUrl": "رابط webhook",
+        "dashboardIndices": "مؤشرات لوحة التحكم",
+        "createdAt": "تاريخ الإنشاء"
+      },
+      "kpi": {
+        "members": "الأعضاء النشطون",
+        "purgeEligible": "متاح للإزالة في"
+      },
+      "banner": {
+        "suspended": "هذا المستأجر معلّق. عمليات الدخول محظورة.",
+        "pending_delete": "هذا المستأجر مُعدّ للحذف. الإزالة متاحة {{when}}.",
+        "pending_provision": "التجهيز قيد الانتظار — لم تكتمل دعوة Keycloak بعد.",
+        "archived": "هذا المستأجر مؤرشف."
+      }
+    },
+    "status": {
+      "active": "نشط",
+      "suspended": "معلّق",
+      "pending_delete": "معلّق للحذف",
+      "pending_provision": "قيد التجهيز",
+      "archived": "مؤرشف"
+    }
+  }
+}

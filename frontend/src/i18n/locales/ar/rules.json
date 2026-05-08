@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "القواعد والحدود",
+    "subtitle": "تعديلات لكل قاعدة، تعديل الخطورة، أو تعطيل. القواعد الافتراضية مُدارة من المنصة؛ التعديلات تنطبق على المؤسسة كلها.",
+    "loadFailed": "فشل تحميل كتالوج القواعد.",
+    "empty": "لا قواعد في الكتالوج بعد."
+  },
+  "table": {
+    "rule": "القاعدة",
+    "severity": "الخطورة",
+    "status": "الحالة",
+    "actions": "الإجراءات",
+    "appliesAll": "جميع المحاصيل",
+    "appliesSome": "{{categories}}"
+  },
+  "row": {
+    "default": "افتراضي",
+    "overridden": "معدَّل",
+    "disabled": "معطَّل",
+    "enable": "تفعيل",
+    "disable": "تعطيل",
+    "expand": "عرض التفاصيل",
+    "collapse": "إخفاء التفاصيل",
+    "save": "حفظ التغييرات",
+    "saving": "جارٍ الحفظ…",
+    "saveFailed": "فشل الحفظ",
+    "reset": "استعادة الافتراضي",
+    "resetting": "جارٍ الاستعادة…",
+    "severityOverride": "تجاوز الخطورة",
+    "severityNone": "استخدام الافتراضي ({{severity}})",
+    "conditionsHeader": "الشروط",
+    "actionsHeader": "الإجراءات",
+    "missingCapability": "تحتاج صلاحية {{capability}} لتعديل القواعد."
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "status": {
+    "active": "نشطة",
+    "draft": "مسودة",
+    "retired": "متقاعدة"
+  }
+}

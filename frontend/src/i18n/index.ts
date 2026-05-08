@@ -12,6 +12,9 @@ import enRecommendations from "./locales/en/recommendations.json";
 import enSignals from "./locales/en/signals.json";
 import enInsights from "./locales/en/insights.json";
 import enAlerts from "./locales/en/alerts.json";
+import enRules from "./locales/en/rules.json";
+import enImageryWeatherConfig from "./locales/en/imageryWeatherConfig.json";
+import enAdmin from "./locales/en/admin.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -22,6 +25,9 @@ import arRecommendations from "./locales/ar/recommendations.json";
 import arSignals from "./locales/ar/signals.json";
 import arInsights from "./locales/ar/insights.json";
 import arAlerts from "./locales/ar/alerts.json";
+import arRules from "./locales/ar/rules.json";
+import arImageryWeatherConfig from "./locales/ar/imageryWeatherConfig.json";
+import arAdmin from "./locales/ar/admin.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -43,6 +49,9 @@ const resources = {
     signals: enSignals,
     insights: enInsights,
     alerts: enAlerts,
+    rules: enRules,
+    imageryWeatherConfig: enImageryWeatherConfig,
+    admin: enAdmin,
   },
   ar: {
     common: arCommon,
@@ -55,6 +64,9 @@ const resources = {
     signals: arSignals,
     insights: arInsights,
     alerts: arAlerts,
+    rules: arRules,
+    imageryWeatherConfig: arImageryWeatherConfig,
+    admin: arAdmin,
   },
 } as const;
 
@@ -77,6 +89,9 @@ void i18n
       "signals",
       "insights",
       "alerts",
+      "rules",
+      "imageryWeatherConfig",
+      "admin",
     ],
     interpolation: { escapeValue: false },
     detection: {

@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Imagery & weather",
+    "subtitle": "Provider configuration, cadence, and cloud-cover thresholds. Per-block management lives on each block's detail page; this view summarises the farm.",
+    "loadFailed": "Failed to load configuration."
+  },
+  "platform": {
+    "heading": "Platform defaults",
+    "vizCloudCover": "Visualization cloud-cover threshold",
+    "aggCloudCover": "Aggregation cloud-cover threshold",
+    "products": "Imagery products available",
+    "productsEmpty": "No imagery products configured."
+  },
+  "blocks": {
+    "heading": "Per-block subscriptions",
+    "empty": "No blocks in this farm yet.",
+    "loadFailed": "Failed to load blocks.",
+    "table": {
+      "block": "Block",
+      "imagery": "Imagery",
+      "weather": "Weather",
+      "lastImagery": "Last imagery",
+      "lastWeather": "Last weather",
+      "actions": "Manage"
+    },
+    "row": {
+      "noSubs": "no subscriptions",
+      "subsCount": "{{count}} provider",
+      "subsCount_plural": "{{count}} providers",
+      "never": "never",
+      "openBlock": "Open block →",
+      "loading": "Loading…"
+    }
+  }
+}

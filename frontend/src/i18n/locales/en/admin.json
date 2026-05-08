@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "section": "Admin",
+    "tenants": "Tenants"
+  },
+  "guard": {
+    "forbiddenTitle": "Platform admin only",
+    "forbiddenBody": "You don't have permission to manage tenants. Sign in with a PlatformAdmin account."
+  },
+  "tenants": {
+    "list": {
+      "title": "Tenants",
+      "subtitle": "Create, suspend, restore, or delete customer tenants.",
+      "newButton": "New tenant",
+      "searchPlaceholder": "Search by slug or name…",
+      "filterAll": "All",
+      "empty": "No tenants match your filters.",
+      "loading": "Loading tenants…",
+      "errorTitle": "Couldn't load tenants",
+      "headers": {
+        "slug": "Slug",
+        "name": "Name",
+        "status": "Status",
+        "contact": "Contact",
+        "created": "Created"
+      },
+      "pagination": {
+        "showing": "Showing {{first}}–{{last}} of {{total}}",
+        "prev": "Previous",
+        "next": "Next"
+      }
+    },
+    "create": {
+      "title": "New tenant",
+      "subtitle": "Provision a tenant with an initial owner.",
+      "comingSoon": "The create-tenant wizard will appear here in PR-E."
+    },
+    "detail": {
+      "title": "Tenant detail",
+      "subtitle": "Profile, settings, and lifecycle actions.",
+      "comingSoon": "Lifecycle actions (suspend / reactivate / delete / purge) will appear here in PR-F.",
+      "back": "Back to tenants",
+      "loading": "Loading tenant…",
+      "errorTitle": "Couldn't load tenant",
+      "profileTitle": "Profile",
+      "settingsTitle": "Settings",
+      "subscriptionTitle": "Subscription",
+      "auditTitle": "Recent activity",
+      "auditEmpty": "No platform-level events recorded yet.",
+      "fields": {
+        "id": "Tenant ID",
+        "slug": "Slug",
+        "schema": "Schema",
+        "contactEmail": "Contact email",
+        "contactPhone": "Contact phone",
+        "locale": "Default locale",
+        "unitSystem": "Default unit system",
+        "timezone": "Timezone",
+        "currency": "Currency",
+        "country": "Country",
+        "tier": "Tier",
+        "planType": "Plan",
+        "startedAt": "Started",
+        "expiresAt": "Expires",
+        "trialWindow": "Trial",
+        "cloudCoverViz": "Cloud-cover (visualization)",
+        "cloudCoverAnalysis": "Cloud-cover (analysis)",
+        "imageryCadence": "Imagery cadence (h)",
+        "alertChannels": "Alert channels",
+        "webhookUrl": "Webhook URL",
+        "dashboardIndices": "Dashboard indices",
+        "createdAt": "Created"
+      },
+      "kpi": {
+        "members": "Active members",
+        "purgeEligible": "Purge eligible at"
+      },
+      "banner": {
+        "suspended": "This tenant is suspended. Sign-ins are blocked.",
+        "pending_delete": "This tenant is marked for deletion. Purge eligible {{when}}.",
+        "pending_provision": "Provisioning pending — Keycloak invite hasn't completed yet.",
+        "archived": "This tenant is archived."
+      }
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "pending_delete": "Pending delete",
+      "pending_provision": "Pending provisioning",
+      "archived": "Archived"
+    }
+  }
+}
