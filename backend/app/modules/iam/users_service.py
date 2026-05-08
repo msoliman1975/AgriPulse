@@ -225,18 +225,29 @@ class TenantUsersService:
                 )
                 # Continue — the DB rows still land below.
                 provisioning_status = "pending"
-        else:
-            # User already exists globally; just join the group for this
-            # tenant. Failure here is non-fatal for the same reason.
+        elif keycloak_subject and not keycloak_subject.startswith("pending::"):
+            # User already exists globally with a real Keycloak subject —
+            # add them to the new tenant's group + assign tenant_role.
             try:
                 group_id = await self._kc.ensure_group(slug)
-                # We don't have an "add user to group" surface yet — fall
-                # through and let the operator wire it via kcadm.sh. Mark
-                # pending so the UI banner appears.
-                del group_id
+                await self._kc.add_existing_user_to_group(
+                    keycloak_user_id=keycloak_subject,
+                    group_id=group_id,
+                    roles=(tenant_role,),
+                )
+                provisioning_status = "succeeded"
+            except KeycloakError as exc:
+                self._log.warning(
+                    "iam_invite_attach_existing_failed",
+                    email=email,
+                    error=str(exc),
+                )
                 provisioning_status = "pending"
-            except KeycloakError:
-                provisioning_status = "pending"
+        else:
+            # Existing global row but Keycloak subject is itself pending
+            # (the original invite couldn't reach KC). Nothing to attach
+            # to — leave pending and the operator runbook handles both.
+            provisioning_status = "pending"
 
         if global_user_row is None:
             user_id = uuid4()
