@@ -105,6 +105,15 @@ export function AlertsIcon(props: IconProps): ReactNode {
   );
 }
 
+export function SignalsIcon(props: IconProps): ReactNode {
+  // Pulse / waveform — a stream of recorded values.
+  return (
+    <svg {...base(props)}>
+      <path d="M3 12h3l3-7 4 14 3-9 2 4h3" />
+    </svg>
+  );
+}
+
 export function RecommendationsIcon(props: IconProps): ReactNode {
   // Lightbulb — "here's an idea, act on it" affordance.
   return (

@@ -11,6 +11,7 @@ import {
   RecommendationsIcon,
   ReportsIcon,
   RulesIcon,
+  SignalsIcon,
   UsersIcon,
 } from "./icons";
 
@@ -113,6 +114,13 @@ export function SideNav(): ReactNode {
           activePathPrefix="/recommendations/"
         />
         <SideNavItem
+          to={hasFarm ? `/signals/${farmSegment}` : "#"}
+          label="Signals"
+          icon={<SignalsIcon className="h-4 w-4" />}
+          disabled={!hasFarm}
+          activePathPrefix="/signals/"
+        />
+        <SideNavItem
           to={hasFarm ? `/plan/${farmSegment}` : "#"}
           label="Plan"
           icon={<PlanIcon className="h-4 w-4" />}
@@ -142,6 +150,13 @@ export function SideNav(): ReactNode {
           icon={<ImageryIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/config/imagery/"
+        />
+        <SideNavItem
+          to={hasFarm ? `/config/signals/${farmSegment}` : "#"}
+          label="Custom signals"
+          icon={<SignalsIcon className="h-4 w-4" />}
+          disabled={!hasFarm}
+          activePathPrefix="/config/signals/"
         />
         <SideNavItem
           to={hasFarm ? `/config/users/${farmSegment}` : "#"}

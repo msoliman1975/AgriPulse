@@ -26,6 +26,8 @@ import { PlanPage } from "@/modules/plan/pages/PlanPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
 import { RecommendationsPage } from "@/modules/recommendations/pages/RecommendationsPage";
 import { ReportsPage } from "@/modules/reports/pages/ReportsPage";
+import { SignalsConfigPage } from "@/modules/signals/pages/SignalsConfigPage";
+import { SignalsLogPage } from "@/modules/signals/pages/SignalsLogPage";
 import { RulesConfigPage } from "@/modules/config/pages/RulesConfigPage";
 import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherConfigPage";
 import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
@@ -82,7 +84,9 @@ export function App(): ReactNode {
               <Route path="/plan/:farmId" element={<PlanPage />} />
               <Route path="/alerts/:farmId" element={<AlertsPage />} />
               <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />
+              <Route path="/signals/:farmId" element={<SignalsLogPage />} />
               <Route path="/reports/:farmId" element={<ReportsPage />} />
+              <Route path="/config/signals/:farmId" element={<SignalsConfigPage />} />
               <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
               <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
               <Route path="/config/users/:farmId" element={<UsersConfigPage />} />

@@ -42,7 +42,10 @@ export type Capability =
   | "irrigation.schedule.manage"
   | "recommendation.read"
   | "recommendation.act"
-  | "decision_tree.read";
+  | "decision_tree.read"
+  | "signal.read"
+  | "signal.define"
+  | "signal.record";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -66,6 +69,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "irrigation.schedule.read",
     "recommendation.read",
     "decision_tree.read",
+    "signal.read",
   ]),
   TenantOwner: tenantWideCaps(),
   TenantAdmin: tenantWideCaps(),
@@ -107,6 +111,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "irrigation.schedule.manage",
     "recommendation.read",
     "recommendation.act",
+    "signal.read",
+    "signal.record",
   ]),
   Agronomist: new Set<Capability>([
     "farm.read",
@@ -133,6 +139,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "irrigation.schedule.manage",
     "recommendation.read",
     "recommendation.act",
+    "signal.read",
+    "signal.record",
   ]),
   FieldOperator: new Set<Capability>([
     "farm.read",
@@ -149,6 +157,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_activity.complete",
     "irrigation.schedule.read",
     "recommendation.read",
+    "signal.read",
+    "signal.record",
   ]),
   Scout: new Set<Capability>([
     "farm.read",
@@ -161,6 +171,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "alert.read",
     "plan.read",
     "recommendation.read",
+    "signal.read",
+    "signal.record",
   ]),
   Viewer: new Set<Capability>([
     "farm.read",
@@ -174,6 +186,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "irrigation.schedule.read",
     "recommendation.read",
+    "signal.read",
   ]),
 };
 
@@ -219,6 +232,9 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "recommendation.read",
     "recommendation.act",
     "decision_tree.read",
+    "signal.read",
+    "signal.define",
+    "signal.record",
   ]);
 }
 
