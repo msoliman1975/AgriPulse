@@ -38,6 +38,33 @@ class AuditEvent(Base):
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class AuditEventArchive(Base):
+    """Platform-level audit events that outlive per-tenant schema drops.
+
+    Lives in `public`. Lifecycle operations on tenants (suspend, purge,
+    etc.) write here so the trail survives `DROP SCHEMA tenant_<id>`.
+    """
+
+    __tablename__ = "audit_events_archive"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    actor_kind: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'user'"))
+    subject_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
 class AuditDataChange(Base):
     __tablename__ = "audit_data_changes"
 

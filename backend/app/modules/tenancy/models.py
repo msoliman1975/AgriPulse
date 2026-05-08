@@ -58,6 +58,11 @@ class Tenant(Base, TimestampedMixin):
     branding_color: Mapped[str | None] = mapped_column(Text, nullable=True)
     schema_name: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keycloak_group_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pending_owner_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pending_owner_full_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class TenantSubscription(Base, TimestampedMixin):

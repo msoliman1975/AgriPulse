@@ -22,9 +22,11 @@ skip it; the steps are idempotent.
 
 ---
 
-## 1 — Create the tenant row + per-tenant schema
+## 1 — Create the tenant row + provision the owner in one call
 
-Hit the platform admin endpoint with a `PlatformAdmin` JWT:
+Hit the platform admin endpoint with a `PlatformAdmin` JWT. Pass
+`owner_email` so the same call also creates the Keycloak group, invites
+the user as `TenantOwner`, and triggers the password-reset email:
 
 ```bash
 curl -X POST https://api.missionagre.io/api/v1/admin/tenants \
@@ -35,53 +37,73 @@ curl -X POST https://api.missionagre.io/api/v1/admin/tenants \
     "name": "Acme Farms",
     "legal_name": "Acme Agribusiness LLC",
     "tax_id": "...",
-    "plan": "growth",
-    "primary_locale": "en"
+    "contact_email": "billing@acme-farms.com",
+    "default_locale": "en",
+    "initial_tier": "standard",
+    "owner_email": "owner@acme-farms.com",
+    "owner_full_name": "Owner Name"
   }'
 ```
 
-The endpoint runs every tenant migration in
-`backend/migrations/tenant/versions/` against the new schema in a single
-transaction. Verify in the response that `migrations_applied` matches
-the latest `alembic heads -n tenant` count.
+The endpoint:
+
+- inserts the `public.tenants` / `tenant_settings` / `tenant_subscriptions` rows,
+- creates the per-tenant schema and runs every tenant Alembic migration,
+- creates the Keycloak group `tenant-<slug>` (idempotent),
+- invites the owner, assigns `TenantOwner`, sends the `UPDATE_PASSWORD` email.
+
+Two return-shape signals to check:
+
+| Field | Meaning |
+| --- | --- |
+| `status: "active"` | Full success — tenant + KC provisioning landed. Hand off. |
+| `status: "pending_provision"` + `provisioning_failed: true` | DB side OK, KC failed. Run § 1a. |
+
+The Keycloak SMTP relay is the same one the notifications module uses;
+in dev the email lands at MailHog (http://localhost:8025).
 
 > **Schema name** is auto-derived as `tenant_<uuid_no_dashes>` from the
 > tenant id; the slug is independent. Both are visible on the response.
 
----
+### 1a — If status came back as `pending_provision`
 
-## 2 — Provision the owner in Keycloak
-
-Tenants don't get their own realm — every user lives in the
-`missionagre` realm and is mapped to a tenant via a Keycloak group.
+Re-run provisioning once the underlying issue (Keycloak unreachable,
+realm role missing, etc.) is resolved:
 
 ```bash
-# Create the group if it doesn't exist
+curl -X POST \
+  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/retry-provisioning \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_JWT"
+```
+
+The retry uses the `pending_owner_email` / `pending_owner_full_name`
+fields stored on the row, so no operator input is needed. On success,
+status flips to `active` and those columns clear.
+
+### 1b — `kcadm.sh` fallback (only if the API path is unavailable)
+
+In a disaster where the admin API itself is down but Keycloak is up,
+the legacy manual steps still work:
+
+```bash
 kcadm.sh create groups -r missionagre \
   -s name="tenant-acme-farms" \
   -s 'attributes={"tenant_slug":["acme-farms"]}'
 
-# Invite the owner
 kcadm.sh create users -r missionagre \
   -s username="owner@acme-farms.com" \
   -s email="owner@acme-farms.com" \
-  -s firstName="..." \
-  -s lastName="..." \
-  -s enabled=true
+  -s firstName="..." -s lastName="..." -s enabled=true
 
-# Add to group + set owner role
 kcadm.sh update users/<user-id>/groups/<group-id> -r missionagre
 kcadm.sh add-roles -r missionagre --uusername "owner@acme-farms.com" \
   --rolename TenantOwner
-
-# Trigger the welcome email (sets a temporary password)
 kcadm.sh update users/<user-id>/execute-actions-email -r missionagre \
   -s '["UPDATE_PASSWORD"]'
 ```
 
-Keycloak's email is configured to send via the same SMTP relay the
-notifications module uses. If MailHog is running locally, the email
-lands at http://localhost:8025.
+Then once the admin API is back, hand-set `keycloak_group_id` on the
+tenant row to match the group you created.
 
 ---
 

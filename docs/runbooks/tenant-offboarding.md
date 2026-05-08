@@ -13,28 +13,52 @@ Removing a tenant cleanly. Two paths:
 
 ## Path A: suspend
 
-### 1. Flip the tenant status
+### 1. Suspend via the admin API
+
+```bash
+curl -X POST \
+  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/suspend \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "trial expired"}'
+```
+
+The endpoint:
+
+- flips `tenants.status='suspended'` and stamps `suspended_at`,
+- writes a `platform.tenant_suspended` row to `audit_events_archive`,
+- best-effort disables every Keycloak user in `tenant-<slug>`.
+
+The auth middleware short-TTL-caches `tenants.status`, so existing
+non-platform JWTs start failing closed within ~30s of the call. Beat
+sweeps that walk `tenants WHERE status = 'active'` skip the tenant
+automatically — no separate stop step.
+
+### 2. Notify customer-success
+
+Add a row in the tracker with the suspension reason + reactivation
+condition. The notifications backbone does not auto-message the
+customer — that's a CS choice.
+
+### Reactivation
+
+```bash
+curl -X POST \
+  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/reactivate \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_JWT"
+```
+
+The endpoint flips status back to `active`, clears `suspended_at`, and
+re-enables Keycloak users in the group. Test by signing in as one
+tenant member.
+
+### Manual fallback (API unavailable)
 
 ```sql
 UPDATE public.tenants
-   SET status = 'suspended', suspended_at = now()
+   SET status = 'suspended', suspended_at = now(), last_status_reason = '...'
  WHERE id = '<tenant-uuid>';
 ```
-
-The auth middleware reads `tenants.status` per request and returns
-`403 tenant-suspended` for any non-platform JWT bound to a suspended
-tenant. Existing sessions fail closed within ~30s (Keycloak token TTL).
-
-### 2. Stop scheduled work
-
-The Beat sweeps walk `tenants WHERE status = 'active'` — suspending
-auto-excludes the tenant from imagery/weather/alerts/recommendations
-sweeps. No further action needed.
-
-### 3. (Optional) Disable Keycloak users
-
-If you want to block the OIDC layer even harder (so a renewed status
-change doesn't accidentally re-enable a long-gone user):
 
 ```bash
 for u in $(kcadm.sh get users -r missionagre -q "groups=tenant-<slug>" --fields username --format csv | tail -n +2); do
@@ -42,24 +66,8 @@ for u in $(kcadm.sh get users -r missionagre -q "groups=tenant-<slug>" --fields 
 done
 ```
 
-Keep the group + memberships; they make re-activation a one-line
-update.
-
-### 4. Notify customer-success
-
-Add a row in the tracker with the suspension reason + reactivation
-condition. The notifications backbone won't auto-message the customer
-— that's a CS choice.
-
-### Reactivation
-
-```sql
-UPDATE public.tenants SET status = 'active', suspended_at = NULL
- WHERE id = '<tenant-uuid>';
-```
-
-Plus re-enable Keycloak users if you disabled them. Test by signing in
-as one tenant member.
+Reactivation is the inverse — flip `status` back to `'active'`, clear
+`suspended_at`, re-enable each KC user.
 
 ---
 
@@ -75,39 +83,46 @@ as one tenant member.
   Glacier — see `runbooks/postgres-failover.md` § "Pre-DDL snapshot"
   for the dump command).
 
-### 1. Drop the tenant schema
+### 1. Mark for deletion (starts the 30-day grace window)
 
-```sql
-DROP SCHEMA tenant_<uuid> CASCADE;
+```bash
+curl -X POST \
+  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/delete \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "customer request, ticket #1234"}'
 ```
 
-This deletes every farm/block/alert/recommendation/observation/audit
-row. There is no soft-delete fallback at the schema level — the dump
-in step 0 is your only recovery path.
+Flips status to `pending_delete`, stamps `deleted_at`, and writes
+`platform.tenant_deletion_requested` to `audit_events_archive`. The
+30-day grace window starts now; `purge_eligible_at` is on the response
+body. Cancel during the window with `POST .../cancel-delete` —
+rolls the tenant back to `suspended` (conservative default; reactivate
+explicitly to allow logins again).
 
-### 2. Cascade-delete public rows
+### 2. Hard-purge after the grace window
 
-```sql
-BEGIN;
-
--- Farm scopes (if `tenant_memberships` references survive after schema drop,
--- the FK to farms is logical, not enforced).
-DELETE FROM public.farm_scopes
- WHERE membership_id IN (
-    SELECT id FROM public.tenant_memberships WHERE tenant_id = '<tenant-uuid>'
- );
-
-DELETE FROM public.tenant_memberships WHERE tenant_id = '<tenant-uuid>';
-DELETE FROM public.tenant_subscriptions WHERE tenant_id = '<tenant-uuid>';
-DELETE FROM public.tenant_settings WHERE tenant_id = '<tenant-uuid>';
-DELETE FROM public.tenants WHERE id = '<tenant-uuid>';
-
-COMMIT;
+```bash
+curl -X POST \
+  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/purge \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"slug_confirmation": "<exact-slug>"}'
 ```
 
-Run this as the platform DBA, not as a normal user — there is no
-RLS policy that would block a misclick from a tenant-scoped session,
-but the DBA-only audit trail is what we use to reconstruct intent.
+The endpoint:
+
+- writes `platform.tenant_purged` to `audit_events_archive` first
+  (durable trail even if the DDL crashes),
+- deletes the public-side rows (`tenants`, `tenant_settings`,
+  `tenant_subscriptions`),
+- `DROP SCHEMA tenant_<id> CASCADE`,
+- best-effort deletes Keycloak users + the `tenant-<slug>` group.
+
+Pass `"force": true` only when the urgent purge has been pre-approved
+(e.g. legal request); it bypasses the grace-window check. The
+`slug_confirmation` field is mandatory either way and must match the
+tenant's slug exactly — guards against fat-finger purges.
 
 ### 3. Remove S3 objects
 
@@ -118,30 +133,47 @@ aws s3 rm "s3://missionagre-uploads/tenants/<tenant-uuid>/" --recursive
 The S3 lifecycle policy will eventually drop them anyway, but explicit
 removal closes the GDPR clock.
 
-### 4. Remove Keycloak users + group
+### Manual fallback (API unavailable)
 
-Keycloak's "Delete user" cascades the role bindings:
+If both the admin API and the API service are down, the original SQL +
+`kcadm.sh` recipe still works:
+
+```sql
+BEGIN;
+DELETE FROM public.farm_scopes
+ WHERE membership_id IN (
+    SELECT id FROM public.tenant_memberships WHERE tenant_id = '<tenant-uuid>'
+ );
+DELETE FROM public.tenant_memberships WHERE tenant_id = '<tenant-uuid>';
+DELETE FROM public.tenant_subscriptions WHERE tenant_id = '<tenant-uuid>';
+DELETE FROM public.tenant_settings WHERE tenant_id = '<tenant-uuid>';
+DELETE FROM public.tenants WHERE id = '<tenant-uuid>';
+DROP SCHEMA tenant_<uuid> CASCADE;
+COMMIT;
+```
 
 ```bash
 for u in $(kcadm.sh get users -r missionagre -q "groups=tenant-<slug>" --fields id --format csv | tail -n +2); do
   kcadm.sh delete "users/$u" -r missionagre
 done
-
 kcadm.sh delete "groups/<group-id>" -r missionagre
 ```
 
-Users who belong to other tenants (rare) keep their accounts; the
-`for` loop only removes the group membership, not the user, when the
-user has additional groups. Verify by hand for any user with mixed
-memberships.
+Users who belong to other tenants (rare) keep their accounts; verify by
+hand for any user with mixed memberships.
 
-### 5. Audit the deletion
+### 4. Audit trail
+
+The API path writes `platform.tenant_deletion_requested` and
+`platform.tenant_purged` rows to `public.audit_events_archive`
+automatically. If you took the manual SQL fallback above instead,
+backfill the archive yourself:
 
 ```sql
 INSERT INTO public.audit_events_archive
   (occurred_at, actor_user_id, event_type, subject_kind, subject_id, details)
 VALUES
-  (now(), '<your-platform-admin-uuid>', 'platform.tenant_deleted', 'tenant',
+  (now(), '<your-platform-admin-uuid>', 'platform.tenant_purged', 'tenant',
    '<tenant-uuid>',
    '{"slug":"<slug>","reason":"customer-request","ticket":"..."}'::jsonb);
 ```
@@ -149,7 +181,7 @@ VALUES
 Note: per-tenant `audit_events` rows are gone with the schema. The
 platform-level archive table is the only durable record.
 
-### 6. Update the customer-success tracker
+### 5. Update the customer-success tracker
 
 Mark closed + reference the deletion-request artifact.
 
