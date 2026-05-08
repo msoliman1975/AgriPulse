@@ -40,6 +40,7 @@ from app.shared.conditions.models import (
     BlockValueRef,
     IndicesValueRef,
     ValueRef,
+    WeatherValueRef,
     parse_value_ref,
 )
 
@@ -131,12 +132,21 @@ def _resolve(ref: ValueRef, ctx: ConditionContext) -> Any:
         if ref.field == "crop_category":
             return ctx.crop_category
         return ctx.block_attributes.get(ref.field)
+    if isinstance(ref, WeatherValueRef):
+        if ctx.weather is None:
+            return None
+        scope_dict = getattr(ctx.weather, ref.scope, None)
+        if scope_dict is None:
+            return None
+        return scope_dict.get(ref.field)
     return None
 
 
 def _ref_key(ref: ValueRef) -> str:
     if isinstance(ref, IndicesValueRef):
         return f"indices.{ref.index_code}.{ref.key}"
+    if isinstance(ref, WeatherValueRef):
+        return f"weather.{ref.scope}.{ref.field}"
     return f"block.{ref.field}"
 
 

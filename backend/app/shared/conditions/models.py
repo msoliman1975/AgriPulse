@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.shared.conditions.context import WEATHER_SCOPES
 from app.shared.conditions.errors import ConditionParseError
 
 INDICES_KEYS: tuple[str, ...] = ("mean", "baseline_deviation")
@@ -36,7 +37,24 @@ class BlockValueRef:
     field: str  # one of BLOCK_FIELDS
 
 
-ValueRef = IndicesValueRef | BlockValueRef
+@dataclass(frozen=True, slots=True)
+class WeatherValueRef:
+    """``{"source":"weather","scope":"forecast_24h","field":"precipitation_mm_total"}``
+
+    ``scope`` selects which dict in ``WeatherSnapshot`` to read from
+    (latest_observation / forecast_24h / forecast_72h / derived_today /
+    derived_yesterday). ``field`` is the key inside that dict — not
+    pre-validated, since the loader is the source of truth for which
+    fields exist per scope. A misspelled field resolves to ``None``,
+    which is permissive-on-missing-data.
+    """
+
+    source: Literal["weather"]
+    scope: str  # one of WEATHER_SCOPES
+    field: str
+
+
+ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef
 
 
 def parse_value_ref(raw: Any) -> ValueRef:
@@ -62,4 +80,12 @@ def parse_value_ref(raw: Any) -> ValueRef:
         if field_ not in BLOCK_FIELDS:
             raise ConditionParseError(f"block ref 'field' must be one of {BLOCK_FIELDS}")
         return BlockValueRef(source="block", field=field_)
+    if source == "weather":
+        scope = raw.get("scope")
+        if scope not in WEATHER_SCOPES:
+            raise ConditionParseError(f"weather ref 'scope' must be one of {WEATHER_SCOPES}")
+        field_ = raw.get("field")
+        if not isinstance(field_, str) or not field_:
+            raise ConditionParseError("weather ref missing 'field'")
+        return WeatherValueRef(source="weather", scope=scope, field=field_)
     raise ConditionParseError(f"unknown value-ref source {source!r}")
