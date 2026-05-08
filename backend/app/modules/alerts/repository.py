@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.alerts.models import Alert, DefaultRule, RuleOverride
+from app.modules.alerts.models import Alert, DefaultRule, RuleOverride, TenantRule
 
 
 def _serialize_jsonb(value: dict[str, Any] | None) -> str | None:
@@ -156,6 +156,137 @@ class AlertsRepository:
         if out is None:
             raise RuntimeError("Override upsert succeeded but row is missing")
         return out
+
+    # ---- Tenant rules (tenant-authored) -------------------------------
+
+    async def list_tenant_rules(
+        self, *, status_filter: str | None = "active"
+    ) -> tuple[dict[str, Any], ...]:
+        stmt = select(TenantRule).where(TenantRule.deleted_at.is_(None))
+        if status_filter:
+            stmt = stmt.where(TenantRule.status == status_filter)
+        stmt = stmt.order_by(TenantRule.code)
+        rows = (await self._tenant.execute(stmt)).scalars().all()
+        return tuple(_tenant_rule_to_dict(r) for r in rows)
+
+    async def get_tenant_rule(self, *, rule_code: str) -> dict[str, Any] | None:
+        stmt = select(TenantRule).where(
+            TenantRule.code == rule_code, TenantRule.deleted_at.is_(None)
+        )
+        row = (await self._tenant.execute(stmt)).scalars().one_or_none()
+        return _tenant_rule_to_dict(row) if row is not None else None
+
+    async def insert_tenant_rule(
+        self,
+        *,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        severity: str,
+        status: str,
+        applies_to_crop_categories: list[str],
+        conditions: dict[str, Any],
+        actions: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO tenant_rules (
+                    code, name_en, name_ar, description_en, description_ar,
+                    severity, status, applies_to_crop_categories,
+                    conditions, actions, version,
+                    created_by, updated_by
+                ) VALUES (
+                    :code, :name_en, :name_ar, :description_en, :description_ar,
+                    :severity, :status, :crops,
+                    CAST(:conditions AS jsonb), CAST(:actions AS jsonb), 1,
+                    :actor, :actor
+                )
+                """
+            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+            {
+                "code": code,
+                "name_en": name_en,
+                "name_ar": name_ar,
+                "description_en": description_en,
+                "description_ar": description_ar,
+                "severity": severity,
+                "status": status,
+                "crops": applies_to_crop_categories,
+                "conditions": _serialize_jsonb(conditions),
+                "actions": _serialize_jsonb(actions),
+                "actor": actor_user_id,
+            },
+        )
+        await self._tenant.flush()
+        out = await self.get_tenant_rule(rule_code=code)
+        if out is None:
+            raise RuntimeError("tenant rule insert succeeded but row is missing")
+        return out
+
+    async def update_tenant_rule(
+        self,
+        *,
+        code: str,
+        updates: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        if not updates:
+            return await self.get_tenant_rule(rule_code=code)
+        # Static allow-list — no caller-supplied identifiers reach the SQL.
+        allowed = {
+            "name_en",
+            "name_ar",
+            "description_en",
+            "description_ar",
+            "severity",
+            "status",
+            "applies_to_crop_categories",
+            "conditions",
+            "actions",
+        }
+        sets: list[str] = []
+        params: dict[str, Any] = {"code": code, "actor": actor_user_id}
+        for col, value in updates.items():
+            if col not in allowed:
+                continue
+            if col in ("conditions", "actions"):
+                sets.append(f"{col} = CAST(:{col} AS jsonb)")
+                params[col] = _serialize_jsonb(value)
+            else:
+                sets.append(f"{col} = :{col}")
+                params[col] = value
+        if not sets:
+            return await self.get_tenant_rule(rule_code=code)
+        # Bump version on every save so an audit trail of changes
+        # exists even though we don't snapshot prior states.
+        sets.extend(
+            ["version = version + 1", "updated_at = now()", "updated_by = :actor"]
+        )
+        await self._tenant.execute(
+            text(
+                f"UPDATE tenant_rules SET {', '.join(sets)} "  # noqa: S608
+                "WHERE code = :code AND deleted_at IS NULL"
+            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+            params,
+        )
+        return await self.get_tenant_rule(rule_code=code)
+
+    async def soft_delete_tenant_rule(
+        self, *, code: str, actor_user_id: UUID | None
+    ) -> bool:
+        result = await self._tenant.execute(
+            text(
+                "UPDATE tenant_rules "
+                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+                "WHERE code = :code AND deleted_at IS NULL"
+            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+            {"code": code, "actor": actor_user_id},
+        )
+        return bool(getattr(result, "rowcount", 0) or 0)
 
     # ---- Alerts (tenant) ----------------------------------------------
 
@@ -403,6 +534,25 @@ class AlertsRepository:
             )
         ).all()
         return tuple(r.id for r in rows)
+
+
+def _tenant_rule_to_dict(row: TenantRule) -> dict[str, Any]:
+    return {
+        "code": row.code,
+        "name_en": row.name_en,
+        "name_ar": row.name_ar,
+        "description_en": row.description_en,
+        "description_ar": row.description_ar,
+        "severity": row.severity,
+        "status": row.status,
+        "applies_to_crop_categories": list(row.applies_to_crop_categories or []),
+        "conditions": row.conditions,
+        "actions": row.actions,
+        "version": row.version,
+        "id": row.id,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    }
 
 
 def _override_to_dict(row: RuleOverride) -> dict[str, Any]:

@@ -70,6 +70,37 @@ class RuleOverride(Base, TimestampedMixin):
     is_disabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
 
 
+class TenantRule(Base, TimestampedMixin):
+    """`tenant_<id>.tenant_rules` — per-tenant authored rules.
+
+    Same shape as `DefaultRule` but lives in the tenant schema. The
+    alerts engine evaluates these in addition to merged defaults +
+    overrides; tenant rules don't go through the override mechanism
+    (a tenant editing their own rule just edits the source).
+    """
+
+    __tablename__ = "tenant_rules"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    severity: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'warning'"))
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    applies_to_crop_categories: Mapped[list[str]] = mapped_column(
+        ARRAY(Text),
+        nullable=False,
+        server_default=text("ARRAY[]::text[]"),
+    )
+    conditions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    actions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
 class Alert(Base, TimestampedMixin):
     """`tenant_<id>.alerts` — fired alerts."""
 
