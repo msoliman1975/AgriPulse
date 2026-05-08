@@ -1,6 +1,9 @@
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useParams } from "react-router-dom";
+
+import { useCapability } from "@/rbac/useCapability";
 
 import {
   AlertsIcon,
@@ -12,6 +15,7 @@ import {
   ReportsIcon,
   RulesIcon,
   SignalsIcon,
+  TenantIcon,
   UsersIcon,
 } from "./icons";
 
@@ -75,6 +79,8 @@ function GroupHeader({ children }: { children: string }): ReactNode {
 export function SideNav(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const hasFarm = Boolean(farmId);
+  const isPlatformAdmin = useCapability("platform.manage_tenants");
+  const { t } = useTranslation("admin");
   // Workspace items resolve their `:farmId` from the URL. When no farm
   // is active (e.g. on the org-admin overview at /farms), they render
   // disabled so clicking won't 404.
@@ -166,6 +172,19 @@ export function SideNav(): ReactNode {
           activePathPrefix="/config/users/"
         />
       </div>
+      {isPlatformAdmin && (
+        <>
+          <GroupHeader>{t("nav.section")}</GroupHeader>
+          <div className="flex flex-col gap-0.5 px-2">
+            <SideNavItem
+              to="/admin/tenants"
+              label={t("nav.tenants")}
+              icon={<TenantIcon className="h-4 w-4" />}
+              activePathPrefix="/admin/tenants"
+            />
+          </div>
+        </>
+      )}
     </nav>
   );
 }

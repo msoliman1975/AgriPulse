@@ -28,6 +28,7 @@ from app.shared.auth.context import (
     TenantRole,
 )
 from app.shared.auth.jwt import InvalidTokenError, JWTValidator, get_default_validator
+from app.shared.auth.tenant_status import get_tenant_status
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -156,6 +157,28 @@ class AuthMiddleware:
             await _send_unauthorized(send, str(exc))
             return
 
+        # Suspend gate: non-platform JWTs bound to a non-active tenant fail
+        # closed. Platform staff retain access so they can reactivate / purge.
+        if context.tenant_id is not None and context.platform_role is None:
+            tenant_status = await get_tenant_status(context.tenant_id)
+            if tenant_status in ("suspended", "pending_delete"):
+                log.info(
+                    "auth_tenant_blocked",
+                    tenant_id=str(context.tenant_id),
+                    tenant_status=tenant_status,
+                    path=path,
+                )
+                await _send_tenant_blocked(send, tenant_status)
+                return
+            if tenant_status == "missing":
+                log.info(
+                    "auth_tenant_missing",
+                    tenant_id=str(context.tenant_id),
+                    path=path,
+                )
+                await _send_tenant_blocked(send, "missing")
+                return
+
         scope.setdefault("state", {})
         # Starlette uses scope["state"] dict; FastAPI surfaces it as request.state.
         # Either way these names are stable contracts other code reads.
@@ -182,6 +205,31 @@ def _extract_bearer_token(request: Request) -> str | None:
     if scheme.lower() != "bearer" or not value:
         return None
     return value.strip()
+
+
+async def _send_tenant_blocked(send: Any, tenant_status: str) -> None:
+    """Send a 403 problem+json body for suspended/pending_delete/missing tenants."""
+    import json
+
+    body = {
+        "type": "https://missionagre.io/problems/tenant-suspended",
+        "title": "Tenant unavailable",
+        "status": 403,
+        "detail": f"Tenant is {tenant_status}; sign-ins are blocked.",
+        "tenant_status": tenant_status,
+    }
+    payload = json.dumps(body).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [
+                (b"content-type", b"application/problem+json"),
+                (b"content-length", str(len(payload)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": payload, "more_body": False})
 
 
 async def _send_unauthorized(send: Any, detail: str) -> None:

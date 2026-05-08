@@ -3,6 +3,8 @@
 // here without adding it to the backend is a no-op (backend will deny).
 
 export type Capability =
+  | "platform.read"
+  | "platform.manage_tenants"
   | "farm.read"
   | "farm.create"
   | "farm.update"
@@ -57,6 +59,7 @@ export type FarmRole = "FarmManager" | "Agronomist" | "FieldOperator" | "Scout" 
 export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = {
   PlatformAdmin: new Set<Capability | "*">(["*"]),
   PlatformSupport: new Set<Capability>([
+    "platform.read",
     "farm.read",
     "farm.member.read",
     "block.read",

@@ -31,9 +31,11 @@ ALEMBIC_INI = Path(app.__file__).resolve().parent.parent / "alembic.ini"
 
 
 class TenantSchemaMigrator(Protocol):
-    """Bootstrap (or upgrade) a single tenant schema to head."""
+    """Bootstrap, upgrade, or drop a single tenant schema."""
 
     def bootstrap(self, schema_name: str) -> None: ...
+
+    def purge(self, schema_name: str) -> None: ...
 
 
 class AlembicTenantMigrator:
@@ -47,6 +49,18 @@ class AlembicTenantMigrator:
         safe = sanitize_tenant_schema(schema_name)
         self._create_schema(safe)
         self._run_alembic_upgrade(safe)
+
+    def purge(self, schema_name: str) -> None:
+        """DROP SCHEMA …CASCADE. Irreversible — caller is responsible for backup."""
+        safe = sanitize_tenant_schema(schema_name)
+        url = str(get_settings().database_sync_url)
+        engine = create_engine(url, future=True)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f'DROP SCHEMA IF EXISTS "{safe}" CASCADE'))
+            self._log.info("tenant_schema_purged", schema=safe)
+        finally:
+            engine.dispose()
 
     def _create_schema(self, schema_name: str) -> None:
         url = str(get_settings().database_sync_url)

@@ -19,7 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.modules.audit.models import AuditEvent
+from app.modules.audit.models import AuditEvent, AuditEventArchive
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, sanitize_tenant_schema
 
@@ -41,6 +41,18 @@ class AuditService(Protocol):
         actor_kind: str = "user",
         client_ip: str | None = None,
         user_agent: str | None = None,
+    ) -> UUID: ...
+
+    async def record_archive(
+        self,
+        *,
+        event_type: str,
+        actor_user_id: UUID | None,
+        subject_kind: str,
+        subject_id: UUID,
+        details: dict[str, Any],
+        correlation_id: UUID | None = None,
+        actor_kind: str = "user",
     ) -> UUID: ...
 
 
@@ -96,6 +108,48 @@ class AuditServiceImpl:
             subject_kind=subject_kind,
             subject_id=str(subject_id),
             tenant_schema=safe_schema,
+        )
+        return event_id
+
+    async def record_archive(
+        self,
+        *,
+        event_type: str,
+        actor_user_id: UUID | None,
+        subject_kind: str,
+        subject_id: UUID,
+        details: dict[str, Any],
+        correlation_id: UUID | None = None,
+        actor_kind: str = "user",
+    ) -> UUID:
+        if actor_kind == "user" and actor_user_id is None:
+            actor_kind = "system"
+
+        event_id = uuid7()
+        when = datetime.now(UTC)
+
+        factory = AsyncSessionLocal()
+        async with factory() as session, session.begin():
+            await session.execute(text("SET LOCAL search_path TO public"))
+            session.add(
+                AuditEventArchive(
+                    id=event_id,
+                    occurred_at=when,
+                    event_type=event_type,
+                    actor_user_id=actor_user_id,
+                    actor_kind=actor_kind,
+                    subject_kind=subject_kind,
+                    subject_id=subject_id,
+                    details=details,
+                    correlation_id=correlation_id,
+                )
+            )
+
+        self._log.info(
+            "audit_archive_recorded",
+            event_type=event_type,
+            subject_kind=subject_kind,
+            subject_id=str(subject_id),
         )
         return event_id
 

@@ -31,6 +31,10 @@ import { SignalsLogPage } from "@/modules/signals/pages/SignalsLogPage";
 import { RulesConfigPage } from "@/modules/config/pages/RulesConfigPage";
 import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherConfigPage";
 import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
+import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
+import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
+import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
+import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { queryClient } from "@/queries/client";
 
 export function App(): ReactNode {
@@ -90,6 +94,13 @@ export function App(): ReactNode {
               <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
               <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
               <Route path="/config/users/:farmId" element={<UsersConfigPage />} />
+              {/* Platform admin tree — capability gate sits inside AdminLayout. */}
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Navigate to="tenants" replace />} />
+                <Route path="tenants" element={<AdminTenantListPage />} />
+                <Route path="tenants/new" element={<AdminTenantCreatePage />} />
+                <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

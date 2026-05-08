@@ -33,7 +33,54 @@
     "create": {
       "title": "New tenant",
       "subtitle": "Provision a tenant with an initial owner.",
-      "comingSoon": "The create-tenant wizard will appear here in PR-E."
+      "step": "Step {{current}} of {{total}}",
+      "steps": {
+        "profile": "Tenant profile",
+        "owner": "Plan & owner",
+        "review": "Review & create"
+      },
+      "fields": {
+        "slug": "Slug",
+        "slugHelp": "URL-safe identifier, 3–32 chars, lowercase letters/digits/hyphens. Permanent.",
+        "name": "Display name",
+        "legalName": "Legal name",
+        "taxId": "Tax ID",
+        "contactEmail": "Contact email",
+        "contactPhone": "Contact phone",
+        "locale": "Default locale",
+        "unitSystem": "Default unit system",
+        "tier": "Plan",
+        "tierHelp": "Initial subscription. Editable later.",
+        "ownerEmail": "Initial owner email",
+        "ownerEmailHelp": "Optional. If set, we provision the Keycloak group + send the welcome email.",
+        "ownerFullName": "Initial owner full name"
+      },
+      "errors": {
+        "slugFormat": "Slug must match [a-z0-9-]{3,32}.",
+        "slugConflict": "A tenant with this slug already exists.",
+        "nameRequired": "Display name is required.",
+        "contactEmailRequired": "Contact email is required.",
+        "contactEmailInvalid": "Contact email must be a valid address.",
+        "ownerEmailInvalid": "Owner email must be a valid address.",
+        "createFailed": "Could not create tenant. Please try again."
+      },
+      "actions": {
+        "next": "Next",
+        "back": "Back",
+        "submit": "Create tenant",
+        "creating": "Creating…",
+        "cancel": "Cancel"
+      },
+      "review": {
+        "ownerNote": "An UPDATE_PASSWORD email will be sent to {{email}}.",
+        "noOwnerNote": "No owner specified — Keycloak provisioning is skipped. You can complete it later via the retry endpoint."
+      },
+      "success": {
+        "title": "Tenant created",
+        "withOwner": "Welcome email sent to {{email}}.",
+        "noOwner": "Tenant ready. Provision the Keycloak owner manually or via the retry endpoint when ready.",
+        "pendingProvision": "Tenant created, but Keycloak provisioning failed. Use 'Retry provisioning' on the detail page once the issue is resolved."
+      }
     },
     "detail": {
       "title": "Tenant detail",
@@ -80,14 +127,47 @@
         "pending_delete": "This tenant is marked for deletion. Purge eligible {{when}}.",
         "pending_provision": "Provisioning pending — Keycloak invite hasn't completed yet.",
         "archived": "This tenant is archived."
-      }
-    },
-    "status": {
-      "active": "Active",
-      "suspended": "Suspended",
-      "pending_delete": "Pending delete",
-      "pending_provision": "Pending provisioning",
-      "archived": "Archived"
+      },
+      "actions": {
+        "title": "Lifecycle",
+        "suspend": "Suspend",
+        "reactivate": "Reactivate",
+        "requestDelete": "Mark for deletion",
+        "cancelDelete": "Cancel deletion",
+        "purge": "Purge now",
+        "retryProvisioning": "Retry provisioning"
+      },
+      "modals": {
+        "suspend": {
+          "title": "Suspend tenant",
+          "body": "Sign-ins for this tenant will be blocked within ~30 seconds. Existing data is preserved.",
+          "reasonLabel": "Reason (optional)",
+          "confirm": "Suspend"
+        },
+        "requestDelete": {
+          "title": "Mark tenant for deletion",
+          "body": "Starts the {{days}}-day grace window. After that, the tenant can be hard-purged. Cancellation returns the tenant to suspended.",
+          "reasonLabel": "Reason (optional)",
+          "confirm": "Mark for deletion"
+        },
+        "purge": {
+          "title": "Purge tenant — irreversible",
+          "body": "This will DROP SCHEMA the tenant, delete public rows, and remove the Keycloak group + users. There is no undo.",
+          "confirmLabel": "Type the slug to confirm:",
+          "forceLabel": "Force-purge (bypass grace window)",
+          "forceWarning": "Use only when authorised — bypasses the {{days}}-day cooling-off period.",
+          "confirm": "Purge tenant"
+        }
+      },
+      "errorTitleAction": "Action failed",
+      "actionPending": "Working…"
     }
+  },
+  "status": {
+    "active": "Active",
+    "suspended": "Suspended",
+    "pending_delete": "Pending delete",
+    "pending_provision": "Pending provisioning",
+    "archived": "Archived"
   }
 }

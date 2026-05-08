@@ -59,6 +59,22 @@ class Settings(BaseSettings):
     )
     keycloak_jwks_cache_ttl_seconds: int = 3600
 
+    # Admin-API client used by tenancy for ensure_group / invite_user etc.
+    # When `keycloak_provisioning_enabled=False` the tenancy module wires a
+    # no-op client; tenant creation still succeeds (operator follows the
+    # runbook for the kcadm.sh fallback). Production envs flip this on +
+    # set the four credentials. Tests inject FakeKeycloakClient directly.
+    keycloak_provisioning_enabled: bool = False
+    keycloak_base_url: str = "https://keycloak.dev.missionagre.local"
+    keycloak_realm: str = "missionagre"
+    keycloak_admin_client_id: str = "missionagre-tenancy"
+    keycloak_admin_client_secret: str = ""
+    keycloak_admin_request_timeout_seconds: float = 10.0
+    # Action URL the user is redirected to when accepting the welcome
+    # email (UPDATE_PASSWORD action). Empty string omits the param so KC
+    # uses the realm default.
+    keycloak_invite_redirect_url: str = ""
+
     # --- Observability ----------------------------------------------------
     otel_exporter_otlp_endpoint: str | None = None
     otel_service_name: str = "missionagre-api"
