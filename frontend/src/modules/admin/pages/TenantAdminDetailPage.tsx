@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -10,6 +10,7 @@ import type {
   AdminTenantSubscription,
 } from "@/api/adminTenants";
 import { KPICard } from "@/components/KPICard";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import {
   useAdminTenant,
@@ -19,7 +20,10 @@ import {
 
 import { TenantActionPanel } from "../components/TenantActionPanel";
 import { TenantAdminsPanel } from "../components/TenantAdminsPanel";
+import { TenantIntegrationsPanel } from "../components/TenantIntegrationsPanel";
 import { TenantStatusBadge } from "../components/TenantStatusBadge";
+
+type Tab = "profile" | "integrations" | "owner" | "lifecycle";
 
 export function TenantAdminDetailPage(): ReactNode {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -58,7 +62,7 @@ export function TenantAdminDetailPage(): ReactNode {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <Link
-        to="/admin/tenants"
+        to="/platform/tenants"
         className="inline-flex items-center text-sm text-ap-muted hover:text-ap-ink"
       >
         ← {t("tenants.detail.back")}
@@ -100,34 +104,72 @@ export function TenantAdminDetailPage(): ReactNode {
         ) : null}
       </div>
 
-      <ProfileCard tenant={tenant} formatter={dateTimeFormatter} />
-      {sidecar?.settings ? (
-        <SettingsCard settings={sidecar.settings} />
-      ) : null}
-      {sidecar?.subscription ? (
-        <SubscriptionCard
-          subscription={sidecar.subscription}
-          formatter={dateTimeFormatter}
-        />
-      ) : null}
-      <AuditCard
-        events={sidecar?.recent_events ?? []}
-        loading={sidecarQuery.isLoading}
-        formatter={dateTimeFormatter}
-      />
-
-      <TenantActionPanel
-        tenant={tenant}
-        purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30}
-      />
-
-      <TenantAdminsPanel tenantId={tenant.id} tenantSlug={tenant.slug} />
+      <DetailTabs tenant={tenant} sidecar={sidecar} sidecarLoading={sidecarQuery.isLoading} formatter={dateTimeFormatter} purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30} />
     </section>
   );
 }
 
 interface FormatterProps {
   formatter: Intl.DateTimeFormat;
+}
+
+interface DetailTabsProps {
+  tenant: AdminTenant;
+  sidecar:
+    | { settings?: AdminTenantSettings | null; subscription?: AdminTenantSubscription | null; recent_events?: AdminTenantArchiveEvent[] | null }
+    | undefined;
+  sidecarLoading: boolean;
+  formatter: Intl.DateTimeFormat;
+  purgeGraceDays: number;
+}
+
+function DetailTabs({
+  tenant,
+  sidecar,
+  sidecarLoading,
+  formatter,
+  purgeGraceDays,
+}: DetailTabsProps): ReactNode {
+  const { t } = useTranslation("admin");
+  const [tab, setTab] = useState<Tab>("profile");
+  return (
+    <div className="flex flex-col gap-4">
+      <SegmentedControl
+        ariaLabel={t("tenants.detail.tabsLabel")}
+        items={[
+          { value: "profile", label: t("tenants.detail.tabs.profile") },
+          { value: "integrations", label: t("tenants.detail.tabs.integrations") },
+          { value: "owner", label: t("tenants.detail.tabs.owner") },
+          { value: "lifecycle", label: t("tenants.detail.tabs.lifecycle") },
+        ]}
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+      />
+      {tab === "profile" ? (
+        <>
+          <ProfileCard tenant={tenant} formatter={formatter} />
+          {sidecar?.settings ? <SettingsCard settings={sidecar.settings} /> : null}
+          {sidecar?.subscription ? (
+            <SubscriptionCard
+              subscription={sidecar.subscription}
+              formatter={formatter}
+            />
+          ) : null}
+          <AuditCard
+            events={sidecar?.recent_events ?? []}
+            loading={sidecarLoading}
+            formatter={formatter}
+          />
+        </>
+      ) : tab === "integrations" ? (
+        <TenantIntegrationsPanel tenantId={tenant.id} />
+      ) : tab === "owner" ? (
+        <TenantAdminsPanel tenantId={tenant.id} tenantSlug={tenant.slug} />
+      ) : (
+        <TenantActionPanel tenant={tenant} purgeGraceDays={purgeGraceDays} />
+      )}
+    </div>
+  );
 }
 
 function StatusBanner({

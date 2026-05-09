@@ -96,10 +96,10 @@ function renderDetail() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[`/admin/tenants/${TENANT_ID}`]}>
+      <MemoryRouter initialEntries={[`/platform/tenants/${TENANT_ID}`]}>
         <Routes>
           <Route
-            path="/admin/tenants/:tenantId"
+            path="/platform/tenants/:tenantId"
             element={<TenantAdminDetailPage />}
           />
         </Routes>

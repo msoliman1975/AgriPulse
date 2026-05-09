@@ -42,16 +42,24 @@ import { IntegrationsHealthPage } from "@/modules/settings/pages/IntegrationsHea
 import { IntegrationsWeatherPage } from "@/modules/settings/pages/IntegrationsWeatherPage";
 import { IntegrationsImageryPage } from "@/modules/settings/pages/IntegrationsImageryPage";
 import { IntegrationsTenantOnlyPage } from "@/modules/settings/pages/IntegrationsTenantOnlyPage";
-import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
+import { AgriPulseGuard } from "@/auth/AgriPulseGuard";
+import { PlatformLayout } from "@/modules/admin/pages/PlatformLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
+import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
+import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
 import { queryClient } from "@/queries/client";
 
 function RedirectDecisionTreeDetail(): ReactNode {
   const { code = "" } = useParams<{ farmId: string; code: string }>();
   return <Navigate to={`/settings/decision-trees/${code}`} replace />;
+}
+
+function RedirectLegacyAdminTenant(): ReactNode {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  return <Navigate to={`/platform/tenants/${tenantId}`} replace />;
 }
 
 export function App(): ReactNode {
@@ -88,6 +96,10 @@ export function App(): ReactNode {
                 </ProtectedRoute>
               }
             >
+              {/* AgriPulseGuard bounces PlatformAdmin to /platform so
+                  Platform staff don't see the Agri.Pulse tree at all
+                  (persona-separation rule from the portal-restructure). */}
+              <Route element={<AgriPulseGuard />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
               <Route path="/farms" element={<FarmListPage />} />
@@ -196,14 +208,39 @@ export function App(): ReactNode {
                   element={<DecisionTreeEditorPage />}
                 />
               </Route>
-              {/* Platform admin tree — capability gate sits inside AdminLayout. */}
-              <Route path="/admin" element={<AdminLayout />}>
+              </Route>
+              {/* Platform Management Portal — capability gate sits
+                  inside PlatformLayout (PR-Reorg2). PlatformAdmin
+                  lands here post-login because AgriPulseGuard above
+                  redirects them away from /. */}
+              <Route path="/platform" element={<PlatformLayout />}>
                 <Route index element={<Navigate to="tenants" replace />} />
                 <Route path="tenants" element={<AdminTenantListPage />} />
                 <Route path="tenants/new" element={<AdminTenantCreatePage />} />
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
+                <Route path="admins" element={<PlatformAdminsPage />} />
+                <Route path="integrations/health" element={<PlatformHealthPage />} />
               </Route>
+              {/* Back-compat: old /admin/* paths redirect to /platform/*
+                  so bookmarks keep working through the URL rename. */}
+              <Route path="/admin" element={<Navigate to="/platform" replace />} />
+              <Route
+                path="/admin/tenants"
+                element={<Navigate to="/platform/tenants" replace />}
+              />
+              <Route
+                path="/admin/tenants/new"
+                element={<Navigate to="/platform/tenants/new" replace />}
+              />
+              <Route
+                path="/admin/tenants/:tenantId"
+                element={<RedirectLegacyAdminTenant />}
+              />
+              <Route
+                path="/admin/defaults"
+                element={<Navigate to="/platform/defaults" replace />}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

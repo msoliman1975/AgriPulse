@@ -40,6 +40,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await sync_from_disk(session)
     except Exception as exc:  # noqa: BLE001
         log.warning("decision_trees_sync_failed", error=str(exc))
+    # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent —
+    # only fires when zero active PlatformAdmins exist.
+    try:
+        from app.modules.platform_admins.bootstrap import (
+            bootstrap_platform_admin,
+        )
+
+        await bootstrap_platform_admin(get_settings())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("platform_admin_bootstrap_lifespan_error", error=str(exc))
     try:
         yield
     finally:
@@ -113,6 +123,15 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.platform_admins.router import (
         router as platform_admins_router,
     )
+    from app.modules.platform_admins.admins_router import (
+        router as platform_admins_self_router,
+    )
+    from app.modules.platform_admins.health_rollup import (
+        router as platform_health_rollup_router,
+    )
+    from app.modules.platform_admins.tenant_integrations import (
+        router as platform_tenant_integrations_router,
+    )
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
@@ -151,6 +170,9 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(integrations_router)
     app.include_router(platform_defaults_router)
     app.include_router(platform_admins_router)
+    app.include_router(platform_tenant_integrations_router)
+    app.include_router(platform_admins_self_router)
+    app.include_router(platform_health_rollup_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from

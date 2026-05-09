@@ -75,6 +75,20 @@ class KeycloakAdminClient(Protocol):
 
     async def delete_user(self, *, keycloak_user_id: str) -> None: ...
 
+    async def invite_platform_admin(
+        self,
+        *,
+        email: str,
+        full_name: str | None,
+        role: str = "PlatformAdmin",
+    ) -> str: ...
+
+    async def set_platform_role(
+        self, *, keycloak_user_id: str, role: str
+    ) -> None: ...
+
+    async def clear_platform_role(self, *, keycloak_user_id: str) -> None: ...
+
     async def aclose(self) -> None: ...
 
 
@@ -151,6 +165,35 @@ class NoopKeycloakClient:
 
     async def delete_user(self, *, keycloak_user_id: str) -> None:
         self._log.warning("keycloak_noop_delete_user", keycloak_user_id=keycloak_user_id)
+
+    async def invite_platform_admin(
+        self,
+        *,
+        email: str,
+        full_name: str | None,
+        role: str = "PlatformAdmin",
+    ) -> str:
+        del full_name
+        self._log.warning(
+            "keycloak_noop_invite_platform_admin", email=email, role=role
+        )
+        raise KeycloakNotConfiguredError(
+            "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
+        )
+
+    async def set_platform_role(
+        self, *, keycloak_user_id: str, role: str
+    ) -> None:
+        self._log.warning(
+            "keycloak_noop_set_platform_role",
+            keycloak_user_id=keycloak_user_id,
+            role=role,
+        )
+
+    async def clear_platform_role(self, *, keycloak_user_id: str) -> None:
+        self._log.warning(
+            "keycloak_noop_clear_platform_role", keycloak_user_id=keycloak_user_id
+        )
 
     async def aclose(self) -> None:
         return None
@@ -424,6 +467,95 @@ class HttpxKeycloakAdminClient:
             f"/users/{keycloak_user_id}",
             operation="delete_user",
             expected=(204, 404),
+        )
+
+    async def invite_platform_admin(
+        self,
+        *,
+        email: str,
+        full_name: str | None,
+        role: str = "PlatformAdmin",
+    ) -> str:
+        """Create (or find) a Keycloak user with no tenant group + set
+        the `platform_role` user attribute. Mirrors what
+        `dev_promote_platform_admin.py` does so the JWT carries the
+        platform_role claim on next sign-in.
+
+        The user is also assigned the matching realm role + emailed a
+        password-reset link, same as the tenant-side invite path.
+        Failures during the password-reset email are logged-and-continued
+        (matches the existing posture)."""
+        first, last = _split_full_name(full_name)
+        body = {
+            "username": email,
+            "email": email,
+            "firstName": first,
+            "lastName": last,
+            "enabled": True,
+            "emailVerified": False,
+            "attributes": {"platform_role": [role]},
+        }
+        resp = await self._request(
+            "POST", "/users", operation="create_platform_user", json=body, expected=(201, 409)
+        )
+        if resp.status_code == 409:
+            user_id = await self._find_user_id_by_email(email)
+            if user_id is None:
+                raise KeycloakRequestError(409, resp.text, operation="create_platform_user")
+            # User already exists — just set the attribute.
+            await self.set_platform_role(keycloak_user_id=user_id, role=role)
+        else:
+            location = resp.headers.get("location") or resp.headers.get("Location")
+            if not location or "/" not in location:
+                user_id_opt = await self._find_user_id_by_email(email)
+                if user_id_opt is None:
+                    raise KeycloakRequestError(
+                        201, "no Location header", operation="create_platform_user"
+                    )
+                user_id = user_id_opt
+            else:
+                user_id = location.rsplit("/", 1)[-1]
+
+        # Realm role mapping — matches the convention from
+        # `dev_bootstrap.py` that platform_role JWT claim is sourced
+        # from the user attribute, not from the realm role. The realm
+        # role is here for parity with TenantOwner and for any code
+        # path that gates on the role itself.
+        await self._assign_realm_role(user_id, role)
+
+        try:
+            await self._send_password_reset(user_id)
+        except KeycloakRequestError as exc:
+            self._log.warning(
+                "keycloak_password_reset_email_failed",
+                user_id=user_id,
+                email=email,
+                error=str(exc),
+            )
+        return user_id
+
+    async def set_platform_role(
+        self, *, keycloak_user_id: str, role: str
+    ) -> None:
+        """Set the `platform_role` user attribute. Idempotent — if
+        the attribute already has this value, no observable change."""
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}",
+            operation="set_platform_role",
+            json={"attributes": {"platform_role": [role]}},
+            expected=(204,),
+        )
+
+    async def clear_platform_role(self, *, keycloak_user_id: str) -> None:
+        """Remove the `platform_role` user attribute. The user account
+        stays — they may still be a tenant user."""
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}",
+            operation="clear_platform_role",
+            json={"attributes": {"platform_role": []}},
+            expected=(204,),
         )
 
     async def aclose(self) -> None:
