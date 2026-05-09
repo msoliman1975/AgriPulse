@@ -4,6 +4,19 @@
     "tenants": "Tenants",
     "defaults": "Platform defaults"
   },
+  "integrations": {
+    "title": "Integration defaults",
+    "subtitle": "Set tenant-tier defaults for weather, imagery, email, and webhook. The tenant owner can override these values inside Agri.Pulse — Platform's job is to seed sensible starting values.",
+    "category": {
+      "weather": "Weather",
+      "imagery": "Imagery",
+      "email": "Email",
+      "webhook": "Webhook"
+    },
+    "loadFailed": "Could not load tenant integration values.",
+    "save": "Save",
+    "clear": "Reset to default"
+  },
   "admins": {
     "title": "Tenant admins",
     "subtitle": "Add or remove TenantAdmins for this tenant. Owner transfer requires a slug confirmation.",
@@ -125,6 +138,13 @@
       "subtitle": "Profile, settings, and lifecycle actions.",
       "comingSoon": "Lifecycle actions (suspend / reactivate / delete / purge) will appear here in PR-F.",
       "back": "Back to tenants",
+      "tabsLabel": "Tenant detail tabs",
+      "tabs": {
+        "profile": "Profile",
+        "integrations": "Integrations",
+        "owner": "Owner",
+        "lifecycle": "Lifecycle"
+      },
       "loading": "Loading tenant…",
       "errorTitle": "Couldn't load tenant",
       "profileTitle": "Profile",
