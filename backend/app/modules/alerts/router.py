@@ -21,7 +21,7 @@ RBAC:
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.alerts.errors import AlertNotFoundError
@@ -115,9 +115,13 @@ async def transition_alert(
         1 for v in (payload.acknowledge, payload.resolve, payload.snooze_until is not None) if v
     )
     if chosen != 1:
-        raise HTTPException(
+        from app.core.errors import APIError
+
+        raise APIError(
             status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid transition payload",
             detail="Exactly one of `acknowledge`, `resolve`, `snooze_until` must be set.",
+            type_="https://missionagre.io/problems/alert-invalid-transition",
         )
     if payload.acknowledge:
         action = "acknowledge"

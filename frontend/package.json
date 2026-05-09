@@ -16,7 +16,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@deck.gl/core": "^9.0.36",
@@ -46,6 +48,8 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -59,7 +63,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.8",
     "autoprefixer": "^10.4.20",
-    "@eslint/js": "^9.17.0",
     "eslint": "^9.17.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.3",

@@ -132,8 +132,10 @@ async def transition_inbox_item(
     service: NotificationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     user_id = _ensure_user(context)
+    schema = context.tenant_schema
+    assert schema is not None  # _ensure_user checked tenant_schema
     updated = await service.transition_inbox_item(
-        item_id=item_id, user_id=user_id, action=payload.action
+        item_id=item_id, user_id=user_id, action=payload.action, tenant_schema=schema
     )
     item = await service.get_inbox_item(item_id=item_id, user_id=user_id)
     if item is None:

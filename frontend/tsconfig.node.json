@@ -23,6 +23,7 @@
     "tailwind.config.ts",
     "postcss.config.js",
     "eslint.config.js",
+    "playwright.config.ts",
     "global.d.ts"
   ]
 }
