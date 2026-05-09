@@ -1,12 +1,10 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate } from "react-router-dom";
 
 import type { TenantUser, UserUpdatePayload } from "@/api/users";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
-import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -21,7 +19,6 @@ import {
 const TENANT_ROLES = ["TenantOwner", "TenantAdmin", "BillingAdmin", "Viewer"] as const;
 
 export function UsersConfigPage(): ReactNode {
-  const farmId = useActiveFarmId();
   const { t } = useTranslation("users");
   const canRead = useCapability("user.read");
   const canInvite = useCapability("user.invite");
@@ -36,9 +33,6 @@ export function UsersConfigPage(): ReactNode {
   const reactivateMut = useReactivateTenantUser();
   const deleteMut = useDeleteTenantUser();
 
-  if (!farmId) {
-    return <Navigate to="/" replace />;
-  }
   if (!canRead) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">

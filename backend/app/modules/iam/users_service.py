@@ -60,16 +60,23 @@ class TenantUsersService:
     The session passed in is the platform-level admin session
     (``get_admin_db_session``) since users + memberships live in
     ``public.*``. The current tenant id comes from the request context.
+
+    `tenant_session` is optional. When provided, the TenantAdmin/Owner
+    grant guardrail (PR-Set7) fans out an in_app_inbox notification to
+    peer admins. Without it, the audit-warning still fires; only the
+    in-app heads-up is skipped.
     """
 
     def __init__(
         self,
         *,
         public_session: AsyncSession,
+        tenant_session: AsyncSession | None = None,
         keycloak: KeycloakAdminClient | None = None,
         audit: AuditService | None = None,
     ) -> None:
         self._public = public_session
+        self._tenant = tenant_session
         self._kc = keycloak or get_keycloak_client()
         self._audit = audit or get_audit_service()
         self._log = get_logger(__name__)
@@ -317,6 +324,25 @@ class TenantUsersService:
             ),
             {"mid": membership_id, "role": tenant_role, "actor": actor_user_id},
         )
+
+        # PR-Set7 guardrail: log + notify peers when a high-trust role
+        # was just granted.
+        from app.modules.platform_admins.guardrails import (
+            emit_role_grant_guardrail,
+            is_guarded_role,
+        )
+
+        if is_guarded_role(tenant_role):
+            await emit_role_grant_guardrail(
+                public_session=self._public,
+                tenant_session=self._tenant,
+                tenant_id=tenant_id,
+                target_user_id=user_id,
+                target_email=email,
+                role=tenant_role,  # type: ignore[arg-type]
+                actor_user_id=actor_user_id,
+                audit=self._audit,
+            )
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -602,8 +628,13 @@ class TenantUsersService:
         return row.keycloak_subject if row is not None else None
 
 
-def get_tenant_users_service(public_session: AsyncSession) -> TenantUsersService:
-    return TenantUsersService(public_session=public_session)
+def get_tenant_users_service(
+    public_session: AsyncSession,
+    tenant_session: AsyncSession | None = None,
+) -> TenantUsersService:
+    return TenantUsersService(
+        public_session=public_session, tenant_session=tenant_session
+    )
 
 
 # Silence unused-import warnings — kept for potential future caller use.

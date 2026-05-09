@@ -1,7 +1,45 @@
 {
   "nav": {
     "section": "Admin",
-    "tenants": "Tenants"
+    "tenants": "Tenants",
+    "defaults": "Platform defaults"
+  },
+  "admins": {
+    "title": "Tenant admins",
+    "subtitle": "Add or remove TenantAdmins for this tenant. Owner transfer requires a slug confirmation.",
+    "loadFailed": "Could not load admins.",
+    "empty": "No admins on this tenant.",
+    "ownerHint": "Tenant owner — use Transfer ownership to move this role.",
+    "transferToButton": "Transfer ownership →",
+    "removeButton": "Revoke admin",
+    "col": { "email": "User", "role": "Role", "actions": "" },
+    "inviteHeading": "Invite a new TenantAdmin",
+    "invite": {
+      "email": "Email",
+      "fullName": "Full name",
+      "submit": "Send invite",
+      "submitting": "Sending…",
+      "kcOk": "Welcome email queued via Keycloak.",
+      "kcPending": "Operator must provision via kcadm.sh — DB rows landed."
+    },
+    "transfer": {
+      "title": "Transfer ownership",
+      "body": "This will move TenantOwner from {{from}} to {{to}}.",
+      "confirmHint": "Type the tenant slug to confirm: {{slug}}",
+      "submit": "Transfer ownership",
+      "submitting": "Transferring…",
+      "cancel": "Cancel"
+    }
+  },
+  "defaults": {
+    "title": "Platform defaults",
+    "subtitle": "Default settings every tenant inherits from. Tenants can override at their own tier.",
+    "readonlyHint": "You don't have platform.manage_defaults — values are read-only.",
+    "loadFailed": "Could not load platform defaults.",
+    "empty": "No defaults defined.",
+    "save": "Save",
+    "saving": "Saving…",
+    "lastUpdated": "Last updated {{when}}"
   },
   "guard": {
     "forbiddenTitle": "Platform admin only",

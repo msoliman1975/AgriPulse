@@ -7,16 +7,15 @@ import { useCapability } from "@/rbac/useCapability";
 
 import {
   AlertsIcon,
+  GearIcon,
   ImageryIcon,
   InsightsIcon,
   LandUnitsIcon,
   PlanIcon,
   RecommendationsIcon,
   ReportsIcon,
-  RulesIcon,
   SignalsIcon,
   TenantIcon,
-  UsersIcon,
 } from "./icons";
 
 interface SideNavItemProps {
@@ -141,15 +140,11 @@ export function SideNav(): ReactNode {
           activePathPrefix="/reports/"
         />
       </div>
+      {/* Per-farm configuration that genuinely needs a farm context. The
+          tenant-wide config (rules, users, decision trees) lives under
+          the Settings hub so a farm doesn't have to be active. */}
       <GroupHeader>Configuration</GroupHeader>
       <div className="flex flex-col gap-0.5 px-2">
-        <SideNavItem
-          to={hasFarm ? `/config/rules/${farmSegment}` : "#"}
-          label="Rules & thresholds"
-          icon={<RulesIcon className="h-4 w-4" />}
-          disabled={!hasFarm}
-          activePathPrefix="/config/rules/"
-        />
         <SideNavItem
           to={hasFarm ? `/config/imagery/${farmSegment}` : "#"}
           label="Imagery & weather"
@@ -164,21 +159,11 @@ export function SideNav(): ReactNode {
           disabled={!hasFarm}
           activePathPrefix="/config/signals/"
         />
-        {isPlatformAdmin ? (
-          <SideNavItem
-            to={hasFarm ? `/config/decision-trees/${farmSegment}` : "#"}
-            label="Decision trees"
-            icon={<RecommendationsIcon className="h-4 w-4" />}
-            disabled={!hasFarm}
-            activePathPrefix="/config/decision-trees/"
-          />
-        ) : null}
         <SideNavItem
-          to={hasFarm ? `/config/users/${farmSegment}` : "#"}
-          label="Users & roles"
-          icon={<UsersIcon className="h-4 w-4" />}
-          disabled={!hasFarm}
-          activePathPrefix="/config/users/"
+          to="/settings"
+          label="Settings"
+          icon={<GearIcon className="h-4 w-4" />}
+          activePathPrefix="/settings"
         />
       </div>
       {isPlatformAdmin && (
@@ -190,6 +175,12 @@ export function SideNav(): ReactNode {
               label={t("nav.tenants")}
               icon={<TenantIcon className="h-4 w-4" />}
               activePathPrefix="/admin/tenants"
+            />
+            <SideNavItem
+              to="/admin/defaults"
+              label={t("nav.defaults")}
+              icon={<GearIcon className="h-4 w-4" />}
+              activePathPrefix="/admin/defaults"
             />
           </div>
         </>

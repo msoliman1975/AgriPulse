@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
 
-import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
 
@@ -49,7 +48,6 @@ nodes:
 `;
 
 export function DecisionTreeCreatePage(): ReactNode {
-  const farmId = useActiveFarmId();
   const navigate = useNavigate();
   const { t } = useTranslation("decisionTrees");
   const canManage = useCapability("decision_tree.manage");
@@ -60,11 +58,8 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   const create = useCreateDecisionTree();
 
-  if (!farmId) {
-    return <Navigate to="/" replace />;
-  }
   if (!canManage) {
-    return <Navigate to={`/config/decision-trees/${farmId}`} replace />;
+    return <Navigate to="/settings/decision-trees" replace />;
   }
 
   const submit = (event: React.FormEvent): void => {
@@ -77,7 +72,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       },
       {
         onSuccess: (tree) => {
-          navigate(`/config/decision-trees/${farmId}/${tree.code}`);
+          navigate(`/settings/decision-trees/${tree.code}`);
         },
       },
     );
@@ -133,7 +128,7 @@ export function DecisionTreeCreatePage(): ReactNode {
         ) : null}
         <button
           type="button"
-          onClick={() => navigate(`/config/decision-trees/${farmId}`)}
+          onClick={() => navigate("/settings/decision-trees")}
           className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
         >
           {t("create.cancel")}
