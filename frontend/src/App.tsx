@@ -39,6 +39,9 @@ import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
 import { IntegrationsLayout } from "@/modules/settings/pages/IntegrationsLayout";
 import { IntegrationsHealthPage } from "@/modules/settings/pages/IntegrationsHealthPage";
+import { IntegrationsWeatherPage } from "@/modules/settings/pages/IntegrationsWeatherPage";
+import { IntegrationsImageryPage } from "@/modules/settings/pages/IntegrationsImageryPage";
+import { IntegrationsTenantOnlyPage } from "@/modules/settings/pages/IntegrationsTenantOnlyPage";
 import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
@@ -157,39 +160,25 @@ export function App(): ReactNode {
                     element={<Navigate to="health" replace />}
                   />
                   <Route path="health" element={<IntegrationsHealthPage />} />
-                  <Route
-                    path="weather"
-                    element={
-                      <SettingsPlaceholderPage
-                        i18nKey="integrations"
-                        requires="tenant.manage_integrations"
-                      />
-                    }
-                  />
-                  <Route
-                    path="imagery"
-                    element={
-                      <SettingsPlaceholderPage
-                        i18nKey="integrations"
-                        requires="tenant.manage_integrations"
-                      />
-                    }
-                  />
+                  <Route path="weather" element={<IntegrationsWeatherPage />} />
+                  <Route path="imagery" element={<IntegrationsImageryPage />} />
                   <Route
                     path="email"
                     element={
-                      <SettingsPlaceholderPage
-                        i18nKey="integrations"
-                        requires="tenant.manage_integrations"
+                      <IntegrationsTenantOnlyPage
+                        category="email"
+                        i18nTitleKey="email.title"
+                        i18nSubtitleKey="email.subtitle"
                       />
                     }
                   />
                   <Route
                     path="webhook"
                     element={
-                      <SettingsPlaceholderPage
-                        i18nKey="integrations"
-                        requires="tenant.manage_integrations"
+                      <IntegrationsTenantOnlyPage
+                        category="webhook"
+                        i18nTitleKey="webhook.title"
+                        i18nSubtitleKey="webhook.subtitle"
                       />
                     }
                   />

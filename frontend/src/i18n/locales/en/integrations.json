@@ -1,0 +1,51 @@
+{
+  "weather": {
+    "title": "Weather integration",
+    "subtitle": "Configure weather provider, polling cadence, and forecast retention. Tenant settings cascade to every farm unless overridden."
+  },
+  "imagery": {
+    "title": "Imagery integration",
+    "subtitle": "Configure satellite product and cloud-cover threshold. Tenant settings cascade to every farm and land unit unless overridden.",
+    "productLabel": "Product code",
+    "cloudPctLabel": "Cloud cap (%)",
+    "applyToBlocksHint": "Apply Farm settings to every land unit:",
+    "applyInherit": "Reset to inherit",
+    "applyLock": "Lock to Farm value",
+    "applyResult": "{{n}} land units updated."
+  },
+  "email": {
+    "title": "Email server",
+    "subtitle": "Outbound transactional email. Falls back to platform defaults when not set."
+  },
+  "webhook": {
+    "title": "Webhook",
+    "subtitle": "Outbound webhook signing and timeout. Falls back to platform defaults when not set."
+  },
+  "section": {
+    "tenant": "Tenant defaults",
+    "farm": "Farm overrides",
+    "farmHint": "Pick a farm to view its resolved chain and override values for that farm only."
+  },
+  "farm": {
+    "pickFarmLabel": "Farm:",
+    "pickFarm": "Choose a farm…",
+    "providerLabel": "Provider code",
+    "cadenceLabel": "Cadence (h)",
+    "inheritPlaceholder": "(inherit)",
+    "resetButton": "Reset to inherit"
+  },
+  "source": {
+    "platform": "Default",
+    "tenant": "Tenant",
+    "farm": "Farm",
+    "resource": "Block"
+  },
+  "col": {
+    "key": "Key",
+    "resolved": "Resolved value",
+    "source": "Source"
+  },
+  "save": "Save",
+  "loadFailed": "Could not load integration settings.",
+  "noSettings": "No settings to display."
+}
