@@ -40,6 +40,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await sync_from_disk(session)
     except Exception as exc:  # noqa: BLE001
         log.warning("decision_trees_sync_failed", error=str(exc))
+    # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent —
+    # only fires when zero active PlatformAdmins exist.
+    try:
+        from app.modules.platform_admins.bootstrap import (
+            bootstrap_platform_admin,
+        )
+
+        await bootstrap_platform_admin(get_settings())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("platform_admin_bootstrap_lifespan_error", error=str(exc))
     try:
         yield
     finally:

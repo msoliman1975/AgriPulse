@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     # uses the realm default.
     keycloak_invite_redirect_url: str = ""
 
+    # --- Platform-admin bootstrap (PR-Reorg6) -----------------------------
+    # On cold start, if no PlatformAdmin exists in
+    # `public.platform_role_assignments`, the lifespan creates one from
+    # these env values. Idempotent — subsequent boots are no-ops once a
+    # PlatformAdmin exists. Empty email skips the bootstrap entirely.
+    platform_admin_email: str = ""
+    platform_admin_full_name: str = "Platform Admin"
+
     # --- Observability ----------------------------------------------------
     otel_exporter_otlp_endpoint: str | None = None
     otel_service_name: str = "missionagre-api"
