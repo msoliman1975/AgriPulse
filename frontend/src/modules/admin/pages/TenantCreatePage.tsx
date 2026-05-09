@@ -87,8 +87,13 @@ export function TenantCreatePage(): ReactNode {
 
   function validateOwner(): boolean {
     const next: Partial<Record<keyof FormState, string>> = {};
-    if (form.owner_email && !EMAIL_RE.test(form.owner_email)) {
+    if (!form.owner_email.trim()) {
+      next.owner_email = t("tenants.create.errors.ownerEmailRequired");
+    } else if (!EMAIL_RE.test(form.owner_email)) {
       next.owner_email = t("tenants.create.errors.ownerEmailInvalid");
+    }
+    if (!form.owner_full_name.trim()) {
+      next.owner_full_name = t("tenants.create.errors.ownerFullNameRequired");
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -105,8 +110,8 @@ export function TenantCreatePage(): ReactNode {
       default_locale: form.default_locale,
       default_unit_system: form.default_unit_system,
       initial_tier: form.initial_tier,
-      owner_email: form.owner_email.trim() || null,
-      owner_full_name: form.owner_full_name.trim() || null,
+      owner_email: form.owner_email.trim(),
+      owner_full_name: form.owner_full_name.trim(),
     };
   }
 
@@ -407,7 +412,10 @@ function OwnerStep({
           />
         )}
       </Field>
-      <Field label={t("tenants.create.fields.ownerFullName")}>
+      <Field
+        label={t("tenants.create.fields.ownerFullName")}
+        error={errors.owner_full_name}
+      >
         {(id) => (
           <input
             id={id}
@@ -441,21 +449,17 @@ function ReviewStep({ form }: { form: FormState }): ReactNode {
         value={form.default_unit_system}
       />
       <ReviewRow label={t("tenants.create.fields.tier")} value={form.initial_tier} />
-      {form.owner_email ? (
-        <>
-          <ReviewRow
-            label={t("tenants.create.fields.ownerEmail")}
-            value={form.owner_email}
-          />
-          <p className="rounded-md bg-emerald-50 p-2 text-xs text-emerald-800">
-            {t("tenants.create.review.ownerNote", { email: form.owner_email })}
-          </p>
-        </>
-      ) : (
-        <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
-          {t("tenants.create.review.noOwnerNote")}
-        </p>
-      )}
+      <ReviewRow
+        label={t("tenants.create.fields.ownerEmail")}
+        value={form.owner_email}
+      />
+      <ReviewRow
+        label={t("tenants.create.fields.ownerFullName")}
+        value={form.owner_full_name}
+      />
+      <p className="rounded-md bg-emerald-50 p-2 text-xs text-emerald-800">
+        {t("tenants.create.review.ownerNote", { email: form.owner_email })}
+      </p>
     </div>
   );
 }

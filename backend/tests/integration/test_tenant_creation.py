@@ -28,6 +28,8 @@ async def test_create_tenant_bootstraps_schema_and_audits(
         slug="acme-test",
         name="Acme Test",
         contact_email="ops@acme.test",
+        owner_email="owner@acme.test",
+        owner_full_name="Acme Owner",
         actor_user_id=actor,
     )
 
@@ -117,10 +119,14 @@ async def test_duplicate_slug_rejected(admin_session: AsyncSession) -> None:
         slug="dup-slug-test",
         name="First",
         contact_email="a@a.test",
+        owner_email="owner1@a.test",
+        owner_full_name="Owner One",
     )
     with pytest.raises(SlugAlreadyExistsError):
         await service.create_tenant(
             slug="dup-slug-test",
             name="Second",
             contact_email="b@b.test",
+            owner_email="owner2@b.test",
+            owner_full_name="Owner Two",
         )

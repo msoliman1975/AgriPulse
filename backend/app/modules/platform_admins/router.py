@@ -6,6 +6,9 @@ only via `platform.manage_tenant_admins`.
   GET    /admins                                — list current admins
   POST   /admins:invite                         — invite a TenantAdmin
   DELETE /admins/{user_id}?role=TenantAdmin     — revoke role
+  POST   /admins:assign-owner                   — seed the first
+                                                  TenantOwner on an
+                                                  ownerless tenant
   POST   /admins/{user_id}:transfer-ownership   — make this user the new
                                                   TenantOwner
 """
@@ -23,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.platform_admins.service import (
     PlatformAdminsService,
     TenantAdminConflictError,
+    TenantOwnerAlreadyExistsError,
     get_platform_admins_service,
 )
 from app.modules.iam.users_service import (
@@ -138,6 +142,92 @@ async def remove_admin_role(
             title="User not in tenant",
             detail=str(exc),
             type_="https://missionagre.io/problems/tenant-admin-not-found",
+        ) from exc
+
+
+class AssignFirstOwnerRequest(BaseModel):
+    """Seed the first TenantOwner on a tenant that currently has none.
+
+    Exactly one of (email + full_name) or user_id must be provided.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    email: EmailStr | None = Field(
+        default=None,
+        description="New-user mode: provision a Keycloak user + assign TenantOwner.",
+    )
+    full_name: str | None = Field(default=None, max_length=200)
+    user_id: UUID | None = Field(
+        default=None,
+        description="Promote-existing-member mode: assign TenantOwner to this member.",
+    )
+
+
+class AssignFirstOwnerResponse(BaseModel):
+    user_id: UUID
+    membership_id: UUID
+    keycloak_provisioning: str
+    keycloak_subject: str | None
+    mode: str
+
+
+@router.post(
+    ":assign-owner",
+    response_model=AssignFirstOwnerResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_first_owner(
+    tenant_id: UUID,
+    payload: AssignFirstOwnerRequest,
+    context: RequestContext = Depends(
+        requires_capability("platform.manage_tenant_admins")
+    ),
+    service: PlatformAdminsService = Depends(_service),
+) -> dict[str, Any]:
+    if (payload.email is None) == (payload.user_id is None):
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid owner-assign request",
+            detail="Provide exactly one of (email + full_name) or user_id.",
+            type_="https://missionagre.io/problems/owner-assign-invalid-mode",
+        )
+    try:
+        return await service.assign_first_owner(
+            tenant_id=tenant_id,
+            email=str(payload.email) if payload.email else None,
+            full_name=payload.full_name,
+            user_id=payload.user_id,
+            actor_user_id=context.user_id,
+        )
+    except TenantOwnerAlreadyExistsError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Tenant already has an owner",
+            detail=str(exc),
+            type_="https://missionagre.io/problems/tenant-owner-already-exists",
+            extras={"current_owner_user_id": str(exc.current_owner_user_id)},
+        ) from exc
+    except TenantUserNotFoundError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="User not in tenant",
+            detail=str(exc),
+            type_="https://missionagre.io/problems/tenant-admin-not-found",
+        ) from exc
+    except TenantUserAlreadyExistsError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="User already in tenant",
+            detail=f"{exc.email!r} is already a member; pass user_id instead.",
+            type_="https://missionagre.io/problems/tenant-admin-already-member",
         ) from exc
 
 

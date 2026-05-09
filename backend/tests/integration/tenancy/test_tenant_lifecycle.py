@@ -38,6 +38,8 @@ async def _create(session: AsyncSession, *, slug: str | None = None):
         slug=slug or _slug("life"),
         name="Lifecycle Test",
         contact_email="ops@life.test",
+        owner_email="owner@life.test",
+        owner_full_name="Lifecycle Owner",
         actor_user_id=uuid4(),
     )
 

@@ -59,7 +59,15 @@
     "transferIntro": "Move TenantOwner away from {{from}}.",
     "newOwnerLabel": "New owner (must already be a member of this tenant)",
     "pickNewOwner": "Pick a member…",
-    "noCandidates": "No other admins on this tenant. Invite one via Agri.Pulse → Settings → Users first."
+    "noCandidates": "No other admins on this tenant. Invite one via Agri.Pulse → Settings → Users first.",
+    "assignIntro": "Seed the first TenantOwner — invite a new user or promote an existing tenant member.",
+    "assignModeInvite": "Invite new user",
+    "assignModePromote": "Promote existing member",
+    "assignEmail": "Email",
+    "assignFullName": "Full name",
+    "assignPickMember": "Pick an existing member",
+    "assignSubmit": "Assign owner",
+    "assignSubmitting": "Assigning…"
   },
   "integrations": {
     "title": "Integration defaults",
@@ -160,7 +168,7 @@
         "tier": "Plan",
         "tierHelp": "Initial subscription. Editable later.",
         "ownerEmail": "Initial owner email",
-        "ownerEmailHelp": "Optional. If set, we provision the Keycloak group + send the welcome email.",
+        "ownerEmailHelp": "Required. The TenantOwner is provisioned in Keycloak and assigned the role at creation.",
         "ownerFullName": "Initial owner full name"
       },
       "errors": {
@@ -170,6 +178,8 @@
         "contactEmailRequired": "Contact email is required.",
         "contactEmailInvalid": "Contact email must be a valid address.",
         "ownerEmailInvalid": "Owner email must be a valid address.",
+        "ownerEmailRequired": "Owner email is required.",
+        "ownerFullNameRequired": "Owner full name is required.",
         "createFailed": "Could not create tenant. Please try again."
       },
       "actions": {

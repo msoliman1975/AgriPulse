@@ -4,14 +4,18 @@ import { useTranslation } from "react-i18next";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import {
+  useAssignFirstOwner,
   useTenantAdmins,
   useTransferOwnership,
+  type TenantAdminRow,
 } from "@/queries/platformAdmins";
 
 interface Props {
   tenantId: string;
   tenantSlug: string;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Tenant Owner panel — Platform's only user-mgmt touchpoint after
@@ -53,7 +57,10 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
       ) : adminsQ.isError ? (
         <p className="mt-3 text-sm text-ap-crit">{t("admins.loadFailed")}</p>
       ) : owner == null ? (
-        <p className="mt-3 text-sm text-ap-warn">{t("owner.none")}</p>
+        <AssignFirstOwnerForm
+          tenantId={tenantId}
+          existingMembers={adminsQ.data ?? []}
+        />
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Pill kind="warn">TenantOwner</Pill>
@@ -162,5 +169,131 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AssignFirstOwnerForm({
+  tenantId,
+  existingMembers,
+}: {
+  tenantId: string;
+  existingMembers: TenantAdminRow[];
+}): ReactNode {
+  const { t } = useTranslation("admin");
+  const assignMut = useAssignFirstOwner(tenantId);
+  const [mode, setMode] = useState<"invite" | "promote">(
+    existingMembers.length > 0 ? "promote" : "invite",
+  );
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [pickedUserId, setPickedUserId] = useState("");
+
+  const inviteValid =
+    EMAIL_RE.test(email.trim()) && fullName.trim().length > 0;
+  const promoteValid = pickedUserId !== "";
+  const canSubmit =
+    mode === "invite" ? inviteValid : promoteValid && existingMembers.length > 0;
+
+  function submit(): void {
+    if (mode === "invite") {
+      assignMut.mutate({ email: email.trim(), full_name: fullName.trim() });
+    } else {
+      assignMut.mutate({ user_id: pickedUserId });
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-ap-warn/40 bg-amber-50/50 p-3">
+      <p className="text-sm text-ap-warn">{t("owner.none")}</p>
+      <p className="mt-1 text-xs text-ap-muted">{t("owner.assignIntro")}</p>
+
+      <div className="mt-3 flex gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => setMode("invite")}
+          className={`rounded-md border px-2 py-1 ${
+            mode === "invite"
+              ? "border-ap-primary bg-ap-primary/10 text-ap-ink"
+              : "border-ap-line bg-ap-panel text-ap-muted"
+          }`}
+        >
+          {t("owner.assignModeInvite")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("promote")}
+          disabled={existingMembers.length === 0}
+          className={`rounded-md border px-2 py-1 disabled:opacity-50 ${
+            mode === "promote"
+              ? "border-ap-primary bg-ap-primary/10 text-ap-ink"
+              : "border-ap-line bg-ap-panel text-ap-muted"
+          }`}
+        >
+          {t("owner.assignModePromote")}
+        </button>
+      </div>
+
+      {mode === "invite" ? (
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-ap-muted">{t("owner.assignEmail")}</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              autoComplete="email"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-ap-muted">{t("owner.assignFullName")}</span>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              autoComplete="name"
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-ap-muted">{t("owner.assignPickMember")}</span>
+            <select
+              value={pickedUserId}
+              onChange={(e) => setPickedUserId(e.target.value)}
+              className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+            >
+              <option value="">{t("owner.pickNewOwner")}</option>
+              {existingMembers.map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {m.full_name ? `${m.full_name} ` : ""}
+                  &lt;{m.email}&gt; ({m.role})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-end gap-2">
+        {assignMut.error ? (
+          <p className="me-auto text-xs text-ap-crit">
+            {(assignMut.error as Error).message}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          disabled={!canSubmit || assignMut.isPending}
+          onClick={submit}
+          className="rounded-md bg-ap-primary px-3 py-1 text-xs font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+        >
+          {assignMut.isPending
+            ? t("owner.assignSubmitting")
+            : t("owner.assignSubmit")}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -105,7 +105,7 @@ async def create_tenant(
             default_locale=payload.default_locale,
             default_unit_system=payload.default_unit_system,
             initial_tier=payload.initial_tier,
-            owner_email=str(payload.owner_email) if payload.owner_email else None,
+            owner_email=str(payload.owner_email),
             owner_full_name=payload.owner_full_name,
             actor_user_id=context.user_id,
         )

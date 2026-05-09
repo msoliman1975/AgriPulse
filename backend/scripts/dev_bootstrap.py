@@ -3,7 +3,9 @@
 Two run modes:
 
   1. **Default** — creates the dev-tenant + the seeded `dev@missionagre.local`
-     as TenantAdmin. Idempotent. Run this once after `compose up`.
+     as TenantOwner (matches production: every tenant has exactly one
+     TenantOwner from creation). Idempotent. Run this once after
+     `compose up`.
 
          python -m scripts.dev_bootstrap
 
@@ -39,7 +41,7 @@ Default mode:
   2. Reads `dev@missionagre.local`'s Keycloak `sub` UUID via the Admin
      REST API.
   3. Inserts a `public.users` row matching the sub plus
-     `tenant_memberships` + `tenant_role_assignments` (TenantAdmin).
+     `tenant_memberships` + `tenant_role_assignments` (TenantOwner).
   4. Flips `unmanagedAttributePolicy` to ENABLED on the realm so
      custom attributes survive Keycloak 26's user-profile filter.
   5. Sets `tenant_id` and `tenant_role` user attributes.
@@ -450,7 +452,7 @@ async def bootstrap_default() -> None:
             kc_user_id,
             {
                 "tenant_id": [str(tenant.tenant_id)],
-                "tenant_role": ["TenantAdmin"],
+                "tenant_role": ["TenantOwner"],
             },
         )
         print("  keycloak attributes: tenant_id, tenant_role set")
@@ -481,7 +483,7 @@ async def bootstrap_default() -> None:
         email=DEV_USER_EMAIL,
         full_name="Dev User",
         tenant_id=tenant.tenant_id,
-        tenant_role="TenantAdmin",
+        tenant_role="TenantOwner",
     )
     print("  db: users / tenant_memberships / tenant_role_assignments upserted")
 

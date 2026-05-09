@@ -38,6 +38,19 @@ class TenantAdminConflictError(Exception):
         super().__init__(message)
 
 
+class TenantOwnerAlreadyExistsError(Exception):
+    """Raised when seeding a first owner against a tenant that already
+    has one. Caller should use transfer-ownership instead.
+    """
+
+    def __init__(self, current_owner_user_id: UUID) -> None:
+        super().__init__(
+            f"tenant already has an active TenantOwner ({current_owner_user_id}); "
+            "use transfer-ownership to replace them."
+        )
+        self.current_owner_user_id = current_owner_user_id
+
+
 class PlatformAdminsService:
     def __init__(
         self,
@@ -263,6 +276,142 @@ class PlatformAdminsService:
                 "to_user_id": str(to_user_id),
             },
         )
+
+    async def assign_first_owner(
+        self,
+        *,
+        tenant_id: UUID,
+        email: str | None = None,
+        full_name: str | None = None,
+        user_id: UUID | None = None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Seed a TenantOwner on a tenant that doesn't have one.
+
+        Two modes:
+          - email + full_name: provision a new Keycloak user and assign
+            them TenantOwner (delegates to ``TenantUsersService.invite_user``).
+          - user_id: promote an existing tenant member by inserting a
+            new TenantOwner role assignment on their existing membership.
+
+        Raises:
+            TenantOwnerAlreadyExistsError: a TenantOwner already exists.
+              Use transfer-ownership instead.
+            ValueError: neither / both modes specified.
+            TenantUserNotFoundError: user_id mode and user not in tenant.
+        """
+        if (email is None) == (user_id is None):
+            raise ValueError(
+                "assign_first_owner requires exactly one of email or user_id"
+            )
+
+        # Guard: never overwrite an existing owner.
+        existing_owner = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT m.user_id
+                    FROM public.tenant_role_assignments tra
+                    JOIN public.tenant_memberships m
+                      ON m.id = tra.membership_id
+                    WHERE m.tenant_id = :tid
+                      AND m.deleted_at IS NULL
+                      AND tra.role = 'TenantOwner'
+                      AND tra.revoked_at IS NULL
+                    LIMIT 1
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tenant_id},
+            )
+        ).first()
+        if existing_owner is not None:
+            raise TenantOwnerAlreadyExistsError(existing_owner.user_id)
+
+        if email is not None:
+            # New-user path: same code as inviting any tenant user, but
+            # with TenantOwner as the role. Handles Keycloak invite +
+            # public.users + tenant_memberships + tenant_role_assignments
+            # + audit + guardrail in one shot.
+            schema = await self._tenant_schema(tenant_id=tenant_id)
+            result = await self._users.invite_user(
+                email=email,
+                full_name=full_name or email,
+                phone=None,
+                tenant_role="TenantOwner",
+                tenant_schema=schema,
+                actor_user_id=actor_user_id,
+            )
+            await self._audit.record_archive(
+                event_type="platform.tenant_owner_assigned",
+                actor_user_id=actor_user_id,
+                subject_kind="tenant",
+                subject_id=tenant_id,
+                details={
+                    "mode": "invite",
+                    "email": email,
+                    "user_id": str(result["user_id"]),
+                    "keycloak_provisioning": result["keycloak_provisioning"],
+                },
+            )
+            return {
+                "user_id": result["user_id"],
+                "membership_id": result["membership_id"],
+                "keycloak_provisioning": result["keycloak_provisioning"],
+                "keycloak_subject": result.get("keycloak_subject"),
+                "mode": "invite",
+            }
+
+        # Promote-existing path.
+        assert user_id is not None  # narrowed by the XOR check above
+        membership_id = await self._membership_id(
+            tenant_id=tenant_id, user_id=user_id
+        )
+        await self._public.execute(
+            text(
+                """
+                INSERT INTO public.tenant_role_assignments
+                    (id, membership_id, role, granted_by)
+                VALUES (:rid, :mid, 'TenantOwner', :actor)
+                """
+            ).bindparams(
+                bindparam("rid", type_=PG_UUID(as_uuid=True)),
+                bindparam("mid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"rid": uuid4(), "mid": membership_id, "actor": actor_user_id},
+        )
+
+        from app.modules.platform_admins.guardrails import (
+            emit_role_grant_guardrail,
+        )
+
+        await emit_role_grant_guardrail(
+            public_session=self._public,
+            tenant_session=None,
+            tenant_id=tenant_id,
+            target_user_id=user_id,
+            target_email=None,
+            role="TenantOwner",
+            actor_user_id=actor_user_id,
+            audit=self._audit,
+        )
+        await self._audit.record_archive(
+            event_type="platform.tenant_owner_assigned",
+            actor_user_id=actor_user_id,
+            subject_kind="tenant",
+            subject_id=tenant_id,
+            details={
+                "mode": "promote",
+                "user_id": str(user_id),
+            },
+        )
+        return {
+            "user_id": user_id,
+            "membership_id": membership_id,
+            "keycloak_provisioning": "n/a",
+            "keycloak_subject": None,
+            "mode": "promote",
+        }
 
     # ---- Helpers ------------------------------------------------------
 

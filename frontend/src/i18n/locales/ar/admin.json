@@ -59,7 +59,15 @@
     "transferIntro": "نقل TenantOwner من {{from}}.",
     "newOwnerLabel": "المالك الجديد (يجب أن يكون عضوًا في المستأجر بالفعل)",
     "pickNewOwner": "اختر عضوًا...",
-    "noCandidates": "لا يوجد مسؤولون آخرون لهذا المستأجر. ادعُ مسؤولاً عبر Agri.Pulse ← الإعدادات ← المستخدمون أولاً."
+    "noCandidates": "لا يوجد مسؤولون آخرون لهذا المستأجر. ادعُ مسؤولاً عبر Agri.Pulse ← الإعدادات ← المستخدمون أولاً.",
+    "assignIntro": "عيّن أول TenantOwner — ادعُ مستخدمًا جديدًا أو رقّ عضوًا حاليًا.",
+    "assignModeInvite": "دعوة مستخدم جديد",
+    "assignModePromote": "ترقية عضو حالي",
+    "assignEmail": "البريد الإلكتروني",
+    "assignFullName": "الاسم الكامل",
+    "assignPickMember": "اختر عضوًا حاليًا",
+    "assignSubmit": "تعيين المالك",
+    "assignSubmitting": "جارٍ التعيين..."
   },
   "integrations": {
     "title": "إعدادات التكاملات الافتراضية",
@@ -160,7 +168,7 @@
         "tier": "الخطة",
         "tierHelp": "الاشتراك الأولي. يمكن تعديله لاحقًا.",
         "ownerEmail": "بريد المالك الأولي",
-        "ownerEmailHelp": "اختياري. إذا تم تعيينه، سنُجهّز مجموعة Keycloak ونرسل بريد الترحيب.",
+        "ownerEmailHelp": "إلزامي. يُجهَّز TenantOwner في Keycloak ويُسنَد الدور عند الإنشاء.",
         "ownerFullName": "الاسم الكامل للمالك"
       },
       "errors": {
@@ -170,6 +178,8 @@
         "contactEmailRequired": "البريد الإلكتروني مطلوب.",
         "contactEmailInvalid": "صيغة البريد الإلكتروني غير صحيحة.",
         "ownerEmailInvalid": "صيغة بريد المالك غير صحيحة.",
+        "ownerEmailRequired": "بريد المالك مطلوب.",
+        "ownerFullNameRequired": "الاسم الكامل للمالك مطلوب.",
         "createFailed": "تعذّر إنشاء المستأجر. يرجى المحاولة مرة أخرى."
       },
       "actions": {
