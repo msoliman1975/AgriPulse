@@ -1,0 +1,30 @@
+{
+  "title": "Settings",
+  "nav": {
+    "org": "Organization",
+    "notifications": "Notifications",
+    "integrations": "Integrations",
+    "users": "Users",
+    "rules": "Rules & thresholds",
+    "decisionTrees": "Decision trees"
+  },
+  "noAccess": {
+    "title": "Settings",
+    "body": "You don't have access to any settings tabs in this tenant.",
+    "missingCapability": "Requires {{capability}}."
+  },
+  "placeholder": {
+    "org": {
+      "title": "Organization",
+      "body": "Tenant profile, branding, and policy. Coming soon."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "body": "Outbound channels — email, webhook, in-app. Coming soon."
+    },
+    "integrations": {
+      "title": "Integrations",
+      "body": "Weather, imagery, email server, and webhook configuration. Coming soon."
+    }
+  }
+}

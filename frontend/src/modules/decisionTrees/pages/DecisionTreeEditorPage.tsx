@@ -1,12 +1,11 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import type { DecisionTreeVersion, DryRunResponse } from "@/api/decisionTrees";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
-import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -17,7 +16,6 @@ import {
 } from "@/queries/decisionTrees";
 
 export function DecisionTreeEditorPage(): ReactNode {
-  const farmId = useActiveFarmId();
   const { code = "" } = useParams<{ code: string }>();
   const { t } = useTranslation("decisionTrees");
   const dateLocale = useDateLocale();
@@ -55,9 +53,6 @@ export function DecisionTreeEditorPage(): ReactNode {
     return yamlBuffer !== latestVersion.tree_yaml;
   }, [latestVersion, yamlBuffer]);
 
-  if (!farmId) {
-    return <Navigate to="/" replace />;
-  }
   if (detail.isError) {
     return <p className="p-4 text-sm text-ap-crit">{t("edit.loadFailed")}</p>;
   }

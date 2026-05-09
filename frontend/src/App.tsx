@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AuthCallback } from "@/auth/AuthCallback";
 import { AuthProvider } from "@/auth/AuthProvider";
@@ -34,11 +34,19 @@ import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
 import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
 import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
+import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
+import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
+import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
 import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { queryClient } from "@/queries/client";
+
+function RedirectDecisionTreeDetail(): ReactNode {
+  const { code = "" } = useParams<{ farmId: string; code: string }>();
+  return <Navigate to={`/settings/decision-trees/${code}`} replace />;
+}
 
 export function App(): ReactNode {
   return (
@@ -94,21 +102,74 @@ export function App(): ReactNode {
               <Route path="/signals/:farmId" element={<SignalsLogPage />} />
               <Route path="/reports/:farmId" element={<ReportsPage />} />
               <Route path="/config/signals/:farmId" element={<SignalsConfigPage />} />
-              <Route path="/config/rules/:farmId" element={<RulesConfigPage />} />
+              {/* Rules + Users are tenant-wide — redirect to the Settings hub. */}
+              <Route
+                path="/config/rules/:farmId"
+                element={<Navigate to="/settings/rules" replace />}
+              />
               <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
-              <Route path="/config/users/:farmId" element={<UsersConfigPage />} />
+              <Route
+                path="/config/users/:farmId"
+                element={<Navigate to="/settings/users" replace />}
+              />
+              {/* Legacy /config/decision-trees/:farmId paths redirect to
+                  /settings/decision-trees (settings are tenant-wide). */}
               <Route
                 path="/config/decision-trees/:farmId"
-                element={<DecisionTreeListPage />}
+                element={<Navigate to="/settings/decision-trees" replace />}
               />
               <Route
                 path="/config/decision-trees/:farmId/new"
-                element={<DecisionTreeCreatePage />}
+                element={<Navigate to="/settings/decision-trees/new" replace />}
               />
+              {/* /config/decision-trees/:farmId/:code → /settings/decision-trees/:code */}
               <Route
                 path="/config/decision-trees/:farmId/:code"
-                element={<DecisionTreeEditorPage />}
+                element={<RedirectDecisionTreeDetail />}
               />
+              {/* Tenant Settings Hub. Capability checks live on each
+                  page so a deep link with the wrong role still 403s. */}
+              <Route path="/settings" element={<SettingsLayout />}>
+                <Route index element={<SettingsIndexPage />} />
+                <Route
+                  path="org"
+                  element={
+                    <SettingsPlaceholderPage
+                      i18nKey="org"
+                      requires="tenant.manage_integrations"
+                    />
+                  }
+                />
+                <Route
+                  path="notifications"
+                  element={
+                    <SettingsPlaceholderPage
+                      i18nKey="notifications"
+                      requires="tenant.manage_integrations"
+                    />
+                  }
+                />
+                <Route
+                  path="integrations"
+                  element={
+                    <SettingsPlaceholderPage
+                      i18nKey="integrations"
+                      requires="tenant.manage_integrations"
+                    />
+                  }
+                />
+                <Route path="users" element={<UsersConfigPage />} />
+                <Route path="rules" element={<RulesConfigPage />} />
+                <Route path="decision-trees" element={<DecisionTreeListPage />} />
+                <Route
+                  path="decision-trees/new"
+                  element={<DecisionTreeCreatePage />}
+                />
+                <Route
+                  path="decision-trees/:code"
+                  element={<DecisionTreeEditorPage />}
+                />
+              </Route>
               {/* Platform admin tree — capability gate sits inside AdminLayout. */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="tenants" replace />} />

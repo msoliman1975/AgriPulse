@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate } from "react-router-dom";
 
 import type {
   AlertSeverity,
@@ -14,7 +13,6 @@ import type {
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
-import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useCreateTenantRule,
@@ -43,7 +41,6 @@ interface MergedRule {
 }
 
 export function RulesConfigPage(): ReactNode {
-  const farmId = useActiveFarmId();
   const { t, i18n } = useTranslation("rules");
   const canManage = useCapability("alert_rule.manage");
   const [tab, setTab] = useState<"platform" | "tenant">("platform");
@@ -72,10 +69,6 @@ export function RulesConfigPage(): ReactNode {
       };
     });
   }, [defaults.data, overrides.data]);
-
-  if (!farmId) {
-    return <Navigate to="/" replace />;
-  }
 
   const isLoading = defaults.isLoading || overrides.isLoading;
   const isError = defaults.isError || overrides.isError;

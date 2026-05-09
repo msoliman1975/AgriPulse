@@ -1,23 +1,17 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
-import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { useDecisionTrees } from "@/queries/decisionTrees";
 
 export function DecisionTreeListPage(): ReactNode {
-  const farmId = useActiveFarmId();
   const { t } = useTranslation("decisionTrees");
   const canManage = useCapability("decision_tree.manage");
 
   const { data, isLoading, isError } = useDecisionTrees();
-
-  if (!farmId) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -28,7 +22,7 @@ export function DecisionTreeListPage(): ReactNode {
         </div>
         {canManage ? (
           <Link
-            to={`/config/decision-trees/${farmId}/new`}
+            to="/settings/decision-trees/new"
             className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
           >
             {t("list.newButton")}
@@ -67,7 +61,7 @@ export function DecisionTreeListPage(): ReactNode {
                 <tr key={tree.id}>
                   <td className="px-4 py-2">
                     <Link
-                      to={`/config/decision-trees/${farmId}/${tree.code}`}
+                      to={`/settings/decision-trees/${tree.code}`}
                       className="font-mono text-xs text-ap-primary hover:underline"
                     >
                       {tree.code}

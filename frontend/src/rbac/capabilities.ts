@@ -53,7 +53,11 @@ export type Capability =
   | "user.invite"
   | "user.update"
   | "user.suspend"
-  | "user.delete";
+  | "user.delete"
+  | "platform.manage_defaults"
+  | "platform.manage_tenant_admins"
+  | "tenant.manage_integrations"
+  | "tenant.read_integration_health";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -79,6 +83,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "recommendation.read",
     "decision_tree.read",
     "signal.read",
+    "tenant.read_integration_health",
   ]),
   TenantOwner: tenantWideCaps(),
   TenantAdmin: tenantWideCaps(),
@@ -249,6 +254,8 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "user.update",
     "user.suspend",
     "user.delete",
+    "tenant.manage_integrations",
+    "tenant.read_integration_health",
   ]);
 }
 
