@@ -47,14 +47,14 @@ function renderWizard() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/admin/tenants/new"]}>
+      <MemoryRouter initialEntries={["/platform/tenants/new"]}>
         <Routes>
-          <Route path="/admin/tenants/new" element={<TenantCreatePage />} />
+          <Route path="/platform/tenants/new" element={<TenantCreatePage />} />
           <Route
-            path="/admin/tenants/:tenantId"
+            path="/platform/tenants/:tenantId"
             element={<p>landed-on-detail</p>}
           />
-          <Route path="/admin/tenants" element={<p>landed-on-list</p>} />
+          <Route path="/platform/tenants" element={<p>landed-on-list</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

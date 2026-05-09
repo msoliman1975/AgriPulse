@@ -102,6 +102,7 @@ roles:
       - recommendation.read
       - recommendation.act
       - decision_tree.read
+      - decision_tree.manage
       - irrigation.record
       - fertilization.record
       - scouting.record
@@ -171,6 +172,7 @@ roles:
       - recommendation.read
       - recommendation.act
       - decision_tree.read
+      - decision_tree.manage
       - irrigation.record
       - fertilization.record
       - scouting.record

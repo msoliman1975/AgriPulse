@@ -58,7 +58,7 @@ export function TenantAdminDetailPage(): ReactNode {
   return (
     <section className="mx-auto max-w-4xl space-y-6">
       <Link
-        to="/admin/tenants"
+        to="/platform/tenants"
         className="inline-flex items-center text-sm text-ap-muted hover:text-ap-ink"
       >
         ← {t("tenants.detail.back")}

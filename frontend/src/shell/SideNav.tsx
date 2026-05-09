@@ -80,10 +80,39 @@ export function SideNav(): ReactNode {
   const hasFarm = Boolean(farmId);
   const isPlatformAdmin = useCapability("platform.manage_tenants");
   const { t } = useTranslation("admin");
+  const farmSegment = farmId ?? "";
+
+  // Persona separation (portal-restructure Q8): PlatformAdmin sees
+  // ONLY the Platform Management Portal nav. Tenant users see the
+  // Agri.Pulse workspace + per-farm config + tenant Settings hub.
+  if (isPlatformAdmin) {
+    return (
+      <nav
+        aria-label="Primary"
+        className="hidden w-56 flex-shrink-0 overflow-y-auto border-e border-ap-line bg-ap-panel py-3 md:block"
+      >
+        <GroupHeader>{t("nav.section")}</GroupHeader>
+        <div className="flex flex-col gap-0.5 px-2">
+          <SideNavItem
+            to="/platform/tenants"
+            label={t("nav.tenants")}
+            icon={<TenantIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/tenants"
+          />
+          <SideNavItem
+            to="/platform/defaults"
+            label={t("nav.defaults")}
+            icon={<GearIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/defaults"
+          />
+        </div>
+      </nav>
+    );
+  }
+
   // Workspace items resolve their `:farmId` from the URL. When no farm
   // is active (e.g. on the org-admin overview at /farms), they render
   // disabled so clicking won't 404.
-  const farmSegment = farmId ?? "";
   return (
     <nav
       aria-label="Primary"
@@ -166,25 +195,6 @@ export function SideNav(): ReactNode {
           activePathPrefix="/settings"
         />
       </div>
-      {isPlatformAdmin && (
-        <>
-          <GroupHeader>{t("nav.section")}</GroupHeader>
-          <div className="flex flex-col gap-0.5 px-2">
-            <SideNavItem
-              to="/admin/tenants"
-              label={t("nav.tenants")}
-              icon={<TenantIcon className="h-4 w-4" />}
-              activePathPrefix="/admin/tenants"
-            />
-            <SideNavItem
-              to="/admin/defaults"
-              label={t("nav.defaults")}
-              icon={<GearIcon className="h-4 w-4" />}
-              activePathPrefix="/admin/defaults"
-            />
-          </div>
-        </>
-      )}
     </nav>
   );
 }

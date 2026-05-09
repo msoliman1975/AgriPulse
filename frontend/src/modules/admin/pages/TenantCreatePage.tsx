@@ -132,7 +132,7 @@ export function TenantCreatePage(): ReactNode {
   }
 
   if (success) {
-    return <SuccessPanel state={success} onDone={() => navigate(`/admin/tenants/${success.tenantId}`)} />;
+    return <SuccessPanel state={success} onDone={() => navigate(`/platform/tenants/${success.tenantId}`)} />;
   }
 
   return (
@@ -181,7 +181,7 @@ export function TenantCreatePage(): ReactNode {
       <footer className="mt-6 flex justify-between">
         <button
           type="button"
-          onClick={() => navigate("/admin/tenants")}
+          onClick={() => navigate("/platform/tenants")}
           className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-muted hover:bg-ap-line/40"
         >
           {t("tenants.create.actions.cancel")}

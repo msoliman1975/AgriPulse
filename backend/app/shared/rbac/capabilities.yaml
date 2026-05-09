@@ -294,8 +294,8 @@ capabilities:
     scope: tenant
     status: active
   decision_tree.manage:
-    description: Author or publish decision trees (platform-authored).
-    scope: platform
+    description: Author or publish decision trees within the tenant.
+    scope: tenant
     status: active
 
   # --- Operational records ---------------------------------------------

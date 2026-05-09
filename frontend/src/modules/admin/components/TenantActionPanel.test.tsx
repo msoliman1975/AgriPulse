@@ -69,14 +69,14 @@ function renderPanel(t: AdminTenant, days = 30) {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter
-        initialEntries={[`/admin/tenants/${t.id}`]}
+        initialEntries={[`/platform/tenants/${t.id}`]}
       >
         <Routes>
           <Route
-            path="/admin/tenants/:tenantId"
+            path="/platform/tenants/:tenantId"
             element={<TenantActionPanel tenant={t} purgeGraceDays={days} />}
           />
-          <Route path="/admin/tenants" element={<p>landed-on-list</p>} />
+          <Route path="/platform/tenants" element={<p>landed-on-list</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

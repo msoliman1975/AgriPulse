@@ -48,6 +48,6 @@ describe("<SideNav> Admin section", () => {
     renderNav();
     expect(screen.getByText("admin:nav.section")).toBeInTheDocument();
     const link = screen.getByText("admin:nav.tenants");
-    expect(link.closest("a")).toHaveAttribute("href", "/admin/tenants");
+    expect(link.closest("a")).toHaveAttribute("href", "/platform/tenants");
   });
 });

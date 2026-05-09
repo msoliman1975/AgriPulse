@@ -157,7 +157,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
             {
               onSuccess: () => {
                 setOpen(null);
-                navigate("/admin/tenants");
+                navigate("/platform/tenants");
               },
             },
           )

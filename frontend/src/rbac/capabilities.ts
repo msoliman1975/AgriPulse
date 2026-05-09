@@ -246,6 +246,7 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "recommendation.read",
     "recommendation.act",
     "decision_tree.read",
+    "decision_tree.manage",
     "signal.read",
     "signal.define",
     "signal.record",
