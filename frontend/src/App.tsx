@@ -37,6 +37,8 @@ import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTr
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
+import { IntegrationsLayout } from "@/modules/settings/pages/IntegrationsLayout";
+import { IntegrationsHealthPage } from "@/modules/settings/pages/IntegrationsHealthPage";
 import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
@@ -149,15 +151,49 @@ export function App(): ReactNode {
                     />
                   }
                 />
-                <Route
-                  path="integrations"
-                  element={
-                    <SettingsPlaceholderPage
-                      i18nKey="integrations"
-                      requires="tenant.manage_integrations"
-                    />
-                  }
-                />
+                <Route path="integrations" element={<IntegrationsLayout />}>
+                  <Route
+                    index
+                    element={<Navigate to="health" replace />}
+                  />
+                  <Route path="health" element={<IntegrationsHealthPage />} />
+                  <Route
+                    path="weather"
+                    element={
+                      <SettingsPlaceholderPage
+                        i18nKey="integrations"
+                        requires="tenant.manage_integrations"
+                      />
+                    }
+                  />
+                  <Route
+                    path="imagery"
+                    element={
+                      <SettingsPlaceholderPage
+                        i18nKey="integrations"
+                        requires="tenant.manage_integrations"
+                      />
+                    }
+                  />
+                  <Route
+                    path="email"
+                    element={
+                      <SettingsPlaceholderPage
+                        i18nKey="integrations"
+                        requires="tenant.manage_integrations"
+                      />
+                    }
+                  />
+                  <Route
+                    path="webhook"
+                    element={
+                      <SettingsPlaceholderPage
+                        i18nKey="integrations"
+                        requires="tenant.manage_integrations"
+                      />
+                    }
+                  />
+                </Route>
                 <Route path="users" element={<UsersConfigPage />} />
                 <Route path="rules" element={<RulesConfigPage />} />
                 <Route path="decision-trees" element={<DecisionTreeListPage />} />

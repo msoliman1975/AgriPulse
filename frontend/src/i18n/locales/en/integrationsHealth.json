@@ -1,0 +1,33 @@
+{
+  "title": "Integration health",
+  "subtitle": "When weather and imagery last synced for each Farm and Block. Refreshes every 30 seconds.",
+  "tabsLabel": "Integration health view",
+  "tabs": { "farms": "Farms", "blocks": "Blocks" },
+  "col": {
+    "farm": "Farm",
+    "block": "Block",
+    "weather": "Weather",
+    "imagery": "Imagery",
+    "actions": "",
+    "viewBlocks": "View blocks"
+  },
+  "status": {
+    "ok": "OK",
+    "warn": "Stale",
+    "crit": "Failing",
+    "neutral": "Idle"
+  },
+  "lastSync": "Synced {{when}}",
+  "noActive": "No active subscription",
+  "neverSynced": "Never synced",
+  "failed24h": "{{n}} failed in last 24h",
+  "loadFailed": "Could not load integration health.",
+  "empty": "No farms in this tenant yet.",
+  "missingCapability": "Requires {{capability}}.",
+  "blockTab": {
+    "farmLabel": "Farm:",
+    "pickFarm": "Choose a farm…",
+    "pickPrompt": "Choose a farm to see per-block sync status.",
+    "empty": "No blocks in this farm."
+  }
+}

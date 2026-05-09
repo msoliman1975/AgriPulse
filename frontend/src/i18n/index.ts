@@ -18,6 +18,7 @@ import enUsers from "./locales/en/users.json";
 import enAdmin from "./locales/en/admin.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enSettings from "./locales/en/settings.json";
+import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -34,6 +35,7 @@ import arUsers from "./locales/ar/users.json";
 import arAdmin from "./locales/ar/admin.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arSettings from "./locales/ar/settings.json";
+import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -61,6 +63,7 @@ const resources = {
     decisionTrees: enDecisionTrees,
     users: enUsers,
     settings: enSettings,
+    integrationsHealth: enIntegrationsHealth,
   },
   ar: {
     common: arCommon,
@@ -79,6 +82,7 @@ const resources = {
     decisionTrees: arDecisionTrees,
     users: arUsers,
     settings: arSettings,
+    integrationsHealth: arIntegrationsHealth,
   },
 } as const;
 
@@ -107,6 +111,7 @@ void i18n
       "decisionTrees",
       "users",
       "settings",
+      "integrationsHealth",
     ],
     interpolation: { escapeValue: false },
     detection: {

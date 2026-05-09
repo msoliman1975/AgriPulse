@@ -229,7 +229,7 @@ async def evaluate_block(
 # ---------- Tenant rule authoring -----------------------------------------
 
 
-def _tenant_rule_not_found(code: str) -> HTTPException:
+def _tenant_rule_not_found(code: str) -> "APIError":
     from app.core.errors import APIError
 
     return APIError(

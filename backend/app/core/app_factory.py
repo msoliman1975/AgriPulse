@@ -109,6 +109,9 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
+    from app.modules.integrations_health.router import (
+        router as integrations_health_router,
+    )
     from app.modules.imagery.subscribers import (
         register_subscribers as register_imagery_subscribers,
     )
@@ -137,6 +140,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(notifications_router)
     app.include_router(recommendations_router)
     app.include_router(signals_router)
+    app.include_router(integrations_health_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from

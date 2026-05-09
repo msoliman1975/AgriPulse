@@ -87,6 +87,24 @@ capabilities:
     description: Grant or revoke a tenant-wide role.
     scope: tenant
     status: active
+
+  # --- Platform admin + tenant integrations ---------------------------
+  platform.manage_defaults:
+    description: Edit platform-wide default settings.
+    scope: platform
+    status: active
+  platform.manage_tenant_admins:
+    description: Add, remove, or transfer-ownership of tenant admins on any tenant.
+    scope: platform
+    status: active
+  tenant.manage_integrations:
+    description: Edit weather, imagery, email, and webhook configs at any inheritance tier.
+    scope: tenant
+    status: active
+  tenant.read_integration_health:
+    description: View integration sync status and recent errors at Farm + Block level.
+    scope: tenant
+    status: active
   role.assign_farm:
     description: Grant or revoke a farm-scoped role.
     scope: farm
