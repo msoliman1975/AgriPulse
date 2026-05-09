@@ -4,6 +4,16 @@
     "tenants": "Tenants",
     "defaults": "Platform defaults"
   },
+  "owner": {
+    "title": "Tenant owner",
+    "subtitle": "Platform's only user-mgmt touchpoint after tenant creation. Pick a new owner from this tenant's existing members; everything else lives in Agri.Pulse.",
+    "none": "No active TenantOwner found.",
+    "transferButton": "Transfer ownership →",
+    "transferIntro": "Move TenantOwner away from {{from}}.",
+    "newOwnerLabel": "New owner (must already be a member of this tenant)",
+    "pickNewOwner": "Pick a member…",
+    "noCandidates": "No other admins on this tenant. Invite one via Agri.Pulse → Settings → Users first."
+  },
   "integrations": {
     "title": "Integration defaults",
     "subtitle": "Set tenant-tier defaults for weather, imagery, email, and webhook. The tenant owner can override these values inside Agri.Pulse — Platform's job is to seed sensible starting values.",
