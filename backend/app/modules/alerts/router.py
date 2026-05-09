@@ -32,8 +32,17 @@ from app.modules.alerts.schemas import (
     EvaluateBlockResponse,
     RuleOverrideResponse,
     RuleOverrideUpsertRequest,
+    TenantRuleCreateRequest,
+    TenantRuleResponse,
+    TenantRuleUpdateRequest,
 )
-from app.modules.alerts.service import AlertsServiceImpl, get_alerts_service
+from app.modules.alerts.service import (
+    AlertsServiceImpl,
+    TenantRuleCodeAlreadyExistsError,
+    TenantRuleCodeConflictsWithDefaultError,
+    TenantRuleNotFoundError,
+    get_alerts_service,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
@@ -211,3 +220,142 @@ async def evaluate_block(
         "rules_skipped_disabled": summary["rules_skipped_disabled"],
         "alerts_opened": summary["alerts_opened"],
     }
+
+
+# ---------- Tenant rule authoring -----------------------------------------
+
+
+def _tenant_rule_not_found(code: str) -> HTTPException:
+    from app.core.errors import APIError
+
+    return APIError(
+        status_code=status.HTTP_404_NOT_FOUND,
+        title="Tenant rule not found",
+        detail=f"No tenant rule with code {code!r}",
+        type_="https://missionagre.io/problems/alerts/tenant-rule-not-found",
+        extras={"code": code},
+    )
+
+
+@router.get(
+    "/rules/tenant",
+    response_model=list[TenantRuleResponse],
+    summary="List tenant-authored alert rules.",
+)
+async def list_tenant_rules(
+    context: RequestContext = Depends(requires_capability("alert_rule.read")),
+    service: AlertsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return list(await service.list_tenant_rules())
+
+
+@router.get(
+    "/rules/tenant/{code}",
+    response_model=TenantRuleResponse,
+    summary="Read one tenant-authored rule.",
+)
+async def get_tenant_rule(
+    code: str,
+    context: RequestContext = Depends(requires_capability("alert_rule.read")),
+    service: AlertsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    out = await service.get_tenant_rule(code=code)
+    if out is None:
+        raise _tenant_rule_not_found(code)
+    return out
+
+
+@router.post(
+    "/rules/tenant",
+    response_model=TenantRuleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new tenant-authored alert rule.",
+)
+async def create_tenant_rule(
+    payload: TenantRuleCreateRequest,
+    context: RequestContext = Depends(requires_capability("alert_rule.manage")),
+    service: AlertsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    try:
+        return await service.create_tenant_rule(
+            code=payload.code,
+            name_en=payload.name_en,
+            name_ar=payload.name_ar,
+            description_en=payload.description_en,
+            description_ar=payload.description_ar,
+            severity=payload.severity,
+            applies_to_crop_categories=payload.applies_to_crop_categories,
+            conditions=payload.conditions,
+            actions=payload.actions,
+            actor_user_id=context.user_id,
+            tenant_schema=schema,
+        )
+    except TenantRuleCodeAlreadyExistsError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Tenant rule code already exists",
+            detail=str(exc),
+            type_="https://missionagre.io/problems/alerts/tenant-rule-code-conflict",
+            extras={"code": exc.code},
+        ) from exc
+    except TenantRuleCodeConflictsWithDefaultError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Code collides with platform default",
+            detail=str(exc),
+            type_="https://missionagre.io/problems/alerts/tenant-rule-default-conflict",
+            extras={"code": exc.code},
+        ) from exc
+
+
+@router.patch(
+    "/rules/tenant/{code}",
+    response_model=TenantRuleResponse,
+    summary="Update a tenant-authored alert rule.",
+)
+async def update_tenant_rule(
+    code: str,
+    payload: TenantRuleUpdateRequest,
+    context: RequestContext = Depends(requires_capability("alert_rule.manage")),
+    service: AlertsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    updates = payload.model_dump(exclude_unset=True)
+    try:
+        return await service.update_tenant_rule(
+            code=code,
+            updates=updates,
+            actor_user_id=context.user_id,
+            tenant_schema=schema,
+        )
+    except TenantRuleNotFoundError as exc:
+        raise _tenant_rule_not_found(code) from exc
+
+
+@router.delete(
+    "/rules/tenant/{code}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Soft-delete a tenant-authored alert rule.",
+)
+async def delete_tenant_rule(
+    code: str,
+    context: RequestContext = Depends(requires_capability("alert_rule.manage")),
+    service: AlertsServiceImpl = Depends(_service),
+) -> None:
+    schema = _ensure_tenant(context)
+    try:
+        await service.delete_tenant_rule(
+            code=code,
+            actor_user_id=context.user_id,
+            tenant_schema=schema,
+        )
+    except TenantRuleNotFoundError as exc:
+        raise _tenant_rule_not_found(code) from exc

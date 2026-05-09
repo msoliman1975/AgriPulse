@@ -96,6 +96,29 @@ class FakeKeycloakClient:
         self.groups[group_id].member_ids.append(uid)
         return uid
 
+    async def add_existing_user_to_group(
+        self,
+        *,
+        keycloak_user_id: str,
+        group_id: str,
+        roles: tuple[str, ...] = (),
+    ) -> None:
+        self._maybe_fail("add_existing_user_to_group")
+        if group_id not in self.groups:
+            raise KeycloakRequestError(
+                404, "group not found", operation="add_existing_user_to_group"
+            )
+        if keycloak_user_id not in self.users:
+            raise KeycloakRequestError(
+                404, "user not found", operation="add_existing_user_to_group"
+            )
+        members = self.groups[group_id].member_ids
+        if keycloak_user_id not in members:
+            members.append(keycloak_user_id)
+        if roles:
+            user = self.users[keycloak_user_id]
+            user.realm_roles = tuple(set(user.realm_roles).union(roles))
+
     async def disable_users_in_group(self, slug: str) -> int:
         self._maybe_fail("disable_users_in_group")
         return self._toggle_users_in_group(slug, enabled=False)

@@ -94,6 +94,43 @@ class AlertsService(Protocol):
         tenant_schema: str,
     ) -> dict[str, Any]: ...
 
+    async def list_tenant_rules(self) -> tuple[dict[str, Any], ...]: ...
+
+    async def get_tenant_rule(self, *, code: str) -> dict[str, Any] | None: ...
+
+    async def create_tenant_rule(
+        self,
+        *,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        severity: str,
+        applies_to_crop_categories: list[str],
+        conditions: dict[str, Any],
+        actions: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]: ...
+
+    async def update_tenant_rule(
+        self,
+        *,
+        code: str,
+        updates: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]: ...
+
+    async def delete_tenant_rule(
+        self,
+        *,
+        code: str,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None: ...
+
 
 class AlertsServiceImpl:
     """Tenant-session-scoped concrete service."""
@@ -129,6 +166,7 @@ class AlertsServiceImpl:
         """
         defaults = await self._repo.list_default_rules(status_filter="active")
         overrides = {o["rule_code"]: o for o in await self._repo.list_overrides()}
+        tenant_rules = await self._repo.list_tenant_rules(status_filter="active")
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
         crop_category = await self._repo.get_block_crop_category(block_id=block_id)
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
@@ -155,17 +193,19 @@ class AlertsServiceImpl:
         rules_evaluated = 0
         rules_skipped_disabled = 0
         alerts_opened = 0
-        for default in defaults:
-            override = overrides.get(default["code"])
-            merged: Rule | None = merge_rule(default=default, override=override)
+
+        async def _try_fire(merged: Rule | None) -> bool:
+            """Evaluate one merged rule against the signals and insert
+            an alert if it fires. Returns True iff a row was inserted
+            (so the caller can bump the counter)."""
+            nonlocal rules_skipped_disabled, rules_evaluated
             if merged is None:
                 rules_skipped_disabled += 1
-                continue
+                return False
             rules_evaluated += 1
             candidate = evaluate_rule(merged, signals)
             if candidate is None:
-                continue
-
+                return False
             alert_id = uuid7()
             inserted = await self._repo.insert_alert(
                 alert_id=alert_id,
@@ -182,10 +222,8 @@ class AlertsServiceImpl:
             )
             if not inserted:
                 # An open alert for this (block, rule) already exists.
-                # Re-evaluation is intentionally idempotent — the open
-                # alert remains the canonical "still firing".
-                continue
-            alerts_opened += 1
+                # Re-evaluation is intentionally idempotent.
+                return False
             await self._audit.record(
                 tenant_schema=tenant_schema,
                 event_type="alerts.alert_opened",
@@ -216,6 +254,23 @@ class AlertsServiceImpl:
                     signal_snapshot=candidate.signal_snapshot,
                 )
             )
+            return True
+
+        # Pass 1 — platform defaults merged with tenant overrides.
+        for default in defaults:
+            override = overrides.get(default["code"])
+            merged: Rule | None = merge_rule(default=default, override=override)
+            if await _try_fire(merged):
+                alerts_opened += 1
+
+        # Pass 2 — tenant-authored rules. They go through the same
+        # ``merge_rule`` helper for shape consistency (with a None
+        # override) so tenant rules + defaults converge on the same
+        # ``Rule`` shape the engine expects.
+        for tenant_rule in tenant_rules:
+            merged = merge_rule(default=tenant_rule, override=None)
+            if await _try_fire(merged):
+                alerts_opened += 1
 
         return {
             "rules_evaluated": rules_evaluated,
@@ -379,6 +434,136 @@ class AlertsServiceImpl:
             },
         )
         return out
+
+    # ---- Tenant rule authoring ---------------------------------------
+
+    async def list_tenant_rules(self) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_tenant_rules(status_filter=None)
+
+    async def get_tenant_rule(self, *, code: str) -> dict[str, Any] | None:
+        return await self._repo.get_tenant_rule(rule_code=code)
+
+    async def create_tenant_rule(
+        self,
+        *,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        severity: str,
+        applies_to_crop_categories: list[str],
+        conditions: dict[str, Any],
+        actions: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        # Don't collide with a platform default's code — alerts.rule_code
+        # is a single namespace across both sources.
+        existing_default = await self._repo.get_default_rule(rule_code=code)
+        if existing_default is not None:
+            raise TenantRuleCodeConflictsWithDefaultError(code)
+        existing_tenant = await self._repo.get_tenant_rule(rule_code=code)
+        if existing_tenant is not None:
+            raise TenantRuleCodeAlreadyExistsError(code)
+        out = await self._repo.insert_tenant_rule(
+            code=code,
+            name_en=name_en,
+            name_ar=name_ar,
+            description_en=description_en,
+            description_ar=description_ar,
+            severity=severity,
+            status="active",
+            applies_to_crop_categories=applies_to_crop_categories,
+            conditions=conditions,
+            actions=actions,
+            actor_user_id=actor_user_id,
+        )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="alerts.tenant_rule_created",
+            actor_user_id=actor_user_id,
+            subject_kind="tenant_rule",
+            subject_id=out["id"],
+            farm_id=None,
+            details={"code": code, "severity": severity},
+        )
+        return out
+
+    async def update_tenant_rule(
+        self,
+        *,
+        code: str,
+        updates: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        existing = await self._repo.get_tenant_rule(rule_code=code)
+        if existing is None:
+            raise TenantRuleNotFoundError(code)
+        out = await self._repo.update_tenant_rule(
+            code=code, updates=updates, actor_user_id=actor_user_id
+        )
+        if out is None:
+            raise TenantRuleNotFoundError(code)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="alerts.tenant_rule_updated",
+            actor_user_id=actor_user_id,
+            subject_kind="tenant_rule",
+            subject_id=out["id"],
+            farm_id=None,
+            details={"code": code, "fields": sorted(updates.keys())},
+        )
+        return out
+
+    async def delete_tenant_rule(
+        self,
+        *,
+        code: str,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None:
+        existing = await self._repo.get_tenant_rule(rule_code=code)
+        if existing is None:
+            raise TenantRuleNotFoundError(code)
+        deleted = await self._repo.soft_delete_tenant_rule(
+            code=code, actor_user_id=actor_user_id
+        )
+        if not deleted:
+            return
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="alerts.tenant_rule_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="tenant_rule",
+            subject_id=existing["id"],
+            farm_id=None,
+            details={"code": code},
+        )
+
+
+# ---- Tenant rule errors -------------------------------------------------
+
+
+class TenantRuleNotFoundError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(f"No tenant rule with code {code!r}")
+        self.code = code
+
+
+class TenantRuleCodeAlreadyExistsError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(f"Tenant rule with code {code!r} already exists")
+        self.code = code
+
+
+class TenantRuleCodeConflictsWithDefaultError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            f"Tenant rule code {code!r} collides with a platform default rule"
+        )
+        self.code = code
 
 
 def get_alerts_service(

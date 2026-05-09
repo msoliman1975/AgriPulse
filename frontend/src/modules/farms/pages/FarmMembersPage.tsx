@@ -11,6 +11,7 @@ import {
 } from "@/api/farmMembers";
 import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
+import { useTenantUsers } from "@/queries/users";
 import { MembersList } from "../components/MembersList";
 
 const ROLES: FarmMemberRole[] = ["FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"];
@@ -19,6 +20,8 @@ export function FarmMembersPage(): JSX.Element {
   const { farmId = "" } = useParams<{ farmId: string }>();
   const { t } = useTranslation("farms");
   const canAssign = useCapability("role.assign_farm", { farmId });
+  const canReadUsers = useCapability("user.read");
+  const tenantUsers = useTenantUsers();
   const [members, setMembers] = useState<FarmMember[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [membershipId, setMembershipId] = useState("");
@@ -91,14 +94,39 @@ export function FarmMembersPage(): JSX.Element {
             <label className="label" htmlFor="membership-id">
               {t("members.membershipId")}
             </label>
-            <input
-              id="membership-id"
-              className="input"
-              value={membershipId}
-              onChange={(e) => setMembershipId(e.target.value)}
-              required
-              placeholder="00000000-0000-0000-0000-000000000000"
-            />
+            {canReadUsers && tenantUsers.data && tenantUsers.data.length > 0 ? (
+              <select
+                id="membership-id"
+                className="input"
+                value={membershipId}
+                onChange={(e) => setMembershipId(e.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  —
+                </option>
+                {tenantUsers.data
+                  // Hide users already assigned to this farm so the dropdown
+                  // doesn't suggest re-adding them.
+                  .filter(
+                    (u) => !members.some((m) => m.membership_id === u.membership_id),
+                  )
+                  .map((u) => (
+                    <option key={u.membership_id} value={u.membership_id}>
+                      {u.full_name} — {u.email}
+                    </option>
+                  ))}
+              </select>
+            ) : (
+              <input
+                id="membership-id"
+                className="input"
+                value={membershipId}
+                onChange={(e) => setMembershipId(e.target.value)}
+                required
+                placeholder="00000000-0000-0000-0000-000000000000"
+              />
+            )}
           </div>
           <div>
             <label className="label" htmlFor="member-role">

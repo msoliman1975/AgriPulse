@@ -55,6 +55,14 @@ class KeycloakAdminClient(Protocol):
         roles: tuple[str, ...] = ("TenantOwner",),
     ) -> str: ...
 
+    async def add_existing_user_to_group(
+        self,
+        *,
+        keycloak_user_id: str,
+        group_id: str,
+        roles: tuple[str, ...] = (),
+    ) -> None: ...
+
     async def disable_users_in_group(self, slug: str) -> int: ...
 
     async def enable_users_in_group(self, slug: str) -> int: ...
@@ -102,6 +110,23 @@ class NoopKeycloakClient:
         roles: tuple[str, ...] = ("TenantOwner",),
     ) -> str:
         del email, full_name, group_id, roles
+        raise KeycloakNotConfiguredError(
+            "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
+        )
+
+    async def add_existing_user_to_group(
+        self,
+        *,
+        keycloak_user_id: str,
+        group_id: str,
+        roles: tuple[str, ...] = (),
+    ) -> None:
+        del roles
+        self._log.warning(
+            "keycloak_noop_add_user_to_group",
+            keycloak_user_id=keycloak_user_id,
+            group_id=group_id,
+        )
         raise KeycloakNotConfiguredError(
             "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
         )
@@ -317,6 +342,30 @@ class HttpxKeycloakAdminClient:
             "keycloak_invite_user", email=email, user_id=user_id, group_id=group_id
         )
         return user_id
+
+    async def add_existing_user_to_group(
+        self,
+        *,
+        keycloak_user_id: str,
+        group_id: str,
+        roles: tuple[str, ...] = (),
+    ) -> None:
+        # PUT is idempotent in Keycloak — re-adding a user already in
+        # the group is a no-op 204.
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}/groups/{group_id}",
+            operation="add_existing_user_to_group",
+            expected=(204,),
+        )
+        for role in roles:
+            await self._assign_realm_role(keycloak_user_id, role)
+        self._log.info(
+            "keycloak_add_existing_user_to_group",
+            user_id=keycloak_user_id,
+            group_id=group_id,
+            roles=list(roles),
+        )
 
     async def disable_users_in_group(self, slug: str) -> int:
         return await self._toggle_users_in_group(slug, enabled=False)

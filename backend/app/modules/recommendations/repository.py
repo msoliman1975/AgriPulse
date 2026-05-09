@@ -117,6 +117,249 @@ class RecommendationsRepository:
             "published_at": row.published_at,
         }
 
+    # ---- Decision-tree authoring (PlatformAdmin) ----------------------
+
+    async def list_all_trees(self) -> tuple[dict[str, Any], ...]:
+        """Every non-deleted tree + the version number of its current
+        published version (if any). Drives the editor's tree list."""
+        rows = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT t.id, t.code, t.name_en, t.name_ar,
+                           t.description_en, t.description_ar,
+                           t.crop_id, t.applicable_regions, t.is_active,
+                           v.version AS current_version
+                    FROM public.decision_trees t
+                    LEFT JOIN public.decision_tree_versions v
+                      ON v.id = t.current_version_id
+                    WHERE t.deleted_at IS NULL
+                    ORDER BY t.code
+                    """
+                )
+            )
+        ).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def list_versions_for_tree(self, *, tree_id: UUID) -> tuple[dict[str, Any], ...]:
+        """All versions for one tree, newest first. Includes raw YAML +
+        compiled JSON so the editor can offer diff-between-versions."""
+        rows = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT id, tree_id, version, tree_yaml, tree_compiled,
+                           compiled_hash, published_at, notes,
+                           created_at, updated_at
+                    FROM public.decision_tree_versions
+                    WHERE tree_id = :tid
+                    ORDER BY version DESC
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        ).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def get_version_by_number(
+        self, *, tree_id: UUID, version: int
+    ) -> dict[str, Any] | None:
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT id, tree_id, version, tree_yaml, tree_compiled,
+                           compiled_hash, published_at, notes,
+                           created_at, updated_at
+                    FROM public.decision_tree_versions
+                    WHERE tree_id = :tid AND version = :v
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id, "v": version},
+            )
+        ).mappings().first()
+        return dict(row) if row is not None else None
+
+    async def get_latest_version_number(self, *, tree_id: UUID) -> int:
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT COALESCE(MAX(version), 0) AS v "
+                    "FROM public.decision_tree_versions WHERE tree_id = :tid"
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        ).first()
+        return int(row.v) if row is not None else 0
+
+    async def insert_tree(
+        self,
+        *,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        crop_id: UUID | None,
+        applicable_regions: list[str],
+        actor_user_id: UUID | None,
+    ) -> UUID:
+        """Insert a new `decision_trees` row. Caller wraps insertion + first
+        version + current_version_id update in one transaction."""
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    INSERT INTO public.decision_trees
+                        (code, name_en, name_ar, description_en, description_ar,
+                         crop_id, applicable_regions, is_active,
+                         created_by, updated_by)
+                    VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
+                            :crop_id, :applicable_regions, TRUE,
+                            :actor, :actor)
+                    RETURNING id
+                    """
+                ).bindparams(
+                    bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {
+                    "code": code,
+                    "name_en": name_en,
+                    "name_ar": name_ar,
+                    "description_en": description_en,
+                    "description_ar": description_ar,
+                    "crop_id": crop_id,
+                    "applicable_regions": applicable_regions,
+                    "actor": actor_user_id,
+                },
+            )
+        ).first()
+        return row.id
+
+    async def insert_version(
+        self,
+        *,
+        tree_id: UUID,
+        version: int,
+        tree_yaml: str,
+        tree_compiled: dict[str, Any],
+        compiled_hash: str,
+        notes: str | None,
+        published_at: datetime | None,
+        published_by: UUID | None,
+    ) -> UUID:
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    INSERT INTO public.decision_tree_versions
+                        (tree_id, version, tree_yaml, tree_compiled,
+                         compiled_hash, notes, published_at, published_by)
+                    VALUES (:tid, :version, :yaml, CAST(:compiled AS jsonb),
+                            :hash, :notes, :published_at, :published_by)
+                    RETURNING id
+                    """
+                ).bindparams(
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("published_by", type_=PG_UUID(as_uuid=True)),
+                ),
+                {
+                    "tid": tree_id,
+                    "version": version,
+                    "yaml": tree_yaml,
+                    "compiled": _serialize_jsonb(tree_compiled),
+                    "hash": compiled_hash,
+                    "notes": notes,
+                    "published_at": published_at,
+                    "published_by": published_by,
+                },
+            )
+        ).first()
+        return row.id
+
+    async def set_current_version(
+        self,
+        *,
+        tree_id: UUID,
+        version_id: UUID,
+        actor_user_id: UUID | None,
+    ) -> None:
+        await self._public.execute(
+            text(
+                "UPDATE public.decision_trees "
+                "SET current_version_id = :vid, updated_by = :actor, updated_at = now() "
+                "WHERE id = :tid"
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("vid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"tid": tree_id, "vid": version_id, "actor": actor_user_id},
+        )
+
+    async def update_tree_metadata(
+        self,
+        *,
+        tree_id: UUID,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        crop_id: UUID | None,
+        applicable_regions: list[str],
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Sync tree-level metadata when a new version's YAML changes
+        the name / description / crop. The version's compiled JSON is
+        the audit record; the tree row holds the human-friendly latest."""
+        await self._public.execute(
+            text(
+                """
+                UPDATE public.decision_trees
+                   SET name_en = :name_en,
+                       name_ar = :name_ar,
+                       description_en = :description_en,
+                       description_ar = :description_ar,
+                       crop_id = :crop_id,
+                       applicable_regions = :applicable_regions,
+                       updated_by = :actor,
+                       updated_at = now()
+                 WHERE id = :tid
+                """
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "tid": tree_id,
+                "name_en": name_en,
+                "name_ar": name_ar,
+                "description_en": description_en,
+                "description_ar": description_ar,
+                "crop_id": crop_id,
+                "applicable_regions": applicable_regions,
+                "actor": actor_user_id,
+            },
+        )
+
+    async def resolve_crop_id(self, crop_code: str | None) -> UUID | None:
+        """Lookup `crops.id` by code. Returns None when crop_code is
+        None/empty or unknown — same permissive behaviour as the YAML
+        loader's `_resolve_crop_id`."""
+        if not crop_code:
+            return None
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT id FROM public.crops WHERE code = :c AND deleted_at IS NULL"
+                ),
+                {"c": crop_code},
+            )
+        ).first()
+        return row.id if row is not None else None
+
     # ---- Recommendations (tenant) -------------------------------------
 
     async def insert_recommendation(

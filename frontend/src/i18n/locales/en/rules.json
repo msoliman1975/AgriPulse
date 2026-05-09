@@ -41,5 +41,40 @@
     "active": "active",
     "draft": "draft",
     "retired": "retired"
+  },
+  "tabs": {
+    "platform": "Platform defaults",
+    "tenant": "Tenant rules"
+  },
+  "tenant": {
+    "newButton": "New rule",
+    "empty": "No tenant rules yet — create one to define a custom alert.",
+    "row": {
+      "tenantBadge": "tenant",
+      "edit": "Edit",
+      "delete": "Delete"
+    }
+  },
+  "form": {
+    "title": "New rule",
+    "editTitle": "Edit rule",
+    "code": "Code",
+    "codeHint": "Unique within your tenant + the platform catalog. Cannot change later.",
+    "codePlaceholder": "high_temp_warning",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic, optional)",
+    "description_en": "Description (English, optional)",
+    "description_ar": "Description (Arabic, optional)",
+    "severity": "Severity",
+    "appliesToCrops": "Applies to crops (comma-separated, blank = all)",
+    "conditions": "Conditions JSON",
+    "conditionsHint": "Top level is `{type: condition_tree, tree: {...}}`.",
+    "actions": "Actions JSON",
+    "actionsHint": "Object with diagnosis_en, diagnosis_ar, prescription_en, prescription_ar.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveFailed": "Save failed",
+    "cancel": "Cancel",
+    "invalidJson": "Conditions and actions must be valid JSON."
   }
 }

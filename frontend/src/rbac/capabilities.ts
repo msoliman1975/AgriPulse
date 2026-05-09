@@ -45,9 +45,15 @@ export type Capability =
   | "recommendation.read"
   | "recommendation.act"
   | "decision_tree.read"
+  | "decision_tree.manage"
   | "signal.read"
   | "signal.define"
-  | "signal.record";
+  | "signal.record"
+  | "user.read"
+  | "user.invite"
+  | "user.update"
+  | "user.suspend"
+  | "user.delete";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
 export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
@@ -238,6 +244,11 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "signal.read",
     "signal.define",
     "signal.record",
+    "user.read",
+    "user.invite",
+    "user.update",
+    "user.suspend",
+    "user.delete",
   ]);
 }
 

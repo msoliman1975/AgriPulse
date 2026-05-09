@@ -278,7 +278,7 @@ capabilities:
   decision_tree.manage:
     description: Author or publish decision trees (platform-authored).
     scope: platform
-    status: stub
+    status: active
 
   # --- Operational records ---------------------------------------------
   irrigation.record:

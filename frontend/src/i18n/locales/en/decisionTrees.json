@@ -1,0 +1,86 @@
+{
+  "list": {
+    "title": "Decision trees",
+    "subtitle": "Author and version the recommendation engine's decision trees. Each save lands as a draft; publish to make it the active version.",
+    "loadFailed": "Failed to load decision trees.",
+    "empty": "No decision trees defined yet.",
+    "newButton": "New tree",
+    "missingCapability": "You need the {{capability}} capability to author trees.",
+    "table": {
+      "code": "Code",
+      "name": "Name",
+      "crop": "Crop",
+      "version": "Version",
+      "anyCrop": "any"
+    },
+    "row": {
+      "draft": "draft only",
+      "v": "v{{n}}"
+    }
+  },
+  "create": {
+    "title": "New decision tree",
+    "subtitle": "Authoring is YAML-driven for the node graph; metadata is form-driven. The first save lands as v1 (draft).",
+    "fields": {
+      "code": "Code (stable identifier)",
+      "codeHint": "Used in URLs and stored on every recommendation. Cannot change later.",
+      "codePlaceholder": "scout_for_stress_v1",
+      "cropCode": "Crop code (optional)",
+      "cropCodeHint": "From the crop catalog. Leave blank for crop-agnostic.",
+      "yaml": "Tree YAML",
+      "yamlHint": "Must include code, name_en, root, nodes. See an existing tree for the structure."
+    },
+    "save": "Create tree",
+    "saving": "Creating…",
+    "cancel": "Cancel",
+    "saveFailed": "Create failed"
+  },
+  "edit": {
+    "loadFailed": "Failed to load tree.",
+    "metadata": {
+      "heading": "Metadata",
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "crop": "Crop",
+      "currentVersion": "Current published version",
+      "draftOnly": "no published version yet"
+    },
+    "yaml": {
+      "heading": "Tree YAML",
+      "subtitle": "Editing creates a new draft version. The compiled hash deduplicates identical saves.",
+      "save": "Save as new draft",
+      "saving": "Saving…",
+      "saveFailed": "Save failed",
+      "noChange": "No change since the latest version — save is disabled."
+    },
+    "versions": {
+      "heading": "Version history",
+      "currentBadge": "current",
+      "draftBadge": "draft",
+      "publishedAt": "published {{when}}",
+      "createdAt": "created {{when}}",
+      "publish": "Publish",
+      "publishing": "Publishing…",
+      "publishFailed": "Publish failed",
+      "load": "Load into editor",
+      "diffWithPrev": "Diff vs previous"
+    },
+    "dryRun": {
+      "heading": "Dry-run against a block",
+      "subtitle": "Walk the in-editor tree against a real block without writing a recommendation row.",
+      "blockId": "Block id",
+      "blockIdPlaceholder": "uuid",
+      "useEditor": "Test the in-editor draft",
+      "useCurrent": "Test the published version",
+      "run": "Run",
+      "running": "Running…",
+      "outcome": "Outcome",
+      "noMatch": "No actionable outcome (tree returned no_action or no path).",
+      "matched": "Matched",
+      "path": "Path walked",
+      "snapshot": "Values resolved",
+      "error": "Error"
+    }
+  }
+}
