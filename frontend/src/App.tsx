@@ -49,6 +49,7 @@ import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
+import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
 import { queryClient } from "@/queries/client";
 
 function RedirectDecisionTreeDetail(): ReactNode {
@@ -219,6 +220,7 @@ export function App(): ReactNode {
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
+                <Route path="integrations/health" element={<PlatformHealthPage />} />
               </Route>
               {/* Back-compat: old /admin/* paths redirect to /platform/*
                   so bookmarks keep working through the URL rename. */}

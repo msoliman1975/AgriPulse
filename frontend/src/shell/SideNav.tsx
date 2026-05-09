@@ -112,6 +112,12 @@ export function SideNav(): ReactNode {
             icon={<UsersIcon className="h-4 w-4" />}
             activePathPrefix="/platform/admins"
           />
+          <SideNavItem
+            to="/platform/integrations/health"
+            label={t("nav.platformHealth")}
+            icon={<AlertsIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/integrations/health"
+          />
         </div>
       </nav>
     );

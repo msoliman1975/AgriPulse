@@ -3,7 +3,31 @@
     "section": "Platform",
     "tenants": "Tenants",
     "defaults": "Platform defaults",
-    "platformAdmins": "Platform admins"
+    "platformAdmins": "Platform admins",
+    "platformHealth": "Integration health"
+  },
+  "platformHealth": {
+    "title": "Cross-tenant integration health",
+    "subtitle": "Per-tenant rollup of weather + imagery sync status. Click a row to drill into that tenant. Refreshes every 30 seconds.",
+    "loadFailed": "Could not load cross-tenant health.",
+    "empty": "No active tenants on the platform.",
+    "col": {
+      "tenant": "Tenant",
+      "farms": "Farms",
+      "weather": "Weather",
+      "imagery": "Imagery"
+    },
+    "status": {
+      "ok": "OK",
+      "warn": "Stale",
+      "crit": "Failing",
+      "neutral": "Idle"
+    },
+    "subs": "{{n}} subs",
+    "lastSync": "Last sync {{when}}",
+    "noActive": "No active subscriptions",
+    "neverSynced": "Never synced",
+    "failed24h": "{{n}} failed in 24h"
   },
   "platformAdmins": {
     "title": "Platform admins",
