@@ -26,7 +26,7 @@ from app.modules.iam.users_service import (
 )
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
-from app.shared.db.session import get_admin_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["iam"])
@@ -40,8 +40,9 @@ def _service(
 
 def _users_service(
     session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> TenantUsersService:
-    return get_tenant_users_service(session)
+    return get_tenant_users_service(session, tenant_session=tenant_session)
 
 
 def _ensure_tenant(context: RequestContext) -> str:

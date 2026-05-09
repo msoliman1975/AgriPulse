@@ -235,6 +235,24 @@ class PlatformAdminsService:
             {"rid": uuid4(), "mid": to_mid, "actor": actor_user_id},
         )
 
+        # PR-Set7 guardrail: warn peers about the new owner. Tenant
+        # session is unavailable on this platform-side path, so the
+        # in-app fan-out is skipped — the audit warning still lands.
+        from app.modules.platform_admins.guardrails import (
+            emit_role_grant_guardrail,
+        )
+
+        await emit_role_grant_guardrail(
+            public_session=self._public,
+            tenant_session=None,
+            tenant_id=tenant_id,
+            target_user_id=to_user_id,
+            target_email=None,
+            role="TenantOwner",
+            actor_user_id=actor_user_id,
+            audit=self._audit,
+        )
+
         await self._audit.record_archive(
             event_type="platform.tenant_owner_transferred",
             actor_user_id=actor_user_id,
