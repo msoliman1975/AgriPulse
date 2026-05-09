@@ -2,7 +2,30 @@
   "nav": {
     "section": "المنصة",
     "tenants": "المستأجرون",
-    "defaults": "الإعدادات الافتراضية"
+    "defaults": "الإعدادات الافتراضية",
+    "platformAdmins": "مسؤولو المنصة"
+  },
+  "platformAdmins": {
+    "title": "مسؤولو المنصة",
+    "subtitle": "إدارة من لديه صلاحية PlatformAdmin أو PlatformSupport. تُعكس سمة `platform_role` في Keycloak.",
+    "inviteButton": "+ دعوة",
+    "loadFailed": "تعذر تحميل مسؤولي المنصة.",
+    "empty": "لا يوجد مسؤولو منصة بعد — قم بالتهيئة عبر متغيرات البيئة.",
+    "removeButton": "إلغاء",
+    "pendingKc": "(تهيئة Keycloak معلقة)",
+    "col": { "user": "المستخدم", "role": "الدور", "actions": "" },
+    "inviteTitle": "دعوة مسؤول منصة",
+    "inviteHint": "ينشئ مستخدم Keycloak (أو يعيد استخدام موجود) ويعيّن سمة platform_role. سيتلقى بريد إعادة تعيين كلمة المرور.",
+    "invite": {
+      "email": "البريد",
+      "fullName": "الاسم الكامل",
+      "role": "الدور",
+      "submit": "إرسال الدعوة",
+      "submitting": "جارٍ الإرسال…",
+      "cancel": "إلغاء",
+      "kcOk": "تم إرسال بريد الترحيب عبر Keycloak.",
+      "kcPending": "يجب على المشغل إنهاء التهيئة عبر kcadm.sh — تم إنشاء صفوف قاعدة البيانات."
+    }
   },
   "owner": {
     "title": "مالك المستأجر",

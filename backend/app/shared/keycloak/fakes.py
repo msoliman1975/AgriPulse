@@ -30,6 +30,7 @@ class FakeUser:
     enabled: bool = True
     actions_emailed: tuple[str, ...] = ()
     realm_roles: tuple[str, ...] = ()
+    platform_role: str | None = None
 
 
 @dataclass
@@ -157,6 +158,45 @@ class FakeKeycloakClient:
         for grp in self.groups.values():
             if keycloak_user_id in grp.member_ids:
                 grp.member_ids.remove(keycloak_user_id)
+
+    async def invite_platform_admin(
+        self,
+        *,
+        email: str,
+        full_name: str | None,
+        role: str = "PlatformAdmin",
+    ) -> str:
+        self._maybe_fail("invite_platform_admin")
+        for user in self.users.values():
+            if user.email == email:
+                user.platform_role = role
+                user.realm_roles = tuple(set(user.realm_roles) | {role})
+                return user.id
+        uid = uuid4().hex
+        self.users[uid] = FakeUser(
+            id=uid,
+            email=email,
+            full_name=full_name,
+            enabled=True,
+            actions_emailed=("UPDATE_PASSWORD",),
+            realm_roles=(role,),
+            platform_role=role,
+        )
+        return uid
+
+    async def set_platform_role(
+        self, *, keycloak_user_id: str, role: str
+    ) -> None:
+        self._maybe_fail("set_platform_role")
+        user = self.users.get(keycloak_user_id)
+        if user is not None:
+            user.platform_role = role
+
+    async def clear_platform_role(self, *, keycloak_user_id: str) -> None:
+        self._maybe_fail("clear_platform_role")
+        user = self.users.get(keycloak_user_id)
+        if user is not None:
+            user.platform_role = None
 
     async def aclose(self) -> None:
         self._closed = True

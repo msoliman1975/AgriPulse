@@ -113,6 +113,9 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.platform_admins.router import (
         router as platform_admins_router,
     )
+    from app.modules.platform_admins.admins_router import (
+        router as platform_admins_self_router,
+    )
     from app.modules.platform_admins.tenant_integrations import (
         router as platform_tenant_integrations_router,
     )
@@ -155,6 +158,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(platform_defaults_router)
     app.include_router(platform_admins_router)
     app.include_router(platform_tenant_integrations_router)
+    app.include_router(platform_admins_self_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from

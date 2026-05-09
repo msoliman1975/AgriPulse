@@ -16,6 +16,7 @@ import {
   ReportsIcon,
   SignalsIcon,
   TenantIcon,
+  UsersIcon,
 } from "./icons";
 
 interface SideNavItemProps {
@@ -104,6 +105,12 @@ export function SideNav(): ReactNode {
             label={t("nav.defaults")}
             icon={<GearIcon className="h-4 w-4" />}
             activePathPrefix="/platform/defaults"
+          />
+          <SideNavItem
+            to="/platform/admins"
+            label={t("nav.platformAdmins")}
+            icon={<UsersIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/admins"
           />
         </div>
       </nav>

@@ -56,6 +56,7 @@ export type Capability =
   | "user.delete"
   | "platform.manage_defaults"
   | "platform.manage_tenant_admins"
+  | "platform.manage_platform_admins"
   | "tenant.manage_integrations"
   | "tenant.read_integration_health";
 

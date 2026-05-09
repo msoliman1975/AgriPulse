@@ -2,7 +2,30 @@
   "nav": {
     "section": "Platform",
     "tenants": "Tenants",
-    "defaults": "Platform defaults"
+    "defaults": "Platform defaults",
+    "platformAdmins": "Platform admins"
+  },
+  "platformAdmins": {
+    "title": "Platform admins",
+    "subtitle": "Manage who has PlatformAdmin or PlatformSupport access. Mirrors the Keycloak `platform_role` user attribute.",
+    "inviteButton": "+ Invite",
+    "loadFailed": "Could not load platform admins.",
+    "empty": "No platform admins yet — bootstrap one via env vars.",
+    "removeButton": "Revoke",
+    "pendingKc": "(pending Keycloak provisioning)",
+    "col": { "user": "User", "role": "Role", "actions": "" },
+    "inviteTitle": "Invite a platform admin",
+    "inviteHint": "Creates a Keycloak user (or reuses an existing one) and sets the platform_role attribute. They'll receive a password-reset email.",
+    "invite": {
+      "email": "Email",
+      "fullName": "Full name",
+      "role": "Role",
+      "submit": "Send invite",
+      "submitting": "Sending…",
+      "cancel": "Cancel",
+      "kcOk": "Welcome email queued via Keycloak.",
+      "kcPending": "Operator must finish provisioning via kcadm.sh — DB rows landed."
+    }
   },
   "owner": {
     "title": "Tenant owner",

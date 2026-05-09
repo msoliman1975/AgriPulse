@@ -97,6 +97,10 @@ capabilities:
     description: Add, remove, or transfer-ownership of tenant admins on any tenant.
     scope: platform
     status: active
+  platform.manage_platform_admins:
+    description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
+    scope: platform
+    status: active
   tenant.manage_integrations:
     description: Edit weather, imagery, email, and webhook configs at any inheritance tier.
     scope: tenant
