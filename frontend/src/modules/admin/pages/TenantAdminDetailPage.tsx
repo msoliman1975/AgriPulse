@@ -18,6 +18,7 @@ import {
 } from "@/queries/admin/tenants";
 
 import { TenantActionPanel } from "../components/TenantActionPanel";
+import { TenantAdminsPanel } from "../components/TenantAdminsPanel";
 import { TenantStatusBadge } from "../components/TenantStatusBadge";
 
 export function TenantAdminDetailPage(): ReactNode {
@@ -119,6 +120,8 @@ export function TenantAdminDetailPage(): ReactNode {
         tenant={tenant}
         purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30}
       />
+
+      <TenantAdminsPanel tenantId={tenant.id} tenantSlug={tenant.slug} />
     </section>
   );
 }
