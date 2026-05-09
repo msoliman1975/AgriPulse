@@ -176,6 +176,12 @@ export function SideNav(): ReactNode {
               icon={<TenantIcon className="h-4 w-4" />}
               activePathPrefix="/admin/tenants"
             />
+            <SideNavItem
+              to="/admin/defaults"
+              label={t("nav.defaults")}
+              icon={<GearIcon className="h-4 w-4" />}
+              activePathPrefix="/admin/defaults"
+            />
           </div>
         </>
       )}

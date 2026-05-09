@@ -46,6 +46,7 @@ import { AdminLayout } from "@/modules/admin/pages/AdminLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
+import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { queryClient } from "@/queries/client";
 
 function RedirectDecisionTreeDetail(): ReactNode {
@@ -201,6 +202,7 @@ export function App(): ReactNode {
                 <Route path="tenants" element={<AdminTenantListPage />} />
                 <Route path="tenants/new" element={<AdminTenantCreatePage />} />
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
+                <Route path="defaults" element={<PlatformDefaultsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

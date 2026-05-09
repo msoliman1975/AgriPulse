@@ -1,7 +1,18 @@
 {
   "nav": {
     "section": "Admin",
-    "tenants": "Tenants"
+    "tenants": "Tenants",
+    "defaults": "Platform defaults"
+  },
+  "defaults": {
+    "title": "Platform defaults",
+    "subtitle": "Default settings every tenant inherits from. Tenants can override at their own tier.",
+    "readonlyHint": "You don't have platform.manage_defaults — values are read-only.",
+    "loadFailed": "Could not load platform defaults.",
+    "empty": "No defaults defined.",
+    "save": "Save",
+    "saving": "Saving…",
+    "lastUpdated": "Last updated {{when}}"
   },
   "guard": {
     "forbiddenTitle": "Platform admin only",
