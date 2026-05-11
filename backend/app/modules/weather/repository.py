@@ -158,6 +158,80 @@ class WeatherRepository:
             .values(**values)
         )
 
+    # ---- Attempt log (PR-IH1) -----------------------------------------
+
+    async def open_attempt(
+        self,
+        *,
+        attempt_id: UUID,
+        subscription_id: UUID,
+        block_id: UUID,
+        farm_id: UUID,
+        provider_code: str,
+        started_at: datetime,
+    ) -> None:
+        """Insert a 'running' attempt row. Paired with `close_attempt`."""
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO weather_ingestion_attempts
+                (id, subscription_id, block_id, farm_id, provider_code,
+                 started_at, status)
+                VALUES (:id, :subscription_id, :block_id, :farm_id,
+                        :provider_code, :started_at, 'running')
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("subscription_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": attempt_id,
+                "subscription_id": subscription_id,
+                "block_id": block_id,
+                "farm_id": farm_id,
+                "provider_code": provider_code,
+                "started_at": started_at,
+            },
+        )
+
+    async def close_attempt(
+        self,
+        *,
+        attempt_id: UUID,
+        completed_at: datetime,
+        status: str,
+        rows_ingested: int | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        """Transition a 'running' attempt to a terminal state."""
+        # Truncate provider messages — they can be HTML error pages.
+        if error_message is not None and len(error_message) > 1000:
+            error_message = error_message[:997] + "..."
+        await self._session.execute(
+            text(
+                """
+                UPDATE weather_ingestion_attempts
+                SET completed_at = :completed_at,
+                    status = :status,
+                    rows_ingested = :rows_ingested,
+                    error_code = :error_code,
+                    error_message = :error_message
+                WHERE id = :id
+                """
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {
+                "id": attempt_id,
+                "completed_at": completed_at,
+                "status": status,
+                "rows_ingested": rows_ingested,
+                "error_code": error_code,
+                "error_message": error_message,
+            },
+        )
+
     # ---- Subscription discovery (Beat sweep helper) -------------------
 
     async def list_active_subscriptions_for_farm(
