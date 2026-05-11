@@ -24,6 +24,7 @@ from app.modules.integrations_health.schemas import (
     BlockIntegrationHealthResponse,
     FarmIntegrationHealthResponse,
     IntegrationAttemptRow,
+    QueueEntry,
 )
 from app.modules.integrations_health.service import (
     IntegrationsHealthService,
@@ -101,6 +102,24 @@ async def list_block_attempts(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_block_attempts(block_id=block_id, kind=kind, limit=limit)
+
+
+@router.get(
+    "/integrations/health/queue",
+    response_model=list[QueueEntry],
+    summary="Pipeline queue — overdue / running / stuck (PR-IH4).",
+)
+async def list_queue(
+    kind: Literal["weather", "imagery"] | None = Query(default=None),
+    state: Literal["overdue", "running", "stuck"] | None = Query(default=None),
+    stuck_minutes: int = Query(default=30, ge=1, le=24 * 60),
+    context: RequestContext = Depends(
+        requires_capability("tenant.read_integration_health")
+    ),
+    service: IntegrationsHealthService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_queue(kind=kind, state=state, stuck_minutes=stuck_minutes)
 
 
 @router.get(

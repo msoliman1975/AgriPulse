@@ -56,6 +56,35 @@ class BlockIntegrationHealthResponse(BaseModel):
     imagery_overdue_count: int = 0
 
 
+class QueueEntry(BaseModel):
+    """One row in the pipeline/queue view (PR-IH4).
+
+    Unified shape across weather + imagery. `state` is one of:
+      - 'overdue'  : subscription's cadence has elapsed since
+                     last_successful_ingest_at
+      - 'running'  : weather attempt with status='running', or
+                     imagery job with status in ('pending', 'requested',
+                     'running')
+      - 'stuck'    : 'running' for longer than the stuck threshold
+                     (default 30 minutes; configurable per deploy).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: str  # 'weather' | 'imagery'
+    state: str  # 'overdue' | 'running' | 'stuck'
+    subscription_id: UUID
+    block_id: UUID
+    farm_id: UUID | None
+    provider_code: str | None
+    # For overdue: last_successful_ingest_at (may be null on never-synced).
+    # For running/stuck: the attempt/job's started_at.
+    since: datetime | None
+    # Stuck rows carry the offending attempt id; overdue/running rows can
+    # too if they're attached to a specific attempt.
+    attempt_id: UUID | None = None
+
+
 class IntegrationAttemptRow(BaseModel):
     """One row from `tenant_<id>.v_integration_recent_attempts`.
 

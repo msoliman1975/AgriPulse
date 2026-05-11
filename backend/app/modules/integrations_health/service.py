@@ -109,6 +109,165 @@ class IntegrationsHealthService:
         ).mappings().all()
         return [dict(r) for r in rows]
 
+    # ---- Queue (PR-IH4) ----------------------------------------------
+
+    async def list_queue(
+        self,
+        *,
+        kind: str | None = None,
+        state: str | None = None,
+        stuck_minutes: int = 30,
+        default_weather_cadence_hours: int = 3,
+        default_imagery_cadence_hours: int = 24,
+    ) -> list[dict[str, Any]]:
+        """Return one row per (subscription, queue state).
+
+        `state` filters: 'overdue' | 'running' | 'stuck' (or None for all).
+        A subscription can appear in multiple states (overdue + stuck on
+        the same row's most recent attempt) — that's fine; the UI groups
+        by state and shows the row once per group.
+
+        Stuck-threshold is in minutes, defaulting to 30. Callers expose
+        this via `platform_defaults` in PR-IH4+; for now it's a kwarg.
+        """
+        rows: list[dict[str, Any]] = []
+        wants_weather = kind is None or kind == "weather"
+        wants_imagery = kind is None or kind == "imagery"
+
+        # --- Weather --------------------------------------------------
+        if wants_weather and (state is None or state == "overdue"):
+            r = (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT ws.id AS subscription_id,
+                               ws.block_id,
+                               b.farm_id,
+                               ws.provider_code,
+                               ws.last_successful_ingest_at AS since
+                        FROM weather_subscriptions ws
+                        JOIN blocks b ON b.id = ws.block_id
+                        WHERE ws.is_active
+                          AND ws.deleted_at IS NULL
+                          AND b.deleted_at IS NULL
+                          AND (ws.last_successful_ingest_at IS NULL
+                               OR ws.last_successful_ingest_at <
+                                  now() - make_interval(
+                                    hours => COALESCE(ws.cadence_hours,
+                                                      :default_cadence)))
+                        ORDER BY ws.last_successful_ingest_at NULLS FIRST
+                        """
+                    ),
+                    {"default_cadence": default_weather_cadence_hours},
+                )
+            ).mappings().all()
+            for x in r:
+                d = dict(x)
+                d.update({"kind": "weather", "state": "overdue", "attempt_id": None})
+                rows.append(d)
+
+        if wants_weather and (state is None or state in ("running", "stuck")):
+            r = (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT wa.id AS attempt_id,
+                               wa.subscription_id,
+                               wa.block_id,
+                               wa.farm_id,
+                               wa.provider_code,
+                               wa.started_at AS since
+                        FROM weather_ingestion_attempts wa
+                        WHERE wa.status = 'running'
+                        ORDER BY wa.started_at ASC
+                        """
+                    )
+                )
+            ).mappings().all()
+            stuck_cutoff_sql = (
+                "EXTRACT(EPOCH FROM (now() - wa.started_at)) / 60 >= :stuck_minutes"
+            )
+            for x in r:
+                d = dict(x)
+                # Determine state per row in Python — re-running the query
+                # twice for stuck vs not-stuck is wasteful.
+                from datetime import datetime as _dt
+                from datetime import timezone as _tz
+
+                age_min = (_dt.now(_tz.utc) - d["since"]).total_seconds() / 60
+                row_state = "stuck" if age_min >= stuck_minutes else "running"
+                if state is None or state == row_state:
+                    d.update({"kind": "weather", "state": row_state})
+                    rows.append(d)
+            _ = stuck_cutoff_sql  # silence unused-var warning
+
+        # --- Imagery --------------------------------------------------
+        if wants_imagery and (state is None or state == "overdue"):
+            r = (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT ias.id AS subscription_id,
+                               ias.block_id,
+                               b.farm_id,
+                               (SELECT ip.code FROM public.imagery_products ip
+                                WHERE ip.id = ias.product_id) AS provider_code,
+                               ias.last_successful_ingest_at AS since
+                        FROM imagery_aoi_subscriptions ias
+                        JOIN blocks b ON b.id = ias.block_id
+                        WHERE ias.is_active
+                          AND ias.deleted_at IS NULL
+                          AND b.deleted_at IS NULL
+                          AND (ias.last_successful_ingest_at IS NULL
+                               OR ias.last_successful_ingest_at <
+                                  now() - make_interval(
+                                    hours => COALESCE(ias.cadence_hours,
+                                                      :default_cadence)))
+                        ORDER BY ias.last_successful_ingest_at NULLS FIRST
+                        """
+                    ),
+                    {"default_cadence": default_imagery_cadence_hours},
+                )
+            ).mappings().all()
+            for x in r:
+                d = dict(x)
+                d.update({"kind": "imagery", "state": "overdue", "attempt_id": None})
+                rows.append(d)
+
+        if wants_imagery and (state is None or state in ("running", "stuck")):
+            r = (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT ij.id AS attempt_id,
+                               ij.subscription_id,
+                               ij.block_id,
+                               b.farm_id,
+                               (SELECT ip.code FROM public.imagery_products ip
+                                WHERE ip.id = ij.product_id) AS provider_code,
+                               COALESCE(ij.started_at, ij.requested_at) AS since
+                        FROM imagery_ingestion_jobs ij
+                        JOIN blocks b ON b.id = ij.block_id
+                        WHERE ij.status IN ('pending', 'requested', 'running')
+                          AND b.deleted_at IS NULL
+                        ORDER BY COALESCE(ij.started_at, ij.requested_at) ASC
+                        """
+                    )
+                )
+            ).mappings().all()
+            for x in r:
+                d = dict(x)
+                from datetime import datetime as _dt
+                from datetime import timezone as _tz
+
+                age_min = (_dt.now(_tz.utc) - d["since"]).total_seconds() / 60
+                row_state = "stuck" if age_min >= stuck_minutes else "running"
+                if state is None or state == row_state:
+                    d.update({"kind": "imagery", "state": row_state})
+                    rows.append(d)
+
+        return rows
+
     async def list_recent_attempts(
         self,
         *,

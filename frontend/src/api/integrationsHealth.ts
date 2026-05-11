@@ -94,6 +94,36 @@ export async function listRecentAttempts(
   return data;
 }
 
+export type QueueState = "overdue" | "running" | "stuck";
+
+export interface QueueEntry {
+  kind: AttemptKind;
+  state: QueueState;
+  subscription_id: string;
+  block_id: string;
+  farm_id: string | null;
+  provider_code: string | null;
+  since: string | null;
+  attempt_id: string | null;
+}
+
+export interface QueueParams {
+  kind?: AttemptKind;
+  state?: QueueState;
+  stuck_minutes?: number;
+}
+
+export async function listQueue(
+  params: QueueParams = {},
+  basePath: string = "/v1",
+): Promise<QueueEntry[]> {
+  const { data } = await apiClient.get<QueueEntry[]>(
+    `${basePath}/integrations/health/queue`,
+    { params },
+  );
+  return data;
+}
+
 export async function listBlockAttempts(
   blockId: string,
   params: { kind?: AttemptKind; limit?: number } = {},

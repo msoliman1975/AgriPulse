@@ -4,9 +4,11 @@ import {
   listBlockAttempts,
   listBlockHealth,
   listFarmHealth,
+  listQueue,
   listRecentAttempts,
   type AttemptKind,
   type AttemptStatus,
+  type QueueState,
 } from "@/api/integrationsHealth";
 
 const REFETCH_MS = 30_000;
@@ -60,6 +62,26 @@ export function useRecentAttempts(
       filters.farm_id ?? "all",
     ] as const,
     queryFn: () => listRecentAttempts({ ...filters, limit: 200 }, basePath),
+    refetchInterval: REFETCH_MS,
+    staleTime: REFETCH_MS / 2,
+  });
+}
+
+export function useIntegrationQueue(
+  kind: AttemptKind | undefined,
+  state: QueueState | undefined,
+  basePath: string = "/v1",
+) {
+  return useQuery({
+    queryKey: [
+      "integrations",
+      "health",
+      "queue",
+      basePath,
+      kind ?? "all",
+      state ?? "all",
+    ] as const,
+    queryFn: () => listQueue({ kind, state }, basePath),
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS / 2,
   });
