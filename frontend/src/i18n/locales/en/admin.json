@@ -27,7 +27,11 @@
     "lastSync": "Last sync {{when}}",
     "noActive": "No active subscriptions",
     "neverSynced": "Never synced",
-    "failed24h": "{{n}} failed in 24h"
+    "failed24h": "{{n}} failed in 24h",
+    "drill": {
+      "back": "Back to all tenants",
+      "missingTenant": "No tenant selected."
+    }
   },
   "platformAdmins": {
     "title": "Platform admins",

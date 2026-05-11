@@ -116,6 +116,7 @@ def _register_module_routers(app: FastAPI) -> None:
     full app (e.g., a Celery worker importing only `app.core.settings`).
     """
     from app.modules.alerts.router import router as alerts_router
+    from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
@@ -128,6 +129,9 @@ def _register_module_routers(app: FastAPI) -> None:
     )
     from app.modules.platform_admins.health_rollup import (
         router as platform_health_rollup_router,
+    )
+    from app.modules.platform_admins.health_tenant_drill import (
+        router as platform_health_tenant_drill_router,
     )
     from app.modules.platform_admins.tenant_integrations import (
         router as platform_tenant_integrations_router,
@@ -157,6 +161,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(iam_router)
     app.include_router(tenancy_router)
     app.include_router(farms_router)
+    app.include_router(farms_blocks_summary_router)
     app.include_router(imagery_router)
     app.include_router(indices_router)
     app.include_router(weather_router)
@@ -173,6 +178,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(platform_tenant_integrations_router)
     app.include_router(platform_admins_self_router)
     app.include_router(platform_health_rollup_router)
+    app.include_router(platform_health_tenant_drill_router)
 
     # Cross-module event subscribers — registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from
