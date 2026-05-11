@@ -212,6 +212,7 @@ pnpm dev   # http://localhost:5173
 | `Port 5173 is already in use`                          | Earlier Vite still bound                                                           | `Stop-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess` then re-run `pnpm dev` |
 | Celery `KeyError: 'imagery.discover_active_subscriptions'` | `_TASK_PACKAGES` pointing at the package, not the submodule                        | Pull main — `app.modules.imagery.tasks` is now the right entry              |
 | Tile request 404s in MapLibre devtools                  | TiTiler can't reach MinIO at `host.docker.internal` (Linux Docker)                 | Add `--network host` to the tile-server run, or use the MinIO container IP  |
+| New API routes 404 after `--reload` picked up other files | `uvicorn --reload` (watchfiles on Windows) misses *new* module files                | See [backend-stale-routes.md](backend-stale-routes.md) — full restart, nuke every `__pycache__`, drop `--reload` |
 
 ## When you're done
 
