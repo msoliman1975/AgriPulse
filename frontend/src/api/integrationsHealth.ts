@@ -124,6 +124,53 @@ export async function listQueue(
   return data;
 }
 
+export type ProbeStatus = "ok" | "error" | "timeout";
+
+export interface ProviderHealth {
+  provider_kind: AttemptKind;
+  provider_code: string;
+  last_status: ProbeStatus | null;
+  last_probe_at: string | null;
+  last_latency_ms: number | null;
+  last_error_message: string | null;
+  failed_24h: number;
+}
+
+export interface ProviderProbe {
+  probe_at: string;
+  status: ProbeStatus;
+  latency_ms: number | null;
+  error_message: string | null;
+}
+
+export async function listProviders(
+  basePath: string = "/v1",
+): Promise<ProviderHealth[]> {
+  const { data } = await apiClient.get<ProviderHealth[]>(
+    `${basePath}/integrations/health/providers`,
+  );
+  return data;
+}
+
+export async function listPlatformProviders(): Promise<ProviderHealth[]> {
+  const { data } = await apiClient.get<ProviderHealth[]>(
+    "/v1/admin/integrations/health/providers",
+  );
+  return data;
+}
+
+export async function listRecentProbes(
+  provider_kind: AttemptKind,
+  provider_code: string,
+  limit: number = 100,
+): Promise<ProviderProbe[]> {
+  const { data } = await apiClient.get<ProviderProbe[]>(
+    "/v1/admin/integrations/health/probes",
+    { params: { provider_kind, provider_code, limit } },
+  );
+  return data;
+}
+
 export async function listBlockAttempts(
   blockId: string,
   params: { kind?: AttemptKind; limit?: number } = {},

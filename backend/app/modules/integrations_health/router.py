@@ -20,10 +20,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.integrations_health.providers_service import (
+    ProviderHealthService,
+)
 from app.modules.integrations_health.schemas import (
     BlockIntegrationHealthResponse,
     FarmIntegrationHealthResponse,
     IntegrationAttemptRow,
+    ProviderHealthRow,
     QueueEntry,
 )
 from app.modules.integrations_health.service import (
@@ -31,7 +35,7 @@ from app.modules.integrations_health.service import (
     get_integrations_health_service,
 )
 from app.shared.auth.context import RequestContext
-from app.shared.db.session import get_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["integrations-health"])
@@ -41,6 +45,24 @@ def _service(
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> IntegrationsHealthService:
     return get_integrations_health_service(tenant_session=tenant_session)
+
+
+def _providers_service(
+    public_session: AsyncSession = Depends(get_db_session),
+) -> ProviderHealthService:
+    """Read-only provider liveness service.
+
+    Uses the tenant session because the tenant-scoped query needs
+    search_path set on the same connection that reads from public.
+    PlatformAdmin routes mount their own dependency below.
+    """
+    return ProviderHealthService(public_session=public_session)
+
+
+def _admin_providers_service(
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> ProviderHealthService:
+    return ProviderHealthService(public_session=public_session)
 
 
 def _ensure_tenant(context: RequestContext) -> None:
@@ -102,6 +124,22 @@ async def list_block_attempts(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_block_attempts(block_id=block_id, kind=kind, limit=limit)
+
+
+@router.get(
+    "/integrations/health/providers",
+    response_model=list[ProviderHealthRow],
+    summary="Provider liveness — tenant-scoped projection (PR-IH6).",
+)
+async def list_tenant_providers(
+    context: RequestContext = Depends(
+        requires_capability("tenant.read_integration_health")
+    ),
+    service: ProviderHealthService = Depends(_providers_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    assert context.tenant_schema is not None  # asserted by _ensure_tenant
+    return await service.list_tenant_providers(tenant_schema=context.tenant_schema)
 
 
 @router.get(

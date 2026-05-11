@@ -85,6 +85,36 @@ class QueueEntry(BaseModel):
     attempt_id: UUID | None = None
 
 
+class ProviderHealthRow(BaseModel):
+    """One row in the Providers tab (PR-IH6).
+
+    Aggregates the most recent probe per provider plus a 24h failure
+    count. `last_probe_at` is null if the scheduler hasn't run yet —
+    the UI maps that to a "pending" pill.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    provider_kind: str  # 'weather' | 'imagery'
+    provider_code: str
+    last_status: str | None  # 'ok' | 'error' | 'timeout' | None
+    last_probe_at: datetime | None
+    last_latency_ms: int | None
+    last_error_message: str | None
+    failed_24h: int
+
+
+class ProviderProbeRow(BaseModel):
+    """One row in the per-provider probe-history drill-down."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    probe_at: datetime
+    status: str
+    latency_ms: int | None
+    error_message: str | None
+
+
 class IntegrationAttemptRow(BaseModel):
     """One row from `tenant_<id>.v_integration_recent_attempts`.
 

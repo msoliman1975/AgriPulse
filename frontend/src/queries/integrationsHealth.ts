@@ -4,8 +4,11 @@ import {
   listBlockAttempts,
   listBlockHealth,
   listFarmHealth,
+  listPlatformProviders,
+  listProviders,
   listQueue,
   listRecentAttempts,
+  listRecentProbes,
   type AttemptKind,
   type AttemptStatus,
   type QueueState,
@@ -83,6 +86,44 @@ export function useIntegrationQueue(
     ] as const,
     queryFn: () => listQueue({ kind, state }, basePath),
     refetchInterval: REFETCH_MS,
+    staleTime: REFETCH_MS / 2,
+  });
+}
+
+export function useProvidersHealth(
+  platformScope: boolean,
+  basePath: string = "/v1",
+) {
+  return useQuery({
+    queryKey: [
+      "integrations",
+      "health",
+      "providers",
+      platformScope ? "platform" : "tenant",
+      basePath,
+    ] as const,
+    queryFn: () =>
+      platformScope ? listPlatformProviders() : listProviders(basePath),
+    refetchInterval: REFETCH_MS,
+    staleTime: REFETCH_MS / 2,
+  });
+}
+
+export function useProviderProbes(
+  provider_kind: AttemptKind | null,
+  provider_code: string | null,
+) {
+  return useQuery({
+    queryKey: [
+      "integrations",
+      "health",
+      "providers",
+      "probes",
+      provider_kind,
+      provider_code,
+    ] as const,
+    queryFn: () => listRecentProbes(provider_kind!, provider_code!, 100),
+    enabled: Boolean(provider_kind && provider_code),
     staleTime: REFETCH_MS / 2,
   });
 }

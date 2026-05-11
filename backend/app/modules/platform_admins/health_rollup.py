@@ -25,6 +25,11 @@ from datetime import datetime
 from uuid import UUID
 
 from app.core.logging import get_logger
+from app.modules.integrations_health.providers_service import ProviderHealthService
+from app.modules.integrations_health.schemas import (
+    ProviderHealthRow,
+    ProviderProbeRow,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session, sanitize_tenant_schema
 from app.shared.rbac.check import requires_capability
@@ -134,3 +139,37 @@ async def cross_tenant_health(
     # potential future expansion — e.g. filter by category).
     _ = bindparam("x", type_=PG_UUID(as_uuid=True))
     return out
+
+
+# ---- Provider probes (PR-IH6) -------------------------------------------
+
+
+@router.get("/health/providers", response_model=list[ProviderHealthRow])
+async def list_platform_providers(
+    context: RequestContext = Depends(
+        requires_capability("platform.manage_tenants")
+    ),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    """Every active provider catalog row + its latest probe."""
+    del context
+    service = ProviderHealthService(public_session=public_session)
+    return await service.list_platform_providers()
+
+
+@router.get("/health/probes", response_model=list[ProviderProbeRow])
+async def list_recent_probes(
+    provider_kind: str,
+    provider_code: str,
+    limit: int = 200,
+    context: RequestContext = Depends(
+        requires_capability("platform.manage_tenants")
+    ),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    """Probe history for one provider — drill-down from the Providers tab."""
+    del context
+    service = ProviderHealthService(public_session=public_session)
+    return await service.list_recent_probes(
+        provider_kind=provider_kind, provider_code=provider_code, limit=limit
+    )
