@@ -13,6 +13,7 @@ per IP, not per call cost, so collapsing to one fetch is also cheaper.
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -25,8 +26,13 @@ from app.modules.weather.providers.protocol import (
     FetchResult,
     HourlyForecast,
     HourlyObservation,
+    ProbeResult,
     WeatherProvider,
 )
+
+# Probe timeout — kept tight because the probe runs on Beat cadence
+# and a slow provider should be visible as a timeout, not a stuck task.
+_PROBE_TIMEOUT_SECONDS = 5.0
 
 # Variables we ask Open-Meteo for. Order is documentation-only; the
 # response is keyed by name. We map directly onto our hypertable
@@ -74,6 +80,47 @@ class OpenMeteoProvider:
     async def aclose(self) -> None:
         if self._owns_http:
             await self._http.aclose()
+
+    async def probe(self) -> ProbeResult:
+        """Tiny `/v1/forecast` call against (0,0) — one hour, one var.
+
+        Open-Meteo's free tier doesn't meter this call cost, so the
+        probe cadence is bounded only by the Beat schedule, not quota.
+        """
+        params: dict[str, Any] = {
+            "latitude": 0,
+            "longitude": 0,
+            "hourly": "temperature_2m",
+            "forecast_days": 1,
+            "timezone": "UTC",
+        }
+        started = time.perf_counter()
+        try:
+            response = await self._http.get(
+                self._forecast_url,
+                params=params,
+                timeout=httpx.Timeout(_PROBE_TIMEOUT_SECONDS),
+            )
+        except httpx.TimeoutException as exc:
+            return ProbeResult(
+                status="timeout",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error_message=str(exc),
+            )
+        except httpx.TransportError as exc:
+            return ProbeResult(
+                status="error",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error_message=str(exc),
+            )
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        if response.status_code >= 400:
+            return ProbeResult(
+                status="error",
+                latency_ms=latency_ms,
+                error_message=f"HTTP {response.status_code}",
+            )
+        return ProbeResult(status="ok", latency_ms=latency_ms)
 
     async def fetch(
         self,

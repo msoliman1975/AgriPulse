@@ -76,4 +76,13 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.recommendations_evaluate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Provider liveness probes (PR-IH5). Pings each active weather +
+    # imagery provider on a tight cadence so the Providers tab can show
+    # red/green status without waiting for a real tenant fetch to fail.
+    # Probes run on `light` because they're seconds-long HTTP calls.
+    "integrations_health.probe_providers": {
+        "task": "integrations_health.probe_providers",
+        "schedule": float(_settings.provider_probe_seconds),
+        "options": {"queue": "light"},
+    },
 }

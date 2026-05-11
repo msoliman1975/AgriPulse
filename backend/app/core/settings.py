@@ -170,6 +170,13 @@ class Settings(BaseSettings):
     # WHERE state='open' keeps re-runs idempotent.
     recommendations_evaluate_sweep_seconds: int = 3600
 
+    # Cadence for `integrations_health.probe_providers` (PR-IH5). 5 min
+    # is the proposal default for Open-Meteo; if Sentinel Hub probe
+    # costs need throttling, raise it. Each probe is a single HTTP
+    # round-trip per provider, so the cost grows linearly with the
+    # provider catalog rather than tenant count.
+    provider_probe_seconds: int = 300
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md § 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`

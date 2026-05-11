@@ -58,12 +58,34 @@ class FetchResult:
     forecasts: tuple[HourlyForecast, ...] = field(default_factory=tuple)
 
 
+@dataclass(frozen=True, slots=True)
+class ProbeResult:
+    """Outcome of a liveness probe — PR-IH5.
+
+    Status:
+      - 'ok'      : provider responded normally
+      - 'error'   : non-2xx HTTP or other adapter-recognized error
+      - 'timeout' : timed out before responding
+    """
+
+    status: str
+    latency_ms: int | None = None
+    error_message: str | None = None
+
+
 class WeatherProvider(Protocol):
     """The contract every weather adapter satisfies."""
 
     @property
     def code(self) -> str:
         """Provider code matching `public.weather_providers.code`."""
+        ...
+
+    async def probe(self) -> ProbeResult:
+        """Cheap liveness check. Should make one bounded-cost request and
+        return within a few seconds. Implementations swallow exceptions
+        and report them via ProbeResult so the orchestrator never raises
+        from a probe call."""
         ...
 
     async def fetch(

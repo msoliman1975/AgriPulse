@@ -44,6 +44,18 @@ class FetchResult:
     content_type: str = "image/tiff; application=geotiff; profile=cloud-optimized"
 
 
+@dataclass(frozen=True, slots=True)
+class ProbeResult:
+    """Outcome of a liveness probe — PR-IH5. Mirrors the weather variant.
+
+    Status: 'ok' | 'error' | 'timeout'.
+    """
+
+    status: str
+    latency_ms: int | None = None
+    error_message: str | None = None
+
+
 class ImageryProvider(Protocol):
     """The contract every provider adapter satisfies.
 
@@ -54,6 +66,10 @@ class ImageryProvider(Protocol):
     @property
     def code(self) -> str:
         """The provider code matching `public.imagery_providers.code`."""
+        ...
+
+    async def probe(self) -> ProbeResult:
+        """Cheap liveness check. See WeatherProvider.probe."""
         ...
 
     async def discover(
