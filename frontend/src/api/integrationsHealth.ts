@@ -11,6 +11,12 @@ export interface FarmIntegrationHealth {
   imagery_active_subs: number;
   imagery_last_sync_at: string | null;
   imagery_failed_24h: number;
+  // PR-IH2 additions
+  weather_failed_24h: number;
+  weather_running_count: number;
+  imagery_running_count: number;
+  weather_overdue_count: number;
+  imagery_overdue_count: number;
 }
 
 export interface BlockIntegrationHealth {
@@ -23,20 +29,79 @@ export interface BlockIntegrationHealth {
   imagery_active_subs: number;
   imagery_last_sync_at: string | null;
   imagery_failed_24h: number;
+  // PR-IH2 additions
+  weather_failed_24h: number;
+  weather_running_count: number;
+  imagery_running_count: number;
+  weather_overdue_count: number;
+  imagery_overdue_count: number;
 }
 
-export async function listFarmHealth(): Promise<FarmIntegrationHealth[]> {
+export type AttemptKind = "weather" | "imagery";
+export type AttemptStatus = "running" | "succeeded" | "failed" | "skipped";
+
+export interface IntegrationAttempt {
+  attempt_id: string;
+  kind: AttemptKind;
+  subscription_id: string;
+  block_id: string;
+  farm_id: string | null;
+  provider_code: string | null;
+  started_at: string;
+  completed_at: string | null;
+  status: AttemptStatus;
+  duration_ms: number | null;
+  rows_ingested: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  scene_id: string | null;
+}
+
+export async function listFarmHealth(
+  basePath: string = "/v1",
+): Promise<FarmIntegrationHealth[]> {
   const { data } = await apiClient.get<FarmIntegrationHealth[]>(
-    "/v1/integrations/health/farms",
+    `${basePath}/integrations/health/farms`,
   );
   return data;
 }
 
 export async function listBlockHealth(
   farmId: string,
+  basePath: string = "/v1",
 ): Promise<BlockIntegrationHealth[]> {
   const { data } = await apiClient.get<BlockIntegrationHealth[]>(
-    `/v1/integrations/health/farms/${farmId}/blocks`,
+    `${basePath}/integrations/health/farms/${farmId}/blocks`,
+  );
+  return data;
+}
+
+export interface RecentAttemptsParams {
+  kind?: AttemptKind;
+  status?: AttemptStatus;
+  farm_id?: string;
+  limit?: number;
+}
+
+export async function listRecentAttempts(
+  params: RecentAttemptsParams = {},
+  basePath: string = "/v1",
+): Promise<IntegrationAttempt[]> {
+  const { data } = await apiClient.get<IntegrationAttempt[]>(
+    `${basePath}/integrations/health/recent`,
+    { params },
+  );
+  return data;
+}
+
+export async function listBlockAttempts(
+  blockId: string,
+  params: { kind?: AttemptKind; limit?: number } = {},
+  basePath: string = "/v1",
+): Promise<IntegrationAttempt[]> {
+  const { data } = await apiClient.get<IntegrationAttempt[]>(
+    `${basePath}/integrations/health/blocks/${blockId}/attempts`,
+    { params },
   );
   return data;
 }

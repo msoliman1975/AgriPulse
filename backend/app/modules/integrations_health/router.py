@@ -4,23 +4,26 @@ Mounted under /api/v1 by the app factory:
 
   GET /integrations/health/farms                       — Farm rollup
   GET /integrations/health/farms/{farm_id}/blocks      — per-Block detail
+  GET /integrations/health/blocks/{block_id}/attempts  — per-Block run log (PR-IH3)
+  GET /integrations/health/recent                      — tenant-wide recent runs (PR-IH3)
 
-Both gated on `tenant.read_integration_health`. PlatformSupport gets
+All gated on `tenant.read_integration_health`. PlatformSupport gets
 this capability so support staff can diagnose tenant integration issues
 without acting on them.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.integrations_health.schemas import (
     BlockIntegrationHealthResponse,
     FarmIntegrationHealthResponse,
+    IntegrationAttemptRow,
 )
 from app.modules.integrations_health.service import (
     IntegrationsHealthService,
@@ -80,3 +83,44 @@ async def list_block_health(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_blocks(farm_id=farm_id)
+
+
+@router.get(
+    "/integrations/health/blocks/{block_id}/attempts",
+    response_model=list[IntegrationAttemptRow],
+    summary="Recent ingestion attempts for one Block (PR-IH3 drill-down).",
+)
+async def list_block_attempts(
+    block_id: UUID,
+    kind: Literal["weather", "imagery"] | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    context: RequestContext = Depends(
+        requires_capability("tenant.read_integration_health")
+    ),
+    service: IntegrationsHealthService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_block_attempts(block_id=block_id, kind=kind, limit=limit)
+
+
+@router.get(
+    "/integrations/health/recent",
+    response_model=list[IntegrationAttemptRow],
+    summary="Tenant-wide recent ingestion attempts (PR-IH3 Runs tab).",
+)
+async def list_recent_attempts(
+    kind: Literal["weather", "imagery"] | None = Query(default=None),
+    status_filter: Literal["running", "succeeded", "failed", "skipped"] | None = Query(
+        default=None, alias="status"
+    ),
+    farm_id: UUID | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    context: RequestContext = Depends(
+        requires_capability("tenant.read_integration_health")
+    ),
+    service: IntegrationsHealthService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_recent_attempts(
+        kind=kind, status=status_filter, farm_id=farm_id, limit=limit
+    )
