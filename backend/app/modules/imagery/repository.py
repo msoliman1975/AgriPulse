@@ -394,15 +394,26 @@ class ImageryRepository:
         job_id: UUID,
         completed_at: datetime,
         error_message: str,
+        error_code: str | None = None,
     ) -> None:
+        """Transition a running job to 'failed'.
+
+        `error_code` is the short categorized label
+        (`tls_trust`, `timeout`, `http_5xx`, …). When None the column
+        stays NULL — caller didn't know how to classify the failure
+        and the Runs tab will group it under "uncategorized".
+        """
+        values: dict[str, Any] = {
+            "status": "failed",
+            "completed_at": completed_at,
+            "error_message": error_message[:1000],
+        }
+        if error_code is not None:
+            values["error_code"] = error_code[:64]
         await self._session.execute(
             update(ImageryIngestionJob)
             .where(ImageryIngestionJob.id == job_id)
-            .values(
-                status="failed",
-                completed_at=completed_at,
-                error_message=error_message[:1000],
-            )
+            .values(**values)
         )
         await self._session.flush()
 

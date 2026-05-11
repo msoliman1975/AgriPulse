@@ -53,6 +53,8 @@
       "status": "الحالة",
       "startedAt": "بدأت",
       "duration": "المدة",
+      "wait": "الانتظار",
+      "run": "التنفيذ",
       "detail": "التفاصيل"
     },
     "summary": { "rows": "{{n}} صف" }
@@ -62,6 +64,7 @@
     "subscriptionId": "الاشتراك",
     "blockId": "القطعة",
     "farmId": "المزرعة",
+    "queuedAt": "في الطابور",
     "startedAt": "بدأت",
     "completedAt": "اكتملت",
     "rowsIngested": "الصفوف المستوعبة",

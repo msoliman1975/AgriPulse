@@ -120,6 +120,10 @@ class IntegrationAttemptRow(BaseModel):
 
     Unified shape across weather + imagery. `scene_id` is imagery-only;
     `rows_ingested` is weather-only. Both are nullable.
+
+    PR-IH8: added explicit `queued_at`, `wait_ms`, `run_ms` so the Runs
+    tab can distinguish "stuck in queue" from "running forever".
+    `duration_ms` is retained for older clients and equals `run_ms`.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -131,9 +135,12 @@ class IntegrationAttemptRow(BaseModel):
     farm_id: UUID | None
     provider_code: str | None
     started_at: datetime
+    queued_at: datetime | None = None
     completed_at: datetime | None
     status: str  # 'running' | 'succeeded' | 'failed' | 'skipped'
     duration_ms: int | None
+    wait_ms: int | None = None
+    run_ms: int | None = None
     rows_ingested: int | None
     error_code: str | None
     error_message: str | None

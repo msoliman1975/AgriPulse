@@ -97,25 +97,10 @@ def reset_provider_factory() -> None:
 # --- Helpers ---------------------------------------------------------------
 
 
-def _classify_error(exc: BaseException) -> str:
-    """Short categorized code for the attempt log.
-
-    The full exception message goes in `error_message`; this code is
-    what the UI filters/groups on, so it has to be coarse and stable.
-    """
-    name = type(exc).__name__.lower()
-    msg = str(exc).lower()
-    if "timeout" in name or "timeout" in msg:
-        return "timeout"
-    if "connect" in name or "connect" in msg:
-        return "connection_error"
-    if any(s in msg for s in ("400", "401", "403", "404", "422")):
-        return "http_4xx"
-    if any(s in msg for s in ("500", "502", "503", "504")):
-        return "http_5xx"
-    if "json" in msg or "decode" in msg or "parse" in msg:
-        return "parse_error"
-    return "provider_error"
+# Local alias kept for backward compatibility with existing call sites.
+# Classifier body moved to integrations_health.error_codes so imagery can
+# share the same vocabulary — see PR-IH8.
+from app.modules.integrations_health.error_codes import classify_error as _classify_error
 
 
 async def _set_tenant_context(session: Any, tenant_schema: str) -> None:

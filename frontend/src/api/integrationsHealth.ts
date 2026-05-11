@@ -48,9 +48,15 @@ export interface IntegrationAttempt {
   farm_id: string | null;
   provider_code: string | null;
   started_at: string;
+  // PR-IH8: when the job entered the queue (imagery has a real queue,
+  // weather sets queued_at == started_at). May be null for older rows.
+  queued_at: string | null;
   completed_at: string | null;
   status: AttemptStatus;
+  // duration_ms == run_ms for back-compat; prefer the split fields.
   duration_ms: number | null;
+  wait_ms: number | null;
+  run_ms: number | null;
   rows_ingested: number | null;
   error_code: string | null;
   error_message: string | null;

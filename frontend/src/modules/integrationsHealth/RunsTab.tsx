@@ -130,7 +130,8 @@ function RunsTable({
             <th className="px-3 py-2 text-start">{t("runs.col.provider")}</th>
             <th className="px-3 py-2 text-start">{t("runs.col.status")}</th>
             <th className="px-3 py-2 text-start">{t("runs.col.startedAt")}</th>
-            <th className="px-3 py-2 text-end">{t("runs.col.duration")}</th>
+            <th className="px-3 py-2 text-end">{t("runs.col.wait")}</th>
+            <th className="px-3 py-2 text-end">{t("runs.col.run")}</th>
             <th className="px-3 py-2 text-start">{t("runs.col.detail")}</th>
           </tr>
         </thead>
@@ -161,7 +162,16 @@ function RunsTable({
                     })}
                   </td>
                   <td className="px-3 py-2 text-end text-ap-muted">
-                    {r.duration_ms !== null ? formatDuration(r.duration_ms) : "—"}
+                    {r.wait_ms !== null && r.wait_ms !== undefined
+                      ? formatDuration(r.wait_ms)
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-end text-ap-muted">
+                    {r.run_ms !== null && r.run_ms !== undefined
+                      ? formatDuration(r.run_ms)
+                      : r.duration_ms !== null
+                        ? formatDuration(r.duration_ms)
+                        : "—"}
                   </td>
                   <td className="px-3 py-2 text-ap-muted">
                     {summaryFor(r, t)}
@@ -169,7 +179,7 @@ function RunsTable({
                 </tr>
                 {isOpen ? (
                   <tr className="bg-ap-bg/30">
-                    <td colSpan={6} className="px-3 py-3">
+                    <td colSpan={7} className="px-3 py-3">
                       <DetailBlock row={r} />
                     </td>
                   </tr>
@@ -191,6 +201,9 @@ function DetailBlock({ row }: { row: IntegrationAttempt }): ReactNode {
       <Field label={t("detail.subscriptionId")} value={row.subscription_id} />
       <Field label={t("detail.blockId")} value={row.block_id} />
       <Field label={t("detail.farmId")} value={row.farm_id ?? "—"} />
+      {row.queued_at && row.queued_at !== row.started_at ? (
+        <Field label={t("detail.queuedAt")} value={row.queued_at} />
+      ) : null}
       <Field label={t("detail.startedAt")} value={row.started_at} />
       <Field label={t("detail.completedAt")} value={row.completed_at ?? "—"} />
       {row.rows_ingested !== null ? (

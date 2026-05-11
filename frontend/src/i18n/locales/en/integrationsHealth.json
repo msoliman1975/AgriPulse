@@ -53,6 +53,8 @@
       "status": "Status",
       "startedAt": "Started",
       "duration": "Duration",
+      "wait": "Wait",
+      "run": "Run",
       "detail": "Detail"
     },
     "summary": { "rows": "{{n}} rows" }
@@ -62,6 +64,7 @@
     "subscriptionId": "Subscription",
     "blockId": "Block",
     "farmId": "Farm",
+    "queuedAt": "Queued",
     "startedAt": "Started",
     "completedAt": "Completed",
     "rowsIngested": "Rows ingested",
