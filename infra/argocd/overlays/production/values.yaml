@@ -1,6 +1,11 @@
 # production environment overrides. ARCHITECTURE.md § 3.2 commits the
 # baseline resource shapes; tune carefully and only with an ADR for
 # anything that changes scale or reliability assumptions.
+
+# Used by the shared chart to template the CNPG backup `destinationPath`.
+global:
+  env: prod
+
 labels:
   partOf: missionagre
 
@@ -44,8 +49,6 @@ postgresCluster:
       memory: 16Gi
   backup:
     enabled: true
-    barmanObjectStore:
-      destinationPath: s3://agripulse-pg-backup-prod
     retentionPolicy: "90d"
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""

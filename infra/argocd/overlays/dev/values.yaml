@@ -1,6 +1,11 @@
 # dev environment overrides for the missionagre-services ApplicationSet.
 # Values here override `infra/helm/<chart>/values.yaml` defaults.
 
+# Used by the shared chart to template the CNPG backup `destinationPath`
+# (s3://agripulse-pg-backup-<env>/pg).
+global:
+  env: dev
+
 # Common knobs across charts.
 labels:
   partOf: missionagre

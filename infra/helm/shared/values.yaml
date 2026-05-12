@@ -3,6 +3,14 @@
 # only in things that genuinely differ (domain names, S3 buckets, etc.).
 
 # ---------------------------------------------------------------------------
+# Global identifiers reused across templates. `env` plugs into the
+# CNPG backup destinationPath (s3://agripulse-pg-backup-<env>) and is
+# expected to be overridden per ArgoCD overlay.
+# ---------------------------------------------------------------------------
+global:
+  env: dev
+
+# ---------------------------------------------------------------------------
 # Common labels applied by every templates/_labels.tpl include.
 # ---------------------------------------------------------------------------
 labels:
@@ -61,9 +69,10 @@ postgresCluster:
   name: missionagre-pg
   instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4-bookworm
-  # IRSA annotations applied to the CNPG-managed ServiceAccount. CD-7 will
-  # consume this on `spec.serviceAccountTemplate`; CD-6 just plumbs the
-  # value through so overlays can set the role ARN today.
+  # IRSA annotations applied to the CNPG-managed ServiceAccount via
+  # `spec.serviceAccountTemplate.metadata.annotations`. Overlays set the
+  # `eks.amazonaws.com/role-arn` key from `terraform output
+  # agripulse_env_resources.<env>.cnpg_irsa_arn`.
   serviceAccountAnnotations: {}
   storage:
     size: 100Gi
@@ -94,18 +103,27 @@ postgresCluster:
       shared_preload_libraries: "timescaledb,pgaudit"
       max_connections: "200"
       log_statement: "ddl"
-  # Backup target. Bucket and KMS key are provisioned by Terraform; the
-  # ApplicationSet overlay sets the per-env bucket name.
+  # Backup target. Buckets + IRSA come from CD-6. `destinationPath` is
+  # templated against `global.env`; overlays override only when they want
+  # a non-default retention. Hits the `agripulse-pg-backup-<env>` bucket
+  # via the CNPG SA's IRSA role.
   backup:
     enabled: true
     barmanObjectStore:
-      destinationPath: s3://missionagre-pg-backups-CHANGEME
+      destinationPath: "s3://agripulse-pg-backup-{{ .Values.global.env }}/pg"
       s3Credentials:
         inheritFromIAMRole: true
       wal:
         compression: gzip
         maxParallel: 4
     retentionPolicy: "30d"
+  # CNPG `ScheduledBackup` resource. Daily at 02:00 UTC. CNPG cron is
+  # 6-field (seconds + 5-field). Backup objects are owned by the
+  # ScheduledBackup itself so deleting it cleans up the chain.
+  scheduledBackup:
+    enabled: true
+    schedule: "0 0 2 * * *"
+    backupOwnerReference: self
 
 # ---------------------------------------------------------------------------
 # Namespace-scoped ConfigMap shared by every service chart.

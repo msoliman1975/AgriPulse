@@ -10,6 +10,13 @@ spec:
   imageName: {{ .Values.postgresCluster.imageName | quote }}
   instances: {{ .Values.postgresCluster.instances }}
 
+  {{- with .Values.postgresCluster.serviceAccountAnnotations }}
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+
   bootstrap:
     initdb:
       database: missionagre
@@ -39,7 +46,7 @@ spec:
   {{- if .Values.postgresCluster.backup.enabled }}
   backup:
     barmanObjectStore:
-      destinationPath: {{ .Values.postgresCluster.backup.barmanObjectStore.destinationPath | quote }}
+      destinationPath: {{ tpl .Values.postgresCluster.backup.barmanObjectStore.destinationPath . | quote }}
       s3Credentials:
         inheritFromIAMRole: {{ .Values.postgresCluster.backup.barmanObjectStore.s3Credentials.inheritFromIAMRole }}
       wal:
