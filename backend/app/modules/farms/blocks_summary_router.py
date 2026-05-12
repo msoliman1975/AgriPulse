@@ -91,7 +91,10 @@ async def get_blocks_summary(
     del context  # capability check side-effect is the only consumer
 
     # 1. Latest index value per (block, index) for blocks in this farm.
-    #    DISTINCT ON inside a CTE bounds the scan to non-archived blocks.
+    #    DISTINCT ON inside a CTE bounds the scan to blocks whose lifecycle
+    #    window is still open — i.e. `active_to` not set, or set to a
+    #    future date. Migration 0026 dropped the legacy `status` column
+    #    in favor of the active_from / active_to date pair.
     index_rows = (
         (
             await tenant_session.execute(
@@ -101,7 +104,7 @@ async def get_blocks_summary(
                         SELECT id FROM blocks
                         WHERE farm_id = :farm_id
                           AND deleted_at IS NULL
-                          AND status NOT IN ('archived')
+                          AND (active_to IS NULL OR active_to > current_date)
                     )
                     SELECT DISTINCT ON (a.block_id, a.index_code)
                            a.block_id,
@@ -158,7 +161,7 @@ async def get_blocks_summary(
                     SELECT id FROM blocks
                     WHERE farm_id = :farm_id
                       AND deleted_at IS NULL
-                      AND status NOT IN ('archived')
+                      AND (active_to IS NULL OR active_to > current_date)
                     """
                 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
                 {"farm_id": farm_id},
