@@ -94,6 +94,14 @@ output "karpenter" {
   }
 }
 
+output "agripulse_secret_arns" {
+  description = "AWS Secrets Manager ARNs created by CD-9. Keyed by `<env>/<purpose>`. Values are placeholders until seeded per docs/runbooks/seeding-secrets.md."
+  value = {
+    for k, s in aws_secretsmanager_secret.agripulse :
+    k => s.arn
+  }
+}
+
 output "agripulse_env_resources" {
   description = "Per-env imagery + pg-backup bucket names and IRSA role ARNs. Overlays read this to wire the api + CNPG ServiceAccount annotations."
   value = {

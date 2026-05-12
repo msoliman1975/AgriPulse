@@ -1,5 +1,10 @@
 # staging environment overrides. Tracks production layout but with
 # smaller resource asks so cost stays sane during pre-release runs.
+
+# Used by the shared chart to template the CNPG backup `destinationPath`.
+global:
+  env: staging
+
 labels:
   partOf: missionagre
 
@@ -36,8 +41,6 @@ postgresCluster:
     size: 15Gi
   backup:
     enabled: true
-    barmanObjectStore:
-      destinationPath: s3://agripulse-pg-backup-staging
     retentionPolicy: "14d"
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import type { TenantAdminRow } from "@/api/platformAdmins";
 import {
   useAssignFirstOwner,
   useTenantAdmins,
@@ -62,11 +63,13 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
       ) : adminsQ.isError ? (
         <p className="mt-3 text-sm text-ap-crit">{t("admins.loadFailed")}</p>
       ) : owner == null ? (
-        <AssignFirstOwnerForm
-          tenantId={tenantId}
-          existingMembers={adminsQ.data ?? []}
-        />
-        <p className="mt-3 text-sm text-ap-warn">{t("owner.none")}</p>
+        <>
+          <p className="mt-3 text-sm text-ap-warn">{t("owner.none")}</p>
+          <AssignFirstOwnerForm
+            tenantId={tenantId}
+            existingMembers={adminsQ.data ?? []}
+          />
+        </>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Pill kind="warn">TenantOwner</Pill>
