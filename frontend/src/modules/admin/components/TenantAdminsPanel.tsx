@@ -7,7 +7,6 @@ import {
   useAssignFirstOwner,
   useTenantAdmins,
   useTransferOwnership,
-  type TenantAdminRow,
 } from "@/queries/platformAdmins";
 
 interface Props {
@@ -22,6 +21,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * tenant creation per the persona-separation rule (decision Q3:
  * "Platform = define and assign TenantOwners; Agri.Pulse = full
  * self-service" for everyone else).
+ *
+ * What lives here:
+ *   - Read-only display of the current TenantOwner.
+ *   - Transfer-ownership flow (slug-confirmation modal — same posture
+ *     as the purge confirmation).
+ *
  *
  * What lives here:
  *   - Read-only display of the current TenantOwner.
@@ -61,6 +66,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
           tenantId={tenantId}
           existingMembers={adminsQ.data ?? []}
         />
+        <p className="mt-3 text-sm text-ap-warn">{t("owner.none")}</p>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Pill kind="warn">TenantOwner</Pill>

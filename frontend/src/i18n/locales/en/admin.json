@@ -32,6 +32,7 @@
       "back": "Back to all tenants",
       "missingTenant": "No tenant selected."
     }
+    "failed24h": "{{n}} failed in 24h"
   },
   "platformAdmins": {
     "title": "Platform admins",
@@ -72,6 +73,7 @@
     "assignPickMember": "Pick an existing member",
     "assignSubmit": "Assign owner",
     "assignSubmitting": "Assigning…"
+    "noCandidates": "No other admins on this tenant. Invite one via Agri.Pulse → Settings → Users first."
   },
   "integrations": {
     "title": "Integration defaults",
