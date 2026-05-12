@@ -1,0 +1,13 @@
+# staging overrides for the missionagre-shared chart.
+
+postgresCluster:
+  instances: 2
+  storage:
+    size: 50Gi
+  walStorage:
+    size: 15Gi
+  backup:
+    enabled: true
+    barmanObjectStore:
+      destinationPath: s3://missionagre-pg-backups-staging
+    retentionPolicy: "14d"

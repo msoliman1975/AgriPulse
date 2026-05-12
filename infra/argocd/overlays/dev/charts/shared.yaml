@@ -1,0 +1,17 @@
+# dev overrides for the missionagre-shared chart (CNPG cluster sizing,
+# extension list, backup wiring).
+
+# Dev DB is the same cluster CNPG instance, just smaller.
+postgresCluster:
+  instances: 1
+  storage:
+    size: 20Gi
+  walStorage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi

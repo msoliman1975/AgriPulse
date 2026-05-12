@@ -50,9 +50,13 @@ spec:
         targetRevision: HEAD
         path: "infra/helm/{{.chart}}"
         helm:
+          # Load order matters: chart defaults → env-wide globals → per-chart
+          # overrides. Per-chart wins so future PRs can author isolated files
+          # without touching the shared overlay surface.
           valueFiles:
             - "values.yaml"
-            - "../../argocd/overlays/{{.env}}/values.yaml"
+            - "../../argocd/overlays/{{.env}}/global.yaml"
+            - "../../argocd/overlays/{{.env}}/charts/{{.chart}}.yaml"
       syncPolicy:
         automated:
           prune: "{{.prune}}"

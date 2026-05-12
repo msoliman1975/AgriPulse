@@ -1,0 +1,20 @@
+# staging environment overrides shared across every chart. Tracks
+# production layout but with smaller resource asks so cost stays sane
+# during pre-release runs. Per-chart overrides live in charts/<chart>.yaml.
+labels:
+  partOf: missionagre
+
+replicaCount: 2
+
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: api.staging.missionagre.io
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi

@@ -1,0 +1,30 @@
+# production environment overrides shared across every chart.
+# ARCHITECTURE.md § 3.2 commits the baseline resource shapes; tune
+# carefully and only with an ADR for anything that changes scale or
+# reliability assumptions. Per-chart overrides live in charts/<chart>.yaml.
+labels:
+  partOf: missionagre
+
+replicaCount: 3
+
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: api.missionagre.io
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: true

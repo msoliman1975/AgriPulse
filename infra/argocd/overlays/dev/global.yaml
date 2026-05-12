@@ -1,5 +1,6 @@
-# dev environment overrides for the missionagre-services ApplicationSet.
-# Values here override `infra/helm/<chart>/values.yaml` defaults.
+# dev environment overrides shared across every chart in the
+# missionagre-services ApplicationSet. Per-chart overrides live in
+# charts/<chart>.yaml and are loaded after this file so they win.
 
 # Common knobs across charts.
 labels:
@@ -14,21 +15,6 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
   host: api.dev.missionagre.local
-
-# Dev DB is the same cluster CNPG instance, just smaller.
-postgresCluster:
-  instances: 1
-  storage:
-    size: 20Gi
-  walStorage:
-    size: 5Gi
-  resources:
-    requests:
-      cpu: 250m
-      memory: 1Gi
-    limits:
-      cpu: "1"
-      memory: 2Gi
 
 # Tighter resources across services in dev.
 resources:
