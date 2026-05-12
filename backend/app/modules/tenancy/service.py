@@ -54,14 +54,14 @@ class TenantService(Protocol):
         slug: str,
         name: str,
         contact_email: str,
+        owner_email: str | None = None,
+        owner_full_name: str | None = None,
         legal_name: str | None = None,
         tax_id: str | None = None,
         contact_phone: str | None = None,
         default_locale: str = "en",
         default_unit_system: str = "feddan",
         initial_tier: str = "free",
-        owner_email: str | None = None,
-        owner_full_name: str | None = None,
         actor_user_id: UUID | None = None,
         correlation_id: UUID | None = None,
     ) -> TenantCreatedResult: ...
@@ -378,14 +378,14 @@ class TenantServiceImpl:
         slug: str,
         name: str,
         contact_email: str,
+        owner_email: str | None = None,
+        owner_full_name: str | None = None,
         legal_name: str | None = None,
         tax_id: str | None = None,
         contact_phone: str | None = None,
         default_locale: str = "en",
         default_unit_system: str = "feddan",
         initial_tier: str = "free",
-        owner_email: str | None = None,
-        owner_full_name: str | None = None,
         actor_user_id: UUID | None = None,
         correlation_id: UUID | None = None,
     ) -> TenantCreatedResult:
@@ -426,13 +426,24 @@ class TenantServiceImpl:
         provisioning_failed = False
         owner_user_id: str | None = None
         if owner_email is not None:
+            # Owner provisioning: invite via Keycloak AND materialize the
+            # public.users / tenant_memberships / tenant_role_assignments
+            # rows so the new owner is a real TenantOwner with caps the
+            # moment they sign in. Routed through TenantUsersService for
+            # a single invite-user code path shared with the tenant-side
+            # users module. The HTTP create-tenant request requires
+            # owner_email; service-level callers (tests, scripts) may
+            # still create owner-less tenants for narrow scenarios and
+            # then call assign_first_owner separately.
+            from app.modules.iam.users_service import TenantUsersService
+
+            users_service = TenantUsersService(
+                public_session=self._session,
+                keycloak=self._kc,
+                audit=self._audit,
+            )
             try:
                 group_id = await self._kc.ensure_group(slug)
-                owner_user_id = await self._kc.invite_user(
-                    email=owner_email,
-                    full_name=owner_full_name,
-                    group_id=group_id,
-                )
             except KeycloakError as exc:
                 provisioning_failed = True
                 self._log.warning(
@@ -447,13 +458,38 @@ class TenantServiceImpl:
                     actor_user_id=actor_user_id,
                 )
             else:
-                tenant = await self._repo.set_provisioning_state(
-                    tenant=tenant,
-                    status="active",
-                    keycloak_group_id=group_id,
-                    clear_pending_owner=True,
+                owner_result = await users_service.invite_user(
+                    email=owner_email,
+                    full_name=owner_full_name or owner_email,
+                    phone=None,
+                    tenant_role="TenantOwner",
+                    tenant_schema=schema_name,
                     actor_user_id=actor_user_id,
                 )
+                owner_user_id = (
+                    str(owner_result["user_id"])
+                    if owner_result.get("user_id") is not None
+                    else None
+                )
+                if owner_result.get("keycloak_provisioning") == "succeeded":
+                    tenant = await self._repo.set_provisioning_state(
+                        tenant=tenant,
+                        status="active",
+                        keycloak_group_id=group_id,
+                        clear_pending_owner=True,
+                        actor_user_id=actor_user_id,
+                    )
+                else:
+                    # DB rows landed but Keycloak invite couldn't reach
+                    # the server (Noop client / transient outage).
+                    # Operator follows the kcadm.sh runbook to finish.
+                    provisioning_failed = True
+                    tenant = await self._repo.set_provisioning_state(
+                        tenant=tenant,
+                        status="pending_provision",
+                        keycloak_group_id=group_id,
+                        actor_user_id=actor_user_id,
+                    )
 
         await self._audit.record(
             tenant_schema=schema_name,

@@ -26,7 +26,6 @@ _CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]{0,31}$")
 FarmType = Literal["commercial", "research", "contract"]
 OwnershipType = Literal["owned", "leased", "partnership", "other"]
 WaterSource = Literal["well", "canal", "nile", "desalinated", "rainfed", "mixed"]
-FarmStatus = Literal["active", "archived"]
 
 IrrigationSystem = Literal["drip", "micro_sprinkler", "pivot", "furrow", "flood", "surface", "none"]
 IrrigationSource = Literal["well", "canal", "nile", "mixed"]
@@ -34,7 +33,6 @@ SoilTexture = Literal[
     "sandy", "sandy_loam", "loam", "clay_loam", "clay", "silty_loam", "silty_clay"
 ]
 SalinityClass = Literal["non_saline", "slightly_saline", "moderately_saline", "strongly_saline"]
-BlockStatus = Literal["active", "fallow", "abandoned", "under_preparation", "archived"]
 BlockCropStatus = Literal["planned", "growing", "harvesting", "completed", "aborted"]
 
 AttachmentKind = Literal["photo", "deed", "soil_test_report", "map", "other"]
@@ -107,6 +105,9 @@ class FarmCreateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] = Field(default_factory=list)
+    # Optional explicit activation date. Defaults to today server-side.
+    # Allowed in past (historic backfill) or future (planned activation).
+    active_from: date | None = None
 
     @field_validator("code")
     @classmethod
@@ -153,13 +154,56 @@ class FarmResponse(BaseModel):
     primary_water_source: WaterSource | None
     established_date: date | None
     tags: list[str]
-    status: FarmStatus
+    active_from: date
+    active_to: date | None
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 
 
 class FarmDetailResponse(FarmResponse):
     boundary: dict[str, Any] = Field(description="GeoJSON MultiPolygon (SRID 4326).")
+
+
+class FarmInactivationRequest(BaseModel):
+    """POST /api/v1/farms/{id}:inactivate body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class FarmInactivationPreviewResponse(BaseModel):
+    """Counts surfaced in the confirm-modal before the user commits."""
+
+    block_count: int
+    alerts_resolved: int
+    irrigation_skipped: int
+    plan_activities_skipped: int
+    weather_subs_deactivated: int
+    imagery_subs_deactivated: int
+
+
+class FarmInactivationResponse(FarmInactivationPreviewResponse):
+    farm_id: UUID
+    active_to: date
+
+
+class FarmReactivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    restore_blocks: bool = Field(
+        default=False,
+        description=(
+            "When true, every block currently inactive under this farm is "
+            "also reactivated."
+        ),
+    )
+
+
+class FarmReactivationResponse(BaseModel):
+    farm_id: UUID
+    restored_block_count: int
 
 
 # ---------- Blocks ----------------------------------------------------------
@@ -195,6 +239,8 @@ class BlockCreateRequest(BaseModel):
             "`{center: {lat, lon}, radius_m, start_angle_deg?, end_angle_deg?}`."
         ),
     )
+    # Optional explicit activation date. Defaults to today server-side.
+    active_from: date | None = None
 
     @field_validator("code")
     @classmethod
@@ -242,7 +288,9 @@ class BlockResponse(BaseModel):
     responsible_user_id: UUID | None
     notes: str | None
     tags: list[str]
-    status: BlockStatus
+    active_from: date
+    active_to: date | None
+    is_active: bool
     unit_type: UnitType
     parent_unit_id: UUID | None
     irrigation_geometry: dict[str, Any] | None
@@ -252,6 +300,66 @@ class BlockResponse(BaseModel):
 
 class BlockDetailResponse(BlockResponse):
     boundary: dict[str, Any]
+
+
+class BlockInactivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class BlockInactivationPreviewResponse(BaseModel):
+    alerts_resolved: int
+    irrigation_skipped: int
+    plan_activities_skipped: int
+    weather_subs_deactivated: int
+    imagery_subs_deactivated: int
+
+
+class BlockInactivationResponse(BlockInactivationPreviewResponse):
+    block_id: UUID
+    farm_id: UUID
+    active_to: date
+
+
+class BlockReactivationResponse(BaseModel):
+    block_id: UUID
+    farm_id: UUID
+
+
+# ---------- Pivot + sectors atomic create ---------------------------------
+
+
+class PivotCenter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class PivotCreateRequest(BaseModel):
+    """POST /api/v1/farms/{farm_id}/pivots body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name: str | None = Field(default=None, max_length=255)
+    center: PivotCenter
+    radius_m: float = Field(gt=0, le=5000)
+    # 1..16 keeps the UI cohort sane; equal-angle slicing.
+    sector_count: int = Field(ge=1, le=16)
+    irrigation_system: IrrigationSystem | None = "pivot"
+    active_from: date | None = None
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+
+class PivotCreateResponse(BaseModel):
+    pivot: BlockDetailResponse
+    sectors: list[BlockDetailResponse]
 
 
 # ---------- Auto-grid -------------------------------------------------------

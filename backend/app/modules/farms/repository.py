@@ -9,12 +9,12 @@ service layer. Read-side projections back to GeoJSON go through
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date as _date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, func, select, text, update
+from sqlalchemy import and_, case, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
@@ -81,6 +81,27 @@ _BLOCK_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
 # ---- Read projections ------------------------------------------------------
 
 
+def _is_active_expr_for(active_from: Any, active_to: Any) -> Any:
+    """Build a server-side ``is_active`` predicate.
+
+    Mirrors the SQL filter we use everywhere else: a row is active when
+    today (Postgres ``current_date``) falls inside ``[active_from,
+    active_to)``. Computing this in SQL keeps it in lock-step with the
+    column defaults the DB stamped on the row, which avoids a
+    timezone-race we hit in user time zones ahead of UTC.
+    """
+    return case(
+        (
+            and_(
+                active_from <= func.current_date(),
+                or_(active_to.is_(None), active_to > func.current_date()),
+            ),
+            True,
+        ),
+        else_=False,
+    ).label("is_active_computed")
+
+
 def _row_geom_select_for_farm(*, with_boundary: bool) -> tuple[Any, ...]:
     """Columns to select for a farm row, with geometry as GeoJSON strings.
 
@@ -103,7 +124,9 @@ def _row_geom_select_for_farm(*, with_boundary: bool) -> tuple[Any, ...]:
         Farm.primary_water_source,
         Farm.established_date,
         Farm.tags,
-        Farm.status,
+        Farm.active_from,
+        Farm.active_to,
+        _is_active_expr_for(Farm.active_from, Farm.active_to),
         Farm.created_at,
         Farm.updated_at,
         func.ST_AsGeoJSON(Farm.centroid).label("centroid_geojson"),
@@ -130,7 +153,9 @@ def _row_geom_select_for_block(*, with_boundary: bool) -> tuple[Any, ...]:
         Block.responsible_user_id,
         Block.notes,
         Block.tags,
-        Block.status,
+        Block.active_from,
+        Block.active_to,
+        _is_active_expr_for(Block.active_from, Block.active_to),
         Block.unit_type,
         Block.parent_unit_id,
         Block.irrigation_geometry,
@@ -189,6 +214,7 @@ class FarmsRepository:
         established_date: Any,
         tags: list[str],
         actor_user_id: UUID | None,
+        active_from: _date | None = None,
     ) -> dict[str, Any]:
         stmt = text(
             """
@@ -197,7 +223,7 @@ class FarmsRepository:
                 boundary_utm, centroid, area_m2,
                 elevation_m, governorate, district, nearest_city, address_line,
                 farm_type, ownership_type, primary_water_source, established_date,
-                tags, status, created_by, updated_by
+                tags, active_from, created_by, updated_by
             )
             VALUES (
                 :id, :code, :name, :description, ST_GeomFromEWKT(:boundary),
@@ -206,7 +232,7 @@ class FarmsRepository:
                 0,
                 :elevation_m, :governorate, :district, :nearest_city, :address_line,
                 :farm_type, :ownership_type, :primary_water_source, :established_date,
-                :tags, 'active', :actor, :actor
+                :tags, COALESCE(:active_from, current_date), :actor, :actor
             )
             RETURNING id, created_at, area_m2
             """
@@ -236,6 +262,7 @@ class FarmsRepository:
                     "primary_water_source": primary_water_source,
                     "established_date": established_date,
                     "tags": tags,
+                    "active_from": active_from,
                     "actor": actor_user_id,
                 },
             )
@@ -269,16 +296,18 @@ class FarmsRepository:
         *,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         governorate: str | None,
         tag: str | None,
-        include_archived: bool,
+        include_inactive: bool,
     ) -> list[dict[str, Any]]:
         stmt = select(*_row_geom_select_for_farm(with_boundary=False))
-        if not include_archived:
-            stmt = stmt.where(Farm.deleted_at.is_(None))
-        if status_filter:
-            stmt = stmt.where(Farm.status == status_filter)
+        if not include_inactive:
+            # Only "currently active" rows: not soft-inactivated AND inside
+            # the lifecycle window.
+            stmt = stmt.where(
+                Farm.deleted_at.is_(None),
+                (Farm.active_to.is_(None)) | (Farm.active_to > func.current_date()),
+            )
         if governorate:
             stmt = stmt.where(Farm.governorate == governorate)
         if tag:
@@ -341,13 +370,42 @@ class FarmsRepository:
             raise FarmNotFoundError(farm_id)
         return farm
 
-    async def archive_farm(self, *, farm_id: UUID, actor_user_id: UUID | None) -> None:
+    async def inactivate_farm(
+        self,
+        *,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        effective_date: _date | None = None,
+    ) -> None:
+        """Set ``active_to`` (and ``deleted_at`` for back-compat) for the farm.
+
+        Existing callers across the codebase still filter on
+        ``deleted_at IS NULL``; we keep that column in lock-step with
+        ``active_to`` so they continue to exclude inactivated rows
+        without each module having to be touched at once.
+        """
+        effective = effective_date or datetime.now(UTC).date()
         result = await self._tenant.execute(
             update(Farm)
             .where(and_(Farm.id == farm_id, Farm.deleted_at.is_(None)))
             .values(
-                status="archived",
+                active_to=effective,
                 deleted_at=datetime.now(UTC),
+                updated_by=actor_user_id,
+            )
+            .returning(Farm.id)
+        )
+        if result.first() is None:
+            raise FarmNotFoundError(farm_id)
+
+    async def reactivate_farm(self, *, farm_id: UUID, actor_user_id: UUID | None) -> None:
+        """Clear ``active_to`` + ``deleted_at`` to bring the farm back."""
+        result = await self._tenant.execute(
+            update(Farm)
+            .where(Farm.id == farm_id, Farm.deleted_at.is_not(None))
+            .values(
+                active_to=None,
+                deleted_at=None,
                 updated_by=actor_user_id,
             )
             .returning(Farm.id)
@@ -386,6 +444,7 @@ class FarmsRepository:
         unit_type: str = "block",
         parent_unit_id: UUID | None = None,
         irrigation_geometry: dict[str, Any] | None = None,
+        active_from: _date | None = None,
     ) -> dict[str, Any]:
         # Confirm the farm exists in this tenant first.
         farm_exists = await self._tenant.execute(
@@ -401,7 +460,7 @@ class FarmsRepository:
                 boundary_utm, centroid, area_m2, aoi_hash,
                 elevation_m, irrigation_system, irrigation_source,
                 soil_texture, salinity_class, soil_ph,
-                responsible_user_id, notes, tags, status,
+                responsible_user_id, notes, tags, active_from,
                 unit_type, parent_unit_id, irrigation_geometry,
                 created_by, updated_by
             )
@@ -412,7 +471,8 @@ class FarmsRepository:
                 0, '',
                 :elevation_m, :irrigation_system, :irrigation_source,
                 :soil_texture, :salinity_class, :soil_ph,
-                :responsible_user_id, :notes, :tags, 'active',
+                :responsible_user_id, :notes, :tags,
+                COALESCE(:active_from, current_date),
                 :unit_type, :parent_unit_id, CAST(:irrigation_geometry AS jsonb),
                 :actor, :actor
             )
@@ -449,6 +509,7 @@ class FarmsRepository:
                     "irrigation_geometry": (
                         json.dumps(irrigation_geometry) if irrigation_geometry is not None else None
                     ),
+                    "active_from": active_from,
                     "actor": actor_user_id,
                 },
             )
@@ -484,17 +545,17 @@ class FarmsRepository:
         farm_id: UUID,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         irrigation_system: str | None,
-        include_archived: bool,
+        include_inactive: bool,
     ) -> list[dict[str, Any]]:
         stmt = select(*_row_geom_select_for_block(with_boundary=False)).where(
             Block.farm_id == farm_id
         )
-        if not include_archived:
-            stmt = stmt.where(Block.deleted_at.is_(None))
-        if status_filter:
-            stmt = stmt.where(Block.status == status_filter)
+        if not include_inactive:
+            stmt = stmt.where(
+                Block.deleted_at.is_(None),
+                (Block.active_to.is_(None)) | (Block.active_to > func.current_date()),
+            )
         if irrigation_system:
             stmt = stmt.where(Block.irrigation_system == irrigation_system)
         if after is not None:
@@ -563,8 +624,14 @@ class FarmsRepository:
             raise BlockNotFoundError(block_id)
         return block, prev_aoi_hash
 
-    async def archive_block(self, *, block_id: UUID, actor_user_id: UUID | None) -> UUID:
-        """Soft-archive and return the parent farm_id (for the event payload)."""
+    async def inactivate_block(
+        self,
+        *,
+        block_id: UUID,
+        actor_user_id: UUID | None,
+        effective_date: _date | None = None,
+    ) -> UUID:
+        """Set ``active_to`` (+ ``deleted_at``) and return the parent farm_id."""
         cur = await self._tenant.execute(
             select(Block.farm_id).where(Block.id == block_id, Block.deleted_at.is_(None))
         )
@@ -572,16 +639,47 @@ class FarmsRepository:
         if row is None:
             raise BlockNotFoundError(block_id)
 
+        effective = effective_date or datetime.now(UTC).date()
         await self._tenant.execute(
             update(Block)
             .where(and_(Block.id == block_id, Block.deleted_at.is_(None)))
             .values(
-                status="archived",
+                active_to=effective,
                 deleted_at=datetime.now(UTC),
                 updated_by=actor_user_id,
             )
         )
         return row.farm_id
+
+    async def reactivate_block(self, *, block_id: UUID, actor_user_id: UUID | None) -> UUID:
+        cur = await self._tenant.execute(
+            select(Block.farm_id).where(Block.id == block_id, Block.deleted_at.is_not(None))
+        )
+        row = cur.first()
+        if row is None:
+            raise BlockNotFoundError(block_id)
+        await self._tenant.execute(
+            update(Block)
+            .where(Block.id == block_id, Block.deleted_at.is_not(None))
+            .values(
+                active_to=None,
+                deleted_at=None,
+                updated_by=actor_user_id,
+            )
+        )
+        return row.farm_id
+
+    async def list_active_block_ids_for_farm(self, *, farm_id: UUID) -> tuple[UUID, ...]:
+        """Block IDs under a farm that are still active. Used by the farm-cascade."""
+        rows = (
+            await self._tenant.execute(
+                select(Block.id).where(
+                    Block.farm_id == farm_id,
+                    Block.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        return tuple(r.id for r in rows)
 
     # ---- Block crops ----------------------------------------------
 
@@ -1199,7 +1297,9 @@ def _farm_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "primary_water_source": row.primary_water_source,
         "established_date": row.established_date,
         "tags": list(row.tags or []),
-        "status": row.status,
+        "active_from": row.active_from,
+        "active_to": row.active_to,
+        "is_active": bool(row.is_active_computed),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
@@ -1226,7 +1326,9 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "responsible_user_id": row.responsible_user_id,
         "notes": row.notes,
         "tags": list(row.tags or []),
-        "status": row.status,
+        "active_from": row.active_from,
+        "active_to": row.active_to,
+        "is_active": bool(row.is_active_computed),
         "unit_type": row.unit_type,
         "parent_unit_id": row.parent_unit_id,
         "irrigation_geometry": row.irrigation_geometry,

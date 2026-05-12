@@ -100,6 +100,45 @@ class WeatherSubscription(Base, TimestampedMixin):
     )
 
 
+class WeatherIngestionAttempt(Base):
+    """`tenant_<id>.weather_ingestion_attempts` — per-attempt history.
+
+    One row per (subscription, fetch attempt). Both success and failure
+    paths write here; `status` discriminates. `duration_ms` is a
+    generated column computed from completed_at - started_at.
+
+    Migration 0021.
+    """
+
+    __tablename__ = "weather_ingestion_attempts"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    subscription_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "weather_subscriptions.id",
+            name="fk_weather_ingestion_attempts_subscription_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    provider_code: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'running'"))
+    rows_ingested: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Generated column on the DB side; expose as read-only here.
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class WeatherObservation(Base):
     """`tenant_<id>.weather_observations` — TimescaleDB hypertable.
 

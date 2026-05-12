@@ -34,6 +34,7 @@ import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
 import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
 import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
+import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
@@ -50,6 +51,7 @@ import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPa
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
 import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
+import { PlatformHealthTenantDrillPage } from "@/modules/admin/pages/PlatformHealthTenantDrillPage";
 import { queryClient } from "@/queries/client";
 
 function RedirectDecisionTreeDetail(): ReactNode {
@@ -113,6 +115,11 @@ export function App(): ReactNode {
               <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
               {/* AgriPulse new IA — farm-scoped routes (UX_SPEC §3 +
                   IMPLEMENTATION_PLAN §3). */}
+              {/* Labs: experimental map-first surface for live validation.
+                  Complements the existing list/table flow — does not
+                  replace it. See docs/proposals/map-first.md. */}
+              <Route path="/labs/map" element={<MapExperiencePage />} />
+              <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
               <Route path="/insights/:farmId" element={<InsightsPage />} />
               <Route path="/plan/:farmId" element={<PlanPage />} />
               <Route path="/alerts/:farmId" element={<AlertsPage />} />
@@ -221,6 +228,10 @@ export function App(): ReactNode {
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
+                <Route
+                  path="integrations/health/tenants/:tenantId"
+                  element={<PlatformHealthTenantDrillPage />}
+                />
               </Route>
               {/* Back-compat: old /admin/* paths redirect to /platform/*
                   so bookmarks keep working through the URL rename. */}

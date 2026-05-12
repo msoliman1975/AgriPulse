@@ -2,7 +2,14 @@
   "title": "Integration health",
   "subtitle": "When weather and imagery last synced for each Farm and Block. Refreshes every 30 seconds.",
   "tabsLabel": "Integration health view",
+  "topTabs": {
+    "overview": "Overview",
+    "runs": "Runs",
+    "queue": "Queue",
+    "providers": "Providers"
+  },
   "tabs": { "farms": "Farms", "blocks": "Blocks" },
+  "overviewScope": { "label": "Overview scope" },
   "col": {
     "farm": "Farm",
     "block": "Block",
@@ -16,6 +23,100 @@
     "warn": "Stale",
     "crit": "Failing",
     "neutral": "Idle"
+  },
+  "badge": {
+    "failed24h": "{{n}} failed (24h)",
+    "running": "{{n}} running",
+    "overdue": "{{n}} overdue"
+  },
+  "kind": {
+    "weather": "Weather",
+    "imagery": "Imagery"
+  },
+  "attemptStatus": {
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "skipped": "Skipped"
+  },
+  "filters": {
+    "kind": "Kind:",
+    "status": "Status:",
+    "farm": "Farm:",
+    "all": "All"
+  },
+  "runs": {
+    "empty": "No recent ingestion attempts in the last 14 days.",
+    "col": {
+      "kind": "Kind",
+      "provider": "Provider",
+      "status": "Status",
+      "startedAt": "Started",
+      "duration": "Duration",
+      "wait": "Wait",
+      "run": "Run",
+      "detail": "Detail"
+    },
+    "summary": { "rows": "{{n}} rows" },
+    "attemptN": "Attempt #{{n}}"
+  },
+  "detail": {
+    "attemptId": "Attempt",
+    "subscriptionId": "Subscription",
+    "blockId": "Block",
+    "farmId": "Farm",
+    "queuedAt": "Queued",
+    "startedAt": "Started",
+    "completedAt": "Completed",
+    "rowsIngested": "Rows ingested",
+    "sceneId": "Scene",
+    "errorCode": "Error code",
+    "errorMessage": "Error message"
+  },
+  "queue": {
+    "placeholder": "Queue view — coming soon.",
+    "sections": {
+      "running": "Running",
+      "overdue": "Overdue",
+      "stuck": "Stuck"
+    },
+    "col": {
+      "kind": "Kind",
+      "block": "Block",
+      "provider": "Provider",
+      "since": "Since",
+      "subscription": "Subscription"
+    },
+    "empty": {
+      "running": "No ingestion jobs running right now.",
+      "overdue": "Nothing overdue.",
+      "stuck": "No stuck attempts."
+    },
+    "stuckThreshold": "Considered stuck after {{minutes}} minutes."
+  },
+  "providers": {
+    "placeholder": "Providers view — coming soon.",
+    "col": {
+      "provider": "Provider",
+      "kind": "Kind",
+      "status": "Status",
+      "lastProbeAt": "Last probe",
+      "latency": "Latency",
+      "error": "Last error"
+    },
+    "probeStatus": {
+      "ok": "Reachable",
+      "error": "Error",
+      "timeout": "Timed out",
+      "unknown": "Not probed yet"
+    },
+    "empty": "No probe results yet — the scheduler runs every few minutes.",
+    "platformOnly": "Provider health is shared across the platform.",
+    "histogram": {
+      "title": "Failure causes (cross-tenant)",
+      "windowLabel": "Last {{h}}h",
+      "empty": "No failures recorded in this window."
+    }
   },
   "lastSync": "Synced {{when}}",
   "noActive": "No active subscription",

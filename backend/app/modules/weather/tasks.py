@@ -43,6 +43,7 @@ from app.modules.weather.providers.open_meteo import OpenMeteoProvider
 from app.modules.weather.providers.protocol import WeatherProvider
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.timezone import tz_for_centroid
+from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 
 _log = get_logger(__name__)
@@ -96,6 +97,12 @@ def reset_provider_factory() -> None:
 # --- Helpers ---------------------------------------------------------------
 
 
+# Local alias kept for backward compatibility with existing call sites.
+# Classifier body moved to integrations_health.error_codes so imagery can
+# share the same vocabulary — see PR-IH8.
+from app.modules.integrations_health.error_codes import classify_error as _classify_error
+
+
 async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
     safe = sanitize_tenant_schema(tenant_schema)
     await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
@@ -125,7 +132,8 @@ async def _fetch_weather_async(
     audit = get_audit_service()
     factory = AsyncSessionLocal()
 
-    # Step 1: resolve farm centroid + collect subscription IDs to touch.
+    # Step 1: resolve farm centroid + open an attempt row per subscription.
+    started_at = datetime.now(UTC)
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         repo = WeatherRepository(session)
@@ -142,6 +150,20 @@ async def _fetch_weather_async(
         subs = await repo.list_active_subscriptions_for_farm(
             farm_id=farm_id, provider_code=provider_code
         )
+        # One attempt row per (subscription, fetch) — keeps each block's
+        # history independent even though the provider call is shared.
+        attempts: list[dict[str, Any]] = []
+        for s in subs:
+            attempt_id = uuid7()
+            await repo.open_attempt(
+                attempt_id=attempt_id,
+                subscription_id=s["id"],
+                block_id=s["block_id"],
+                farm_id=farm_id,
+                provider_code=provider_code,
+                started_at=started_at,
+            )
+            attempts.append({"id": attempt_id, "subscription_id": s["id"]})
         subscription_ids = tuple(s["id"] for s in subs)
 
     # Step 2: fetch from the provider. No DB session held during HTTP IO.
@@ -156,12 +178,22 @@ async def _fetch_weather_async(
             )
         except Exception as exc:
             now = datetime.now(UTC)
+            error_code = _classify_error(exc)
+            error_message = str(exc)
             async with factory() as session, session.begin():
                 await _set_tenant_context(session, tenant_schema)
                 repo = WeatherRepository(session)
                 for sub_id in subscription_ids:
                     await repo.touch_subscription_attempt(
                         subscription_id=sub_id, attempted_at=now, success=False
+                    )
+                for a in attempts:
+                    await repo.close_attempt(
+                        attempt_id=a["id"],
+                        completed_at=now,
+                        status="failed",
+                        error_code=error_code,
+                        error_message=error_message,
                     )
             await audit.record(
                 tenant_schema=tenant_schema,
@@ -201,6 +233,14 @@ async def _fetch_weather_async(
         for sub_id in subscription_ids:
             await repo.touch_subscription_attempt(
                 subscription_id=sub_id, attempted_at=now, success=True
+            )
+        total_rows = observations_inserted + forecasts_inserted
+        for a in attempts:
+            await repo.close_attempt(
+                attempt_id=a["id"],
+                completed_at=now,
+                status="succeeded",
+                rows_ingested=total_rows,
             )
 
     await audit.record(

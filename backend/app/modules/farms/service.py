@@ -7,7 +7,7 @@ request via `get_farm_service`.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date as _date, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -17,27 +17,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.farms import auto_grid as _auto_grid
+from app.modules.farms import cascade as _cascade
 from app.modules.farms import geometry as _geometry
+from app.modules.farms import pivot_geometry as _pivot_geometry
 from app.modules.farms.errors import (
     BlockNotFoundError,
     FarmNotFoundError,
     InvalidUnitTypeError,
 )
 from app.modules.farms.events import (
-    BlockArchivedV1,
     BlockAttachmentDeletedV1,
     BlockAttachmentUploadedV1,
     BlockBoundaryChangedV1,
     BlockCreatedV1,
     BlockCropAssignedV1,
+    BlockInactivatedV1,
+    BlockReactivatedV1,
     BlockUpdatedV1,
-    FarmArchivedV1,
     FarmAttachmentDeletedV1,
     FarmAttachmentUploadedV1,
     FarmBoundaryChangedV1,
     FarmCreatedV1,
+    FarmInactivatedV1,
     FarmMemberAssignedV1,
     FarmMemberRevokedV1,
+    FarmReactivatedV1,
     FarmUpdatedV1,
 )
 from app.modules.farms.repository import FarmsRepository
@@ -106,6 +110,7 @@ class FarmService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
         preferred_unit: str,
+        active_from: _date | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -114,10 +119,9 @@ class FarmService(Protocol):
         *,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         governorate: str | None,
         tag: str | None,
-        include_archived: bool,
+        include_inactive: bool,
         preferred_unit: str,
     ) -> list[dict[str, Any]]: ...
 
@@ -135,14 +139,31 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
-    async def archive_farm(
+    async def preview_farm_inactivation(
+        self,
+        *,
+        farm_id: UUID,
+    ) -> dict[str, Any]: ...
+
+    async def inactivate_farm(
         self,
         *,
         farm_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        reason: str | None = None,
         correlation_id: UUID | None = None,
-    ) -> None: ...
+    ) -> dict[str, Any]: ...
+
+    async def reactivate_farm(
+        self,
+        *,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        restore_blocks: bool = False,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
 
     async def create_block(
         self,
@@ -166,6 +187,7 @@ class FarmService(Protocol):
         unit_type: str = "block",
         parent_unit_id: UUID | None = None,
         irrigation_geometry: dict[str, Any] | None = None,
+        active_from: _date | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -175,9 +197,8 @@ class FarmService(Protocol):
         farm_id: UUID,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         irrigation_system: str | None,
-        include_archived: bool,
+        include_inactive: bool,
         preferred_unit: str,
     ) -> list[dict[str, Any]]: ...
 
@@ -195,16 +216,50 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
-    async def archive_block(
+    async def preview_block_inactivation(
+        self,
+        *,
+        block_id: UUID,
+    ) -> dict[str, Any]: ...
+
+    async def inactivate_block(
+        self,
+        *,
+        block_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        reason: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def reactivate_block(
         self,
         *,
         block_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
         correlation_id: UUID | None = None,
-    ) -> None: ...
+    ) -> dict[str, Any]: ...
 
     async def auto_grid(self, *, farm_id: UUID, cell_size_m: int) -> dict[str, Any]: ...
+
+    async def create_pivot_with_sectors(
+        self,
+        *,
+        farm_id: UUID,
+        code: str,
+        name: str | None,
+        center_lat: float,
+        center_lon: float,
+        radius_m: float,
+        sector_count: int,
+        irrigation_system: str | None,
+        active_from: _date | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        preferred_unit: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
 
     async def assign_block_crop(
         self,
@@ -396,6 +451,7 @@ class FarmServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         preferred_unit: str,
+        active_from: _date | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
         _geometry.validate_multipolygon_geojson(boundary)
@@ -419,6 +475,7 @@ class FarmServiceImpl:
             established_date=established_date,
             tags=tags,
             actor_user_id=actor_user_id,
+            active_from=active_from,
         )
         await self._tenant_session.flush()
 
@@ -454,19 +511,17 @@ class FarmServiceImpl:
         *,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         governorate: str | None,
         tag: str | None,
-        include_archived: bool,
+        include_inactive: bool,
         preferred_unit: str,
     ) -> list[dict[str, Any]]:
         rows = await self._repo.list_farms(
             after=after,
             limit=limit,
-            status_filter=status_filter,
             governorate=governorate,
             tag=tag,
-            include_archived=include_archived,
+            include_inactive=include_inactive,
         )
         return [_stamp_area_unit(r, preferred_unit) for r in rows]
 
@@ -527,27 +582,137 @@ class FarmServiceImpl:
             )
         return _stamp_area_unit(farm, preferred_unit)
 
-    async def archive_farm(
+    async def preview_farm_inactivation(self, *, farm_id: UUID) -> dict[str, Any]:
+        """Return the cascade counts (and child block count) for the modal."""
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+        block_ids = await self._repo.list_active_block_ids_for_farm(farm_id=farm_id)
+        counts = await _cascade.preview_block_cascade(
+            session=self._tenant_session, block_ids=block_ids
+        )
+        return {
+            "block_count": len(block_ids),
+            **counts.as_dict(),
+        }
+
+    async def inactivate_farm(
         self,
         *,
         farm_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        reason: str | None = None,
         correlation_id: UUID | None = None,
-    ) -> None:
-        await self._repo.archive_farm(farm_id=farm_id, actor_user_id=actor_user_id)
+    ) -> dict[str, Any]:
+        """Set active_to on the farm and cascade-inactivate every active block."""
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+        block_ids = await self._repo.list_active_block_ids_for_farm(farm_id=farm_id)
+
+        # Apply the cascade BEFORE flipping the farm/block rows — the
+        # cascade reads from those tables, so doing it last would let
+        # any pending row remain pending. Same transaction either way.
+        counts = await _cascade.apply_block_cascade(
+            session=self._tenant_session,
+            block_ids=block_ids,
+            actor_user_id=actor_user_id,
+            reason_code="farm_inactivated",
+        )
+        for bid in block_ids:
+            await self._repo.inactivate_block(block_id=bid, actor_user_id=actor_user_id)
+        await self._repo.inactivate_farm(farm_id=farm_id, actor_user_id=actor_user_id)
         await self._tenant_session.flush()
+
+        today_str = datetime.now(UTC).date().isoformat()
         await self._audit.record(
             tenant_schema=tenant_schema,
-            event_type="farms.farm_archived",
+            event_type="farms.farm_inactivated",
             actor_user_id=actor_user_id,
             subject_kind="farm",
             subject_id=farm_id,
             farm_id=farm_id,
-            details={},
+            details={
+                "reason": reason,
+                "active_to": today_str,
+                "cascaded_block_count": len(block_ids),
+                **counts.as_dict(),
+            },
             correlation_id=correlation_id,
         )
-        self._bus.publish(FarmArchivedV1(farm_id=farm_id, actor_user_id=actor_user_id))
+        self._bus.publish(
+            FarmInactivatedV1(
+                farm_id=farm_id,
+                active_to=today_str,
+                cascaded_block_count=len(block_ids),
+                actor_user_id=actor_user_id,
+            )
+        )
+        return {
+            "farm_id": farm_id,
+            "active_to": today_str,
+            "block_count": len(block_ids),
+            **counts.as_dict(),
+        }
+
+    async def reactivate_farm(
+        self,
+        *,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        restore_blocks: bool = False,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Clear active_to. ``restore_blocks`` decides whether to also lift
+        active_to on every block that was inactivated by the farm cascade.
+
+        Because the cascade fans out without a per-block 'reason', we
+        conservatively interpret "restore" as: reactivate every currently
+        inactive block under the farm. Operators who only want partial
+        restore should hit the per-block reactivate endpoint instead.
+        """
+        await self._repo.reactivate_farm(farm_id=farm_id, actor_user_id=actor_user_id)
+        restored = 0
+        if restore_blocks:
+            inactive_ids = await self._list_inactive_block_ids_for_farm(farm_id)
+            for bid in inactive_ids:
+                await self._repo.reactivate_block(block_id=bid, actor_user_id=actor_user_id)
+                restored += 1
+        await self._tenant_session.flush()
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.farm_reactivated",
+            actor_user_id=actor_user_id,
+            subject_kind="farm",
+            subject_id=farm_id,
+            farm_id=farm_id,
+            details={"restored_block_count": restored},
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            FarmReactivatedV1(
+                farm_id=farm_id,
+                restored_block_count=restored,
+                actor_user_id=actor_user_id,
+            )
+        )
+        return {"farm_id": farm_id, "restored_block_count": restored}
+
+    async def _list_inactive_block_ids_for_farm(self, farm_id: UUID) -> tuple[UUID, ...]:
+        """Block IDs under a farm that currently have ``deleted_at`` stamped."""
+        from sqlalchemy import select
+
+        from app.modules.farms.models import Block
+
+        rows = (
+            await self._tenant_session.execute(
+                select(Block.id).where(
+                    Block.farm_id == farm_id, Block.deleted_at.is_not(None)
+                )
+            )
+        ).all()
+        return tuple(r.id for r in rows)
 
     # ---- Blocks -----------------------------------------------------
 
@@ -573,6 +738,7 @@ class FarmServiceImpl:
         unit_type: str = "block",
         parent_unit_id: UUID | None = None,
         irrigation_geometry: dict[str, Any] | None = None,
+        active_from: _date | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
         _geometry.validate_polygon_geojson(boundary)
@@ -603,6 +769,7 @@ class FarmServiceImpl:
             unit_type=unit_type,
             parent_unit_id=parent_unit_id,
             irrigation_geometry=irrigation_geometry,
+            active_from=active_from,
         )
         await self._tenant_session.flush()
 
@@ -698,9 +865,8 @@ class FarmServiceImpl:
         farm_id: UUID,
         after: UUID | None,
         limit: int,
-        status_filter: str | None,
         irrigation_system: str | None,
-        include_archived: bool,
+        include_inactive: bool,
         preferred_unit: str,
     ) -> list[dict[str, Any]]:
         # Confirm farm exists; cross-tenant calls return 404 here.
@@ -711,9 +877,8 @@ class FarmServiceImpl:
             farm_id=farm_id,
             after=after,
             limit=limit,
-            status_filter=status_filter,
             irrigation_system=irrigation_system,
-            include_archived=include_archived,
+            include_inactive=include_inactive,
         )
         return [_stamp_area_unit(r, preferred_unit) for r in rows]
 
@@ -773,19 +938,79 @@ class FarmServiceImpl:
             )
         return _stamp_area_unit(block, preferred_unit)
 
-    async def archive_block(
+    async def preview_block_inactivation(self, *, block_id: UUID) -> dict[str, Any]:
+        if (await self._repo.get_block_by_id(block_id, with_boundary=False)) is None:
+            raise BlockNotFoundError(block_id)
+        counts = await _cascade.preview_block_cascade(
+            session=self._tenant_session, block_ids=[block_id]
+        )
+        return counts.as_dict()
+
+    async def inactivate_block(
+        self,
+        *,
+        block_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        reason: str | None = None,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        block = await self._repo.get_block_by_id(block_id, with_boundary=False)
+        if block is None:
+            raise BlockNotFoundError(block_id)
+
+        counts = await _cascade.apply_block_cascade(
+            session=self._tenant_session,
+            block_ids=[block_id],
+            actor_user_id=actor_user_id,
+            reason_code="block_inactivated",
+        )
+        farm_id = await self._repo.inactivate_block(
+            block_id=block_id, actor_user_id=actor_user_id
+        )
+        await self._tenant_session.flush()
+
+        today_str = datetime.now(UTC).date().isoformat()
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_inactivated",
+            actor_user_id=actor_user_id,
+            subject_kind="block",
+            subject_id=block_id,
+            farm_id=farm_id,
+            details={"reason": reason, "active_to": today_str, **counts.as_dict()},
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            BlockInactivatedV1(
+                block_id=block_id,
+                farm_id=farm_id,
+                active_to=today_str,
+                actor_user_id=actor_user_id,
+            )
+        )
+        return {
+            "block_id": block_id,
+            "farm_id": farm_id,
+            "active_to": today_str,
+            **counts.as_dict(),
+        }
+
+    async def reactivate_block(
         self,
         *,
         block_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
         correlation_id: UUID | None = None,
-    ) -> None:
-        farm_id = await self._repo.archive_block(block_id=block_id, actor_user_id=actor_user_id)
+    ) -> dict[str, Any]:
+        farm_id = await self._repo.reactivate_block(
+            block_id=block_id, actor_user_id=actor_user_id
+        )
         await self._tenant_session.flush()
         await self._audit.record(
             tenant_schema=tenant_schema,
-            event_type="farms.block_archived",
+            event_type="farms.block_reactivated",
             actor_user_id=actor_user_id,
             subject_kind="block",
             subject_id=block_id,
@@ -794,8 +1019,148 @@ class FarmServiceImpl:
             correlation_id=correlation_id,
         )
         self._bus.publish(
-            BlockArchivedV1(block_id=block_id, farm_id=farm_id, actor_user_id=actor_user_id)
+            BlockReactivatedV1(
+                block_id=block_id, farm_id=farm_id, actor_user_id=actor_user_id
+            )
         )
+        return {"block_id": block_id, "farm_id": farm_id}
+
+    # ---- Pivots + sectors -------------------------------------------
+
+    async def create_pivot_with_sectors(
+        self,
+        *,
+        farm_id: UUID,
+        code: str,
+        name: str | None,
+        center_lat: float,
+        center_lon: float,
+        radius_m: float,
+        sector_count: int,
+        irrigation_system: str | None,
+        active_from: _date | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        preferred_unit: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Insert a pivot + N pivot_sector children atomically.
+
+        Geometry is computed in Python (spherical approximation); the
+        existing ``blocks_geom_compute`` trigger reprojects each row to
+        UTM and stamps ``area_m2``. All inserts share the caller's
+        tenant transaction so a downstream failure rolls everything
+        back.
+        """
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        pivot_polygon = _pivot_geometry.circle_polygon(
+            lat=center_lat, lon=center_lon, radius_m=radius_m
+        )
+        sector_polygons = _pivot_geometry.equal_sectors(
+            lat=center_lat,
+            lon=center_lon,
+            radius_m=radius_m,
+            sector_count=sector_count,
+        )
+
+        pivot_id = uuid7()
+        pivot_ewkt = _geometry.geojson_to_ewkt_polygon(pivot_polygon)
+        await self._repo.insert_block(
+            block_id=pivot_id,
+            farm_id=farm_id,
+            code=code,
+            name=name,
+            boundary_ewkt=pivot_ewkt,
+            elevation_m=None,
+            irrigation_system=irrigation_system,
+            irrigation_source=None,
+            soil_texture=None,
+            salinity_class=None,
+            soil_ph=None,
+            responsible_user_id=None,
+            notes=None,
+            tags=[],
+            actor_user_id=actor_user_id,
+            unit_type="pivot",
+            parent_unit_id=None,
+            irrigation_geometry={
+                "center": {"lat": center_lat, "lon": center_lon},
+                "radius_m": radius_m,
+                "sector_count": sector_count,
+            },
+            active_from=active_from,
+        )
+
+        # Sectors. Codes are deterministic suffixes — `<pivot_code>-S1` ...
+        # `-S{N}`. Same farm-scoped uniqueness as plain blocks.
+        sector_ids: list[UUID] = []
+        for i, poly in enumerate(sector_polygons, start=1):
+            sec_id = uuid7()
+            await self._repo.insert_block(
+                block_id=sec_id,
+                farm_id=farm_id,
+                code=f"{code}-S{i}",
+                name=None,
+                boundary_ewkt=_geometry.geojson_to_ewkt_polygon(poly),
+                elevation_m=None,
+                irrigation_system=irrigation_system,
+                irrigation_source=None,
+                soil_texture=None,
+                salinity_class=None,
+                soil_ph=None,
+                responsible_user_id=None,
+                notes=None,
+                tags=[],
+                actor_user_id=actor_user_id,
+                unit_type="pivot_sector",
+                parent_unit_id=pivot_id,
+                irrigation_geometry=None,
+                active_from=active_from,
+            )
+            sector_ids.append(sec_id)
+        await self._tenant_session.flush()
+
+        # Fetch the materialized rows back so the response carries the
+        # computed area + boundary.
+        pivot_row = await self._repo.get_block_by_id(pivot_id)
+        sector_rows = [
+            await self._repo.get_block_by_id(sid) for sid in sector_ids
+        ]
+        if pivot_row is None or any(s is None for s in sector_rows):
+            # Should never happen — insert succeeded and we hold the txn.
+            raise BlockNotFoundError(pivot_id)
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.pivot_created",
+            actor_user_id=actor_user_id,
+            subject_kind="block",
+            subject_id=pivot_id,
+            farm_id=farm_id,
+            details={
+                "code": code,
+                "sector_count": sector_count,
+                "radius_m": radius_m,
+            },
+            correlation_id=correlation_id,
+        )
+        self._bus.publish(
+            BlockCreatedV1(
+                block_id=pivot_id,
+                farm_id=farm_id,
+                code=code,
+                area_m2=pivot_row["area_m2"],
+                aoi_hash=pivot_row["aoi_hash"],
+                actor_user_id=actor_user_id,
+            )
+        )
+
+        return {
+            "pivot": _stamp_area_unit(pivot_row, preferred_unit),
+            "sectors": [_stamp_area_unit(s, preferred_unit) for s in sector_rows if s],
+        }
 
     # ---- Auto-grid --------------------------------------------------
 

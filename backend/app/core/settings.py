@@ -170,6 +170,26 @@ class Settings(BaseSettings):
     # WHERE state='open' keeps re-runs idempotent.
     recommendations_evaluate_sweep_seconds: int = 3600
 
+    # Cadence for `integrations_health.probe_providers` (PR-IH5). 5 min
+    # is the proposal default for Open-Meteo; if Sentinel Hub probe
+    # costs need throttling, raise it. Each probe is a single HTTP
+    # round-trip per provider, so the cost grows linearly with the
+    # provider catalog rather than tenant count.
+    provider_probe_seconds: int = 300
+
+    # PR-IH11. Beat cadence for the consecutive-failure-streak watcher.
+    # 10 min strikes a balance: alerting within a beat or two of the
+    # third failure (so a 15-min weather cadence with 3 fails crosses
+    # the threshold within ~45 min) while keeping the sweep cheap.
+    integration_failure_check_seconds: int = 600
+
+    # Streak length that triggers a single inbox alert. Three is
+    # conservative: a one-off network blip + a noisy retry both
+    # naturally clear without paging anyone; sustained breakage
+    # (3 strikes) is worth a notification. Per-tenant override via
+    # `platform_defaults` is a future follow-up.
+    integration_failure_streak_threshold: int = 3
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md § 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`

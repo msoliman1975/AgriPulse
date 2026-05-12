@@ -52,6 +52,7 @@ from app.modules.imagery.events import (
     SceneIngestedV1,
     SceneSkippedV1,
 )
+from app.modules.integrations_health.error_codes import classify_error
 from app.modules.imagery.pgstac import (
     build_item_doc,
     collection_id_for,
@@ -418,6 +419,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
                 job_id=job_id,
                 completed_at=datetime.now(UTC),
                 error_message="block_missing",
+                error_code="config_error",
             )
             bus.publish(IngestionFailedV1(job_id=job_id, error="block_missing"))
             return {"job_id": str(job_id), "status": "failed"}
@@ -441,6 +443,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
                 job_id=job_id,
                 farm_id=block["farm_id"],
                 error=str(exc) or exc.__class__.__name__,
+                error_code=classify_error(exc),
             )
             return {"job_id": str(job_id), "status": "failed"}
     finally:
@@ -466,6 +469,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
             job_id=job_id,
             farm_id=block["farm_id"],
             error=f"s3_put_failed: {exc}",
+            error_code="storage_error",
         )
         return {"job_id": str(job_id), "status": "failed"}
 
@@ -512,6 +516,7 @@ async def _register_stac_item_async(
                 job_id=job_id,
                 completed_at=datetime.now(UTC),
                 error_message="block_missing",
+                error_code="config_error",
             )
             bus.publish(IngestionFailedV1(job_id=job_id, error="block_missing"))
             return {"job_id": str(job_id), "status": "failed"}
@@ -561,6 +566,7 @@ async def _register_stac_item_async(
                 job_id=job_id,
                 completed_at=datetime.now(UTC),
                 error_message=f"stac_register_failed: {exc}",
+                error_code="stac_register_failed",
             )
             bus.publish(IngestionFailedV1(job_id=job_id, error=str(exc)))
             await _record_audit(
@@ -840,6 +846,7 @@ async def _fail_job(
     job_id: UUID,
     farm_id: UUID,
     error: str,
+    error_code: str | None = None,
 ) -> None:
     bus = get_default_bus()
     factory = AsyncSessionLocal()
@@ -850,6 +857,7 @@ async def _fail_job(
             job_id=job_id,
             completed_at=datetime.now(UTC),
             error_message=error,
+            error_code=error_code,
         )
     bus.publish(IngestionFailedV1(job_id=job_id, error=error))
     await _record_audit(

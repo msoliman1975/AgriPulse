@@ -133,5 +133,7 @@ class ImageryIngestionJob(Base):
     cloud_cover_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     valid_pixel_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # PR-IH8: coarse categorized label — see integrations_health.error_codes.
+    error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     stac_item_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     assets_written: Mapped[dict[str, Any] | list[Any] | None] = mapped_column(JSONB, nullable=True)

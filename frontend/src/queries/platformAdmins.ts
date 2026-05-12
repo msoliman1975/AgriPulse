@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  assignFirstOwner,
   inviteTenantAdmin,
   listTenantAdmins,
   removeTenantAdmin,
   transferTenantOwnership,
+  type AssignOwnerPayload,
+  type AssignOwnerResponse,
   type InviteAdminPayload,
   type InviteAdminResponse,
   type TenantAdminRow,
@@ -53,4 +56,14 @@ export function useTransferOwnership(tenantId: string) {
   });
 }
 
-export type { TenantAdminRow };
+export function useAssignFirstOwner(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation<AssignOwnerResponse, Error, AssignOwnerPayload>({
+    mutationFn: (payload) => assignFirstOwner(tenantId, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["platform_admins", tenantId] });
+    },
+  });
+}
+
+export type { AssignOwnerPayload, AssignOwnerResponse, TenantAdminRow };

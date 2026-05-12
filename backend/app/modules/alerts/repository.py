@@ -524,12 +524,21 @@ class AlertsRepository:
         return crop_row.category if crop_row is not None else None
 
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
-        """Every active block in the tenant — Beat sweep input."""
+        """Every active block in the tenant — Beat sweep input.
+
+        Inactivation now stamps ``active_to`` AND ``deleted_at``, so
+        ``deleted_at IS NULL`` alone suffices to scope to live blocks.
+        Future-dated activations (``active_from > current_date``) are
+        excluded — Beat shouldn't fire alerts on a block that isn't
+        operational yet.
+        """
         rows = (
             await self._tenant.execute(
                 text(
                     "SELECT id FROM blocks "
-                    "WHERE deleted_at IS NULL AND status NOT IN ('archived', 'abandoned')"
+                    "WHERE deleted_at IS NULL "
+                    "  AND active_from <= current_date "
+                    "  AND (active_to IS NULL OR active_to > current_date)"
                 )
             )
         ).all()

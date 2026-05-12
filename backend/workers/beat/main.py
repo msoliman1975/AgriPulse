@@ -76,4 +76,23 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.recommendations_evaluate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Provider liveness probes (PR-IH5). Pings each active weather +
+    # imagery provider on a tight cadence so the Providers tab can show
+    # red/green status without waiting for a real tenant fetch to fail.
+    # Probes run on `light` because they're seconds-long HTTP calls.
+    "integrations_health.probe_providers": {
+        "task": "integrations_health.probe_providers",
+        "schedule": float(_settings.provider_probe_seconds),
+        "options": {"queue": "light"},
+    },
+    # Consecutive-failure streak alerter (PR-IH11). Scans every active
+    # tenant; for each subscription whose newest attempt is the Nth
+    # consecutive failure (N = streak threshold) and which hasn't yet
+    # been alerted on this streak, fans out an in-app inbox item to
+    # every TenantOwner / TenantAdmin in that tenant.
+    "integrations_health.check_failure_streaks": {
+        "task": "integrations_health.check_failure_streaks",
+        "schedule": float(_settings.integration_failure_check_seconds),
+        "options": {"queue": "light"},
+    },
 }

@@ -2,7 +2,14 @@
   "title": "صحة التكاملات",
   "subtitle": "آخر مزامنة للطقس والصور لكل مزرعة وقطعة. يتم التحديث كل 30 ثانية.",
   "tabsLabel": "عرض صحة التكاملات",
+  "topTabs": {
+    "overview": "نظرة عامة",
+    "runs": "عمليات التشغيل",
+    "queue": "قائمة الانتظار",
+    "providers": "الموردون"
+  },
   "tabs": { "farms": "المزارع", "blocks": "القطع" },
+  "overviewScope": { "label": "نطاق النظرة العامة" },
   "col": {
     "farm": "المزرعة",
     "block": "القطعة",
@@ -16,6 +23,100 @@
     "warn": "متأخر",
     "crit": "فاشل",
     "neutral": "خامل"
+  },
+  "badge": {
+    "failed24h": "{{n}} فاشل (24س)",
+    "running": "{{n}} قيد التشغيل",
+    "overdue": "{{n}} متأخر"
+  },
+  "kind": {
+    "weather": "الطقس",
+    "imagery": "الصور"
+  },
+  "attemptStatus": {
+    "running": "قيد التشغيل",
+    "succeeded": "ناجح",
+    "failed": "فشل",
+    "skipped": "تم التخطي"
+  },
+  "filters": {
+    "kind": "النوع:",
+    "status": "الحالة:",
+    "farm": "المزرعة:",
+    "all": "الكل"
+  },
+  "runs": {
+    "empty": "لا توجد محاولات استيعاب حديثة خلال آخر 14 يومًا.",
+    "col": {
+      "kind": "النوع",
+      "provider": "المورد",
+      "status": "الحالة",
+      "startedAt": "بدأت",
+      "duration": "المدة",
+      "wait": "الانتظار",
+      "run": "التنفيذ",
+      "detail": "التفاصيل"
+    },
+    "summary": { "rows": "{{n}} صف" },
+    "attemptN": "المحاولة #{{n}}"
+  },
+  "detail": {
+    "attemptId": "المحاولة",
+    "subscriptionId": "الاشتراك",
+    "blockId": "القطعة",
+    "farmId": "المزرعة",
+    "queuedAt": "في الطابور",
+    "startedAt": "بدأت",
+    "completedAt": "اكتملت",
+    "rowsIngested": "الصفوف المستوعبة",
+    "sceneId": "المشهد",
+    "errorCode": "رمز الخطأ",
+    "errorMessage": "رسالة الخطأ"
+  },
+  "queue": {
+    "placeholder": "عرض قائمة الانتظار — قريبًا.",
+    "sections": {
+      "running": "قيد التشغيل",
+      "overdue": "متأخر",
+      "stuck": "عالق"
+    },
+    "col": {
+      "kind": "النوع",
+      "block": "القطعة",
+      "provider": "المورد",
+      "since": "منذ",
+      "subscription": "الاشتراك"
+    },
+    "empty": {
+      "running": "لا توجد مهام استيعاب قيد التشغيل حاليًا.",
+      "overdue": "لا شيء متأخر.",
+      "stuck": "لا توجد محاولات عالقة."
+    },
+    "stuckThreshold": "تعتبر عالقة بعد {{minutes}} دقيقة."
+  },
+  "providers": {
+    "placeholder": "عرض الموردين — قريبًا.",
+    "col": {
+      "provider": "المورد",
+      "kind": "النوع",
+      "status": "الحالة",
+      "lastProbeAt": "آخر فحص",
+      "latency": "زمن الاستجابة",
+      "error": "آخر خطأ"
+    },
+    "probeStatus": {
+      "ok": "متاح",
+      "error": "خطأ",
+      "timeout": "انتهت المهلة",
+      "unknown": "لم يتم الفحص بعد"
+    },
+    "empty": "لا توجد نتائج فحص بعد — يعمل المجدول كل بضع دقائق.",
+    "platformOnly": "صحة المورد مشتركة عبر المنصة.",
+    "histogram": {
+      "title": "أسباب الفشل (عبر المستأجرين)",
+      "windowLabel": "آخر {{h}} ساعة",
+      "empty": "لا توجد حالات فشل خلال هذه النافذة."
+    }
   },
   "lastSync": "تمت المزامنة {{when}}",
   "noActive": "لا يوجد اشتراك نشط",

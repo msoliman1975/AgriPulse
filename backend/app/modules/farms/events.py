@@ -34,10 +34,24 @@ class FarmUpdatedV1(Event):
     actor_user_id: UUID | None = None
 
 
-class FarmArchivedV1(Event):
-    event_name: ClassVar[str] = "farms.farm_archived.v1"
+class FarmInactivatedV1(Event):
+    """A farm's lifecycle window was closed (active_to set)."""
+
+    event_name: ClassVar[str] = "farms.farm_inactivated.v1"
 
     farm_id: UUID
+    active_to: str  # ISO date
+    cascaded_block_count: int
+    actor_user_id: UUID | None = None
+
+
+class FarmReactivatedV1(Event):
+    """A previously-inactive farm has been reopened (active_to cleared)."""
+
+    event_name: ClassVar[str] = "farms.farm_reactivated.v1"
+
+    farm_id: UUID
+    restored_block_count: int
     actor_user_id: UUID | None = None
 
 
@@ -91,8 +105,21 @@ class BlockBoundaryChangedV1(Event):
     actor_user_id: UUID | None = None
 
 
-class BlockArchivedV1(Event):
-    event_name: ClassVar[str] = "farms.block_archived.v1"
+class BlockInactivatedV1(Event):
+    """A block's lifecycle window was closed (active_to set)."""
+
+    event_name: ClassVar[str] = "farms.block_inactivated.v1"
+
+    block_id: UUID
+    farm_id: UUID
+    active_to: str  # ISO date
+    actor_user_id: UUID | None = None
+
+
+class BlockReactivatedV1(Event):
+    """A previously-inactive block has been reopened (active_to cleared)."""
+
+    event_name: ClassVar[str] = "farms.block_reactivated.v1"
 
     block_id: UUID
     farm_id: UUID

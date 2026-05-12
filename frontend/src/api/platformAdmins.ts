@@ -58,3 +58,26 @@ export async function transferTenantOwnership(
     { from_user_id: fromUserId },
   );
 }
+
+export type AssignOwnerPayload =
+  | { email: string; full_name: string }
+  | { user_id: string };
+
+export interface AssignOwnerResponse {
+  user_id: string;
+  membership_id: string;
+  keycloak_provisioning: string;
+  keycloak_subject: string | null;
+  mode: "invite" | "promote";
+}
+
+export async function assignFirstOwner(
+  tenantId: string,
+  payload: AssignOwnerPayload,
+): Promise<AssignOwnerResponse> {
+  const { data } = await apiClient.post<AssignOwnerResponse>(
+    `${base(tenantId)}:assign-owner`,
+    payload,
+  );
+  return data;
+}

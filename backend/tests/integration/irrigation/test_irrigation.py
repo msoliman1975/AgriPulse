@@ -132,24 +132,24 @@ async def _seed_block_with_crop_and_weather(
     await admin_session.execute(text(f'SET LOCAL search_path TO "{schema_name}", public'))
     await admin_session.execute(
         text(
-            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2, status) "
+            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2) "
             "VALUES (:fid, 'PR7-FARM', 'PR-7 Farm', "
             "        'SRID=4326;MULTIPOLYGON(((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1)))'::geometry, "
             "        'SRID=32636;MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        100, 'active')"
+            "        100)"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
         {"fid": farm_id},
     )
     await admin_session.execute(
         text(
             "INSERT INTO blocks (id, farm_id, code, boundary, boundary_utm, centroid, area_m2, "
-            "                    aoi_hash, unit_type, status, irrigation_system) "
+            "                    aoi_hash, unit_type, irrigation_system) "
             "VALUES (:bid, :fid, 'B-PR7', "
             "        'SRID=4326;POLYGON((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1))'::geometry, "
             "        'SRID=32636;POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        50, 'pr7-aoi-hash', 'block', 'active', 'drip')"
+            "        50, 'pr7-aoi-hash', 'block', 'drip')"
         ).bindparams(
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
             bindparam("fid", type_=PG_UUID(as_uuid=True)),
@@ -359,24 +359,24 @@ async def test_block_without_current_crop_returns_none(
     await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
     await admin_session.execute(
         text(
-            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2, status) "
+            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2) "
             "VALUES (:fid, 'PR7-NC', 'PR-7 NC', "
             "        'SRID=4326;MULTIPOLYGON(((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1)))'::geometry, "
             "        'SRID=32636;MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        100, 'active')"
+            "        100)"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
         {"fid": farm_id},
     )
     await admin_session.execute(
         text(
             "INSERT INTO blocks (id, farm_id, code, boundary, boundary_utm, centroid, area_m2, "
-            "                    aoi_hash, unit_type, status, irrigation_system) "
+            "                    aoi_hash, unit_type, irrigation_system) "
             "VALUES (:bid, :fid, 'B-PR7-NC', "
             "        'SRID=4326;POLYGON((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1))'::geometry, "
             "        'SRID=32636;POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        50, 'pr7-nc-hash', 'block', 'active', 'drip')"
+            "        50, 'pr7-nc-hash', 'block', 'drip')"
         ).bindparams(
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
             bindparam("fid", type_=PG_UUID(as_uuid=True)),

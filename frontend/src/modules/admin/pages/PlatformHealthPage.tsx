@@ -88,6 +88,7 @@ export function PlatformHealthPage(): ReactNode {
                   <tr key={row.tenant_id}>
                     <td className="px-3 py-2 text-ap-ink">
                       <Link
+                        to={`/platform/integrations/health/tenants/${row.tenant_id}`}
                         to={`/platform/tenants/${row.tenant_id}`}
                         className="hover:text-ap-primary"
                       >

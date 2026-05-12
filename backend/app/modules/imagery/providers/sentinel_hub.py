@@ -27,7 +27,11 @@ import httpx
 from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.imagery.errors import SentinelHubNotConfiguredError
-from app.modules.imagery.providers.protocol import DiscoveredScene, FetchResult
+from app.modules.imagery.providers.protocol import DiscoveredScene, FetchResult, ProbeResult
+
+# Probe timeout — see open_meteo for rationale. Slightly higher because
+# Sentinel Hub's OAuth + catalog round-trip is heavier than Open-Meteo.
+_PROBE_TIMEOUT_SECONDS = 8.0
 
 # How early before token expiry we refresh. Sentinel Hub tokens live
 # 60 min; a 10-min cushion absorbs clock skew + network latency.
@@ -113,6 +117,62 @@ class SentinelHubProvider:
         """Close the underlying HTTP client if we own it."""
         if self._owns_http:
             await self._http.aclose()
+
+    async def probe(self) -> ProbeResult:
+        """Refresh the OAuth token and call it good.
+
+        The token refresh endpoint is the cheapest call that exercises
+        credentials end-to-end: a successful response confirms the
+        client ID/secret are valid and the SH frontend is up. We
+        explicitly avoid the catalog endpoint here because it's billed
+        per processing unit; token refresh isn't.
+        """
+        started = time.time()
+        try:
+            response = await self._http.post(
+                self._oauth_url,
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=httpx.Timeout(_PROBE_TIMEOUT_SECONDS),
+            )
+        except httpx.TimeoutException as exc:
+            return ProbeResult(
+                status="timeout",
+                latency_ms=int((time.time() - started) * 1000),
+                error_message=str(exc),
+            )
+        except httpx.TransportError as exc:
+            return ProbeResult(
+                status="error",
+                latency_ms=int((time.time() - started) * 1000),
+                error_message=str(exc),
+            )
+        latency_ms = int((time.time() - started) * 1000)
+        if response.status_code >= 400:
+            return ProbeResult(
+                status="error",
+                latency_ms=latency_ms,
+                error_message=f"HTTP {response.status_code}",
+            )
+        # On success, refresh our in-process token cache opportunistically
+        # so the next real fetch doesn't have to round-trip again.
+        try:
+            body = response.json()
+            access_token = str(body["access_token"])
+            expires_in = int(body.get("expires_in", 3600))
+            self._token = _CachedToken(
+                access_token=access_token,
+                expires_at_epoch=time.time() + expires_in,
+            )
+        except (KeyError, ValueError, TypeError):
+            # Probe still counts as "ok" even if the body shape changed —
+            # the connectivity signal is what we're after.
+            pass
+        return ProbeResult(status="ok", latency_ms=latency_ms)
 
     # -- OAuth ----------------------------------------------------------
 

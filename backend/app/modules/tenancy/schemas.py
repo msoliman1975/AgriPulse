@@ -25,14 +25,13 @@ class CreateTenantRequest(BaseModel):
     default_locale: Literal["en", "ar"] = "en"
     default_unit_system: Literal["feddan", "acre", "hectare"] = "feddan"
     initial_tier: Literal["free", "standard", "premium", "enterprise"] = "free"
-    owner_email: EmailStr | None = Field(
-        default=None,
+    owner_email: EmailStr = Field(
         description=(
-            "Initial TenantOwner. When set, the create flow also provisions "
-            "the Keycloak group + invites this user."
+            "Initial TenantOwner. The create flow provisions the Keycloak "
+            "group + invites this user and assigns them the TenantOwner role."
         ),
     )
-    owner_full_name: str | None = Field(default=None, max_length=255)
+    owner_full_name: str = Field(min_length=1, max_length=255)
 
     @field_validator("slug")
     @classmethod

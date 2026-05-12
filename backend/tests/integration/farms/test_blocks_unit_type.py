@@ -117,13 +117,13 @@ async def test_unit_type_check_constraint_rejects_unknown(admin_session: AsyncSe
             text(
                 "INSERT INTO blocks ("
                 "  id, farm_id, code, boundary, boundary_utm, centroid, area_m2, aoi_hash, "
-                "  unit_type, status"
+                "  unit_type"
                 ") VALUES ("
                 "  gen_random_uuid(), gen_random_uuid(), 'BAD',"
                 "  'SRID=4326;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry,"
                 "  'SRID=32636;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry,"
                 "  'SRID=4326;POINT(0 0)'::geometry,"
-                "  0, '', 'kite', 'active'"
+                "  0, '', 'kite'"
                 ")"
             )
         )

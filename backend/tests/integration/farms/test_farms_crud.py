@@ -102,7 +102,8 @@ async def test_create_and_get_farm(admin_session: AsyncSession) -> None:
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["code"] == "FARM-1"
-    assert body["status"] == "active"
+    assert body["is_active"] is True
+    assert body["active_to"] is None
     assert body["area_unit"] == "feddan"
     assert float(body["area_value"]) > 0
     farm_id = body["id"]
@@ -176,7 +177,9 @@ async def test_archive_then_get_returns_404(admin_session: AsyncSession) -> None
         farm_id = resp.json()["id"]
 
         del_resp = await c.delete(f"/api/v1/farms/{farm_id}")
-        assert del_resp.status_code == 204
+        assert del_resp.status_code == 200
+        assert del_resp.json()["farm_id"] == farm_id
+        assert del_resp.json()["block_count"] == 0
 
         get_resp = await c.get(f"/api/v1/farms/{farm_id}")
         assert get_resp.status_code == 404
