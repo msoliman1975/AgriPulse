@@ -35,6 +35,18 @@ spec:
             chart: ingress-nginx
             repoURL: https://kubernetes.github.io/ingress-nginx
             chartVersion: 4.11.3
+
+          - name: external-dns
+            namespace: external-dns
+            chart: external-dns
+            repoURL: https://kubernetes-sigs.github.io/external-dns/
+            chartVersion: 1.15.0
+
+          - name: karpenter
+            namespace: karpenter
+            chart: karpenter
+            repoURL: public.ecr.aws/karpenter
+            chartVersion: 1.0.6
   template:
     metadata:
       name: "platform-{{.name}}"

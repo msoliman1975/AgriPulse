@@ -61,3 +61,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "environments" {
+  description = "Logical envs whose S3 buckets + IRSA roles this stack owns (regardless of var.environment). Imagery + pg-backup buckets are global resources; one TF stack owns all three so per-env apply doesn't drift."
+  type        = list(string)
+  default     = ["dev", "staging", "prod"]
+}

@@ -1,0 +1,37 @@
+# Karpenter controller. Real IRSA ARN + cluster + queue name are injected
+# at deploy time from `terraform output karpenter` — overlays/<env>/values
+# carry the per-env values; this file only holds defaults that apply to
+# every env.
+
+replicas: 2
+
+# Controller runs on the system baseline managed node group; Karpenter
+# itself can't be auto-scheduled by Karpenter.
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+
+nodeSelector:
+  missionagre.io/role: system
+
+serviceAccount:
+  create: true
+  name: karpenter
+  annotations: {}
+
+settings:
+  clusterName: "" # set per-env
+  interruptionQueue: "" # set per-env (SQS queue name from Terraform)
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Prometheus integration — kube-prometheus-stack scrapes the metrics
+# endpoint via ServiceMonitor.
+serviceMonitor:
+  enabled: true

@@ -8,14 +8,44 @@ labels:
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
 
-# Hosts use the dev wildcard; cert-manager issues against the staging
-# Let's Encrypt directory so we don't burn prod rate limits.
+# Hosts use the dev subdomain of agripulse.cloud; cert-manager issues
+# against the staging Let's Encrypt directory so we don't burn prod rate
+# limits.
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
-  host: api.dev.missionagre.local
+  host: api.dev.agripulse.cloud
 
-# Dev DB is the same cluster CNPG instance, just smaller.
+# ExternalDNS + cert-manager IRSA ARNs come from `terraform output
+# iam_role_arns` (keys: external_dns, cert_manager). Filled in by the
+# bootstrap step in CD-10.
+externalDns:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: ""
+
+# Karpenter (CD-8). clusterName + nodeIAMRoleName come from
+# `terraform output karpenter`.
+karpenter:
+  enabled: true
+  clusterName: missionagre-dev
+  nodeIAMRoleName: missionagre-dev-karpenter-node
+
+certManagerController:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: ""
+
+# Per-env api IRSA binding. ARN comes from
+# `terraform output agripulse_env_resources` → .dev.api_irsa_arn.
+# Filled in at deploy time by CD-10 bootstrap.
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+
+# Dev DB is the same cluster CNPG instance, just smaller. CNPG IRSA ARN
+# comes from `terraform output agripulse_env_resources` → .dev.cnpg_irsa_arn.
 postgresCluster:
   instances: 1
   storage:
@@ -29,6 +59,15 @@ postgresCluster:
     limits:
       cpu: "1"
       memory: 2Gi
+  serviceAccountAnnotations:
+    eks.amazonaws.com/role-arn: ""
+
+# Alembic PreSync Job (api chart only — other charts ignore this key).
+# The Job runs `alembic upgrade head` before any Deployment rolls; failure
+# blocks the sync and the previous version keeps serving. Runbook:
+# docs/runbooks/failed-migration-recovery.md.
+migrations:
+  enabled: true
 
 # Tighter resources across services in dev.
 resources:

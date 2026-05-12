@@ -64,6 +64,13 @@ grafana:
       labelValue: "1"
       searchNamespace: ALL
 
+# Operator runs on the baseline (CriticalAddonsOnly-tainted) node group;
+# Karpenter is responsible for scaling everything else.
+prometheusOperator:
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+
 # Components we don't run (kube-state-metrics + node-exporter we keep).
 kubeApiServer:
   enabled: true
