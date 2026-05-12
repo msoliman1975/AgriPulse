@@ -673,7 +673,9 @@ class RecommendationsRepository:
             await self._tenant.execute(
                 text(
                     "SELECT id FROM blocks "
-                    "WHERE deleted_at IS NULL AND status NOT IN ('archived','abandoned')"
+                    "WHERE deleted_at IS NULL "
+                    "  AND active_from <= current_date "
+                    "  AND (active_to IS NULL OR active_to > current_date)"
                 )
             )
         ).all()

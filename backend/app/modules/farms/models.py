@@ -127,7 +127,13 @@ class Farm(Base, TimestampedMixin):
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
-    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    # Lifecycle: `is_active` is derived from `active_from <= current_date
+    # AND (active_to IS NULL OR active_to > current_date)`. See
+    # tenant migration 0026.
+    active_from: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=text("current_date")
+    )
+    active_to: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class Block(Base, TimestampedMixin):
@@ -169,7 +175,11 @@ class Block(Base, TimestampedMixin):
     soil_organic_matter_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     last_soil_test_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     responsible_user_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
-    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))
+    # Lifecycle: see Farm.active_from / active_to.
+    active_from: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=text("current_date")
+    )
+    active_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )

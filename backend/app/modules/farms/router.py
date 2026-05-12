@@ -38,18 +38,29 @@ from app.modules.farms.schemas import (
     BlockCropAssignRequest,
     BlockCropResponse,
     BlockDetailResponse,
+    BlockInactivationPreviewResponse,
+    BlockInactivationRequest,
+    BlockInactivationResponse,
+    BlockReactivationResponse,
     BlockResponse,
     BlockUpdateRequest,
     CropResponse,
     CropVarietyResponse,
     FarmCreateRequest,
     FarmDetailResponse,
+    FarmInactivationPreviewResponse,
+    FarmInactivationRequest,
+    FarmInactivationResponse,
     FarmMemberAssignRequest,
     FarmMemberResponse,
+    FarmReactivationRequest,
+    FarmReactivationResponse,
     FarmResponse,
     FarmUpdateRequest,
     GrowthStageLogResponse,
     GrowthStageTransitionRequest,
+    PivotCreateRequest,
+    PivotCreateResponse,
 )
 from app.modules.farms.service import FarmService, get_farm_service
 from app.shared.auth.context import RequestContext
@@ -139,6 +150,7 @@ async def create_farm(
         actor_user_id=context.user_id,
         tenant_schema=schema,
         preferred_unit=context.preferred_unit,
+        active_from=payload.active_from,
         correlation_id=_correlation_id(request),
     )
 
@@ -151,10 +163,9 @@ async def create_farm(
 async def list_farms(
     cursor: str | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=200),
-    status_filter: str | None = Query(default=None, alias="status"),
     governorate: str | None = Query(default=None),
     tag: str | None = Query(default=None),
-    include_archived: bool = Query(default=False),
+    include_inactive: bool = Query(default=False),
     context: RequestContext = Depends(requires_capability("farm.read")),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
@@ -164,10 +175,9 @@ async def list_farms(
     items = await service.list_farms(
         after=after,
         limit=capped_limit,
-        status_filter=status_filter,
         governorate=governorate,
         tag=tag,
-        include_archived=include_archived,
+        include_inactive=include_inactive,
         preferred_unit=context.preferred_unit,
     )
     next_cursor = encode_cursor(items[-1]["id"]) if len(items) == capped_limit else None
@@ -214,20 +224,77 @@ async def update_farm(
     )
 
 
+@router.get(
+    "/farms/{farm_id}/inactivate-preview",
+    response_model=FarmInactivationPreviewResponse,
+    summary="Preview the cascade counts for a farm inactivation.",
+)
+async def preview_farm_inactivation(
+    farm_id: UUID,
+    context: RequestContext = Depends(requires_capability("farm.delete", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.preview_farm_inactivation(farm_id=farm_id)
+
+
+@router.post(
+    "/farms/{farm_id}/inactivate",
+    response_model=FarmInactivationResponse,
+    summary="Inactivate a farm and cascade to all active blocks.",
+)
+async def inactivate_farm(
+    farm_id: UUID,
+    payload: FarmInactivationRequest,
+    request: Request,
+    context: RequestContext = Depends(requires_capability("farm.delete", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.inactivate_farm(
+        farm_id=farm_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        reason=payload.reason,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.post(
+    "/farms/{farm_id}/reactivate",
+    response_model=FarmReactivationResponse,
+    summary="Reactivate a previously inactivated farm.",
+)
+async def reactivate_farm(
+    farm_id: UUID,
+    payload: FarmReactivationRequest,
+    request: Request,
+    context: RequestContext = Depends(requires_capability("farm.delete", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.reactivate_farm(
+        farm_id=farm_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        restore_blocks=payload.restore_blocks,
+        correlation_id=_correlation_id(request),
+    )
+
+
 @router.delete(
     "/farms/{farm_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Soft-archive a farm.",
-    response_model=None,
+    response_model=FarmInactivationResponse,
+    summary="Inactivate a farm (alias for :inactivate with default reason).",
 )
 async def archive_farm(
     farm_id: UUID,
     request: Request,
     context: RequestContext = Depends(requires_capability("farm.delete", farm_id_param="farm_id")),
     service: FarmService = Depends(_service),
-) -> None:
+) -> dict[str, Any]:
     schema = _ensure_tenant(context)
-    await service.archive_farm(
+    return await service.inactivate_farm(
         farm_id=farm_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
@@ -272,6 +339,7 @@ async def create_block(
         actor_user_id=context.user_id,
         tenant_schema=schema,
         preferred_unit=context.preferred_unit,
+        active_from=payload.active_from,
         correlation_id=_correlation_id(request),
     )
 
@@ -285,9 +353,8 @@ async def list_blocks(
     farm_id: UUID,
     cursor: str | None = Query(default=None),
     limit: int | None = Query(default=None, ge=1, le=200),
-    status_filter: str | None = Query(default=None, alias="status"),
     irrigation_system: str | None = Query(default=None),
-    include_archived: bool = Query(default=False),
+    include_inactive: bool = Query(default=False),
     context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
@@ -297,9 +364,8 @@ async def list_blocks(
         farm_id=farm_id,
         after=decode_cursor(cursor),
         limit=capped_limit,
-        status_filter=status_filter,
         irrigation_system=irrigation_system,
-        include_archived=include_archived,
+        include_inactive=include_inactive,
         preferred_unit=context.preferred_unit,
     )
     next_cursor = encode_cursor(items[-1]["id"]) if len(items) == capped_limit else None
@@ -373,18 +439,38 @@ async def update_block(
     )
 
 
-@router.delete(
-    "/blocks/{block_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Soft-archive a block.",
-    response_model=None,
+@router.get(
+    "/blocks/{block_id}/inactivate-preview",
+    response_model=BlockInactivationPreviewResponse,
+    summary="Preview the cascade counts for a block inactivation.",
 )
-async def archive_block(
+async def preview_block_inactivation(
     block_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.delete", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+    return await service.preview_block_inactivation(block_id=block_id)
+
+
+@router.post(
+    "/blocks/{block_id}/inactivate",
+    response_model=BlockInactivationResponse,
+    summary="Inactivate a block and run the cascade.",
+)
+async def inactivate_block(
+    block_id: UUID,
+    payload: BlockInactivationRequest,
     request: Request,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
-) -> None:
+) -> dict[str, Any]:
     from app.modules.farms.errors import BlockNotFoundError
     from app.shared.rbac.check import has_capability
 
@@ -393,7 +479,69 @@ async def archive_block(
     if not has_capability(context, "block.delete", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
 
-    await service.archive_block(
+    return await service.inactivate_block(
+        block_id=block_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        reason=payload.reason,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.post(
+    "/blocks/{block_id}/reactivate",
+    response_model=BlockReactivationResponse,
+    summary="Reactivate a previously inactivated block.",
+)
+async def reactivate_block(
+    block_id: UUID,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    # An inactive block won't be returned by the regular get_block (it
+    # filters deleted_at). Look up the parent farm via the repo directly.
+    repo = getattr(service, "_repo", None)
+    if repo is None:
+        raise BlockNotFoundError(block_id)
+    row = await repo.get_block_by_id(block_id, with_boundary=False, include_archived=True)
+    if row is None:
+        raise BlockNotFoundError(block_id)
+    if not has_capability(context, "block.delete", farm_id=row["farm_id"]):
+        raise BlockNotFoundError(block_id)
+
+    return await service.reactivate_block(
+        block_id=block_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.delete(
+    "/blocks/{block_id}",
+    response_model=BlockInactivationResponse,
+    summary="Inactivate a block (alias for :inactivate with default reason).",
+)
+async def archive_block(
+    block_id: UUID,
+    request: Request,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.delete", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+
+    return await service.inactivate_block(
         block_id=block_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
@@ -417,6 +565,37 @@ async def auto_grid(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     return await service.auto_grid(farm_id=farm_id, cell_size_m=payload.cell_size_m)
+
+
+@router.post(
+    "/farms/{farm_id}/pivots",
+    response_model=PivotCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a center-pivot rig with N equal sector children atomically.",
+)
+async def create_pivot(
+    farm_id: UUID,
+    payload: PivotCreateRequest,
+    request: Request,
+    context: RequestContext = Depends(requires_capability("block.create", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.create_pivot_with_sectors(
+        farm_id=farm_id,
+        code=payload.code,
+        name=payload.name,
+        center_lat=payload.center.lat,
+        center_lon=payload.center.lon,
+        radius_m=payload.radius_m,
+        sector_count=payload.sector_count,
+        irrigation_system=payload.irrigation_system,
+        active_from=payload.active_from,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        preferred_unit=context.preferred_unit,
+        correlation_id=_correlation_id(request),
+    )
 
 
 # ---------- Block crops -----------------------------------------------------

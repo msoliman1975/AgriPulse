@@ -25,6 +25,7 @@ interface SideNavItemProps {
   icon: ReactNode;
   disabled?: boolean;
   activePathPrefix?: string;
+  badge?: string;
 }
 
 function SideNavItem({
@@ -33,6 +34,7 @@ function SideNavItem({
   icon,
   disabled,
   activePathPrefix,
+  badge,
 }: SideNavItemProps): ReactNode {
   const location = useLocation();
   if (disabled) {
@@ -44,6 +46,7 @@ function SideNavItem({
       >
         {icon}
         <span>{label}</span>
+        {badge ? <BetaBadge>{badge}</BetaBadge> : null}
       </span>
     );
   }
@@ -64,7 +67,16 @@ function SideNavItem({
     >
       {icon}
       <span>{label}</span>
+      {badge ? <BetaBadge>{badge}</BetaBadge> : null}
     </NavLink>
+  );
+}
+
+function BetaBadge({ children }: { children: string }): ReactNode {
+  return (
+    <span className="ms-auto rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-800">
+      {children}
+    </span>
   );
 }
 
@@ -141,8 +153,15 @@ export function SideNav(): ReactNode {
           activePathPrefix="/insights/"
         />
         <SideNavItem
-          to={hasFarm ? `/farms/${farmSegment}` : "/farms"}
+          to={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
           label="Land units"
+          icon={<LandUnitsIcon className="h-4 w-4" />}
+          activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
+        />
+        {/* Legacy form-based view kept as a fallback while we iterate. */}
+        <SideNavItem
+          to={hasFarm ? `/farms/${farmSegment}` : "/farms"}
+          label="Land units (legacy)"
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/farms/${farmSegment}` : "/farms"}
         />

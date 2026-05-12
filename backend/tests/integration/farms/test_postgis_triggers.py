@@ -45,10 +45,10 @@ async def test_farm_trigger_computes_centroid_and_area(
     await admin_session.execute(
         text(
             "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, "
-            "area_m2, farm_type, status) "
+            "area_m2, farm_type) "
             "VALUES (:id, 'F-T1', 'Trigger Farm', ST_GeomFromEWKT(:b), "
             "'SRID=32636;MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'::geometry, "
-            "'SRID=4326;POINT(0 0)'::geometry, 0, 'commercial', 'active')"
+            "'SRID=4326;POINT(0 0)'::geometry, 0, 'commercial')"
         ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
         {"id": farm_id, "b": boundary_ewkt},
     )
@@ -95,10 +95,10 @@ async def test_block_trigger_computes_aoi_hash(admin_session: AsyncSession) -> N
     await admin_session.execute(
         text(
             "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, "
-            "area_m2, farm_type, status) "
+            "area_m2, farm_type) "
             "VALUES (:id, 'F-1', 'F1', ST_GeomFromEWKT(:b), "
             "'SRID=32636;MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'::geometry, "
-            "'SRID=4326;POINT(0 0)'::geometry, 0, 'commercial', 'active')"
+            "'SRID=4326;POINT(0 0)'::geometry, 0, 'commercial')"
         ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
         {
             "id": farm_id,
@@ -111,10 +111,10 @@ async def test_block_trigger_computes_aoi_hash(admin_session: AsyncSession) -> N
     await admin_session.execute(
         text(
             "INSERT INTO blocks (id, farm_id, code, boundary, boundary_utm, centroid, "
-            "area_m2, aoi_hash, status) "
+            "area_m2, aoi_hash) "
             "VALUES (:bid, :fid, 'B-1', ST_GeomFromEWKT(:b), "
             "'SRID=32636;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry, "
-            "'SRID=4326;POINT(0 0)'::geometry, 0, '', 'active')"
+            "'SRID=4326;POINT(0 0)'::geometry, 0, '')"
         ).bindparams(
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
             bindparam("fid", type_=PG_UUID(as_uuid=True)),

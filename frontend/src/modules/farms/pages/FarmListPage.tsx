@@ -17,7 +17,7 @@ export function FarmListPage(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listFarms({ include_archived: includeArchived })
+    listFarms({ include_inactive: includeArchived })
       .then((page) => {
         if (!cancelled) setFarms(page.items);
       })
@@ -88,7 +88,11 @@ export function FarmListPage(): JSX.Element {
                   <td className="py-2">
                     <AreaDisplay areaM2={Number(f.area_m2)} />
                   </td>
-                  <td className="py-2">{t(`status.${f.status}`)}</td>
+                  <td className="py-2">
+                    {f.is_active
+                      ? t("status.active")
+                      : t("status.archived")}
+                  </td>
                 </tr>
               ))}
             </tbody>

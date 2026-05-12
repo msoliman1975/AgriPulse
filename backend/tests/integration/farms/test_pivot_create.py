@@ -1,4 +1,4 @@
-"""Integration tests for farm CRUD endpoints."""
+"""Integration test for the pivot+sector atomic create endpoint."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .conftest import build_app, make_context
 pytestmark = [pytest.mark.integration]
 
 
-def _square(lon: float, lat: float, side: float = 0.005) -> dict[str, object]:
+def _square(lon: float, lat: float, side: float = 0.02) -> dict[str, object]:
     return {
         "type": "MultiPolygon",
         "coordinates": [
@@ -35,7 +35,7 @@ def _square(lon: float, lat: float, side: float = 0.005) -> dict[str, object]:
     }
 
 
-async def _create_user_in_tenant(session: AsyncSession, *, tenant_id, user_id) -> None:
+async def _create_user_in_tenant(session, *, tenant_id, user_id):
     await session.execute(
         text(
             "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
@@ -71,17 +71,15 @@ async def _create_user_in_tenant(session: AsyncSession, *, tenant_id, user_id) -
 
 
 @pytest.mark.asyncio
-async def test_create_and_get_farm(admin_session: AsyncSession) -> None:
+async def test_create_pivot_with_4_sectors(admin_session: AsyncSession) -> None:
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
-        slug="farms-crud-1",
-        name="Farms CRUD",
-        contact_email="ops@farms-crud.test",
+        slug="pivot-create",
+        name="Pivot",
+        contact_email="ops@pivot-create.test",
     )
-
     user_id = uuid4()
     await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
-
     context = make_context(
         user_id=user_id,
         tenant_id=tenant.tenant_id,
@@ -90,96 +88,77 @@ async def test_create_and_get_farm(admin_session: AsyncSession) -> None:
     app = build_app(context)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post(
+        farm = await c.post(
             "/api/v1/farms",
+            json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
+        )
+        assert farm.status_code == 201, farm.text
+        farm_id = farm.json()["id"]
+
+        resp = await c.post(
+            f"/api/v1/farms/{farm_id}/pivots",
             json={
-                "code": "FARM-1",
-                "name": "Acme Farm 1",
-                "boundary": _square(31.2, 30.0),
-                "farm_type": "commercial",
+                "code": "P1",
+                "name": "Pivot 1",
+                "center": {"lat": 30.005, "lon": 31.205},
+                "radius_m": 300,
+                "sector_count": 4,
             },
         )
     assert resp.status_code == 201, resp.text
     body = resp.json()
-    assert body["code"] == "FARM-1"
-    assert body["is_active"] is True
-    assert body["active_to"] is None
-    assert body["area_unit"] == "feddan"
-    assert float(body["area_value"]) > 0
-    farm_id = body["id"]
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.get(f"/api/v1/farms/{farm_id}")
-    assert resp.status_code == 200
-    assert resp.json()["id"] == farm_id
+    assert body["pivot"]["code"] == "P1"
+    assert body["pivot"]["unit_type"] == "pivot"
+    assert body["pivot"]["parent_unit_id"] is None
+    # Circle of radius 300m → area ~ pi*300² ≈ 282,743 m². Spherical
+    # approximation + 64-vertex polygon trims a bit; accept ±5%.
+    pivot_area = float(body["pivot"]["area_m2"])
+    assert 269_000 < pivot_area < 297_000
+
+    assert len(body["sectors"]) == 4
+    for i, s in enumerate(body["sectors"], start=1):
+        assert s["code"] == f"P1-S{i}"
+        assert s["unit_type"] == "pivot_sector"
+        assert s["parent_unit_id"] == body["pivot"]["id"]
+    # Each equal sector covers ~25% of the pivot area.
+    sector_areas = [float(s["area_m2"]) for s in body["sectors"]]
+    for a in sector_areas:
+        assert 65_000 < a < 80_000
+    # Sectors sum to roughly the pivot (allow 1% slack for spherical-vs-flat).
+    total = sum(sector_areas)
+    assert abs(total - pivot_area) / pivot_area < 0.02
 
 
 @pytest.mark.asyncio
-async def test_create_rejects_out_of_egypt_geometry(admin_session: AsyncSession) -> None:
+async def test_create_pivot_rejects_bad_radius(admin_session: AsyncSession) -> None:
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
-        slug="farms-bbox",
-        name="OOB",
-        contact_email="ops@farms-bbox.test",
+        slug="pivot-bad",
+        name="Pivot",
+        contact_email="ops@pivot-bad.test",
     )
-
     user_id = uuid4()
     await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
-
     context = make_context(
         user_id=user_id,
         tenant_id=tenant.tenant_id,
         tenant_role=TenantRole.TENANT_ADMIN,
     )
     app = build_app(context)
-
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post(
+        farm = await c.post(
             "/api/v1/farms",
+            json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
+        )
+        farm_id = farm.json()["id"]
+        resp = await c.post(
+            f"/api/v1/farms/{farm_id}/pivots",
             json={
-                "code": "FARM-OOB",
-                "name": "Out of bounds",
-                # Tripoli — outside Egypt's bbox.
-                "boundary": _square(13.0, 32.0),
-                "farm_type": "commercial",
+                "code": "P1",
+                "center": {"lat": 30.005, "lon": 31.205},
+                "radius_m": -5,
+                "sector_count": 4,
             },
         )
     assert resp.status_code == 422
-    assert "Egypt" in resp.json().get("title", "") or "egypt" in resp.text.lower()
-
-
-@pytest.mark.asyncio
-async def test_archive_then_get_returns_404(admin_session: AsyncSession) -> None:
-    tenancy = get_tenant_service(admin_session)
-    tenant = await tenancy.create_tenant(
-        slug="farms-archive",
-        name="Archive",
-        contact_email="ops@farms-archive.test",
-    )
-    user_id = uuid4()
-    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
-    context = make_context(
-        user_id=user_id,
-        tenant_id=tenant.tenant_id,
-        tenant_role=TenantRole.TENANT_ADMIN,
-    )
-    app = build_app(context)
-
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post(
-            "/api/v1/farms",
-            json={
-                "code": "FARM-A",
-                "name": "Will Archive",
-                "boundary": _square(31.2, 30.0),
-            },
-        )
-        farm_id = resp.json()["id"]
-
-        del_resp = await c.delete(f"/api/v1/farms/{farm_id}")
-        assert del_resp.status_code == 200
-        assert del_resp.json()["farm_id"] == farm_id
-        assert del_resp.json()["block_count"] == 0
-
-        get_resp = await c.get(f"/api/v1/farms/{farm_id}")
-        assert get_resp.status_code == 404

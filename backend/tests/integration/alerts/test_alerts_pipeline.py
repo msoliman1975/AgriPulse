@@ -42,24 +42,24 @@ async def _seed_block_with_ndvi_row(
     await admin_session.execute(text(f'SET LOCAL search_path TO "{schema_name}", public'))
     await admin_session.execute(
         text(
-            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2, status) "
+            "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2) "
             "VALUES (:fid, 'PR5-FARM', 'PR-5 Farm', "
             "        'SRID=4326;MULTIPOLYGON(((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1)))'::geometry, "
             "        'SRID=32636;MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        100, 'active')"
+            "        100)"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
         {"fid": farm_id},
     )
     await admin_session.execute(
         text(
             "INSERT INTO blocks (id, farm_id, code, boundary, boundary_utm, centroid, area_m2, "
-            "                    aoi_hash, unit_type, status) "
+            "                    aoi_hash, unit_type) "
             "VALUES (:bid, :fid, 'B-PR5', "
             "        'SRID=4326;POLYGON((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1))'::geometry, "
             "        'SRID=32636;POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
-            "        50, 'pr5-aoi-hash', 'block', 'active')"
+            "        50, 'pr5-aoi-hash', 'block')"
         ).bindparams(
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
             bindparam("fid", type_=PG_UUID(as_uuid=True)),

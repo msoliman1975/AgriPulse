@@ -118,6 +118,7 @@ export function App(): ReactNode {
               {/* Labs: experimental map-first surface for live validation.
                   Complements the existing list/table flow — does not
                   replace it. See docs/proposals/map-first.md. */}
+              <Route path="/labs/map" element={<MapExperiencePage />} />
               <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
               <Route path="/insights/:farmId" element={<InsightsPage />} />
               <Route path="/plan/:farmId" element={<PlanPage />} />

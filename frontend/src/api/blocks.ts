@@ -25,7 +25,6 @@ export type SalinityClass =
   | "slightly_saline"
   | "moderately_saline"
   | "strongly_saline";
-export type BlockStatus = "active" | "fallow" | "abandoned" | "under_preparation" | "archived";
 
 // Land-unit polymorphism. A "block" row may represent a plain block, a
 // pivot (full-circle, center-pivot irrigation), or a pivot_sector (a
@@ -52,7 +51,10 @@ export interface Block {
   responsible_user_id: string | null;
   notes: string | null;
   tags: string[];
-  status: BlockStatus;
+  // Lifecycle replaces the old status enum (active/fallow/abandoned/...).
+  active_from: string; // ISO date
+  active_to: string | null;
+  is_active: boolean;
   unit_type: UnitType;
   parent_unit_id: string | null;
   irrigation_geometry: Record<string, unknown> | null;
@@ -77,11 +79,10 @@ export interface BlockCreatePayload {
   responsible_user_id?: string | null;
   notes?: string | null;
   tags?: string[];
-  // Defaults to 'block' on the backend; pivots/sectors require a
-  // dedicated creation flow that PR-1 does not yet expose in the UI.
   unit_type?: UnitType;
   parent_unit_id?: string | null;
   irrigation_geometry?: Record<string, unknown> | null;
+  active_from?: string | null;
 }
 
 export type BlockUpdatePayload = Partial<BlockCreatePayload>;
@@ -89,9 +90,8 @@ export type BlockUpdatePayload = Partial<BlockCreatePayload>;
 export interface BlockListParams {
   cursor?: string;
   limit?: number;
-  status?: BlockStatus;
   irrigation_system?: IrrigationSystem;
-  include_archived?: boolean;
+  include_inactive?: boolean;
 }
 
 export interface AutoGridCandidate {
@@ -105,8 +105,25 @@ export interface AutoGridResponse {
   candidates: AutoGridCandidate[];
 }
 
-// Backend serializes area_m2 / area_value as Decimal (JSON string). Coerce
-// to number at the boundary so render code can call .toFixed() etc.
+export interface BlockInactivationPreview {
+  alerts_resolved: number;
+  irrigation_skipped: number;
+  plan_activities_skipped: number;
+  weather_subs_deactivated: number;
+  imagery_subs_deactivated: number;
+}
+
+export interface BlockInactivationResult extends BlockInactivationPreview {
+  block_id: string;
+  farm_id: string;
+  active_to: string;
+}
+
+export interface BlockReactivationResult {
+  block_id: string;
+  farm_id: string;
+}
+
 function normalizeBlock<T extends { area_m2: unknown; area_value: unknown }>(b: T): T {
   return { ...b, area_m2: Number(b.area_m2 ?? 0), area_value: Number(b.area_value ?? 0) };
 }
@@ -140,8 +157,66 @@ export async function updateBlock(
   return normalizeBlock(data);
 }
 
-export async function archiveBlock(blockId: string): Promise<void> {
-  await apiClient.delete(`/v1/blocks/${blockId}`);
+export async function getBlockInactivationPreview(
+  blockId: string,
+): Promise<BlockInactivationPreview> {
+  const { data } = await apiClient.get<BlockInactivationPreview>(
+    `/v1/blocks/${blockId}/inactivate-preview`,
+  );
+  return data;
+}
+
+export async function inactivateBlock(
+  blockId: string,
+  payload: { reason?: string | null } = {},
+): Promise<BlockInactivationResult> {
+  const { data } = await apiClient.post<BlockInactivationResult>(
+    `/v1/blocks/${blockId}/inactivate`,
+    payload,
+  );
+  return data;
+}
+
+export async function reactivateBlock(blockId: string): Promise<BlockReactivationResult> {
+  const { data } = await apiClient.post<BlockReactivationResult>(
+    `/v1/blocks/${blockId}/reactivate`,
+  );
+  return data;
+}
+
+// DELETE alias for backwards-compatibility callers.
+export async function archiveBlock(blockId: string): Promise<BlockInactivationResult> {
+  const { data } = await apiClient.delete<BlockInactivationResult>(`/v1/blocks/${blockId}`);
+  return data;
+}
+
+export interface PivotCreatePayload {
+  code: string;
+  name?: string | null;
+  center: { lat: number; lon: number };
+  radius_m: number;
+  sector_count: number;
+  irrigation_system?: IrrigationSystem | null;
+  active_from?: string | null;
+}
+
+export interface PivotCreateResult {
+  pivot: BlockDetail;
+  sectors: BlockDetail[];
+}
+
+export async function createPivot(
+  farmId: string,
+  payload: PivotCreatePayload,
+): Promise<PivotCreateResult> {
+  const { data } = await apiClient.post<PivotCreateResult>(
+    `/v1/farms/${farmId}/pivots`,
+    payload,
+  );
+  return {
+    pivot: normalizeBlock(data.pivot),
+    sectors: data.sectors.map(normalizeBlock),
+  };
 }
 
 export async function autoGrid(farmId: string, cellSizeM: number): Promise<AutoGridResponse> {
