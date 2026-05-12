@@ -104,6 +104,15 @@ class ProviderHealthRow(BaseModel):
     failed_24h: int
 
 
+class ProviderErrorHistogramEntry(BaseModel):
+    """One bucket in the per-provider failure-cause histogram (PR-IH10)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    error_code: str  # 'tls_trust' | 'timeout' | … | 'uncategorized'
+    count: int
+
+
 class ProviderProbeRow(BaseModel):
     """One row in the per-provider probe-history drill-down."""
 
@@ -145,3 +154,7 @@ class IntegrationAttemptRow(BaseModel):
     error_code: str | None
     error_message: str | None
     scene_id: str | None
+    # PR-IH9: Nth consecutive failure for this subscription, inclusive.
+    # 0 for non-failures or first-attempt successes. UI shows
+    # "Attempt #N" badge when > 1.
+    failed_streak_position: int = 0

@@ -61,6 +61,10 @@ export interface IntegrationAttempt {
   error_code: string | null;
   error_message: string | null;
   scene_id: string | null;
+  // PR-IH9: position within the current consecutive-failure streak.
+  // 0 for non-failures; N for the Nth consecutive failure on this
+  // subscription. Surfaced as "Attempt #N" when > 1.
+  failed_streak_position: number;
 }
 
 export async function listFarmHealth(
@@ -147,6 +151,23 @@ export interface ProviderProbe {
   status: ProbeStatus;
   latency_ms: number | null;
   error_message: string | null;
+}
+
+export interface ProviderErrorHistogramEntry {
+  error_code: string;
+  count: number;
+}
+
+export async function listProviderErrorHistogram(
+  provider_kind: AttemptKind,
+  provider_code: string,
+  hours: number = 24,
+): Promise<ProviderErrorHistogramEntry[]> {
+  const { data } = await apiClient.get<ProviderErrorHistogramEntry[]>(
+    "/v1/admin/integrations/health/error-histogram",
+    { params: { provider_kind, provider_code, hours } },
+  );
+  return data;
 }
 
 export async function listProviders(

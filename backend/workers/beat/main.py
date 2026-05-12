@@ -85,4 +85,14 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.provider_probe_seconds),
         "options": {"queue": "light"},
     },
+    # Consecutive-failure streak alerter (PR-IH11). Scans every active
+    # tenant; for each subscription whose newest attempt is the Nth
+    # consecutive failure (N = streak threshold) and which hasn't yet
+    # been alerted on this streak, fans out an in-app inbox item to
+    # every TenantOwner / TenantAdmin in that tenant.
+    "integrations_health.check_failure_streaks": {
+        "task": "integrations_health.check_failure_streaks",
+        "schedule": float(_settings.integration_failure_check_seconds),
+        "options": {"queue": "light"},
+    },
 }

@@ -30,6 +30,7 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.alerts.tasks",
     "app.modules.irrigation.tasks",
     "app.modules.integrations_health.probes",
+    "app.modules.integrations_health.streak_watcher",
 )
 
 

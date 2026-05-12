@@ -57,7 +57,8 @@
       "run": "Run",
       "detail": "Detail"
     },
-    "summary": { "rows": "{{n}} rows" }
+    "summary": { "rows": "{{n}} rows" },
+    "attemptN": "Attempt #{{n}}"
   },
   "detail": {
     "attemptId": "Attempt",
@@ -110,7 +111,12 @@
       "unknown": "Not probed yet"
     },
     "empty": "No probe results yet — the scheduler runs every few minutes.",
-    "platformOnly": "Provider health is shared across the platform."
+    "platformOnly": "Provider health is shared across the platform.",
+    "histogram": {
+      "title": "Failure causes (cross-tenant)",
+      "windowLabel": "Last {{h}}h",
+      "empty": "No failures recorded in this window."
+    }
   },
   "lastSync": "Synced {{when}}",
   "noActive": "No active subscription",

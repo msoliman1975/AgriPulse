@@ -6,6 +6,7 @@ import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import {
+  useProviderErrorHistogram,
   useProviderProbes,
   useProvidersHealth,
 } from "@/queries/integrationsHealth";
@@ -55,8 +56,67 @@ export function ProvidersTab({
       )}
 
       {platformScope && selected ? (
-        <ProbeHistory kind={selected.kind} code={selected.code} />
+        <>
+          <ErrorHistogram kind={selected.kind} code={selected.code} />
+          <ProbeHistory kind={selected.kind} code={selected.code} />
+        </>
       ) : null}
+    </div>
+  );
+}
+
+function ErrorHistogram({
+  kind,
+  code,
+}: {
+  kind: AttemptKind;
+  code: string;
+}): ReactNode {
+  const { t } = useTranslation("integrationsHealth");
+  const q = useProviderErrorHistogram(kind, code, 24);
+  const entries = q.data ?? [];
+  const max = entries.reduce((m, e) => Math.max(m, e.count), 0);
+
+  return (
+    <div className="rounded-xl border border-ap-line bg-ap-panel p-3">
+      <header className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-ap-ink">
+          {t("providers.histogram.title")}
+        </h3>
+        <span className="text-xs text-ap-muted">
+          {t("providers.histogram.windowLabel", { h: 24 })}
+        </span>
+      </header>
+      {q.isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : q.isError ? (
+        <p className="text-xs text-ap-crit">{t("loadFailed")}</p>
+      ) : entries.length === 0 ? (
+        <p className="text-xs text-ap-muted">
+          {t("providers.histogram.empty")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1.5 text-xs">
+          {entries.map((e) => (
+            <li key={e.error_code} className="flex items-center gap-2">
+              <span className="w-32 shrink-0 font-mono text-ap-ink">
+                {e.error_code}
+              </span>
+              <div className="flex-1 overflow-hidden rounded bg-ap-line/40">
+                <div
+                  className="h-2 rounded bg-ap-crit"
+                  style={{
+                    width: max > 0 ? `${(e.count / max) * 100}%` : "0%",
+                  }}
+                />
+              </div>
+              <span className="w-10 shrink-0 text-end font-mono text-ap-muted">
+                {e.count}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

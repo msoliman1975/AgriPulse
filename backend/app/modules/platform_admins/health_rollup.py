@@ -27,6 +27,7 @@ from uuid import UUID
 from app.core.logging import get_logger
 from app.modules.integrations_health.providers_service import ProviderHealthService
 from app.modules.integrations_health.schemas import (
+    ProviderErrorHistogramEntry,
     ProviderHealthRow,
     ProviderProbeRow,
 )
@@ -172,4 +173,25 @@ async def list_recent_probes(
     service = ProviderHealthService(public_session=public_session)
     return await service.list_recent_probes(
         provider_kind=provider_kind, provider_code=provider_code, limit=limit
+    )
+
+
+@router.get(
+    "/health/error-histogram",
+    response_model=list[ProviderErrorHistogramEntry],
+)
+async def provider_error_histogram(
+    provider_kind: str,
+    provider_code: str,
+    hours: int = 24,
+    context: RequestContext = Depends(
+        requires_capability("platform.manage_tenants")
+    ),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    """Cross-tenant failure-cause histogram for one provider (PR-IH10)."""
+    del context
+    service = ProviderHealthService(public_session=public_session)
+    return await service.cross_tenant_error_histogram(
+        provider_kind=provider_kind, provider_code=provider_code, hours=hours
     )

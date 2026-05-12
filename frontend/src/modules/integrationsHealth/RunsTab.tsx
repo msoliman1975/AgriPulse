@@ -151,9 +151,16 @@ function RunsTable({
                     {r.provider_code ?? "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <Pill kind={pillForStatus(r.status)}>
-                      {t(`attemptStatus.${r.status}`)}
-                    </Pill>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Pill kind={pillForStatus(r.status)}>
+                        {t(`attemptStatus.${r.status}`)}
+                      </Pill>
+                      {r.failed_streak_position > 1 ? (
+                        <Pill kind="crit">
+                          {t("runs.attemptN", { n: r.failed_streak_position })}
+                        </Pill>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-ap-muted">
                     {formatDistanceToNow(parseISO(r.started_at), {

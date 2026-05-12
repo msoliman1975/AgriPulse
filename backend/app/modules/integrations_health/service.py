@@ -38,7 +38,7 @@ _ATTEMPT_COLUMNS = (
     "attempt_id, kind, subscription_id, block_id, farm_id, provider_code, "
     "started_at, queued_at, completed_at, status, "
     "duration_ms, wait_ms, run_ms, rows_ingested, "
-    "error_code, error_message, scene_id"
+    "error_code, error_message, scene_id, failed_streak_position"
 )
 
 

@@ -5,6 +5,7 @@ import {
   listBlockHealth,
   listFarmHealth,
   listPlatformProviders,
+  listProviderErrorHistogram,
   listProviders,
   listQueue,
   listRecentAttempts,
@@ -105,6 +106,27 @@ export function useProvidersHealth(
     queryFn: () =>
       platformScope ? listPlatformProviders() : listProviders(basePath),
     refetchInterval: REFETCH_MS,
+    staleTime: REFETCH_MS / 2,
+  });
+}
+
+export function useProviderErrorHistogram(
+  provider_kind: AttemptKind | null,
+  provider_code: string | null,
+  hours: number = 24,
+) {
+  return useQuery({
+    queryKey: [
+      "integrations",
+      "health",
+      "providers",
+      "error-histogram",
+      provider_kind,
+      provider_code,
+      hours,
+    ] as const,
+    queryFn: () => listProviderErrorHistogram(provider_kind!, provider_code!, hours),
+    enabled: Boolean(provider_kind && provider_code),
     staleTime: REFETCH_MS / 2,
   });
 }

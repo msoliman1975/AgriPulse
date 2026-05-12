@@ -164,6 +164,108 @@ class ProviderHealthService:
         _ = tenant_schema
         return [dict(r) for r in rows]
 
+    async def cross_tenant_error_histogram(
+        self,
+        *,
+        provider_kind: str,
+        provider_code: str,
+        hours: int = 24,
+    ) -> list[dict[str, Any]]:
+        """Aggregate failed-attempt `error_code` counts across every tenant.
+
+        Walks every active tenant schema (same pattern as
+        `health_rollup.py`), reads the per-tenant failure table for the
+        given provider, sums error_code → count, and merges the result.
+
+        `provider_kind` discriminates which tenant table to read:
+          - 'weather'  → tenant_<id>.weather_ingestion_attempts
+          - 'imagery'  → tenant_<id>.imagery_ingestion_jobs
+
+        Returns the histogram already sorted by descending count.
+        """
+        from app.shared.db.session import sanitize_tenant_schema  # local import: no cycle
+
+        if provider_kind not in ("weather", "imagery"):
+            return []
+        hours = max(1, min(hours, 7 * 24))
+
+        tenants = (
+            await self._pub.execute(
+                text(
+                    """
+                    SELECT schema_name
+                    FROM public.tenants
+                    WHERE status = 'active' AND deleted_at IS NULL
+                    """
+                )
+            )
+        ).all()
+
+        merged: dict[str, int] = {}
+        for t in tenants:
+            try:
+                schema = sanitize_tenant_schema(t.schema_name)
+            except ValueError:
+                continue
+            await self._pub.execute(
+                text(f"SET LOCAL search_path TO {schema}, public")
+            )
+            try:
+                if provider_kind == "weather":
+                    rows = (
+                        await self._pub.execute(
+                            text(
+                                """
+                                SELECT COALESCE(error_code, 'uncategorized') AS code,
+                                       COUNT(*)::int AS n
+                                FROM weather_ingestion_attempts
+                                WHERE status = 'failed'
+                                  AND provider_code = :p
+                                  AND started_at > now() - make_interval(hours => :h)
+                                GROUP BY 1
+                                """
+                            ),
+                            {"p": provider_code, "h": hours},
+                        )
+                    ).all()
+                else:
+                    # Imagery jobs key on product_id, not provider directly;
+                    # join through public.imagery_products.
+                    rows = (
+                        await self._pub.execute(
+                            text(
+                                """
+                                SELECT COALESCE(ij.error_code, 'uncategorized') AS code,
+                                       COUNT(*)::int AS n
+                                FROM imagery_ingestion_jobs ij
+                                JOIN public.imagery_products ip
+                                  ON ip.id = ij.product_id
+                                WHERE ij.status = 'failed'
+                                  AND ip.provider_code = :p
+                                  AND ij.requested_at > now() - make_interval(hours => :h)
+                                GROUP BY 1
+                                """
+                            ),
+                            {"p": provider_code, "h": hours},
+                        )
+                    ).all()
+            except Exception:  # noqa: BLE001
+                # Tenant mid-migration / missing column — skip, don't fail
+                # the whole rollup. Mirrors health_rollup.py behavior.
+                continue
+            finally:
+                await self._pub.execute(text("SET LOCAL search_path TO public"))
+
+            for row in rows:
+                merged[row.code] = merged.get(row.code, 0) + int(row.n)
+
+        return [
+            {"error_code": code, "count": count}
+            for code, count in sorted(
+                merged.items(), key=lambda kv: kv[1], reverse=True
+            )
+        ]
+
     async def list_recent_probes(
         self, *, provider_kind: str, provider_code: str, limit: int = 200
     ) -> list[dict[str, Any]]:
