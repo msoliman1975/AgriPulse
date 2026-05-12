@@ -1,0 +1,71 @@
+name: infra-apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/infra-apply.yml"
+  workflow_dispatch:
+
+# Serialise applies — concurrent applies fight for the DynamoDB lock and
+# can wedge state. Cancel-in-progress=false keeps the queue ordered.
+concurrency:
+  group: infra-apply-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  apply:
+    name: terraform apply
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Environment gate: a reviewer must approve before the job picks up
+    # the OIDC token. Define `production-infra` in repo settings with at
+    # least one required reviewer.
+    environment: production-infra
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Configure AWS credentials (OIDC apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
+          aws-region: me-south-1
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.AWS_TF_STATE_BUCKET }}" \
+            -backend-config="key=dev/terraform.tfstate" \
+            -backend-config="region=me-south-1" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=${{ vars.AWS_TF_LOCK_TABLE }}"
+
+      - name: terraform apply
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var "environment=dev" \
+            -var "github_org=${{ github.repository_owner }}" \
+            -var "github_repo=${{ github.event.repository.name }}" \
+            -var "tf_state_bucket=${{ vars.AWS_TF_STATE_BUCKET }}"
+
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_INFRA_WEBHOOK }}
+        run: |
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            --data "{\"text\":\":x: infra-apply failed on ${{ github.sha }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$SLACK_WEBHOOK_URL"

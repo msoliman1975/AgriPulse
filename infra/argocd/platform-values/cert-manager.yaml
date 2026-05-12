@@ -1,5 +1,18 @@
 installCRDs: true
+
+# IRSA-annotated ServiceAccount so the DNS-01 solver can write TXT records
+# in the agripulse.cloud zone. Real ARN is injected per-env via the overlay
+# (overlays/<env>/values.yaml under `certManagerController.serviceAccount`).
+serviceAccount:
+  create: true
+  name: cert-manager
+  annotations: {}
+
 prometheus:
   enabled: true
   servicemonitor:
     enabled: true
+
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists

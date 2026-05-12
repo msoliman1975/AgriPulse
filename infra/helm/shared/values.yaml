@@ -16,7 +16,7 @@ certManager:
   # Two issuers ship by default: Let's Encrypt staging (for development
   # validation) and prod (used in staging + production envs).
   acme:
-    email: ops@missionagre.io
+    email: ops@agripulse.cloud
     staging:
       enabled: true
       name: letsencrypt-staging
@@ -25,12 +25,17 @@ certManager:
       enabled: true
       name: letsencrypt-prod
       server: https://acme-v02.api.letsencrypt.org/directory
+    # DNS-01 solver against Route 53 — the controller assumes the
+    # cert-manager IRSA role at runtime, so no static AWS credentials.
+    # `route53Region` / `route53HostedZoneId` are overridden per-env via
+    # overlays/<env>/values.yaml when the hosted-zone ID is known.
     solvers:
-      # http01 ingress solver via NGINX. Cluster envs that need DNS-01
-      # (wildcard certs) override `solvers` per env.
-      - http01:
-          ingress:
-            class: nginx
+      - dns01:
+          route53:
+            region: me-south-1
+        selector:
+          dnsZones:
+            - agripulse.cloud
 
 # ---------------------------------------------------------------------------
 # External Secrets Operator integration.
@@ -56,6 +61,10 @@ postgresCluster:
   name: missionagre-pg
   instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4-bookworm
+  # IRSA annotations applied to the CNPG-managed ServiceAccount. CD-7 will
+  # consume this on `spec.serviceAccountTemplate`; CD-6 just plumbs the
+  # value through so overlays can set the role ARN today.
+  serviceAccountAnnotations: {}
   storage:
     size: 100Gi
     storageClass: gp3
@@ -107,3 +116,16 @@ appConfig:
   log:
     level: INFO
     format: json
+
+# ---------------------------------------------------------------------------
+# Karpenter (CD-8). NodePool + EC2NodeClass live in
+# templates/karpenter-nodepools.yaml. The controller chart itself is
+# installed via the platform ApplicationSet, not this chart.
+# ---------------------------------------------------------------------------
+karpenter:
+  # Default off: the NodePool + EC2NodeClass need real AWS resource names
+  # (cluster name + node IAM role) before they can render. Overlays flip
+  # this to true and fill in the values from `terraform output karpenter`.
+  enabled: false
+  clusterName: ""
+  nodeIAMRoleName: ""

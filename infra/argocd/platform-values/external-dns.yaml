@@ -1,0 +1,50 @@
+provider: aws
+
+# Constrain to our zone so a stray Ingress with a different host can never
+# create records elsewhere.
+domainFilters:
+  - agripulse.cloud
+
+# `upsert-only` is intentional for V1: removing an Ingress will NOT delete
+# its DNS record. Flip to `sync` once we trust the controller end-to-end.
+policy: upsert-only
+
+txtOwnerId: missionagre-eks
+txtPrefix: edns-
+
+sources:
+  - ingress
+  - service
+
+# ExternalDNS reads region from this env; me-south-1 stays consistent with
+# the Terraform default.
+env:
+  - name: AWS_REGION
+    value: me-south-1
+
+# IRSA ARN is injected per-env via the overlay (overlays/<env>/values.yaml
+# under `externalDns.serviceAccount.annotations`). Default left empty so a
+# fresh install fails closed.
+serviceAccount:
+  create: true
+  name: external-dns
+  annotations: {}
+
+# Schedule on the system baseline node group; Karpenter (CD-8) adds more
+# nodes for workloads but ExternalDNS belongs with the cluster operators.
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true

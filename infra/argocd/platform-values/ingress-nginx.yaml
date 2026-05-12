@@ -1,5 +1,10 @@
 controller:
   replicaCount: 2
+  # Schedules on the baseline managed node group; Karpenter would not be
+  # able to provision a node for ingress-nginx before there's a Service.
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
   metrics:
     enabled: true
     serviceMonitor:

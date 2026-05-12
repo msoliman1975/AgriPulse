@@ -34,15 +34,27 @@ module "eks" {
   }
 
   eks_managed_node_groups = {
+    # Baseline node group for cluster-critical pods only: Karpenter
+    # controller, ingress-nginx, kube-prometheus-stack operator. Karpenter
+    # provisions everything else dynamically; this group exists so the
+    # cluster never hits zero nodes and Karpenter itself always has a home.
     default = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = var.node_instance_types
-      desired_size   = var.node_desired_size
-      min_size       = var.node_min_size
-      max_size       = var.node_max_size
+      ami_type       = "AL2023_ARM_64_STANDARD"
+      instance_types = ["t4g.medium"]
+      desired_size   = 1
+      min_size       = 1
+      max_size       = 2
 
       labels = {
-        "missionagre.io/role" = "default"
+        "missionagre.io/role" = "system"
+      }
+
+      taints = {
+        critical = {
+          key    = "CriticalAddonsOnly"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
       }
 
       tags = local.common_tags

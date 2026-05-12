@@ -7,8 +7,26 @@ replicaCount: 2
 
 ingress:
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  host: api.staging.missionagre.io
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  host: api.staging.agripulse.cloud
+
+# IRSA ARNs filled in by bootstrap (terraform output iam_role_arns).
+externalDns:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: ""
+
+# Karpenter (CD-8). clusterName + nodeIAMRoleName come from
+# `terraform output karpenter`.
+karpenter:
+  enabled: true
+  clusterName: missionagre-staging
+  nodeIAMRoleName: missionagre-staging-karpenter-node
+
+certManagerController:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: ""
 
 postgresCluster:
   instances: 2
@@ -19,8 +37,17 @@ postgresCluster:
   backup:
     enabled: true
     barmanObjectStore:
-      destinationPath: s3://missionagre-pg-backups-staging
+      destinationPath: s3://agripulse-pg-backup-staging
     retentionPolicy: "14d"
+  serviceAccountAnnotations:
+    eks.amazonaws.com/role-arn: ""
+
+# Per-env api IRSA binding. ARN comes from
+# `terraform output agripulse_env_resources` → .staging.api_irsa_arn.
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
 
 resources:
   requests:
