@@ -161,6 +161,15 @@ appConfig:
     format: json
 
 # ---------------------------------------------------------------------------
+# CD-15 — cost guardrails.
+# ---------------------------------------------------------------------------
+# PrometheusRule alerts for pods sitting idle (low CPU / low memory) for
+# 24h. Off by default so the dev cluster doesn't flood Slack while it's
+# small; staging and production overlays flip this to true.
+costAlerts:
+  enabled: false
+
+# ---------------------------------------------------------------------------
 # Karpenter (CD-8). NodePool + EC2NodeClass live in
 # templates/karpenter-nodepools.yaml. The controller chart itself is
 # installed via the platform ApplicationSet, not this chart.
