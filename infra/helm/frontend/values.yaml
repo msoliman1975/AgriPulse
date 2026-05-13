@@ -4,6 +4,12 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# See infra/helm/shared/values.yaml; overlays override `global.env` +
+# `global.envHost`.
+global:
+  env: dev
+  envHost: dev.agripulse.cloud
+
 replicaCount: 2
 revisionHistoryLimit: 5
 
@@ -22,7 +28,8 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
     nginx.ingress.kubernetes.io/proxy-body-size: "1m"
-  host: app.dev.missionagre.local
+  # Final host renders as `${hostPrefix}.${global.envHost}`.
+  hostPrefix: app
   tlsSecretName: missionagre-frontend-tls
 
 resources:

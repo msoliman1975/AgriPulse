@@ -2,6 +2,14 @@
 # We only override what production-shape requires. Defaults that are fine
 # (PodDisruptionBudget, NetworkPolicy, ServiceMonitor) we leave alone.
 
+# Mirrors infra/helm/shared/values.yaml; overlays override `global.envHost`.
+# The bitnami sub-chart does not run values through `tpl`, so we cannot
+# template the hostname directly — overlays must set
+# `keycloak.ingress.hostname` per env (see overlays/<env>/values.yaml).
+global:
+  env: dev
+  envHost: dev.agripulse.cloud
+
 keycloak:
   # Two replicas with the standard postgresql sub-chart wiring.
   replicaCount: 2
@@ -31,7 +39,7 @@ keycloak:
   ingress:
     enabled: true
     ingressClassName: nginx
-    hostname: keycloak.dev.missionagre.local
+    hostname: keycloak.dev.agripulse.cloud
     tls: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-staging

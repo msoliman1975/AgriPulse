@@ -62,6 +62,18 @@ variable "tags" {
   default     = {}
 }
 
+variable "argocd_chart_version" {
+  description = "Pinned argo/argo-cd Helm chart version (CD-10)."
+  type        = string
+  default     = "7.7.3"
+}
+
+variable "argocd_admin_allowlist_cidrs" {
+  description = "CIDRs allowed to hit the ArgoCD UI ingress until Keycloak SSO lands (CD-13). Empty list disables the whitelist (open to the internet — only use for break-glass)."
+  type        = list(string)
+  default     = []
+}
+
 variable "environments" {
   description = "Logical envs whose S3 buckets + IRSA roles this stack owns (regardless of var.environment). Imagery + pg-backup buckets are global resources; one TF stack owns all three so per-env apply doesn't drift."
   type        = list(string)

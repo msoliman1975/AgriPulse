@@ -4,6 +4,12 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# See infra/helm/shared/values.yaml; overlays override `global.env` +
+# `global.envHost`.
+global:
+  env: dev
+  envHost: dev.agripulse.cloud
+
 replicaCount: 2
 revisionHistoryLimit: 5
 
@@ -24,7 +30,8 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     cert-manager.io/cluster-issuer: letsencrypt-staging
-  host: tiles.dev.missionagre.local
+  # Final host renders as `${hostPrefix}.${global.envHost}`.
+  hostPrefix: tiles
   pathPrefix: /
   tlsSecretName: missionagre-tile-server-tls
 
@@ -69,7 +76,7 @@ probes:
 
 env:
   AWS_DEFAULT_REGION: me-south-1
-  CORS_ALLOW_ORIGINS: "https://app.dev.missionagre.local"
+  CORS_ALLOW_ORIGINS: "https://app.{{ .Values.global.envHost }}"
   DEFAULT_MAX_ZOOM: "22"
   DEFAULT_MIN_ZOOM: "0"
   GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"

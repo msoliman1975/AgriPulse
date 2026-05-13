@@ -15,4 +15,9 @@ locals {
     },
     var.tags
   )
+
+  # CD-10 — ArgoCD UI hostname. Single name across all envs because we run one
+  # ArgoCD per cluster, and the cluster is per-env. ExternalDNS + cert-manager
+  # produce the A record + cert against the agripulse.cloud hosted zone.
+  argocd_hostname = "argocd.agripulse.cloud"
 }
