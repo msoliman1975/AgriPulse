@@ -1,0 +1,74 @@
+{{- /*
+CD-15. PrometheusRule that flags pods sitting idle for 24h. Cost-rather-
+than-correctness alerts: triggering means we're paying for a workload
+that isn't doing anything, not that the workload is broken.
+
+Disabled by default in the shared chart values so the smaller dev
+cluster doesn't drown anyone in noise; staging + production overlays
+flip `costAlerts.enabled` to true.
+
+Both alerts run with a 24h `for` clause, so transient idleness during
+deploys or low-traffic hours doesn't fire — only consistent idleness.
+*/ -}}
+{{- if .Values.costAlerts.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: missionagre-cost-guardrails
+  labels:
+    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: missionagre.cost
+      rules:
+        - alert: IdlePodCPU
+          expr: |
+            avg_over_time(
+              rate(container_cpu_usage_seconds_total{
+                namespace!~"kube-.*|argocd|external-secrets|cnpg-system",
+                container!~"POD|"
+              }[5m])[24h:5m]
+            ) < 0.02
+          for: 24h
+          labels:
+            severity: warning
+            kind: cost
+          annotations:
+            summary: "Pod {{ "{{ $labels.namespace }}/{{ $labels.pod }}" }} averaged <2% CPU for 24h."
+            description: |
+              {{ "{{ $labels.container }}" }} in {{ "{{ $labels.namespace }}/{{ $labels.pod }}" }} averaged
+              less than 2% of one CPU over the last 24h. If this is steady-state,
+              consider scaling the workload down or merging it with another.
+            runbook_url: "https://github.com/msoliman1975/MissionAgre/blob/main/docs/runbooks/cost-guardrails.md"
+
+        - alert: IdlePodMemory
+          expr: |
+            avg_over_time(
+              (
+                container_memory_working_set_bytes{
+                  namespace!~"kube-.*|argocd|external-secrets|cnpg-system",
+                  container!~"POD|"
+                }
+                /
+                on(namespace,pod,container)
+                container_spec_memory_limit_bytes{
+                  namespace!~"kube-.*|argocd|external-secrets|cnpg-system",
+                  container!~"POD|"
+                }
+              )[24h:5m]
+            ) < 0.10
+          for: 24h
+          labels:
+            severity: warning
+            kind: cost
+          annotations:
+            summary: "Pod {{ "{{ $labels.namespace }}/{{ $labels.pod }}" }} used <10% of its memory limit for 24h."
+            description: |
+              {{ "{{ $labels.container }}" }} in {{ "{{ $labels.namespace }}/{{ $labels.pod }}" }} used less
+              than 10% of its configured memory limit over the last 24h. The
+              limit is paying for capacity the pod doesn't need — consider
+              dropping it.
+            runbook_url: "https://github.com/msoliman1975/MissionAgre/blob/main/docs/runbooks/cost-guardrails.md"
+{{- end }}

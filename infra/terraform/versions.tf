@@ -18,6 +18,14 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.33"
     }
+    # CD-15: used to zip the EBS sweeper + Slack publisher Lambda
+    # source directories at apply time, so the .py files in
+    # infra/terraform/{ebs-sweeper,slack-publisher}-lambda/ ship
+    # straight to Lambda without a separate build step.
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.6"
+    }
   }
 
   # State lives in S3 + DynamoDB lock table. Bucket and table are created

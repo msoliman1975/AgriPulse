@@ -27,6 +27,13 @@ global:
 labels:
   partOf: missionagre
 
+# CD-15: idle-pod alerts off in dev. The smaller cluster runs short of
+# stable 24h windows (workloads scale to zero between dev sessions) so
+# the noise/signal ratio isn't worth it. Staging and production both
+# enable the rules.
+costAlerts:
+  enabled: false
+
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
 
