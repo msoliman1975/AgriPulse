@@ -26,6 +26,31 @@ spec:
         - {{ . | quote }}
         {{- end }}
 
+  {{- /* CD-13: managed roles. CNPG creates+reconciles each role and
+         pulls the password from a k8s Secret. Used for the `keycloak`
+         role so Keycloak's externalDatabase connects with the same
+         credential the role was created with. Empty list disables this. */}}
+  {{- with .Values.postgresCluster.managed }}
+  {{- if .roles }}
+  managed:
+    roles:
+      {{- range .roles }}
+      - name: {{ .name | quote }}
+        ensure: {{ default "present" .ensure | quote }}
+        login: {{ default true .login }}
+        superuser: {{ default false .superuser }}
+        createdb: {{ default false .createdb }}
+        createrole: {{ default false .createrole }}
+        inherit: {{ default true .inherit }}
+        {{- with .comment }}
+        comment: {{ . | quote }}
+        {{- end }}
+        passwordSecret:
+          name: {{ .passwordSecret.name | quote }}
+      {{- end }}
+  {{- end }}
+  {{- end }}
+
   storage:
     size: {{ .Values.postgresCluster.storage.size }}
     storageClass: {{ .Values.postgresCluster.storage.storageClass | quote }}

@@ -42,10 +42,12 @@ ingress:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 
 # Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
-# must be set explicitly per env.
+# must be set explicitly per env. CD-13: `ingress.hostnameStrict` pins
+# the issuer URL; strict mode rejects Host header confusion attempts.
 keycloak:
   ingress:
     hostname: keycloak.agripulse.cloud
+    hostnameStrict: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
 

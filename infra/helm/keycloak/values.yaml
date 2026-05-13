@@ -5,27 +5,56 @@
 # Mirrors infra/helm/shared/values.yaml; overlays override `global.envHost`.
 # The bitnami sub-chart does not run values through `tpl`, so we cannot
 # template the hostname directly — overlays must set
-# `keycloak.ingress.hostname` per env (see overlays/<env>/values.yaml).
+# `keycloak.ingress.hostname` AND `keycloak.extraEnvVars[KC_HOSTNAME]` per
+# env (see overlays/<env>/values.yaml).
 global:
   env: dev
   envHost: dev.agripulse.cloud
 
+# CD-13: ExternalSecret wiring for the admin + DB passwords. Toggle each
+# off only for unit-level `helm template` smoke testing — in real envs
+# both must be on so the bitnami chart's existingSecret references resolve.
+externalSecrets:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: ClusterSecretStore
+  admin:
+    enabled: true
+  db:
+    enabled: true
+
 keycloak:
-  # Two replicas with the standard postgresql sub-chart wiring.
+  # CD-13: HA topology. `production: true` flips the bitnami chart to the
+  # Quarkus-`start` runtime (not `start-dev`), enables Infinispan
+  # distributed cache automatically, and turns on TLS-aware proxy
+  # behavior. Two replicas is the minimum for distributed-cache validity.
   replicaCount: 2
   production: true
-  proxy: edge # Behind NGINX ingress with TLS termination.
+
+  # Edge: TLS terminates at ingress-nginx and Keycloak speaks plain HTTP
+  # behind it. With `production: true` the chart sets KC_PROXY=edge
+  # automatically; setting `proxy` keeps the value explicit for review.
+  proxy: edge
+
+  # Cache: explicit Infinispan with the production cache stack. The
+  # bitnami chart auto-sets this when `production: true`, but keeping it
+  # explicit makes audits easier and the start-up args greppable.
+  cache:
+    enabled: true
+    stack: kubernetes
 
   auth:
     # The bootstrap admin password is created in AWS Secrets Manager and
-    # synced via ExternalSecret; the bitnami chart references the secret
-    # by name through `existingSecret`.
+    # synced into k8s by the ExternalSecret in
+    # templates/externalsecret-admin.yaml.
     existingSecret: missionagre-keycloak-admin
     passwordSecretKey: admin_password
 
   # Realm import: bake the missionagre realm into a ConfigMap and mount
-  # it. The same realm we ship in infra/dev/compose.yaml; the staging
-  # and production overlays substitute their own realm export.
+  # it. CD-13 keeps the same JSON shipped in
+  # `infra/helm/keycloak/files/missionagre-realm.json`. Production realm
+  # updates flow via the runbook in docs/runbooks/keycloak-realm-update.md.
   extraStartupArgs: "--import-realm"
   extraVolumes:
     - name: realm-import
@@ -36,16 +65,30 @@ keycloak:
       mountPath: /opt/bitnami/keycloak/data/import
       readOnly: true
 
+  # CD-13: stable issuer URL. The bitnami chart maps
+  # `ingress.hostname` → KEYCLOAK_HOSTNAME (which becomes KC_HOSTNAME on
+  # the server) and `ingress.hostnameStrict` → KEYCLOAK_HOSTNAME_STRICT.
+  # Strict mode rejects requests whose Host header doesn't match —
+  # defense against host-confusion attacks and the only way to make sure
+  # every access-token `iss` claim resolves to the same FQDN regardless
+  # of which pod issued it. Overlays override `ingress.hostname` per env.
   ingress:
     enabled: true
     ingressClassName: nginx
     hostname: keycloak.dev.agripulse.cloud
+    hostnameStrict: true
     tls: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-staging
 
   # Use the operator-managed Postgres rather than the bundled bitnami DB.
+  # CD-13: the `keycloak` database is provisioned by the CNPG Cluster
+  # via the shared chart's `postgresCluster.databases` block, and the
+  # `keycloak` role's password lives in `missionagre-keycloak-db` (synced
+  # by templates/externalsecret-db.yaml). Vendor is implied by `host`+
+  # `port` but set explicitly so chart upgrades can't auto-switch.
   externalDatabase:
+    vendor: postgresql
     host: missionagre-pg-rw
     port: 5432
     database: keycloak

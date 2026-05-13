@@ -1,0 +1,38 @@
+{{- /*
+CD-13. CNPG `Database` CRs for non-primary databases that live in the
+same Cluster. The primary `missionagre` database is created by the
+Cluster's `bootstrap.initdb` — those are bootstrap-only and not
+reconcilable. Anything we want to add later (Keycloak realm DB here)
+goes through this CR so CNPG can drop+recreate without nuking the
+cluster.
+
+The `keycloak` role referenced as `owner` is reconciled by the Cluster's
+`managed.roles` block in postgres-cluster.yaml; its password is sourced
+from the k8s Secret named in `postgresCluster.managed.roles[*].passwordSecret`.
+*/ -}}
+{{- if and .Values.postgresCluster.enabled .Values.postgresCluster.databases }}
+{{- range .Values.postgresCluster.databases }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ printf "%s-%s" $.Values.postgresCluster.name .name | quote }}
+  labels:
+    {{- include "missionagre.shared.labels" $ | nindent 4 }}
+spec:
+  name: {{ .name | quote }}
+  owner: {{ .owner | quote }}
+  cluster:
+    name: {{ $.Values.postgresCluster.name | quote }}
+  {{- with .ensure }}
+  ensure: {{ . | quote }}
+  {{- end }}
+  {{- with .extensions }}
+  extensions:
+    {{- range . }}
+    - name: {{ .name | quote }}
+      ensure: {{ default "present" .ensure | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
