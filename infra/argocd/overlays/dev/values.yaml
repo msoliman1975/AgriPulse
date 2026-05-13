@@ -23,6 +23,13 @@ global:
     tileServer:
       tag: ""
 
+# Per-env env-var overrides. Top-level `env:` merges into each chart's
+# own env map (api + workers both consume it; harmless for charts that
+# don't read these keys).
+env:
+  PLATFORM_ADMIN_EMAIL: dev@agripulse.cloud
+  PLATFORM_ADMIN_FULL_NAME: Platform Admin
+
 # Common knobs across charts.
 labels:
   partOf: agripulse

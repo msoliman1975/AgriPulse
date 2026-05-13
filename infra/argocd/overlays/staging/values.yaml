@@ -28,6 +28,13 @@ global:
 labels:
   partOf: agripulse
 
+# Per-env env-var overrides. Top-level `env:` merges into each chart's
+# own env map (api consumes these for the cold-start PlatformAdmin
+# bootstrap; harmless for charts that don't read them).
+env:
+  PLATFORM_ADMIN_EMAIL: ops@agripulse.cloud
+  PLATFORM_ADMIN_FULL_NAME: Platform Admin
+
 # api / frontend / tile-server top-level deployments. Two replicas is
 # enough for a real load-balanced rolling deploy without paying the
 # 3-AZ HA tax of production.
