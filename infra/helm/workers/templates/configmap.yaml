@@ -6,5 +6,5 @@ metadata:
     {{- include "missionagre-workers.labels" . | nindent 4 }}
 data:
   {{- range $k, $v := .Values.env }}
-  {{ $k }}: {{ $v | quote }}
+  {{ $k }}: {{ tpl ($v | toString) $ | quote }}
   {{- end }}

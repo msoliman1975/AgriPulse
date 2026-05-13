@@ -3,12 +3,19 @@
 # only in things that genuinely differ (domain names, S3 buckets, etc.).
 
 # ---------------------------------------------------------------------------
-# Global identifiers reused across templates. `env` plugs into the
-# CNPG backup destinationPath (s3://agripulse-pg-backup-<env>) and is
-# expected to be overridden per ArgoCD overlay.
+# Global identifiers reused across templates.
+#   * `env` plugs into the CNPG backup destinationPath
+#     (s3://agripulse-pg-backup-<env>) and is expected to be overridden
+#     per ArgoCD overlay.
+#   * `envHost` is the per-env DNS suffix consumed by every service chart's
+#     ingress + env templates (api.<envHost>, app.<envHost>, …). Overlays
+#     set this to `dev.agripulse.cloud` / `staging.agripulse.cloud` /
+#     `agripulse.cloud`. The dev default lives here so a bare `helm
+#     template` still produces a valid manifest.
 # ---------------------------------------------------------------------------
 global:
   env: dev
+  envHost: dev.agripulse.cloud
 
 # ---------------------------------------------------------------------------
 # Common labels applied by every templates/_labels.tpl include.

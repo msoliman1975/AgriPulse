@@ -1,19 +1,31 @@
 # staging environment overrides. Tracks production layout but with
 # smaller resource asks so cost stays sane during pre-release runs.
 
-# Used by the shared chart to template the CNPG backup `destinationPath`.
+# Used by the shared chart to template the CNPG backup `destinationPath`
+# (s3://agripulse-pg-backup-<env>/pg) and by each service chart's
+# `${hostPrefix}.${global.envHost}` Ingress rendering.
 global:
   env: staging
+  envHost: staging.agripulse.cloud
 
 labels:
   partOf: missionagre
 
 replicaCount: 2
 
+# Per-chart host renders as `${hostPrefix}.${global.envHost}` (e.g.
+# api.staging.agripulse.cloud, app.staging.agripulse.cloud).
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
-  host: api.staging.agripulse.cloud
+
+# Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
+# must be set explicitly per env.
+keycloak:
+  ingress:
+    hostname: keycloak.staging.agripulse.cloud
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
 
 # IRSA ARNs filled in by bootstrap (terraform output iam_role_arns).
 externalDns:

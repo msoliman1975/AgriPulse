@@ -2,19 +2,32 @@
 # baseline resource shapes; tune carefully and only with an ADR for
 # anything that changes scale or reliability assumptions.
 
-# Used by the shared chart to template the CNPG backup `destinationPath`.
+# Used by the shared chart to template the CNPG backup `destinationPath`
+# (s3://agripulse-pg-backup-<env>/pg) and by each service chart's
+# `${hostPrefix}.${global.envHost}` Ingress rendering. Production uses
+# the apex zone (no per-env subdomain).
 global:
   env: prod
+  envHost: agripulse.cloud
 
 labels:
   partOf: missionagre
 
 replicaCount: 3
 
+# Per-chart host renders as `${hostPrefix}.${global.envHost}` (e.g.
+# api.agripulse.cloud, app.agripulse.cloud).
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-  host: api.agripulse.cloud
+
+# Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
+# must be set explicitly per env.
+keycloak:
+  ingress:
+    hostname: keycloak.agripulse.cloud
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
 
 # IRSA ARNs filled in by bootstrap (terraform output iam_role_arns).
 externalDns:

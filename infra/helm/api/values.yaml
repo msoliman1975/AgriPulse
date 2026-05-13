@@ -4,6 +4,12 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# Re-declared per chart so a bare `helm template` of this chart still
+# resolves; overlays override `global.env` + `global.envHost`.
+global:
+  env: dev
+  envHost: dev.agripulse.cloud
+
 replicaCount: 2
 
 # Image is read-only at runtime; the venv was assembled at build time.
@@ -25,7 +31,10 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "16m"
     cert-manager.io/cluster-issuer: letsencrypt-staging
-  host: api.dev.missionagre.local
+  # Final host is rendered as `${hostPrefix}.${global.envHost}` by the
+  # Ingress template. Overlays only flip `global.envHost`; the prefix is
+  # the same in every env.
+  hostPrefix: api
   pathPrefix: /api
   tlsSecretName: missionagre-api-tls
 
@@ -79,9 +88,9 @@ env:
   REDIS_URL: redis://missionagre-redis:6379/0
   CELERY_BROKER_URL: redis://missionagre-redis:6379/1
   CELERY_RESULT_BACKEND: redis://missionagre-redis:6379/2
-  KEYCLOAK_ISSUER: https://keycloak.dev.missionagre.local/realms/missionagre
+  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre"
   KEYCLOAK_AUDIENCE: missionagre-api
-  KEYCLOAK_JWKS_URL: https://keycloak.dev.missionagre.local/realms/missionagre/protocol/openid-connect/certs
+  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
 
 # Secrets pulled from AWS Secrets Manager via ExternalSecret. The remote
@@ -104,6 +113,16 @@ externalSecret:
       property: aws_access_key_id
     - secretKey: AWS_SECRET_ACCESS_KEY
       property: aws_secret_access_key
+  # CD-9 per-purpose secrets at `agripulse/<env>/<purpose>`. Each entry's
+  # `remoteKey` is `tpl`-rendered against the chart context, so
+  # `.Values.global.env` resolves from the overlay (dev/staging/prod).
+  crossRefs:
+    - secretKey: SMTP_PASSWORD
+      remoteKey: "agripulse/{{ .Values.global.env }}/brevo-smtp-password"
+    - secretKey: JWT_SIGNING_KEY
+      remoteKey: "agripulse/{{ .Values.global.env }}/jwt-signing-key"
+    - secretKey: SENTINEL_HUB_CLIENT_SECRET
+      remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
 
 serviceMonitor:
   enabled: true

@@ -7,6 +7,12 @@ image:
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
+# See infra/helm/shared/values.yaml; overlays override `global.env` +
+# `global.envHost`.
+global:
+  env: dev
+  envHost: dev.agripulse.cloud
+
 revisionHistoryLimit: 5
 
 serviceAccount:
@@ -38,9 +44,9 @@ env:
   REDIS_URL: redis://missionagre-redis:6379/0
   CELERY_BROKER_URL: redis://missionagre-redis:6379/1
   CELERY_RESULT_BACKEND: redis://missionagre-redis:6379/2
-  KEYCLOAK_ISSUER: https://keycloak.dev.missionagre.local/realms/missionagre
+  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre"
   KEYCLOAK_AUDIENCE: missionagre-api
-  KEYCLOAK_JWKS_URL: https://keycloak.dev.missionagre.local/realms/missionagre/protocol/openid-connect/certs
+  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
 
 externalSecret:
@@ -60,6 +66,17 @@ externalSecret:
       property: aws_access_key_id
     - secretKey: AWS_SECRET_ACCESS_KEY
       property: aws_secret_access_key
+  # CD-9 per-purpose secrets at `agripulse/<env>/<purpose>`. SMTP is
+  # included here because workers send notification email too — keeping
+  # this in sync with the API chart is the documented gotcha in
+  # docs/runbooks/seeding-secrets.md.
+  crossRefs:
+    - secretKey: SMTP_PASSWORD
+      remoteKey: "agripulse/{{ .Values.global.env }}/brevo-smtp-password"
+    - secretKey: JWT_SIGNING_KEY
+      remoteKey: "agripulse/{{ .Values.global.env }}/jwt-signing-key"
+    - secretKey: SENTINEL_HUB_CLIENT_SECRET
+      remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
 
 # Three workloads off the same image. light/heavy queues are conventional
 # names per ARCHITECTURE.md § 3.1; beat is the singleton scheduler.

@@ -2,9 +2,11 @@
 # Values here override `infra/helm/<chart>/values.yaml` defaults.
 
 # Used by the shared chart to template the CNPG backup `destinationPath`
-# (s3://agripulse-pg-backup-<env>/pg).
+# (s3://agripulse-pg-backup-<env>/pg) and by each service chart's
+# `${hostPrefix}.${global.envHost}` Ingress rendering.
 global:
   env: dev
+  envHost: dev.agripulse.cloud
 
 # Common knobs across charts.
 labels:
@@ -13,13 +15,21 @@ labels:
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
 
-# Hosts use the dev subdomain of agripulse.cloud; cert-manager issues
-# against the staging Let's Encrypt directory so we don't burn prod rate
-# limits.
+# cert-manager issues against the staging Let's Encrypt directory so we
+# don't burn prod rate limits. The Ingress hostname per service is rendered
+# from `${ingress.hostPrefix}.${global.envHost}` inside each service chart;
+# overlays only flip the env-wide suffix.
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
-  host: api.dev.agripulse.cloud
+
+# Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
+# must be set explicitly per env.
+keycloak:
+  ingress:
+    hostname: keycloak.dev.agripulse.cloud
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
 
 # ExternalDNS + cert-manager IRSA ARNs come from `terraform output
 # iam_role_arns` (keys: external_dns, cert_manager). Filled in by the

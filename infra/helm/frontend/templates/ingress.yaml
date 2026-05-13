@@ -13,10 +13,10 @@ spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
     - hosts:
-        - {{ .Values.ingress.host }}
+        - {{ printf "%s.%s" .Values.ingress.hostPrefix .Values.global.envHost }}
       secretName: {{ .Values.ingress.tlsSecretName }}
   rules:
-    - host: {{ .Values.ingress.host }}
+    - host: {{ printf "%s.%s" .Values.ingress.hostPrefix .Values.global.envHost }}
       http:
         paths:
           - path: /

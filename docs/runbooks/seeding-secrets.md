@@ -41,10 +41,22 @@ temporarily during the seed if waiting).
 
 ```bash
 NS=missionagre
-kubectl get secret -n $NS <ext-secret-target-name> -o yaml
-kubectl get secret -n $NS <ext-secret-target-name> \
-  -o jsonpath='{.data.password}' | base64 -d
+
+# The api + workers charts pull the per-purpose secrets into their main
+# secret (api-missionagre-api-secrets / workers-missionagre-workers-secrets).
+# Pick any one key to confirm the round-trip — `SMTP_PASSWORD` is the
+# canonical smoke test because both charts include it.
+kubectl get secret -n $NS api-missionagre-api-secrets -o yaml
+kubectl get secret -n $NS api-missionagre-api-secrets \
+  -o jsonpath='{.data.SMTP_PASSWORD}' | base64 -d
+kubectl get secret -n $NS workers-missionagre-workers-secrets \
+  -o jsonpath='{.data.SMTP_PASSWORD}' | base64 -d
 ```
+
+The two values **must** match — workers send notification email too, so the
+api and workers ExternalSecrets share the same `agripulse/<env>/brevo-smtp-password`
+remoteRef (see `infra/helm/{api,workers}/values.yaml` → `externalSecret.crossRefs`).
+If they diverge, seeding was partial; rerun the `put-secret-value` in §1.
 
 If the secret is missing, debug in this order:
 
