@@ -39,10 +39,14 @@ ingress:
     cert-manager.io/cluster-issuer: letsencrypt-staging
 
 # Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
-# must be set explicitly per env.
+# must be set explicitly per env. CD-13: `ingress.hostnameStrict` flows
+# into KEYCLOAK_HOSTNAME_STRICT so the issuer URL is pinned (every JWT
+# `iss` and OIDC discovery doc resolves to this FQDN regardless of which
+# pod served the request).
 keycloak:
   ingress:
     hostname: keycloak.dev.agripulse.cloud
+    hostnameStrict: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-staging
 
