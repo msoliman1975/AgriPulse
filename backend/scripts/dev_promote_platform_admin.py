@@ -2,7 +2,7 @@
 
 `dev_bootstrap.py` only wires `tenant_id` + `tenant_role` claim mappers,
 which is enough for tenant-scoped roles. The admin portal needs
-`platform_role` in the access token — this script sets the attribute on
+`platform_role` in the access token â€” this script sets the attribute on
 the user and adds the missing protocol mapper. Idempotent.
 
     python -m scripts.dev_promote_platform_admin
@@ -31,7 +31,7 @@ from scripts.dev_bootstrap import (
     kc_set_user_attributes,
 )
 
-DEFAULT_USER = os.getenv("DEV_USER_EMAIL", "dev@missionagre.local")
+DEFAULT_USER = os.getenv("DEV_USER_EMAIL", "dev@agripulse.local")
 
 
 def main() -> None:
@@ -52,7 +52,7 @@ def main() -> None:
         user = kc_get_user(client, token, args.user_email)
         if user is None:
             print(
-                f"  user not found in realm — run dev_bootstrap.py first",
+                f"  user not found in realm â€” run dev_bootstrap.py first",
                 file=sys.stderr,
             )
             raise SystemExit(2)

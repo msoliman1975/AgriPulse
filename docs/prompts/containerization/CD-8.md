@@ -1,17 +1,17 @@
-# CD-8 — Karpenter: controller, NodePool, EC2NodeClass
+# CD-8 â€” Karpenter: controller, NodePool, EC2NodeClass
 
-[Shared preamble — see README.md]
+[Shared preamble â€” see README.md]
 
 ## Goal
 Replace the current `eks_managed_node_groups.default` block (which has fixed min/max/desired and no spot) with Karpenter for dynamic, cost-optimized node provisioning. Keep a minimal on-demand baseline for system pods (Karpenter itself, kube-prometheus operator) so the cluster never hits zero nodes.
 
 ## Files to change
-- `infra/terraform/eks.tf` — shrink the default managed node group to a 1-node `t4g.medium` baseline tagged for system pods. Add a tag/label scheme `missionagre.io/role=system`.
-- `infra/terraform/karpenter.tf` — new. Karpenter controller IRSA, SQS interruption queue, EventBridge rules for spot interruption + instance state change.
-- `infra/argocd/platform-values/karpenter.yaml` — new (or add to platform AppSet).
-- `infra/argocd/appsets/platform.yaml` — add `karpenter` if not already present.
-- `infra/helm/shared/templates/karpenter-nodepools.yaml` — new. NodePool + EC2NodeClass resources.
-- `infra/helm/shared/values.yaml` — `karpenter` block.
+- `infra/terraform/eks.tf` â€” shrink the default managed node group to a 1-node `t4g.medium` baseline tagged for system pods. Add a tag/label scheme `agripulse.cloud/role=system`.
+- `infra/terraform/karpenter.tf` â€” new. Karpenter controller IRSA, SQS interruption queue, EventBridge rules for spot interruption + instance state change.
+- `infra/argocd/platform-values/karpenter.yaml` â€” new (or add to platform AppSet).
+- `infra/argocd/appsets/platform.yaml` â€” add `karpenter` if not already present.
+- `infra/helm/shared/templates/karpenter-nodepools.yaml` â€” new. NodePool + EC2NodeClass resources.
+- `infra/helm/shared/values.yaml` â€” `karpenter` block.
 
 ## Tasks
 1. Terraform:
@@ -19,7 +19,7 @@ Replace the current `eks_managed_node_groups.default` block (which has fixed min
    - SQS interruption queue + EventBridge rules.
    - Tag subnets (private) with `karpenter.sh/discovery: <cluster-name>`.
    - Tag node-group security group with `karpenter.sh/discovery: <cluster-name>`.
-2. Shrink the existing `default` managed node group to: `min_size=1`, `max_size=2`, `desired_size=1`, `instance_types=["t4g.medium"]`, labels include `missionagre.io/role: system`, taints `CriticalAddonsOnly=true:NoSchedule`. This keeps Karpenter + kube-prometheus operator + ingress-nginx (mark them with appropriate tolerations) on the baseline node.
+2. Shrink the existing `default` managed node group to: `min_size=1`, `max_size=2`, `desired_size=1`, `instance_types=["t4g.medium"]`, labels include `agripulse.cloud/role: system`, taints `CriticalAddonsOnly=true:NoSchedule`. This keeps Karpenter + kube-prometheus operator + ingress-nginx (mark them with appropriate tolerations) on the baseline node.
 3. Karpenter helm chart values (`infra/argocd/platform-values/karpenter.yaml`):
    - `serviceAccount.annotations` with the IRSA ARN.
    - `settings.clusterName`, `settings.interruptionQueue`.
@@ -40,7 +40,7 @@ Replace the current `eks_managed_node_groups.default` block (which has fixed min
 ## Out of scope
 - Don't create separate NodePools for spot-only workloads in this PR. The single NodePool with mixed capacity types handles 90 % of cases.
 - Don't migrate the workers to spot-only just yet. That's a follow-up tuning PR.
-- Don't enable Karpenter's drift detection (`disruption.budgets`) — defaults are fine.
+- Don't enable Karpenter's drift detection (`disruption.budgets`) â€” defaults are fine.
 
 ## Definition of done
 - `terraform apply` succeeds without recreating the EKS cluster (only shrinking node group + adding Karpenter resources).

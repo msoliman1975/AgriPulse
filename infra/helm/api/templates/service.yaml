@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "missionagre-api.fullname" . }}
+  name: {{ include "agripulse-api.fullname" . }}
   labels:
-    {{- include "missionagre-api.labels" . | nindent 4 }}
+    {{- include "agripulse-api.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -16,4 +16,4 @@ spec:
       targetPort: metrics
       protocol: TCP
   selector:
-    {{- include "missionagre-api.selectorLabels" . | nindent 4 }}
+    {{- include "agripulse-api.selectorLabels" . | nindent 4 }}

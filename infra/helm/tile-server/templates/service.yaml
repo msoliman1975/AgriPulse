@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "missionagre-tile-server.fullname" . }}
+  name: {{ include "agripulse-tile-server.fullname" . }}
   labels:
-    {{- include "missionagre-tile-server.labels" . | nindent 4 }}
+    {{- include "agripulse-tile-server.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +12,4 @@ spec:
       targetPort: http
       protocol: TCP
   selector:
-    {{- include "missionagre-tile-server.selectorLabels" . | nindent 4 }}
+    {{- include "agripulse-tile-server.selectorLabels" . | nindent 4 }}

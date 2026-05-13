@@ -2,7 +2,7 @@
 #
 # Today this file holds:
 #   * external-dns (Route 53 RW on the agripulse.cloud zone)
-#   * cert-manager (Route 53 TXT RW on the same zone — DNS-01 solver)
+#   * cert-manager (Route 53 TXT RW on the same zone â€” DNS-01 solver)
 #   * api / cnpg IRSA bindings keyed by deploy env, used by the
 #     EKS-dev/staging/prod target namespaces.
 #
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "external_dns" {
 }
 
 resource "aws_iam_policy" "external_dns" {
-  name        = "missionagre-${var.environment}-external-dns"
+  name        = "agripulse-${var.environment}-external-dns"
   description = "Allow ExternalDNS to manage records inside the agripulse.cloud hosted zone."
   policy      = data.aws_iam_policy_document.external_dns.json
 }
@@ -42,7 +42,7 @@ module "iam_role_external_dns" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.50"
 
-  role_name = "missionagre-${var.environment}-external-dns"
+  role_name = "agripulse-${var.environment}-external-dns"
 
   oidc_providers = {
     main = {
@@ -88,7 +88,7 @@ data "aws_iam_policy_document" "cert_manager_dns01" {
 }
 
 resource "aws_iam_policy" "cert_manager_dns01" {
-  name        = "missionagre-${var.environment}-cert-manager-dns01"
+  name        = "agripulse-${var.environment}-cert-manager-dns01"
   description = "Allow cert-manager DNS-01 solver to manage TXT records under the agripulse.cloud zone."
   policy      = data.aws_iam_policy_document.cert_manager_dns01.json
 }
@@ -97,7 +97,7 @@ module "iam_role_cert_manager" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.50"
 
-  role_name = "missionagre-${var.environment}-cert-manager"
+  role_name = "agripulse-${var.environment}-cert-manager"
 
   oidc_providers = {
     main = {
@@ -114,7 +114,7 @@ module "iam_role_cert_manager" {
 }
 
 # ---------------------------------------------------------------------------
-# CD-6 — per-env agripulse IRSA roles.
+# CD-6 â€” per-env agripulse IRSA roles.
 #
 # Bound to ServiceAccounts in the per-env Kubernetes namespaces (`dev`,
 # `staging`, `prod`). The trust policy lets only those SAs assume the role
@@ -221,9 +221,9 @@ module "iam_role_agripulse_cnpg" {
     main = {
       provider_arn = module.eks.oidc_provider_arn
       # CNPG names its SA after the Cluster CR; the shared chart pins this
-      # to `missionagre-pg`. CD-7 will switch the Cluster CR to use this
+      # to `agripulse-pg`. CD-7 will switch the Cluster CR to use this
       # SA template; that PR will line the names up if they ever diverge.
-      namespace_service_accounts = ["${each.value}:missionagre-pg"]
+      namespace_service_accounts = ["${each.value}:agripulse-pg"]
     }
   }
 

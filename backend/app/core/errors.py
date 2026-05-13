@@ -1,6 +1,6 @@
 """RFC 7807 application/problem+json error model and FastAPI handlers.
 
-Per ARCHITECTURE.md § 8: every error response uses problem+json shape.
+Per ARCHITECTURE.md Â§ 8: every error response uses problem+json shape.
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     problem = Problem(
-        type="https://missionagre.io/problems/validation",
+        type="https://agripulse.cloud/problems/validation",
         title="Request validation failed",
         status=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="One or more request fields failed validation.",
@@ -121,7 +121,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         method=request.method,
     )
     problem = Problem(
-        type="https://missionagre.io/problems/internal",
+        type="https://agripulse.cloud/problems/internal",
         title="Internal server error",
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="An unexpected error occurred. The error has been logged.",

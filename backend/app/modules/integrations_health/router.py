@@ -1,11 +1,11 @@
-"""Integration health endpoints — read-only.
+"""Integration health endpoints â€” read-only.
 
 Mounted under /api/v1 by the app factory:
 
-  GET /integrations/health/farms                       — Farm rollup
-  GET /integrations/health/farms/{farm_id}/blocks      — per-Block detail
-  GET /integrations/health/blocks/{block_id}/attempts  — per-Block run log (PR-IH3)
-  GET /integrations/health/recent                      — tenant-wide recent runs (PR-IH3)
+  GET /integrations/health/farms                       â€” Farm rollup
+  GET /integrations/health/farms/{farm_id}/blocks      â€” per-Block detail
+  GET /integrations/health/blocks/{block_id}/attempts  â€” per-Block run log (PR-IH3)
+  GET /integrations/health/recent                      â€” tenant-wide recent runs (PR-IH3)
 
 All gated on `tenant.read_integration_health`. PlatformSupport gets
 this capability so support staff can diagnose tenant integration issues
@@ -73,7 +73,7 @@ def _ensure_tenant(context: RequestContext) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
 
 
@@ -129,7 +129,7 @@ async def list_block_attempts(
 @router.get(
     "/integrations/health/providers",
     response_model=list[ProviderHealthRow],
-    summary="Provider liveness — tenant-scoped projection (PR-IH6).",
+    summary="Provider liveness â€” tenant-scoped projection (PR-IH6).",
 )
 async def list_tenant_providers(
     context: RequestContext = Depends(
@@ -145,7 +145,7 @@ async def list_tenant_providers(
 @router.get(
     "/integrations/health/queue",
     response_model=list[QueueEntry],
-    summary="Pipeline queue — overdue / running / stuck (PR-IH4).",
+    summary="Pipeline queue â€” overdue / running / stuck (PR-IH4).",
 )
 async def list_queue(
     kind: Literal["weather", "imagery"] | None = Query(default=None),

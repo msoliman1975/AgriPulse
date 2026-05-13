@@ -1,4 +1,4 @@
-# ADR 0001 — Stack baseline anchored in `docs/ARCHITECTURE.md`
+# ADR 0001 â€” Stack baseline anchored in `docs/ARCHITECTURE.md`
 
 **Status:** Accepted
 **Date:** 2026-04-28
@@ -6,7 +6,7 @@
 
 ## Context
 
-`docs/ARCHITECTURE.md` is binding. It records every committed stack and infrastructure decision for MissionAgre's MVP. Engineers should never invent or "improve" a stack choice during implementation; they should re-read the architecture doc instead.
+`docs/ARCHITECTURE.md` is binding. It records every committed stack and infrastructure decision for AgriPulse's MVP. Engineers should never invent or "improve" a stack choice during implementation; they should re-read the architecture doc instead.
 
 This ADR exists to anchor that arrangement: it does not introduce new decisions. It records, in the form we'll use for every future change, that the stack already enumerated in `docs/ARCHITECTURE.md` and the schemas already enumerated in `docs/data_model.md` are the source of truth from this point forward.
 
@@ -26,8 +26,8 @@ This ADR exists to anchor that arrangement: it does not introduce new decisions.
 
 ## Alternatives considered
 
-- **No ADRs, only the architecture doc.** Rejected — without an audit trail, "the architecture doc says X" loses its history. ADRs explain the *why* that the architecture doc only summarizes as the *what*.
-- **ADRs in a separate repo.** Rejected — separation breaks the link between a decision and the code or schema that implements it.
+- **No ADRs, only the architecture doc.** Rejected â€” without an audit trail, "the architecture doc says X" loses its history. ADRs explain the *why* that the architecture doc only summarizes as the *what*.
+- **ADRs in a separate repo.** Rejected â€” separation breaks the link between a decision and the code or schema that implements it.
 
 ## Follow-ups
 

@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// MissionAgre dev server.
+// AgriPulse dev server.
 // 5173 matches the Keycloak realm's redirectUris (infra/dev/compose.yaml)
 // and the backend's CORS_ALLOWED_ORIGINS default.
 export default defineConfig({

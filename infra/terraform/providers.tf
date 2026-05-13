@@ -3,10 +3,10 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "missionagre"
+      Project     = "agripulse"
       Environment = var.environment
       ManagedBy   = "terraform"
-      Repo        = "msoliman1975/MissionAgre"
+      Repo        = "msoliman1975/AgriPulse"
     }
   }
 }

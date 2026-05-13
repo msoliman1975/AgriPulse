@@ -5,13 +5,13 @@ kind: NodePool
 metadata:
   name: general
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   weight: 10
   template:
     metadata:
       labels:
-        missionagre.io/role: workload
+        agripulse.cloud/role: workload
     spec:
       nodeClassRef:
         group: karpenter.k8s.aws
@@ -42,7 +42,7 @@ kind: EC2NodeClass
 metadata:
   name: default
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   amiFamily: AL2023
   role: {{ required "karpenter.nodeIAMRoleName must be set (terraform output karpenter.node_iam_role_name)" .Values.karpenter.nodeIAMRoleName | quote }}
@@ -60,5 +60,5 @@ spec:
         encrypted: true
   tags:
     karpenter.sh/cluster: {{ .Values.karpenter.clusterName | quote }}
-    missionagre.io/managed-by: karpenter
+    agripulse.cloud/managed-by: karpenter
 {{- end }}

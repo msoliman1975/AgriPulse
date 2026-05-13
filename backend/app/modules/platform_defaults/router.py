@@ -4,8 +4,8 @@ Mounted at /api/v1/admin/defaults. PlatformAdmin only (capability:
 `platform.manage_defaults` for writes; `platform.read` is enough for
 reads since defaults are non-sensitive).
 
-  GET   /api/v1/admin/defaults                 — list all keys
-  PUT   /api/v1/admin/defaults/{key}           — update one value
+  GET   /api/v1/admin/defaults                 â€” list all keys
+  PUT   /api/v1/admin/defaults/{key}           â€” update one value
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ async def update_default(
             status_code=404,
             title="Platform default not found",
             detail=f"No platform default with key {key!r}.",
-            type_="https://missionagre.io/problems/platform-default-not-found",
+            type_="https://agripulse.cloud/problems/platform-default-not-found",
         )
     _validate_against_schema(payload.value, existing["value_schema"], key)
     updated = await repo.update_default_value(
@@ -137,6 +137,6 @@ def _validate_against_schema(value: Any, schema: str, key: str) -> None:
             f"Setting {key!r} expects value_schema={schema!r} "
             f"but got {type(value).__name__}."
         ),
-        type_="https://missionagre.io/problems/platform-default-invalid-value",
+        type_="https://agripulse.cloud/problems/platform-default-invalid-value",
         extras={"key": key, "expected_schema": schema},
     )

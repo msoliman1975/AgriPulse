@@ -2,26 +2,26 @@
 
 Two YAML files in this package describe the policy:
 
-  - capabilities.yaml      — every capability string the platform recognizes
-  - role_capabilities.yaml — which capabilities each role grants
+  - capabilities.yaml      â€” every capability string the platform recognizes
+  - role_capabilities.yaml â€” which capabilities each role grants
 
 Code never checks roles directly. It either asks
 `has_capability(context, "alert.acknowledge", farm_id=...)` or attaches
 `Depends(requires_capability("alert.acknowledge", farm_id_param="farm_id"))`
 to a FastAPI route.
 
-Resolution order on every request, per ARCHITECTURE.md § 7:
+Resolution order on every request, per ARCHITECTURE.md Â§ 7:
 
-  1. PlatformRole — if it grants the capability, allow.
-  2. TenantRole   — if it grants the capability, allow.
-  3. FarmScope    — if a scope on the matching farm_id grants it, allow.
+  1. PlatformRole â€” if it grants the capability, allow.
+  2. TenantRole   â€” if it grants the capability, allow.
+  3. FarmScope    â€” if a scope on the matching farm_id grants it, allow.
 
 First match wins; otherwise PermissionDeniedError (HTTP 403).
 """
 
 # NOTE: deliberately NO `from __future__ import annotations`. The
 # inner `_check` dependency below uses `request: Request`, and FastAPI
-# can't resolve string annotations to the FastAPI Request injection —
+# can't resolve string annotations to the FastAPI Request injection â€”
 # it would silently demote the parameter to a query param and break
 # every route that depends on this factory.
 
@@ -56,7 +56,7 @@ class PermissionDeniedError(APIError):
             status_code=status.HTTP_403_FORBIDDEN,
             title="Forbidden",
             detail=f"Missing capability: {capability}",
-            type_="https://missionagre.io/problems/permission-denied",
+            type_="https://agripulse.cloud/problems/permission-denied",
             extras=extras,
         )
 
@@ -138,7 +138,7 @@ class CapabilityRegistry:
         *,
         farm_id: UUID | None = None,
     ) -> bool:
-        """Resolve PlatformRole → TenantRole → FarmScope; first match wins.
+        """Resolve PlatformRole â†’ TenantRole â†’ FarmScope; first match wins.
 
         Unknown capabilities deny: a typo must never silently grant.
         """

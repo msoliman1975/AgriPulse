@@ -14,7 +14,7 @@ Mounted under /api/v1 by the app factory.
   POST   /signals/definitions/{id}/observations
   GET    /signals/observations
 
-RBAC follows data_model § 9 + capabilities.yaml:
+RBAC follows data_model Â§ 9 + capabilities.yaml:
   * `signal.read` for definition / observation reads.
   * `signal.define` for definition / assignment writes (tenant-scoped).
   * `signal.record` for recording observations (farm-scoped).
@@ -65,7 +65,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -86,7 +86,7 @@ async def _resolve_tenant_id(*, schema: str, tenant_session: AsyncSession) -> UU
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             title="Tenant not found",
             detail="Could not resolve tenant id from JWT-claimed schema.",
-            type_="https://missionagre.io/problems/tenant-not-found",
+            type_="https://agripulse.cloud/problems/tenant-not-found",
         )
     return row.id
 
@@ -253,7 +253,7 @@ async def delete_assignment(
 def _ensure_farm_capability(context: RequestContext, capability: str, farm_id: UUID) -> None:
     """Body-driven farm-scoped check. The route-level
     ``requires_capability(farm_id_param=...)`` reads from path/query
-    params, but ``farm_id`` here lives in the JSON body — so the route
+    params, but ``farm_id`` here lives in the JSON body â€” so the route
     handler authenticates first, parses the body, then checks the
     farm scope explicitly."""
     if not has_capability(context, capability, farm_id=farm_id):
@@ -307,7 +307,7 @@ async def create_observation(
             status_code=status.HTTP_403_FORBIDDEN,
             title="User context required",
             detail="Recording an observation requires an authenticated user.",
-            type_="https://missionagre.io/problems/user-required",
+            type_="https://agripulse.cloud/problems/user-required",
         )
     return await service.create_observation(
         definition_id=definition_id,

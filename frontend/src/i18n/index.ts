@@ -44,7 +44,7 @@ export type SupportedLanguage = "en" | "ar";
 export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = ["en", "ar"];
 export const DEFAULT_LANGUAGE: SupportedLanguage = "en";
 
-// Per ARCHITECTURE.md § 11, the frontend ships with two locales (en, ar)
+// Per ARCHITECTURE.md Â§ 11, the frontend ships with two locales (en, ar)
 // loaded eagerly at this scope (the bundle is small). Future modules add
 // their own namespaces lazily via i18next-http-backend.
 const resources = {
@@ -122,7 +122,7 @@ void i18n
     detection: {
       order: ["localStorage", "navigator", "htmlTag"],
       caches: ["localStorage"],
-      lookupLocalStorage: "missionagre.lang",
+      lookupLocalStorage: "agripulse.lang",
     },
     react: { useSuspense: false },
   });

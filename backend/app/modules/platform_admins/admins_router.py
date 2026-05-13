@@ -3,9 +3,9 @@
 Mounted at /api/v1/admin/platform-admins. PlatformAdmin only via
 `platform.manage_platform_admins`.
 
-  GET    /platform-admins                — list current platform admins
-  POST   /platform-admins:invite         — invite a PlatformAdmin / Support
-  DELETE /platform-admins/{user_id}      — revoke role
+  GET    /platform-admins                â€” list current platform admins
+  POST   /platform-admins:invite         â€” invite a PlatformAdmin / Support
+  DELETE /platform-admins/{user_id}      â€” revoke role
 """
 
 from __future__ import annotations
@@ -104,7 +104,7 @@ async def invite_platform_admin(
             status_code=status.HTTP_409_CONFLICT,
             title="Already a platform admin",
             detail=f"{exc.email!r} already has an active platform role.",
-            type_="https://missionagre.io/problems/platform-admin-already-exists",
+            type_="https://agripulse.cloud/problems/platform-admin-already-exists",
         ) from exc
 
 
@@ -136,7 +136,7 @@ async def remove_platform_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             title="Platform admin not found",
             detail=str(exc),
-            type_="https://missionagre.io/problems/platform-admin-not-found",
+            type_="https://agripulse.cloud/problems/platform-admin-not-found",
         ) from exc
     except ValueError as exc:
         from app.core.errors import APIError
@@ -145,5 +145,5 @@ async def remove_platform_admin(
             status_code=status.HTTP_409_CONFLICT,
             title="Cannot remove last admin",
             detail=str(exc),
-            type_="https://missionagre.io/problems/platform-admin-last",
+            type_="https://agripulse.cloud/problems/platform-admin-last",
         ) from exc

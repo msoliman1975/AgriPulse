@@ -13,17 +13,17 @@ subscriber (registered in `app.core.app_factory`) runs inline:
 1. Loads tenant context, the affected farm's scoped users, and the
    tenant's `alert_notification_channels` preference.
 2. For each user, dispatches the channels they've opted into:
-   - **in_app** — inserts a row in `<tenant>.in_app_inbox` and
+   - **in_app** â€” inserts a row in `<tenant>.in_app_inbox` and
      publishes to Redis channel `inbox:<tenant_id>:<user_id>` for SSE
      listeners.
-   - **email** — renders the `alert_opened` template and sends through
+   - **email** â€” renders the `alert_opened` template and sends through
      the configured SMTP relay (MailHog in dev).
-3. **webhook** — runs once per alert (tenant-scoped, not per-user).
+3. **webhook** â€” runs once per alert (tenant-scoped, not per-user).
    POSTs the structured event to
    `tenant_settings.webhook_endpoint_url`.
 
 Every attempt records a row in `<tenant>.notification_dispatches`
-(`status` ∈ `pending | sent | skipped | failed`) so the audit trail is
+(`status` âˆˆ `pending | sent | skipped | failed`) so the audit trail is
 complete regardless of channel outcome.
 
 ## Webhook contract
@@ -37,10 +37,10 @@ Headers:
 | Header | Value |
 |---|---|
 | `Content-Type` | `application/json` |
-| `User-Agent` | `MissionAgre-Webhooks/1.0` |
-| `X-MissionAgre-Event` | `alert.opened` |
-| `X-MissionAgre-Delivery` | UUID — unique per attempt; receivers can use this for idempotency |
-| `X-MissionAgre-Signature` | `sha256=<hex>` HMAC-SHA256 of the raw body bytes |
+| `User-Agent` | `AgriPulse-Webhooks/1.0` |
+| `X-AgriPulse-Event` | `alert.opened` |
+| `X-AgriPulse-Delivery` | UUID â€” unique per attempt; receivers can use this for idempotency |
+| `X-AgriPulse-Signature` | `sha256=<hex>` HMAC-SHA256 of the raw body bytes |
 
 Body (sorted keys, UTF-8):
 
@@ -69,7 +69,7 @@ expected = "sha256=" + hmac.new(
     raw_body_bytes,
     hashlib.sha256,
 ).hexdigest()
-if not hmac.compare_digest(expected, request.headers["X-MissionAgre-Signature"]):
+if not hmac.compare_digest(expected, request.headers["X-AgriPulse-Signature"]):
     abort(401)
 ```
 
@@ -97,7 +97,7 @@ Development / test:
 - If the tenant has a `kms_key` set, it is appended (`<secret>::<kms_key>`)
   so two tenants on the same dev secret still produce distinct
   signatures.
-- Setting `WEBHOOK_DEV_SECRET=` (empty) disables dev signing — the
+- Setting `WEBHOOK_DEV_SECRET=` (empty) disables dev signing â€” the
   webhook channel will record `status='skipped'` with reason
   `no signing secret configured`.
 
@@ -110,7 +110,7 @@ Development / test:
 | `SMTP_USERNAME` | (empty) | MailHog has no auth |
 | `SMTP_PASSWORD` | (empty) | |
 | `SMTP_STARTTLS` | `false` | Production must set to `true` |
-| `SMTP_FROM` | `Agri.Pulse <noreply@agripulse.local>` | |
+| `SMTP_FROM` | `AgriPulse <noreply@agripulse.local>` | |
 
 MailHog web UI: http://localhost:8025/. The compose stack starts it
 alongside Postgres / Redis / Keycloak / MinIO.
@@ -132,7 +132,7 @@ Manually replay an alert through the channels:
 ```bash
 # As a tenant admin:
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-  https://api.<env>.missionagre.io/api/v1/blocks/<block_id>/alerts:evaluate
+  https://api.<env>.agripulse.cloud/api/v1/blocks/<block_id>/alerts:evaluate
 ```
 
 Re-running is idempotent: the partial UNIQUE on

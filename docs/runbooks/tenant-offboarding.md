@@ -2,10 +2,10 @@
 
 Removing a tenant cleanly. Two paths:
 
-- **Suspend** — keep the data, block sign-ins. Reversible. Use for
+- **Suspend** â€” keep the data, block sign-ins. Reversible. Use for
   trials that lapsed, accounts behind on billing, or customers who
   asked for a pause.
-- **Delete** — irreversible (after a grace window). Use only on a
+- **Delete** â€” irreversible (after a grace window). Use only on a
   customer's written request or after a 90-day suspended-and-silent
   policy expiry.
 
@@ -17,7 +17,7 @@ Removing a tenant cleanly. Two paths:
 
 ```bash
 curl -X POST \
-  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/suspend \
+  https://api.agripulse.cloud/api/v1/admin/tenants/<tenant-id>/suspend \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{"reason": "trial expired"}'
@@ -32,19 +32,19 @@ The endpoint:
 The auth middleware short-TTL-caches `tenants.status`, so existing
 non-platform JWTs start failing closed within ~30s of the call. Beat
 sweeps that walk `tenants WHERE status = 'active'` skip the tenant
-automatically — no separate stop step.
+automatically â€” no separate stop step.
 
 ### 2. Notify customer-success
 
 Add a row in the tracker with the suspension reason + reactivation
 condition. The notifications backbone does not auto-message the
-customer — that's a CS choice.
+customer â€” that's a CS choice.
 
 ### Reactivation
 
 ```bash
 curl -X POST \
-  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/reactivate \
+  https://api.agripulse.cloud/api/v1/admin/tenants/<tenant-id>/reactivate \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT"
 ```
 
@@ -61,12 +61,12 @@ UPDATE public.tenants
 ```
 
 ```bash
-for u in $(kcadm.sh get users -r missionagre -q "groups=tenant-<slug>" --fields username --format csv | tail -n +2); do
-  kcadm.sh update "users/$u" -r missionagre -s enabled=false
+for u in $(kcadm.sh get users -r agripulse -q "groups=tenant-<slug>" --fields username --format csv | tail -n +2); do
+  kcadm.sh update "users/$u" -r agripulse -s enabled=false
 done
 ```
 
-Reactivation is the inverse — flip `status` back to `'active'`, clear
+Reactivation is the inverse â€” flip `status` back to `'active'`, clear
 `suspended_at`, re-enable each KC user.
 
 ---
@@ -75,19 +75,19 @@ Reactivation is the inverse — flip `status` back to `'active'`, clear
 
 ### 0. Pre-conditions
 
-- Written deletion request from a `TenantOwner` or platform legal —
+- Written deletion request from a `TenantOwner` or platform legal â€”
   attach to the ticket.
-- Suspension has been in effect for ≥ 30 days OR the request is
+- Suspension has been in effect for â‰¥ 30 days OR the request is
   explicitly "purge now".
 - A backup exists (PITR + a hand-taken `pg_dump tenant_<id>` to S3
-  Glacier — see `runbooks/postgres-failover.md` § "Pre-DDL snapshot"
+  Glacier â€” see `runbooks/postgres-failover.md` Â§ "Pre-DDL snapshot"
   for the dump command).
 
 ### 1. Mark for deletion (starts the 30-day grace window)
 
 ```bash
 curl -X POST \
-  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/delete \
+  https://api.agripulse.cloud/api/v1/admin/tenants/<tenant-id>/delete \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{"reason": "customer request, ticket #1234"}'
@@ -96,7 +96,7 @@ curl -X POST \
 Flips status to `pending_delete`, stamps `deleted_at`, and writes
 `platform.tenant_deletion_requested` to `audit_events_archive`. The
 30-day grace window starts now; `purge_eligible_at` is on the response
-body. Cancel during the window with `POST .../cancel-delete` —
+body. Cancel during the window with `POST .../cancel-delete` â€”
 rolls the tenant back to `suspended` (conservative default; reactivate
 explicitly to allow logins again).
 
@@ -104,7 +104,7 @@ explicitly to allow logins again).
 
 ```bash
 curl -X POST \
-  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/purge \
+  https://api.agripulse.cloud/api/v1/admin/tenants/<tenant-id>/purge \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{"slug_confirmation": "<exact-slug>"}'
@@ -122,12 +122,12 @@ The endpoint:
 Pass `"force": true` only when the urgent purge has been pre-approved
 (e.g. legal request); it bypasses the grace-window check. The
 `slug_confirmation` field is mandatory either way and must match the
-tenant's slug exactly — guards against fat-finger purges.
+tenant's slug exactly â€” guards against fat-finger purges.
 
 ### 3. Remove S3 objects
 
 ```bash
-aws s3 rm "s3://missionagre-uploads/tenants/<tenant-uuid>/" --recursive
+aws s3 rm "s3://agripulse-uploads/tenants/<tenant-uuid>/" --recursive
 ```
 
 The S3 lifecycle policy will eventually drop them anyway, but explicit
@@ -153,10 +153,10 @@ COMMIT;
 ```
 
 ```bash
-for u in $(kcadm.sh get users -r missionagre -q "groups=tenant-<slug>" --fields id --format csv | tail -n +2); do
-  kcadm.sh delete "users/$u" -r missionagre
+for u in $(kcadm.sh get users -r agripulse -q "groups=tenant-<slug>" --fields id --format csv | tail -n +2); do
+  kcadm.sh delete "users/$u" -r agripulse
 done
-kcadm.sh delete "groups/<group-id>" -r missionagre
+kcadm.sh delete "groups/<group-id>" -r agripulse
 ```
 
 Users who belong to other tenants (rare) keep their accounts; verify by
@@ -189,7 +189,7 @@ Mark closed + reference the deletion-request artifact.
 
 ## Troubleshooting
 
-**`DROP SCHEMA … CASCADE` errors on hypertables.** Manually drop the
+**`DROP SCHEMA â€¦ CASCADE` errors on hypertables.** Manually drop the
 hypertable chunks first:
 
 ```sql
@@ -210,5 +210,5 @@ SELECT conname, conrelid::regclass
  WHERE confrelid = 'public.tenants'::regclass;
 ```
 
-…then add a `DELETE FROM <table>` step above tenants. Update this
+â€¦then add a `DELETE FROM <table>` step above tenants. Update this
 runbook so the next operator sees the table.

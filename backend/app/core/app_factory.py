@@ -25,12 +25,12 @@ from app.shared.correlation import CorrelationIdMiddleware
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """App lifespan — startup and shutdown bookkeeping."""
+    """App lifespan â€” startup and shutdown bookkeeping."""
     log = get_logger(__name__)
     log.info("app_startup", env=get_settings().app_env)
     # Sync decision-tree YAML files into the public catalog so a fresh
     # process picks up authored changes without a manual migration. The
-    # loader is idempotent — same content on disk → no DB writes.
+    # loader is idempotent â€” same content on disk â†’ no DB writes.
     try:
         from app.modules.recommendations.loader import sync_from_disk
         from app.shared.db.session import AsyncSessionLocal
@@ -40,7 +40,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await sync_from_disk(session)
     except Exception as exc:  # noqa: BLE001
         log.warning("decision_trees_sync_failed", error=str(exc))
-    # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent —
+    # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent â€”
     # only fires when zero active PlatformAdmins exist.
     try:
         from app.modules.platform_admins.bootstrap import (
@@ -73,7 +73,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="MissionAgre API",
+        title="AgriPulse API",
         version="0.1.0",
         docs_url="/docs" if settings.app_debug else None,
         redoc_url=None,
@@ -180,7 +180,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(platform_health_rollup_router)
     app.include_router(platform_health_tenant_drill_router)
 
-    # Cross-module event subscribers — registered once per process.
+    # Cross-module event subscribers â€” registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from
     # farms and resets cached scenes accordingly. Notifications listens
     # for AlertOpenedV1 and fans out per-channel dispatches.

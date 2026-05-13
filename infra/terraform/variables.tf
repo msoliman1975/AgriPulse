@@ -1,5 +1,5 @@
 variable "region" {
-  description = "AWS region. ARCHITECTURE.md § 3.2 commits me-south-1 (Bahrain)."
+  description = "AWS region. ARCHITECTURE.md Â§ 3.2 commits me-south-1 (Bahrain)."
   type        = string
   default     = "me-south-1"
 }
@@ -21,7 +21,7 @@ variable "vpc_cidr" {
 }
 
 variable "cluster_name" {
-  description = "EKS cluster name; defaults to missionagre-<env>."
+  description = "EKS cluster name; defaults to agripulse-<env>."
   type        = string
   default     = ""
 }
@@ -69,7 +69,7 @@ variable "argocd_chart_version" {
 }
 
 variable "argocd_admin_allowlist_cidrs" {
-  description = "CIDRs allowed to hit the ArgoCD UI ingress until Keycloak SSO lands (CD-13). Empty list disables the whitelist (open to the internet — only use for break-glass)."
+  description = "CIDRs allowed to hit the ArgoCD UI ingress until Keycloak SSO lands (CD-13). Empty list disables the whitelist (open to the internet â€” only use for break-glass)."
   type        = list(string)
   default     = []
 }

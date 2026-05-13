@@ -2,19 +2,19 @@
 
 Mounted under /api/v1 by the app factory. Endpoints:
 
-  GET    /alerts                                — list alerts (filterable)
-  PATCH  /alerts/{alert_id}                     — acknowledge / resolve / snooze
-  GET    /rules/defaults                        — platform-curated rule catalog
-  GET    /rules/overrides                       — tenant overrides
-  PUT    /rules/overrides/{rule_code}           — upsert override
-  POST   /blocks/{block_id}/alerts:evaluate     — admin/debug on-demand eval
+  GET    /alerts                                â€” list alerts (filterable)
+  PATCH  /alerts/{alert_id}                     â€” acknowledge / resolve / snooze
+  GET    /rules/defaults                        â€” platform-curated rule catalog
+  GET    /rules/overrides                       â€” tenant overrides
+  PUT    /rules/overrides/{rule_code}           â€” upsert override
+  POST   /blocks/{block_id}/alerts:evaluate     â€” admin/debug on-demand eval
 
 RBAC:
   * Reads use ``alert.read`` and ``alert_rule.read`` (every farm-scope
     role grants these per the capability catalog).
   * Acknowledge / snooze require ``alert.acknowledge`` / ``alert.snooze``.
   * Resolve requires ``alert.resolve``.
-  * Override management requires ``alert_rule.manage`` — tenant-scoped,
+  * Override management requires ``alert_rule.manage`` â€” tenant-scoped,
     not per-farm, since rules apply tenant-wide.
 """
 
@@ -67,7 +67,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -121,7 +121,7 @@ async def transition_alert(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid transition payload",
             detail="Exactly one of `acknowledge`, `resolve`, `snooze_until` must be set.",
-            type_="https://missionagre.io/problems/alert-invalid-transition",
+            type_="https://agripulse.cloud/problems/alert-invalid-transition",
         )
     if payload.acknowledge:
         action = "acknowledge"
@@ -134,7 +134,7 @@ async def transition_alert(
         cap = "alert.snooze"
 
     if not has_capability(context, cap):
-        # No farm scope here — alerts list is tenant-wide; the caller
+        # No farm scope here â€” alerts list is tenant-wide; the caller
         # already has alert.read because they got the alert id.
         raise AlertNotFoundError(alert_id)
 
@@ -236,7 +236,7 @@ def _tenant_rule_not_found(code: str) -> "APIError":
         status_code=status.HTTP_404_NOT_FOUND,
         title="Tenant rule not found",
         detail=f"No tenant rule with code {code!r}",
-        type_="https://missionagre.io/problems/alerts/tenant-rule-not-found",
+        type_="https://agripulse.cloud/problems/alerts/tenant-rule-not-found",
         extras={"code": code},
     )
 
@@ -304,7 +304,7 @@ async def create_tenant_rule(
             status_code=status.HTTP_409_CONFLICT,
             title="Tenant rule code already exists",
             detail=str(exc),
-            type_="https://missionagre.io/problems/alerts/tenant-rule-code-conflict",
+            type_="https://agripulse.cloud/problems/alerts/tenant-rule-code-conflict",
             extras={"code": exc.code},
         ) from exc
     except TenantRuleCodeConflictsWithDefaultError as exc:
@@ -314,7 +314,7 @@ async def create_tenant_rule(
             status_code=status.HTTP_409_CONFLICT,
             title="Code collides with platform default",
             detail=str(exc),
-            type_="https://missionagre.io/problems/alerts/tenant-rule-default-conflict",
+            type_="https://agripulse.cloud/problems/alerts/tenant-rule-default-conflict",
             extras={"code": exc.code},
         ) from exc
 

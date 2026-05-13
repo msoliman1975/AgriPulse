@@ -1,6 +1,6 @@
 image:
-  repository: ghcr.io/msoliman1975/missionagre/api
-  tag: "" # Empty → falls back to .Chart.AppVersion in the Deployment.
+  repository: ghcr.io/msoliman1975/agripulse/api
+  tag: "" # Empty â†’ falls back to .Chart.AppVersion in the Deployment.
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -23,7 +23,7 @@ revisionHistoryLimit: 5
 
 serviceAccount:
   create: true
-  name: "" # Empty → "{{ Release.Name }}-api"
+  name: "" # Empty â†’ "{{ Release.Name }}-api"
   annotations: {}
 
 service:
@@ -42,7 +42,7 @@ ingress:
   # the same in every env.
   hostPrefix: api
   pathPrefix: /api
-  tlsSecretName: missionagre-api-tls
+  tlsSecretName: agripulse-api-tls
 
 resources:
   requests:
@@ -89,14 +89,14 @@ probes:
 env:
   APP_ENV: production
   APP_LOG_LEVEL: INFO
-  DATABASE_URL: postgresql+asyncpg://missionagre@missionagre-pg-rw:5432/missionagre
-  DATABASE_SYNC_URL: postgresql+psycopg://missionagre@missionagre-pg-rw:5432/missionagre
-  REDIS_URL: redis://missionagre-redis:6379/0
-  CELERY_BROKER_URL: redis://missionagre-redis:6379/1
-  CELERY_RESULT_BACKEND: redis://missionagre-redis:6379/2
-  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre"
-  KEYCLOAK_AUDIENCE: missionagre-api
-  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre/protocol/openid-connect/certs"
+  DATABASE_URL: postgresql+asyncpg://agripulse@agripulse-pg-rw:5432/agripulse
+  DATABASE_SYNC_URL: postgresql+psycopg://agripulse@agripulse-pg-rw:5432/agripulse
+  REDIS_URL: redis://agripulse-redis:6379/0
+  CELERY_BROKER_URL: redis://agripulse-redis:6379/1
+  CELERY_RESULT_BACKEND: redis://agripulse-redis:6379/2
+  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse"
+  KEYCLOAK_AUDIENCE: agripulse-api
+  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
 
 # Secrets pulled from AWS Secrets Manager via ExternalSecret. The remote
@@ -108,8 +108,8 @@ externalSecret:
     name: aws-secretsmanager
     kind: ClusterSecretStore
   remoteRef:
-    key: missionagre/api
-  # Map remote keys → in-pod env names.
+    key: agripulse/api
+  # Map remote keys â†’ in-pod env names.
   data:
     - secretKey: DATABASE_PASSWORD
       property: database_password

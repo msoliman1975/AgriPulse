@@ -2,13 +2,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "missionagre-api.fullname" . }}
+  name: {{ include "agripulse-api.fullname" . }}
   labels:
-    {{- include "missionagre-api.labels" . | nindent 4 }}
+    {{- include "agripulse-api.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "missionagre-api.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-api.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: metrics
       path: /metrics

@@ -5,7 +5,7 @@ its URL on the tenant's ``tenant_settings.webhook_endpoint_url``,
 fires an alert, and asserts:
 
   * The receiver got a POST with the expected JSON shape.
-  * The ``X-MissionAgre-Signature`` header matches an HMAC computed
+  * The ``X-AgriPulse-Signature`` header matches an HMAC computed
     locally with the dev secret.
   * The dispatch row records ``status='sent'``.
 """
@@ -126,7 +126,7 @@ async def test_webhook_post_carries_valid_hmac_signature(
                     tenant_schema=tenant.schema_name,
                 )
 
-        # Wait briefly for the (sync, in-process) handler to land — the
+        # Wait briefly for the (sync, in-process) handler to land â€” the
         # handler runs inline in publish but tests sometimes race the
         # capture-server's accept loop.
         for _ in range(20):
@@ -144,9 +144,9 @@ async def test_webhook_post_carries_valid_hmac_signature(
             captured["body"],
             hashlib.sha256,
         ).hexdigest()
-        assert captured["headers"]["X-MissionAgre-Signature"] == f"sha256={digest}"
-        assert captured["headers"]["X-MissionAgre-Event"] == "alert.opened"
-        assert "X-MissionAgre-Delivery" in captured["headers"]
+        assert captured["headers"]["X-AgriPulse-Signature"] == f"sha256={digest}"
+        assert captured["headers"]["X-AgriPulse-Event"] == "alert.opened"
+        assert "X-AgriPulse-Delivery" in captured["headers"]
 
         body = json.loads(captured["body"])
         assert body["event"] == "alert.opened"

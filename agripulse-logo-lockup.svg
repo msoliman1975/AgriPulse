@@ -37,7 +37,7 @@
   <!-- Pulse contained in circle -->
   <path d="M22 98 L62 98 L72 82 L82 112 L100 72 L118 108 L126 92 L140 98 L178 96" fill="none" stroke="#E24B4A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Wordmark: Agri.Pulse -->
+  <!-- Wordmark: AgriPulse -->
   <text x="210" y="88" font-family="'Helvetica Neue', 'Arial', sans-serif" font-size="52" font-weight="600" fill="#2C2C2A" letter-spacing="-1">Agri</text>
   <text x="320" y="88" font-family="'Helvetica Neue', 'Arial', sans-serif" font-size="52" font-weight="600" fill="#1D9E75" letter-spacing="-1">.Pulse</text>
 

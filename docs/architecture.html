@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>MissionAgre — Architecture</title>
+<title>AgriPulse â€” Architecture</title>
 <style>
   :root{
     --bg:#0e1116; --surface:#161b22; --surface-2:#1c232c; --border:#2a323d;
@@ -31,7 +31,7 @@
   }
   nav.toc a{display:block;padding:4px 0;color:var(--text);text-decoration:none;font-size:13px}
   nav.toc a:hover{color:var(--accent-2)}
-  nav.toc a::before{content:"›";color:var(--muted);margin-right:8px}
+  nav.toc a::before{content:"â€º";color:var(--muted);margin-right:8px}
   section{margin:36px 0}
   section > h2{
     font-size:20px;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
@@ -135,12 +135,12 @@
 <div class="wrap">
 
 <header class="hero">
-  <h1>MissionAgre — Platform Architecture</h1>
+  <h1>AgriPulse â€” Platform Architecture</h1>
   <div class="sub">Multi-tenant satellite-driven farm management SaaS for Egyptian agribusinesses.</div>
   <div class="meta">
-    <span><b>Repo:</b> msoliman1975/MissionAgre</span>
+    <span><b>Repo:</b> msoliman1975/AgriPulse</span>
     <span><b>Region:</b> AWS me-south-1 (Bahrain)</span>
-    <span><b>MVP target:</b> 1–3 tenants, 6-week build</span>
+    <span><b>MVP target:</b> 1â€“3 tenants, 6-week build</span>
     <span><b>Year-3 target:</b> ~500 tenants, ~25K blocks</span>
     <span><b>Source of truth:</b> docs/ARCHITECTURE.md, docs/data_model.md</span>
   </div>
@@ -168,7 +168,7 @@
 <section id="overview">
   <h2><span class="num">1</span> Overview &amp; pillars</h2>
   <p>
-    MissionAgre is a cloud-native SaaS that lets commercial agribusinesses in Egypt monitor crop health,
+    AgriPulse is a cloud-native SaaS that lets commercial agribusinesses in Egypt monitor crop health,
     irrigation, and weather using satellite imagery, weather forecasts, and custom signals; with rules-based
     alerting and explainable agronomic recommendations. The platform is a <b>modular monolith</b> backend
     plus a single-page web frontend and a dedicated tile server, deployed on Kubernetes.
@@ -180,7 +180,7 @@
     <div class="card"><h4>Cloud-portable</h4>
       <div class="body">Kubernetes (EKS), CloudNativePG, MinIO/S3 abstraction, no AWS-locked managed services in the core.</div></div>
     <div class="card"><h4>Capability RBAC</h4>
-      <div class="body">Eight roles, three-layer scope resolution (platform → tenant → farm). Code uses <code>@requires_capability</code>.</div></div>
+      <div class="body">Eight roles, three-layer scope resolution (platform â†’ tenant â†’ farm). Code uses <code>@requires_capability</code>.</div></div>
     <div class="card"><h4>i18n + RTL</h4>
       <div class="body">English + Arabic at launch, logical CSS, react-i18next, language &amp; unit preferences per user.</div></div>
     <div class="card"><h4>Egypt-native</h4>
@@ -203,50 +203,50 @@
     <div class="layer">
       <h5>Client</h5>
       <div class="row">
-        <div class="chip"><b>React 18</b> <span>· TypeScript 5 · Vite</span></div>
+        <div class="chip"><b>React 18</b> <span>Â· TypeScript 5 Â· Vite</span></div>
         <div class="chip"><b>Tailwind</b> <span>+ RTL plugin</span></div>
         <div class="chip"><b>react-i18next</b></div>
         <div class="chip"><b>MapLibre GL</b> <span>+ deck.gl</span></div>
         <div class="chip"><b>Recharts</b></div>
       </div>
     </div>
-    <div class="arrow">▼</div>
+    <div class="arrow">â–¼</div>
     <div class="layer">
       <h5>Edge &amp; identity</h5>
       <div class="row">
-        <div class="chip"><b>NGINX Ingress</b> <span>· cert-manager · WAF + Shield Std.</span></div>
-        <div class="chip"><b>Keycloak</b> <span>single realm · tenant_id JWT claim</span></div>
+        <div class="chip"><b>NGINX Ingress</b> <span>Â· cert-manager Â· WAF + Shield Std.</span></div>
+        <div class="chip"><b>Keycloak</b> <span>single realm Â· tenant_id JWT claim</span></div>
       </div>
     </div>
-    <div class="arrow">▼</div>
+    <div class="arrow">â–¼</div>
     <div class="layer">
       <h5>Application</h5>
       <div class="row">
-        <div class="chip"><b>FastAPI</b> <span>Python 3.12 · Pydantic v2</span></div>
-        <div class="chip"><b>SQLAlchemy 2.x</b> <span>async · Alembic</span></div>
-        <div class="chip"><b>Celery 5.x</b> <span>light + heavy queues · Beat</span></div>
-        <div class="chip"><b>TiTiler</b> <span>COG → XYZ/WMTS</span></div>
+        <div class="chip"><b>FastAPI</b> <span>Python 3.12 Â· Pydantic v2</span></div>
+        <div class="chip"><b>SQLAlchemy 2.x</b> <span>async Â· Alembic</span></div>
+        <div class="chip"><b>Celery 5.x</b> <span>light + heavy queues Â· Beat</span></div>
+        <div class="chip"><b>TiTiler</b> <span>COG â†’ XYZ/WMTS</span></div>
         <div class="chip"><b>SSE</b> <span>live alerts</span></div>
       </div>
     </div>
-    <div class="arrow">▼</div>
+    <div class="arrow">â–¼</div>
     <div class="layer">
       <h5>Data &amp; storage</h5>
       <div class="row">
-        <div class="chip"><b>PostgreSQL 16</b> <span>PostGIS · TimescaleDB · pgstac · pgaudit</span></div>
-        <div class="chip"><b>Redis 7</b> <span>cache · Celery broker · SSE pub/sub</span></div>
-        <div class="chip"><b>S3-compatible</b> <span>boto3 · MinIO in dev</span></div>
+        <div class="chip"><b>PostgreSQL 16</b> <span>PostGIS Â· TimescaleDB Â· pgstac Â· pgaudit</span></div>
+        <div class="chip"><b>Redis 7</b> <span>cache Â· Celery broker Â· SSE pub/sub</span></div>
+        <div class="chip"><b>S3-compatible</b> <span>boto3 Â· MinIO in dev</span></div>
       </div>
     </div>
-    <div class="arrow">▼</div>
+    <div class="arrow">â–¼</div>
     <div class="layer">
       <h5>Platform</h5>
       <div class="row">
-        <div class="chip"><b>EKS</b> <span>dev · staging · production</span></div>
-        <div class="chip"><b>CloudNativePG</b> <span>primary + standby · PITR to S3</span></div>
-        <div class="chip"><b>ArgoCD</b> <span>GitOps · Helm per service</span></div>
-        <div class="chip"><b>External Secrets</b> <span>→ AWS Secrets Manager</span></div>
-        <div class="chip"><b>Prometheus · Loki · Tempo · Grafana · GlitchTip</b></div>
+        <div class="chip"><b>EKS</b> <span>dev Â· staging Â· production</span></div>
+        <div class="chip"><b>CloudNativePG</b> <span>primary + standby Â· PITR to S3</span></div>
+        <div class="chip"><b>ArgoCD</b> <span>GitOps Â· Helm per service</span></div>
+        <div class="chip"><b>External Secrets</b> <span>â†’ AWS Secrets Manager</span></div>
+        <div class="chip"><b>Prometheus Â· Loki Â· Tempo Â· Grafana Â· GlitchTip</b></div>
       </div>
     </div>
   </div>
@@ -262,27 +262,27 @@
 <!-- 3. LAYOUT -->
 <section id="layout">
   <h2><span class="num">3</span> Repository layout</h2>
-<pre>MissionAgre/
-├── backend/
-│   ├── app/
-│   │   ├── modules/         # one folder per module (§ 6)
-│   │   ├── shared/          # _shared/conditions, _shared/db, _shared/auth_utils
-│   │   ├── core/            # config, logging, observability, FastAPI app factory
-│   │   └── main.py
-│   ├── workers/             # light/, heavy/, beat/, tasks/, celery_factory.py
-│   ├── migrations/          # public/ + tenant/ (custom per-tenant runner)
-│   └── tests/               # unit · integration · e2e
-├── frontend/                # React 18 / TS / Vite — modules/, shared/, i18n/
-├── tile-server/             # TiTiler image with config overrides
-├── infra/
-│   ├── helm/                # api · workers · tile-server · frontend · keycloak · shared
-│   ├── argocd/              # ApplicationSet manifests
-│   ├── terraform/           # AWS bootstrap (VPC, EKS, S3, KMS)
-│   └── dev/                 # docker compose for local stateful services
-├── docs/                    # ARCHITECTURE.md, data_model.md, runbooks/, decisions/
-├── prompts/                 # Claude Code session prompts and roadmap
-├── scripts/
-└── .github/                 # workflows, CODEOWNERS, templates, Dependabot
+<pre>AgriPulse/
+â”œâ”€â”€ backend/
+â”‚   â”œâ”€â”€ app/
+â”‚   â”‚   â”œâ”€â”€ modules/         # one folder per module (Â§ 6)
+â”‚   â”‚   â”œâ”€â”€ shared/          # _shared/conditions, _shared/db, _shared/auth_utils
+â”‚   â”‚   â”œâ”€â”€ core/            # config, logging, observability, FastAPI app factory
+â”‚   â”‚   â””â”€â”€ main.py
+â”‚   â”œâ”€â”€ workers/             # light/, heavy/, beat/, tasks/, celery_factory.py
+â”‚   â”œâ”€â”€ migrations/          # public/ + tenant/ (custom per-tenant runner)
+â”‚   â””â”€â”€ tests/               # unit Â· integration Â· e2e
+â”œâ”€â”€ frontend/                # React 18 / TS / Vite â€” modules/, shared/, i18n/
+â”œâ”€â”€ tile-server/             # TiTiler image with config overrides
+â”œâ”€â”€ infra/
+â”‚   â”œâ”€â”€ helm/                # api Â· workers Â· tile-server Â· frontend Â· keycloak Â· shared
+â”‚   â”œâ”€â”€ argocd/              # ApplicationSet manifests
+â”‚   â”œâ”€â”€ terraform/           # AWS bootstrap (VPC, EKS, S3, KMS)
+â”‚   â””â”€â”€ dev/                 # docker compose for local stateful services
+â”œâ”€â”€ docs/                    # ARCHITECTURE.md, data_model.md, runbooks/, decisions/
+â”œâ”€â”€ prompts/                 # Claude Code session prompts and roadmap
+â”œâ”€â”€ scripts/
+â””â”€â”€ .github/                 # workflows, CODEOWNERS, templates, Dependabot
 </pre>
   <p class="muted">
     Monorepo, single <code>main</code>, trunk-based development. Feature branches live &lt;2 days,
@@ -300,8 +300,8 @@
     <div class="card"><h4>api</h4><div class="body">FastAPI app, autoscaled. Exposes <code>/api/v1</code> + SSE stream.</div></div>
     <div class="card"><h4>workers (light)</h4><div class="body">Short Celery tasks: alert evaluation, notifications, audit fanout.</div></div>
     <div class="card"><h4>workers (heavy)</h4><div class="body">Long Celery tasks: Sentinel Hub fetch, COG generation, index aggregation.</div></div>
-    <div class="card"><h4>beat</h4><div class="body">Single replica scheduler — imagery polling, 15-min alert evaluation, daily recommendations.</div></div>
-    <div class="card"><h4>tile-server</h4><div class="body">TiTiler reading COGs from S3, reprojecting UTM 36N → Web Mercator.</div></div>
+    <div class="card"><h4>beat</h4><div class="body">Single replica scheduler â€” imagery polling, 15-min alert evaluation, daily recommendations.</div></div>
+    <div class="card"><h4>tile-server</h4><div class="body">TiTiler reading COGs from S3, reprojecting UTM 36N â†’ Web Mercator.</div></div>
     <div class="card"><h4>postgres</h4><div class="body">CloudNativePG: 1 primary + 1 standby. PostGIS, TimescaleDB, pgstac, pgaudit.</div></div>
     <div class="card"><h4>redis</h4><div class="body">Cache + Celery broker + SSE pub/sub (single instance, three roles).</div></div>
     <div class="card"><h4>keycloak</h4><div class="body">Single realm, JWT issuer. Separate DB.</div></div>
@@ -313,7 +313,7 @@
     <div class="step"><b>1. Ingress</b>NGINX terminates TLS, generates <code>X-Correlation-ID</code>, applies per-tenant rate limiting.</div>
     <div class="step"><b>2. Auth</b>FastAPI middleware verifies Keycloak JWT, extracts <code>tenant_id</code> + scopes.</div>
     <div class="step"><b>3. Tenant routing</b><code>SET LOCAL search_path TO tenant_&lt;id&gt;, public</code> on the request transaction.</div>
-    <div class="step"><b>4. Capability check</b><code>@requires_capability("…", farm_id=…)</code> resolves PlatformRole → TenantRole → FarmScope.</div>
+    <div class="step"><b>4. Capability check</b><code>@requires_capability("â€¦", farm_id=â€¦)</code> resolves PlatformRole â†’ TenantRole â†’ FarmScope.</div>
     <div class="step"><b>5. Module service</b>Domain logic via Protocol; cross-module via DI or in-proc event bus.</div>
     <div class="step"><b>6. Persistence</b>SQLAlchemy 2 async; RLS as defense-in-depth on shared tables.</div>
     <div class="step"><b>7. Async fanout</b>Sync handlers in-request; async handlers dispatched to Celery with correlation header.</div>
@@ -331,7 +331,7 @@
       <div class="body">
         <p><span class="pill public">public</span> shared catalogs, tenants, users, RBAC, pgstac.</p>
         <p><span class="pill tenant">tenant_&lt;uuid&gt;</span> all tenant-owned data: farms, blocks, indices aggregates, alerts.</p>
-        <p>Cross-schema FKs are <b>logical</b>, not declarative — the app enforces them; a periodic consistency-check job logs orphans.</p>
+        <p>Cross-schema FKs are <b>logical</b>, not declarative â€” the app enforces them; a periodic consistency-check job logs orphans.</p>
       </div>
     </div>
     <div class="card">
@@ -356,7 +356,7 @@
   <h2><span class="num">6</span> Backend modules</h2>
 
   <p class="muted">
-    Modular monolith — twelve modules under <code>backend/app/modules/</code> (forecasting is out of scope for MVP).
+    Modular monolith â€” twelve modules under <code>backend/app/modules/</code> (forecasting is out of scope for MVP).
     Each module exposes only <code>service.py</code> (Protocol + impl) and <code>events.py</code> (versioned Pydantic events).
     Cross-module imports of <code>repository</code>/<code>domain</code> are forbidden; <b>import-linter</b> enforces this in CI.
     The single allowed shared layer is <code>app/shared/</code> (DB session helpers, auth utilities, the conditions library
@@ -392,7 +392,7 @@
   <p>Capabilities are the unit of authorization, not roles. Capabilities live in
     <code>backend/app/shared/rbac/capabilities.yaml</code>; role mappings in
     <code>role_capabilities.yaml</code>. Code uses
-    <code>@requires_capability("alert.acknowledge", farm_id=…)</code> — never <code>if role == "…"</code>.</p>
+    <code>@requires_capability("alert.acknowledge", farm_id=â€¦)</code> â€” never <code>if role == "â€¦"</code>.</p>
 
   <table>
     <thead><tr><th>Role</th><th>Scope</th><th>Description</th></tr></thead>
@@ -418,7 +418,7 @@
   "preferred_language": "en | ar",
   "preferred_unit": "feddan | acre | hectare"
 }</pre>
-  <p class="muted">Resolution order: PlatformRole → TenantRole → FarmScope (first match wins). Token TTL 15 min ⇒ revocation latency. Redis-backed scope lookup is a P2 upgrade.</p>
+  <p class="muted">Resolution order: PlatformRole â†’ TenantRole â†’ FarmScope (first match wins). Token TTL 15 min â‡’ revocation latency. Redis-backed scope lookup is a P2 upgrade.</p>
 </section>
 
 <!-- 8. API -->
@@ -427,9 +427,9 @@
 
   <div class="grid cols-2">
     <div class="card"><h4>Surface</h4><div class="body">REST + OpenAPI 3.x. All endpoints under <code>/api/v1/...</code>. SSE on <code>/api/v1/me/alerts/stream</code>. Tile server on <code>/tiles/{collection}/{z}/{x}/{y}.png</code>.</div></div>
-    <div class="card"><h4>Tenancy</h4><div class="body">Tenant <b>never</b> appears in URL or query — always from JWT. Per-request <code>SET LOCAL search_path</code>.</div></div>
-    <div class="card"><h4>Encoding</h4><div class="body">JSON keys snake_case. Timestamps RFC 3339. Areas in <code>m²</code> on the wire; client converts to feddan/acre/hectare for display.</div></div>
-    <div class="card"><h4>Pagination</h4><div class="body">Cursor-based — <code>?limit=50&amp;cursor=&lt;opaque&gt;</code>. No offset pagination.</div></div>
+    <div class="card"><h4>Tenancy</h4><div class="body">Tenant <b>never</b> appears in URL or query â€” always from JWT. Per-request <code>SET LOCAL search_path</code>.</div></div>
+    <div class="card"><h4>Encoding</h4><div class="body">JSON keys snake_case. Timestamps RFC 3339. Areas in <code>mÂ²</code> on the wire; client converts to feddan/acre/hectare for display.</div></div>
+    <div class="card"><h4>Pagination</h4><div class="body">Cursor-based â€” <code>?limit=50&amp;cursor=&lt;opaque&gt;</code>. No offset pagination.</div></div>
     <div class="card"><h4>Errors</h4><div class="body">RFC 7807 <code>application/problem+json</code>.</div></div>
     <div class="card"><h4>Idempotency</h4><div class="body">Optional <code>Idempotency-Key</code> header on state-changing endpoints, stored in Redis 24 h.</div></div>
   </div>
@@ -443,7 +443,7 @@
     <div class="card"><h4>Provider</h4><div class="body">Sentinel Hub Process API behind <code>SentinelHubProvider</code>. Adapter pattern leaves room for a future <code>Sentinel2OpenDataProvider</code> and <code>PlanetScopeProvider</code>.</div></div>
     <div class="card"><h4>Indices</h4><div class="body"><b>Hybrid</b>: six standard indices (NDVI, NDWI, EVI, SAVI, NDRE, GNDVI) precomputed and stored as COGs + aggregated to TimescaleDB; custom indices computed on-demand.</div></div>
     <div class="card"><h4>Storage / projection</h4><div class="body">COGs in object storage in UTM 36N (EPSG:32636); web tiles served in Web Mercator (EPSG:3857) by TiTiler reprojecting on the fly.</div></div>
-    <div class="card"><h4>STAC</h4><div class="body"><code>pgstac</code> inside the same Postgres instance — no separate STAC server.</div></div>
+    <div class="card"><h4>STAC</h4><div class="body"><code>pgstac</code> inside the same Postgres instance â€” no separate STAC server.</div></div>
     <div class="card"><h4>Cloud thresholds</h4><div class="body">60 % for visualization, 20 % for index aggregation; per-tenant overrides supported.</div></div>
     <div class="card"><h4>Retention</h4><div class="body">90 days S3 Standard, then S3 Glacier Instant Retrieval via lifecycle rule.</div></div>
     <div class="card"><h4>Idempotency</h4><div class="body">Deterministic asset IDs: <code>{provider}/{product}/{scene_id}/{aoi_hash}/{index_or_band}.tif</code>.</div></div>
@@ -456,7 +456,7 @@
     <div class="step"><b>Poll</b>Beat polls Sentinel Hub by AOI/cadence.</div>
     <div class="step"><b>Fetch</b>Heavy worker downloads scene, generates per-index COGs.</div>
     <div class="step"><b>Catalog</b>Upserts STAC items in pgstac with deterministic IDs.</div>
-    <div class="step"><b>Aggregate</b>Computes per-block stats → TimescaleDB hypertable.</div>
+    <div class="step"><b>Aggregate</b>Computes per-block stats â†’ TimescaleDB hypertable.</div>
     <div class="step"><b>Serve</b>TiTiler streams tiles; API exposes scenes &amp; timeseries; frontend overlays on MapLibre.</div>
   </div>
 </section>
@@ -472,7 +472,7 @@
         <ul class="tight">
           <li><b>Tier-2 compound rules</b> (AND/OR groups, time windows, deltas, trends). No arbitrary scripted rules.</li>
           <li><b>Pull-based evaluation</b> every 15 min via Celery Beat.</li>
-          <li>Lifecycle: <code>open → acknowledged → resolved</code> (or <code>snoozed → open</code>, or <code>auto_resolved</code>).</li>
+          <li>Lifecycle: <code>open â†’ acknowledged â†’ resolved</code> (or <code>snoozed â†’ open</code>, or <code>auto_resolved</code>).</li>
           <li>Channels: in-app (SSE), email (SMTP), webhook (HMAC). <b>No SMS</b> until P2.</li>
           <li>Cooldown enforced structurally by uniqueness of open alerts per <code>(rule, farm, block)</code>.</li>
         </ul>
@@ -483,9 +483,9 @@
       <div class="body">
         <ul class="tight">
           <li>Hand-authored YAML decision trees per crop, versioned and immutable once published.</li>
-          <li><b>Daily per-block</b> evaluation — slower-moving than alerts.</li>
+          <li><b>Daily per-block</b> evaluation â€” slower-moving than alerts.</li>
           <li>Explainability mandatory: every recommendation carries <code>tree_path</code> plus <code>text_en</code>/<code>text_ar</code>.</li>
-          <li>Lifecycle: <code>open → applied | dismissed | deferred | expired</code>.</li>
+          <li>Lifecycle: <code>open â†’ applied | dismissed | deferred | expired</code>.</li>
         </ul>
       </div>
     </div>
@@ -505,25 +505,25 @@
   <p class="muted">
     Around 40 tables + 7 TimescaleDB hypertables + ~10 continuous aggregates / views, plus pgstac.
     UUID v7 primary keys everywhere. Soft delete (<code>deleted_at</code>) is the default.
-    Areas in <b>m²</b> as <code>NUMERIC(14,2)</code> — never store <code>area_feddan</code> / <code>area_acre</code> / <code>area_ha</code>.
+    Areas in <b>mÂ²</b> as <code>NUMERIC(14,2)</code> â€” never store <code>area_feddan</code> / <code>area_acre</code> / <code>area_ha</code>.
     Geometries in WGS84 (4326); a parallel <code>geometry_utm</code> column holds UTM 36N for area math.
   </p>
 
   <table>
-    <thead><tr><th>§</th><th>Module</th><th>Schema</th><th>Tables</th><th>Hypertables</th><th>Notable extensions</th></tr></thead>
+    <thead><tr><th>Â§</th><th>Module</th><th>Schema</th><th>Tables</th><th>Hypertables</th><th>Notable extensions</th></tr></thead>
     <tbody>
-      <tr><td>3</td><td>tenancy</td><td><span class="pill public">public</span></td><td>3</td><td>0</td><td>—</td></tr>
-      <tr><td>4</td><td>iam</td><td><span class="pill public">public</span></td><td>6</td><td>0</td><td>—</td></tr>
+      <tr><td>3</td><td>tenancy</td><td><span class="pill public">public</span></td><td>3</td><td>0</td><td>â€”</td></tr>
+      <tr><td>4</td><td>iam</td><td><span class="pill public">public</span></td><td>6</td><td>0</td><td>â€”</td></tr>
       <tr><td>5</td><td>farms</td><td><span class="pill tenant">tenant</span></td><td>7</td><td>0</td><td>PostGIS</td></tr>
       <tr><td>6</td><td>imagery</td><td><span class="pill mixed">mixed</span></td><td>4</td><td>0</td><td>pgstac</td></tr>
       <tr><td>7</td><td>indices</td><td><span class="pill tenant">tenant</span></td><td>2</td><td>1</td><td>TimescaleDB</td></tr>
       <tr><td>8</td><td>weather</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>2</td><td>TimescaleDB</td></tr>
       <tr><td>9</td><td>signals</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>1</td><td>TimescaleDB</td></tr>
-      <tr><td>10</td><td>alerts</td><td><span class="pill tenant">tenant</span></td><td>5</td><td>1</td><td>—</td></tr>
-      <tr><td>11</td><td>recommendations</td><td><span class="pill mixed">mixed</span></td><td>4</td><td>1</td><td>—</td></tr>
-      <tr><td>12</td><td>notifications</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>0</td><td>—</td></tr>
-      <tr><td>13</td><td>audit</td><td><span class="pill tenant">tenant</span></td><td>2</td><td>1</td><td>TimescaleDB · pgaudit</td></tr>
-      <tr><td>14</td><td>analytics</td><td><span class="pill tenant">views</span></td><td>0</td><td>—</td><td>continuous aggregates</td></tr>
+      <tr><td>10</td><td>alerts</td><td><span class="pill tenant">tenant</span></td><td>5</td><td>1</td><td>â€”</td></tr>
+      <tr><td>11</td><td>recommendations</td><td><span class="pill mixed">mixed</span></td><td>4</td><td>1</td><td>â€”</td></tr>
+      <tr><td>12</td><td>notifications</td><td><span class="pill tenant">tenant</span></td><td>3</td><td>0</td><td>â€”</td></tr>
+      <tr><td>13</td><td>audit</td><td><span class="pill tenant">tenant</span></td><td>2</td><td>1</td><td>TimescaleDB Â· pgaudit</td></tr>
+      <tr><td>14</td><td>analytics</td><td><span class="pill tenant">views</span></td><td>0</td><td>â€”</td><td>continuous aggregates</td></tr>
     </tbody>
   </table>
 
@@ -553,11 +553,11 @@
     </div></div>
     <div class="card"><h4>i18n / RTL</h4><div class="body">
       react-i18next with JSON namespaces per module, lazy-loaded. Root <code>dir="rtl"</code> toggle, logical CSS properties
-      (<code>margin-inline-start</code> not <code>margin-left</code>), Tailwind RTL plugin. Western (0–9) numerals; Gregorian only.
+      (<code>margin-inline-start</code> not <code>margin-left</code>), Tailwind RTL plugin. Western (0â€“9) numerals; Gregorian only.
       Crops carry both <code>name_en</code> and <code>name_ar</code> as data, not translations.
     </div></div>
     <div class="card"><h4>State</h4><div class="body">
-      Server cache via <code>api/</code> hooks; SSE channel for live alerts; user prefs in <code>prefs/</code> drive the unit toggle (m² → feddan/acre/ha) at the presentation layer only.
+      Server cache via <code>api/</code> hooks; SSE channel for live alerts; user prefs in <code>prefs/</code> drive the unit toggle (mÂ² â†’ feddan/acre/ha) at the presentation layer only.
     </div></div>
   </div>
 </section>
@@ -568,20 +568,20 @@
 
   <div class="grid cols-2">
     <div class="card">
-      <h4>CI — GitHub Actions</h4>
+      <h4>CI â€” GitHub Actions</h4>
       <div class="body">
         <ul class="tight">
-          <li><b>pre-commit</b> — repo-wide hooks (ruff, black, prettier, gitleaks, …).</li>
-          <li><b>backend</b> — <code>uv sync --frozen</code>, ruff, black, mypy, import-linter, pytest (unit + integration).</li>
-          <li><b>frontend</b> — <code>pnpm install --frozen-lockfile</code>, eslint, tsc, prettier, vitest, build.</li>
-          <li><b>helm</b> — <code>helm dependency build</code> + lint + template per chart.</li>
-          <li><b>infra-tf</b> — <code>terraform fmt</code> + <code>init -backend=false</code> + <code>validate</code>.</li>
-          <li><b>containers</b> — matrix build of <code>api</code>, <code>workers</code>, <code>tile-server</code>, <code>frontend</code>; merge to <code>main</code> pushes <code>ghcr.io/msoliman1975/missionagre/&lt;name&gt;:&lt;sha&gt;</code> + <code>latest</code>.</li>
+          <li><b>pre-commit</b> â€” repo-wide hooks (ruff, black, prettier, gitleaks, â€¦).</li>
+          <li><b>backend</b> â€” <code>uv sync --frozen</code>, ruff, black, mypy, import-linter, pytest (unit + integration).</li>
+          <li><b>frontend</b> â€” <code>pnpm install --frozen-lockfile</code>, eslint, tsc, prettier, vitest, build.</li>
+          <li><b>helm</b> â€” <code>helm dependency build</code> + lint + template per chart.</li>
+          <li><b>infra-tf</b> â€” <code>terraform fmt</code> + <code>init -backend=false</code> + <code>validate</code>.</li>
+          <li><b>containers</b> â€” matrix build of <code>api</code>, <code>workers</code>, <code>tile-server</code>, <code>frontend</code>; merge to <code>main</code> pushes <code>ghcr.io/msoliman1975/agripulse/&lt;name&gt;:&lt;sha&gt;</code> + <code>latest</code>.</li>
         </ul>
       </div>
     </div>
     <div class="card">
-      <h4>CD — ArgoCD</h4>
+      <h4>CD â€” ArgoCD</h4>
       <div class="body">
         <p>ArgoCD reads Helm charts in <code>infra/helm/*</code> and ApplicationSets in <code>infra/argocd/*</code>.
           A follow-up PR (<code>argocd-sync.yml</code>) bumps <code>image.tag</code> in the dev overlay after every successful main build.</p>
@@ -612,8 +612,8 @@
 
   <div class="grid cols-4">
     <div class="card"><h4>Metrics</h4><div class="body">Prometheus + <code>prometheus-fastapi-instrumentator</code>; RED metrics on every endpoint and worker task.</div></div>
-    <div class="card"><h4>Logs</h4><div class="body">Structured JSON via <code>structlog</code> → Loki. Mandatory fields: timestamp, level, service, correlation_id, tenant_id, user_id (when known). No PII.</div></div>
-    <div class="card"><h4>Traces</h4><div class="body">OpenTelemetry auto-instrumentation for FastAPI, SQLAlchemy, Celery, requests, httpx → Tempo. Custom spans around index computation and alert evaluation.</div></div>
+    <div class="card"><h4>Logs</h4><div class="body">Structured JSON via <code>structlog</code> â†’ Loki. Mandatory fields: timestamp, level, service, correlation_id, tenant_id, user_id (when known). No PII.</div></div>
+    <div class="card"><h4>Traces</h4><div class="body">OpenTelemetry auto-instrumentation for FastAPI, SQLAlchemy, Celery, requests, httpx â†’ Tempo. Custom spans around index computation and alert evaluation.</div></div>
     <div class="card"><h4>Errors</h4><div class="body">GlitchTip (open-source Sentry alternative). Single Grafana pane fronts metrics + logs + traces.</div></div>
   </div>
 
@@ -648,7 +648,7 @@
 <footer>
   Generated from <code>docs/ARCHITECTURE.md</code>, <code>docs/data_model.md</code>, <code>README.md</code>,
   and the current state of <code>backend/</code>, <code>frontend/</code>, and <code>infra/</code>.
-  Standalone HTML — no external assets, no JavaScript. Open in any browser or print to PDF.
+  Standalone HTML â€” no external assets, no JavaScript. Open in any browser or print to PDF.
 </footer>
 
 </div>

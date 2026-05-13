@@ -4,7 +4,7 @@ Spins up a single PostgreSQL+TimescaleDB+PostGIS container and a Redis
 container per test session. Migrations run once at module import; each
 test gets its own AsyncSession.
 
-Skipped if Docker / testcontainers are not available — the marker
+Skipped if Docker / testcontainers are not available â€” the marker
 `integration` lets CI gate this whole tree on presence of containers.
 """
 
@@ -35,10 +35,10 @@ _TIMESCALE_IMAGE = "timescale/timescaledb-ha:pg16"
 def postgres_container() -> Iterator[object]:
     if PostgresContainer is None:  # pragma: no cover
         pytest.skip("testcontainers not installed")
-    # `driver="psycopg"` matches our psycopg[binary] dep — without it
+    # `driver="psycopg"` matches our psycopg[binary] dep â€” without it
     # testcontainers falls back to psycopg2 for its readiness probe.
     container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg")
-    container.with_env("POSTGRES_DB", "missionagre_test")
+    container.with_env("POSTGRES_DB", "agripulse_test")
     container.start()
     try:
         yield container
@@ -78,7 +78,7 @@ def _wire_settings(
     os.environ["DATABASE_SYNC_URL"] = sync_url
     os.environ["REDIS_URL"] = redis_url
     # Point Celery broker at the test Redis so module-side `.delay()`
-    # calls — e.g. weather.fetch_weather chaining derive_weather_daily —
+    # calls â€” e.g. weather.fetch_weather chaining derive_weather_daily â€”
     # enqueue against a reachable broker instead of falling through to
     # the default amqp://localhost. No worker consumes the queue in the
     # test process; tasks are direct-invoked through their `_async`
@@ -93,7 +93,7 @@ def _wire_settings(
 
     # Construct the publisher-side Celery app so `@shared_task.delay(...)`
     # resolves to the configured broker. Without this, `current_app`
-    # is Celery's implicit default with no broker → connection refused.
+    # is Celery's implicit default with no broker â†’ connection refused.
     from workers.celery_factory import build_publisher
 
     build_publisher()
@@ -108,7 +108,7 @@ def _wire_settings(
 
     yield
 
-    # Drop async engine — keeps pytest from leaking pool connections.
+    # Drop async engine â€” keeps pytest from leaking pool connections.
     import asyncio
 
     from app.shared.db.session import dispose_engine

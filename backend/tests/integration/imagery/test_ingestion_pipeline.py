@@ -1,4 +1,4 @@
-"""Full ingestion pipeline: discover → acquire → register_stac_item.
+"""Full ingestion pipeline: discover â†’ acquire â†’ register_stac_item.
 
 We invoke the three task async cores in sequence (without going through
 Celery's `.delay()` / asyncio.run wrappers) against a real Postgres +
@@ -67,7 +67,7 @@ class _FakeProvider:
 
 
 class _CaptureStorage:
-    bucket = "missionagre-uploads"
+    bucket = "agripulse-uploads"
 
     def __init__(self) -> None:
         self.uploads: list[tuple[str, bytes, str]] = []
@@ -75,7 +75,7 @@ class _CaptureStorage:
     def put_object(self, *, key: str, body: bytes, content_type: str) -> None:
         self.uploads.append((key, body, content_type))
 
-    # Unused parts of the StorageClient Protocol — return-typed-as-Any
+    # Unused parts of the StorageClient Protocol â€” return-typed-as-Any
     # so a missed call from production code surfaces loudly.
     def presign_upload(self, **_: Any) -> Any:  # pragma: no cover
         raise AssertionError("unexpected presign_upload in pipeline test")
@@ -179,9 +179,9 @@ async def test_full_pipeline_succeeds_end_to_end(
         ).scalar_one()
         job_id = UUID(str(job_id_raw))
 
-        # Acquire — uploads a COG to the capture-only storage.
+        # Acquire â€” uploads a COG to the capture-only storage.
         await imagery_tasks._acquire_scene_async(job_id, tenant_schema)
-        # Register — creates pgstac collection + items row.
+        # Register â€” creates pgstac collection + items row.
         await imagery_tasks._register_stac_item_async(
             job_id, tenant_schema, [capture.uploads[0][0]]
         )
@@ -225,7 +225,7 @@ async def test_pipeline_idempotent_on_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Re-running discover+acquire+register with the same scene must be a no-op
-    after the first success — no new ingestion-job rows, no new pgstac.items.
+    after the first success â€” no new ingestion-job rows, no new pgstac.items.
     """
     sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
         admin_session, slug="imagery-pipeline-idemp"

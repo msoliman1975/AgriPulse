@@ -1,11 +1,11 @@
 [project]
-name = "missionagre-backend"
+name = "agripulse-backend"
 version = "0.1.0"
-description = "MissionAgre backend — multi-tenant farm management API."
+description = "AgriPulse backend â€” multi-tenant farm management API."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { text = "Proprietary" }
-authors = [{ name = "MissionAgre" }]
+authors = [{ name = "AgriPulse" }]
 
 dependencies = [
   # Web framework
@@ -22,7 +22,7 @@ dependencies = [
   "geoalchemy2>=0.16,<0.17",
 
   # STAC catalog. We bootstrap pgstac as plain SQL via pypgstac (no
-  # server-side extension binary required) — see the public 0007
+  # server-side extension binary required) â€” see the public 0007
   # migration. Pinned to the 0.8.x line that ships with STAC API 1.0.
   # `psycopg-pool` is consumed by pypgstac's PgstacDB connection helper
   # but not pinned by the package's own metadata, so we list it here.
@@ -214,7 +214,7 @@ filterwarnings = [
   # asyncpg's connection close path leaves socket FDs to be GC'd; on
   # Linux CI those surface as PytestUnraisableExceptionWarning during
   # session teardown. They aren't from any test we control and don't
-  # affect the result count — ignore.
+  # affect the result count â€” ignore.
   "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
@@ -232,7 +232,7 @@ exclude_lines = [
 ]
 
 # --- import-linter ----------------------------------------------------------
-# Module boundaries per ARCHITECTURE.md § 6.1: each module exposes only
+# Module boundaries per ARCHITECTURE.md Â§ 6.1: each module exposes only
 # `service.py` and `events.py`; all other submodules are private. Cross-
 # module imports must go through the service Protocol.
 
@@ -244,7 +244,7 @@ name = "shared cannot import domain modules"
 type = "forbidden"
 source_modules = ["app.shared"]
 forbidden_modules = ["app.modules"]
-# `app.core` is the wiring layer — `app_factory` imports module routers
+# `app.core` is the wiring layer â€” `app_factory` imports module routers
 # explicitly. That is the one allowed direction; everything else under
 # core (errors, settings, observability, logging) stays pure.
 

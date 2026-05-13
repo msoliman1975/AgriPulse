@@ -38,7 +38,7 @@
     "subtitle": "Manage who has PlatformAdmin or PlatformSupport access. Mirrors the Keycloak `platform_role` user attribute.",
     "inviteButton": "+ Invite",
     "loadFailed": "Could not load platform admins.",
-    "empty": "No platform admins yet — bootstrap one via env vars.",
+    "empty": "No platform admins yet â€” bootstrap one via env vars.",
     "removeButton": "Revoke",
     "pendingKc": "(pending Keycloak provisioning)",
     "col": { "user": "User", "role": "Role", "actions": "" },
@@ -49,33 +49,33 @@
       "fullName": "Full name",
       "role": "Role",
       "submit": "Send invite",
-      "submitting": "Sending…",
+      "submitting": "Sendingâ€¦",
       "cancel": "Cancel",
       "kcOk": "Welcome email queued via Keycloak.",
-      "kcPending": "Operator must finish provisioning via kcadm.sh — DB rows landed."
+      "kcPending": "Operator must finish provisioning via kcadm.sh â€” DB rows landed."
     }
   },
   "owner": {
     "title": "Tenant owner",
-    "subtitle": "Platform's only user-mgmt touchpoint after tenant creation. Pick a new owner from this tenant's existing members; everything else lives in Agri.Pulse.",
+    "subtitle": "Platform's only user-mgmt touchpoint after tenant creation. Pick a new owner from this tenant's existing members; everything else lives in AgriPulse.",
     "none": "No active TenantOwner found.",
-    "transferButton": "Transfer ownership →",
+    "transferButton": "Transfer ownership â†’",
     "transferIntro": "Move TenantOwner away from {{from}}.",
     "newOwnerLabel": "New owner (must already be a member of this tenant)",
-    "pickNewOwner": "Pick a member…",
-    "noCandidates": "No other admins on this tenant. Invite one via Agri.Pulse → Settings → Users first.",
-    "assignIntro": "Seed the first TenantOwner — invite a new user or promote an existing tenant member.",
+    "pickNewOwner": "Pick a memberâ€¦",
+    "noCandidates": "No other admins on this tenant. Invite one via AgriPulse â†’ Settings â†’ Users first.",
+    "assignIntro": "Seed the first TenantOwner â€” invite a new user or promote an existing tenant member.",
     "assignModeInvite": "Invite new user",
     "assignModePromote": "Promote existing member",
     "assignEmail": "Email",
     "assignFullName": "Full name",
     "assignPickMember": "Pick an existing member",
     "assignSubmit": "Assign owner",
-    "assignSubmitting": "Assigning…"
+    "assignSubmitting": "Assigningâ€¦"
   },
   "integrations": {
     "title": "Integration defaults",
-    "subtitle": "Set tenant-tier defaults for weather, imagery, email, and webhook. The tenant owner can override these values inside Agri.Pulse — Platform's job is to seed sensible starting values.",
+    "subtitle": "Set tenant-tier defaults for weather, imagery, email, and webhook. The tenant owner can override these values inside AgriPulse â€” Platform's job is to seed sensible starting values.",
     "category": {
       "weather": "Weather",
       "imagery": "Imagery",
@@ -91,8 +91,8 @@
     "subtitle": "Add or remove TenantAdmins for this tenant. Owner transfer requires a slug confirmation.",
     "loadFailed": "Could not load admins.",
     "empty": "No admins on this tenant.",
-    "ownerHint": "Tenant owner — use Transfer ownership to move this role.",
-    "transferToButton": "Transfer ownership →",
+    "ownerHint": "Tenant owner â€” use Transfer ownership to move this role.",
+    "transferToButton": "Transfer ownership â†’",
     "removeButton": "Revoke admin",
     "col": { "email": "User", "role": "Role", "actions": "" },
     "inviteHeading": "Invite a new TenantAdmin",
@@ -100,27 +100,27 @@
       "email": "Email",
       "fullName": "Full name",
       "submit": "Send invite",
-      "submitting": "Sending…",
+      "submitting": "Sendingâ€¦",
       "kcOk": "Welcome email queued via Keycloak.",
-      "kcPending": "Operator must provision via kcadm.sh — DB rows landed."
+      "kcPending": "Operator must provision via kcadm.sh â€” DB rows landed."
     },
     "transfer": {
       "title": "Transfer ownership",
       "body": "This will move TenantOwner from {{from}} to {{to}}.",
       "confirmHint": "Type the tenant slug to confirm: {{slug}}",
       "submit": "Transfer ownership",
-      "submitting": "Transferring…",
+      "submitting": "Transferringâ€¦",
       "cancel": "Cancel"
     }
   },
   "defaults": {
     "title": "Platform defaults",
     "subtitle": "Default settings every tenant inherits from. Tenants can override at their own tier.",
-    "readonlyHint": "You don't have platform.manage_defaults — values are read-only.",
+    "readonlyHint": "You don't have platform.manage_defaults â€” values are read-only.",
     "loadFailed": "Could not load platform defaults.",
     "empty": "No defaults defined.",
     "save": "Save",
-    "saving": "Saving…",
+    "saving": "Savingâ€¦",
     "lastUpdated": "Last updated {{when}}"
   },
   "guard": {
@@ -132,10 +132,10 @@
       "title": "Tenants",
       "subtitle": "Create, suspend, restore, or delete customer tenants.",
       "newButton": "New tenant",
-      "searchPlaceholder": "Search by slug or name…",
+      "searchPlaceholder": "Search by slug or nameâ€¦",
       "filterAll": "All",
       "empty": "No tenants match your filters.",
-      "loading": "Loading tenants…",
+      "loading": "Loading tenantsâ€¦",
       "errorTitle": "Couldn't load tenants",
       "headers": {
         "slug": "Slug",
@@ -145,7 +145,7 @@
         "created": "Created"
       },
       "pagination": {
-        "showing": "Showing {{first}}–{{last}} of {{total}}",
+        "showing": "Showing {{first}}â€“{{last}} of {{total}}",
         "prev": "Previous",
         "next": "Next"
       }
@@ -161,7 +161,7 @@
       },
       "fields": {
         "slug": "Slug",
-        "slugHelp": "URL-safe identifier, 3–32 chars, lowercase letters/digits/hyphens. Permanent.",
+        "slugHelp": "URL-safe identifier, 3â€“32 chars, lowercase letters/digits/hyphens. Permanent.",
         "name": "Display name",
         "legalName": "Legal name",
         "taxId": "Tax ID",
@@ -190,12 +190,12 @@
         "next": "Next",
         "back": "Back",
         "submit": "Create tenant",
-        "creating": "Creating…",
+        "creating": "Creatingâ€¦",
         "cancel": "Cancel"
       },
       "review": {
         "ownerNote": "An UPDATE_PASSWORD email will be sent to {{email}}.",
-        "noOwnerNote": "No owner specified — Keycloak provisioning is skipped. You can complete it later via the retry endpoint."
+        "noOwnerNote": "No owner specified â€” Keycloak provisioning is skipped. You can complete it later via the retry endpoint."
       },
       "success": {
         "title": "Tenant created",
@@ -216,7 +216,7 @@
         "owner": "Owner",
         "lifecycle": "Lifecycle"
       },
-      "loading": "Loading tenant…",
+      "loading": "Loading tenantâ€¦",
       "errorTitle": "Couldn't load tenant",
       "profileTitle": "Profile",
       "settingsTitle": "Settings",
@@ -254,7 +254,7 @@
       "banner": {
         "suspended": "This tenant is suspended. Sign-ins are blocked.",
         "pending_delete": "This tenant is marked for deletion. Purge eligible {{when}}.",
-        "pending_provision": "Provisioning pending — Keycloak invite hasn't completed yet.",
+        "pending_provision": "Provisioning pending â€” Keycloak invite hasn't completed yet.",
         "archived": "This tenant is archived."
       },
       "actions": {
@@ -280,16 +280,16 @@
           "confirm": "Mark for deletion"
         },
         "purge": {
-          "title": "Purge tenant — irreversible",
+          "title": "Purge tenant â€” irreversible",
           "body": "This will DROP SCHEMA the tenant, delete public rows, and remove the Keycloak group + users. There is no undo.",
           "confirmLabel": "Type the slug to confirm:",
           "forceLabel": "Force-purge (bypass grace window)",
-          "forceWarning": "Use only when authorised — bypasses the {{days}}-day cooling-off period.",
+          "forceWarning": "Use only when authorised â€” bypasses the {{days}}-day cooling-off period.",
           "confirm": "Purge tenant"
         }
       },
       "errorTitleAction": "Action failed",
-      "actionPending": "Working…"
+      "actionPending": "Workingâ€¦"
     }
   },
   "status": {

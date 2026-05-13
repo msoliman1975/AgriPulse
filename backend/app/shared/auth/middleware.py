@@ -7,7 +7,7 @@ Bypassed paths (no auth required, no 401 raised):
     them in production)
 
 Every other path requires a valid Bearer JWT. Failures surface as 401
-with an RFC 7807 problem+json body — handled in app.core.errors.
+with an RFC 7807 problem+json body â€” handled in app.core.errors.
 """
 
 from __future__ import annotations
@@ -212,7 +212,7 @@ async def _send_tenant_blocked(send: Any, tenant_status: str) -> None:
     import json
 
     body = {
-        "type": "https://missionagre.io/problems/tenant-suspended",
+        "type": "https://agripulse.cloud/problems/tenant-suspended",
         "title": "Tenant unavailable",
         "status": 403,
         "detail": f"Tenant is {tenant_status}; sign-ins are blocked.",
@@ -237,7 +237,7 @@ async def _send_unauthorized(send: Any, detail: str) -> None:
     import json
 
     body = {
-        "type": "https://missionagre.io/problems/unauthorized",
+        "type": "https://agripulse.cloud/problems/unauthorized",
         "title": "Unauthorized",
         "status": 401,
         "detail": detail,
@@ -249,7 +249,7 @@ async def _send_unauthorized(send: Any, detail: str) -> None:
             "status": 401,
             "headers": [
                 (b"content-type", b"application/problem+json"),
-                (b"www-authenticate", b'Bearer realm="missionagre"'),
+                (b"www-authenticate", b'Bearer realm="agripulse"'),
                 (b"content-length", str(len(payload)).encode()),
             ],
         }

@@ -1,8 +1,8 @@
-# capabilities.yaml — canonical capability list for MissionAgre RBAC.
+# capabilities.yaml â€” canonical capability list for AgriPulse RBAC.
 #
 # Naming: "<resource>.<action>". `<resource>` is the noun owning the data;
 # `<action>` is what is being done to/with it. Capability names are stable
-# strings — add new ones, never rename existing ones.
+# strings â€” add new ones, never rename existing ones.
 #
 # Fields:
 #   description : human-readable, audit-friendly summary
@@ -17,7 +17,7 @@
 #                          documents the resource; the route will appear
 #                          in a later prompt)
 #
-# See ARCHITECTURE.md § 7 and data_model.md § 4.
+# See ARCHITECTURE.md Â§ 7 and data_model.md Â§ 4.
 
 capabilities:
   # --- Platform admin --------------------------------------------------

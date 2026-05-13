@@ -1,5 +1,5 @@
 # Karpenter controller. Real IRSA ARN + cluster + queue name are injected
-# at deploy time from `terraform output karpenter` — overlays/<env>/values
+# at deploy time from `terraform output karpenter` â€” overlays/<env>/values
 # carry the per-env values; this file only holds defaults that apply to
 # every env.
 
@@ -12,7 +12,7 @@ tolerations:
     operator: Exists
 
 nodeSelector:
-  missionagre.io/role: system
+  agripulse.cloud/role: system
 
 serviceAccount:
   create: true
@@ -31,7 +31,7 @@ resources:
     cpu: "1"
     memory: 512Mi
 
-# Prometheus integration — kube-prometheus-stack scrapes the metrics
+# Prometheus integration â€” kube-prometheus-stack scrapes the metrics
 # endpoint via ServiceMonitor.
 serviceMonitor:
   enabled: true

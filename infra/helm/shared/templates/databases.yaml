@@ -1,7 +1,7 @@
 {{- /*
 CD-13. CNPG `Database` CRs for non-primary databases that live in the
-same Cluster. The primary `missionagre` database is created by the
-Cluster's `bootstrap.initdb` — those are bootstrap-only and not
+same Cluster. The primary `agripulse` database is created by the
+Cluster's `bootstrap.initdb` â€” those are bootstrap-only and not
 reconcilable. Anything we want to add later (Keycloak realm DB here)
 goes through this CR so CNPG can drop+recreate without nuking the
 cluster.
@@ -18,7 +18,7 @@ kind: Database
 metadata:
   name: {{ printf "%s-%s" $.Values.postgresCluster.name .name | quote }}
   labels:
-    {{- include "missionagre.shared.labels" $ | nindent 4 }}
+    {{- include "agripulse.shared.labels" $ | nindent 4 }}
 spec:
   name: {{ .name | quote }}
   owner: {{ .owner | quote }}

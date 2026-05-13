@@ -1,7 +1,7 @@
 """Application settings.
 
 Loaded from environment variables (with .env support in dev). Single source
-of truth — modules import `get_settings()` rather than reading os.environ.
+of truth â€” modules import `get_settings()` rather than reading os.environ.
 """
 
 from __future__ import annotations
@@ -31,17 +31,17 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     app_metrics_port: int = 9090
-    service_name: str = "missionagre-api"
+    service_name: str = "agripulse-api"
 
     # --- Database ---------------------------------------------------------
     database_url: PostgresDsn = Field(
         default=PostgresDsn(
-            "postgresql+asyncpg://missionagre:missionagre@localhost:5432/missionagre"
+            "postgresql+asyncpg://agripulse:agripulse@localhost:5432/agripulse"
         )
     )
     database_sync_url: PostgresDsn = Field(
         default=PostgresDsn(
-            "postgresql+psycopg://missionagre:missionagre@localhost:5432/missionagre"
+            "postgresql+psycopg://agripulse:agripulse@localhost:5432/agripulse"
         )
     )
     database_pool_size: int = 5
@@ -52,10 +52,10 @@ class Settings(BaseSettings):
     redis_url: RedisDsn = Field(default=RedisDsn("redis://localhost:6379/0"))
 
     # --- Keycloak ---------------------------------------------------------
-    keycloak_issuer: str = "https://keycloak.dev.missionagre.local/realms/missionagre"
-    keycloak_audience: str = "missionagre-api"
+    keycloak_issuer: str = "https://keycloak.dev.agripulse.local/realms/agripulse"
+    keycloak_audience: str = "agripulse-api"
     keycloak_jwks_url: str = (
-        "https://keycloak.dev.missionagre.local/realms/missionagre" "/protocol/openid-connect/certs"
+        "https://keycloak.dev.agripulse.local/realms/agripulse" "/protocol/openid-connect/certs"
     )
     keycloak_jwks_cache_ttl_seconds: int = 3600
 
@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     # runbook for the kcadm.sh fallback). Production envs flip this on +
     # set the four credentials. Tests inject FakeKeycloakClient directly.
     keycloak_provisioning_enabled: bool = False
-    keycloak_base_url: str = "https://keycloak.dev.missionagre.local"
-    keycloak_realm: str = "missionagre"
-    keycloak_admin_client_id: str = "missionagre-tenancy"
+    keycloak_base_url: str = "https://keycloak.dev.agripulse.local"
+    keycloak_realm: str = "agripulse"
+    keycloak_admin_client_id: str = "agripulse-tenancy"
     keycloak_admin_client_secret: str = ""
     keycloak_admin_request_timeout_seconds: float = 10.0
     # Action URL the user is redirected to when accepting the welcome
@@ -78,14 +78,14 @@ class Settings(BaseSettings):
     # --- Platform-admin bootstrap (PR-Reorg6) -----------------------------
     # On cold start, if no PlatformAdmin exists in
     # `public.platform_role_assignments`, the lifespan creates one from
-    # these env values. Idempotent — subsequent boots are no-ops once a
+    # these env values. Idempotent â€” subsequent boots are no-ops once a
     # PlatformAdmin exists. Empty email skips the bootstrap entirely.
     platform_admin_email: str = ""
     platform_admin_full_name: str = "Platform Admin"
 
     # --- Observability ----------------------------------------------------
     otel_exporter_otlp_endpoint: str | None = None
-    otel_service_name: str = "missionagre-api"
+    otel_service_name: str = "agripulse-api"
     otel_resource_attributes: str = "deployment.environment=dev"
 
     # --- Celery -----------------------------------------------------------
@@ -95,15 +95,15 @@ class Settings(BaseSettings):
     # --- Object storage (S3-compatible) ----------------------------------
     s3_endpoint_url: str | None = "http://localhost:9000"
     s3_region: str = "us-east-1"
-    s3_access_key_id: str = "missionagre"
-    s3_secret_access_key: str = "missionagre-dev"
-    s3_bucket_uploads: str = "missionagre-uploads"
+    s3_access_key_id: str = "agripulse"
+    s3_secret_access_key: str = "agripulse-dev"
+    s3_bucket_uploads: str = "agripulse-uploads"
     s3_path_style: bool = True
     s3_presign_expires_seconds: int = 900
 
     # --- Periodic jobs ---------------------------------------------------
-    # Cross-schema FK consistency check for `public.farm_scopes` ↔
-    # `tenant_<id>.farms`. Hourly is enough — orphans only happen when a
+    # Cross-schema FK consistency check for `public.farm_scopes` â†”
+    # `tenant_<id>.farms`. Hourly is enough â€” orphans only happen when a
     # farm is hard-deleted, which is operationally rare.
     farm_scope_consistency_check_seconds: int = 3600
 
@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     # SentinelHubProvider.__init__ raises SentinelHubNotConfiguredError
     # when client_id or client_secret is empty (PR-B). Local dev fills
     # these via infra/dev/.env (gitignored); cluster envs via the
-    # ExternalSecret missionagre-sentinel-hub.
+    # ExternalSecret agripulse-sentinel-hub.
     sentinel_hub_client_id: str = ""
     sentinel_hub_client_secret: str = ""
     sentinel_hub_oauth_url: str = "https://services.sentinel-hub.com/oauth/token"
@@ -164,7 +164,7 @@ class Settings(BaseSettings):
     irrigation_generate_sweep_seconds: int = 3600
 
     # Cadence for `recommendations.evaluate_sweep`. Daily in production
-    # — decision trees consume slow-moving signals (NDVI baselines).
+    # â€” decision trees consume slow-moving signals (NDVI baselines).
     # Hourly in dev so a fresh aggregate triggers a recommendation
     # within one Beat cycle. Partial UNIQUE on (block_id, tree_id)
     # WHERE state='open' keeps re-runs idempotent.
@@ -191,9 +191,9 @@ class Settings(BaseSettings):
     integration_failure_streak_threshold: int = 3
 
     # --- Imagery thresholds ----------------------------------------------
-    # ARCHITECTURE.md § 9: 60% for visualization, 20% for index aggregation.
+    # ARCHITECTURE.md Â§ 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`
-    # (NULL = use these defaults) — applied by service code in PR-B/PR-C.
+    # (NULL = use these defaults) â€” applied by service code in PR-B/PR-C.
     imagery_cloud_cover_visualization_max_pct: int = 60
     imagery_cloud_cover_aggregation_max_pct: int = 20
 
@@ -210,13 +210,13 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_starttls: bool = False
-    smtp_from: str = "Agri.Pulse <noreply@agripulse.local>"
+    smtp_from: str = "AgriPulse <noreply@agripulse.local>"
     smtp_timeout_seconds: float = 10.0
 
     # --- Webhook channel (PR-S4-E) ---------------------------------------
     # Per-tenant ``webhook_endpoint_url`` is the receiver URL; the HMAC
     # secret in production resolves through KMS (the per-tenant
-    # ``webhook_signing_secret_kms_key`` row), but dev has no KMS — so
+    # ``webhook_signing_secret_kms_key`` row), but dev has no KMS â€” so
     # ``webhook_dev_secret`` is the fallback when no KMS key is wired.
     # Empty string disables the dev fallback (failed signature).
     webhook_dev_secret: str = "dev-only-not-for-prod"
@@ -239,6 +239,6 @@ def get_settings() -> Settings:
     """Return the singleton Settings instance.
 
     The lru_cache means env-var changes mid-process require a manual
-    `get_settings.cache_clear()` — used in tests.
+    `get_settings.cache_clear()` â€” used in tests.
     """
     return Settings()

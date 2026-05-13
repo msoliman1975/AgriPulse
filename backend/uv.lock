@@ -762,7 +762,7 @@ wheels = [
 ]
 
 [[package]]
-name = "missionagre-backend"
+name = "agripulse-backend"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

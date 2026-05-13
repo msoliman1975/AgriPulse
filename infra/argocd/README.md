@@ -1,7 +1,7 @@
-# MissionAgre — ArgoCD
+# AgriPulse â€” ArgoCD
 
-GitOps surface for the platform. Three environments — `dev`, `staging`,
-`production` — each rendered from this folder.
+GitOps surface for the platform. Three environments â€” `dev`, `staging`,
+`production` â€” each rendered from this folder.
 
 ## Layout
 
@@ -32,7 +32,7 @@ kubectl apply -n argocd -f infra/argocd/appsets/bootstrap.yaml
 ```
 
 This creates the four ApplicationSets which fan out into Applications, one
-per `(chart × environment)` cell. Each Application has:
+per `(chart Ã— environment)` cell. Each Application has:
 
 - `syncPolicy.automated` for `dev`; `automated.prune: false` for `production`.
 - `syncOptions: ["ServerSideApply=true", "CreateNamespace=true"]`.

@@ -1,7 +1,7 @@
 import { test, expect } from "../fixtures";
 
 /**
- * Golden-path smoke. The point isn't deep coverage — it's that the
+ * Golden-path smoke. The point isn't deep coverage â€” it's that the
  * production bundle boots, the auth gate accepts a sessionStorage user,
  * and the primary navigation surfaces render without throwing.
  *
@@ -29,12 +29,12 @@ test.describe("App shell smoke", () => {
   test("language switch flips html.dir to rtl when Arabic selected", async ({
     authedPage,
   }) => {
-    // i18n init reads the saved language from `missionagre.lang` —
+    // i18n init reads the saved language from `agripulse.lang` â€”
     // see src/i18n/index.ts (lookupLocalStorage). Setting it before
     // page load makes Arabic the active language at boot, which fires
-    // syncHtmlAttributes("ar") → <html dir="rtl">.
+    // syncHtmlAttributes("ar") â†’ <html dir="rtl">.
     await authedPage.addInitScript(() => {
-      window.localStorage.setItem("missionagre.lang", "ar");
+      window.localStorage.setItem("agripulse.lang", "ar");
     });
     await authedPage.goto("/");
     await expect

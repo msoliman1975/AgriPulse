@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/msoliman1975/missionagre/tile-server
+  repository: ghcr.io/msoliman1975/agripulse/tile-server
   tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []
@@ -37,7 +37,7 @@ ingress:
   # Final host renders as `${hostPrefix}.${global.envHost}`.
   hostPrefix: tiles
   pathPrefix: /
-  tlsSecretName: missionagre-tile-server-tls
+  tlsSecretName: agripulse-tile-server-tls
 
 resources:
   requests:

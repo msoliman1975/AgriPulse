@@ -1,4 +1,4 @@
-# Containerization & AWS deployment prompts (CD-1 … CD-15)
+# Containerization & AWS deployment prompts (CD-1 â€¦ CD-15)
 
 Each `CD-N.md` file is a self-contained prompt you can paste into a fresh Claude Code session. It assumes nothing about prior conversation context.
 
@@ -7,15 +7,15 @@ Use one per PR. They are designed to be **mergeable + revertable independently**
 Strategy of record: `docs/proposals/app-containerization-strategy.md`.
 
 ## Groups
-- **CD-1 … CD-4** — docs + local-dev parity + observability gaps. Low risk.
-- **CD-5 … CD-7** — DNS, S3, CNPG backup. Together they make a real cloud Postgres viable.
-- **CD-8 … CD-10** — Karpenter, External Secrets, ArgoCD bootstrap. After CD-10 the cluster is GitOps-managed.
-- **CD-11 … CD-12** — CI auth + image-bump fix. Removes static keys + closes the tile-server gap.
-- **CD-13 … CD-15** — Keycloak prod hardening + production promotion runbook + cost guardrails.
+- **CD-1 â€¦ CD-4** â€” docs + local-dev parity + observability gaps. Low risk.
+- **CD-5 â€¦ CD-7** â€” DNS, S3, CNPG backup. Together they make a real cloud Postgres viable.
+- **CD-8 â€¦ CD-10** â€” Karpenter, External Secrets, ArgoCD bootstrap. After CD-10 the cluster is GitOps-managed.
+- **CD-11 â€¦ CD-12** â€” CI auth + image-bump fix. Removes static keys + closes the tile-server gap.
+- **CD-13 â€¦ CD-15** â€” Keycloak prod hardening + production promotion runbook + cost guardrails.
 
 ## Shared preamble (already inside each prompt)
 ```
-You are working on the MissionAgre (Agri.Pulse) repo. Strategy of record:
+You are working on the AgriPulse (AgriPulse) repo. Strategy of record:
 docs/proposals/app-containerization-strategy.md. Target platform: EKS +
 ArgoCD + Helm in AWS me-south-1, single account, three K8s namespaces
 (dev/staging/prod). In-cluster CNPG + Redis; S3 for objects; GHCR for

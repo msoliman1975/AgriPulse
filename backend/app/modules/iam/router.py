@@ -52,7 +52,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -71,7 +71,7 @@ async def _resolve_tenant_id(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             title="Tenant not found",
             detail="Could not resolve tenant id from JWT-claimed schema.",
-            type_="https://missionagre.io/problems/tenant-not-found",
+            type_="https://agripulse.cloud/problems/tenant-not-found",
         )
     return row.id
 
@@ -81,7 +81,7 @@ def _user_not_found(user_id: UUID) -> APIError:
         status_code=status.HTTP_404_NOT_FOUND,
         title="User not found",
         detail=f"No user with id {user_id} in this tenant.",
-        type_="https://missionagre.io/problems/iam/user-not-found",
+        type_="https://agripulse.cloud/problems/iam/user-not-found",
         extras={"user_id": str(user_id)},
     )
 
@@ -102,7 +102,7 @@ async def get_me(
             status_code=status.HTTP_404_NOT_FOUND,
             title="User not found",
             detail="No user record exists for this token. Sign out and back in.",
-            type_="https://missionagre.io/problems/user-not-found",
+            type_="https://agripulse.cloud/problems/user-not-found",
         ) from exc
 
 
@@ -150,7 +150,7 @@ async def invite_tenant_user(
             status_code=status.HTTP_409_CONFLICT,
             title="User already a tenant member",
             detail=str(exc),
-            type_="https://missionagre.io/problems/iam/user-already-exists",
+            type_="https://agripulse.cloud/problems/iam/user-already-exists",
             extras={"email": exc.email},
         ) from exc
 

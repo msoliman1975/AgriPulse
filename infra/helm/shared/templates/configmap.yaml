@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: missionagre-app-config
+  name: agripulse-app-config
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 data:
   SERVICE_NAME: {{ .Values.appConfig.serviceName | quote }}
   AWS_DEFAULT_REGION: {{ .Values.appConfig.region | quote }}

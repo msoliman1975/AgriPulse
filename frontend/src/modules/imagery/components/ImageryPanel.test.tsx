@@ -9,7 +9,7 @@ import { renderAtRoute } from "@/modules/farms/test-utils";
 const FARM_ID = "11111111-1111-1111-1111-111111111111";
 const BLOCK_ID = "22222222-2222-2222-2222-222222222222";
 
-// Mock the WebGL bits — jsdom can't render maplibre + deck.gl.
+// Mock the WebGL bits â€” jsdom can't render maplibre + deck.gl.
 vi.mock("./NDVIMap", () => ({
   NDVIMap: ({ tileUrlTemplate }: { tileUrlTemplate: string | null }) => (
     <div data-testid="ndvi-map">{tileUrlTemplate ?? "no-tiles"}</div>
@@ -35,7 +35,7 @@ vi.mock("@/rbac/useCapability", () => ({ useCapability: useCapabilityMock }));
 
 const TEST_CONFIG = {
   tile_server_base_url: "http://localhost:8001",
-  s3_bucket: "missionagre-uploads",
+  s3_bucket: "agripulse-uploads",
   cloud_cover_visualization_max_pct: 60,
   cloud_cover_aggregation_max_pct: 20,
   products: [
@@ -173,9 +173,9 @@ describe("ImageryPanel", () => {
     );
 
     // Wait for the scene picker to mount.
-    const select = await screen.findByLabelText(/المشهد/);
+    const select = await screen.findByLabelText(/Ø§Ù„Ù…Ø´Ù‡Ø¯/);
     expect(select).toBeInTheDocument();
-    // The mocked NDVIMap surfaces the tile-URL template — assert it
+    // The mocked NDVIMap surfaces the tile-URL template â€” assert it
     // contains the index COG asset path and the rescale window.
     await waitFor(() => {
       const map = screen.getByTestId("ndvi-map");

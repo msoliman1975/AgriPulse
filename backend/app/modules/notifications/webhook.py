@@ -7,9 +7,9 @@ secret, and JSON-serialisable body. The function:
     keys) so the signature is stable across senders/runtimes.
   * Computes ``sha256=<hex>`` HMAC over the raw bytes.
   * POSTs with the headers a receiver needs to verify:
-        X-MissionAgre-Event:     <event-name>
-        X-MissionAgre-Delivery:  <dispatch_id>
-        X-MissionAgre-Signature: sha256=<hex>
+        X-AgriPulse-Event:     <event-name>
+        X-AgriPulse-Delivery:  <dispatch_id>
+        X-AgriPulse-Signature: sha256=<hex>
   * Treats any non-2xx response, network error, or timeout as a
     delivery failure (raised as ``WebhookSendError``).
 
@@ -69,10 +69,10 @@ def send_webhook(
     signature = sign_body(secret=secret, body=serialised)
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "MissionAgre-Webhooks/1.0",
-        "X-MissionAgre-Event": event_name,
-        "X-MissionAgre-Delivery": str(delivery_id),
-        "X-MissionAgre-Signature": signature,
+        "User-Agent": "AgriPulse-Webhooks/1.0",
+        "X-AgriPulse-Event": event_name,
+        "X-AgriPulse-Delivery": str(delivery_id),
+        "X-AgriPulse-Signature": signature,
     }
     try:
         with httpx.Client(timeout=timeout_seconds) as client:

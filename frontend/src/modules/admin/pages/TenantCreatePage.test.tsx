@@ -81,7 +81,7 @@ describe("<TenantCreatePage>", () => {
     });
   });
 
-  it("walks the happy path through profile → owner → review → create", async () => {
+  it("walks the happy path through profile â†’ owner â†’ review â†’ create", async () => {
     createMock.mockResolvedValue(buildSuccess({ status: "active" }));
     const user = userEvent.setup();
     renderWizard();
@@ -94,7 +94,7 @@ describe("<TenantCreatePage>", () => {
     await user.type(screen.getByLabelText("Initial owner full name"), "Owner Name");
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    await screen.findByText("Step 3 of 3 — Review & create");
+    await screen.findByText("Step 3 of 3 â€” Review & create");
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     expect(await screen.findByText("Tenant created")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("<TenantCreatePage>", () => {
     createMock.mockRejectedValue(
       new ApiError(
         {
-          type: "https://missionagre.io/problems/tenant-slug-conflict",
+          type: "https://agripulse.cloud/problems/tenant-slug-conflict",
           title: "Tenant slug already exists",
           status: 409,
         },
@@ -183,7 +183,7 @@ describe("<TenantCreatePage>", () => {
     const user = userEvent.setup();
     renderWizard();
 
-    // Two chars — under the 3-char minimum. (The slug input lowercases on
+    // Two chars â€” under the 3-char minimum. (The slug input lowercases on
     // change, so an "all caps" string like "BAD" would have passed.)
     await user.type(screen.getByLabelText("Slug"), "ab");
     await user.type(screen.getByLabelText("Display name"), "Acme");

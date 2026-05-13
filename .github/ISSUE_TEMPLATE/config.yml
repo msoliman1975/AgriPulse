@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Architectural decision
-    url: https://github.com/msoliman1975/MissionAgre/blob/main/docs/ARCHITECTURE.md
+    url: https://github.com/msoliman1975/AgriPulse/blob/main/docs/ARCHITECTURE.md
     about: Read the binding architecture decisions before opening an issue that proposes a stack or pattern change.
   - name: Data model
-    url: https://github.com/msoliman1975/MissionAgre/blob/main/docs/data_model.md
+    url: https://github.com/msoliman1975/AgriPulse/blob/main/docs/data_model.md
     about: Schema and table definitions live here.

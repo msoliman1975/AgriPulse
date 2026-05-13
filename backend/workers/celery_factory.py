@@ -20,7 +20,7 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.audit",
     "app.modules.notifications",
     "app.modules.recommendations",
-    # Celery's `include=` imports the literal module name — packages are
+    # Celery's `include=` imports the literal module name â€” packages are
     # NOT recursed. Point at the submodule that owns the @shared_task
     # decorators so Beat-dispatched tasks resolve on workers.
     "app.modules.imagery.tasks",
@@ -45,7 +45,7 @@ def build_celery(queue: QueueName) -> Celery:
     settings = get_settings()
 
     app = Celery(
-        f"missionagre-{queue}",
+        f"agripulse-{queue}",
         broker=settings.celery_broker_url,
         backend=settings.celery_result_backend,
         include=list(_TASK_PACKAGES),
@@ -72,14 +72,14 @@ def build_publisher() -> Celery:
     """Construct a publisher-side Celery app for the FastAPI process.
 
     Without this, `@shared_task` decorators resolve to Celery's implicit
-    default app — which has no broker configured and silently falls
+    default app â€” which has no broker configured and silently falls
     through to amqp://localhost:5672. Calls to `task.delay(...)` from
     the API process then 500 with `kombu.exceptions.OperationalError:
     Connection refused`.
 
     Constructing a Celery instance has the side effect of becoming
     `current_app`, which is what `@shared_task` resolves through. The
-    queue name we pass is the publisher-side default — task fan-out
+    queue name we pass is the publisher-side default â€” task fan-out
     relies on `task_routes` (not configured yet) for per-task targeting.
     """
     return build_celery("light")

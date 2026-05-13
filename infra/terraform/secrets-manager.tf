@@ -1,4 +1,4 @@
-# CD-9 — AWS Secrets Manager placeholders.
+# CD-9 â€” AWS Secrets Manager placeholders.
 #
 # Terraform owns the resource (name, KMS, tags, IAM) but does NOT own the
 # value. Each secret is created with a one-off placeholder; a human seeds
@@ -24,7 +24,7 @@ locals {
     "postgres-superuser-password",
   ]
 
-  # Cartesian of env × purpose, flattened to a map with stable keys
+  # Cartesian of env Ã— purpose, flattened to a map with stable keys
   # (`<env>/<purpose>`) so `for_each` produces deterministic IDs.
   agripulse_secrets = {
     for pair in setproduct(var.environments, local.agripulse_secret_purposes) :
@@ -40,7 +40,7 @@ resource "aws_secretsmanager_secret" "agripulse" {
 
   name        = "agripulse/${each.value.env}/${each.value.purpose}"
   description = "Placeholder owned by Terraform. Value seeded out-of-band per docs/runbooks/seeding-secrets.md."
-  kms_key_id  = aws_kms_key.missionagre.arn
+  kms_key_id  = aws_kms_key.agripulse.arn
 
   tags = merge(local.common_tags, {
     Env     = each.value.env
@@ -64,7 +64,7 @@ resource "aws_secretsmanager_secret_version" "agripulse_placeholder" {
 }
 
 # Read-only access scoped to the agripulse/ prefix only. Distinct from the
-# legacy `missionagre/*` policy in iam.tf — both attach to the same
+# legacy `agripulse/*` policy in iam.tf â€” both attach to the same
 # external-secrets IRSA role so the migration can land incrementally.
 resource "aws_iam_policy" "agripulse_secrets_read" {
   name        = "agripulse-${var.environment}-secrets-read"

@@ -8,7 +8,7 @@ from fastapi import status
 
 from app.core.errors import APIError
 
-_TYPE_BASE = "https://missionagre.io/problems/plans"
+_TYPE_BASE = "https://agripulse.cloud/problems/plans"
 
 
 class PlanNotFoundError(APIError):

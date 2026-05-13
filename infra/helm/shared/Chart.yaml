@@ -1,13 +1,13 @@
 apiVersion: v2
-name: missionagre-shared
+name: agripulse-shared
 description: |
-  Cluster-wide MissionAgre resources: namespace ConfigMap, cert-manager
+  Cluster-wide AgriPulse resources: namespace ConfigMap, cert-manager
   ClusterIssuers, sample ExternalSecret pulling from AWS Secrets Manager,
   the CloudNativePG `Cluster` manifest, and labels common across all
   service charts.
 
-  ARCHITECTURE.md § 3.2 commits the operators (cert-manager, External
-  Secrets Operator, CloudNativePG) — this chart provisions our specific
+  ARCHITECTURE.md Â§ 3.2 commits the operators (cert-manager, External
+  Secrets Operator, CloudNativePG) â€” this chart provisions our specific
   resources on top of those operators, never the operators themselves.
   Operators are installed via ArgoCD ApplicationSets pointing at upstream
   HelmRepo URLs, kept versioned in `infra/argocd/`.
@@ -15,12 +15,12 @@ type: application
 version: 0.1.0
 appVersion: "0.1.0"
 kubeVersion: ">=1.28.0"
-home: https://github.com/msoliman1975/MissionAgre
+home: https://github.com/msoliman1975/AgriPulse
 icon: https://avatars.githubusercontent.com/u/0
 maintainers:
   - name: msoliman1975
 keywords:
-  - missionagre
+  - agripulse
   - tenancy
   - postgres
   - cloudnativepg

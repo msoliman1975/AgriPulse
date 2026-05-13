@@ -21,7 +21,7 @@ const CATEGORIES: Category[] = ["weather", "imagery", "email", "webhook"];
  * /platform/tenants/:id Integrations tab. Per-category sections, each
  * showing the resolved tenant-tier values with inline edit. Writes
  * land in `tenant_settings_overrides` so TenantOwner can later edit
- * them in Agri.Pulse — Platform's values just seed the defaults.
+ * them in AgriPulse â€” Platform's values just seed the defaults.
  */
 export function TenantIntegrationsPanel({ tenantId }: Props): ReactNode {
   const { t } = useTranslation("admin");

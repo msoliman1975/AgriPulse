@@ -15,9 +15,9 @@ loki:
     s3:
       region: me-south-1
     bucketNames:
-      chunks: missionagre-loki-chunks
-      ruler: missionagre-loki-ruler
-      admin: missionagre-loki-admin
+      chunks: agripulse-loki-chunks
+      ruler: agripulse-loki-ruler
+      admin: agripulse-loki-admin
   limits_config:
     retention_period: 30d
 

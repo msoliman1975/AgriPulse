@@ -4,16 +4,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ printf "%s-%s" (include "missionagre-workers.fullname" $) $name }}
+  name: {{ printf "%s-%s" (include "agripulse-workers.fullname" $) $name }}
   labels:
-    {{- include "missionagre-workers.labels" $ | nindent 4 }}
+    {{- include "agripulse-workers.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ printf "worker-%s" $name }}
 spec:
   replicas: {{ $workload.replicaCount }}
   revisionHistoryLimit: {{ $.Values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      {{- include "missionagre-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
+      {{- include "agripulse-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
   strategy:
     {{- if eq $name "beat" }}
     type: Recreate
@@ -26,11 +26,11 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "missionagre-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 8 }}
+        {{- include "agripulse-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
     spec:
-      serviceAccountName: {{ include "missionagre-workers.serviceAccountName" $ }}
+      serviceAccountName: {{ include "agripulse-workers.serviceAccountName" $ }}
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -39,18 +39,18 @@ spec:
         {{- toYaml $.Values.podSecurityContext | nindent 8 }}
       containers:
         - name: worker
-          image: {{ include "missionagre-workers.imageRef" $ | quote }}
+          image: {{ include "agripulse-workers.imageRef" $ | quote }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           command:
             {{- toYaml $workload.command | nindent 12 }}
           envFrom:
             - configMapRef:
-                name: missionagre-app-config
+                name: agripulse-app-config
             - configMapRef:
-                name: {{ include "missionagre-workers.fullname" $ }}
+                name: {{ include "agripulse-workers.fullname" $ }}
             {{- if $.Values.externalSecret.enabled }}
             - secretRef:
-                name: {{ include "missionagre-workers.fullname" $ }}-secrets
+                name: {{ include "agripulse-workers.fullname" $ }}-secrets
             {{- end }}
           resources:
             {{- toYaml $workload.resources | nindent 12 }}

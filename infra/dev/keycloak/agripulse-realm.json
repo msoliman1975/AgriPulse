@@ -1,6 +1,6 @@
 {
-  "realm": "missionagre",
-  "displayName": "MissionAgre (dev)",
+  "realm": "agripulse",
+  "displayName": "AgriPulse (dev)",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
@@ -14,9 +14,9 @@
   "ssoSessionMaxLifespan": 36000,
   "clients": [
     {
-      "clientId": "missionagre-api",
-      "name": "MissionAgre API (dev)",
-      "description": "Single dev client. SPA flow for the frontend, ROPC for curl-driven backend testing. Audience mapper adds 'missionagre-api' to access tokens to match KEYCLOAK_AUDIENCE.",
+      "clientId": "agripulse-api",
+      "name": "AgriPulse API (dev)",
+      "description": "Single dev client. SPA flow for the frontend, ROPC for curl-driven backend testing. Audience mapper adds 'agripulse-api' to access tokens to match KEYCLOAK_AUDIENCE.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -39,12 +39,12 @@
       },
       "protocolMappers": [
         {
-          "name": "audience-missionagre-api",
+          "name": "audience-agripulse-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "missionagre-api",
+            "included.client.audience": "agripulse-api",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -54,8 +54,8 @@
   ],
   "users": [
     {
-      "username": "dev@missionagre.local",
-      "email": "dev@missionagre.local",
+      "username": "dev@agripulse.local",
+      "email": "dev@agripulse.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "Dev",

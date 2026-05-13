@@ -1,8 +1,8 @@
-# CD-10 — ArgoCD bootstrap.
+# CD-10 â€” ArgoCD bootstrap.
 #
 # Terraform owns the install of ArgoCD itself (chart + namespace + admin
-# password seed). Everything downstream — platform operators, services,
-# observability — is GitOps from `infra/argocd/appsets/bootstrap.yaml` once
+# password seed). Everything downstream â€” platform operators, services,
+# observability â€” is GitOps from `infra/argocd/appsets/bootstrap.yaml` once
 # that one manifest is applied (see docs/runbooks/argocd-bootstrap.md).
 #
 # Chicken-and-egg on the admin password: external-secrets is installed by the
@@ -10,7 +10,7 @@
 # first boot Terraform generates the password, bcrypts it into the chart
 # values, and seeds the plaintext into AWS Secrets Manager. Once ArgoCD has
 # reconciled external-secrets, an ExternalSecret can take over the rotation
-# story — but the bootstrap value is owned here, not in `secrets-manager.tf`'s
+# story â€” but the bootstrap value is owned here, not in `secrets-manager.tf`'s
 # placeholder pattern.
 
 resource "random_password" "argocd_admin" {
@@ -24,7 +24,7 @@ resource "random_password" "argocd_admin" {
 resource "aws_secretsmanager_secret" "argocd_admin" {
   name        = "agripulse/${var.environment}/argocd-admin-password"
   description = "ArgoCD UI admin password. Owned by Terraform until Keycloak SSO lands (CD-13)."
-  kms_key_id  = aws_kms_key.missionagre.arn
+  kms_key_id  = aws_kms_key.agripulse.arn
 
   tags = merge(local.common_tags, {
     Env     = var.environment
@@ -58,7 +58,7 @@ resource "helm_release" "argocd" {
   # `configs.secret.argocdServerAdminPassword` wants a bcrypt hash. Storing
   # plaintext in SM lets operators retrieve it; the chart only ever sees the
   # hash. `argocdServerAdminPasswordMtime` must be a valid RFC3339 timestamp
-  # — keep it stable across applies so we don't bump the password every run.
+  # â€” keep it stable across applies so we don't bump the password every run.
   set_sensitive {
     name  = "configs.secret.argocdServerAdminPassword"
     value = bcrypt(random_password.argocd_admin.result)
@@ -98,7 +98,7 @@ resource "helm_release" "argocd" {
 
   depends_on = [
     module.eks,
-    # External Secrets IRSA exists — even though the controller itself
+    # External Secrets IRSA exists â€” even though the controller itself
     # installs via the platform AppSet, having the role pre-created means the
     # first ExternalSecret to sync after install doesn't race IAM.
     module.iam_role_external_secrets,

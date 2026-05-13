@@ -79,7 +79,7 @@ def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
     async engine is a module-level singleton; without disposal between
     tasks, asyncpg connections retained by the pool reference the
     previous (now-closed) loop, and the next task's pool checkout fails
-    with `RuntimeError: Event loop is closed` → AttributeError on the
+    with `RuntimeError: Event loop is closed` â†’ AttributeError on the
     proactor's `send`. Disposing at the end of each task forces the
     next one to rebuild the pool inside its own loop.
 
@@ -173,7 +173,7 @@ async def _record_audit(
 ) -> None:
     """Audit envelope used by all imagery state transitions.
 
-    Celery tasks are `system` actors — there's no `actor_user_id` on a
+    Celery tasks are `system` actors â€” there's no `actor_user_id` on a
     Beat-driven discovery. The audit service lowers `actor_kind` to
     `system` automatically when `actor_user_id` is None.
     """
@@ -225,7 +225,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
         product = await _lookup_product(session, subscription["product_id"])
 
         # Window: from `last_successful_ingest_at` (or 90 days ago, the
-        # retention floor per ARCH §9) up to now.
+        # retention floor per ARCH Â§9) up to now.
         now = datetime.now(UTC)
         window_start = subscription["last_successful_ingest_at"] or _ninety_days_ago(now)
 
@@ -237,7 +237,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
 
         # SentinelHubProvider raises SentinelHubNotConfiguredError from
         # its constructor when credentials are empty, so the factory
-        # call must live inside the try/except — otherwise the task
+        # call must live inside the try/except â€” otherwise the task
         # dies before the synthetic failed-job marker is written and the
         # UI shows nothing.
         provider: ImageryProvider | None = None
@@ -252,7 +252,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
                     max_cloud_cover_pct=cloud_cap,
                 )
             except SentinelHubNotConfiguredError:
-                # Configuration failure — record one synthetic failed
+                # Configuration failure â€” record one synthetic failed
                 # job so dev clusters surface the misconfig loudly.
                 marker_id = uuid7()
                 await session.execute(
@@ -556,8 +556,8 @@ async def _register_stac_item_async(
                         if job["cloud_cover_pct"] is not None
                         else None
                     ),
-                    "missionagre:scene_id": job["scene_id"],
-                    "missionagre:aoi_hash": block["aoi_hash"],
+                    "agripulse:scene_id": job["scene_id"],
+                    "agripulse:aoi_hash": block["aoi_hash"],
                 },
             )
             await upsert_item(session, item_doc=item_doc)
@@ -601,7 +601,7 @@ async def _register_stac_item_async(
         details={"stac_item_id": item_id},
     )
 
-    # Chain compute_indices — runs on the heavy queue (rasterio reads
+    # Chain compute_indices â€” runs on the heavy queue (rasterio reads
     # are CPU + IO heavy). Failure here doesn't roll back the
     # registration; the job stays `succeeded` and a separate retry
     # tool can re-trigger compute on demand (P2).
@@ -632,7 +632,7 @@ async def _compute_indices_async(
 
     All IO routes through the same DI seams as `acquire_scene` so unit
     tests can swap the storage backend. The rasterio reader / writer
-    is local to this task — keeps the import graph thin for processes
+    is local to this task â€” keeps the import graph thin for processes
     that don't need rasterio (the API + light worker).
     """
     bus = get_default_bus()
@@ -655,7 +655,7 @@ async def _compute_indices_async(
         product = await _lookup_product(session, job["product_id"])
 
     # Step 2: read raw COG, compute indices, write per-index COGs.
-    # Local import — pulls rasterio/numpy only into the heavy worker.
+    # Local import â€” pulls rasterio/numpy only into the heavy worker.
     from app.modules.imagery._rasterio_io import (
         compute_and_write_indices,
         load_raw_bands_and_aggregate,
@@ -751,8 +751,8 @@ async def _compute_indices_async(
                 "eo:cloud_cover": (
                     float(job["cloud_cover_pct"]) if job["cloud_cover_pct"] is not None else None
                 ),
-                "missionagre:scene_id": job["scene_id"],
-                "missionagre:aoi_hash": block["aoi_hash"],
+                "agripulse:scene_id": job["scene_id"],
+                "agripulse:aoi_hash": block["aoi_hash"],
             },
         )
         await upsert_item(session, item_doc=item_doc)
@@ -884,7 +884,7 @@ def _iso(dt: datetime) -> str:
 def _bbox_from_geojson(geojson: dict[str, Any]) -> tuple[float, float, float, float]:
     """Compute a 2D bbox from a GeoJSON Polygon/MultiPolygon.
 
-    The block boundary is always a Polygon (data_model § 5.5); guard
+    The block boundary is always a Polygon (data_model Â§ 5.5); guard
     against MultiPolygon for symmetry with farms.
     """
     coords = _flatten_coords(geojson["type"], geojson["coordinates"])

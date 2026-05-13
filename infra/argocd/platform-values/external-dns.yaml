@@ -9,7 +9,7 @@ domainFilters:
 # its DNS record. Flip to `sync` once we trust the controller end-to-end.
 policy: upsert-only
 
-txtOwnerId: missionagre-eks
+txtOwnerId: agripulse-eks
 txtPrefix: edns-
 
 sources:

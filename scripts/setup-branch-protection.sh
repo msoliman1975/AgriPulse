@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Apply MissionAgre's branch-protection ruleset to `main` via the GitHub
+# Apply AgriPulse's branch-protection ruleset to `main` via the GitHub
 # Rulesets API. Rulesets are the modern replacement for classic branch
-# protection and work on free private repos — classic branch protection
+# protection and work on free private repos â€” classic branch protection
 # requires GitHub Pro / Team.
 #
 # Run once per repo, then any time the required-checks list changes.
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 OWNER="${OWNER:-msoliman1975}"
-REPO="${REPO:-MissionAgre}"
+REPO="${REPO:-AgriPulse}"
 RULESET_NAME="${RULESET_NAME:-main-branch-protection}"
 DRY_RUN=0
 

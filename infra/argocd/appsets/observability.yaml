@@ -1,12 +1,12 @@
 ---
-# Observability stack — Prometheus + Grafana via kube-prometheus-stack,
+# Observability stack â€” Prometheus + Grafana via kube-prometheus-stack,
 # Loki + Promtail for logs, Tempo for traces, GlitchTip for errors.
 # Per-chart values live next to this file in
 # infra/argocd/platform-values/<name>.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: missionagre-observability
+  name: agripulse-observability
   namespace: argocd
 spec:
   generators:
@@ -40,7 +40,7 @@ spec:
     metadata:
       name: "observability-{{.name}}"
       labels:
-        app.kubernetes.io/part-of: missionagre-observability
+        app.kubernetes.io/part-of: agripulse-observability
     spec:
       project: default
       destination:
@@ -53,7 +53,7 @@ spec:
           helm:
             valueFiles:
               - $values/infra/argocd/platform-values/{{.name}}.yaml
-        - repoURL: https://github.com/msoliman1975/MissionAgre.git
+        - repoURL: https://github.com/msoliman1975/AgriPulse.git
           targetRevision: HEAD
           ref: values
       syncPolicy:

@@ -18,24 +18,24 @@ interface Props {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Tenant Owner panel — Platform's only user-mgmt touchpoint after
+ * Tenant Owner panel â€” Platform's only user-mgmt touchpoint after
  * tenant creation per the persona-separation rule (decision Q3:
- * "Platform = define and assign TenantOwners; Agri.Pulse = full
+ * "Platform = define and assign TenantOwners; AgriPulse = full
  * self-service" for everyone else).
  *
  * What lives here:
  *   - Read-only display of the current TenantOwner.
- *   - Transfer-ownership flow (slug-confirmation modal — same posture
+ *   - Transfer-ownership flow (slug-confirmation modal â€” same posture
  *     as the purge confirmation).
  *
  *
  * What lives here:
  *   - Read-only display of the current TenantOwner.
- *   - Transfer-ownership flow (slug-confirmation modal — same posture
+ *   - Transfer-ownership flow (slug-confirmation modal â€” same posture
  *     as the purge confirmation).
  *
  * What used to live here (PR-Reorg4 removal): the Invite TenantAdmin
- * form + per-row "Revoke admin" actions. Those moved to Agri.Pulse —
+ * form + per-row "Revoke admin" actions. Those moved to AgriPulse â€”
  * TenantOwner manages them via /settings/users.
  */
 export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {

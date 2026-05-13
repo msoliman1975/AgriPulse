@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "missionagre-tile-server.fullname" . }}
+  name: {{ include "agripulse-tile-server.fullname" . }}
   labels:
-    {{- include "missionagre-tile-server.labels" . | nindent 4 }}
+    {{- include "agripulse-tile-server.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      {{- include "missionagre-tile-server.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-tile-server.selectorLabels" . | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -18,14 +18,14 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "missionagre-tile-server.selectorLabels" . | nindent 8 }}
+        {{- include "agripulse-tile-server.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "missionagre-tile-server.serviceAccountName" . }}
+      serviceAccountName: {{ include "agripulse-tile-server.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -34,7 +34,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: tile-server
-          image: {{ include "missionagre-tile-server.imageRef" . | quote }}
+          image: {{ include "agripulse-tile-server.imageRef" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -42,7 +42,7 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "missionagre-tile-server.fullname" . }}
+                name: {{ include "agripulse-tile-server.fullname" . }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}
           readinessProbe:

@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "missionagre-tile-server.fullname" . }}
+  name: {{ include "agripulse-tile-server.fullname" . }}
   labels:
-    {{- include "missionagre-tile-server.labels" . | nindent 4 }}
+    {{- include "agripulse-tile-server.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -23,7 +23,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "missionagre-tile-server.fullname" . }}
+                name: {{ include "agripulse-tile-server.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
 {{- end }}

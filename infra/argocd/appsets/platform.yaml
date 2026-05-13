@@ -1,12 +1,12 @@
 ---
-# Cluster operators — installed once per cluster from upstream Helm
+# Cluster operators â€” installed once per cluster from upstream Helm
 # repositories. We do not vendor these; pin versions here and let
 # Dependabot bump them. Per-operator values live in
 # infra/argocd/platform-values/<name>.yaml so they stay readable.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: missionagre-platform
+  name: agripulse-platform
   namespace: argocd
 spec:
   generators:
@@ -51,7 +51,7 @@ spec:
     metadata:
       name: "platform-{{.name}}"
       labels:
-        app.kubernetes.io/part-of: missionagre-platform
+        app.kubernetes.io/part-of: agripulse-platform
     spec:
       project: default
       destination:
@@ -64,7 +64,7 @@ spec:
           helm:
             valueFiles:
               - $values/infra/argocd/platform-values/{{.name}}.yaml
-        - repoURL: https://github.com/msoliman1975/MissionAgre.git
+        - repoURL: https://github.com/msoliman1975/AgriPulse.git
           targetRevision: HEAD
           ref: values
       syncPolicy:
