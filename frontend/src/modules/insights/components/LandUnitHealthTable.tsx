@@ -77,14 +77,8 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
 
 function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode {
   const navigate = useNavigate();
-  const status: "ok" | "warn" | "crit" | "neutral" =
-    b.status === "active"
-      ? "ok"
-      : b.status === "fallow"
-        ? "warn"
-        : b.status === "abandoned"
-          ? "crit"
-          : "neutral";
+  const status: "ok" | "neutral" = b.is_active ? "ok" : "neutral";
+  const statusLabel = b.is_active ? "active" : "inactive";
   return (
     <tr className="hover:bg-ap-line/20">
       <td className="px-4 py-2">
@@ -99,7 +93,7 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
         {b.area_value.toFixed(1)} {b.area_unit}
       </td>
       <td className="px-4 py-2">
-        <Pill kind={status}>{b.status}</Pill>
+        <Pill kind={status}>{statusLabel}</Pill>
       </td>
       <td className="px-4 py-2 text-end">
         <button

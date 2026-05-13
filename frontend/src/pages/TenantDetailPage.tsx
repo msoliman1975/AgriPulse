@@ -143,7 +143,7 @@ export function TenantDetailPage(): ReactNode {
                     <td className="py-2">
                       <AreaDisplay areaM2={Number(f.area_m2)} />
                     </td>
-                    <td className="py-2">{tFarms(`status.${f.status}`)}</td>
+                    <td className="py-2">{tFarms(f.is_active ? "status.active" : "status.archived")}</td>
                   </tr>
                 ))}
               </tbody>

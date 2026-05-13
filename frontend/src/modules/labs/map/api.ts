@@ -210,7 +210,7 @@ export async function loadUnitDetail(args: {
     safeTimeseries(args.blockId, "ndre", from, to),
     safeTimeseries(args.blockId, "ndwi", from, to),
     listAlerts({ block_id: args.blockId, status: "open", limit: 50 }),
-    safeIrrigation(args.farmId, args.blockId),
+    safeIrrigation(args.farmId),
     safeRecommendations(args.blockId),
     safeForecast(args.blockId),
     safeCalendar(args.farmId, from, to),
@@ -383,7 +383,7 @@ async function safeTimeseries(
     return [];
   }
 }
-async function safeIrrigation(farmId: string, blockId: string): Promise<IrrigationSchedule[]> {
+async function safeIrrigation(farmId: string): Promise<IrrigationSchedule[]> {
   try {
     return await listIrrigationSchedules(farmId, {});
   } catch {
