@@ -11,7 +11,9 @@
 {{- end -}}
 
 {{- define "missionagre-workers.imageRef" -}}
-{{- $tag := default .Chart.AppVersion .Values.image.tag -}}
+{{- /* See api chart helper. Overlay key is `workers` even though workers
+       reuse the API image — bumping both keeps the audit trail per-image. */ -}}
+{{- $tag := default .Chart.AppVersion (default .Values.image.tag .Values.global.images.workers.tag) -}}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 

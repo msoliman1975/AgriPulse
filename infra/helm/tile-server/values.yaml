@@ -5,10 +5,14 @@ image:
 imagePullSecrets: []
 
 # See infra/helm/shared/values.yaml; overlays override `global.env` +
-# `global.envHost`.
+# `global.envHost`. Empty `images.tileServer.tag` seed for the CD-12
+# imageRef helper (camelCase because the chart name has a hyphen).
 global:
   env: dev
   envHost: dev.agripulse.cloud
+  images:
+    tileServer:
+      tag: ""
 
 replicaCount: 2
 revisionHistoryLimit: 5

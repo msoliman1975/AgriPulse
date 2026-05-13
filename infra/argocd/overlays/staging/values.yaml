@@ -12,6 +12,18 @@
 global:
   env: staging
   envHost: staging.agripulse.cloud
+  # CD-12 per-image tag map. Staging is NOT auto-bumped — promotion to
+  # this overlay is a hand-written PR after dev smoke testing. Keys are
+  # present so the chart helper's lookup is safe.
+  images:
+    api:
+      tag: ""
+    workers:
+      tag: ""
+    frontend:
+      tag: ""
+    tileServer:
+      tag: ""
 
 labels:
   partOf: missionagre

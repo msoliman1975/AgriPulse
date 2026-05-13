@@ -11,7 +11,7 @@
 {{- end -}}
 
 {{- define "missionagre-frontend.imageRef" -}}
-{{- $tag := default .Chart.AppVersion .Values.image.tag -}}
+{{- $tag := default .Chart.AppVersion (default .Values.image.tag .Values.global.images.frontend.tag) -}}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 
