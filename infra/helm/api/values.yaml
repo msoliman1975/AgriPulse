@@ -98,6 +98,13 @@ env:
   KEYCLOAK_AUDIENCE: agripulse-api
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
+  # On backend cold start, if no active PlatformAdmin exists in
+  # public.platform_role_assignments, the lifespan seeds one from these
+  # two values. Empty email skips the bootstrap. Per-env overlays set the
+  # real address; the default here is intentionally empty so a chart
+  # rendered without an overlay never silently provisions an admin.
+  PLATFORM_ADMIN_EMAIL: ""
+  PLATFORM_ADMIN_FULL_NAME: "Platform Admin"
 
 # Secrets pulled from AWS Secrets Manager via ExternalSecret. The remote
 # JSON object's top-level keys are projected as env vars on the Pod.
