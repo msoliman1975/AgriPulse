@@ -1,6 +1,13 @@
 # production environment overrides. ARCHITECTURE.md § 3.2 commits the
 # baseline resource shapes; tune carefully and only with an ADR for
 # anything that changes scale or reliability assumptions.
+#
+# How this file is consumed: every chart in the missionagre-services
+# AppSet (api, workers, tile-server, frontend, keycloak, shared) is
+# rendered with chart-default values + this overlay layered on top.
+# Charts only read the keys they reference, so chart-specific blocks
+# (`workloads:`, `keycloak:`) at the top level are fine — unused keys
+# are ignored by Helm.
 
 # Used by the shared chart to template the CNPG backup `destinationPath`
 # (s3://agripulse-pg-backup-<env>/pg) and by each service chart's
@@ -13,10 +20,12 @@ global:
 labels:
   partOf: missionagre
 
+# api / frontend / tile-server top-level deployments. Workers are sized
+# per-queue under `workloads:` below.
 replicaCount: 3
 
 # Per-chart host renders as `${hostPrefix}.${global.envHost}` (e.g.
-# api.agripulse.cloud, app.agripulse.cloud).
+# api.agripulse.cloud, app.agripulse.cloud, tiles.agripulse.cloud).
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -47,12 +56,16 @@ certManagerController:
     annotations:
       eks.amazonaws.com/role-arn: ""
 
+# CNPG: 3 instances spread across 3 AZs for HA. Storage matches the
+# anticipated first-year working set; bump via ADR if pgstac/timescale
+# growth blows past the headroom. WAL is sized for ~3 days of
+# uninterrupted retention even under heavy import.
 postgresCluster:
-  instances: 2
+  instances: 3
   storage:
-    size: 200Gi
+    size: 100Gi
   walStorage:
-    size: 60Gi
+    size: 20Gi
   resources:
     requests:
       cpu: "2"
@@ -62,23 +75,35 @@ postgresCluster:
       memory: 16Gi
   backup:
     enabled: true
-    retentionPolicy: "90d"
+    retentionPolicy: "30d"
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""
 
+# api / frontend / tile-server resource shape. Sized for the api pod
+# (busiest); frontend + tile-server tolerate the same envelope. If
+# tile-server starts paging on heavy COG ranges, split the chart-level
+# resources block before we widen this.
 resources:
   requests:
-    cpu: 250m
+    cpu: 500m
     memory: 512Mi
   limits:
     cpu: "2"
-    memory: 1Gi
+    memory: 2Gi
 
+# HPA on api. min=3 holds the AZ spread; max=10 is the documented
+# scale ceiling before we revisit pod-density vs node-count.
 hpa:
   enabled: true
   minReplicas: 3
-  maxReplicas: 12
+  maxReplicas: 10
   targetCPUUtilizationPercentage: 70
+
+# api PDB — keep at least 2 of 3 up during voluntary disruption
+# (node drain, version bump). Workers PDBs live under `workloads:`.
+pdb:
+  enabled: true
+  minAvailable: 2
 
 networkPolicy:
   enabled: true
@@ -89,3 +114,46 @@ serviceAccount:
   create: true
   annotations:
     eks.amazonaws.com/role-arn: ""
+
+# Per-queue worker sizing. Light handles the high-fan-out notification +
+# SSE plumbing; heavy is the COG / imagery pipeline and singleton-ish.
+# Heavy can scale on demand if we ever attach an HPA — for V1 a single
+# replica is intentional to avoid double-running long imagery jobs.
+workloads:
+  light:
+    enabled: true
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+    pdb:
+      enabled: true
+      minAvailable: 1
+  heavy:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+      limits:
+        cpu: "4"
+        memory: 8Gi
+    pdb:
+      enabled: false
+  beat:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    pdb:
+      enabled: false
