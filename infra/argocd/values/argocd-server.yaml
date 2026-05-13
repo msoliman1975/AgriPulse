@@ -1,0 +1,102 @@
+# CD-10 — argo/argo-cd Helm values consumed by infra/terraform/argocd.tf.
+#
+# Anything that has to vary per-env (hostname, allowlist CIDRs, bcrypt admin
+# hash) is injected as `set` / `set_sensitive` overrides by Terraform; this
+# file holds the static, cluster-wide config so it stays diffable in PRs.
+#
+# Keycloak SSO + RBAC are out of scope here — CD-13 wires those. Until then
+# the UI is gated by the ingress IP allowlist + the local admin account.
+
+global:
+  # Lets us trace logs back to a specific release on a multi-tenant cluster
+  # if we ever land one.
+  logging:
+    format: json
+    level: info
+
+configs:
+  params:
+    # TLS terminates at the ingress; ArgoCD speaks gRPC-web behind it. If we
+    # ever expose argocd-server's gRPC port directly (CLI without --grpc-web)
+    # this would need to flip and the ingress backend protocol would change.
+    server.insecure: false
+
+  cm:
+    # Keep the public URL canonical so the UI generates correct redirect
+    # links and the CLI's `argocd login` lands on the right host.
+    url: https://argocd.agripulse.cloud
+    # Default to the in-cluster repo creds; per-repo creds get added via the
+    # `argocd-repo-creds` secret pattern, not here.
+    timeout.reconciliation: 180s
+    # CD-13 adds the Keycloak OIDC block here. Leaving it out (vs. stubbing
+    # it half-configured) means the UI shows only "username/password" login
+    # — which is exactly what we want while the IP allowlist is the gate.
+
+  rbac:
+    # Until SSO lands, the only principal is the local `admin` user. The
+    # `policy.default` of "" (no role) means every other identity is denied.
+    policy.default: ""
+    policy.csv: |
+      g, admin, role:admin
+
+# Controllers run two replicas each. ArgoCD shards Applications across
+# controller replicas via the operator-builtin sharding, so 2 gives us
+# headroom + a survive-one-pod-down property.
+controller:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+repoServer:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+applicationSet:
+  # The ApplicationSet controller is leader-elected but does not run active-
+  # active (a follower just sits idle). Single replica avoids the wasted Pod.
+  replicas: 1
+
+server:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+      nginx.ingress.kubernetes.io/ssl-passthrough: "false"
+      # `whitelist-source-range` is added by Terraform when
+      # var.argocd_admin_allowlist_cidrs is non-empty. Leaving it out here
+      # means a missing override results in an open ingress — which is loud
+      # at first apply (the runbook calls it out) rather than silently wrong.
+
+dex:
+  # Disabled — we're going straight to Keycloak in CD-13, no point running
+  # dex as a translation layer.
+  enabled: false
+
+redis-ha:
+  # Single Redis is fine while ArgoCD is the only consumer; if we ever turn
+  # on HA Redis the upstream chart wants a different replica topology.
+  enabled: false
+
+notifications:
+  # Off until we have a real target. ArgoCD's own UI is the source of truth
+  # for sync state, and the platform AppSet drives the rest via GitOps.
+  enabled: false
