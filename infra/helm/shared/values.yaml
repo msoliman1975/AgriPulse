@@ -102,6 +102,24 @@ postgresCluster:
     - "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
     - "CREATE EXTENSION IF NOT EXISTS citext;"
     - "CREATE EXTENSION IF NOT EXISTS pgaudit;"
+  # CD-13: roles managed by CNPG. The `keycloak` role owns the keycloak
+  # database; its password is the k8s Secret synced from SM by the
+  # keycloak chart's ExternalSecret (missionagre-keycloak-db).
+  managed:
+    roles:
+      - name: keycloak
+        ensure: present
+        login: true
+        comment: "Keycloak realm DB owner (CD-13)"
+        passwordSecret:
+          name: missionagre-keycloak-db
+  # Per-CR databases living in the same Cluster. The primary
+  # `missionagre` DB comes from bootstrap.initdb above; anything else
+  # goes here so CNPG can reconcile it.
+  databases:
+    - name: keycloak
+      owner: keycloak
+      ensure: present
   # Postgres-wide config; tenant migrations are in
   # backend/migrations/{public,tenant}/ and apply via the API pod's
   # init container.

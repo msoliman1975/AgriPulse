@@ -15,6 +15,10 @@ locals {
   agripulse_secret_purposes = [
     "brevo-smtp-password",
     "keycloak-admin-password",
+    # CD-13: per-env password for the `keycloak` CNPG role. CNPG reads
+    # this via a k8s Secret synced by the keycloak chart's ExternalSecret;
+    # Keycloak's externalDatabase block reads the same k8s Secret.
+    "keycloak-db-password",
     "sentinel-hub-client-secret",
     "jwt-signing-key",
     "postgres-superuser-password",
