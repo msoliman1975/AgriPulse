@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import time
 from typing import Any, Protocol
+from uuid import UUID
 
 import httpx
 
@@ -53,6 +54,7 @@ class KeycloakAdminClient(Protocol):
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
+        tenant_id: "UUID | str | None" = None,
     ) -> str: ...
 
     async def add_existing_user_to_group(
@@ -61,6 +63,7 @@ class KeycloakAdminClient(Protocol):
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
+        tenant_id: "UUID | str | None" = None,
     ) -> None: ...
 
     async def disable_users_in_group(self, slug: str) -> int: ...
@@ -122,8 +125,9 @@ class NoopKeycloakClient:
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
+        tenant_id: "UUID | str | None" = None,
     ) -> str:
-        del email, full_name, group_id, roles
+        del email, full_name, group_id, roles, tenant_id
         raise KeycloakNotConfiguredError(
             "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
         )
@@ -134,8 +138,9 @@ class NoopKeycloakClient:
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
+        tenant_id: "UUID | str | None" = None,
     ) -> None:
-        del roles
+        del roles, tenant_id
         self._log.warning(
             "keycloak_noop_add_user_to_group",
             keycloak_user_id=keycloak_user_id,
@@ -320,12 +325,13 @@ class HttpxKeycloakAdminClient:
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
+        tenant_id: UUID | str | None = None,
     ) -> str:
         # We do NOT pass `groups` in the create body — KC requires the
         # group path, not the id, which makes mistakes easy. Add the user
         # via the explicit users/{id}/groups/{gid} call below.
         first, last = _split_full_name(full_name)
-        body = {
+        body: dict[str, Any] = {
             "username": email,
             "email": email,
             "firstName": first,
@@ -333,6 +339,16 @@ class HttpxKeycloakAdminClient:
             "enabled": True,
             "emailVerified": False,
         }
+        # Inline tenant_id + tenant_role into the create body so the JWT
+        # claims work on first sign-in. We can't PUT them afterwards —
+        # Keycloak's PUT /users/{id} treats missing fields as empty and
+        # would wipe email/firstName/lastName (mirrors what
+        # `invite_platform_admin` does for `platform_role`).
+        if tenant_id is not None and roles:
+            body["attributes"] = {
+                "tenant_id": [str(tenant_id)],
+                "tenant_role": [roles[0]],
+            }
 
         resp = await self._request(
             "POST", "/users", operation="create_user", json=body, expected=(201, 409)
@@ -392,6 +408,7 @@ class HttpxKeycloakAdminClient:
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
+        tenant_id: UUID | str | None = None,
     ) -> None:
         # PUT is idempotent in Keycloak — re-adding a user already in
         # the group is a no-op 204.
@@ -403,6 +420,13 @@ class HttpxKeycloakAdminClient:
         )
         for role in roles:
             await self._assign_realm_role(keycloak_user_id, role)
+        # See invite_user above for why we set tenant_id/tenant_role here.
+        if tenant_id is not None and roles:
+            await self._set_tenant_attributes(
+                keycloak_user_id=keycloak_user_id,
+                tenant_id=tenant_id,
+                tenant_role=roles[0],
+            )
         self._log.info(
             "keycloak_add_existing_user_to_group",
             user_id=keycloak_user_id,
@@ -547,6 +571,49 @@ class HttpxKeycloakAdminClient:
             expected=(204,),
         )
 
+    async def _set_tenant_attributes(
+        self,
+        *,
+        keycloak_user_id: str,
+        tenant_id: UUID | str,
+        tenant_role: str,
+    ) -> None:
+        """Set tenant_id + tenant_role user attributes on an existing
+        Keycloak user.
+
+        These become JWT claims via the per-client protocol mappers in
+        `agripulse-api` (`tenant_id-mapper`, `tenant_role-mapper`). The
+        backend auth middleware reads `tenant_role` directly for RBAC,
+        so a user without these attributes has no tenant context
+        regardless of their `public.tenant_role_assignments` row.
+
+        Implementation note: Keycloak's PUT /users/{id} treats missing
+        top-level fields (email/firstName/lastName) as "set to empty",
+        so a naive `PUT {"attributes": {...}}` would wipe them. We GET
+        first, merge the attributes additively, then PUT the full
+        representation. `invite_user` avoids this round-trip by
+        inlining attributes into the initial POST body — this helper is
+        for the `add_existing_user_to_group` path.
+        """
+        resp = await self._request(
+            "GET",
+            f"/users/{keycloak_user_id}",
+            operation="set_tenant_attributes_get",
+            expected=(200,),
+        )
+        user = resp.json()
+        attrs = dict(user.get("attributes") or {})
+        attrs["tenant_id"] = [str(tenant_id)]
+        attrs["tenant_role"] = [tenant_role]
+        user["attributes"] = attrs
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}",
+            operation="set_tenant_attributes",
+            json=user,
+            expected=(204,),
+        )
+
     async def clear_platform_role(self, *, keycloak_user_id: str) -> None:
         """Remove the `platform_role` user attribute. The user account
         stays — they may still be a tenant user."""
@@ -624,10 +691,29 @@ class HttpxKeycloakAdminClient:
             expected=(200, 404),
         )
         if resp.status_code == 404:
-            self._log.warning(
-                "keycloak_role_missing", role=role_name, user_id=user_id
+            # Fresh realm imports don't ship our application roles
+            # (TenantOwner, TenantAdmin, FarmManager, ...). Auto-create on
+            # first assignment so the invite flow doesn't silently produce
+            # users with no realm role. Subsequent invites find the role
+            # via the GET above and skip this path.
+            self._log.info(
+                "keycloak_role_creating_on_demand",
+                role=role_name,
+                user_id=user_id,
             )
-            return
+            await self._request(
+                "POST",
+                "/roles",
+                operation="create_realm_role",
+                json={"name": role_name},
+                expected=(201, 409),
+            )
+            resp = await self._request(
+                "GET",
+                f"/roles/{role_name}",
+                operation="lookup_role_after_create",
+                expected=(200,),
+            )
         role = resp.json()
         await self._request(
             "POST",

@@ -562,6 +562,7 @@ class TenantServiceImpl:
                 email=owner_email,
                 full_name=tenant.pending_owner_full_name,
                 group_id=group_id,
+                tenant_id=tenant.id,
             )
         except KeycloakNotConfiguredError:
             # Not configured ≠ failed — the operator has not enabled
