@@ -130,6 +130,42 @@ PLATFORM_ADMIN_FULL_NAME=Platform Admin
 > Keycloak-side and inserts a `pending::` placeholder user row that
 > blocks subsequent `dev_bootstrap` runs on `uq_users_email`.
 
+### 5b — Realm SMTP (Brevo)
+
+The realm JSON ships with no `smtpServer`, so every Keycloak email
+attempt (invites, password reset, verify email, execute-actions emails)
+silently no-ops. Wire Brevo into the realm:
+
+```bash
+python -m scripts.dev_keycloak_smtp
+```
+
+Reads `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` /
+`SMTP_STARTTLS` / `SMTP_FROM` from `backend/.env` (the same vars the
+notifications module uses) and PUTs them onto the realm. Idempotent.
+
+To verify end-to-end delivery:
+
+```bash
+python -m scripts.dev_keycloak_smtp --send-test you@yourmailbox.tld
+```
+
+That triggers an actual `UPDATE_PASSWORD` invite email through Brevo to
+the given address (target user must already exist in the realm — pass
+either their username or email). A `204` response + an email in your
+inbox confirms the full pipeline.
+
+> **Skip Keycloak's `testSMTPConnection` admin endpoint** — in
+> Keycloak 26 it returns `"Failed to send email"` even when real sends
+> succeed (the test path doesn't re-resolve the masked password it just
+> stored). The `--send-test` path uses `execute-actions-email`, which
+> hits the real send pipeline.
+
+> **Brevo configuration** — the `from` address must be a verified
+> sender in your Brevo account. The repo's `SMTP_FROM` defaults to
+> `AgriPulse <platform@agripulse.tech>`; if you're using your own Brevo
+> account, swap the address to one you've verified.
+
 ## 6 — Dev tenant + user + Keycloak claims
 
 ```bash
@@ -298,6 +334,8 @@ pnpm dev   # http://localhost:5173
 | API log: `platform_admin_invite_keycloak_failed`, `invalid_client` | The `agripulse-tenancy` admin client doesn't exist or its `.env` secret is stale (regen on every script run) | Re-run `dev_keycloak_admin_client`, paste new secret into `.env`, restart backend |
 | `dev_bootstrap.py` fails with `duplicate key … uq_users_email` | Earlier failed `bootstrap_platform_admin` left a `pending::` placeholder user      | `psql ... -c "DELETE FROM public.users WHERE keycloak_subject LIKE 'pending::%';"` then retry |
 | `alembic` exits with `UnicodeDecodeError: 'charmap'` reading `alembic.ini` | Non-ASCII characters in `alembic.ini` + cp1252 locale on Windows                   | Replace em-dashes / smart quotes with ASCII (the committed file is ASCII)   |
+| Invite / password-reset emails silently never arrive   | Realm's `smtpServer` is empty — Keycloak no-ops the send                            | Run `python -m scripts.dev_keycloak_smtp` (Section 5b)                       |
+| Keycloak Admin UI "Test connection" button returns "Failed to send email" but real invites work | Known Keycloak 26 quirk in the `testSMTPConnection` endpoint                       | Ignore the test button; use `dev_keycloak_smtp.py --send-test` instead       |
 | `Port 5173 is already in use`                          | Earlier Vite still bound                                                           | `Stop-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess` then re-run `pnpm dev` |
 | Celery `KeyError: 'imagery.discover_active_subscriptions'` | `_TASK_PACKAGES` pointing at the package, not the submodule                        | Pull main — `app.modules.imagery.tasks` is now the right entry              |
 | Tile request 404s in MapLibre devtools                  | TiTiler can't reach MinIO at `host.docker.internal` (Linux Docker)                 | Add `--network host` to the tile-server run, or use the MinIO container IP  |
@@ -325,7 +363,8 @@ order**:
 
 1. `alembic -n public upgrade head`  (Section 4)
 2. `python -m scripts.dev_keycloak_admin_client` + paste new secret into `.env`  (Section 5)
-3. `python -m scripts.dev_bootstrap`  (Section 6)
-4. Restart backend so the lifespan auto-seeds `PlatformAdmin` (assumes `PLATFORM_ADMIN_EMAIL` is set in `.env`), **or** `python -m scripts.dev_promote_platform_admin`  (Section 7)
+3. `python -m scripts.dev_keycloak_smtp`  (Section 5b — only if you want invite/reset emails to actually send)
+4. `python -m scripts.dev_bootstrap`  (Section 6)
+5. Restart backend so the lifespan auto-seeds `PlatformAdmin` (assumes `PLATFORM_ADMIN_EMAIL` is set in `.env`), **or** `python -m scripts.dev_promote_platform_admin`  (Section 7)
 
 Skipping any step is the source of most "login works but ..." bugs.
