@@ -112,14 +112,25 @@ def kc_admin_token(client: httpx.Client) -> str:
 
 
 def kc_get_user(client: httpx.Client, token: str, email: str) -> dict[str, Any] | None:
-    resp = client.get(
-        f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
-        params={"email": email, "exact": "true"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    resp.raise_for_status()
-    users = resp.json()
-    return dict(users[0]) if users else None
+    """Find a realm user by email, falling back to username.
+
+    The seeded `dev@agripulse.local` user has its email field stripped
+    by Keycloak 26's User Profile validator on realm import (`.local`
+    fails the email format check), so an email-only lookup can miss
+    the user even though they're present. We then look up by
+    username, which the seed always sets.
+    """
+    for key in ("email", "username"):
+        resp = client.get(
+            f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
+            params={key: email, "exact": "true"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+        users = resp.json()
+        if users:
+            return dict(users[0])
+    return None
 
 
 def kc_create_user(
@@ -197,6 +208,56 @@ def kc_set_user_attributes(
         json=user,
     )
     put.raise_for_status()
+
+
+def kc_patch_user_profile(
+    client: httpx.Client,
+    token: str,
+    user_id: str,
+    *,
+    email: str,
+    first_name: str,
+    last_name: str,
+) -> bool:
+    """Ensure email + firstName + lastName are populated on the user.
+
+    Keycloak 26's User Profile feature silently strips these fields
+    during realm import when their values don't match the built-in
+    validators (notably: email validator rejects the `.local` TLD). The
+    seeded `dev@agripulse.local` user ends up with username set but
+    every other built-in field empty. We patch them back via the Admin
+    API, which respects the User Profile config but applies it after
+    enable + emailVerified are already set, so the values stick.
+
+    Idempotent: returns True if anything changed, False if the user
+    already has the requested values.
+    """
+    resp = client.get(
+        f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp.raise_for_status()
+    user = resp.json()
+    changed = False
+    if user.get("email") != email:
+        user["email"] = email
+        user["emailVerified"] = True
+        changed = True
+    if user.get("firstName") != first_name:
+        user["firstName"] = first_name
+        changed = True
+    if user.get("lastName") != last_name:
+        user["lastName"] = last_name
+        changed = True
+    if not changed:
+        return False
+    put = client.put(
+        f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json=user,
+    )
+    put.raise_for_status()
+    return True
 
 
 def kc_get_client_uuid(client: httpx.Client, token: str) -> str:
@@ -445,6 +506,21 @@ async def bootstrap_default() -> None:
         kc_user_id = user["id"]
         user_uuid = UUID(kc_user_id)
         print(f"  keycloak sub: {kc_user_id}")
+
+        # Restore email + firstName + lastName if Keycloak's realm import
+        # stripped them. The seeded user has username set but the built-in
+        # fields end up empty when the email's TLD (.local) trips the User
+        # Profile validator. PUT via Admin API works around this.
+        patched = kc_patch_user_profile(
+            client,
+            token,
+            kc_user_id,
+            email=DEV_USER_EMAIL,
+            first_name="Dev",
+            last_name="User",
+        )
+        if patched:
+            print("  keycloak user profile: email + firstName + lastName patched")
 
         kc_set_user_attributes(
             client,
