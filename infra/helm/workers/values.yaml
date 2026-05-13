@@ -8,10 +8,14 @@ image:
 imagePullSecrets: []
 
 # See infra/helm/shared/values.yaml; overlays override `global.env` +
-# `global.envHost`.
+# `global.envHost`. Empty `images.workers.tag` seed for the CD-12
+# imageRef helper.
 global:
   env: dev
   envHost: dev.agripulse.cloud
+  images:
+    workers:
+      tag: ""
 
 revisionHistoryLimit: 5
 

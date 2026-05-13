@@ -5,10 +5,16 @@ image:
 imagePullSecrets: []
 
 # Re-declared per chart so a bare `helm template` of this chart still
-# resolves; overlays override `global.env` + `global.envHost`.
+# resolves; overlays override `global.env` + `global.envHost`. The
+# `images.api.tag` slot is seeded empty so the imageRef helper's lookup
+# never NPEs when the chart is rendered without an overlay; the dev
+# overlay's argocd-sync.yml workflow fills it per-image (CD-12).
 global:
   env: dev
   envHost: dev.agripulse.cloud
+  images:
+    api:
+      tag: ""
 
 replicaCount: 2
 

@@ -16,6 +16,17 @@
 global:
   env: prod
   envHost: agripulse.cloud
+  # CD-12 per-image tag map. Production is promoted by hand; the
+  # auto-bump workflow only touches the dev overlay.
+  images:
+    api:
+      tag: ""
+    workers:
+      tag: ""
+    frontend:
+      tag: ""
+    tileServer:
+      tag: ""
 
 labels:
   partOf: missionagre

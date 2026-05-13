@@ -7,6 +7,21 @@
 global:
   env: dev
   envHost: dev.agripulse.cloud
+  # Per-image tag map maintained by .github/workflows/argocd-sync.yml.
+  # CD-12: the loop bumps each chart independently — the old single
+  # `image.tag` left tile-server stuck. yq writes here directly; empty
+  # string falls back to .Chart.AppVersion so a fresh checkout still
+  # renders. Only the dev overlay is auto-bumped; staging/production
+  # promotion is hand-written.
+  images:
+    api:
+      tag: ""
+    workers:
+      tag: ""
+    frontend:
+      tag: ""
+    tileServer:
+      tag: ""
 
 # Common knobs across charts.
 labels:

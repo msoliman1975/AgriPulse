@@ -16,7 +16,13 @@ charts so values.yaml fields and selector labels stay aligned.
 {{- end -}}
 
 {{- define "missionagre-api.imageRef" -}}
-{{- $tag := default .Chart.AppVersion .Values.image.tag -}}
+{{- /* Tag resolution order: overlay global.images.api.tag → chart-local
+       image.tag → .Chart.AppVersion. The overlay map is bumped per-image
+       by .github/workflows/argocd-sync.yml so api/workers/frontend/
+       tileServer no longer share a single global tag. The chart's
+       values.yaml seeds an empty global.images.api.tag so a bare
+       `helm template` (without the overlay) still resolves. */ -}}
+{{- $tag := default .Chart.AppVersion (default .Values.image.tag .Values.global.images.api.tag) -}}
 {{- printf "%s:%s" .Values.image.repository $tag -}}
 {{- end -}}
 
