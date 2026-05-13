@@ -1,5 +1,10 @@
 # staging environment overrides. Tracks production layout but with
 # smaller resource asks so cost stays sane during pre-release runs.
+#
+# How this file is consumed: every chart in the missionagre-services
+# AppSet is rendered with chart-default values + this overlay layered
+# on top. Charts only read the keys they reference, so chart-specific
+# blocks (`workloads:`, `keycloak:`) at the top level are fine.
 
 # Used by the shared chart to template the CNPG backup `destinationPath`
 # (s3://agripulse-pg-backup-<env>/pg) and by each service chart's
@@ -11,6 +16,9 @@ global:
 labels:
   partOf: missionagre
 
+# api / frontend / tile-server top-level deployments. Two replicas is
+# enough for a real load-balanced rolling deploy without paying the
+# 3-AZ HA tax of production.
 replicaCount: 2
 
 # Per-chart host renders as `${hostPrefix}.${global.envHost}` (e.g.
@@ -45,6 +53,8 @@ certManagerController:
     annotations:
       eks.amazonaws.com/role-arn: ""
 
+# CNPG: 2 instances — enough to validate failover during soak runs
+# without burning prod-shape spend.
 postgresCluster:
   instances: 2
   storage:
@@ -57,6 +67,28 @@ postgresCluster:
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""
 
+# api / frontend / tile-server resource shape. Smaller than prod —
+# staging is for smoke + soak, not load.
+resources:
+  requests:
+    cpu: 250m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# HPA on api in staging too, just with a lower ceiling. Lets us
+# exercise the autoscaling path before prod sees it.
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
 # Per-env api IRSA binding. ARN comes from
 # `terraform output agripulse_env_resources` → .staging.api_irsa_arn.
 serviceAccount:
@@ -64,10 +96,42 @@ serviceAccount:
   annotations:
     eks.amazonaws.com/role-arn: ""
 
-resources:
-  requests:
-    cpu: 100m
-    memory: 256Mi
-  limits:
-    cpu: "1"
-    memory: 512Mi
+# Per-queue worker sizing. Same shape as prod but smaller asks.
+workloads:
+  light:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    pdb:
+      enabled: true
+      minAvailable: 1
+  heavy:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+    pdb:
+      enabled: false
+  beat:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    pdb:
+      enabled: false
