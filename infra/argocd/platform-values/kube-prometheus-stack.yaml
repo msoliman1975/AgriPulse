@@ -34,7 +34,7 @@ grafana:
   defaultDashboardsTimezone: Africa/Cairo
   adminPassword: "" # comes via External Secret, not values file
   admin:
-    existingSecret: missionagre-grafana-admin
+    existingSecret: agripulse-grafana-admin
     userKey: username
     passwordKey: password
   persistence:
@@ -47,11 +47,11 @@ grafana:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-staging
     hosts:
-      - grafana.dev.missionagre.local
+      - grafana.dev.agripulse.local
     tls:
       - hosts:
-          - grafana.dev.missionagre.local
-        secretName: missionagre-grafana-tls
+          - grafana.dev.agripulse.local
+        secretName: agripulse-grafana-tls
   sidecar:
     dashboards:
       enabled: true

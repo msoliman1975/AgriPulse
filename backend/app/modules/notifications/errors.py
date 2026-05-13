@@ -13,7 +13,7 @@ class InboxItemNotFoundError(APIError):
             status_code=404,
             title="Inbox item not found",
             detail=f"No inbox item with id {item_id}.",
-            type_="https://missionagre.io/problems/inbox-item-not-found",
+            type_="https://agripulse.cloud/problems/inbox-item-not-found",
         )
 
 
@@ -26,5 +26,5 @@ class TemplateNotFoundError(APIError):
                 f"No notification_templates row for "
                 f"({template_code!r}, {locale!r}, {channel!r})."
             ),
-            type_="https://missionagre.io/problems/notification-template-missing",
+            type_="https://agripulse.cloud/problems/notification-template-missing",
         )

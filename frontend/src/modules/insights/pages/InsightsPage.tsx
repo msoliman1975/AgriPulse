@@ -61,7 +61,7 @@ export function InsightsPage(): ReactNode {
         <div className="flex items-start gap-3">
           <img
             src="/agripulse-mark.png"
-            alt="Agri.Pulse"
+            alt="AgriPulse"
             className="h-12 w-12 shrink-0 object-contain"
           />
           <div>
@@ -73,12 +73,12 @@ export function InsightsPage(): ReactNode {
               <Skeleton className="inline-block h-4 w-64" />
             ) : (
               <>
-                <span className="font-medium text-ap-ink">{farm?.name ?? "—"}</span>
+                <span className="font-medium text-ap-ink">{farm?.name ?? "â€”"}</span>
                 {farm ? (
                   <>
-                    {" · "}
+                    {" Â· "}
                     {Number(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
-                    {" · "}
+                    {" Â· "}
                     {format(new Date(), "EEEE, MMMM d", { locale: dateLocale })}
                   </>
                 ) : null}

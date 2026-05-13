@@ -4,7 +4,7 @@
 
 # Mirrors infra/helm/shared/values.yaml; overlays override `global.envHost`.
 # The bitnami sub-chart does not run values through `tpl`, so we cannot
-# template the hostname directly — overlays must set
+# template the hostname directly â€” overlays must set
 # `keycloak.ingress.hostname` AND `keycloak.extraEnvVars[KC_HOSTNAME]` per
 # env (see overlays/<env>/values.yaml).
 global:
@@ -12,7 +12,7 @@ global:
   envHost: dev.agripulse.cloud
 
 # CD-13: ExternalSecret wiring for the admin + DB passwords. Toggle each
-# off only for unit-level `helm template` smoke testing — in real envs
+# off only for unit-level `helm template` smoke testing â€” in real envs
 # both must be on so the bitnami chart's existingSecret references resolve.
 externalSecrets:
   refreshInterval: 1h
@@ -48,27 +48,27 @@ keycloak:
     # The bootstrap admin password is created in AWS Secrets Manager and
     # synced into k8s by the ExternalSecret in
     # templates/externalsecret-admin.yaml.
-    existingSecret: missionagre-keycloak-admin
+    existingSecret: agripulse-keycloak-admin
     passwordSecretKey: admin_password
 
-  # Realm import: bake the missionagre realm into a ConfigMap and mount
+  # Realm import: bake the agripulse realm into a ConfigMap and mount
   # it. CD-13 keeps the same JSON shipped in
-  # `infra/helm/keycloak/files/missionagre-realm.json`. Production realm
+  # `infra/helm/keycloak/files/agripulse-realm.json`. Production realm
   # updates flow via the runbook in docs/runbooks/keycloak-realm-update.md.
   extraStartupArgs: "--import-realm"
   extraVolumes:
     - name: realm-import
       configMap:
-        name: missionagre-keycloak-realm
+        name: agripulse-keycloak-realm
   extraVolumeMounts:
     - name: realm-import
       mountPath: /opt/bitnami/keycloak/data/import
       readOnly: true
 
   # CD-13: stable issuer URL. The bitnami chart maps
-  # `ingress.hostname` → KEYCLOAK_HOSTNAME (which becomes KC_HOSTNAME on
-  # the server) and `ingress.hostnameStrict` → KEYCLOAK_HOSTNAME_STRICT.
-  # Strict mode rejects requests whose Host header doesn't match —
+  # `ingress.hostname` â†’ KEYCLOAK_HOSTNAME (which becomes KC_HOSTNAME on
+  # the server) and `ingress.hostnameStrict` â†’ KEYCLOAK_HOSTNAME_STRICT.
+  # Strict mode rejects requests whose Host header doesn't match â€”
   # defense against host-confusion attacks and the only way to make sure
   # every access-token `iss` claim resolves to the same FQDN regardless
   # of which pod issued it. Overlays override `ingress.hostname` per env.
@@ -84,16 +84,16 @@ keycloak:
   # Use the operator-managed Postgres rather than the bundled bitnami DB.
   # CD-13: the `keycloak` database is provisioned by the CNPG Cluster
   # via the shared chart's `postgresCluster.databases` block, and the
-  # `keycloak` role's password lives in `missionagre-keycloak-db` (synced
+  # `keycloak` role's password lives in `agripulse-keycloak-db` (synced
   # by templates/externalsecret-db.yaml). Vendor is implied by `host`+
   # `port` but set explicitly so chart upgrades can't auto-switch.
   externalDatabase:
     vendor: postgresql
-    host: missionagre-pg-rw
+    host: agripulse-pg-rw
     port: 5432
     database: keycloak
     user: keycloak
-    existingSecret: missionagre-keycloak-db
+    existingSecret: agripulse-keycloak-db
     existingSecretPasswordKey: password
   postgresql:
     enabled: false

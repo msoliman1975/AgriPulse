@@ -75,7 +75,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -248,7 +248,7 @@ async def get_config(
 ) -> dict[str, Any]:
     """Bootstrap payload the SPA fetches on app load.
 
-    No per-farm gate — the JWT already proves a tenant scope, and the
+    No per-farm gate â€” the JWT already proves a tenant scope, and the
     response carries no block-level data. Routes that need stricter
     isolation (scene URLs, raster tile templates) gate themselves
     elsewhere.

@@ -78,7 +78,7 @@ export function App(): ReactNode {
                 tokens asynchronously. If ProtectedRoute saw the
                 unauth-yet state and bounced to /login, /login would
                 signinRedirect to Keycloak, Keycloak would round-trip
-                back to /auth/callback — a redirect loop. */}
+                back to /auth/callback â€” a redirect loop. */}
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route
               element={
@@ -99,7 +99,7 @@ export function App(): ReactNode {
               }
             >
               {/* AgriPulseGuard bounces PlatformAdmin to /platform so
-                  Platform staff don't see the Agri.Pulse tree at all
+                  Platform staff don't see the AgriPulse tree at all
                   (persona-separation rule from the portal-restructure). */}
               <Route element={<AgriPulseGuard />}>
               <Route path="/" element={<HomePage />} />
@@ -113,10 +113,10 @@ export function App(): ReactNode {
               <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
               <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
               <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
-              {/* AgriPulse new IA — farm-scoped routes (UX_SPEC §3 +
-                  IMPLEMENTATION_PLAN §3). */}
+              {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
+                  IMPLEMENTATION_PLAN Â§3). */}
               {/* Labs: experimental map-first surface for live validation.
-                  Complements the existing list/table flow — does not
+                  Complements the existing list/table flow â€” does not
                   replace it. See docs/proposals/map-first.md. */}
               <Route path="/labs/map" element={<MapExperiencePage />} />
               <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
@@ -127,7 +127,7 @@ export function App(): ReactNode {
               <Route path="/signals/:farmId" element={<SignalsLogPage />} />
               <Route path="/reports/:farmId" element={<ReportsPage />} />
               <Route path="/config/signals/:farmId" element={<SignalsConfigPage />} />
-              {/* Rules + Users are tenant-wide — redirect to the Settings hub. */}
+              {/* Rules + Users are tenant-wide â€” redirect to the Settings hub. */}
               <Route
                 path="/config/rules/:farmId"
                 element={<Navigate to="/settings/rules" replace />}
@@ -147,7 +147,7 @@ export function App(): ReactNode {
                 path="/config/decision-trees/:farmId/new"
                 element={<Navigate to="/settings/decision-trees/new" replace />}
               />
-              {/* /config/decision-trees/:farmId/:code → /settings/decision-trees/:code */}
+              {/* /config/decision-trees/:farmId/:code â†’ /settings/decision-trees/:code */}
               <Route
                 path="/config/decision-trees/:farmId/:code"
                 element={<RedirectDecisionTreeDetail />}
@@ -216,7 +216,7 @@ export function App(): ReactNode {
                 />
               </Route>
               </Route>
-              {/* Platform Management Portal — capability gate sits
+              {/* Platform Management Portal â€” capability gate sits
                   inside PlatformLayout (PR-Reorg2). PlatformAdmin
                   lands here post-login because AgriPulseGuard above
                   redirects them away from /. */}

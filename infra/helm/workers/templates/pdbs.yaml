@@ -4,13 +4,13 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ printf "%s-%s" (include "missionagre-workers.fullname" $) $name }}
+  name: {{ printf "%s-%s" (include "agripulse-workers.fullname" $) $name }}
   labels:
-    {{- include "missionagre-workers.labels" $ | nindent 4 }}
+    {{- include "agripulse-workers.labels" $ | nindent 4 }}
 spec:
   minAvailable: {{ $workload.pdb.minAvailable }}
   selector:
     matchLabels:
-      {{- include "missionagre-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
+      {{- include "agripulse-workers.selectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
 {{- end }}
 {{- end }}

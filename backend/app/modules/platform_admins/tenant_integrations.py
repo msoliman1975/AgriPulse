@@ -6,7 +6,7 @@ PlatformAdmin via the wildcard `*`).
 
 Reads and writes the tenant tier of the three-tier resolver
 (`public.tenant_settings_overrides`). Farm and LandUnit tier overrides
-stay in Agri.Pulse — the Platform portal only sets the tenant
+stay in AgriPulse â€” the Platform portal only sets the tenant
 defaults that TenantOwner can later override.
 
 Audit lands in `audit_events_archive` since these are platform-level
@@ -81,7 +81,7 @@ def _validate_category(category: str) -> Category:
             status_code=400,
             title="Invalid integration category",
             detail=f"{category!r} is not one of {list(CATEGORY_KEYS)}",
-            type_="https://missionagre.io/problems/integrations/invalid-category",
+            type_="https://agripulse.cloud/problems/integrations/invalid-category",
         )
     return category  # type: ignore[return-value]
 
@@ -139,7 +139,7 @@ async def write_tenant_integration(
             status_code=400,
             title="Invalid key for category",
             detail=f"{key!r} does not belong to category {cat!r}",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
 
     repo = SettingsRepository(public_session=public_session)
@@ -193,7 +193,7 @@ async def clear_tenant_integration(
             status_code=400,
             title="Invalid key for category",
             detail=f"{key!r} does not belong to category {cat!r}",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
 
     repo = SettingsRepository(public_session=public_session)

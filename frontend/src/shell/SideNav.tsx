@@ -97,7 +97,7 @@ export function SideNav(): ReactNode {
 
   // Persona separation (portal-restructure Q8): PlatformAdmin sees
   // ONLY the Platform Management Portal nav. Tenant users see the
-  // Agri.Pulse workspace + per-farm config + tenant Settings hub.
+  // AgriPulse workspace + per-farm config + tenant Settings hub.
   if (isPlatformAdmin) {
     return (
       <nav

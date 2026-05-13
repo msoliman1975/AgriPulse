@@ -1,4 +1,4 @@
-# MissionAgre frontend
+# AgriPulse frontend
 
 React 18 + TypeScript + Vite SPA. Tailwind with `tailwindcss-rtl` for
 bilingual (en + ar) support. OIDC against Keycloak via `react-oidc-context`.
@@ -24,7 +24,7 @@ cp .env.example .env.local       # edit only if defaults don't match
 pnpm dev                          # http://localhost:5173
 ```
 
-Sign in with `dev@missionagre.local` / `dev` (the seed user from the
+Sign in with `dev@agripulse.local` / `dev` (the seed user from the
 imported Keycloak realm).
 
 ## Scripts

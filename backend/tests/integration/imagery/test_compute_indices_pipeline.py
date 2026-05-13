@@ -117,7 +117,7 @@ def _utm_aoi_geojson() -> dict[str, Any]:
 
 
 def _wgs_aoi_geojson() -> dict[str, Any]:
-    """A polygon in WGS84 — just provided for the block-context reader."""
+    """A polygon in WGS84 â€” just provided for the block-context reader."""
     return {
         "type": "Polygon",
         "coordinates": [
@@ -165,7 +165,7 @@ class _S3DictStorage:
     we stored without going to MinIO.
     """
 
-    bucket = "missionagre-uploads"
+    bucket = "agripulse-uploads"
 
     def __init__(self) -> None:
         self.uploads: dict[str, bytes] = {}
@@ -334,7 +334,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     monkeypatch.setattr(compute_indices, "delay", lambda *a, **k: None)
 
     try:
-        # discover → acquire → register → compute (all async cores).
+        # discover â†’ acquire â†’ register â†’ compute (all async cores).
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
         job_id_raw = (
             await admin_session.execute(
@@ -399,7 +399,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     by_index = {r.index_code: r for r in rows}
     assert by_index["ndvi"].mean is not None
     assert by_index["ndvi"].valid_pixel_count > 0
-    # AOI footprint counts pixels — total_pixel_count is positive for at
+    # AOI footprint counts pixels â€” total_pixel_count is positive for at
     # least one index (the AOI may be slightly off the synthetic raster
     # bounds because the polygon was supplied in WGS84 and projected to
     # UTM by the trigger; tolerate either zero or positive).

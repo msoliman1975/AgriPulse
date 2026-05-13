@@ -16,7 +16,7 @@ A capability denial surfaces as 404 to avoid leaking block existence
 across farm scopes.
 
 Note: deliberately NO `from __future__ import annotations` (same
-reason as imagery/router.py — FastAPI's TypeAdapter cannot resolve
+reason as imagery/router.py â€” FastAPI's TypeAdapter cannot resolve
 string annotations on Request injection).
 """
 
@@ -74,7 +74,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -254,7 +254,7 @@ async def list_observations(
 @router.get(
     "/blocks/{block_id}/weather/derived",
     response_model=list[DerivedDailyRead],
-    summary="Daily derived weather signals (GDD, ET₀, rolling rainfall).",
+    summary="Daily derived weather signals (GDD, ETâ‚€, rolling rainfall).",
 )
 async def list_derived_daily(
     block_id: UUID,

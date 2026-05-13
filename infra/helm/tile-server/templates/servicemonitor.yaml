@@ -2,13 +2,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "missionagre-tile-server.fullname" . }}
+  name: {{ include "agripulse-tile-server.fullname" . }}
   labels:
-    {{- include "missionagre-tile-server.labels" . | nindent 4 }}
+    {{- include "agripulse-tile-server.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "missionagre-tile-server.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-tile-server.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: http
       path: /metrics

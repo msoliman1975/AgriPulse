@@ -3,12 +3,12 @@
 We use pypgstac's bundled SQL helpers via plain SQL calls:
 ``pgstac.create_collection(jsonb)`` and ``pgstac.create_items(jsonb)``.
 Both take a STAC JSON object and handle partitioning + validation.
-data_model.md § 6.6 mandates per-tenant collection IDs of the form
+data_model.md Â§ 6.6 mandates per-tenant collection IDs of the form
 ``tenant_<uuid>__<product_code>`` so the per-tenant RLS policy on
 ``pgstac.items`` can isolate by ``collection LIKE 'tenant_<id>__%'``.
 
 Collections are created lazily on first ingestion (Q3 in the PR-A
-plan) — no upfront seeding at tenant bootstrap. The lazy create is
+plan) â€” no upfront seeding at tenant bootstrap. The lazy create is
 idempotent via ``ON CONFLICT DO NOTHING`` semantics (pypgstac's
 ``create_collection`` upserts by id).
 """
@@ -62,7 +62,7 @@ def build_collection_doc(
         "type": "Collection",
         "id": collection_id,
         "title": f"{product_code} (tenant scope)",
-        "description": description or f"MissionAgre {product_code} per-tenant collection.",
+        "description": description or f"AgriPulse {product_code} per-tenant collection.",
         "stac_version": "1.0.0",
         "license": "proprietary",
         "extent": {
@@ -86,7 +86,7 @@ def build_item_doc(
 
     ``item_id`` is expected to be the deterministic
     ``{provider}/{product}/{scene_id}/{aoi_hash}`` string per
-    data_model § 6.6 — pgstac stores it verbatim and the tile server
+    data_model Â§ 6.6 â€” pgstac stores it verbatim and the tile server
     looks it up that way.
 
     ``assets`` maps role names (``raw_bands``, ``ndvi``, ...) to STAC
@@ -119,9 +119,9 @@ async def ensure_collection(
     """Create the collection if absent. Idempotent.
 
     pgstac ships both ``create_collection`` (INSERT, raises on duplicate)
-    and ``upsert_collection`` (INSERT … ON CONFLICT DO UPDATE). When the
-    pipeline fans out — many `register_stac_item` tasks racing for the
-    same tenant — only one wins the create; the rest hit
+    and ``upsert_collection`` (INSERT â€¦ ON CONFLICT DO UPDATE). When the
+    pipeline fans out â€” many `register_stac_item` tasks racing for the
+    same tenant â€” only one wins the create; the rest hit
     UniqueViolation, which dirties the txn and turns every subsequent
     statement into ``InFailedSQLTransactionError``. ``upsert_collection``
     closes that race entirely.
@@ -141,7 +141,7 @@ async def upsert_item(
     """Insert or update one STAC item via pypgstac.
 
     pgstac's ``create_items`` is INSERT-only and raises on duplicate
-    id. ``upsert_items`` is INSERT … ON CONFLICT DO UPDATE — exactly
+    id. ``upsert_items`` is INSERT â€¦ ON CONFLICT DO UPDATE â€” exactly
     the contract we need so the imagery pipeline can call this once
     after ``register_stac_item`` (raw_bands only) and again after
     ``compute_indices`` (raw_bands + six index assets) without the

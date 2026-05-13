@@ -2,12 +2,12 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "missionagre-api.fullname" . }}
+  name: {{ include "agripulse-api.fullname" . }}
   labels:
-    {{- include "missionagre-api.labels" . | nindent 4 }}
+    {{- include "agripulse-api.labels" . | nindent 4 }}
 spec:
   minAvailable: {{ .Values.pdb.minAvailable }}
   selector:
     matchLabels:
-      {{- include "missionagre-api.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-api.selectorLabels" . | nindent 6 }}
 {{- end }}

@@ -1,18 +1,18 @@
-# MissionAgre tile server
+# AgriPulse tile server
 
 Wraps [TiTiler](https://developmentseed.org/titiler/) to serve XYZ/WMTS tiles
-from MissionAgre's COG storage. ARCHITECTURE.md § 9 commits this stack —
+from AgriPulse's COG storage. ARCHITECTURE.md Â§ 9 commits this stack â€”
 keep changes small and prefer upstream features over local forks.
 
 ## Running locally (production-like)
 
 ```bash
-docker build -t missionagre/tile-server:dev .
+docker build -t agripulse/tile-server:dev .
 docker run --rm -p 8000:8000 \
   -e AWS_S3_ENDPOINT_URL=http://host.docker.internal:9000 \
-  -e AWS_ACCESS_KEY_ID=missionagre \
-  -e AWS_SECRET_ACCESS_KEY=missionagre-dev \
-  missionagre/tile-server:dev
+  -e AWS_ACCESS_KEY_ID=agripulse \
+  -e AWS_SECRET_ACCESS_KEY=agripulse-dev \
+  agripulse/tile-server:dev
 ```
 
 Then `curl http://localhost:8000/healthz` for the readiness probe and

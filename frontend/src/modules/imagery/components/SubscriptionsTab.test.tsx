@@ -33,7 +33,7 @@ import { SubscriptionsTab } from "./SubscriptionsTab";
 
 const TEST_CONFIG = {
   tile_server_base_url: "http://localhost:8001",
-  s3_bucket: "missionagre-uploads",
+  s3_bucket: "agripulse-uploads",
   cloud_cover_visualization_max_pct: 60,
   cloud_cover_aggregation_max_pct: 20,
   products: [
@@ -125,7 +125,7 @@ describe("SubscriptionsTab", () => {
     useCapabilityMock.mockReturnValue(false);
 
     render(withConfig(<SubscriptionsTab blockId={BLOCK_ID} farmId={FARM_ID} />));
-    await screen.findByText(/اشتراكات الصور/);
+    await screen.findByText(/Ø§Ø´ØªØ±Ø§ÙƒØ§Øª Ø§Ù„ØµÙˆØ±/);
     expect(document.documentElement.getAttribute("dir")).toBe("rtl");
   });
 });

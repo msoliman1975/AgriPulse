@@ -4,7 +4,7 @@ kind: ScheduledBackup
 metadata:
   name: {{ .Values.postgresCluster.name }}-scheduled
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.postgresCluster.scheduledBackup.schedule | quote }}
   backupOwnerReference: {{ .Values.postgresCluster.scheduledBackup.backupOwnerReference | quote }}

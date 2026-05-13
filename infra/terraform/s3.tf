@@ -1,12 +1,12 @@
 # Three buckets per env. Imagery raw + COGs are bucket-versioned with a
 # lifecycle that moves objects past 90 days to S3 Glacier Instant Retrieval
-# (ARCHITECTURE.md § 9). Exports is shorter-lived (30 days then expire).
+# (ARCHITECTURE.md Â§ 9). Exports is shorter-lived (30 days then expire).
 
 locals {
   buckets = {
-    imagery_raw  = "missionagre-imagery-raw-${var.environment}"
-    imagery_cogs = "missionagre-imagery-cogs-${var.environment}"
-    exports      = "missionagre-exports-${var.environment}"
+    imagery_raw  = "agripulse-imagery-raw-${var.environment}"
+    imagery_cogs = "agripulse-imagery-cogs-${var.environment}"
+    exports      = "agripulse-exports-${var.environment}"
   }
 }
 
@@ -48,7 +48,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.missionagre.arn
+      kms_master_key_id = aws_kms_key.agripulse.arn
     }
     bucket_key_enabled = true
   }
@@ -99,7 +99,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "exports" {
 }
 
 # ---------------------------------------------------------------------------
-# CD-6 — agripulse-{imagery,pg-backup}-{env} buckets.
+# CD-6 â€” agripulse-{imagery,pg-backup}-{env} buckets.
 #
 # Replaces MinIO outside dev. Imagery buckets retain noncurrent versions
 # (STANDARD_IA at 30d, DEEP_ARCHIVE at 90d). Backup buckets hard-expire at
@@ -145,7 +145,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "agripulse_imagery
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.missionagre.arn
+      kms_master_key_id = aws_kms_key.agripulse.arn
     }
     bucket_key_enabled = true
   }
@@ -213,7 +213,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "agripulse_pg_back
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.missionagre.arn
+      kms_master_key_id = aws_kms_key.agripulse.arn
     }
     bucket_key_enabled = true
   }

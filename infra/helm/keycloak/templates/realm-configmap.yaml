@@ -1,18 +1,18 @@
 {{/*
 Realm import ConfigMap. The realm JSON is loaded from the file shipped
-in infra/dev/keycloak/missionagre-realm.json so dev and the cluster
+in infra/dev/keycloak/agripulse-realm.json so dev and the cluster
 import the same baseline. Per-env overlays may replace the contents
 in their own ConfigMap.
 */}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: missionagre-keycloak-realm
+  name: agripulse-keycloak-realm
   labels:
-    app.kubernetes.io/name: missionagre-keycloak
+    app.kubernetes.io/name: agripulse-keycloak
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/part-of: missionagre
+    app.kubernetes.io/part-of: agripulse
 data:
-  missionagre-realm.json: |-
-    {{- .Files.Get "files/missionagre-realm.json" | nindent 4 }}
+  agripulse-realm.json: |-
+    {{- .Files.Get "files/agripulse-realm.json" | nindent 4 }}

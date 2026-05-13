@@ -1,8 +1,8 @@
 apiVersion: v2
-name: missionagre-keycloak
+name: agripulse-keycloak
 description: |
   Thin umbrella over the upstream Bitnami keycloak chart. We never roll
-  our own Keycloak HA topology — the upstream chart handles the database,
+  our own Keycloak HA topology â€” the upstream chart handles the database,
   cache, ingress, and HPA, and our values overrides pin the realm import,
   the database connection, and the issuer host.
 
@@ -15,7 +15,7 @@ kubeVersion: ">=1.28.0"
 maintainers:
   - name: msoliman1975
 keywords:
-  - missionagre
+  - agripulse
   - keycloak
   - oidc
 

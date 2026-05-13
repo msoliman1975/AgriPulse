@@ -34,29 +34,29 @@ depends_on: str | Sequence[str] | None = None
 
 
 _SEED: list[dict[str, object]] = [
-    # ---- recommendation_opened — in-app -----------------------------------
+    # ---- recommendation_opened â€” in-app -----------------------------------
     {
         "template_code": "recommendation_opened",
         "locale": "en",
         "channel": "in_app",
         "subject": "{{severity_label}} recommendation on block {{block_code}}",
-        "body": "{{tree_name}} — {{text}}",
+        "body": "{{tree_name}} â€” {{text}}",
         "body_html": None,
     },
     {
         "template_code": "recommendation_opened",
         "locale": "ar",
         "channel": "in_app",
-        "subject": "توصية {{severity_label}} على الحقل {{block_code}}",
-        "body": "{{tree_name}} — {{text}}",
+        "subject": "ØªÙˆØµÙŠØ© {{severity_label}} Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}}",
+        "body": "{{tree_name}} â€” {{text}}",
         "body_html": None,
     },
-    # ---- recommendation_opened — email ------------------------------------
+    # ---- recommendation_opened â€” email ------------------------------------
     {
         "template_code": "recommendation_opened",
         "locale": "en",
         "channel": "email",
-        "subject": "[Agri.Pulse] {{severity_label}} recommendation on block {{block_code}}",
+        "subject": "[AgriPulse] {{severity_label}} recommendation on block {{block_code}}",
         "body": (
             "A new recommendation is available on block {{block_code}} of farm {{farm_name}}.\n\n"
             "Tree: {{tree_name}}\n"
@@ -71,18 +71,18 @@ _SEED: list[dict[str, object]] = [
         "template_code": "recommendation_opened",
         "locale": "ar",
         "channel": "email",
-        "subject": "[أجري.بَلس] توصية {{severity_label}} على الحقل {{block_code}}",
+        "subject": "[Ø£Ø¬Ø±ÙŠ.Ø¨ÙŽÙ„Ø³] ØªÙˆØµÙŠØ© {{severity_label}} Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}}",
         "body": (
-            "توصية جديدة متاحة على الحقل {{block_code}} من مزرعة {{farm_name}}.\n\n"
-            "الشجرة: {{tree_name}}\n"
-            "الإجراء: {{action_type}}\n"
-            "الخطورة: {{severity_label}}\n\n"
+            "ØªÙˆØµÙŠØ© Ø¬Ø¯ÙŠØ¯Ø© Ù…ØªØ§Ø­Ø© Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}} Ù…Ù† Ù…Ø²Ø±Ø¹Ø© {{farm_name}}.\n\n"
+            "Ø§Ù„Ø´Ø¬Ø±Ø©: {{tree_name}}\n"
+            "Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡: {{action_type}}\n"
+            "Ø§Ù„Ø®Ø·ÙˆØ±Ø©: {{severity_label}}\n\n"
             "{{text}}\n\n"
-            "عرض التفاصيل: {{link_url}}\n"
+            "Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„: {{link_url}}\n"
         ),
         "body_html": None,
     },
-    # ---- recommendation_opened — webhook ---------------------------------
+    # ---- recommendation_opened â€” webhook ---------------------------------
     # Body is the structured JSON payload. `evaluation_snapshot_json` is
     # rendered as a JSON literal (the renderer substitutes a JSON string
     # we pre-serialised in the render context).

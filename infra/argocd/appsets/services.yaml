@@ -1,11 +1,11 @@
 ---
-# Generates one Application per (service chart × environment). Six charts ×
+# Generates one Application per (service chart Ã— environment). Six charts Ã—
 # three environments = 18 Applications. Each Application uses the chart at
 # `infra/helm/<chart>` and overlays `infra/argocd/overlays/<env>/values.yaml`.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: missionagre-services
+  name: agripulse-services
   namespace: argocd
 spec:
   generators:
@@ -22,31 +22,31 @@ spec:
           - list:
               elements:
                 - env: dev
-                  namespace: missionagre
+                  namespace: agripulse
                   autoSync: "true"
                   prune: "true"
                 - env: staging
-                  namespace: missionagre
+                  namespace: agripulse
                   autoSync: "true"
                   prune: "false"
                 - env: production
-                  namespace: missionagre
+                  namespace: agripulse
                   autoSync: "false"
                   prune: "false"
   template:
     metadata:
       name: "{{.chart}}-{{.env}}"
       labels:
-        app.kubernetes.io/part-of: missionagre
-        missionagre.io/env: "{{.env}}"
-        missionagre.io/chart: "{{.chart}}"
+        app.kubernetes.io/part-of: agripulse
+        agripulse.cloud/env: "{{.env}}"
+        agripulse.cloud/chart: "{{.chart}}"
     spec:
       project: default
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{.namespace}}"
       source:
-        repoURL: https://github.com/msoliman1975/MissionAgre.git
+        repoURL: https://github.com/msoliman1975/AgriPulse.git
         targetRevision: HEAD
         path: "infra/helm/{{.chart}}"
         helm:

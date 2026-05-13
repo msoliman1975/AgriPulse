@@ -15,7 +15,7 @@ import { test as base, expect, type Page } from "@playwright/test";
  *
  * The body is a JSON-stringified `User` with at minimum:
  *   - access_token, id_token, refresh_token (any string is fine for
- *     the in-app code paths — the gate is `auth.isAuthenticated`)
+ *     the in-app code paths â€” the gate is `auth.isAuthenticated`)
  *   - profile (claims) including sub, email, preferred_username
  *   - expires_at (unix-seconds in the future)
  *
@@ -23,8 +23,8 @@ import { test as base, expect, type Page } from "@playwright/test";
  * surfaces as the app bouncing to /login.
  */
 
-const AUTHORITY = "http://localhost:8080/realms/missionagre";
-const CLIENT_ID = "missionagre-api";
+const AUTHORITY = "http://localhost:8080/realms/agripulse";
+const CLIENT_ID = "agripulse-api";
 const STORAGE_KEY = `oidc.user:${AUTHORITY}:${CLIENT_ID}`;
 
 const FAKE_USER_ID = "11111111-1111-7111-8111-111111111111";
@@ -44,7 +44,7 @@ function base64Url(input: string): string {
 function fakeJwt(claims: Record<string, unknown>): string {
   // The frontend's `decodeJwt` only base64-decodes the payload; the
   // header + signature are opaque to it. The backend validates real
-  // tokens — Playwright never reaches the backend.
+  // tokens â€” Playwright never reaches the backend.
   const header = base64Url(JSON.stringify({ alg: "none", typ: "JWT" }));
   const payload = base64Url(JSON.stringify(claims));
   return `${header}.${payload}.fake-signature`;
@@ -159,7 +159,7 @@ async function installApiMocks(page: Page): Promise<void> {
       });
       return;
     }
-    // Default empty success for any other GET — keeps the test
+    // Default empty success for any other GET â€” keeps the test
     // resilient to unrelated polling. Mutation endpoints fall through
     // to a 501 below so we don't accidentally pretend writes succeed.
     if (request.method() === "GET") {

@@ -1,4 +1,4 @@
-# MissionAgre — local development services.
+# AgriPulse â€” local development services.
 #
 # Brings up Postgres+TimescaleDB+PostGIS, Redis, Keycloak, and MinIO so the
 # backend (and later the frontend) can run natively against them. See
@@ -14,10 +14,10 @@
 # same on Docker Desktop and on Podman with compose support.
 #
 # All credentials in this file are dev-only and committed on purpose. Never
-# reuse them outside this stack — production runs in Kubernetes with
-# External Secrets Operator (ARCHITECTURE.md § 3.2).
+# reuse them outside this stack â€” production runs in Kubernetes with
+# External Secrets Operator (ARCHITECTURE.md Â§ 3.2).
 
-name: missionagre-dev
+name: agripulse-dev
 
 services:
   # Postgres 16 + TimescaleDB + PostGIS + pg_stat_statements, bundled by the
@@ -25,27 +25,27 @@ services:
   # extensions Alembic creates (migration 0001) are guaranteed to be there.
   postgres:
     image: timescale/timescaledb-ha:pg16
-    container_name: missionagre-postgres
+    container_name: agripulse-postgres
     environment:
-      POSTGRES_DB: missionagre
-      POSTGRES_USER: missionagre
-      POSTGRES_PASSWORD: missionagre
+      POSTGRES_DB: agripulse
+      POSTGRES_USER: agripulse
+      POSTGRES_PASSWORD: agripulse
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/home/postgres/pgdata/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U missionagre -d missionagre"]
+      test: ["CMD-SHELL", "pg_isready -U agripulse -d agripulse"]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
 
   # Single Redis instance shared across cache, Celery broker, and SSE pub/sub
-  # by logical-DB convention (db 0/1/2) per ARCHITECTURE.md § 3.1.
+  # by logical-DB convention (db 0/1/2) per ARCHITECTURE.md Â§ 3.1.
   redis:
     image: redis:7-alpine
-    container_name: missionagre-redis
+    container_name: agripulse-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
@@ -58,13 +58,13 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Keycloak in dev mode. The realm at ./keycloak/missionagre-realm.json is
+  # Keycloak in dev mode. The realm at ./keycloak/agripulse-realm.json is
   # imported on first start and persists in the keycloakdata volume after.
-  # `start-dev` enables HTTP and disables hostname strictness — fine locally,
+  # `start-dev` enables HTTP and disables hostname strictness â€” fine locally,
   # never use this configuration anywhere a real client connects.
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    container_name: missionagre-keycloak
+    container_name: agripulse-keycloak
     command: ["start-dev", "--import-realm"]
     environment:
       # Bootstrap admin (Keycloak 26+ env names).
@@ -77,7 +77,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./keycloak/missionagre-realm.json:/opt/keycloak/data/import/missionagre-realm.json:ro
+      - ./keycloak/agripulse-realm.json:/opt/keycloak/data/import/agripulse-realm.json:ro
       - keycloakdata:/opt/keycloak/data
     restart: unless-stopped
 
@@ -85,11 +85,11 @@ services:
   # the minio-init sidecar below.
   minio:
     image: quay.io/minio/minio:latest
-    container_name: missionagre-minio
+    container_name: agripulse-minio
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: missionagre
-      MINIO_ROOT_PASSWORD: missionagre-dev
+      MINIO_ROOT_USER: agripulse
+      MINIO_ROOT_PASSWORD: agripulse-dev
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # web console
@@ -101,7 +101,7 @@ services:
   # the buckets the backend expects. Exits 0; not restarted.
   minio-init:
     image: quay.io/minio/mc:latest
-    container_name: missionagre-minio-init
+    container_name: agripulse-minio-init
     depends_on:
       - minio
     entrypoint:
@@ -109,21 +109,21 @@ services:
       - -c
       - |
         set -e
-        until mc alias set local http://minio:9000 missionagre missionagre-dev >/dev/null 2>&1; do
+        until mc alias set local http://minio:9000 agripulse agripulse-dev >/dev/null 2>&1; do
           echo "waiting for minio..."
           sleep 1
         done
-        mc mb --ignore-existing local/missionagre-imagery
-        mc mb --ignore-existing local/missionagre-uploads
-        echo "minio buckets ready: missionagre-imagery, missionagre-uploads"
+        mc mb --ignore-existing local/agripulse-imagery
+        mc mb --ignore-existing local/agripulse-uploads
+        echo "minio buckets ready: agripulse-imagery, agripulse-uploads"
     restart: "no"
 
-  # MailHog — local SMTP capture for the notifications email channel
+  # MailHog â€” local SMTP capture for the notifications email channel
   # (PR-S4-D of Slice 4). Backend talks to :1025; visit :8025 in a
   # browser to read what got sent.
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: missionagre-mailhog
+    container_name: agripulse-mailhog
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # web UI

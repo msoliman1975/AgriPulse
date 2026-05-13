@@ -5,20 +5,20 @@ config page shows red badges, this is the recovery path.
 
 The pipeline has four moving parts. Diagnose top-down:
 
-1. **Beat sweep** (`imagery.discover_active_subscriptions`) — finds
+1. **Beat sweep** (`imagery.discover_active_subscriptions`) â€” finds
    subscriptions due for refresh.
-2. **Heavy worker** (`imagery.discover_scenes` → `imagery.acquire_scene`)
-   — calls Sentinel Hub Catalog + Process API, writes COGs to S3.
-3. **Indices computation** — derives NDVI/EVI/etc., writes
+2. **Heavy worker** (`imagery.discover_scenes` â†’ `imagery.acquire_scene`)
+   â€” calls Sentinel Hub Catalog + Process API, writes COGs to S3.
+3. **Indices computation** â€” derives NDVI/EVI/etc., writes
    `block_index_aggregates` rows.
-4. **Tile-server** — renders COGs to map tiles for the SPA.
+4. **Tile-server** â€” renders COGs to map tiles for the SPA.
 
 A failure anywhere shows up as the same UX symptom (no fresh imagery),
 so jumping to step 2 is tempting and usually wrong.
 
 ---
 
-## 1 — Confirm the symptom
+## 1 â€” Confirm the symptom
 
 ```sql
 -- Per-block latest scene + age. Run inside the tenant schema.
@@ -35,17 +35,17 @@ SELECT b.code,
 ```
 
 If `age > 7 days` for every block, it's a global pipeline issue. If it's
-one block, treat as a subscription issue (§ 3 below).
+one block, treat as a subscription issue (Â§ 3 below).
 
 ---
 
-## 2 — Check Beat is enqueueing
+## 2 â€” Check Beat is enqueueing
 
 ```bash
 # In dev:
-docker logs --tail 200 missionagre-beat | grep imagery
+docker logs --tail 200 agripulse-beat | grep imagery
 # In cluster:
-kubectl logs -n missionagre deploy/beat | grep imagery.discover_active
+kubectl logs -n agripulse deploy/beat | grep imagery.discover_active
 ```
 
 Expected: a line every `imagery_discover_active_subscriptions_seconds`
@@ -54,16 +54,16 @@ Expected: a line every `imagery_discover_active_subscriptions_seconds`
 If silent, Beat itself is wedged. Restart:
 
 ```bash
-kubectl rollout restart -n missionagre deploy/beat
+kubectl rollout restart -n agripulse deploy/beat
 ```
 
 If the log says "discovered 0 subscriptions" but the imagery config
-page lists active subs, the SQL filter is wrong; jump to § 3 to verify
+page lists active subs, the SQL filter is wrong; jump to Â§ 3 to verify
 subscription rows are healthy.
 
 ---
 
-## 3 — Check subscriptions
+## 3 â€” Check subscriptions
 
 ```sql
 SELECT b.code,
@@ -80,17 +80,17 @@ SELECT b.code,
 
 Telltale signs:
 
-- `last_attempted_at IS NULL` for hours after creation → Beat is silent.
+- `last_attempted_at IS NULL` for hours after creation â†’ Beat is silent.
 - `last_attempted_at` recent but `last_successful_acquisition_at` stale
-  → Sentinel Hub call is failing. Go to § 4.
-- `is_active = FALSE` → operator paused it (intentional).
+  â†’ Sentinel Hub call is failing. Go to Â§ 4.
+- `is_active = FALSE` â†’ operator paused it (intentional).
 
 ---
 
-## 4 — Check the heavy worker
+## 4 â€” Check the heavy worker
 
 ```bash
-kubectl logs -n missionagre deploy/worker-heavy --tail 500 | \
+kubectl logs -n agripulse deploy/worker-heavy --tail 500 | \
   grep -E "imagery\.(discover|acquire)" | tail -30
 ```
 
@@ -98,18 +98,18 @@ Common failure modes:
 
 | Log line | Meaning | Fix |
 |---|---|---|
-| `SentinelHubNotConfiguredError` | Empty `sentinel_hub_client_id` / `_secret` | Restore the `missionagre-sentinel-hub` ExternalSecret. |
+| `SentinelHubNotConfiguredError` | Empty `sentinel_hub_client_id` / `_secret` | Restore the `agripulse-sentinel-hub` ExternalSecret. |
 | `429 Too Many Requests` | We exceeded the Sentinel Hub rate limit | Throttle: lower `cadence_hours` floor, or wait. The request will retry on the next sweep. |
 | `403 Forbidden` from `/api/v1/process` | Account out of credits | Top up the SH balance. Imagery jobs land as `failed`; they self-heal once credits return. |
-| `botocore.exceptions.ClientError: PutObject … AccessDenied` | S3 credentials drifted | Restore the `missionagre-s3-uploads` ExternalSecret, restart workers. |
-| `IntegrityError uq_imagery_jobs_subscription_scene` | Duplicate-job race | Benign — the second worker was redundant. Ignore. |
+| `botocore.exceptions.ClientError: PutObject â€¦ AccessDenied` | S3 credentials drifted | Restore the `agripulse-s3-uploads` ExternalSecret, restart workers. |
+| `IntegrityError uq_imagery_jobs_subscription_scene` | Duplicate-job race | Benign â€” the second worker was redundant. Ignore. |
 
 If the worker isn't logging at all, it's idle: the queue's empty (Beat
-silent — see § 2) or the worker pod is wedged. Restart.
+silent â€” see Â§ 2) or the worker pod is wedged. Restart.
 
 ---
 
-## 5 — Check indices computation
+## 5 â€” Check indices computation
 
 The indices Beat task (`indices.compute_index_for_scene`) is chained
 from `imagery.acquire_scene`. If imagery rows land but index aggregates
@@ -124,37 +124,37 @@ SELECT s.id, s.scene_datetime, count(bia.*) AS aggregate_count
  ORDER BY s.scene_datetime DESC;
 ```
 
-`aggregate_count = 0` for fresh scenes → check the worker-heavy log for
+`aggregate_count = 0` for fresh scenes â†’ check the worker-heavy log for
 `indices.compute_index_for_scene` errors. Most common: a block
 geometry that doesn't intersect the scene (the AOI lives outside the
-tile bounds) — surfaces as `no_pixels_in_aoi`.
+tile bounds) â€” surfaces as `no_pixels_in_aoi`.
 
 ---
 
-## 6 — Check the tile-server
+## 6 â€” Check the tile-server
 
 If aggregates exist but the SPA still shows blank tiles:
 
 ```bash
 # Hit the tile-server health endpoint directly
-curl https://tiles.missionagre.io/healthz
+curl https://tiles.agripulse.cloud/healthz
 
 # Tail logs
-kubectl logs -n missionagre deploy/tile-server --tail 100
+kubectl logs -n agripulse deploy/tile-server --tail 100
 ```
 
 Common: an S3 read-permission drift. The tile-server uses a different
-IAM role than the workers. Restore `missionagre-tile-server-s3` if so.
+IAM role than the workers. Restore `agripulse-tile-server-s3` if so.
 
 ---
 
-## 7 — On-demand re-run
+## 7 â€” On-demand re-run
 
 Once the underlying issue is fixed, force a single-block refresh
 without waiting for the next Beat tick:
 
 ```bash
-curl -X POST "https://api.missionagre.io/api/v1/blocks/$BLOCK_ID/imagery/refresh" \
+curl -X POST "https://api.agripulse.cloud/api/v1/blocks/$BLOCK_ID/imagery/refresh" \
   -H "Authorization: Bearer $JWT"
 ```
 

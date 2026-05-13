@@ -1,4 +1,4 @@
-"""notification_templates — platform-curated rendered text per (code, locale, channel).
+"""notification_templates â€” platform-curated rendered text per (code, locale, channel).
 
 PR-S4-B of Slice 4. The notifications module renders one of these
 rows when fanning out an alert/recommendation across channels. Like
@@ -8,7 +8,7 @@ per-tenant template customisation is ever needed (deferred to P2).
 
 Primary key is (template_code, locale, channel, version) so a template
 can be revised by inserting a new version row instead of mutating the
-old one — older alerts retain the wording that fired with them.
+old one â€” older alerts retain the wording that fired with them.
 
 Revision ID: 0014
 Revises: 0013
@@ -36,22 +36,22 @@ _SEED: list[dict[str, object]] = [
         "locale": "en",
         "channel": "in_app",
         "subject": "{{severity_label}} alert on block {{block_code}}",
-        "body": "{{rule_name}} — {{diagnosis}}",
+        "body": "{{rule_name}} â€” {{diagnosis}}",
         "body_html": None,
     },
     {
         "template_code": "alert_opened",
         "locale": "ar",
         "channel": "in_app",
-        "subject": "تنبيه {{severity_label}} على الحقل {{block_code}}",
-        "body": "{{rule_name}} — {{diagnosis}}",
+        "subject": "ØªÙ†Ø¨ÙŠÙ‡ {{severity_label}} Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}}",
+        "body": "{{rule_name}} â€” {{diagnosis}}",
         "body_html": None,
     },
     {
         "template_code": "alert_opened",
         "locale": "en",
         "channel": "email",
-        "subject": "[Agri.Pulse] {{severity_label}} alert on block {{block_code}}",
+        "subject": "[AgriPulse] {{severity_label}} alert on block {{block_code}}",
         "body": (
             "An alert just fired on block {{block_code}} of farm {{farm_name}}.\n\n"
             "Rule: {{rule_name}}\n"
@@ -66,14 +66,14 @@ _SEED: list[dict[str, object]] = [
         "template_code": "alert_opened",
         "locale": "ar",
         "channel": "email",
-        "subject": "[أجري.بَلس] تنبيه {{severity_label}} على الحقل {{block_code}}",
+        "subject": "[Ø£Ø¬Ø±ÙŠ.Ø¨ÙŽÙ„Ø³] ØªÙ†Ø¨ÙŠÙ‡ {{severity_label}} Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}}",
         "body": (
-            "صدر تنبيه جديد على الحقل {{block_code}} من مزرعة {{farm_name}}.\n\n"
-            "القاعدة: {{rule_name}}\n"
-            "الخطورة: {{severity_label}}\n\n"
-            "التشخيص:\n{{diagnosis}}\n\n"
-            "الإجراء المقترح:\n{{prescription}}\n\n"
-            "عرض التفاصيل: {{link_url}}\n"
+            "ØµØ¯Ø± ØªÙ†Ø¨ÙŠÙ‡ Ø¬Ø¯ÙŠØ¯ Ø¹Ù„Ù‰ Ø§Ù„Ø­Ù‚Ù„ {{block_code}} Ù…Ù† Ù…Ø²Ø±Ø¹Ø© {{farm_name}}.\n\n"
+            "Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©: {{rule_name}}\n"
+            "Ø§Ù„Ø®Ø·ÙˆØ±Ø©: {{severity_label}}\n\n"
+            "Ø§Ù„ØªØ´Ø®ÙŠØµ:\n{{diagnosis}}\n\n"
+            "Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ù…Ù‚ØªØ±Ø­:\n{{prescription}}\n\n"
+            "Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„: {{link_url}}\n"
         ),
         "body_html": None,
     },

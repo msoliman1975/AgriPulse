@@ -1,8 +1,8 @@
 apiVersion: v2
-name: missionagre-tile-server
+name: agripulse-tile-server
 description: |
-  TiTiler-based COG → XYZ/WMTS service. ARCHITECTURE.md § 9 commits this
-  as the only tile layer for MissionAgre; the chart deploys our wrapped
+  TiTiler-based COG â†’ XYZ/WMTS service. ARCHITECTURE.md Â§ 9 commits this
+  as the only tile layer for AgriPulse; the chart deploys our wrapped
   image with COG storage routed via IRSA-attached IAM credentials.
 type: application
 version: 0.1.0
@@ -11,7 +11,7 @@ kubeVersion: ">=1.28.0"
 maintainers:
   - name: msoliman1975
 keywords:
-  - missionagre
+  - agripulse
   - tiles
   - titiler
   - cog

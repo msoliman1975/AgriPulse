@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: A regression or unexpected behavior in MissionAgre
+about: A regression or unexpected behavior in AgriPulse
 title: "[bug] "
 labels: ["bug", "needs-triage"]
 assignees: []

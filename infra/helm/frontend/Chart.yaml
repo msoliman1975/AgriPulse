@@ -1,8 +1,8 @@
 apiVersion: v2
-name: missionagre-frontend
+name: agripulse-frontend
 description: |
-  MissionAgre frontend SPA, served by nginx-unprivileged after a Vite build.
-  Stateless, ingress-fronted, no secrets at runtime — environment-specific
+  AgriPulse frontend SPA, served by nginx-unprivileged after a Vite build.
+  Stateless, ingress-fronted, no secrets at runtime â€” environment-specific
   values are injected at build time via `pnpm build` arguments.
 type: application
 version: 0.1.0
@@ -11,6 +11,6 @@ kubeVersion: ">=1.28.0"
 maintainers:
   - name: msoliman1975
 keywords:
-  - missionagre
+  - agripulse
   - frontend
   - spa

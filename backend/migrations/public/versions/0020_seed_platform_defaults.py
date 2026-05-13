@@ -62,7 +62,7 @@ SEEDS: list[tuple[str, object, str, str, str]] = [
     ),
     (
         "email.from_address",
-        "noreply@missionagre.com",
+        "noreply@agripulse.com",
         "string",
         "email",
         "From address for outbound transactional email.",

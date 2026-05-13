@@ -1,6 +1,6 @@
 # Runbook: `farms` module
 
-> **Status:** stub. Per `prompts/prompt_02_farm_management.md` § "PR-C", Prompt 6 fills this out properly. The sections here are skeletons — symptom → triage → resolution — so the on-call team has somewhere to land while we ship the rest.
+> **Status:** stub. Per `prompts/prompt_02_farm_management.md` Â§ "PR-C", Prompt 6 fills this out properly. The sections here are skeletons â€” symptom â†’ triage â†’ resolution â€” so the on-call team has somewhere to land while we ship the rest.
 
 For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) see [`docs/modules/farms.md`](../modules/farms.md).
 
@@ -11,7 +11,7 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 - Source: [`backend/app/modules/farms/`](../../backend/app/modules/farms), [`frontend/src/modules/farms/`](../../frontend/src/modules/farms)
 - Capabilities: [`backend/app/shared/rbac/role_capabilities.yaml`](../../backend/app/shared/rbac/role_capabilities.yaml)
 - Tenant migration: [`backend/migrations/tenant/versions/0002_farms_blocks_attachments.py`](../../backend/migrations/tenant/versions/0002_farms_blocks_attachments.py)
-- S3 bucket (dev): `missionagre-uploads` (configurable via `S3_BUCKET_UPLOADS`)
+- S3 bucket (dev): `agripulse-uploads` (configurable via `S3_BUCKET_UPLOADS`)
 - Beat schedule: [`backend/workers/beat/main.py`](../../backend/workers/beat/main.py)
 
 ---
@@ -20,7 +20,7 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 
 ### Farm creation returns 422 "Geometry outside Egypt"
 
-**Triage:** the API rejects any geometry whose bounding box falls outside `lon 24..36, lat 22..32`. This is a sanity guard — see `app/modules/farms/geometry.py`.
+**Triage:** the API rejects any geometry whose bounding box falls outside `lon 24..36, lat 22..32`. This is a sanity guard â€” see `app/modules/farms/geometry.py`.
 
 **Resolution:**
 - Verify the user's GeoJSON is in WGS84 (SRID 4326), not UTM. Common mistake: a Shapefile with a non-WGS84 `.prj` will parse but yield large coordinate values.
@@ -31,7 +31,7 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 **Triage:** `ST_IsValid` rejected the polygon, or `kinks()` found self-intersections in the frontend pre-check.
 
 **Resolution:**
-- Ask the user to re-draw — the most common cause is a bow-tie polygon from manual editing.
+- Ask the user to re-draw â€” the most common cause is a bow-tie polygon from manual editing.
 - For uploaded files, run `ST_MakeValid` in psql to inspect what Postgres sees.
 
 ### Farm shows `area_m2 = 0` after create
@@ -44,15 +44,15 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
   SET search_path TO tenant_<tenant_id>, public;
   SELECT id, area_m2, ST_Area(boundary_utm) FROM farms WHERE id = '<farm_id>';
   ```
-- If `ST_Area(boundary_utm)` is non-zero but `area_m2 = 0`, the `*_at` trigger ordering is wrong — escalate, this is a migration regression.
+- If `ST_Area(boundary_utm)` is non-zero but `area_m2 = 0`, the `*_at` trigger ordering is wrong â€” escalate, this is a migration regression.
 
 ### Auto-grid returns no candidates
 
 **Triage:** input cell size is wider than the farm's bounding box, or the farm is irregularly shaped and no full cell intersects.
 
 **Resolution:**
-- Pick a smaller `cell_size_m` (default 500). For a 100-feddan farm (~420k m²), 200 m × 200 m gives ~10 cells.
-- This isn't an error — surface it as the empty state on the auto-grid page.
+- Pick a smaller `cell_size_m` (default 500). For a 100-feddan farm (~420k mÂ²), 200 m Ã— 200 m gives ~10 cells.
+- This isn't an error â€” surface it as the empty state on the auto-grid page.
 
 ### Attachment upload fails at the PUT step
 
@@ -61,16 +61,16 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 **Resolution:**
 - Confirm the frontend is sending `Content-Type` and `Content-Length` headers exactly as returned by `:init`. Any drift breaks the v4 signature.
 - Confirm the JWT bearer header is **not** being attached. The `apiClient` interceptor would corrupt the signature; the upload helper at `frontend/src/lib/upload.ts` uses raw `fetch()` to avoid this.
-- Check MinIO/S3 logs for the bucket — common dev failure is the bucket not being provisioned. The `minio-init` sidecar in `infra/dev/compose.yaml` should create `missionagre-uploads`.
+- Check MinIO/S3 logs for the bucket â€” common dev failure is the bucket not being provisioned. The `minio-init` sidecar in `infra/dev/compose.yaml` should create `agripulse-uploads`.
 
 ### `audit_events` rows showing `farm_scope_orphan_detected`
 
 **Triage:** the consistency-check Beat job found a row in `public.farm_scopes` whose `farm_id` no longer exists (or is soft-deleted) in the tenant's `farms` table.
 
 **Resolution:**
-- The audit row is informational — the job intentionally does not delete. Possible causes:
-  - A farm was hard-deleted in psql (should never happen — soft-archive is the contract).
-  - A farm was archived in tenant A while a `farm_scope` for it lived in tenant B (cross-tenant FK leak — investigate immediately, this is a data integrity bug).
+- The audit row is informational â€” the job intentionally does not delete. Possible causes:
+  - A farm was hard-deleted in psql (should never happen â€” soft-archive is the contract).
+  - A farm was archived in tenant A while a `farm_scope` for it lived in tenant B (cross-tenant FK leak â€” investigate immediately, this is a data integrity bug).
   - Schema name in `tenants.schema_name` doesn't match the actual schema.
 - Inspect:
   ```sql
@@ -98,8 +98,8 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 To pause without redeploying, set the cadence high in the cluster's ConfigMap and roll the Beat pod:
 
 ```bash
-kubectl set env deploy/missionagre-beat FARM_SCOPE_CONSISTENCY_CHECK_SECONDS=86400 -n missionagre
-kubectl rollout restart deploy/missionagre-beat -n missionagre
+kubectl set env deploy/agripulse-beat FARM_SCOPE_CONSISTENCY_CHECK_SECONDS=86400 -n agripulse
+kubectl rollout restart deploy/agripulse-beat -n agripulse
 ```
 
 To force a one-off run from a worker shell:

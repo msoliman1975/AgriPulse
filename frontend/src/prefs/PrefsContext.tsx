@@ -23,8 +23,8 @@ interface PrefsState {
   setWeatherUnit: (unit: WeatherUnitSystem) => void;
 }
 
-const AREA_STORAGE_KEY = "missionagre.prefs.unit";
-const WEATHER_STORAGE_KEY = "missionagre.prefs.weatherUnit";
+const AREA_STORAGE_KEY = "agripulse.prefs.unit";
+const WEATHER_STORAGE_KEY = "agripulse.prefs.weatherUnit";
 
 function readStoredUnit(): AreaUnit {
   if (typeof window === "undefined") return "feddan";

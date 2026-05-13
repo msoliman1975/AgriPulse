@@ -1,4 +1,4 @@
-"""FastAPI router: /api/v1/admin/tenants — PlatformAdmin tenant lifecycle.
+"""FastAPI router: /api/v1/admin/tenants â€” PlatformAdmin tenant lifecycle.
 
 All endpoints gated by the `platform.manage_tenants` capability.
 """
@@ -65,7 +65,7 @@ def _not_found(tenant_id: UUID) -> APIError:
         status_code=status.HTTP_404_NOT_FOUND,
         title="Tenant not found",
         detail=f"No tenant with id {tenant_id}",
-        type_="https://missionagre.io/problems/tenant-not-found",
+        type_="https://agripulse.cloud/problems/tenant-not-found",
         extras={"tenant_id": str(tenant_id)},
     )
 
@@ -75,7 +75,7 @@ def _conflict_status(exc: InvalidStatusTransitionError) -> APIError:
         status_code=status.HTTP_409_CONFLICT,
         title="Invalid tenant status transition",
         detail=str(exc),
-        type_="https://missionagre.io/problems/tenant-invalid-transition",
+        type_="https://agripulse.cloud/problems/tenant-invalid-transition",
         extras={"current_status": exc.current, "attempted": exc.attempted},
     )
 
@@ -114,7 +114,7 @@ async def create_tenant(
             status_code=status.HTTP_409_CONFLICT,
             title="Tenant slug already exists",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-slug-conflict",
+            type_="https://agripulse.cloud/problems/tenant-slug-conflict",
             extras={"slug": payload.slug},
         ) from exc
 
@@ -156,14 +156,14 @@ async def retry_provisioning(
             status_code=status.HTTP_409_CONFLICT,
             title="Nothing to provision",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-nothing-to-provision",
+            type_="https://agripulse.cloud/problems/tenant-nothing-to-provision",
         ) from exc
     except KeycloakNotConfiguredError as exc:
         raise APIError(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             title="Keycloak provisioning disabled",
             detail=str(exc),
-            type_="https://missionagre.io/problems/keycloak-not-configured",
+            type_="https://agripulse.cloud/problems/keycloak-not-configured",
         ) from exc
     return _detail(snapshot)
 
@@ -435,13 +435,13 @@ async def purge_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Slug confirmation mismatch",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-slug-mismatch",
+            type_="https://agripulse.cloud/problems/tenant-slug-mismatch",
         ) from exc
     except PurgeNotEligibleError as exc:
         raise APIError(
             status_code=status.HTTP_409_CONFLICT,
             title="Purge not yet eligible",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-purge-not-eligible",
+            type_="https://agripulse.cloud/problems/tenant-purge-not-eligible",
             extras={"eligible_at": exc.eligible_at.isoformat()},
         ) from exc

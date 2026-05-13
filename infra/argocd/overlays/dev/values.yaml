@@ -1,4 +1,4 @@
-# dev environment overrides for the missionagre-services ApplicationSet.
+# dev environment overrides for the agripulse-services ApplicationSet.
 # Values here override `infra/helm/<chart>/values.yaml` defaults.
 
 # Used by the shared chart to template the CNPG backup `destinationPath`
@@ -8,7 +8,7 @@ global:
   env: dev
   envHost: dev.agripulse.cloud
   # Per-image tag map maintained by .github/workflows/argocd-sync.yml.
-  # CD-12: the loop bumps each chart independently — the old single
+  # CD-12: the loop bumps each chart independently â€” the old single
   # `image.tag` left tile-server stuck. yq writes here directly; empty
   # string falls back to .Chart.AppVersion so a fresh checkout still
   # renders. Only the dev overlay is auto-bumped; staging/production
@@ -25,7 +25,7 @@ global:
 
 # Common knobs across charts.
 labels:
-  partOf: missionagre
+  partOf: agripulse
 
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
@@ -62,8 +62,8 @@ externalDns:
 # `terraform output karpenter`.
 karpenter:
   enabled: true
-  clusterName: missionagre-dev
-  nodeIAMRoleName: missionagre-dev-karpenter-node
+  clusterName: agripulse-dev
+  nodeIAMRoleName: agripulse-dev-karpenter-node
 
 certManagerController:
   serviceAccount:
@@ -71,7 +71,7 @@ certManagerController:
       eks.amazonaws.com/role-arn: ""
 
 # Per-env api IRSA binding. ARN comes from
-# `terraform output agripulse_env_resources` → .dev.api_irsa_arn.
+# `terraform output agripulse_env_resources` â†’ .dev.api_irsa_arn.
 # Filled in at deploy time by CD-10 bootstrap.
 serviceAccount:
   create: true
@@ -79,7 +79,7 @@ serviceAccount:
     eks.amazonaws.com/role-arn: ""
 
 # Dev DB is the same cluster CNPG instance, just smaller. CNPG IRSA ARN
-# comes from `terraform output agripulse_env_resources` → .dev.cnpg_irsa_arn.
+# comes from `terraform output agripulse_env_resources` â†’ .dev.cnpg_irsa_arn.
 postgresCluster:
   instances: 1
   storage:
@@ -96,7 +96,7 @@ postgresCluster:
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""
 
-# Alembic PreSync Job (api chart only — other charts ignore this key).
+# Alembic PreSync Job (api chart only â€” other charts ignore this key).
 # The Job runs `alembic upgrade head` before any Deployment rolls; failure
 # blocks the sync and the previous version keeps serving. Runbook:
 # docs/runbooks/failed-migration-recovery.md.

@@ -3,7 +3,7 @@ import tailwindRtl from "tailwindcss-rtl";
 
 // Design tokens.
 //
-// MissionAgre's palette is intentionally muted: dark green primary for
+// AgriPulse's palette is intentionally muted: dark green primary for
 // agronomic association, sand tones for surfaces (Egypt context), neutral
 // slates for text. Tokens are defined here as Tailwind extensions so they
 // can be used uniformly via class names; raw CSS uses CSS variables in
@@ -40,7 +40,7 @@ export default {
           800: "#6b4a29",
           900: "#5a3e26",
         },
-        // AgriPulse semantic tokens (UX_SPEC.md §9). Coexist with brand/sand;
+        // AgriPulse semantic tokens (UX_SPEC.md Â§9). Coexist with brand/sand;
         // pages built against the new IA prefer `ap.*` for surface,
         // semantic, activity-type, and growth-stage colors.
         ap: {

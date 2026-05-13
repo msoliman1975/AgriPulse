@@ -1,4 +1,4 @@
-# CD-8 — Karpenter controller IAM + interruption queue + EventBridge.
+# CD-8 â€” Karpenter controller IAM + interruption queue + EventBridge.
 #
 # The terraform-aws-modules/eks/aws//modules/karpenter submodule produces
 # the controller IRSA role, the EC2 node-instance profile Karpenter will
@@ -19,10 +19,10 @@ module "karpenter" {
   irsa_oidc_provider_arn          = module.eks.oidc_provider_arn
   irsa_namespace_service_accounts = ["karpenter:karpenter"]
 
-  # Node IAM role — Karpenter attaches this to instances it launches.
+  # Node IAM role â€” Karpenter attaches this to instances it launches.
   # `enable_pod_identity_association` etc. left at defaults.
   create_node_iam_role          = true
-  node_iam_role_name            = "missionagre-${var.environment}-karpenter-node"
+  node_iam_role_name            = "agripulse-${var.environment}-karpenter-node"
   node_iam_role_use_name_prefix = false
   node_iam_role_additional_policies = {
     AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

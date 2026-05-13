@@ -3,13 +3,13 @@
 Mounted at /api/v1/admin/tenants/{tenant_id}/admins. PlatformAdmin
 only via `platform.manage_tenant_admins`.
 
-  GET    /admins                                — list current admins
-  POST   /admins:invite                         — invite a TenantAdmin
-  DELETE /admins/{user_id}?role=TenantAdmin     — revoke role
-  POST   /admins:assign-owner                   — seed the first
+  GET    /admins                                â€” list current admins
+  POST   /admins:invite                         â€” invite a TenantAdmin
+  DELETE /admins/{user_id}?role=TenantAdmin     â€” revoke role
+  POST   /admins:assign-owner                   â€” seed the first
                                                   TenantOwner on an
                                                   ownerless tenant
-  POST   /admins/{user_id}:transfer-ownership   — make this user the new
+  POST   /admins/{user_id}:transfer-ownership   â€” make this user the new
                                                   TenantOwner
 """
 
@@ -114,7 +114,7 @@ async def invite_admin(
             status_code=status.HTTP_409_CONFLICT,
             title="User already in tenant",
             detail=f"{exc.email!r} already has an active membership.",
-            type_="https://missionagre.io/problems/tenant-admin-already-member",
+            type_="https://agripulse.cloud/problems/tenant-admin-already-member",
         ) from exc
 
 
@@ -141,7 +141,7 @@ async def remove_admin_role(
             status_code=status.HTTP_404_NOT_FOUND,
             title="User not in tenant",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-admin-not-found",
+            type_="https://agripulse.cloud/problems/tenant-admin-not-found",
         ) from exc
 
 
@@ -191,7 +191,7 @@ async def assign_first_owner(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid owner-assign request",
             detail="Provide exactly one of (email + full_name) or user_id.",
-            type_="https://missionagre.io/problems/owner-assign-invalid-mode",
+            type_="https://agripulse.cloud/problems/owner-assign-invalid-mode",
         )
     try:
         return await service.assign_first_owner(
@@ -208,7 +208,7 @@ async def assign_first_owner(
             status_code=status.HTTP_409_CONFLICT,
             title="Tenant already has an owner",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-owner-already-exists",
+            type_="https://agripulse.cloud/problems/tenant-owner-already-exists",
             extras={"current_owner_user_id": str(exc.current_owner_user_id)},
         ) from exc
     except TenantUserNotFoundError as exc:
@@ -218,7 +218,7 @@ async def assign_first_owner(
             status_code=status.HTTP_404_NOT_FOUND,
             title="User not in tenant",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-admin-not-found",
+            type_="https://agripulse.cloud/problems/tenant-admin-not-found",
         ) from exc
     except TenantUserAlreadyExistsError as exc:
         from app.core.errors import APIError
@@ -227,7 +227,7 @@ async def assign_first_owner(
             status_code=status.HTTP_409_CONFLICT,
             title="User already in tenant",
             detail=f"{exc.email!r} is already a member; pass user_id instead.",
-            type_="https://missionagre.io/problems/tenant-admin-already-member",
+            type_="https://agripulse.cloud/problems/tenant-admin-already-member",
         ) from exc
 
 
@@ -262,7 +262,7 @@ async def transfer_ownership(
             status_code=status.HTTP_404_NOT_FOUND,
             title="User not in tenant",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-admin-not-found",
+            type_="https://agripulse.cloud/problems/tenant-admin-not-found",
         ) from exc
     except TenantAdminConflictError as exc:
         from app.core.errors import APIError
@@ -271,5 +271,5 @@ async def transfer_ownership(
             status_code=status.HTTP_409_CONFLICT,
             title="Ownership transfer conflict",
             detail=str(exc),
-            type_="https://missionagre.io/problems/tenant-admin-conflict",
+            type_="https://agripulse.cloud/problems/tenant-admin-conflict",
         ) from exc

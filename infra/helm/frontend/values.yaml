@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/msoliman1975/missionagre/frontend
+  repository: ghcr.io/msoliman1975/agripulse/frontend
   tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []
@@ -34,7 +34,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "1m"
   # Final host renders as `${hostPrefix}.${global.envHost}`.
   hostPrefix: app
-  tlsSecretName: missionagre-frontend-tls
+  tlsSecretName: agripulse-frontend-tls
 
 resources:
   requests:

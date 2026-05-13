@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildTileUrlTemplate, indexAssetKey, visualizationDefaults } from "./tileUrl";
 
 const TILE_URL = "http://localhost:8001";
-const BUCKET = "missionagre-uploads";
+const BUCKET = "agripulse-uploads";
 
 describe("buildTileUrlTemplate", () => {
   it("emits TiTiler XYZ template with placeholders intact", () => {

@@ -4,7 +4,7 @@ One endpoint in PR-C:
 
   GET /api/v1/blocks/{block_id}/indices/{index_code}/timeseries
 
-Per-farm RBAC: same pattern as imagery — block-only routes look up
+Per-farm RBAC: same pattern as imagery â€” block-only routes look up
 the block's farm_id, gate on `index.read`, and surface denial as 404.
 """
 
@@ -42,7 +42,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 

@@ -13,7 +13,7 @@ module "eks" {
 
   # Encrypt secrets at rest with our KMS key.
   cluster_encryption_config = {
-    provider_key_arn = aws_kms_key.missionagre.arn
+    provider_key_arn = aws_kms_key.agripulse.arn
     resources        = ["secrets"]
   }
 
@@ -46,7 +46,7 @@ module "eks" {
       max_size       = 2
 
       labels = {
-        "missionagre.io/role" = "system"
+        "agripulse.cloud/role" = "system"
       }
 
       taints = {

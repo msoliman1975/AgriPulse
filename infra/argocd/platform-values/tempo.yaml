@@ -4,7 +4,7 @@ tempo:
     trace:
       backend: s3
       s3:
-        bucket: missionagre-tempo-traces
+        bucket: agripulse-tempo-traces
         endpoint: s3.me-south-1.amazonaws.com
         region: me-south-1
   metricsGenerator:

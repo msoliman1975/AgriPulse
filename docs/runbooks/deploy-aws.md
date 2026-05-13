@@ -1,4 +1,4 @@
-# MissionAgre — AWS Deployment Guide
+# AgriPulse â€” AWS Deployment Guide
 
 End-to-end deployment guide that maps directly to what's already in this repo
 (`infra/terraform/`, `infra/helm/`, `infra/argocd/`). Follow it top-to-bottom
@@ -9,9 +9,9 @@ with different overlays.
 
 ## 0. What you'll end up with
 
-- One AWS account hosting one EKS cluster (`missionagre-dev`) in `me-south-1`
-  (Bahrain — co-located with Sentinel-2 Open Data on S3 per ARCHITECTURE.md
-  § 3.2).
+- One AWS account hosting one EKS cluster (`agripulse-dev`) in `me-south-1`
+  (Bahrain â€” co-located with Sentinel-2 Open Data on S3 per ARCHITECTURE.md
+  Â§ 3.2).
 - VPC + private subnets, KMS CMK, three S3 buckets (`imagery-raw`,
   `imagery-cogs`, `exports`), five IRSA roles.
 - Cluster operators: ingress-nginx, cert-manager, External Secrets,
@@ -19,7 +19,7 @@ with different overlays.
 - Application services: `api`, `workers` (light + heavy + beat), `tile-server`,
   `frontend`, `keycloak`, `shared` (CNPG cluster, ClusterIssuers,
   ClusterSecretStore).
-- Container images on GHCR: `ghcr.io/msoliman1975/missionagre/{api,workers,tile-server,frontend}`.
+- Container images on GHCR: `ghcr.io/msoliman1975/agripulse/{api,workers,tile-server,frontend}`.
 - ArgoCD reconciling everything from `main`.
 
 ---
@@ -29,9 +29,9 @@ with different overlays.
 Install:
 
 - AWS CLI v2, `aws configure sso` against the target account.
-- Terraform ≥ 1.7 (matches `infra/terraform/versions.tf`).
+- Terraform â‰¥ 1.7 (matches `infra/terraform/versions.tf`).
 - `kubectl` matching the `cluster_version` (default `1.31`).
-- `helm` ≥ 3.14, `argocd` CLI, `jq`, `yq`.
+- `helm` â‰¥ 3.14, `argocd` CLI, `jq`, `yq`.
 - `gh` CLI logged in to GitHub.
 
 Confirm caller identity and region:
@@ -43,12 +43,12 @@ $env:AWS_REGION = "me-south-1"
 
 In the AWS account, you'll also need:
 
-- A Route 53 public hosted zone you own (e.g. `missionagre.example`). Used for
-  `*.dev.missionagre.example`, etc.
-- ACM is **not** required — cert-manager + Let's Encrypt handles certs (per
-  ARCHITECTURE.md § 3.2).
-- Quotas: at least 6 × `t3.large` On-Demand vCPU headroom in the region; check
-  `Service Quotas → EC2`.
+- A Route 53 public hosted zone you own (e.g. `agripulse.example`). Used for
+  `*.dev.agripulse.example`, etc.
+- ACM is **not** required â€” cert-manager + Let's Encrypt handles certs (per
+  ARCHITECTURE.md Â§ 3.2).
+- Quotas: at least 6 Ã— `t3.large` On-Demand vCPU headroom in the region; check
+  `Service Quotas â†’ EC2`.
 
 ---
 
@@ -59,7 +59,7 @@ supply the values via `-backend-config`. Create the bucket + lock table first:
 
 ```powershell
 $ACCOUNT = (aws sts get-caller-identity --query Account --output text)
-$BUCKET  = "missionagre-tfstate-$ACCOUNT"
+$BUCKET  = "agripulse-tfstate-$ACCOUNT"
 
 aws s3api create-bucket `
   --bucket $BUCKET `
@@ -72,14 +72,14 @@ aws s3api put-public-access-block --bucket $BUCKET --public-access-block-configu
   "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
 aws dynamodb create-table `
-  --table-name missionagre-tfstate-lock `
+  --table-name agripulse-tfstate-lock `
   --attribute-definitions AttributeName=LockID,AttributeType=S `
   --key-schema AttributeName=LockID,KeyType=HASH `
   --billing-mode PAY_PER_REQUEST `
   --region me-south-1
 ```
 
-Cross-check with `docs/runbooks/bootstrap-aws-account.md` if it exists — it's
+Cross-check with `docs/runbooks/bootstrap-aws-account.md` if it exists â€” it's
 the canonical version of this step.
 
 ---
@@ -94,7 +94,7 @@ terraform init `
   -backend-config="key=dev/terraform.tfstate" `
   -backend-config="region=me-south-1" `
   -backend-config="encrypt=true" `
-  -backend-config="dynamodb_table=missionagre-tfstate-lock"
+  -backend-config="dynamodb_table=agripulse-tfstate-lock"
 
 terraform plan -var environment=dev -out=dev.tfplan
 terraform apply dev.tfplan
@@ -102,14 +102,14 @@ terraform apply dev.tfplan
 
 What this creates (one resource per file in `infra/terraform/`):
 
-- `vpc.tf` — VPC `10.30.0.0/16`, three AZs, public + private subnets, single
+- `vpc.tf` â€” VPC `10.30.0.0/16`, three AZs, public + private subnets, single
   NAT for dev.
-- `eks.tf` — EKS `missionagre-dev`, managed node group (`t3.large` × 3,
-  autoscale 2–6), OIDC provider for IRSA.
-- `kms.tf` — customer-managed CMK used for EBS, S3 SSE, and Secrets Manager.
-- `s3.tf` — `imagery-raw`, `imagery-cogs`, `exports` buckets with the 90-day →
-  Glacier IR lifecycle rule from ARCHITECTURE.md § 9.
-- `iam.tf` — five IRSA roles consumed by workloads (API, workers, tile-server,
+- `eks.tf` â€” EKS `agripulse-dev`, managed node group (`t3.large` Ã— 3,
+  autoscale 2â€“6), OIDC provider for IRSA.
+- `kms.tf` â€” customer-managed CMK used for EBS, S3 SSE, and Secrets Manager.
+- `s3.tf` â€” `imagery-raw`, `imagery-cogs`, `exports` buckets with the 90-day â†’
+  Glacier IR lifecycle rule from ARCHITECTURE.md Â§ 9.
+- `iam.tf` â€” five IRSA roles consumed by workloads (API, workers, tile-server,
   External Secrets, CloudNativePG backups).
 
 Capture the outputs you'll need:
@@ -126,7 +126,7 @@ bucket names below.
 ## 4. Get cluster access
 
 ```powershell
-aws eks update-kubeconfig --name missionagre-dev --region me-south-1
+aws eks update-kubeconfig --name agripulse-dev --region me-south-1
 kubectl get nodes
 ```
 
@@ -139,24 +139,24 @@ an access entry with the `AmazonEKSClusterAdminPolicy` association).
 ## 5. Seed AWS Secrets Manager
 
 External Secrets Operator (installed in step 7) pulls everything below. Create
-them once per environment under the path prefix `missionagre/dev/`:
+them once per environment under the path prefix `agripulse/dev/`:
 
 | Secret name | Keys | Used by |
 |---|---|---|
-| `missionagre/dev/postgres/superuser` | `username`, `password` | CloudNativePG cluster bootstrap |
-| `missionagre/dev/postgres/app` | `username`, `password`, `database` | API, workers (Alembic + runtime) |
-| `missionagre/dev/keycloak/admin` | `username`, `password` | Keycloak chart |
-| `missionagre/dev/keycloak/oidc` | `client_id`, `client_secret` | API JWT verification |
-| `missionagre/dev/sentinelhub` | `client_id`, `client_secret` | Imagery provider adapter |
-| `missionagre/dev/smtp` | `host`, `port`, `username`, `password` | Notifications |
-| `missionagre/dev/webhook-signing-key` | `key` | Outbound webhook HMAC |
-| `missionagre/dev/argocd/repo` | `url`, `username`, `password` (or SSH key) | ArgoCD repo creds (private repo) |
+| `agripulse/dev/postgres/superuser` | `username`, `password` | CloudNativePG cluster bootstrap |
+| `agripulse/dev/postgres/app` | `username`, `password`, `database` | API, workers (Alembic + runtime) |
+| `agripulse/dev/keycloak/admin` | `username`, `password` | Keycloak chart |
+| `agripulse/dev/keycloak/oidc` | `client_id`, `client_secret` | API JWT verification |
+| `agripulse/dev/sentinelhub` | `client_id`, `client_secret` | Imagery provider adapter |
+| `agripulse/dev/smtp` | `host`, `port`, `username`, `password` | Notifications |
+| `agripulse/dev/webhook-signing-key` | `key` | Outbound webhook HMAC |
+| `agripulse/dev/argocd/repo` | `url`, `username`, `password` (or SSH key) | ArgoCD repo creds (private repo) |
 
 Example:
 
 ```powershell
-aws secretsmanager create-secret --name missionagre/dev/postgres/app `
-  --secret-string '{"username":"missionagre","password":"<generated>","database":"missionagre"}' `
+aws secretsmanager create-secret --name agripulse/dev/postgres/app `
+  --secret-string '{"username":"agripulse","password":"<generated>","database":"agripulse"}' `
   --kms-key-id $(terraform output -raw kms_key_arn)
 ```
 
@@ -185,9 +185,9 @@ kubectl -n argocd apply -f infra\argocd\appsets\bootstrap.yaml
 `bootstrap.yaml` is an AppOfApps that creates the four ApplicationSets in
 `infra/argocd/appsets/`:
 
-- `platform.yaml` — cert-manager, external-secrets, ingress-nginx, CloudNativePG
-- `observability.yaml` — kube-prometheus-stack, Loki, Tempo, Promtail, GlitchTip
-- `services.yaml` — api, workers, tile-server, frontend, keycloak, shared
+- `platform.yaml` â€” cert-manager, external-secrets, ingress-nginx, CloudNativePG
+- `observability.yaml` â€” kube-prometheus-stack, Loki, Tempo, Promtail, GlitchTip
+- `services.yaml` â€” api, workers, tile-server, frontend, keycloak, shared
 - All values from `infra/argocd/platform-values/*.yaml` and
   `infra/argocd/overlays/dev/values.yaml`.
 
@@ -202,10 +202,10 @@ argocd app wait -l environment=dev --health --timeout 1200
 Order of convergence (ArgoCD enforces sync waves; if you break it, this is the
 order):
 
-1. cert-manager → ClusterIssuers (in `shared` chart) → External Secrets →
+1. cert-manager â†’ ClusterIssuers (in `shared` chart) â†’ External Secrets â†’
    ClusterSecretStore.
 2. ingress-nginx (provisions an AWS NLB).
-3. CloudNativePG operator → `shared` chart's `Cluster` CR → primary + standby
+3. CloudNativePG operator â†’ `shared` chart's `Cluster` CR â†’ primary + standby
    running.
 4. observability stack.
 5. keycloak (waits on Postgres ready).
@@ -224,12 +224,12 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.
 In Route 53, create ALIAS records pointing to that hostname for the dev names
 (these match the ingress hosts in `infra/argocd/overlays/dev/values.yaml`):
 
-- `app.dev.missionagre.example` → frontend
-- `api.dev.missionagre.example` → api
-- `tiles.dev.missionagre.example` → tile-server
-- `auth.dev.missionagre.example` → keycloak
-- `argocd.dev.missionagre.example` → argocd
-- `grafana.dev.missionagre.example` → grafana
+- `app.dev.agripulse.example` â†’ frontend
+- `api.dev.agripulse.example` â†’ api
+- `tiles.dev.agripulse.example` â†’ tile-server
+- `auth.dev.agripulse.example` â†’ keycloak
+- `argocd.dev.agripulse.example` â†’ argocd
+- `grafana.dev.agripulse.example` â†’ grafana
 
 cert-manager reads the `letsencrypt-prod` ClusterIssuer from the `shared` chart
 and issues certs automatically. Watch:
@@ -245,13 +245,13 @@ kubectl get certificate -A
 Images come from `.github/workflows/ci.yml`. To enable pushes:
 
 1. In GitHub repo settings, the `containers` job pushes to
-   `ghcr.io/msoliman1975/missionagre/<name>` on merges to `main`. No additional
+   `ghcr.io/msoliman1975/agripulse/<name>` on merges to `main`. No additional
    setup if you own that GHCR namespace.
 2. Make the GHCR packages either **public** (simplest for dev) or create an
    `imagePullSecret` and reference it in each Helm values file:
 
    ```powershell
-   kubectl -n missionagre-dev create secret docker-registry ghcr-pull `
+   kubectl -n agripulse-dev create secret docker-registry ghcr-pull `
      --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=$env:GHCR_PAT
    ```
 
@@ -276,30 +276,30 @@ Postgres comes up empty. You need to:
    `shared` chart includes a post-create Job; if it didn't run, exec in:
 
    ```powershell
-   kubectl -n missionagre-dev exec -it missionagre-pg-1 -- psql -d missionagre -c `
+   kubectl -n agripulse-dev exec -it agripulse-pg-1 -- psql -d agripulse -c `
      "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS timescaledb; CREATE EXTENSION IF NOT EXISTS pgaudit; CREATE EXTENSION IF NOT EXISTS pgstac CASCADE;"
    ```
 
-2. **Run public-schema migrations** — Alembic from the API image:
+2. **Run public-schema migrations** â€” Alembic from the API image:
 
    ```powershell
-   kubectl -n missionagre-dev run alembic-public --rm -it --restart=Never `
-     --image=ghcr.io/msoliman1975/missionagre/api:<sha> `
-     --env="DATABASE_URL=$(kubectl -n missionagre-dev get secret app-db -o jsonpath='{.data.url}' | base64 -d)" `
+   kubectl -n agripulse-dev run alembic-public --rm -it --restart=Never `
+     --image=ghcr.io/msoliman1975/agripulse/api:<sha> `
+     --env="DATABASE_URL=$(kubectl -n agripulse-dev get secret app-db -o jsonpath='{.data.url}' | base64 -d)" `
      -- alembic -c alembic.ini -x schema=public upgrade head
    ```
 
-3. **Seed reference data** — crops, decision trees, capability YAMLs:
+3. **Seed reference data** â€” crops, decision trees, capability YAMLs:
 
    ```powershell
-   kubectl -n missionagre-dev exec deploy/api -- python -m app.scripts.seed_reference_data
+   kubectl -n agripulse-dev exec deploy/api -- python -m app.scripts.seed_reference_data
    ```
 
-4. **Configure Keycloak** — the realm JSON in
-   `infra/helm/keycloak/files/missionagre-realm.json` is imported on first
+4. **Configure Keycloak** â€” the realm JSON in
+   `infra/helm/keycloak/files/agripulse-realm.json` is imported on first
    start. Sanity check:
-   - Realm: `missionagre`, single client with `tenant_id` mapper.
-   - Set the OIDC client secret to match `missionagre/dev/keycloak/oidc`.
+   - Realm: `agripulse`, single client with `tenant_id` mapper.
+   - Set the OIDC client secret to match `agripulse/dev/keycloak/oidc`.
 
 ---
 
@@ -307,11 +307,11 @@ Postgres comes up empty. You need to:
 
 ```powershell
 # 1. Provision the tenant row + schema (custom runner from scripts/)
-kubectl -n missionagre-dev exec deploy/api -- python -m app.scripts.create_tenant `
+kubectl -n agripulse-dev exec deploy/api -- python -m app.scripts.create_tenant `
   --slug acme --display-name "ACME Farms" --owner-email owner@acme.com
 
 # 2. Apply tenant-schema migrations to that one tenant
-kubectl -n missionagre-dev exec deploy/api -- python -m app.scripts.tenant_migrate --tenant acme
+kubectl -n agripulse-dev exec deploy/api -- python -m app.scripts.tenant_migrate --tenant acme
 
 # 3. Keycloak: create the TenantOwner user, set initial password
 ```
@@ -328,20 +328,20 @@ Before declaring "deployed":
 
 ```powershell
 # Auth flow
-curl -i https://auth.dev.missionagre.example/realms/missionagre/.well-known/openid-configuration
+curl -i https://auth.dev.agripulse.example/realms/agripulse/.well-known/openid-configuration
 
 # API health
-curl -i https://api.dev.missionagre.example/healthz
-curl -i https://api.dev.missionagre.example/api/v1/me -H "Authorization: Bearer <jwt>"
+curl -i https://api.dev.agripulse.example/healthz
+curl -i https://api.dev.agripulse.example/api/v1/me -H "Authorization: Bearer <jwt>"
 
 # Tile server
-curl -i https://tiles.dev.missionagre.example/healthz
+curl -i https://tiles.dev.agripulse.example/healthz
 
 # SSE
-curl -N https://api.dev.missionagre.example/api/v1/me/alerts/stream -H "Authorization: Bearer <jwt>"
+curl -N https://api.dev.agripulse.example/api/v1/me/alerts/stream -H "Authorization: Bearer <jwt>"
 
 # Frontend
-curl -I https://app.dev.missionagre.example/
+curl -I https://app.dev.agripulse.example/
 ```
 
 Then trigger an end-to-end satellite path:
@@ -366,14 +366,14 @@ In Grafana:
 - GlitchTip is empty (no errors).
 
 Alerts wired by `kube-prometheus-stack` defaults: node pressure, pod
-crashloop, cert expiry, ingress 5xx rate. Add MissionAgre-specific alert rules
+crashloop, cert expiry, ingress 5xx rate. Add AgriPulse-specific alert rules
 in a follow-up ADR.
 
 ---
 
 ## 13. Promote to staging and production
 
-The path is the same — switch overlays:
+The path is the same â€” switch overlays:
 
 ```powershell
 terraform workspace new staging   # or: -backend-config="key=staging/terraform.tfstate"
@@ -393,7 +393,7 @@ For production also:
 - CloudNativePG: 1 primary + 2 standbys, PITR retention 14 days.
 - Larger node group; consider `c6i.xlarge` for heavy workers and a dedicated
   taint.
-- AWS WAF + Shield Standard on the NLB (via WAFv2 web ACL → ALB ingress, or
+- AWS WAF + Shield Standard on the NLB (via WAFv2 web ACL â†’ ALB ingress, or
   move to ALB controller for L7 WAF).
 - Backup the KMS CMK and the Terraform state bucket cross-region.
 
@@ -409,7 +409,7 @@ For production also:
 - **Branch protection.** Once the repo is on a paid GitHub plan or public, run
   `scripts/setup-branch-protection.sh`.
 - **Cost guardrails.** Enable AWS Budgets at the account level; tag everything
-  (`Project=missionagre`, `Environment=dev`) — `providers.tf` already does
+  (`Project=agripulse`, `Environment=dev`) â€” `providers.tf` already does
   this.
 - **DR test.** Once per quarter: `terraform destroy` a sandbox env and rebuild
   from scratch using this guide. The whole point of the Terraform/ArgoCD split

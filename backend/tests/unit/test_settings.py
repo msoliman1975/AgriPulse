@@ -13,7 +13,7 @@ def test_defaults_are_dev(monkeypatch: pytest.MonkeyPatch) -> None:
     s = get_settings()
     assert s.app_env == "dev"
     assert s.app_log_level == "INFO"
-    assert s.service_name == "missionagre-api"
+    assert s.service_name == "agripulse-api"
 
 
 def test_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:

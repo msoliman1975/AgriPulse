@@ -2,7 +2,7 @@
 
 **Symptom.** You added a new module + router, restarted the backend, and the new
 endpoints 404 while the *old* endpoints in the *same* router keep working. The
-React app shows generic "Could not load …" errors; DevTools → Network shows
+React app shows generic "Could not load â€¦" errors; DevTools â†’ Network shows
 `status: 404`, `content-type: application/problem+json`, body
 `{"type":"about:blank","title":"Not Found", ...}`.
 
@@ -30,14 +30,14 @@ Two compounding causes seen in the wild:
 Run these in order. **The fifth one is the ground-truth answer.**
 
 ```powershell
-cd C:\Users\mosoliman\projects\MissionAgre\backend
+cd C:\Users\mosoliman\projects\AgriPulse\backend
 .\.venv\Scripts\Activate.ps1
 
 # 1. Probe a new route directly. 401 ("Missing bearer token") DOES NOT prove the
-#    route exists — auth middleware runs before routing, so it returns 401 for any
+#    route exists â€” auth middleware runs before routing, so it returns 401 for any
 #    unauthenticated request even on a path that doesn't exist as a route. Use the
 #    response shape to discriminate:
-#       401 problem+json type="https://missionagre.io/problems/unauthorized"  -> auth ran (route MAY or may NOT exist)
+#       401 problem+json type="https://agripulse.cloud/problems/unauthorized"  -> auth ran (route MAY or may NOT exist)
 #       404 problem+json type="about:blank"                                   -> route NOT registered
 #       403 problem+json type=".../permission-denied"                         -> route exists, cap missing
 $tid = "<some-tenant-id>"
@@ -48,7 +48,7 @@ try {
   "body  : $($_.ErrorDetails.Message)"
 }
 
-# 2. Sanity-check openapi.json (only useful if app_debug=True — disabled in prod).
+# 2. Sanity-check openapi.json (only useful if app_debug=True â€” disabled in prod).
 ((Invoke-WebRequest "http://localhost:8000/openapi.json" -UseBasicParsing).Content `
   | Select-String -Pattern '/api/v1[^"]*<NEW_ROUTE_SUBSTRING>[^"]*' -AllMatches).Matches.Value | Sort-Object -Unique
 
@@ -69,10 +69,10 @@ python -c "from app.core.app_factory import create_app; app = create_app(); prin
 If step 5 lists your new routes but step 2 does not, **the running uvicorn is
 serving stale state**. Skip diagnosis, jump to the fix.
 
-## Fix — clean restart procedure
+## Fix â€” clean restart procedure
 
 ```powershell
-cd C:\Users\mosoliman\projects\MissionAgre\backend
+cd C:\Users\mosoliman\projects\AgriPulse\backend
 .\.venv\Scripts\Activate.ps1
 
 # Kill every Python process (uvicorn worker, watchfiles reloader, zombies).
@@ -82,7 +82,7 @@ Start-Sleep -Seconds 1
 # Confirm port 8000 is free. If anything is still listening, kill that PID too.
 Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
 
-# Nuke EVERY __pycache__ under backend/ (not just app/) — stale .pyc files in
+# Nuke EVERY __pycache__ under backend/ (not just app/) â€” stale .pyc files in
 # migrations/, workers/, tests/ have re-imported old module versions before.
 Get-ChildItem -Path . -Filter __pycache__ -Recurse -Directory -Force | Remove-Item -Recurse -Force
 
@@ -110,11 +110,11 @@ on edits inside that module is fine.
 ## When the fix doesn't work
 
 If step 5 also fails to list the new routes (i.e. `python -c "from
-app.core.app_factory import create_app; …"` shows the old set), the problem is
+app.core.app_factory import create_app; â€¦"` shows the old set), the problem is
 in the source, not the process. Common causes:
 
 - An import inside one of the new modules raises silently (FastAPI does NOT
-  skip routers whose import fails — the exception propagates — but if the
+  skip routers whose import fails â€” the exception propagates â€” but if the
   router file imports another package conditionally and that package is missing
   from the venv, you'll see a real `ImportError` traceback at uvicorn startup).
 - `_register_module_routers` doesn't call `app.include_router(...)` for the new
@@ -141,7 +141,7 @@ for m in mods:
 
 ## Related runbooks
 
-- [local-stack-bootstrap.md](local-stack-bootstrap.md) — full first-time setup.
+- [local-stack-bootstrap.md](local-stack-bootstrap.md) â€” full first-time setup.
 
 ## History
 

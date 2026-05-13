@@ -13,7 +13,7 @@ from fastapi import status
 
 from app.core.errors import APIError
 
-_TYPE_BASE = "https://missionagre.io/problems"
+_TYPE_BASE = "https://agripulse.cloud/problems"
 
 
 class FarmNotFoundError(APIError):
@@ -86,7 +86,7 @@ class InvalidUnitTypeError(APIError):
     """Pivot/sector parent rules violated. Surfaces as 422.
 
     Raised when a pivot_sector references a parent that doesn't exist,
-    isn't a pivot, or sits on a different farm — and when block/pivot
+    isn't a pivot, or sits on a different farm â€” and when block/pivot
     rows try to set parent_unit_id (which is reserved for sectors).
     """
 

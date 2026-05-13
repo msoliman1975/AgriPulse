@@ -1,7 +1,7 @@
 image:
-  repository: ghcr.io/msoliman1975/missionagre/api
+  repository: ghcr.io/msoliman1975/agripulse/api
   tag:
-    "" # Empty → falls back to .Chart.AppVersion. Workers
+    "" # Empty â†’ falls back to .Chart.AppVersion. Workers
     # share the API image to keep migrations and code
     # paths in lockstep.
   pullPolicy: IfNotPresent
@@ -43,14 +43,14 @@ containerSecurityContext:
 env:
   APP_ENV: production
   APP_LOG_LEVEL: INFO
-  DATABASE_URL: postgresql+asyncpg://missionagre@missionagre-pg-rw:5432/missionagre
-  DATABASE_SYNC_URL: postgresql+psycopg://missionagre@missionagre-pg-rw:5432/missionagre
-  REDIS_URL: redis://missionagre-redis:6379/0
-  CELERY_BROKER_URL: redis://missionagre-redis:6379/1
-  CELERY_RESULT_BACKEND: redis://missionagre-redis:6379/2
-  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre"
-  KEYCLOAK_AUDIENCE: missionagre-api
-  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/missionagre/protocol/openid-connect/certs"
+  DATABASE_URL: postgresql+asyncpg://agripulse@agripulse-pg-rw:5432/agripulse
+  DATABASE_SYNC_URL: postgresql+psycopg://agripulse@agripulse-pg-rw:5432/agripulse
+  REDIS_URL: redis://agripulse-redis:6379/0
+  CELERY_BROKER_URL: redis://agripulse-redis:6379/1
+  CELERY_RESULT_BACKEND: redis://agripulse-redis:6379/2
+  KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse"
+  KEYCLOAK_AUDIENCE: agripulse-api
+  KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
 
 externalSecret:
@@ -60,7 +60,7 @@ externalSecret:
     name: aws-secretsmanager
     kind: ClusterSecretStore
   remoteRef:
-    key: missionagre/api # Same secret as API; keeps DB password in sync.
+    key: agripulse/api # Same secret as API; keeps DB password in sync.
   data:
     - secretKey: DATABASE_PASSWORD
       property: database_password
@@ -71,7 +71,7 @@ externalSecret:
     - secretKey: AWS_SECRET_ACCESS_KEY
       property: aws_secret_access_key
   # CD-9 per-purpose secrets at `agripulse/<env>/<purpose>`. SMTP is
-  # included here because workers send notification email too — keeping
+  # included here because workers send notification email too â€” keeping
   # this in sync with the API chart is the documented gotcha in
   # docs/runbooks/seeding-secrets.md.
   crossRefs:
@@ -83,7 +83,7 @@ externalSecret:
       remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
 
 # Three workloads off the same image. light/heavy queues are conventional
-# names per ARCHITECTURE.md § 3.1; beat is the singleton scheduler.
+# names per ARCHITECTURE.md Â§ 3.1; beat is the singleton scheduler.
 workloads:
   light:
     enabled: true

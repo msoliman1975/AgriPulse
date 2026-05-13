@@ -1,8 +1,8 @@
-"""Provision the `missionagre-tenancy` Keycloak admin client for local dev.
+"""Provision the `agripulse-tenancy` Keycloak admin client for local dev.
 
 Required by `app/shared/keycloak/client.py` so the tenancy module can
 ensure_group / invite_user / etc. against the dev realm. Production uses
-the same shape — a confidential client with `serviceAccountsEnabled=true`
+the same shape â€” a confidential client with `serviceAccountsEnabled=true`
 and a service-account user that holds the realm-management roles.
 
 Idempotent. Re-running:
@@ -35,7 +35,7 @@ from scripts.dev_bootstrap import (
     kc_admin_token,
 )
 
-CLIENT_ID = "missionagre-tenancy"
+CLIENT_ID = "agripulse-tenancy"
 REALM_MGMT_CLIENT_ID = "realm-management"
 
 
@@ -59,7 +59,7 @@ def _get_client_by_clientid(
 def _create_admin_client(http: httpx.Client, token: str) -> str:
     body = {
         "clientId": CLIENT_ID,
-        "name": "MissionAgre Tenancy Provisioning",
+        "name": "AgriPulse Tenancy Provisioning",
         "description": (
             "Service-account client used by the FastAPI backend to "
             "provision Keycloak groups + users when tenants are created."
@@ -177,7 +177,7 @@ def main() -> None:
     with httpx.Client(timeout=30.0) as http:
         token = kc_admin_token(http)
 
-        # Realm-management client UUID — we attach roles FROM this client TO
+        # Realm-management client UUID â€” we attach roles FROM this client TO
         # the SA user. Every realm has one; failure here = wrong realm.
         rm_client = _get_client_by_clientid(http, token, REALM_MGMT_CLIENT_ID)
         if rm_client is None:

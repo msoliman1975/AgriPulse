@@ -8,7 +8,7 @@ from fastapi import status
 
 from app.core.errors import APIError
 
-_TYPE_BASE = "https://missionagre.io/problems/recommendations"
+_TYPE_BASE = "https://agripulse.cloud/problems/recommendations"
 
 
 class RecommendationNotFoundError(APIError):

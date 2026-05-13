@@ -2,17 +2,17 @@
 
 Mounted under /api/v1 by the app factory. Endpoints:
 
-  GET    /recommendations                                — list (filterable)
-  GET    /recommendations/{recommendation_id}            — detail with tree path
-  PATCH  /recommendations/{recommendation_id}            — apply / dismiss / defer
-  GET    /decision-trees                                 — catalog list
-  POST   /blocks/{block_id}/recommendations:evaluate     — admin/debug eval
+  GET    /recommendations                                â€” list (filterable)
+  GET    /recommendations/{recommendation_id}            â€” detail with tree path
+  PATCH  /recommendations/{recommendation_id}            â€” apply / dismiss / defer
+  GET    /decision-trees                                 â€” catalog list
+  POST   /blocks/{block_id}/recommendations:evaluate     â€” admin/debug eval
 
 RBAC:
   * Reads use ``recommendation.read`` and ``decision_tree.read``.
   * Apply / dismiss / defer require ``recommendation.act``.
   * On-demand evaluation requires ``decision_tree.read`` (anyone with
-    that capability can also kick a sweep — the data already exists,
+    that capability can also kick a sweep â€” the data already exists,
     we're just synthesising it earlier).
 """
 
@@ -49,7 +49,7 @@ from app.modules.recommendations.service import (
     get_recommendations_service,
 )
 # Importing the private authoring errors to map them at the route layer is
-# OK — they live in the same module's service.py, not across a module
+# OK â€” they live in the same module's service.py, not across a module
 # boundary.
 from app.modules.recommendations.service import (  # noqa: E402
     _DecisionTreeCodeAlreadyExistsError,
@@ -84,7 +84,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -163,7 +163,7 @@ async def transition_recommendation(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid transition payload",
             detail="Exactly one of `apply`, `dismiss`, `defer_until` must be set.",
-            type_="https://missionagre.io/problems/recommendation-invalid-transition",
+            type_="https://agripulse.cloud/problems/recommendation-invalid-transition",
         )
     if payload.apply:
         action = "apply"
@@ -271,7 +271,7 @@ def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
             status_code=status.HTTP_404_NOT_FOUND,
             title="Decision tree not found",
             detail=f"No decision tree with code {exc.code!r}.",
-            type_="https://missionagre.io/problems/recommendations/decision-tree-not-found",
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-not-found",
             extras={"code": exc.code},
         )
     if isinstance(exc, _DecisionTreeVersionNotFoundError):
@@ -279,7 +279,7 @@ def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
             status_code=status.HTTP_404_NOT_FOUND,
             title="Decision tree version not found",
             detail=f"Tree {exc.code!r} has no version {exc.version}.",
-            type_="https://missionagre.io/problems/recommendations/decision-tree-version-not-found",
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-version-not-found",
             extras={"code": exc.code, "version": exc.version},
         )
     if isinstance(exc, _DecisionTreeCodeAlreadyExistsError):
@@ -287,7 +287,7 @@ def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
             status_code=status.HTTP_409_CONFLICT,
             title="Decision tree code already exists",
             detail=f"A decision tree with code {exc.code!r} already exists.",
-            type_="https://missionagre.io/problems/recommendations/decision-tree-code-conflict",
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-code-conflict",
             extras={"code": exc.code},
         )
     if isinstance(exc, _DecisionTreeCodeMismatchError):
@@ -295,7 +295,7 @@ def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Decision tree code mismatch",
             detail=str(exc),
-            type_="https://missionagre.io/problems/recommendations/decision-tree-code-mismatch",
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-code-mismatch",
             extras={"expected": exc.expected, "got": exc.got},
         )
     if isinstance(exc, _DecisionTreeNoPublishedVersionError):
@@ -303,7 +303,7 @@ def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
             status_code=status.HTTP_409_CONFLICT,
             title="No published version",
             detail=str(exc),
-            type_="https://missionagre.io/problems/recommendations/decision-tree-no-published-version",
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-no-published-version",
             extras={"code": exc.code},
         )
     return None

@@ -6,7 +6,7 @@ kind: ClusterIssuer
 metadata:
   name: {{ .Values.certManager.acme.staging.name }}
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   acme:
     email: {{ .Values.certManager.acme.email | quote }}
@@ -23,7 +23,7 @@ kind: ClusterIssuer
 metadata:
   name: {{ .Values.certManager.acme.prod.name }}
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   acme:
     email: {{ .Values.certManager.acme.email | quote }}

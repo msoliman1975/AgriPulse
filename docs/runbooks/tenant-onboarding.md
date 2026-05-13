@@ -1,6 +1,6 @@
 # Tenant onboarding
 
-Walk-through for spinning up a new customer tenant — from "we just signed
+Walk-through for spinning up a new customer tenant â€” from "we just signed
 them" to "the first user can log in and create a farm." Covers the dev
 stack and the staging/prod cluster path.
 
@@ -9,11 +9,11 @@ skip it; the steps are idempotent.
 
 ---
 
-## 0 — What you need before starting
+## 0 â€” What you need before starting
 
 - Tenant slug: short URL-safe identifier, `^[a-z0-9-]{3,32}$` (e.g.
   `acme-farms`). This becomes part of the schema name and is **stable
-  forever** — pick deliberately.
+  forever** â€” pick deliberately.
 - Display name + legal name + tax ID (if collected).
 - Initial owner: name, email, phone. The owner becomes the sole
   `TenantOwner` and can re-delegate later.
@@ -22,14 +22,14 @@ skip it; the steps are idempotent.
 
 ---
 
-## 1 — Create the tenant row + provision the owner in one call
+## 1 â€” Create the tenant row + provision the owner in one call
 
 Hit the platform admin endpoint with a `PlatformAdmin` JWT. Pass
 `owner_email` so the same call also creates the Keycloak group, invites
 the user as `TenantOwner`, and triggers the password-reset email:
 
 ```bash
-curl -X POST https://api.missionagre.io/api/v1/admin/tenants \
+curl -X POST https://api.agripulse.cloud/api/v1/admin/tenants \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{
@@ -56,8 +56,8 @@ Two return-shape signals to check:
 
 | Field | Meaning |
 | --- | --- |
-| `status: "active"` | Full success — tenant + KC provisioning landed. Hand off. |
-| `status: "pending_provision"` + `provisioning_failed: true` | DB side OK, KC failed. Run § 1a. |
+| `status: "active"` | Full success â€” tenant + KC provisioning landed. Hand off. |
+| `status: "pending_provision"` + `provisioning_failed: true` | DB side OK, KC failed. Run Â§ 1a. |
 
 The Keycloak SMTP relay is the same one the notifications module uses;
 in dev the email lands at MailHog (http://localhost:8025).
@@ -65,14 +65,14 @@ in dev the email lands at MailHog (http://localhost:8025).
 > **Schema name** is auto-derived as `tenant_<uuid_no_dashes>` from the
 > tenant id; the slug is independent. Both are visible on the response.
 
-### 1a — If status came back as `pending_provision`
+### 1a â€” If status came back as `pending_provision`
 
 Re-run provisioning once the underlying issue (Keycloak unreachable,
 realm role missing, etc.) is resolved:
 
 ```bash
 curl -X POST \
-  https://api.missionagre.io/api/v1/admin/tenants/<tenant-id>/retry-provisioning \
+  https://api.agripulse.cloud/api/v1/admin/tenants/<tenant-id>/retry-provisioning \
   -H "Authorization: Bearer $PLATFORM_ADMIN_JWT"
 ```
 
@@ -80,25 +80,25 @@ The retry uses the `pending_owner_email` / `pending_owner_full_name`
 fields stored on the row, so no operator input is needed. On success,
 status flips to `active` and those columns clear.
 
-### 1b — `kcadm.sh` fallback (only if the API path is unavailable)
+### 1b â€” `kcadm.sh` fallback (only if the API path is unavailable)
 
 In a disaster where the admin API itself is down but Keycloak is up,
 the legacy manual steps still work:
 
 ```bash
-kcadm.sh create groups -r missionagre \
+kcadm.sh create groups -r agripulse \
   -s name="tenant-acme-farms" \
   -s 'attributes={"tenant_slug":["acme-farms"]}'
 
-kcadm.sh create users -r missionagre \
+kcadm.sh create users -r agripulse \
   -s username="owner@acme-farms.com" \
   -s email="owner@acme-farms.com" \
   -s firstName="..." -s lastName="..." -s enabled=true
 
-kcadm.sh update users/<user-id>/groups/<group-id> -r missionagre
-kcadm.sh add-roles -r missionagre --uusername "owner@acme-farms.com" \
+kcadm.sh update users/<user-id>/groups/<group-id> -r agripulse
+kcadm.sh add-roles -r agripulse --uusername "owner@acme-farms.com" \
   --rolename TenantOwner
-kcadm.sh update users/<user-id>/execute-actions-email -r missionagre \
+kcadm.sh update users/<user-id>/execute-actions-email -r agripulse \
   -s '["UPDATE_PASSWORD"]'
 ```
 
@@ -107,7 +107,7 @@ tenant row to match the group you created.
 
 ---
 
-## 3 — Mirror the user in the platform DB
+## 3 â€” Mirror the user in the platform DB
 
 The first time the new owner logs in, the auth middleware lazy-creates
 their `public.users` row. To pre-create + audit:
@@ -128,7 +128,7 @@ VALUES ('<tenant-uuid>', '<user-uuid>', 'active');
 
 ---
 
-## 4 — Configure tenant settings (optional, can defer)
+## 4 â€” Configure tenant settings (optional, can defer)
 
 Defaults work for most customers. Override only when explicitly asked:
 
@@ -141,17 +141,17 @@ UPDATE public.tenant_settings
  WHERE tenant_id = '<tenant-uuid>';
 ```
 
-For webhook integrations, see `runbooks/notifications.md` § "Webhook
+For webhook integrations, see `runbooks/notifications.md` Â§ "Webhook
 KMS-key plumbing."
 
 ---
 
-## 5 — Smoke-test the path
+## 5 â€” Smoke-test the path
 
-1. Owner clicks the welcome-email link → lands on Keycloak → sets password.
-2. Redirect to https://app.missionagre.io/ → lands on `/me`.
+1. Owner clicks the welcome-email link â†’ lands on Keycloak â†’ sets password.
+2. Redirect to https://app.agripulse.cloud/ â†’ lands on `/me`.
 3. `GET /api/v1/me` returns the right `tenant_memberships[0].role = TenantOwner`.
-4. Click "New farm" → form submits → farm appears in the list.
+4. Click "New farm" â†’ form submits â†’ farm appears in the list.
 5. (Optional) Subscribe one block to imagery; wait 15 minutes; verify a
    scene shows up. Synthetic failure modes (missing SH credentials) land
    in `imagery_jobs` with `status='failed'` and surface in the
@@ -159,7 +159,7 @@ KMS-key plumbing."
 
 ---
 
-## 6 — Hand off
+## 6 â€” Hand off
 
 - Owner's password is theirs; you don't keep a copy.
 - Document the tenant id + slug in the customer-success tracker.
@@ -170,14 +170,14 @@ KMS-key plumbing."
 
 ## Troubleshooting
 
-**"Schema already exists"** — a previous attempt failed mid-create. Run
+**"Schema already exists"** â€” a previous attempt failed mid-create. Run
 `DROP SCHEMA tenant_<uuid> CASCADE` (after confirming no real data) and
 retry the create-tenant call.
 
-**"User can log in but `tenant_memberships` is empty"** — the Keycloak
+**"User can log in but `tenant_memberships` is empty"** â€” the Keycloak
 group attribute `tenant_slug` is missing. Re-run the `create groups`
-command from § 2 with the attribute.
+command from Â§ 2 with the attribute.
 
-**"Welcome email never arrives"** — check Keycloak's SMTP config under
-`Realm settings → Email`; in dev the relay is MailHog. In production the
-relay is in the `missionagre-smtp` ExternalSecret.
+**"Welcome email never arrives"** â€” check Keycloak's SMTP config under
+`Realm settings â†’ Email`; in dev the relay is MailHog. In production the
+relay is in the `agripulse-smtp` ExternalSecret.

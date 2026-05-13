@@ -2,7 +2,7 @@
 
 Terraform installs ArgoCD itself. ArgoCD then installs everything else via
 the AppSets in `infra/argocd/appsets/`. After this runbook, the workflow is:
-push to `main` → ArgoCD syncs.
+push to `main` â†’ ArgoCD syncs.
 
 ## 1. First-time install
 
@@ -16,7 +16,7 @@ The apply produces an `argocd-server` Deployment plus its companion pods.
 Verify:
 
 ```bash
-aws eks update-kubeconfig --region me-south-1 --name missionagre-dev
+aws eks update-kubeconfig --region me-south-1 --name agripulse-dev
 kubectl get pods -n argocd
 # argocd-application-controller-*  Running
 # argocd-applicationset-controller-* Running
@@ -41,8 +41,8 @@ them go green:
 kubectl get applications -n argocd -w
 ```
 
-Expect 6 services × 3 envs (18) + 6 platform Applications + 5 observability
-Applications. Initial sync takes ~10–15 minutes.
+Expect 6 services Ã— 3 envs (18) + 6 platform Applications + 5 observability
+Applications. Initial sync takes ~10â€“15 minutes.
 
 ## 3. Log into the UI
 
@@ -54,9 +54,9 @@ aws secretsmanager get-secret-value \
 ```
 
 Open `https://argocd.agripulse.cloud`. User `admin`, password from above.
-TLS comes from the cert-manager → Let's Encrypt → Route 53 DNS-01 chain that
+TLS comes from the cert-manager â†’ Let's Encrypt â†’ Route 53 DNS-01 chain that
 CD-5 set up; if the page returns the staging cert, the cluster issuer
-annotation is wrong — re-check `infra/argocd/values/argocd-server.yaml`.
+annotation is wrong â€” re-check `infra/argocd/values/argocd-server.yaml`.
 
 If the hostname does not resolve, ExternalDNS hasn't published the A record
 yet. Tail `kubectl logs -n external-dns deploy/external-dns` and look for
@@ -73,12 +73,12 @@ the `argocd-server` ingress in the change set.
 1. Add an entry to the second list in `services.yaml`'s matrix generator
    (`{env, namespace, autoSync, prune}`).
 2. Create `infra/argocd/overlays/<env>/values.yaml`.
-3. Push. The AppSet spans (charts × envs); new envs add a row of Apps.
+3. Push. The AppSet spans (charts Ã— envs); new envs add a row of Apps.
 
 ## 6. Failure: Application stuck in OutOfSync after a PR
 
 ```bash
-# 1. Force a hard refresh — argocd-repo-server caches manifests.
+# 1. Force a hard refresh â€” argocd-repo-server caches manifests.
 kubectl annotate application -n argocd <app> argocd.argoproj.io/refresh=hard --overwrite
 
 # 2. If still OutOfSync, look at the diff.
@@ -92,7 +92,7 @@ argocd app sync <app> --force --replace
 ```
 
 If the diff itself is empty but the status disagrees, the controller is
-stuck — restart it: `kubectl rollout restart -n argocd statefulset/argocd-application-controller`.
+stuck â€” restart it: `kubectl rollout restart -n argocd statefulset/argocd-application-controller`.
 
 ## 7. Failure: ArgoCD itself is broken
 

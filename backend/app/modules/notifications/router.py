@@ -2,15 +2,15 @@
 
 Mounted under /api/v1 by the app factory. PR-B endpoints:
 
-  GET    /inbox                      — current user's inbox
-  GET    /inbox/unread-count         — bell badge feed
-  PATCH  /inbox/{item_id}            — mark read / archive
+  GET    /inbox                      â€” current user's inbox
+  GET    /inbox/unread-count         â€” bell badge feed
+  PATCH  /inbox/{item_id}            â€” mark read / archive
 
 PR-C will add ``GET /inbox/stream`` (SSE).
 
 RBAC:
-  * ``notification.read_inbox`` — every tenant role grants this.
-  * ``notification.write_inbox`` — same; "write" here is just
+  * ``notification.read_inbox`` â€” every tenant role grants this.
+  * ``notification.write_inbox`` â€” same; "write" here is just
     read/archive on one's own items.
 """
 
@@ -55,7 +55,7 @@ def _ensure_user(context: RequestContext) -> UUID:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return context.user_id
 
@@ -99,7 +99,7 @@ async def stream_inbox(
 ) -> StreamingResponse:
     """Yields ``event: inbox\\ndata: <json>\\n\\n`` per push.
 
-    Auth piggybacks on the standard JWT middleware — clients pass the
+    Auth piggybacks on the standard JWT middleware â€” clients pass the
     bearer token via ``fetch`` (``EventSource`` does not support custom
     headers natively). On disconnect, the underlying Redis subscription
     is closed.

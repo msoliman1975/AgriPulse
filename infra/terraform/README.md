@@ -1,12 +1,12 @@
-# MissionAgre — Terraform
+# AgriPulse â€” Terraform
 
-Bootstraps the AWS substrate that hosts MissionAgre per ARCHITECTURE.md
-§ 3.2: VPC + subnets, EKS cluster, KMS key, S3 buckets, and the IRSA roles
+Bootstraps the AWS substrate that hosts AgriPulse per ARCHITECTURE.md
+Â§ 3.2: VPC + subnets, EKS cluster, KMS key, S3 buckets, and the IRSA roles
 ArgoCD-installed workloads assume.
 
 ## What lives here vs. ArgoCD
 
-This module owns the **immutable substrate** — anything that is expensive
+This module owns the **immutable substrate** â€” anything that is expensive
 to recreate or that ArgoCD cannot manage (the cluster itself, the network,
 S3 buckets, IAM roles). Operators and applications go through ArgoCD
 (`infra/argocd/appsets/`). The split is sharp on purpose: a `terraform
@@ -30,16 +30,16 @@ outputs.tf       VPC ID, EKS endpoint, role ARNs.
 ## State backend
 
 State lives in a per-account S3 bucket with a DynamoDB lock table. The
-backend block in `versions.tf` is intentionally empty — `terraform init`
+backend block in `versions.tf` is intentionally empty â€” `terraform init`
 gets the values via `-backend-config`:
 
 ```bash
 terraform init \
-  -backend-config="bucket=missionagre-tfstate-<account-id>" \
+  -backend-config="bucket=agripulse-tfstate-<account-id>" \
   -backend-config="key=<env>/terraform.tfstate" \
   -backend-config="region=me-south-1" \
   -backend-config="encrypt=true" \
-  -backend-config="dynamodb_table=missionagre-tfstate-lock"
+  -backend-config="dynamodb_table=agripulse-tfstate-lock"
 ```
 
 The bucket and table are created once per account by the bootstrap
@@ -49,7 +49,7 @@ runbook in `docs/runbooks/bootstrap-aws-account.md` (Prompt 6).
 
 The `infra-tf` job in `.github/workflows/ci.yml` runs `terraform fmt
 -check -recursive` and `terraform init -backend=false && terraform
-validate` on every push/PR. No `plan` or `apply` in CI — those happen
+validate` on every push/PR. No `plan` or `apply` in CI â€” those happen
 manually with the runbook.
 
 ## Local

@@ -1,7 +1,7 @@
 # staging environment overrides. Tracks production layout but with
 # smaller resource asks so cost stays sane during pre-release runs.
 #
-# How this file is consumed: every chart in the missionagre-services
+# How this file is consumed: every chart in the agripulse-services
 # AppSet is rendered with chart-default values + this overlay layered
 # on top. Charts only read the keys they reference, so chart-specific
 # blocks (`workloads:`, `keycloak:`) at the top level are fine.
@@ -12,7 +12,7 @@
 global:
   env: staging
   envHost: staging.agripulse.cloud
-  # CD-12 per-image tag map. Staging is NOT auto-bumped — promotion to
+  # CD-12 per-image tag map. Staging is NOT auto-bumped â€” promotion to
   # this overlay is a hand-written PR after dev smoke testing. Keys are
   # present so the chart helper's lookup is safe.
   images:
@@ -26,7 +26,7 @@ global:
       tag: ""
 
 labels:
-  partOf: missionagre
+  partOf: agripulse
 
 # api / frontend / tile-server top-level deployments. Two replicas is
 # enough for a real load-balanced rolling deploy without paying the
@@ -59,15 +59,15 @@ externalDns:
 # `terraform output karpenter`.
 karpenter:
   enabled: true
-  clusterName: missionagre-staging
-  nodeIAMRoleName: missionagre-staging-karpenter-node
+  clusterName: agripulse-staging
+  nodeIAMRoleName: agripulse-staging-karpenter-node
 
 certManagerController:
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: ""
 
-# CNPG: 2 instances — enough to validate failover during soak runs
+# CNPG: 2 instances â€” enough to validate failover during soak runs
 # without burning prod-shape spend.
 postgresCluster:
   instances: 2
@@ -81,7 +81,7 @@ postgresCluster:
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: ""
 
-# api / frontend / tile-server resource shape. Smaller than prod —
+# api / frontend / tile-server resource shape. Smaller than prod â€”
 # staging is for smoke + soak, not load.
 resources:
   requests:
@@ -104,7 +104,7 @@ pdb:
   minAvailable: 1
 
 # Per-env api IRSA binding. ARN comes from
-# `terraform output agripulse_env_resources` → .staging.api_irsa_arn.
+# `terraform output agripulse_env_resources` â†’ .staging.api_irsa_arn.
 serviceAccount:
   create: true
   annotations:

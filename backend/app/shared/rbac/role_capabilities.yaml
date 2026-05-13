@@ -1,8 +1,8 @@
-# role_capabilities.yaml — role → capability mapping.
+# role_capabilities.yaml â€” role â†’ capability mapping.
 #
-# Roles are the eight in ARCHITECTURE.md § 7.1 plus BillingAdmin and
-# PlatformSupport from data_model § 4.5 / § 4.7. Resolution order at
-# request time (PlatformRole → TenantRole → FarmScope, first match wins)
+# Roles are the eight in ARCHITECTURE.md Â§ 7.1 plus BillingAdmin and
+# PlatformSupport from data_model Â§ 4.5 / Â§ 4.7. Resolution order at
+# request time (PlatformRole â†’ TenantRole â†’ FarmScope, first match wins)
 # lives in check.py, not here.
 #
 # Every capability listed must be defined in capabilities.yaml; loading
@@ -13,7 +13,7 @@ roles:
   # ---- Platform-scoped ------------------------------------------------
 
   PlatformAdmin:
-    description: MissionAgre staff with full cross-tenant control.
+    description: AgriPulse staff with full cross-tenant control.
     capabilities:
       - "*"
 

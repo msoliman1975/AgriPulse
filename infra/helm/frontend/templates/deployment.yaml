@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "missionagre-frontend.fullname" . }}
+  name: {{ include "agripulse-frontend.fullname" . }}
   labels:
-    {{- include "missionagre-frontend.labels" . | nindent 4 }}
+    {{- include "agripulse-frontend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      {{- include "missionagre-frontend.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-frontend.selectorLabels" . | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -18,13 +18,13 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "missionagre-frontend.selectorLabels" . | nindent 8 }}
+        {{- include "agripulse-frontend.selectorLabels" . | nindent 8 }}
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "missionagre-frontend.serviceAccountName" . }}
+      serviceAccountName: {{ include "agripulse-frontend.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -33,7 +33,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: frontend
-          image: {{ include "missionagre-frontend.imageRef" . | quote }}
+          image: {{ include "agripulse-frontend.imageRef" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

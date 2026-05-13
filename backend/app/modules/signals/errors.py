@@ -8,7 +8,7 @@ from fastapi import status
 
 from app.core.errors import APIError
 
-_TYPE_BASE = "https://missionagre.io/problems/signals"
+_TYPE_BASE = "https://agripulse.cloud/problems/signals"
 
 
 class SignalDefinitionNotFoundError(APIError):

@@ -2,7 +2,7 @@
 
 When operators report "alerts aren't firing" or "this block obviously has
 a problem and we got nothing." The alerts engine is a Beat-driven
-pull-based sweep, so "stuck" is rarely literal — usually it's "running
+pull-based sweep, so "stuck" is rarely literal â€” usually it's "running
 but producing zero candidates."
 
 The recommendations engine runs on the same wiring (Beat + per-tenant
@@ -12,30 +12,30 @@ task names where called out.
 
 ---
 
-## 1 — Confirm the sweep is running
+## 1 â€” Confirm the sweep is running
 
 ```bash
-kubectl logs -n missionagre deploy/beat | grep "alerts.evaluate_alerts_sweep"
+kubectl logs -n agripulse deploy/beat | grep "alerts.evaluate_alerts_sweep"
 ```
 
 Expected cadence: every `alerts_evaluate_sweep_seconds`. Default 1800s
 in production, 30 min in dev.
 
-If silent → Beat itself is wedged. Restart:
+If silent â†’ Beat itself is wedged. Restart:
 
 ```bash
-kubectl rollout restart -n missionagre deploy/beat
+kubectl rollout restart -n agripulse deploy/beat
 ```
 
 If the line says "tenants_scanned=0", `public.tenants` has no
-`status='active'` rows — or the API gateway lost its DB connection.
+`status='active'` rows â€” or the API gateway lost its DB connection.
 
 ---
 
-## 2 — Confirm the per-tenant evaluator runs
+## 2 â€” Confirm the per-tenant evaluator runs
 
 ```bash
-kubectl logs -n missionagre deploy/worker-light --tail 500 | \
+kubectl logs -n agripulse deploy/worker-light --tail 500 | \
   grep "alerts_tenant_sweep_done"
 ```
 
@@ -45,21 +45,21 @@ query is wrong (tenant has no `status='active'` blocks) or the tenant
 has no blocks at all.
 
 If `blocks_processed > 0` but `alerts_opened=0` consistently across
-many tenants, jump to § 3. If only one tenant is silent, check whether
+many tenants, jump to Â§ 3. If only one tenant is silent, check whether
 all their `default_rules` are overridden disabled in
 `tenant_<id>.rule_overrides`.
 
 ---
 
-## 3 — Verify rules are active and candidates exist
+## 3 â€” Verify rules are active and candidates exist
 
 ```sql
 SELECT count(*) FROM public.default_rules
  WHERE status = 'active' AND deleted_at IS NULL;
--- expect ≥ 2 (the seed ndvi_severe_drop + ndvi_warning_drop).
+-- expect â‰¥ 2 (the seed ndvi_severe_drop + ndvi_warning_drop).
 ```
 
-If 0 → migration 0012 didn't seed; reapply the seed manually.
+If 0 â†’ migration 0012 didn't seed; reapply the seed manually.
 
 For one tenant, check whether overrides are blocking everything:
 
@@ -88,11 +88,11 @@ SELECT b.code,
  ORDER BY latest_index DESC NULLS LAST;
 ```
 
-`index_rows = 0` → nothing for the engine to evaluate. The imagery
-pipeline is upstream — see `runbooks/imagery-pipeline-failure.md`.
+`index_rows = 0` â†’ nothing for the engine to evaluate. The imagery
+pipeline is upstream â€” see `runbooks/imagery-pipeline-failure.md`.
 
-`baseline_deviation IS NULL` for every row → no `block_index_baselines`
-rows yet. Baselines need ≥ 3 historical observations per (block,
+`baseline_deviation IS NULL` for every row â†’ no `block_index_baselines`
+rows yet. Baselines need â‰¥ 3 historical observations per (block,
 index, day_of_year). Either the data is too new (give it a few weeks
 of history) or the recompute Beat task isn't running.
 
@@ -104,12 +104,12 @@ celery -A workers.celery call indices.recompute_baselines_sweep
 
 ---
 
-## 4 — Re-fire by hand
+## 4 â€” Re-fire by hand
 
 To fire one block immediately (for a customer demo or to test a fix):
 
 ```bash
-curl -X POST "https://api.missionagre.io/api/v1/blocks/$BLOCK_ID/alerts:evaluate" \
+curl -X POST "https://api.agripulse.cloud/api/v1/blocks/$BLOCK_ID/alerts:evaluate" \
   -H "Authorization: Bearer $JWT"
 ```
 
@@ -124,18 +124,18 @@ SELECT channel, status, error
 
 `status='skipped'` reasons are surfaced in `error` (no recipients,
 channel disabled by tenant, no email on file). `status='failed'` on the
-SMTP/webhook channel logs a transport error — see
+SMTP/webhook channel logs a transport error â€” see
 `runbooks/notifications.md`.
 
 ---
 
-## 5 — Stuck-on-evaluation (rare)
+## 5 â€” Stuck-on-evaluation (rare)
 
 If a worker pod is showing CPU pegged on `_evaluate_alerts_for_tenant_async`
 and not making progress, suspect a runaway condition tree. The engine
 caps tree-walks at 64 steps and the alerts predicate dispatcher only
 runs against `default_rules` (whose conditions are hand-maintained), so
-this should never happen in practice — but a malformed JSONB blob from
+this should never happen in practice â€” but a malformed JSONB blob from
 a tenant override could in theory loop forever in an external evaluator.
 
 Fix: `UPDATE rule_overrides SET is_disabled = TRUE WHERE rule_code =
@@ -144,7 +144,7 @@ shape and tighten the `RuleOverrideUpsertRequest` validator if needed.
 
 ---
 
-## 6 — Recommendations equivalent
+## 6 â€” Recommendations equivalent
 
 Substitute task names:
 - Beat schedule entry: `recommendations.evaluate_sweep`.
@@ -152,14 +152,14 @@ Substitute task names:
 - Worker log marker: `recommendations_tenant_sweep_done`.
 
 Inputs are the same NDVI aggregates plus weather + signals snapshots,
-so the same § 3 query applies.
+so the same Â§ 3 query applies.
 
 The decision-tree YAML on disk is loaded into `public.decision_trees`
 on app startup. If a freshly-deployed tree isn't firing, check the
 backend log for `decision_trees_sync_done` at startup:
 
 ```bash
-kubectl logs -n missionagre deploy/api | grep decision_trees_sync_done
+kubectl logs -n agripulse deploy/api | grep decision_trees_sync_done
 ```
 
 `versions_inserted=0` means the on-disk YAML matches the latest DB

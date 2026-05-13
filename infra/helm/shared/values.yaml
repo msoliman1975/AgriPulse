@@ -1,4 +1,4 @@
-# Default values for the missionagre-shared chart. Per-env overrides live
+# Default values for the agripulse-shared chart. Per-env overrides live
 # in infra/argocd/overlays/<env>/values.yaml so dev/staging/prod diverge
 # only in things that genuinely differ (domain names, S3 buckets, etc.).
 
@@ -8,7 +8,7 @@
 #     (s3://agripulse-pg-backup-<env>) and is expected to be overridden
 #     per ArgoCD overlay.
 #   * `envHost` is the per-env DNS suffix consumed by every service chart's
-#     ingress + env templates (api.<envHost>, app.<envHost>, …). Overlays
+#     ingress + env templates (api.<envHost>, app.<envHost>, â€¦). Overlays
 #     set this to `dev.agripulse.cloud` / `staging.agripulse.cloud` /
 #     `agripulse.cloud`. The dev default lives here so a bare `helm
 #     template` still produces a valid manifest.
@@ -21,7 +21,7 @@ global:
 # Common labels applied by every templates/_labels.tpl include.
 # ---------------------------------------------------------------------------
 labels:
-  partOf: missionagre
+  partOf: agripulse
 
 # ---------------------------------------------------------------------------
 # cert-manager ClusterIssuer.
@@ -40,7 +40,7 @@ certManager:
       enabled: true
       name: letsencrypt-prod
       server: https://acme-v02.api.letsencrypt.org/directory
-    # DNS-01 solver against Route 53 — the controller assumes the
+    # DNS-01 solver against Route 53 â€” the controller assumes the
     # cert-manager IRSA role at runtime, so no static AWS credentials.
     # `route53Region` / `route53HostedZoneId` are overridden per-env via
     # overlays/<env>/values.yaml when the hosted-zone ID is known.
@@ -73,7 +73,7 @@ externalSecrets:
 # ---------------------------------------------------------------------------
 postgresCluster:
   enabled: true
-  name: missionagre-pg
+  name: agripulse-pg
   instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4-bookworm
   # IRSA annotations applied to the CNPG-managed ServiceAccount via
@@ -104,7 +104,7 @@ postgresCluster:
     - "CREATE EXTENSION IF NOT EXISTS pgaudit;"
   # CD-13: roles managed by CNPG. The `keycloak` role owns the keycloak
   # database; its password is the k8s Secret synced from SM by the
-  # keycloak chart's ExternalSecret (missionagre-keycloak-db).
+  # keycloak chart's ExternalSecret (agripulse-keycloak-db).
   managed:
     roles:
       - name: keycloak
@@ -112,9 +112,9 @@ postgresCluster:
         login: true
         comment: "Keycloak realm DB owner (CD-13)"
         passwordSecret:
-          name: missionagre-keycloak-db
+          name: agripulse-keycloak-db
   # Per-CR databases living in the same Cluster. The primary
-  # `missionagre` DB comes from bootstrap.initdb above; anything else
+  # `agripulse` DB comes from bootstrap.initdb above; anything else
   # goes here so CNPG can reconcile it.
   databases:
     - name: keycloak
@@ -154,7 +154,7 @@ postgresCluster:
 # Namespace-scoped ConfigMap shared by every service chart.
 # ---------------------------------------------------------------------------
 appConfig:
-  serviceName: missionagre
+  serviceName: agripulse
   region: me-south-1
   log:
     level: INFO

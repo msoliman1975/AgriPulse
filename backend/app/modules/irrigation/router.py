@@ -45,7 +45,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -115,7 +115,7 @@ async def apply_or_skip(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Missing required field",
             detail="`applied_volume_mm` is required when action='apply'.",
-            type_="https://missionagre.io/problems/irrigation-missing-volume",
+            type_="https://agripulse.cloud/problems/irrigation-missing-volume",
         )
     return await service.transition(
         schedule_id=schedule_id,

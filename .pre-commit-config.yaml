@@ -1,4 +1,4 @@
-# Pre-commit hooks for MissionAgre.
+# Pre-commit hooks for AgriPulse.
 #
 # Install once per clone:
 #   pip install pre-commit && pre-commit install
@@ -55,7 +55,7 @@ repos:
           - sqlalchemy>=2
           - types-PyYAML
         args: [--config-file=backend/pyproject.toml]
-        # Run on push, not on every commit — type-checking on a partial
+        # Run on push, not on every commit â€” type-checking on a partial
         # tree is noisy.
         stages: [pre-push]
 
@@ -66,7 +66,7 @@ repos:
         # Frontend has its own pinned Prettier (frontend/prettier.config.js,
         # printWidth 100) and runs `pnpm format:check` in the frontend CI
         # job. The mirrored Prettier here uses defaults and would fight that
-        # config — keep it scoped to YAML only (matches the pre-PR-3
+        # config â€” keep it scoped to YAML only (matches the pre-PR-3
         # behaviour for everything outside frontend/).
         files: '\.ya?ml$'
         # Excludes:

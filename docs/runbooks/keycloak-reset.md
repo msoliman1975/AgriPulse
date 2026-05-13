@@ -11,14 +11,14 @@ paths first.
 
 ---
 
-## 1 — JWKS cache + JWT refresh
+## 1 â€” JWKS cache + JWT refresh
 
 When users see "401 Invalid token" right after a Keycloak deploy:
 
 ```bash
 # Backend caches the JWKS for `keycloak_jwks_cache_ttl_seconds`
 # (default 1h). Force a refetch by restarting the API:
-kubectl rollout restart -n missionagre deploy/api
+kubectl rollout restart -n agripulse deploy/api
 ```
 
 Users then need to re-login. The frontend OIDC client refreshes tokens
@@ -27,19 +27,19 @@ new keys.
 
 ---
 
-## 2 — A specific user can't log in
+## 2 â€” A specific user can't log in
 
 ### "Account is disabled"
 
 ```bash
-kcadm.sh update users/<user-id> -r missionagre -s enabled=true
+kcadm.sh update users/<user-id> -r agripulse -s enabled=true
 ```
 
 ### "Invalid username or password" but the user swears it's right
 
 ```bash
 # Reset their password to a temporary value + email link
-kcadm.sh update users/<user-id>/execute-actions-email -r missionagre \
+kcadm.sh update users/<user-id>/execute-actions-email -r agripulse \
   -s '["UPDATE_PASSWORD"]'
 ```
 
@@ -49,9 +49,9 @@ A duplicate user with the same email under a different username is
 blocking. Find + remove the orphan:
 
 ```bash
-kcadm.sh get users -r missionagre -q "email=<email>"
+kcadm.sh get users -r agripulse -q "email=<email>"
 # If two rows: delete the older one (check createdTimestamp).
-kcadm.sh delete users/<orphan-id> -r missionagre
+kcadm.sh delete users/<orphan-id> -r agripulse
 ```
 
 ### Group/role drift (user lost their TenantAdmin)
@@ -59,27 +59,27 @@ kcadm.sh delete users/<orphan-id> -r missionagre
 Re-grant:
 
 ```bash
-kcadm.sh add-roles -r missionagre --uusername "<email>" \
+kcadm.sh add-roles -r agripulse --uusername "<email>" \
   --rolename TenantAdmin
-kcadm.sh update users/<user-id>/groups/<tenant-group-id> -r missionagre
+kcadm.sh update users/<user-id>/groups/<tenant-group-id> -r agripulse
 ```
 
 The platform DB row in `public.tenant_memberships` should already
-exist (created on first login); if missing, see § 3 of
+exist (created on first login); if missing, see Â§ 3 of
 `runbooks/tenant-onboarding.md`.
 
 ---
 
-## 3 — Realm export / import drift
+## 3 â€” Realm export / import drift
 
 When a Keycloak feature flag or theme change in
 `infra/keycloak/realm-export.json` doesn't show up in the running
 realm, you have to re-import. **This rotates the realm's signing keys
-unless you carry them over** — schedule a maintenance window.
+unless you carry them over** â€” schedule a maintenance window.
 
 ```bash
 # 1. Export the live realm (so we can diff)
-kcadm.sh get realms/missionagre -r master > /tmp/realm-live.json
+kcadm.sh get realms/agripulse -r master > /tmp/realm-live.json
 
 # 2. Diff against the file in repo
 diff <(jq -S . infra/keycloak/realm-export.json) <(jq -S . /tmp/realm-live.json) | head
@@ -91,65 +91,65 @@ kc.sh import --file infra/keycloak/realm-export.json --override true
 kubectl rollout restart -n keycloak statefulset/keycloak
 
 # 5. Restart the API so the JWKS cache repopulates from the new keys
-kubectl rollout restart -n missionagre deploy/api
+kubectl rollout restart -n agripulse deploy/api
 ```
 
-Tell users to log out + back in — refresh tokens minted against the
+Tell users to log out + back in â€” refresh tokens minted against the
 old keys will fail.
 
 ---
 
-## 4 — Full reset (dev only)
+## 4 â€” Full reset (dev only)
 
 In local dev, the realm lives in `infra/dev/compose.yaml`'s Keycloak
 service. To wipe and rebootstrap:
 
 ```bash
 docker compose -f infra/dev/compose.yaml down keycloak
-docker volume rm missionagre_keycloak_h2  # the H2 db volume name
+docker volume rm agripulse_keycloak_h2  # the H2 db volume name
 docker compose -f infra/dev/compose.yaml up -d keycloak
 
-# Re-run the dev bootstrap to recreate the missionagre realm + dev user
+# Re-run the dev bootstrap to recreate the agripulse realm + dev user
 python backend/scripts/dev_bootstrap.py
 ```
 
 Sign back in at http://localhost:8080/admin (admin/admin) to verify.
 
 > Never run this in staging/production. There is no full reset there
-> — recovery goes through § 3 (realm re-import) or § 5 (DR).
+> â€” recovery goes through Â§ 3 (realm re-import) or Â§ 5 (DR).
 
 ---
 
-## 5 — DR: Keycloak DB lost
+## 5 â€” DR: Keycloak DB lost
 
 Keycloak's storage in production is on the same CNPG cluster (separate
 schema). PITR for the Keycloak schema follows the same procedure as
-`runbooks/postgres-failover.md` § 5; recovery time is identical.
+`runbooks/postgres-failover.md` Â§ 5; recovery time is identical.
 
 After PITR:
 
 1. Restart Keycloak so it reconnects to the recovered DB.
 2. Verify the admin login works (master realm is in the same backup).
 3. Re-issue tokens for any users whose sessions were active during the
-   restore — easiest path is "Sign out all sessions" under
-   `Realm settings → Sessions`.
+   restore â€” easiest path is "Sign out all sessions" under
+   `Realm settings â†’ Sessions`.
 
 ---
 
-## 6 — Verifying after any reset
+## 6 â€” Verifying after any reset
 
 ```bash
 # JWKS endpoint responds with the live keys
-curl -fsS https://keycloak.missionagre.io/realms/missionagre/protocol/openid-connect/certs | jq '.keys[].kid'
+curl -fsS https://keycloak.agripulse.cloud/realms/agripulse/protocol/openid-connect/certs | jq '.keys[].kid'
 
 # A test user can log in (use the playwright suite if available)
 playwright test tests/auth-smoke.spec.ts
 
 # Backend accepts the resulting JWT
 TOKEN=$(get-test-jwt)
-curl -fsS -H "Authorization: Bearer $TOKEN" https://api.missionagre.io/api/v1/me
+curl -fsS -H "Authorization: Bearer $TOKEN" https://api.agripulse.cloud/api/v1/me
 ```
 
 Document the change in the platform-on-call channel even for routine
-resets — Keycloak is the auth root of trust, and silent fixes are how
+resets â€” Keycloak is the auth root of trust, and silent fixes are how
 the next operator gets surprised.

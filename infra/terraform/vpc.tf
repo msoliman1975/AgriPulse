@@ -2,7 +2,7 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.13"
 
-  name = "missionagre-${var.environment}"
+  name = "agripulse-${var.environment}"
   cidr = var.vpc_cidr
 
   azs             = local.azs

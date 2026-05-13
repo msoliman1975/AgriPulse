@@ -1,4 +1,4 @@
-"""Tenant integrations config endpoints — three tiers.
+"""Tenant integrations config endpoints â€” three tiers.
 
 Mounted under /api/v1 by the app factory.
 
@@ -75,7 +75,7 @@ def _ensure_tenant(context: RequestContext) -> tuple[UUID, str]:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return context.tenant_id, context.tenant_schema
 
@@ -113,7 +113,7 @@ async def put_weather_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid key",
             detail=f"{key!r} is not a weather-category key.",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
     return await service.upsert_tenant_value(
         tenant_id=tid,
@@ -214,7 +214,7 @@ async def put_imagery_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid key",
             detail=f"{key!r} is not an imagery-category key.",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
     return await service.upsert_tenant_value(
         tenant_id=tid,
@@ -348,7 +348,7 @@ async def put_email_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid key",
             detail=f"{key!r} is not an email-category key.",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
     return await service.upsert_tenant_value(
         tenant_id=tid,
@@ -392,7 +392,7 @@ async def put_webhook_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid key",
             detail=f"{key!r} is not a webhook-category key.",
-            type_="https://missionagre.io/problems/integrations/invalid-key",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
     return await service.upsert_tenant_value(
         tenant_id=tid,

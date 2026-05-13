@@ -1,9 +1,9 @@
-# CD-11 — GitHub OIDC federation for CI.
+# CD-11 â€” GitHub OIDC federation for CI.
 #
 # Two scoped roles:
-#   * gha-terraform-plan  — read-only on services + RW on the TF state
+#   * gha-terraform-plan  â€” read-only on services + RW on the TF state
 #     lock. Assumed by PR runs (`pull_request` events).
-#   * gha-terraform-apply — write on the resource types this stack
+#   * gha-terraform-apply â€” write on the resource types this stack
 #     manages. Assumed only by `push` to `refs/heads/main` and gated
 #     behind a manual GitHub environment approval (production-infra).
 #
@@ -19,7 +19,7 @@ variable "github_org" {
 variable "github_repo" {
   description = "GitHub repository name (without org)."
   type        = string
-  default     = "MissionAgre"
+  default     = "AgriPulse"
 }
 
 variable "tf_state_bucket" {
@@ -30,7 +30,7 @@ variable "tf_state_bucket" {
 variable "tf_lock_table" {
   description = "DynamoDB lock table name. The plan + apply roles both need RW on this so terraform init/plan can acquire the lock."
   type        = string
-  default     = "missionagre-tfstate-lock"
+  default     = "agripulse-tfstate-lock"
 }
 
 # --- OIDC provider -------------------------------------------------------

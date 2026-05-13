@@ -8,7 +8,7 @@ from fastapi import status
 
 from app.core.errors import APIError
 
-_TYPE_BASE = "https://missionagre.io/problems/irrigation"
+_TYPE_BASE = "https://agripulse.cloud/problems/irrigation"
 
 
 class IrrigationScheduleNotFoundError(APIError):
@@ -23,7 +23,7 @@ class IrrigationScheduleNotFoundError(APIError):
 
 
 class InvalidIrrigationTransitionError(APIError):
-    """409 — caller asked to apply / skip a schedule whose state doesn't
+    """409 â€” caller asked to apply / skip a schedule whose state doesn't
     allow it (e.g. applying an already-skipped row)."""
 
     def __init__(self, *, current_status: str, action: str) -> None:

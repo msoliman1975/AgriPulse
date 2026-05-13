@@ -30,7 +30,7 @@ output "cluster_oidc_issuer_url" {
 
 output "kms_key_arn" {
   description = "Customer-managed KMS key for at-rest encryption."
-  value       = aws_kms_key.missionagre.arn
+  value       = aws_kms_key.agripulse.arn
 }
 
 output "s3_buckets" {

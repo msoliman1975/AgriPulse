@@ -18,7 +18,7 @@ class WeatherProviderNotFoundError(APIError):
                 f"No active weather provider with code {provider_code!r}. "
                 "Check public.weather_providers."
             ),
-            type_="https://missionagre.io/problems/weather/provider-not-found",
+            type_="https://agripulse.cloud/problems/weather/provider-not-found",
         )
 
 
@@ -32,19 +32,19 @@ class WeatherSubscriptionNotFoundError(APIError):
                 if subscription_id
                 else "Subscription not found."
             ),
-            type_="https://missionagre.io/problems/weather/subscription-not-found",
+            type_="https://agripulse.cloud/problems/weather/subscription-not-found",
         )
 
 
 class WeatherSubscriptionAlreadyExistsError(APIError):
-    """409 — `(block_id, provider_code) WHERE is_active` is unique."""
+    """409 â€” `(block_id, provider_code) WHERE is_active` is unique."""
 
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
             title="Subscription already exists",
             detail=("An active weather subscription for this block and provider already exists."),
-            type_="https://missionagre.io/problems/weather/subscription-conflict",
+            type_="https://agripulse.cloud/problems/weather/subscription-conflict",
         )
 
 
@@ -59,5 +59,5 @@ class BlockNotVisibleError(APIError):
             status_code=status.HTTP_404_NOT_FOUND,
             title="Block not found",
             detail=(f"No block with id {block_id}" if block_id else "Block not found."),
-            type_="https://missionagre.io/problems/farms/block-not-found",
+            type_="https://agripulse.cloud/problems/farms/block-not-found",
         )

@@ -1,6 +1,6 @@
 # Runbook: Postgres point-in-time restore (CNPG + S3 / Barman)
 
-Audience: on-call. Use this when the live `missionagre-pg` CNPG `Cluster`
+Audience: on-call. Use this when the live `agripulse-pg` CNPG `Cluster`
 in dev/staging/prod has lost data or is unrecoverable and you need to
 roll forward from S3-backed WAL archives.
 
@@ -20,12 +20,12 @@ The S3 buckets, KMS key, and CNPG IRSA role are provisioned by Terraform
 
 ```bash
 ENV=prod
-NS=missionagre
+NS=agripulse
 
 kubectl exec -n $NS postgres-cluster-1 -c postgres -- \
   barman-cloud-backup-list \
     s3://agripulse-pg-backup-$ENV/pg \
-    missionagre-pg
+    agripulse-pg
 ```
 
 The output lists base backups with `Backup ID`, `Status`, `Begin/End time`,
@@ -40,12 +40,12 @@ archived WAL segment.
 kubectl exec -n $NS postgres-cluster-1 -c postgres -- \
   barman-cloud-check-wal-archive \
     s3://agripulse-pg-backup-$ENV/pg \
-    missionagre-pg
+    agripulse-pg
 ```
 
 A clean exit means the WAL archive is intact and the backup chain is
 restorable. A non-zero exit usually means a WAL segment is missing
-(operator paged on `CNPGWALArchiveStalled` — see section 6).
+(operator paged on `CNPGWALArchiveStalled` â€” see section 6).
 
 ## 3. Restore to a new namespace
 
@@ -64,7 +64,7 @@ metadata:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: missionagre-pg
+  name: agripulse-pg
   namespace: pg-restore-2026-05-12
 spec:
   instances: 1
@@ -73,7 +73,7 @@ spec:
   serviceAccountTemplate:
     metadata:
       annotations:
-        # Same IRSA role as the source env — restore reads the same S3
+        # Same IRSA role as the source env â€” restore reads the same S3
         # bucket. From `terraform output agripulse_env_resources`.
         eks.amazonaws.com/role-arn: <cnpg_irsa_arn for source env>
 
@@ -100,14 +100,14 @@ spec:
         wal:
           compression: gzip
           maxParallel: 4
-        serverName: missionagre-pg
+        serverName: agripulse-pg
 ```
 
 Apply, then watch:
 
 ```bash
-kubectl -n pg-restore-2026-05-12 get cluster missionagre-pg -w
-kubectl -n pg-restore-2026-05-12 logs missionagre-pg-1 -c postgres -f
+kubectl -n pg-restore-2026-05-12 get cluster agripulse-pg -w
+kubectl -n pg-restore-2026-05-12 logs agripulse-pg-1 -c postgres -f
 ```
 
 Expect the bootstrap pod to download the base backup, then replay WAL
@@ -117,8 +117,8 @@ depending on WAL volume.
 ## 4. Verify the restored cluster
 
 ```bash
-kubectl -n pg-restore-2026-05-12 exec missionagre-pg-1 -c postgres -- \
-  psql -U postgres -d missionagre -c \
+kubectl -n pg-restore-2026-05-12 exec agripulse-pg-1 -c postgres -- \
+  psql -U postgres -d agripulse -c \
   "SELECT pg_is_in_recovery(), now() AT TIME ZONE 'UTC' AS now_utc, pg_last_xact_replay_timestamp();"
 ```
 
@@ -129,9 +129,9 @@ contain the lost rows; compare row counts and the latest timestamps.
 
 Once the restored cluster passes verification:
 
-1. Scale all writers down to zero. `kubectl -n missionagre scale deploy --all --replicas=0`
+1. Scale all writers down to zero. `kubectl -n agripulse scale deploy --all --replicas=0`
 2. Update the connection strings:
-   - Read-write: `postgresql+asyncpg://missionagre@missionagre-pg-rw.pg-restore-2026-05-12.svc:5432/missionagre`
+   - Read-write: `postgresql+asyncpg://agripulse@agripulse-pg-rw.pg-restore-2026-05-12.svc:5432/agripulse`
    - The `ExternalSecret` projecting the DB password is per-namespace;
      the new namespace will create its own from the same SM key. If you
      run permanently from the new namespace, update
@@ -148,20 +148,20 @@ Symptom: Prometheus alert `CNPGWALArchiveStalled` fires (rule lives in
 pages because `pg_stat_archiver.archived_count` stops advancing.
 
 1. Inspect operator status:
-   `kubectl -n missionagre describe cluster missionagre-pg | grep -A2 WAL`
+   `kubectl -n agripulse describe cluster agripulse-pg | grep -A2 WAL`
 2. Force a WAL archive push:
    ```bash
-   kubectl exec -n missionagre missionagre-pg-1 -c postgres -- \
-     barman-cloud-wal-archive s3://agripulse-pg-backup-prod/pg missionagre-pg
+   kubectl exec -n agripulse agripulse-pg-1 -c postgres -- \
+     barman-cloud-wal-archive s3://agripulse-pg-backup-prod/pg agripulse-pg
    ```
 3. Common causes:
-   - IRSA role lost `s3:PutObject` on the backup bucket — re-check
+   - IRSA role lost `s3:PutObject` on the backup bucket â€” re-check
      `terraform output agripulse_env_resources`.
    - S3 bucket lifecycle rule rolled an in-flight WAL segment to a tier
      that does not support overwrite. Should not happen with the
      `expire-backups-30d` rule, but worth confirming.
    - Disk-pressure on the primary blocking WAL flush. Check
-     `kubectl top pod -n missionagre`.
+     `kubectl top pod -n agripulse`.
 
 ## 7. Drill cadence
 

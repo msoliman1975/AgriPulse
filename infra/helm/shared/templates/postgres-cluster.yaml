@@ -4,9 +4,9 @@ kind: Cluster
 metadata:
   name: {{ .Values.postgresCluster.name }}
   labels:
-    {{- include "missionagre.shared.labels" . | nindent 4 }}
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
-  description: MissionAgre primary Postgres cluster (CloudNativePG-managed).
+  description: AgriPulse primary Postgres cluster (CloudNativePG-managed).
   imageName: {{ .Values.postgresCluster.imageName | quote }}
   instances: {{ .Values.postgresCluster.instances }}
 
@@ -19,8 +19,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: missionagre
-      owner: missionagre
+      database: agripulse
+      owner: agripulse
       postInitSQL:
         {{- range .Values.postgresCluster.postInitSQL }}
         - {{ . | quote }}

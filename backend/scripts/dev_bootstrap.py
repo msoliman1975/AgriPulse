@@ -2,14 +2,14 @@
 
 Two run modes:
 
-  1. **Default** — creates the dev-tenant + the seeded `dev@missionagre.local`
+  1. **Default** â€” creates the dev-tenant + the seeded `dev@agripulse.local`
      as TenantOwner (matches production: every tenant has exactly one
      TenantOwner from creation). Idempotent. Run this once after
      `compose up`.
 
          python -m scripts.dev_bootstrap
 
-  2. **Add user** — creates an additional Keycloak user and attaches it
+  2. **Add user** â€” creates an additional Keycloak user and attaches it
      to the dev-tenant with a chosen tenant role and/or farm-scoped role.
      Useful for testing per-farm RBAC paths (Viewer can't refresh,
      Agronomist can't manage subscriptions, etc.).
@@ -25,7 +25,7 @@ Two run modes:
 Notes
 -----
 
-There is no production admin frontend yet for user management — that
+There is no production admin frontend yet for user management â€” that
 ships in a later prompt. Until then this script is the canonical
 "create another user" path on the dev cluster. Production is expected
 to wire SCIM / a self-serve invite flow against Keycloak; the realm's
@@ -38,7 +38,7 @@ Default mode:
 
   1. Creates a tenant via the in-process tenancy service (which also
      bootstraps the per-tenant schema + runs the tenant migrations).
-  2. Reads `dev@missionagre.local`'s Keycloak `sub` UUID via the Admin
+  2. Reads `dev@agripulse.local`'s Keycloak `sub` UUID via the Admin
      REST API.
   3. Inserts a `public.users` row matching the sub plus
      `tenant_memberships` + `tenant_role_assignments` (TenantOwner).
@@ -46,7 +46,7 @@ Default mode:
      custom attributes survive Keycloak 26's user-profile filter.
   5. Sets `tenant_id` and `tenant_role` user attributes.
   6. Adds two `oidc-usermodel-attribute-mapper` protocol mappers to
-     the `missionagre-api` client.
+     the `agripulse-api` client.
 
 Add-user mode performs only the user-side steps (2-5) plus the new
 `farm_scopes` row when `--farm-id` is provided. The realm-level config
@@ -55,10 +55,10 @@ is assumed to be in place from a prior default run.
 Environment variables (all optional):
 
   KEYCLOAK_BASE_URL    default http://localhost:8080
-  KEYCLOAK_REALM       default missionagre
+  KEYCLOAK_REALM       default agripulse
   KEYCLOAK_ADMIN       default admin
   KEYCLOAK_PASSWORD    default admin
-  DEV_USER_EMAIL       default dev@missionagre.local
+  DEV_USER_EMAIL       default dev@agripulse.local
   DEV_TENANT_SLUG      default dev-tenant
 """
 
@@ -83,12 +83,12 @@ from app.modules.tenancy.service import (
 from app.shared.db.session import AsyncSessionLocal, dispose_engine
 
 KEYCLOAK_BASE_URL = os.getenv("KEYCLOAK_BASE_URL", "http://localhost:8080")
-KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "missionagre")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "agripulse")
 KEYCLOAK_ADMIN = os.getenv("KEYCLOAK_ADMIN", "admin")
 KEYCLOAK_PASSWORD = os.getenv("KEYCLOAK_PASSWORD", "admin")
-DEV_USER_EMAIL = os.getenv("DEV_USER_EMAIL", "dev@missionagre.local")
+DEV_USER_EMAIL = os.getenv("DEV_USER_EMAIL", "dev@agripulse.local")
 DEV_TENANT_SLUG = os.getenv("DEV_TENANT_SLUG", "dev-tenant")
-CLIENT_ID = "missionagre-api"
+CLIENT_ID = "agripulse-api"
 
 VALID_TENANT_ROLES = {"TenantOwner", "TenantAdmin", "BillingAdmin"}
 VALID_FARM_ROLES = {"FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"}
@@ -273,7 +273,7 @@ async def upsert_user_record(
 ) -> None:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
-        # public.users — keycloak_subject mirrors id (same UUID).
+        # public.users â€” keycloak_subject mirrors id (same UUID).
         await session.execute(
             text(
                 """
@@ -439,7 +439,7 @@ async def bootstrap_default() -> None:
         user = kc_get_user(client, token, DEV_USER_EMAIL)
         if user is None:
             raise RuntimeError(
-                f"Keycloak user {DEV_USER_EMAIL!r} not found — re-import the realm "
+                f"Keycloak user {DEV_USER_EMAIL!r} not found â€” re-import the realm "
                 f"or run with --user-email <email> to create one."
             )
         kc_user_id = user["id"]

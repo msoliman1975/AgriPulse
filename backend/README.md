@@ -1,6 +1,6 @@
-# MissionAgre backend
+# AgriPulse backend
 
-FastAPI service for MissionAgre.
+FastAPI service for AgriPulse.
 
 ## Local services
 
@@ -21,15 +21,15 @@ docker compose -f infra/dev/compose.yaml down -v       # stop AND wipe data
 
 | Service   | URL                       | Credentials                     |
 |-----------|---------------------------|---------------------------------|
-| Postgres  | `localhost:5432`          | `missionagre / missionagre`     |
+| Postgres  | `localhost:5432`          | `agripulse / agripulse`     |
 | Redis     | `localhost:6379`          | (no auth in dev)                |
 | Keycloak  | http://localhost:8080     | admin: `admin / admin`          |
-| MinIO API | http://localhost:9000     | `missionagre / missionagre-dev` |
-| MinIO UI  | http://localhost:9001     | `missionagre / missionagre-dev` |
+| MinIO API | http://localhost:9000     | `agripulse / agripulse-dev` |
+| MinIO UI  | http://localhost:9001     | `agripulse / agripulse-dev` |
 
-The stack pre-provisions a Keycloak realm `missionagre` with client
-`missionagre-api` and a dev user `dev@missionagre.local` (password `dev`),
-and creates two MinIO buckets (`missionagre-imagery`, `missionagre-uploads`).
+The stack pre-provisions a Keycloak realm `agripulse` with client
+`agripulse-api` and a dev user `dev@agripulse.local` (password `dev`),
+and creates two MinIO buckets (`agripulse-imagery`, `agripulse-uploads`).
 
 > Tested with Rancher Desktop in dockerd (moby) mode on Windows; works the
 > same on Docker Desktop and on Podman with compose support.
@@ -42,7 +42,7 @@ uv sync --extra dev
 
 # 2. Configure environment
 cp .env.example .env
-# .env defaults already match infra/dev/compose.yaml — edit only if you
+# .env defaults already match infra/dev/compose.yaml â€” edit only if you
 # changed ports or credentials.
 
 # 3. Run migrations against the public schema
@@ -81,5 +81,5 @@ scripts/       Operational scripts (e.g., migrate_tenants.py)
 tests/         unit/ + integration/ + e2e/
 ```
 
-The thirteen modules under `app/modules/` are listed in `docs/ARCHITECTURE.md` § 6.
-Cross-module imports of internals are forbidden — enforced by `import-linter`.
+The thirteen modules under `app/modules/` are listed in `docs/ARCHITECTURE.md` Â§ 6.
+Cross-module imports of internals are forbidden â€” enforced by `import-linter`.

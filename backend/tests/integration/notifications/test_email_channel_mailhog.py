@@ -5,7 +5,7 @@ localhost:1025/8025. The test:
 
   1. Clears MailHog's inbox via its HTTP API.
   2. Fires an alert through the engine, which triggers the
-     notifications subscriber → SMTP send.
+     notifications subscriber â†’ SMTP send.
   3. Polls MailHog's inbox until the message arrives, then asserts the
      subject/recipient match the rendered template.
 """
@@ -70,7 +70,7 @@ async def _wait_for_message_to(address: str, timeout_s: float = 5.0) -> dict:
 @pytest.mark.asyncio
 async def test_alert_email_arrives_in_mailhog(admin_session: AsyncSession) -> None:
     if not await _mailhog_available():
-        pytest.skip("MailHog not running on localhost:8025 — start it via compose")
+        pytest.skip("MailHog not running on localhost:8025 â€” start it via compose")
 
     register_subscribers(get_default_bus())
     await _clear_mailhog()
@@ -107,8 +107,8 @@ async def test_alert_email_arrives_in_mailhog(admin_session: AsyncSession) -> No
         (v[0] for k, v in message["Content"]["Headers"].items() if k.lower() == "subject"),
         "",
     )
-    assert "Agri.Pulse" in subject_header
-    assert "alert" in subject_header.lower() or "تنبيه" in subject_header
+    assert "AgriPulse" in subject_header
+    assert "alert" in subject_header.lower() or "ØªÙ†Ø¨ÙŠÙ‡" in subject_header
 
     # And the dispatch row reflects status='sent'.
     row = (

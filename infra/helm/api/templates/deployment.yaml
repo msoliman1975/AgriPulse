@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "missionagre-api.fullname" . }}
+  name: {{ include "agripulse-api.fullname" . }}
   labels:
-    {{- include "missionagre-api.labels" . | nindent 4 }}
+    {{- include "agripulse-api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      {{- include "missionagre-api.selectorLabels" . | nindent 6 }}
+      {{- include "agripulse-api.selectorLabels" . | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -18,7 +18,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "missionagre-api.selectorLabels" . | nindent 8 }}
+        {{- include "agripulse-api.selectorLabels" . | nindent 8 }}
       annotations:
         # Roll the Deployment when ConfigMap or ExternalSecret data
         # changes, since we mount them as envFrom.
@@ -27,7 +27,7 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "missionagre-api.serviceAccountName" . }}
+      serviceAccountName: {{ include "agripulse-api.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -36,7 +36,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: api
-          image: {{ include "missionagre-api.imageRef" . | quote }}
+          image: {{ include "agripulse-api.imageRef" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -47,12 +47,12 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: missionagre-app-config
+                name: agripulse-app-config
             - configMapRef:
-                name: {{ include "missionagre-api.fullname" . }}
+                name: {{ include "agripulse-api.fullname" . }}
             {{- if .Values.externalSecret.enabled }}
             - secretRef:
-                name: {{ include "missionagre-api.fullname" . }}-secrets
+                name: {{ include "agripulse-api.fullname" . }}-secrets
             {{- end }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}

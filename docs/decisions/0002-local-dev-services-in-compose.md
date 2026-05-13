@@ -1,4 +1,4 @@
-# ADR 0002 — Local development runs services in containers, app code natively
+# ADR 0002 â€” Local development runs services in containers, app code natively
 
 **Status:** Accepted
 **Date:** 2026-04-28
@@ -6,7 +6,7 @@
 
 ## Context
 
-`docs/ARCHITECTURE.md` § 3.2 commits the production deployment topology
+`docs/ARCHITECTURE.md` Â§ 3.2 commits the production deployment topology
 (EKS, CloudNativePG, External Secrets, ArgoCD) but says nothing about how
 an engineer brings the platform up on a laptop. Without an explicit local-
 dev arrangement, drift is inevitable: each engineer invents their own
@@ -14,7 +14,7 @@ setup, the values in `backend/.env.example` don't match anything anyone
 runs, and onboarding requires reading every component's docs separately.
 
 `backend/.env.example` already assumes Postgres on `localhost:5432`,
-Redis on `localhost:6379`, and a Keycloak issuer URL — that is, it
+Redis on `localhost:6379`, and a Keycloak issuer URL â€” that is, it
 shipped a "services on the host network" assumption without the
 companion runtime to satisfy it. This ADR makes that assumption
 explicit and provides the runtime.
@@ -32,23 +32,23 @@ Local development uses a **split runtime**:
 1. **Stateful dependencies run in containers** via
    `infra/dev/compose.yaml`: Postgres+TimescaleDB+PostGIS, Redis,
    Keycloak, and MinIO. The container engine is whatever the engineer
-   has installed — Docker Desktop, Rancher Desktop in dockerd (moby)
+   has installed â€” Docker Desktop, Rancher Desktop in dockerd (moby)
    mode, or Podman with compose support. The compose file uses only
    features available in all three.
 2. **Application code runs natively** on the host (Windows, macOS,
    Linux, or WSL2): the FastAPI service via `uv run uvicorn`, Celery
    workers via `uv run celery`, and the React frontend (when it lands)
    via `pnpm dev`. Hot reload, debuggers, and profilers all behave
-   the way they normally do — there is no in-container edit loop.
+   the way they normally do â€” there is no in-container edit loop.
 3. The compose stack publishes to fixed `localhost:*` ports that
    match the defaults in `backend/.env.example`: Postgres `5432`,
    Redis `6379`, Keycloak `8080`, MinIO `9000`/`9001`. The only
    environment edit a fresh engineer needs is `cp .env.example .env`.
-4. Integration tests **continue to use `testcontainers`** —
+4. Integration tests **continue to use `testcontainers`** â€”
    ephemeral, per-session, isolated from the compose stack. This ADR
    does not change the test infrastructure.
 5. Production and staging are unaffected: they run on Kubernetes per
-   ARCHITECTURE.md § 3.2. The compose file is `infra/dev/`-scoped on
+   ARCHITECTURE.md Â§ 3.2. The compose file is `infra/dev/`-scoped on
    purpose and must not be mistaken for staging infrastructure.
 
 ## Consequences
@@ -68,8 +68,8 @@ Local development uses a **split runtime**:
   - One more piece of dev infrastructure to maintain alongside
     `testcontainers`. Drift is possible; mitigated by using the
     same Postgres image (`timescale/timescaledb-ha:pg16`) in both.
-  - Dev credentials (`missionagre/missionagre`, Keycloak `admin/admin`,
-    MinIO `missionagre/missionagre-dev`) are committed. They are not
+  - Dev credentials (`agripulse/agripulse`, Keycloak `admin/admin`,
+    MinIO `agripulse/agripulse-dev`) are committed. They are not
     secrets but engineers must never reuse them outside `infra/dev/`.
   - Keycloak in `start-dev` mode is not production-faithful: no
     clustering, in-memory caches, and dev-only realm import. That is
@@ -89,7 +89,7 @@ Local development uses a **split runtime**:
   tear down at the end of each pytest session; you cannot develop
   against a Keycloak realm if it disappears every five minutes.
 - **Tilt or Skaffold against a local kind/k3d cluster.** Rejected
-  for MVP — too much machinery for a four-service dev environment.
+  for MVP â€” too much machinery for a four-service dev environment.
   Reconsider when the service count justifies it.
 
 ## Follow-ups

@@ -7,10 +7,10 @@ Mounted under /api/v1 by the app factory. Endpoints:
   GET    /farms/{farm_id}/plans/calendar?from=&to=
   GET    /plans/{plan_id}
   PATCH  /plans/{plan_id}
-  DELETE /plans/{plan_id}                                  — soft-archive
+  DELETE /plans/{plan_id}                                  â€” soft-archive
   POST   /plans/{plan_id}/activities
   GET    /plans/{plan_id}/activities
-  PATCH  /activities/{activity_id}                         — metadata + state actions
+  PATCH  /activities/{activity_id}                         â€” metadata + state actions
 
 RBAC:
   * Reads use ``plan.read``.
@@ -61,7 +61,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -143,7 +143,7 @@ async def get_plan(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     plan = await service.get_plan(plan_id=plan_id)
-    # Per-farm gate on plan.read — plan rows carry farm_id, so we
+    # Per-farm gate on plan.read â€” plan rows carry farm_id, so we
     # resolve and check after the fetch (matches imagery's pattern).
     if not has_capability(context, "plan.read", farm_id=plan["farm_id"]):
         raise PlanNotFoundError(plan_id)
@@ -271,9 +271,9 @@ async def update_activity(
     metadata_changes = payload.model_dump(exclude={"state"}, exclude_unset=True)
 
     # State transitions and metadata edits gate on different capabilities:
-    #   * `complete` / `skip` (and `start` as the same flow's prelude) →
+    #   * `complete` / `skip` (and `start` as the same flow's prelude) â†’
     #     `plan_activity.complete` so field operators can drive them.
-    #   * Editing scheduled_date / product / dosage / notes → `plan.manage`
+    #   * Editing scheduled_date / product / dosage / notes â†’ `plan.manage`
     #     so only managers reshuffle the schedule.
     if state_action is not None and not has_capability(
         context, "plan_activity.complete", farm_id=plan["farm_id"]

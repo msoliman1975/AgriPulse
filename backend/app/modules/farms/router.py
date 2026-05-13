@@ -3,7 +3,7 @@
 The router is mounted under /api/v1 by the app factory. Sessions:
 
   * `get_db_session` is tenant-scoped (search_path = tenant_<uuid>, public).
-  * `get_admin_db_session` is public-only — needed for `farm_scopes` ops
+  * `get_admin_db_session` is public-only â€” needed for `farm_scopes` ops
     that target `public.farm_scopes` regardless of search_path.
 
 Two distinct sessions means two transactions per request (tenant + public).
@@ -102,7 +102,7 @@ def _correlation_id(request: Request) -> UUID | None:
 def _ensure_tenant(context: RequestContext) -> str:
     schema = context.tenant_schema
     if schema is None:
-        # Defense-in-depth — the JWT middleware already gates this for
+        # Defense-in-depth â€” the JWT middleware already gates this for
         # tenant-scoped capabilities, so platform-only callers should not
         # reach here.
         from app.core.errors import APIError
@@ -111,7 +111,7 @@ def _ensure_tenant(context: RequestContext) -> str:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return schema
 
@@ -382,7 +382,7 @@ async def get_block(
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
-    # Block routes do not have farm_id in the path — RBAC verifies the
+    # Block routes do not have farm_id in the path â€” RBAC verifies the
     # caller has block.read on *some* farm; the service then 404s if the
     # block belongs to a farm the caller cannot see. (For MVP we
     # delegate to tenant-scoped capability; per-farm RBAC on block
@@ -682,7 +682,7 @@ async def record_growth_stage(
 
     schema = _ensure_tenant(context)
     block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
-    # crop_assignment.update is the closest existing capability — a stage
+    # crop_assignment.update is the closest existing capability â€” a stage
     # change is editing the active assignment's growth state. The
     # alerts/recs gates are too narrow; geometry capabilities are too broad.
     if not has_capability(context, "crop_assignment.update", farm_id=block["farm_id"]):
@@ -747,7 +747,7 @@ async def assign_member(
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="role.assign_farm requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
 
     return await service.assign_member(
@@ -812,7 +812,7 @@ def _require_tenant_id(context: RequestContext) -> UUID:
             status_code=status.HTTP_403_FORBIDDEN,
             title="Tenant context required",
             detail="This endpoint requires a tenant-scoped JWT.",
-            type_="https://missionagre.io/problems/tenant-required",
+            type_="https://agripulse.cloud/problems/tenant-required",
         )
     return context.tenant_id
 
@@ -1042,7 +1042,7 @@ async def delete_block_attachment(
 async def _peek_farm_attachment(service: FarmService, attachment_id: UUID) -> dict[str, Any] | None:
     """Read just enough of the attachment row to resolve its owning farm.
 
-    Bypasses the public service surface — uses the underlying repo so we
+    Bypasses the public service surface â€” uses the underlying repo so we
     don't presign a download URL on a row we're about to delete.
     """
     repo = getattr(service, "_repo", None)
