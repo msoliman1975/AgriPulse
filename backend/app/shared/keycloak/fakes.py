@@ -16,7 +16,7 @@ force the next call to raise.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.shared.keycloak.client import group_name_for
 from app.shared.keycloak.errors import KeycloakRequestError
@@ -31,6 +31,8 @@ class FakeUser:
     actions_emailed: tuple[str, ...] = ()
     realm_roles: tuple[str, ...] = ()
     platform_role: str | None = None
+    tenant_id: str | None = None
+    tenant_role: str | None = None
 
 
 @dataclass
@@ -72,6 +74,7 @@ class FakeKeycloakClient:
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
+        tenant_id: UUID | str | None = None,
     ) -> str:
         self._maybe_fail("invite_user")
         if group_id not in self.groups:
@@ -84,6 +87,9 @@ class FakeKeycloakClient:
                 user.actions_emailed = tuple(
                     set(user.actions_emailed).union({"UPDATE_PASSWORD"})
                 )
+                if tenant_id is not None and roles:
+                    user.tenant_id = str(tenant_id)
+                    user.tenant_role = roles[0]
                 return user.id
         uid = uuid4().hex
         self.users[uid] = FakeUser(
@@ -93,6 +99,8 @@ class FakeKeycloakClient:
             enabled=True,
             actions_emailed=("UPDATE_PASSWORD",),
             realm_roles=tuple(roles),
+            tenant_id=str(tenant_id) if tenant_id is not None else None,
+            tenant_role=roles[0] if (tenant_id is not None and roles) else None,
         )
         self.groups[group_id].member_ids.append(uid)
         return uid
@@ -103,6 +111,7 @@ class FakeKeycloakClient:
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
+        tenant_id: UUID | str | None = None,
     ) -> None:
         self._maybe_fail("add_existing_user_to_group")
         if group_id not in self.groups:
@@ -119,6 +128,9 @@ class FakeKeycloakClient:
         if roles:
             user = self.users[keycloak_user_id]
             user.realm_roles = tuple(set(user.realm_roles).union(roles))
+            if tenant_id is not None:
+                user.tenant_id = str(tenant_id)
+                user.tenant_role = roles[0]
 
     async def disable_users_in_group(self, slug: str) -> int:
         self._maybe_fail("disable_users_in_group")

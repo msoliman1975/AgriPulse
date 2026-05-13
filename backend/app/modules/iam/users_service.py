@@ -221,6 +221,7 @@ class TenantUsersService:
                     full_name=full_name,
                     group_id=group_id,
                     roles=(tenant_role,),
+                    tenant_id=tenant_id,
                 )
                 keycloak_subject = kc_user_id
                 provisioning_status = "succeeded"
@@ -241,6 +242,7 @@ class TenantUsersService:
                     keycloak_user_id=keycloak_subject,
                     group_id=group_id,
                     roles=(tenant_role,),
+                    tenant_id=tenant_id,
                 )
                 provisioning_status = "succeeded"
             except KeycloakError as exc:
