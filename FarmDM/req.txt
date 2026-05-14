@@ -24,7 +24,7 @@ VEGETATION_PLAN
   - farm_id (FK)
   - season_year
   - status (draft, active, completed)
-  
+
 PLAN_ACTIVITY
   - id (PK)
   - plan_id (FK)

@@ -27,6 +27,9 @@ repos:
         args: [--maxkb=1024]
       - id: mixed-line-ending
         args: [--fix=lf]
+        # Windows-only scripts are pinned to CRLF in .gitattributes; skip
+        # them here so the hook doesn't fight git's checkout normalization.
+        exclude: '\.(ps1|bat|cmd)$'
       - id: detect-private-key
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
