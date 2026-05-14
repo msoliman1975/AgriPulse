@@ -17,7 +17,7 @@ Strategy of record: `docs/proposals/app-containerization-strategy.md`.
 ```
 You are working on the AgriPulse (AgriPulse) repo. Strategy of record:
 docs/proposals/app-containerization-strategy.md. Target platform: EKS +
-ArgoCD + Helm in AWS me-south-1, single account, three K8s namespaces
+ArgoCD + Helm in AWS eu-south-1, single account, three K8s namespaces
 (dev/staging/prod). In-cluster CNPG + Redis; S3 for objects; GHCR for
 images; Brevo for SMTP; cert-manager + Let's Encrypt for TLS;
 ExternalDNS + Route 53 for DNS (zone agripulse.cloud); Karpenter for

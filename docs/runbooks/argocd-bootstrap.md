@@ -16,7 +16,7 @@ The apply produces an `argocd-server` Deployment plus its companion pods.
 Verify:
 
 ```bash
-aws eks update-kubeconfig --region me-south-1 --name agripulse-dev
+aws eks update-kubeconfig --region eu-south-1 --name agripulse-dev
 kubectl get pods -n argocd
 # argocd-application-controller-*  Running
 # argocd-applicationset-controller-* Running
@@ -48,7 +48,7 @@ Applications. Initial sync takes ~10â€“15 minutes.
 
 ```bash
 aws secretsmanager get-secret-value \
-  --region me-south-1 \
+  --region eu-south-1 \
   --secret-id "agripulse/dev/argocd-admin-password" \
   --query SecretString --output text
 ```

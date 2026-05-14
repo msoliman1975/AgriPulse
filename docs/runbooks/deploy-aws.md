@@ -9,8 +9,8 @@ with different overlays.
 
 ## 0. What you'll end up with
 
-- One AWS account hosting one EKS cluster (`agripulse-dev`) in `me-south-1`
-  (Bahrain â€” co-located with Sentinel-2 Open Data on S3 per ARCHITECTURE.md
+- One AWS account hosting one EKS cluster (`agripulse-dev`) in `eu-south-1`
+  (Milan â€” Italian/EU data residency per ARCHITECTURE.md
   Â§ 3.2).
 - VPC + private subnets, KMS CMK, three S3 buckets (`imagery-raw`,
   `imagery-cogs`, `exports`), five IRSA roles.
@@ -38,7 +38,7 @@ Confirm caller identity and region:
 
 ```powershell
 aws sts get-caller-identity
-$env:AWS_REGION = "me-south-1"
+$env:AWS_REGION = "eu-south-1"
 ```
 
 In the AWS account, you'll also need:
@@ -63,8 +63,8 @@ $BUCKET  = "agripulse-tfstate-$ACCOUNT"
 
 aws s3api create-bucket `
   --bucket $BUCKET `
-  --region me-south-1 `
-  --create-bucket-configuration LocationConstraint=me-south-1
+  --region eu-south-1 `
+  --create-bucket-configuration LocationConstraint=eu-south-1
 aws s3api put-bucket-versioning --bucket $BUCKET --versioning-configuration Status=Enabled
 aws s3api put-bucket-encryption --bucket $BUCKET --server-side-encryption-configuration `
   '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
@@ -76,7 +76,7 @@ aws dynamodb create-table `
   --attribute-definitions AttributeName=LockID,AttributeType=S `
   --key-schema AttributeName=LockID,KeyType=HASH `
   --billing-mode PAY_PER_REQUEST `
-  --region me-south-1
+  --region eu-south-1
 ```
 
 Cross-check with `docs/runbooks/bootstrap-aws-account.md` if it exists â€” it's
@@ -92,7 +92,7 @@ Set-Location infra\terraform
 terraform init `
   -backend-config="bucket=$BUCKET" `
   -backend-config="key=dev/terraform.tfstate" `
-  -backend-config="region=me-south-1" `
+  -backend-config="region=eu-south-1" `
   -backend-config="encrypt=true" `
   -backend-config="dynamodb_table=agripulse-tfstate-lock"
 
@@ -126,7 +126,7 @@ bucket names below.
 ## 4. Get cluster access
 
 ```powershell
-aws eks update-kubeconfig --name agripulse-dev --region me-south-1
+aws eks update-kubeconfig --name agripulse-dev --region eu-south-1
 kubectl get nodes
 ```
 

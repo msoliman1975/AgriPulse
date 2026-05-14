@@ -79,7 +79,7 @@ probes:
     timeoutSeconds: 5
 
 env:
-  AWS_DEFAULT_REGION: me-south-1
+  AWS_DEFAULT_REGION: eu-south-1
   CORS_ALLOW_ORIGINS: "https://app.{{ .Values.global.envHost }}"
   DEFAULT_MAX_ZOOM: "22"
   DEFAULT_MIN_ZOOM: "0"

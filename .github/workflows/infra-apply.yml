@@ -42,14 +42,14 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
-          aws-region: me-south-1
+          aws-region: eu-south-1
 
       - name: terraform init
         run: |
           terraform init \
             -backend-config="bucket=${{ vars.AWS_TF_STATE_BUCKET }}" \
             -backend-config="key=dev/terraform.tfstate" \
-            -backend-config="region=me-south-1" \
+            -backend-config="region=eu-south-1" \
             -backend-config="encrypt=true" \
             -backend-config="dynamodb_table=${{ vars.AWS_TF_LOCK_TABLE }}"
 

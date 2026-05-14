@@ -6,7 +6,7 @@ in the Terraform state file.
 
 See `infra/terraform/secrets-manager.tf` for the resource list. The IAM
 policy attached to the External Secrets controller only grants
-`GetSecretValue` on `arn:aws:secretsmanager:me-south-1:<account>:secret:agripulse/*`,
+`GetSecretValue` on `arn:aws:secretsmanager:eu-south-1:<account>:secret:agripulse/*`,
 so a typo on a non-matching path will fail with `AccessDenied` rather
 than `NotFound` â€” useful debug signal.
 
@@ -21,7 +21,7 @@ value once:
 ENV=prod   # or dev / staging
 
 aws secretsmanager put-secret-value \
-  --region me-south-1 \
+  --region eu-south-1 \
   --secret-id "agripulse/$ENV/brevo-smtp-password" \
   --secret-string "<paste-actual-password>"
 ```
@@ -70,7 +70,7 @@ Same `put-secret-value` call with a new value:
 
 ```bash
 aws secretsmanager put-secret-value \
-  --region me-south-1 \
+  --region eu-south-1 \
   --secret-id "agripulse/prod/brevo-smtp-password" \
   --secret-string "<new-password>"
 ```

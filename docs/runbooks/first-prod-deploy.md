@@ -46,7 +46,7 @@ Verify each is set (not just declared) before continuing:
 for s in brevo-smtp-password keycloak-admin-password \
          sentinel-hub-client-secret jwt-signing-key \
          postgres-superuser-password; do
-  aws secretsmanager describe-secret --region me-south-1 \
+  aws secretsmanager describe-secret --region eu-south-1 \
     --secret-id "agripulse/prod/$s" \
     --query 'VersionIdsToStages' --output text
 done

@@ -28,7 +28,7 @@ terraform {
     # Configured per env via -backend-config in CI:
     #   bucket  = "agripulse-tfstate-<account-id>"
     #   key     = "<env>/terraform.tfstate"
-    #   region  = "me-south-1"
+    #   region  = "eu-south-1"
     #   encrypt = true
     #   dynamodb_table = "agripulse-tfstate-lock"
   }

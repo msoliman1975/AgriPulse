@@ -11,7 +11,7 @@ This document is the source of truth for how AgriPulse is containerized and how 
 | Area | Choice | Rationale |
 | --- | --- | --- |
 | Platform | **EKS + ArgoCD + Helm** | 60â€“70 % of the scaffolding already exists in `infra/`. Pivoting to ECS would discard weeks of work. |
-| Region | **me-south-1 (Bahrain)** | Lowest latency to MENA/Gulf customers. ~10â€“20 % pricier than eu-west-1; trade accepted. |
+| Region | **eu-south-1 (Milan)** | Italian/EU data residency; AWS account was provisioned here. (Original draft selected me-south-1 / Bahrain for MENA latency; reversed 2026-05-13 — see memory project-aws-auth.) ~10â€“20 % pricier than eu-west-1; trade accepted. |
 | Accounts / envs | **One AWS account, three Kubernetes namespaces** (`dev`, `staging`, `prod`) | Cheapest option. Blast-radius isolation is weaker than separate accounts â€” compensated by `terraform plan` review and ArgoCD dry-runs. |
 | Postgres | **In-cluster CloudNativePG** (already templated in `infra/helm/shared/`) | Cost + cloud-provider portability. User accepts the ops burden. |
 | Postgres backups | **S3 + Barman Cloud, 30-day PITR** | The only credible DR story for in-cluster Postgres. |
@@ -167,7 +167,7 @@ total: 2â€“10 min depending on resource
 
 ## 8. Open questions deferred past CD-15
 
-- **EKS multi-AZ posture** â€” `me-south-1` has 3 AZs; CNPG cluster `instances: 3` would survive an AZ outage but doubles EBS cost. Decide based on actual customer SLA.
+- **EKS multi-AZ posture** â€” `eu-south-1` has 3 AZs; CNPG cluster `instances: 3` would survive an AZ outage but doubles EBS cost. Decide based on actual customer SLA.
 - **Multi-region DR** â€” out of scope. CNPG cross-region replication via Barman Cloud is possible; revisit when there's a customer with a contractual DR clause.
 - **Keycloak per-tenant realm** â€” currently single realm with per-env clients. Multi-realm requires resolver work and is owned by the admin-portals epic, not containerization.
 - **Blue/green** â€” ArgoCD rolling updates are sufficient for V1. Argo Rollouts when customer SLAs demand it.

@@ -12,9 +12,9 @@ The Helm charts already reference `ExternalSecret` resources (`infra/helm/api/te
   - `agripulse/<env>/sentinel-hub-client-secret`
   - `agripulse/<env>/jwt-signing-key`
   - `agripulse/<env>/postgres-superuser-password`
-- `infra/terraform/iam-irsa.tf` — IRSA role for the `external-secrets` ServiceAccount with `secretsmanager:GetSecretValue` scoped to `arn:aws:secretsmanager:me-south-1:<account>:secret:agripulse/*`.
+- `infra/terraform/iam-irsa.tf` — IRSA role for the `external-secrets` ServiceAccount with `secretsmanager:GetSecretValue` scoped to `arn:aws:secretsmanager:eu-south-1:<account>:secret:agripulse/*`.
 - `infra/argocd/platform-values/external-secrets.yaml` — already exists; verify `serviceAccount.annotations` references the IRSA role.
-- `infra/helm/shared/templates/cluster-secret-store.yaml` — confirm it's a `ClusterSecretStore` (not namespaced) with `provider.aws.region: me-south-1` and `auth.jwt.serviceAccountRef` pointing at `external-secrets`.
+- `infra/helm/shared/templates/cluster-secret-store.yaml` — confirm it's a `ClusterSecretStore` (not namespaced) with `provider.aws.region: eu-south-1` and `auth.jwt.serviceAccountRef` pointing at `external-secrets`.
 - `infra/helm/api/templates/externalsecret.yaml` — verify `secretStoreRef.name` matches the ClusterSecretStore and `data` lists each SM key.
 - `infra/helm/workers/templates/externalsecret.yaml` — same; **must include the same SMTP secret** (codebase gotcha — workers send email too).
 - `docs/runbooks/seeding-secrets.md` — new, ~30 lines.
