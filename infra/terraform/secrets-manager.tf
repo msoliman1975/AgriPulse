@@ -63,9 +63,9 @@ resource "aws_secretsmanager_secret_version" "agripulse_placeholder" {
   }
 }
 
-# Read-only access scoped to the agripulse/ prefix only. Distinct from the
-# legacy `agripulse/*` policy in iam.tf â€” both attach to the same
-# external-secrets IRSA role so the migration can land incrementally.
+# Read-only access scoped to the agripulse/ prefix only. Single source of
+# truth — the `iam.tf` modules attach this via their `role_policy_arns`
+# map (api, workers, external-secrets).
 resource "aws_iam_policy" "agripulse_secrets_read" {
   name        = "agripulse-${var.environment}-secrets-read"
   description = "Read access to the agripulse/* prefix in AWS Secrets Manager."
@@ -86,7 +86,5 @@ resource "aws_iam_policy" "agripulse_secrets_read" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "external_secrets_agripulse" {
-  role       = module.iam_role_external_secrets.iam_role_name
-  policy_arn = aws_iam_policy.agripulse_secrets_read.arn
-}
+# Attachment is handled by `iam.tf` via the iam-role-for-service-accounts-eks
+# module's role_policy_arns map (see module.iam_role_external_secrets).
