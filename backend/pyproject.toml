@@ -330,6 +330,14 @@ source_modules = [
 forbidden_modules = [
   "app.modules.audit.models",
 ]
+# tenancy.repository reads tenant lifecycle events from
+# audit_events_archive directly to render the tenant detail page's
+# audit timeline. Routing this through AuditService would mean adding
+# a typed read method to the Protocol; tracked separately. Until then,
+# the typed ORM read is preferable to a stringly-typed dict crossing.
+ignore_imports = [
+  "app.modules.tenancy.repository -> app.modules.audit.models",
+]
 allow_indirect_imports = true
 
 # The remaining 10 modules are placeholders today; the contracts still

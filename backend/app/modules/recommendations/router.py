@@ -261,7 +261,7 @@ def _author_service(
     return get_decision_trees_author_service(public_session=public_session)
 
 
-def _map_authoring_error(exc: Exception) -> RuntimeError | None:
+def _map_authoring_error(exc: Exception) -> Exception | None:
     """Map authoring-service errors to APIError, return one to raise.
 
     Centralised so each endpoint stays focused on the happy path."""
@@ -323,7 +323,9 @@ async def get_decision_tree(
     _ensure_tenant(context)
     detail = await service.get_tree_detail(code=code)
     if detail is None:
-        raise _map_authoring_error(_DecisionTreeNotFoundError(code))  # type: ignore[arg-type]
+        mapped = _map_authoring_error(_DecisionTreeNotFoundError(code))
+        assert mapped is not None
+        raise mapped
     return detail
 
 
@@ -340,7 +342,9 @@ async def list_decision_tree_versions(
     _ensure_tenant(context)
     detail = await service.get_tree_detail(code=code)
     if detail is None:
-        raise _map_authoring_error(_DecisionTreeNotFoundError(code))  # type: ignore[arg-type]
+        mapped = _map_authoring_error(_DecisionTreeNotFoundError(code))
+        assert mapped is not None
+        raise mapped
     return detail["versions"]
 
 

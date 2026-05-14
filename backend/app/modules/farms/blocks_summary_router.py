@@ -201,7 +201,7 @@ async def get_blocks_summary(
 
         a = alerts_by_block.get(bid, {})
         alert_count = int(a.get("alert_count", 0))
-        alert_severity: MapSeverity | None = a.get("alert_severity")  # type: ignore[assignment]
+        alert_severity: MapSeverity | None = a.get("alert_severity")
 
         health = _classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
 

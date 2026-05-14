@@ -246,7 +246,7 @@ class HttpxKeycloakAdminClient:
             self._token = payload["access_token"]
             ttl = float(payload.get("expires_in", 60))
             self._token_expires_at = time.monotonic() + max(0.0, ttl - _TOKEN_REFRESH_SLACK_SECONDS)
-            return self._token  # type: ignore[return-value]
+            return self._token
 
     async def _request(
         self,

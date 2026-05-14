@@ -7,11 +7,12 @@ exist mostly for type hints + the typed admin paths.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -82,7 +83,7 @@ class SettingsRepository:
             ),
             {"key": key, "value": value_json, "actor": actor_user_id},
         )
-        return (result.rowcount or 0) > 0
+        return (cast("CursorResult[Any]", result).rowcount or 0) > 0
 
     # ---- tenant_settings_overrides -----------------------------------------
 
@@ -162,4 +163,4 @@ class SettingsRepository:
             ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
             {"tid": tenant_id, "key": key},
         )
-        return (result.rowcount or 0) > 0
+        return (cast("CursorResult[Any]", result).rowcount or 0) > 0

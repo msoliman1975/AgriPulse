@@ -118,6 +118,10 @@ async def cross_tenant_health(
             # Reset search_path so the next iteration can re-set safely.
             await public_session.execute(text("SET LOCAL search_path TO public"))
 
+        if row is None:
+            # Aggregation always returns a single row (even when empty),
+            # but type-narrow for mypy.
+            continue
         out.append(
             {
                 "tenant_id": t.id,

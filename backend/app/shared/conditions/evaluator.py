@@ -127,10 +127,10 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
     ref: ValueRef, ctx: ConditionContext
 ) -> Any:
     if isinstance(ref, IndicesValueRef):
-        entry = ctx.indices.get(ref.index_code)
-        if entry is None:
+        idx_entry = ctx.indices.get(ref.index_code)
+        if idx_entry is None:
             return None
-        return getattr(entry, ref.key, None)
+        return getattr(idx_entry, ref.key, None)
     if isinstance(ref, BlockValueRef):
         if ref.field == "crop_category":
             return ctx.crop_category
@@ -143,10 +143,10 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
             return None
         return scope_dict.get(ref.field)
     if isinstance(ref, SignalsValueRef):
-        entry = ctx.signals.get(ref.code)
-        if entry is None:
+        sig_entry = ctx.signals.get(ref.code)
+        if sig_entry is None:
             return None
-        return getattr(entry, ref.key, None)
+        return getattr(sig_entry, ref.key, None)
     return None
 
 

@@ -83,7 +83,7 @@ def _validate_category(category: str) -> Category:
             detail=f"{category!r} is not one of {list(CATEGORY_KEYS)}",
             type_="https://agripulse.cloud/problems/integrations/invalid-category",
         )
-    return category  # type: ignore[return-value]
+    return category
 
 
 @router.get(

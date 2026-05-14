@@ -12,11 +12,12 @@ listing + audit.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -270,7 +271,7 @@ class PlatformAdminsRoleService:
             ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
             {"uid": user_id, "role": role},
         )
-        if (result.rowcount or 0) == 0:
+        if (cast("CursorResult[Any]", result).rowcount or 0) == 0:
             raise PlatformAdminNotFoundError(f"user {user_id} is not a {role}")
 
         # Clear the Keycloak attribute (best-effort).

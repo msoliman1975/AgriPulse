@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import ColumnElement, bindparam, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +45,7 @@ class SignalsRepository:
     async def get_definition(
         self, *, definition_id: UUID | None = None, code: str | None = None
     ) -> dict[str, Any] | None:
-        clauses = [SignalDefinition.deleted_at.is_(None)]
+        clauses: list[ColumnElement[bool]] = [SignalDefinition.deleted_at.is_(None)]
         if definition_id is not None:
             clauses.append(SignalDefinition.id == definition_id)
         elif code is not None:

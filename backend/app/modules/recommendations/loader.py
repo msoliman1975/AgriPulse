@@ -313,6 +313,7 @@ async def _insert_tree(
             },
         )
     ).first()
+    assert row is not None  # INSERT ... RETURNING always yields one row
     return row.id
 
 
@@ -363,4 +364,5 @@ async def _insert_version(
             },
         )
     ).first()
+    assert row is not None  # INSERT ... RETURNING always yields one row
     return row.id

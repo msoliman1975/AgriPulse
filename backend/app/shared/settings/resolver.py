@@ -51,7 +51,7 @@ class _DefaultsCache:
         self._loaded_at: float = 0.0
 
     def is_fresh(self) -> bool:
-        return self._rows and (time.monotonic() - self._loaded_at) < _DEFAULTS_TTL_SECONDS
+        return bool(self._rows) and (time.monotonic() - self._loaded_at) < _DEFAULTS_TTL_SECONDS
 
     def replace(self, rows: list[dict[str, Any]]) -> None:
         self._rows = {r["key"]: r for r in rows}

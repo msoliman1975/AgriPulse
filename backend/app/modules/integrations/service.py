@@ -20,11 +20,12 @@ Audit on every write — `integrations.tenant_setting_set`,
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit import AuditService, get_audit_service
@@ -337,7 +338,7 @@ class IntegrationsService:
                 ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
                 {"fid": farm_id},
             )
-            affected = result.rowcount or 0
+            affected = cast("CursorResult[Any]", result).rowcount or 0
         elif mode == "lock":
             # Write the Farm's resolved cloud-cover into every block.
             farm_settings = await self.get_farm_imagery(tenant_id=UUID(int=0), farm_id=farm_id)
@@ -366,7 +367,7 @@ class IntegrationsService:
                     ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
                     {"fid": farm_id, "cc": int(farm_cloud)},
                 )
-                affected = result.rowcount or 0
+                affected = cast("CursorResult[Any]", result).rowcount or 0
         else:
             raise ValueError(f"Unknown apply-to-blocks mode: {mode!r}")
         await self._audit.record(
