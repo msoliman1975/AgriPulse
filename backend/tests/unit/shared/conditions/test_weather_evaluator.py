@@ -98,9 +98,7 @@ def test_predicate_misses_when_scope_present_but_field_unknown() -> None:
         "left": {"source": "weather", "scope": "forecast_24h", "field": "totally_made_up"},
         "right": 1,
     }
-    matched, snapshot = evaluate(
-        tree, _ctx(forecast_24h={"precipitation_mm_total": Decimal("0")})
-    )
+    matched, snapshot = evaluate(tree, _ctx(forecast_24h={"precipitation_mm_total": Decimal("0")}))
     assert matched is False
     assert snapshot["values"]["weather.forecast_24h.totally_made_up"] is None
 

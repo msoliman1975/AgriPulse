@@ -62,9 +62,7 @@ async def list_defaults(
 async def update_default(
     key: str,
     payload: UpdateDefaultRequest,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_defaults")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_defaults")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> dict[str, Any]:
     audit = get_audit_service()
@@ -117,7 +115,7 @@ def _validate_against_schema(value: Any, schema: str, key: str) -> None:
     if schema == "string":
         ok = value is None or isinstance(value, str)
     elif schema == "number":
-        ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        ok = isinstance(value, int | float) and not isinstance(value, bool)
     elif schema == "boolean":
         ok = isinstance(value, bool)
     elif schema == "object":
@@ -134,8 +132,7 @@ def _validate_against_schema(value: Any, schema: str, key: str) -> None:
         status_code=400,
         title="Invalid value for platform default",
         detail=(
-            f"Setting {key!r} expects value_schema={schema!r} "
-            f"but got {type(value).__name__}."
+            f"Setting {key!r} expects value_schema={schema!r} " f"but got {type(value).__name__}."
         ),
         type_="https://agripulse.cloud/problems/platform-default-invalid-value",
         extras={"key": key, "expected_schema": schema},

@@ -34,7 +34,8 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import ARRAY, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

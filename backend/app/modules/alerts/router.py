@@ -18,13 +18,16 @@ RBAC:
     not per-farm, since rules apply tenant-wide.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.alerts.errors import AlertNotFoundError
+
+if TYPE_CHECKING:
+    from app.core.errors import APIError
 from app.modules.alerts.schemas import (
     AlertResponse,
     AlertTransitionRequest,

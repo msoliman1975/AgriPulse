@@ -69,9 +69,9 @@ class PlatformAdminsService:
     async def _tenant_schema(self, *, tenant_id: UUID) -> str:
         row = (
             await self._public.execute(
-                text(
-                    "SELECT schema_name FROM public.tenants WHERE id = :tid"
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                text("SELECT schema_name FROM public.tenants WHERE id = :tid").bindparams(
+                    bindparam("tid", type_=PG_UUID(as_uuid=True))
+                ),
                 {"tid": tenant_id},
             )
         ).first()
@@ -85,9 +85,10 @@ class PlatformAdminsService:
         """All active memberships in the tenant whose role assignment is
         TenantOwner or TenantAdmin."""
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT u.id AS user_id,
                            u.email::text AS email,
                            u.full_name,
@@ -106,10 +107,13 @@ class PlatformAdminsService:
                       AND tra.role IN ('TenantOwner','TenantAdmin')
                     ORDER BY tra.role, u.full_name
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tenant_id},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tenant_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     # ---- Writes -------------------------------------------------------
@@ -125,8 +129,7 @@ class PlatformAdminsService:
     ) -> dict[str, Any]:
         if role != "TenantAdmin":
             raise ValueError(
-                "invite_admin only creates TenantAdmin; transfer_ownership "
-                "moves TenantOwner."
+                "invite_admin only creates TenantAdmin; transfer_ownership " "moves TenantOwner."
             )
         schema = await self._tenant_schema(tenant_id=tenant_id)
         result = await self._users.invite_user(
@@ -167,9 +170,7 @@ class PlatformAdminsService:
         Doesn't delete the membership — the user may still be a
         TenantAdmin elsewhere or have non-admin roles in this tenant.
         """
-        membership_id = await self._membership_id(
-            tenant_id=tenant_id, user_id=user_id
-        )
+        membership_id = await self._membership_id(tenant_id=tenant_id, user_id=user_id)
         result = await self._public.execute(
             text(
                 """
@@ -211,12 +212,8 @@ class PlatformAdminsService:
         yet so they retain editorial powers; the previous owner keeps
         their other roles untouched.
         """
-        from_mid = await self._membership_id(
-            tenant_id=tenant_id, user_id=from_user_id
-        )
-        to_mid = await self._membership_id(
-            tenant_id=tenant_id, user_id=to_user_id
-        )
+        from_mid = await self._membership_id(tenant_id=tenant_id, user_id=from_user_id)
+        to_mid = await self._membership_id(tenant_id=tenant_id, user_id=to_user_id)
 
         # Revoke owner from the previous user.
         await self._public.execute(
@@ -301,9 +298,7 @@ class PlatformAdminsService:
             TenantUserNotFoundError: user_id mode and user not in tenant.
         """
         if (email is None) == (user_id is None):
-            raise ValueError(
-                "assign_first_owner requires exactly one of email or user_id"
-            )
+            raise ValueError("assign_first_owner requires exactly one of email or user_id")
 
         # Guard: never overwrite an existing owner.
         existing_owner = (
@@ -363,9 +358,7 @@ class PlatformAdminsService:
 
         # Promote-existing path.
         assert user_id is not None  # narrowed by the XOR check above
-        membership_id = await self._membership_id(
-            tenant_id=tenant_id, user_id=user_id
-        )
+        membership_id = await self._membership_id(tenant_id=tenant_id, user_id=user_id)
         await self._public.execute(
             text(
                 """
@@ -432,9 +425,7 @@ class PlatformAdminsService:
             )
         ).first()
         if row is None:
-            raise TenantUserNotFoundError(
-                f"user {user_id} not a member of tenant {tenant_id}"
-            )
+            raise TenantUserNotFoundError(f"user {user_id} not a member of tenant {tenant_id}")
         return row.id
 
 

@@ -30,8 +30,7 @@ def circle_polygon(
     """Return a GeoJSON Polygon approximating a circle on the WGS-84 sphere."""
     if radius_m <= 0:
         raise ValueError("radius_m must be positive")
-    if vertices < 8:
-        vertices = 8
+    vertices = max(vertices, 8)
 
     coords: list[list[float]] = []
     cos_lat = math.cos(math.radians(lat))

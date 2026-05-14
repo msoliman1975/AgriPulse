@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.recommendations.errors import DecisionTreeParseError
-from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
+from app.modules.recommendations.models import DecisionTree
 
 _log = get_logger(__name__)
 
@@ -192,12 +192,16 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
 
         # Fetch existing tree by code.
         existing = (
-            await public_session.execute(
-                select(DecisionTree).where(
-                    DecisionTree.code == compiled["code"], DecisionTree.deleted_at.is_(None)
+            (
+                await public_session.execute(
+                    select(DecisionTree).where(
+                        DecisionTree.code == compiled["code"], DecisionTree.deleted_at.is_(None)
+                    )
                 )
             )
-        ).scalars().one_or_none()
+            .scalars()
+            .one_or_none()
+        )
 
         if existing is None:
             tree_id = await _insert_tree(
@@ -312,9 +316,7 @@ async def _insert_tree(
     return row.id
 
 
-async def _latest_version_for_tree(
-    session: AsyncSession, tree_id: Any
-) -> tuple[int, str] | None:
+async def _latest_version_for_tree(session: AsyncSession, tree_id: Any) -> tuple[int, str] | None:
     row = (
         await session.execute(
             text(

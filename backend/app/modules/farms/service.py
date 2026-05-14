@@ -7,7 +7,8 @@ request via `get_farm_service`.
 
 from __future__ import annotations
 
-from datetime import UTC, date as _date, datetime
+from datetime import UTC, datetime
+from datetime import date as _date
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -707,9 +708,7 @@ class FarmServiceImpl:
 
         rows = (
             await self._tenant_session.execute(
-                select(Block.id).where(
-                    Block.farm_id == farm_id, Block.deleted_at.is_not(None)
-                )
+                select(Block.id).where(Block.farm_id == farm_id, Block.deleted_at.is_not(None))
             )
         ).all()
         return tuple(r.id for r in rows)
@@ -965,9 +964,7 @@ class FarmServiceImpl:
             actor_user_id=actor_user_id,
             reason_code="block_inactivated",
         )
-        farm_id = await self._repo.inactivate_block(
-            block_id=block_id, actor_user_id=actor_user_id
-        )
+        farm_id = await self._repo.inactivate_block(block_id=block_id, actor_user_id=actor_user_id)
         await self._tenant_session.flush()
 
         today_str = datetime.now(UTC).date().isoformat()
@@ -1004,9 +1001,7 @@ class FarmServiceImpl:
         tenant_schema: str,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
-        farm_id = await self._repo.reactivate_block(
-            block_id=block_id, actor_user_id=actor_user_id
-        )
+        farm_id = await self._repo.reactivate_block(block_id=block_id, actor_user_id=actor_user_id)
         await self._tenant_session.flush()
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -1019,9 +1014,7 @@ class FarmServiceImpl:
             correlation_id=correlation_id,
         )
         self._bus.publish(
-            BlockReactivatedV1(
-                block_id=block_id, farm_id=farm_id, actor_user_id=actor_user_id
-            )
+            BlockReactivatedV1(block_id=block_id, farm_id=farm_id, actor_user_id=actor_user_id)
         )
         return {"block_id": block_id, "farm_id": farm_id}
 
@@ -1125,9 +1118,7 @@ class FarmServiceImpl:
         # Fetch the materialized rows back so the response carries the
         # computed area + boundary.
         pivot_row = await self._repo.get_block_by_id(pivot_id)
-        sector_rows = [
-            await self._repo.get_block_by_id(sid) for sid in sector_ids
-        ]
+        sector_rows = [await self._repo.get_block_by_id(sid) for sid in sector_ids]
         if pivot_row is None or any(s is None for s in sector_rows):
             # Should never happen — insert succeeded and we hold the txn.
             raise BlockNotFoundError(pivot_id)

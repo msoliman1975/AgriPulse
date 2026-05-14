@@ -86,9 +86,7 @@ class SignalsService(Protocol):
         tenant_schema: str,
     ) -> None: ...
 
-    async def list_assignments(
-        self, *, definition_id: UUID
-    ) -> tuple[dict[str, Any], ...]: ...
+    async def list_assignments(self, *, definition_id: UUID) -> tuple[dict[str, Any], ...]: ...
 
     async def create_assignment(
         self,
@@ -287,9 +285,7 @@ class SignalsServiceImpl:
 
     # ---- Assignments --------------------------------------------------
 
-    async def list_assignments(
-        self, *, definition_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_assignments(self, *, definition_id: UUID) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_assignments(definition_id=definition_id)
 
     async def create_assignment(
@@ -406,9 +402,7 @@ class SignalsServiceImpl:
 
     # ---- Observations -------------------------------------------------
 
-    def _validate_value(
-        self, *, defn: dict[str, Any], request_values: dict[str, Any]
-    ) -> None:
+    def _validate_value(self, *, defn: dict[str, Any], request_values: dict[str, Any]) -> None:
         kind = defn["value_kind"]
         # Exactly one value column must be set, matching the row-level CHECK.
         provided = [k for k, v in request_values.items() if v is not None]
@@ -446,9 +440,7 @@ class SignalsServiceImpl:
         elif kind == "categorical":
             allowed = defn["categorical_values"] or []
             if request_values["value_categorical"] not in allowed:
-                raise InvalidSignalValueError(
-                    detail=f"value_categorical must be one of {allowed}."
-                )
+                raise InvalidSignalValueError(detail=f"value_categorical must be one of {allowed}.")
 
     async def create_observation(
         self,

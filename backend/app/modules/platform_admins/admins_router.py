@@ -69,9 +69,7 @@ class InvitePlatformAdminResponse(BaseModel):
 
 @router.get("", response_model=list[PlatformAdminRow])
 async def list_platform_admins(
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_platform_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_platform_admins")),
     service: PlatformAdminsRoleService = Depends(_service),
 ) -> list[dict[str, Any]]:
     del context
@@ -85,9 +83,7 @@ async def list_platform_admins(
 )
 async def invite_platform_admin(
     payload: InvitePlatformAdminRequest,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_platform_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_platform_admins")),
     service: PlatformAdminsRoleService = Depends(_service),
 ) -> dict[str, Any]:
     try:
@@ -115,12 +111,8 @@ async def invite_platform_admin(
 )
 async def remove_platform_admin(
     user_id: UUID,
-    role: Literal["PlatformAdmin", "PlatformSupport"] = Query(
-        default="PlatformAdmin"
-    ),
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_platform_admins")
-    ),
+    role: Literal["PlatformAdmin", "PlatformSupport"] = Query(default="PlatformAdmin"),
+    context: RequestContext = Depends(requires_capability("platform.manage_platform_admins")),
     service: PlatformAdminsRoleService = Depends(_service),
 ) -> None:
     try:

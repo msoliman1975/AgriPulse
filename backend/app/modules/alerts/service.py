@@ -527,9 +527,7 @@ class AlertsServiceImpl:
         existing = await self._repo.get_tenant_rule(rule_code=code)
         if existing is None:
             raise TenantRuleNotFoundError(code)
-        deleted = await self._repo.soft_delete_tenant_rule(
-            code=code, actor_user_id=actor_user_id
-        )
+        deleted = await self._repo.soft_delete_tenant_rule(code=code, actor_user_id=actor_user_id)
         if not deleted:
             return
         await self._audit.record(
@@ -560,9 +558,7 @@ class TenantRuleCodeAlreadyExistsError(Exception):
 
 class TenantRuleCodeConflictsWithDefaultError(Exception):
     def __init__(self, code: str) -> None:
-        super().__init__(
-            f"Tenant rule code {code!r} collides with a platform default rule"
-        )
+        super().__init__(f"Tenant rule code {code!r} collides with a platform default rule")
         self.code = code
 
 

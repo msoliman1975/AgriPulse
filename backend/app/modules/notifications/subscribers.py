@@ -224,15 +224,8 @@ def _build_render_ctx(
     fields directly.
     """
     is_ar = locale == "ar"
-    severity_label = (
-        {
-            "info": "Info",
-            "warning": "Warning",
-            "critical": "Critical",
-        }
-        .get(alert["severity"], alert["severity"])
-        .upper()
-    )
+    severity_map = {"info": "Info", "warning": "Warning", "critical": "Critical"}
+    severity_label = severity_map.get(alert["severity"], alert["severity"]).upper()
     diagnosis = alert.get("diagnosis_ar") if is_ar else alert.get("diagnosis_en")
     prescription = alert.get("prescription_ar") if is_ar else alert.get("prescription_en")
     rule_name = (
@@ -883,15 +876,8 @@ def _build_render_ctx_for_recommendation(
 ) -> dict[str, Any]:
     """Variables exposed to the recommendation template renderer."""
     is_ar = locale == "ar"
-    severity_label = (
-        {
-            "info": "Info",
-            "warning": "Warning",
-            "critical": "Critical",
-        }
-        .get(rec["severity"], rec["severity"])
-        .upper()
-    )
+    severity_map = {"info": "Info", "warning": "Warning", "critical": "Critical"}
+    severity_label = severity_map.get(rec["severity"], rec["severity"]).upper()
     text_localized = rec.get("text_ar") if is_ar else rec.get("text_en")
     tree_name = (
         (tree.get("name_ar") if is_ar else tree.get("name_en"))
@@ -1267,9 +1253,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
             _log.warning("recommendation_opened_tenant_not_found", schema=schema)
             return
 
-        names = (
-            _load_block_and_farm(session, block_id=event.block_id, farm_id=event.farm_id) or {}
-        )
+        names = _load_block_and_farm(session, block_id=event.block_id, farm_id=event.farm_id) or {}
         rec: dict[str, Any] = {
             "recommendation_id": event.recommendation_id,
             "block_id": event.block_id,
@@ -1303,9 +1287,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
         inbox_events: list[InboxItemCreatedV1] = []
         for user in recipients:
             user_channels = list(user.get("notification_channels") or ["in_app"])
-            effective = [
-                c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS
-            ]
+            effective = [c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS]
             locale = user.get("locale") or _DEFAULT_LOCALE
             for channel in _PER_USER_CHANNELS:
                 inbox = _dispatch_rec_channel_for_user(
@@ -1339,9 +1321,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
             user_id=ev.user_id,
             payload={
                 "id": str(ev.inbox_item_id),
-                "recommendation_id": (
-                    str(ev.recommendation_id) if ev.recommendation_id else None
-                ),
+                "recommendation_id": (str(ev.recommendation_id) if ev.recommendation_id else None),
                 "severity": ev.severity,
                 "title": ev.title,
                 "body": ev.body,
@@ -1364,8 +1344,7 @@ def register_subscribers(bus: EventBus) -> None:
         bus.register(AlertOpenedV1, _on_alert_opened, mode="sync")
 
     has_rec_handler = any(
-        sub.handler is _on_recommendation_opened
-        for sub in bus.handlers_for(RecommendationOpenedV1)
+        sub.handler is _on_recommendation_opened for sub in bus.handlers_for(RecommendationOpenedV1)
     )
     if not has_rec_handler:
         bus.register(RecommendationOpenedV1, _on_recommendation_opened, mode="sync")

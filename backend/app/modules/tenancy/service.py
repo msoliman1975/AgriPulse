@@ -39,7 +39,6 @@ from app.shared.keycloak import (
     get_keycloak_client,
 )
 
-
 # Grace window between request_delete and purge eligibility.
 # Aligns with docs/runbooks/tenant-offboarding.md "≥ 30 days".
 PURGE_GRACE_DAYS: int = 30
@@ -281,9 +280,7 @@ class InvalidStatusTransitionError(ValueError):
     """Raised when a lifecycle method is called from an incompatible status."""
 
     def __init__(self, current: str, attempted: str) -> None:
-        super().__init__(
-            f"cannot transition tenant from status={current!r} via {attempted!r}"
-        )
+        super().__init__(f"cannot transition tenant from status={current!r} via {attempted!r}")
         self.current = current
         self.attempted = attempted
 
@@ -584,9 +581,7 @@ class TenantServiceImpl:
             details={"slug": tenant.slug, "schema_name": tenant.schema_name},
         )
         invalidate_tenant_status_cache(tenant_id)
-        self._log.info(
-            "tenant_provisioning_retried", tenant_id=str(tenant_id), slug=tenant.slug
-        )
+        self._log.info("tenant_provisioning_retried", tenant_id=str(tenant_id), slug=tenant.slug)
         return _to_snapshot(tenant)
 
     async def list_tenants(
@@ -616,9 +611,7 @@ class TenantServiceImpl:
         tenant = await self._require(tenant_id)
         return _to_snapshot(tenant)
 
-    async def get_tenant_sidecar(
-        self, tenant_id: UUID, *, audit_limit: int = 20
-    ) -> TenantSidecar:
+    async def get_tenant_sidecar(self, tenant_id: UUID, *, audit_limit: int = 20) -> TenantSidecar:
         # Fail fast if the tenant doesn't exist, even if everything else
         # below would still legally return empties.
         await self._require(tenant_id)
@@ -702,9 +695,7 @@ class TenantServiceImpl:
                     actor_user_id=actor_user_id,
                 )
             )
-            self._log.info(
-                "tenant_updated", tenant_id=str(tenant_id), fields=list(changed)
-            )
+            self._log.info("tenant_updated", tenant_id=str(tenant_id), fields=list(changed))
         return _to_snapshot(tenant)
 
     async def suspend_tenant(
@@ -753,9 +744,7 @@ class TenantServiceImpl:
         # auth middleware; KC is defense-in-depth.
         try:
             disabled = await self._kc.disable_users_in_group(tenant.slug)
-            self._log.info(
-                "tenant_keycloak_disabled", tenant_id=str(tenant_id), count=disabled
-            )
+            self._log.info("tenant_keycloak_disabled", tenant_id=str(tenant_id), count=disabled)
         except KeycloakError as exc:
             self._log.warning(
                 "tenant_keycloak_disable_failed",
@@ -803,9 +792,7 @@ class TenantServiceImpl:
         invalidate_tenant_status_cache(tenant_id)
         try:
             enabled = await self._kc.enable_users_in_group(tenant.slug)
-            self._log.info(
-                "tenant_keycloak_enabled", tenant_id=str(tenant_id), count=enabled
-            )
+            self._log.info("tenant_keycloak_enabled", tenant_id=str(tenant_id), count=enabled)
         except KeycloakError as exc:
             self._log.warning(
                 "tenant_keycloak_enable_failed",
@@ -917,9 +904,7 @@ class TenantServiceImpl:
         if tenant.status != "pending_delete":
             raise InvalidStatusTransitionError(tenant.status, "purge")
         if slug_confirmation != tenant.slug:
-            raise SlugConfirmationMismatchError(
-                "slug confirmation does not match tenant slug"
-            )
+            raise SlugConfirmationMismatchError("slug confirmation does not match tenant slug")
 
         deleted_at = tenant.deleted_at
         if deleted_at is not None and not force:
@@ -956,9 +941,7 @@ class TenantServiceImpl:
         # users that are easy to delete by hand later via kcadm.sh.
         try:
             removed = await self._kc.delete_users_and_group(slug)
-            self._log.info(
-                "tenant_keycloak_purged", tenant_id=str(tenant_id), removed=removed
-            )
+            self._log.info("tenant_keycloak_purged", tenant_id=str(tenant_id), removed=removed)
         except KeycloakError as exc:
             self._log.warning(
                 "tenant_keycloak_purge_failed",

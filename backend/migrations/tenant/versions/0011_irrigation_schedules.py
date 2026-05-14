@@ -117,28 +117,18 @@ def upgrade() -> None:
         "ix_irrigation_schedules_pending_date",
         "irrigation_schedules",
         ["scheduled_for"],
-        postgresql_where=sa.text(
-            "deleted_at IS NULL AND status = 'pending'"
-        ),
+        postgresql_where=sa.text("deleted_at IS NULL AND status = 'pending'"),
     )
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_irrigation_schedules_pending_date", table_name="irrigation_schedules"
-    )
-    op.drop_index(
-        "ix_irrigation_schedules_block_date", table_name="irrigation_schedules"
-    )
-    op.drop_index(
-        "uq_irrigation_schedules_block_date_pending", table_name="irrigation_schedules"
-    )
+    op.drop_index("ix_irrigation_schedules_pending_date", table_name="irrigation_schedules")
+    op.drop_index("ix_irrigation_schedules_block_date", table_name="irrigation_schedules")
+    op.drop_index("uq_irrigation_schedules_block_date_pending", table_name="irrigation_schedules")
     op.drop_constraint(
         "ck_irrigation_schedules_recommended_nonneg",
         "irrigation_schedules",
         type_="check",
     )
-    op.drop_constraint(
-        "ck_irrigation_schedules_status", "irrigation_schedules", type_="check"
-    )
+    op.drop_constraint("ck_irrigation_schedules_status", "irrigation_schedules", type_="check")
     op.drop_table("irrigation_schedules")

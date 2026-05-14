@@ -411,9 +411,7 @@ class ImageryRepository:
         if error_code is not None:
             values["error_code"] = error_code[:64]
         await self._session.execute(
-            update(ImageryIngestionJob)
-            .where(ImageryIngestionJob.id == job_id)
-            .values(**values)
+            update(ImageryIngestionJob).where(ImageryIngestionJob.id == job_id).values(**values)
         )
         await self._session.flush()
 

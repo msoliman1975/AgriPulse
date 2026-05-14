@@ -55,9 +55,10 @@ class PlatformAdminsRoleService:
 
     async def list_admins(self) -> list[dict[str, Any]]:
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT u.id AS user_id,
                            u.email::text AS email,
                            u.full_name,
@@ -71,9 +72,12 @@ class PlatformAdminsRoleService:
                       AND u.deleted_at IS NULL
                     ORDER BY pra.role, u.full_name
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     # ---- Writes -------------------------------------------------------
@@ -126,9 +130,7 @@ class PlatformAdminsRoleService:
             )
         ).first()
 
-        kc_subject: str | None = (
-            global_user.keycloak_subject if global_user else None
-        )
+        kc_subject: str | None = global_user.keycloak_subject if global_user else None
         provisioning_status = "pending"
 
         if global_user is None:
@@ -149,9 +151,7 @@ class PlatformAdminsRoleService:
             # User already exists globally — just set the platform_role
             # attribute on their existing KC account.
             try:
-                await self._kc.set_platform_role(
-                    keycloak_user_id=kc_subject, role=role
-                )
+                await self._kc.set_platform_role(keycloak_user_id=kc_subject, role=role)
                 provisioning_status = "succeeded"
             except KeycloakError as exc:
                 self._log.warning(
@@ -271,9 +271,7 @@ class PlatformAdminsRoleService:
             {"uid": user_id, "role": role},
         )
         if (result.rowcount or 0) == 0:
-            raise PlatformAdminNotFoundError(
-                f"user {user_id} is not a {role}"
-            )
+            raise PlatformAdminNotFoundError(f"user {user_id} is not a {role}")
 
         # Clear the Keycloak attribute (best-effort).
         kc_sub = await self._user_keycloak_subject(user_id=user_id)
@@ -300,9 +298,9 @@ class PlatformAdminsRoleService:
     async def _user_keycloak_subject(self, *, user_id: UUID) -> str | None:
         row = (
             await self._public.execute(
-                text(
-                    "SELECT keycloak_subject FROM public.users WHERE id = :uid"
-                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                text("SELECT keycloak_subject FROM public.users WHERE id = :uid").bindparams(
+                    bindparam("uid", type_=PG_UUID(as_uuid=True))
+                ),
                 {"uid": user_id},
             )
         ).first()

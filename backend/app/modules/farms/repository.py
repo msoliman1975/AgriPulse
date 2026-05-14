@@ -9,7 +9,8 @@ service layer. Read-side projections back to GeoJSON go through
 from __future__ import annotations
 
 import json
-from datetime import UTC, date as _date, datetime
+from datetime import UTC, datetime
+from datetime import date as _date
 from decimal import Decimal
 from typing import Any
 from uuid import UUID

@@ -1,4 +1,4 @@
-"""Full ingestion pipeline: discover â†’ acquire â†’ register_stac_item.
+"""Full ingestion pipeline: discover -> acquire -> register_stac_item.
 
 We invoke the three task async cores in sequence (without going through
 Celery's `.delay()` / asyncio.run wrappers) against a real Postgres +

@@ -129,14 +129,10 @@ class SettingsResolver:
         """
         column = _farm_weather_column_for(key)
         if self._tenant is not None and column is not None:
-            farm_value = await self._fetch_farm_weather_override(
-                farm_id=farm_id, column=column
-            )
+            farm_value = await self._fetch_farm_weather_override(farm_id=farm_id, column=column)
             if farm_value is not None:
                 value, updated_at = farm_value
-                return ResolvedSetting(
-                    value=value, source="farm", overridden_at=updated_at
-                )
+                return ResolvedSetting(value=value, source="farm", overridden_at=updated_at)
         return await self.get_tenant(tenant_id, key)
 
     # ---- LandUnit tier (imagery) -------------------------------------------
@@ -158,22 +154,14 @@ class SettingsResolver:
         """
         column = _imagery_column_for(key)
         if self._tenant is not None and column is not None:
-            block_value = await self._fetch_block_imagery_override(
-                block_id=block_id, column=column
-            )
+            block_value = await self._fetch_block_imagery_override(block_id=block_id, column=column)
             if block_value is not None:
                 value, updated_at = block_value
-                return ResolvedSetting(
-                    value=value, source="resource", overridden_at=updated_at
-                )
-            farm_value = await self._fetch_farm_imagery_override(
-                farm_id=farm_id, column=column
-            )
+                return ResolvedSetting(value=value, source="resource", overridden_at=updated_at)
+            farm_value = await self._fetch_farm_imagery_override(farm_id=farm_id, column=column)
             if farm_value is not None:
                 value, updated_at = farm_value
-                return ResolvedSetting(
-                    value=value, source="farm", overridden_at=updated_at
-                )
+                return ResolvedSetting(value=value, source="farm", overridden_at=updated_at)
         return await self.get_tenant(tenant_id, key)
 
     # ---- Cache plumbing ----------------------------------------------------
@@ -182,35 +170,41 @@ class SettingsResolver:
         if _cache.is_fresh():
             return
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, value_schema, description, category,
                            updated_at, updated_by
                     FROM public.platform_defaults
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         _cache.replace([dict(r) for r in rows])
 
     # ---- Lookups -----------------------------------------------------------
 
-    async def _fetch_tenant_override(
-        self, *, tenant_id: UUID, key: str
-    ) -> dict[str, Any] | None:
+    async def _fetch_tenant_override(self, *, tenant_id: UUID, key: str) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, updated_at, updated_by
                     FROM public.tenant_settings_overrides
                     WHERE tenant_id = :tid AND key = :key
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tenant_id, "key": key},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tenant_id, "key": key},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row is not None else None
 
     async def _fetch_farm_weather_override(

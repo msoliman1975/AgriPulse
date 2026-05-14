@@ -32,7 +32,7 @@ _TLS_TRUST_MARKERS: tuple[str, ...] = (
 )
 
 
-def classify_error(exc: BaseException) -> str:
+def classify_error(exc: BaseException) -> str:  # noqa: PLR0911 - flat dispatch ladder by design
     """Categorize a caught exception into a short, stable error code.
 
     Returns one of:

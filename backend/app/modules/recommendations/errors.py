@@ -41,9 +41,7 @@ class InvalidRecommendationTransitionError(APIError):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
             title="Invalid recommendation state transition",
-            detail=(
-                f"Cannot {action} a recommendation whose current state is {current_state!r}."
-            ),
+            detail=(f"Cannot {action} a recommendation whose current state is {current_state!r}."),
             type_=f"{_TYPE_BASE}/invalid-transition",
             extras={"current_state": current_state, "action": action},
         )

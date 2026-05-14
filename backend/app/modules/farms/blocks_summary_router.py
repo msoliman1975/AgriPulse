@@ -11,7 +11,7 @@ map-first frontend needs to color polygons + show alert badges:
         last_index_at,
       }, ...] }
 
-Designed to replace ~N×4 round-trips (per-block detail + per-block-per-
+Designed to replace ~Nx4 round-trips (per-block detail + per-block-per-
 index timeseries + tenant-wide alert list) the prototype was making for
 N blocks. Two SQL queries against the tenant schema, one in-process join.
 
@@ -83,15 +83,14 @@ class BlocksSummaryResponse(BaseModel):
 )
 async def get_blocks_summary(
     farm_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("block.read", farm_id_param="farm_id")
-    ),
+    context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> BlocksSummaryResponse:
     del context  # capability check side-effect is the only consumer
 
     # 1. Latest index value per (block, index) for blocks in this farm.
-    #    DISTINCT ON inside a CTE bounds the scan to non-archived blocks.
+    #    DISTINCT ON inside a CTE bounds the scan to currently-active
+    #    blocks per the active_from/active_to lifecycle.
     index_rows = (
         (
             await tenant_session.execute(
@@ -100,8 +99,8 @@ async def get_blocks_summary(
                     WITH active_blocks AS (
                         SELECT id FROM blocks
                         WHERE farm_id = :farm_id
-                          AND deleted_at IS NULL
-                          AND status NOT IN ('archived')
+                          AND active_from <= current_date
+                          AND (active_to IS NULL OR active_to > current_date)
                     )
                     SELECT DISTINCT ON (a.block_id, a.index_code)
                            a.block_id,
@@ -157,8 +156,8 @@ async def get_blocks_summary(
                     """
                     SELECT id FROM blocks
                     WHERE farm_id = :farm_id
-                      AND deleted_at IS NULL
-                      AND status NOT IN ('archived')
+                      AND active_from <= current_date
+                      AND (active_to IS NULL OR active_to > current_date)
                     """
                 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
                 {"farm_id": farm_id},
@@ -204,9 +203,7 @@ async def get_blocks_summary(
         alert_count = int(a.get("alert_count", 0))
         alert_severity: MapSeverity | None = a.get("alert_severity")  # type: ignore[assignment]
 
-        health = _classify_health(
-            worst_alert_severity=alert_severity, ndvi_current=ndvi_current
-        )
+        health = _classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
 
         units.append(
             BlockSummary(

@@ -88,9 +88,10 @@ class TenantUsersService:
         row + tenant_role_assignments + preferences. One DB round-trip
         for the join, then a second for preferences."""
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT u.id AS user_id,
                            u.email::text AS email,
                            u.full_name,
@@ -118,18 +119,25 @@ class TenantUsersService:
                       AND u.deleted_at IS NULL
                     ORDER BY u.full_name
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tenant_id},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tenant_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         out: list[dict[str, Any]] = []
         for row in rows:
             user_id = row["user_id"]
             prefs = (
-                await self._public.execute(
-                    select(UserPreferences).where(UserPreferences.user_id == user_id)
+                (
+                    await self._public.execute(
+                        select(UserPreferences).where(UserPreferences.user_id == user_id)
+                    )
                 )
-            ).scalars().one_or_none()
+                .scalars()
+                .one_or_none()
+            )
             out.append(
                 {
                     "id": user_id,
@@ -149,9 +157,7 @@ class TenantUsersService:
             )
         return out
 
-    async def _resolve_tenant(
-        self, *, tenant_schema: str
-    ) -> tuple[UUID, str]:
+    async def _resolve_tenant(self, *, tenant_schema: str) -> tuple[UUID, str]:
         """Get (tenant_id, tenant_slug) from the request context's schema."""
         row = (
             await self._public.execute(
@@ -206,9 +212,7 @@ class TenantUsersService:
             )
         ).first()
 
-        keycloak_subject: str | None = (
-            global_user_row.keycloak_subject if global_user_row else None
-        )
+        keycloak_subject: str | None = global_user_row.keycloak_subject if global_user_row else None
         provisioning_status = "pending"
 
         # Try to invite via Keycloak. Best-effort; a Noop client raises
@@ -393,7 +397,7 @@ class TenantUsersService:
                 sets.extend(["updated_by = :actor", "updated_at = now()"])
                 await self._public.execute(
                     text(
-                        f"UPDATE public.users SET {', '.join(sets)} "  # noqa: S608
+                        f"UPDATE public.users SET {', '.join(sets)} "
                         "WHERE id = :id AND deleted_at IS NULL"
                     ).bindparams(
                         bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -415,16 +419,14 @@ class TenantUsersService:
             if patch:
                 # Upsert the prefs row (lazy-creation).
                 cols = ", ".join(["user_id", *patch.keys()])
-                placeholders = ", ".join([":user_id", *(f":{k}" for k in patch.keys())])
+                placeholders = ", ".join([":user_id", *(f":{k}" for k in patch)])
                 update_set = ", ".join(
-                    [f"{k} = EXCLUDED.{k}" for k in patch.keys()] + ["updated_at = now()"]
+                    [f"{k} = EXCLUDED.{k}" for k in patch] + ["updated_at = now()"]
                 )
-                bind_params: list[Any] = [
-                    bindparam("user_id", type_=PG_UUID(as_uuid=True))
-                ]
+                bind_params: list[Any] = [bindparam("user_id", type_=PG_UUID(as_uuid=True))]
                 await self._public.execute(
                     text(
-                        f"INSERT INTO public.user_preferences ({cols}) "  # noqa: S608
+                        f"INSERT INTO public.user_preferences ({cols}) "
                         f"VALUES ({placeholders}) "
                         f"ON CONFLICT (user_id) DO UPDATE SET {update_set}"
                     ).bindparams(*bind_params),
@@ -452,9 +454,7 @@ class TenantUsersService:
         tenant_schema: str,
     ) -> None:
         await self._require_membership(user_id=user_id, tenant_id=tenant_id)
-        await self._set_membership_status(
-            user_id=user_id, tenant_id=tenant_id, status="suspended"
-        )
+        await self._set_membership_status(user_id=user_id, tenant_id=tenant_id, status="suspended")
         kc_subject = await self._user_keycloak_subject(user_id=user_id)
         if kc_subject and not kc_subject.startswith("pending::"):
             try:
@@ -479,12 +479,8 @@ class TenantUsersService:
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> None:
-        await self._require_membership(
-            user_id=user_id, tenant_id=tenant_id, allow_suspended=True
-        )
-        await self._set_membership_status(
-            user_id=user_id, tenant_id=tenant_id, status="active"
-        )
+        await self._require_membership(user_id=user_id, tenant_id=tenant_id, allow_suspended=True)
+        await self._set_membership_status(user_id=user_id, tenant_id=tenant_id, status="active")
         kc_subject = await self._user_keycloak_subject(user_id=user_id)
         if kc_subject and not kc_subject.startswith("pending::"):
             try:
@@ -509,9 +505,7 @@ class TenantUsersService:
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> None:
-        await self._require_membership(
-            user_id=user_id, tenant_id=tenant_id, allow_suspended=True
-        )
+        await self._require_membership(user_id=user_id, tenant_id=tenant_id, allow_suspended=True)
         # Soft-delete the membership; do NOT remove the global user row
         # because they may belong to other tenants.
         await self._public.execute(
@@ -585,9 +579,7 @@ class TenantUsersService:
         if not allow_suspended:
             clauses.append("m.status = 'active'")
         sql = (
-            "SELECT 1 FROM public.tenant_memberships m WHERE "
-            + " AND ".join(clauses)
-            + " LIMIT 1"
+            "SELECT 1 FROM public.tenant_memberships m WHERE " + " AND ".join(clauses) + " LIMIT 1"
         )
         row = (
             await self._public.execute(
@@ -599,13 +591,9 @@ class TenantUsersService:
             )
         ).first()
         if row is None:
-            raise TenantUserNotFoundError(
-                f"user {user_id} not a member of tenant {tenant_id}"
-            )
+            raise TenantUserNotFoundError(f"user {user_id} not a member of tenant {tenant_id}")
 
-    async def _set_membership_status(
-        self, *, user_id: UUID, tenant_id: UUID, status: str
-    ) -> None:
+    async def _set_membership_status(self, *, user_id: UUID, tenant_id: UUID, status: str) -> None:
         await self._public.execute(
             text(
                 "UPDATE public.tenant_memberships SET status = :status, "
@@ -621,9 +609,9 @@ class TenantUsersService:
     async def _user_keycloak_subject(self, *, user_id: UUID) -> str | None:
         row = (
             await self._public.execute(
-                text(
-                    "SELECT keycloak_subject FROM public.users WHERE id = :uid"
-                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                text("SELECT keycloak_subject FROM public.users WHERE id = :uid").bindparams(
+                    bindparam("uid", type_=PG_UUID(as_uuid=True))
+                ),
                 {"uid": user_id},
             )
         ).first()
@@ -634,9 +622,7 @@ def get_tenant_users_service(
     public_session: AsyncSession,
     tenant_session: AsyncSession | None = None,
 ) -> TenantUsersService:
-    return TenantUsersService(
-        public_session=public_session, tenant_session=tenant_session
-    )
+    return TenantUsersService(public_session=public_session, tenant_session=tenant_session)
 
 
 # Silence unused-import warnings — kept for potential future caller use.

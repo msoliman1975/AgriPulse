@@ -29,7 +29,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.recommendations.engine import (
-    EvaluationResult,
     TreePathStep,
     evaluate_tree,
 )
@@ -138,9 +137,7 @@ class RecommendationsServiceImpl:
         # return empty data when the block has no provider/observation
         # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
-        signals = await load_signals_snapshot(
-            self._tenant, block_id=block_id, farm_id=farm_id
-        )
+        signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
@@ -178,9 +175,7 @@ class RecommendationsServiceImpl:
             recommendation_id = uuid7()
             valid_until: datetime | None = None
             if result.outcome.valid_for_hours is not None:
-                valid_until = datetime.now(UTC) + timedelta(
-                    hours=result.outcome.valid_for_hours
-                )
+                valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
 
             inserted = await self._repo.insert_recommendation(
                 recommendation_id=recommendation_id,
@@ -286,7 +281,7 @@ class RecommendationsServiceImpl:
 
     # ---- Transitions --------------------------------------------------
 
-    async def transition_recommendation(
+    async def transition_recommendation(  # noqa: PLR0912 - state-machine transition handler
         self,
         *,
         recommendation_id: UUID,
@@ -517,12 +512,13 @@ class DecisionTreesAuthorService:
         """Create a new tree + its v1 draft. Validates the YAML via
         ``compile_tree`` before any DB write — a malformed body never
         produces a half-created row."""
+        import yaml as _yaml
+
         from app.modules.recommendations.errors import DecisionTreeNotFoundError
         from app.modules.recommendations.loader import (
             _hash_compiled,
             compile_tree,
         )
-        import yaml as _yaml
 
         if await self._repo.get_tree_by_code(code) is not None:
             raise _DecisionTreeCodeAlreadyExistsError(code)
@@ -532,9 +528,7 @@ class DecisionTreesAuthorService:
         # The compiled body's `code` field must match the URL — protect
         # against a typo where the YAML says one thing and the URL another.
         if compiled.get("code") != code:
-            raise _DecisionTreeCodeMismatchError(
-                expected=code, got=str(compiled.get("code"))
-            )
+            raise _DecisionTreeCodeMismatchError(expected=code, got=str(compiled.get("code")))
         compiled_hash = _hash_compiled(compiled)
         crop_id = await self._repo.resolve_crop_id(crop_code)
 
@@ -590,11 +584,12 @@ class DecisionTreesAuthorService:
         notes: str | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
+        import yaml as _yaml
+
         from app.modules.recommendations.loader import (
             _hash_compiled,
             compile_tree,
         )
-        import yaml as _yaml
 
         tree = await self._repo.get_tree_by_code(code)
         if tree is None:
@@ -602,18 +597,14 @@ class DecisionTreesAuthorService:
         spec = _yaml.safe_load(tree_yaml)
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         if compiled.get("code") != code:
-            raise _DecisionTreeCodeMismatchError(
-                expected=code, got=str(compiled.get("code"))
-            )
+            raise _DecisionTreeCodeMismatchError(expected=code, got=str(compiled.get("code")))
         compiled_hash = _hash_compiled(compiled)
         # No-op when the new YAML hashes identical — the editor can
         # call save liberally; we only insert when there's actually a
         # change.
         latest = await self._repo.get_latest_version_number(tree_id=tree["id"])
         if latest > 0:
-            latest_row = await self._repo.get_version_by_number(
-                tree_id=tree["id"], version=latest
-            )
+            latest_row = await self._repo.get_version_by_number(tree_id=tree["id"], version=latest)
             if latest_row is not None and latest_row["compiled_hash"] == compiled_hash:
                 return await self._tree_with_version(code=code, version=latest)
         next_version = latest + 1
@@ -662,9 +653,7 @@ class DecisionTreesAuthorService:
         tree = await self._repo.get_tree_by_code(code)
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
-        version_row = await self._repo.get_version_by_number(
-            tree_id=tree["id"], version=version
-        )
+        version_row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
         if version_row is None:
             raise _DecisionTreeVersionNotFoundError(code=code, version=version)
         # Idempotent: republishing a version that's already current is a
@@ -725,9 +714,10 @@ class DecisionTreesAuthorService:
         Otherwise the persisted ``version`` is loaded; defaults to the
         current published version if neither is supplied.
         """
+        import yaml as _yaml
+
         from app.modules.recommendations.engine import evaluate_tree
         from app.modules.recommendations.loader import compile_tree
-        import yaml as _yaml
 
         if tree_yaml is not None:
             spec = _yaml.safe_load(tree_yaml)
@@ -745,9 +735,7 @@ class DecisionTreesAuthorService:
                 target_version = current["version"]
             if target_version is None:
                 raise _DecisionTreeNoPublishedVersionError(code)
-            row = await self._repo.get_version_by_number(
-                tree_id=tree["id"], version=target_version
-            )
+            row = await self._repo.get_version_by_number(tree_id=tree["id"], version=target_version)
             if row is None:
                 raise _DecisionTreeVersionNotFoundError(code=code, version=target_version)
             compiled = row["tree_compiled"]
@@ -755,9 +743,7 @@ class DecisionTreesAuthorService:
         # Build the same context the production evaluator would see.
         # Uses tenant_session so we read the right tenant's signals/
         # weather/indices.
-        repo = RecommendationsRepository(
-            tenant_session=tenant_session, public_session=self._public
-        )
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
         from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
@@ -794,8 +780,7 @@ class DecisionTreesAuthorService:
                 "valid_for_hours": result.outcome.valid_for_hours,
             }
         return {
-            "matched": result.outcome is not None
-            and result.outcome.action_type != "no_action",
+            "matched": result.outcome is not None and result.outcome.action_type != "no_action",
             "outcome": outcome_dict,
             "path": _serialize_path(result.path),
             "evaluation_snapshot": result.evaluation_snapshot,
@@ -842,9 +827,7 @@ class _DecisionTreeCodeAlreadyExistsError(_DecisionTreeAuthoringError):
 
 class _DecisionTreeCodeMismatchError(_DecisionTreeAuthoringError):
     def __init__(self, *, expected: str, got: str) -> None:
-        super().__init__(
-            f"YAML body has code {got!r} but the URL says {expected!r}"
-        )
+        super().__init__(f"YAML body has code {got!r} but the URL says {expected!r}")
         self.expected = expected
         self.got = got
 

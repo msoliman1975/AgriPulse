@@ -42,21 +42,20 @@ from app.modules.recommendations.schemas import (
     RecommendationResponse,
     RecommendationTransitionRequest,
 )
-from app.modules.recommendations.service import (
-    DecisionTreesAuthorService,
-    RecommendationsServiceImpl,
-    get_decision_trees_author_service,
-    get_recommendations_service,
-)
+
 # Importing the private authoring errors to map them at the route layer is
 # OK â€” they live in the same module's service.py, not across a module
 # boundary.
-from app.modules.recommendations.service import (  # noqa: E402
+from app.modules.recommendations.service import (
+    DecisionTreesAuthorService,
+    RecommendationsServiceImpl,
     _DecisionTreeCodeAlreadyExistsError,
     _DecisionTreeCodeMismatchError,
     _DecisionTreeNoPublishedVersionError,
     _DecisionTreeNotFoundError,
     _DecisionTreeVersionNotFoundError,
+    get_decision_trees_author_service,
+    get_recommendations_service,
 )
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
@@ -70,9 +69,7 @@ def _service(
     tenant_session: AsyncSession = Depends(get_db_session),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> RecommendationsServiceImpl:
-    return get_recommendations_service(
-        tenant_session=tenant_session, public_session=public_session
-    )
+    return get_recommendations_service(tenant_session=tenant_session, public_session=public_session)
 
 
 def _ensure_tenant(context: RequestContext) -> str:
@@ -203,9 +200,10 @@ async def list_decision_trees(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     rows = (
-        await public_session.execute(
-            text(
-                """
+        (
+            await public_session.execute(
+                text(
+                    """
                 SELECT t.id, t.code, t.name_en, t.name_ar,
                        t.description_en, t.description_ar,
                        t.crop_id, t.applicable_regions, t.is_active,
@@ -216,9 +214,12 @@ async def list_decision_trees(
                 WHERE t.deleted_at IS NULL
                 ORDER BY t.code
                 """
+                )
             )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -260,7 +261,7 @@ def _author_service(
     return get_decision_trees_author_service(public_session=public_session)
 
 
-def _map_authoring_error(exc: Exception) -> "RuntimeError | None":
+def _map_authoring_error(exc: Exception) -> RuntimeError | None:
     """Map authoring-service errors to APIError, return one to raise.
 
     Centralised so each endpoint stays focused on the happy path."""
@@ -364,7 +365,7 @@ async def create_decision_tree(
         )
     except DecisionTreeParseError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
             raise mapped from exc
@@ -393,7 +394,7 @@ async def append_decision_tree_version(
         )
     except DecisionTreeParseError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
             raise mapped from exc
@@ -418,7 +419,7 @@ async def publish_decision_tree_version(
             version=version,
             actor_user_id=context.user_id,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
             raise mapped from exc
@@ -448,7 +449,7 @@ async def dry_run_decision_tree(
         )
     except DecisionTreeParseError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
             raise mapped from exc

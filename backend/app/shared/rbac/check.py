@@ -138,7 +138,7 @@ class CapabilityRegistry:
         *,
         farm_id: UUID | None = None,
     ) -> bool:
-        """Resolve PlatformRole â†’ TenantRole â†’ FarmScope; first match wins.
+        """Resolve PlatformRole -> TenantRole -> FarmScope; first match wins.
 
         Unknown capabilities deny: a typo must never silently grant.
         """

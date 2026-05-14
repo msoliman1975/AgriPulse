@@ -52,7 +52,6 @@ from app.modules.imagery.events import (
     SceneIngestedV1,
     SceneSkippedV1,
 )
-from app.modules.integrations_health.error_codes import classify_error
 from app.modules.imagery.pgstac import (
     build_item_doc,
     collection_id_for,
@@ -63,6 +62,7 @@ from app.modules.imagery.providers.protocol import ImageryProvider
 from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.storage import raw_bands_key
+from app.modules.integrations_health.error_codes import classify_error
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 from app.shared.eventbus import get_default_bus
@@ -79,7 +79,7 @@ def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
     async engine is a module-level singleton; without disposal between
     tasks, asyncpg connections retained by the pool reference the
     previous (now-closed) loop, and the next task's pool checkout fails
-    with `RuntimeError: Event loop is closed` â†’ AttributeError on the
+    with `RuntimeError: Event loop is closed` -> AttributeError on the
     proactor's `send`. Disposing at the end of each task forces the
     next one to rebuild the pool inside its own loop.
 

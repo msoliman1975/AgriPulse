@@ -68,9 +68,7 @@ async def test_suspend_then_reactivate(admin_session: AsyncSession) -> None:
     assert suspended.suspended_at is not None
     assert suspended.last_status_reason == "trial expired"
 
-    reactivated = await service.reactivate_tenant(
-        created.tenant_id, actor_user_id=uuid4()
-    )
+    reactivated = await service.reactivate_tenant(created.tenant_id, actor_user_id=uuid4())
     assert reactivated.status == "active"
     assert reactivated.suspended_at is None
     assert reactivated.last_status_reason is None
@@ -208,9 +206,7 @@ async def test_purge_force_drops_schema_and_public_rows(
     # commits independently — the row is therefore visible across sessions).
     schema_exists = (
         await admin_session.execute(
-            text(
-                "SELECT count(*) FROM information_schema.schemata WHERE schema_name = :s"
-            ),
+            text("SELECT count(*) FROM information_schema.schemata WHERE schema_name = :s"),
             {"s": created.schema_name},
         )
     ).scalar_one()

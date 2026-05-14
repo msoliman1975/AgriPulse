@@ -79,9 +79,7 @@ async def _resolve_and_scope(
 )
 async def drill_farms(
     tenant_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -97,9 +95,7 @@ async def drill_farms(
 async def drill_blocks(
     tenant_id: UUID,
     farm_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -117,9 +113,7 @@ async def drill_block_attempts(
     block_id: UUID,
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -140,9 +134,7 @@ async def drill_recent(
     ),
     farm_id: UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -162,9 +154,7 @@ async def drill_queue(
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     state: Literal["overdue", "running", "stuck"] | None = Query(default=None),
     stuck_minutes: int = Query(default=30, ge=1, le=24 * 60),
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -179,9 +169,7 @@ async def drill_queue(
 )
 async def drill_providers(
     tenant_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     """Tenant-scoped provider list (only providers this tenant subscribes to)."""

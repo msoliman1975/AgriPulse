@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.audit.models import AuditEventArchive
 from app.modules.tenancy.models import Tenant, TenantSettings, TenantSubscription
 
-
 _UPDATABLE_FIELDS: frozenset[str] = frozenset(
     {
         "name",
@@ -232,9 +231,7 @@ class TenantRepository:
     async def get_settings(self, tenant_id: UUID) -> TenantSettings | None:
         return await self._session.get(TenantSettings, tenant_id)
 
-    async def get_current_subscription(
-        self, tenant_id: UUID
-    ) -> TenantSubscription | None:
+    async def get_current_subscription(self, tenant_id: UUID) -> TenantSubscription | None:
         stmt = (
             select(TenantSubscription)
             .where(

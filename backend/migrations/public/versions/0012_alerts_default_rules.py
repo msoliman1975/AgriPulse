@@ -120,8 +120,7 @@ _SEED_RULES: list[dict[str, object]] = [
                 "chart for the past two weeks."
             ),
             "prescription_ar": (
-                "أضف الحقل إلى جولة الفحص الروتينية التالية؛ راجع منحنى الاتجاه لآخر "
-                "أسبوعين."
+                "أضف الحقل إلى جولة الفحص الروتينية التالية؛ راجع منحنى الاتجاه لآخر " "أسبوعين."
             ),
         },
     },
@@ -240,10 +239,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_default_rules_status", table_name="default_rules", schema="public")
-    op.drop_constraint(
-        "ck_default_rules_status", "default_rules", schema="public", type_="check"
-    )
-    op.drop_constraint(
-        "ck_default_rules_severity", "default_rules", schema="public", type_="check"
-    )
+    op.drop_constraint("ck_default_rules_status", "default_rules", schema="public", type_="check")
+    op.drop_constraint("ck_default_rules_severity", "default_rules", schema="public", type_="check")
     op.drop_table("default_rules", schema="public")

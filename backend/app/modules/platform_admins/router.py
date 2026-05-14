@@ -23,15 +23,15 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.iam.users_service import (
+    TenantUserAlreadyExistsError,
+    TenantUserNotFoundError,
+)
 from app.modules.platform_admins.service import (
     PlatformAdminsService,
     TenantAdminConflictError,
     TenantOwnerAlreadyExistsError,
     get_platform_admins_service,
-)
-from app.modules.iam.users_service import (
-    TenantUserAlreadyExistsError,
-    TenantUserNotFoundError,
 )
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session
@@ -77,9 +77,7 @@ class InviteAdminResponse(BaseModel):
 @router.get("", response_model=list[TenantAdminRow])
 async def list_admins(
     tenant_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenant_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenant_admins")),
     service: PlatformAdminsService = Depends(_service),
 ) -> list[dict[str, Any]]:
     del context
@@ -94,9 +92,7 @@ async def list_admins(
 async def invite_admin(
     tenant_id: UUID,
     payload: InviteAdminRequest,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenant_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenant_admins")),
     service: PlatformAdminsService = Depends(_service),
 ) -> dict[str, Any]:
     try:
@@ -122,9 +118,7 @@ async def invite_admin(
 async def remove_admin_role(
     tenant_id: UUID,
     user_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenant_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenant_admins")),
     service: PlatformAdminsService = Depends(_service),
 ) -> None:
     try:
@@ -179,9 +173,7 @@ class AssignFirstOwnerResponse(BaseModel):
 async def assign_first_owner(
     tenant_id: UUID,
     payload: AssignFirstOwnerRequest,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenant_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenant_admins")),
     service: PlatformAdminsService = Depends(_service),
 ) -> dict[str, Any]:
     if (payload.email is None) == (payload.user_id is None):
@@ -233,19 +225,17 @@ async def assign_first_owner(
 
 class TransferOwnershipRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    from_user_id: UUID = Field(
-        description="Current TenantOwner; verified before the transfer."
-    )
+    from_user_id: UUID = Field(description="Current TenantOwner; verified before the transfer.")
 
 
-@router.post("/{user_id}:transfer-ownership", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.post(
+    "/{user_id}:transfer-ownership", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def transfer_ownership(
     tenant_id: UUID,
     user_id: UUID,
     payload: TransferOwnershipRequest,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenant_admins")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenant_admins")),
     service: PlatformAdminsService = Depends(_service),
 ) -> None:
     try:

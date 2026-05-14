@@ -15,6 +15,7 @@ days. That keeps the table bounded without a separate retention job.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Coroutine
 from typing import Any
 from uuid import UUID
@@ -151,7 +152,7 @@ async def _probe_weather(code: str) -> dict[str, Any]:
                 "latency_ms": None,
                 "error_message": f"unknown weather provider: {code}",
             }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"status": "error", "latency_ms": None, "error_message": str(exc)}
 
     try:
@@ -161,14 +162,12 @@ async def _probe_weather(code: str) -> dict[str, Any]:
             "latency_ms": result.latency_ms,
             "error_message": result.error_message,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.exception("weather_probe_failed", provider_code=code)
         return {"status": "error", "latency_ms": None, "error_message": str(exc)}
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await provider.aclose()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 async def _probe_imagery(code: str) -> dict[str, Any]:
@@ -186,7 +185,7 @@ async def _probe_imagery(code: str) -> dict[str, Any]:
                 "latency_ms": None,
                 "error_message": f"unknown imagery provider: {code}",
             }
-    except SentinelHubNotConfiguredError as exc:
+    except SentinelHubNotConfiguredError:
         # Not a transport failure — credentials simply aren't wired up
         # in this environment. Surfacing it as error gives the UI a
         # clear "configure me" hint instead of silently hiding the row.
@@ -195,7 +194,7 @@ async def _probe_imagery(code: str) -> dict[str, Any]:
             "latency_ms": None,
             "error_message": "provider not configured",
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"status": "error", "latency_ms": None, "error_message": str(exc)}
 
     try:
@@ -205,14 +204,12 @@ async def _probe_imagery(code: str) -> dict[str, Any]:
             "latency_ms": result.latency_ms,
             "error_message": result.error_message,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.exception("imagery_probe_failed", provider_code=code)
         return {"status": "error", "latency_ms": None, "error_message": str(exc)}
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await provider.aclose()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def _new_id() -> UUID:

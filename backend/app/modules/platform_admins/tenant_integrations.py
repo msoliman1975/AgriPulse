@@ -94,9 +94,7 @@ def _validate_category(category: str) -> Category:
 async def read_tenant_integration(
     tenant_id: UUID,
     category: str,
-    context: RequestContext = Depends(
-        requires_capability("tenant.manage_integrations")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> dict[str, Any]:
     del context
@@ -126,9 +124,7 @@ async def write_tenant_integration(
     category: str,
     payload: TenantSettingUpsertBody,
     key: str = Query(..., description="The platform_defaults key to override."),
-    context: RequestContext = Depends(
-        requires_capability("tenant.manage_integrations")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> dict[str, Any]:
     cat = _validate_category(category)
@@ -180,9 +176,7 @@ async def clear_tenant_integration(
     tenant_id: UUID,
     category: str,
     key: str = Query(...),
-    context: RequestContext = Depends(
-        requires_capability("tenant.manage_integrations")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> dict[str, Any]:
     cat = _validate_category(category)

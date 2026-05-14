@@ -40,7 +40,13 @@ def test_seed_yaml_compiles() -> None:
 
 def test_compile_rejects_missing_code() -> None:
     with pytest.raises(DecisionTreeParseError, match="missing 'code'"):
-        compile_tree({"name_en": "x", "nodes": {"root": {"outcome": {"action_type": "no_action", "text_en": "x"}}}}, source_path="x")
+        compile_tree(
+            {
+                "name_en": "x",
+                "nodes": {"root": {"outcome": {"action_type": "no_action", "text_en": "x"}}},
+            },
+            source_path="x",
+        )
 
 
 def test_compile_rejects_missing_root_node() -> None:
@@ -50,7 +56,9 @@ def test_compile_rejects_missing_root_node() -> None:
                 "code": "x",
                 "name_en": "x",
                 "root": "missing_id",
-                "nodes": {"some_other_id": {"outcome": {"action_type": "no_action", "text_en": "x"}}},
+                "nodes": {
+                    "some_other_id": {"outcome": {"action_type": "no_action", "text_en": "x"}}
+                },
             },
             source_path="x",
         )
@@ -65,7 +73,17 @@ def test_compile_rejects_dangling_pointer() -> None:
                 "root": "root",
                 "nodes": {
                     "root": {
-                        "condition": {"tree": {"op": "lt", "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"}, "right": 0}},
+                        "condition": {
+                            "tree": {
+                                "op": "lt",
+                                "left": {
+                                    "source": "indices",
+                                    "index_code": "ndvi",
+                                    "key": "baseline_deviation",
+                                },
+                                "right": 0,
+                            }
+                        },
                         "on_match": "missing_target",
                         "on_miss": "leaf",
                     },

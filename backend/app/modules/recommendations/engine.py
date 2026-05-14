@@ -101,7 +101,9 @@ class EvaluationResult:
     evaluation_snapshot: dict[str, Any] = field(default_factory=dict)
 
 
-def evaluate_tree(compiled: Mapping[str, Any], ctx: ConditionContext) -> EvaluationResult:
+def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
+    compiled: Mapping[str, Any], ctx: ConditionContext
+) -> EvaluationResult:
     """Walk ``compiled`` from its root with ``ctx`` and return the result.
 
     Returns ``EvaluationResult.outcome = None`` when the tree leaves on

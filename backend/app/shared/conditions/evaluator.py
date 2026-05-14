@@ -123,7 +123,9 @@ def _eval_comparison(
     raise ConditionParseError(f"unknown op {op!r}")
 
 
-def _resolve(ref: ValueRef, ctx: ConditionContext) -> Any:
+def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
+    ref: ValueRef, ctx: ConditionContext
+) -> Any:
     if isinstance(ref, IndicesValueRef):
         entry = ctx.indices.get(ref.index_code)
         if entry is None:

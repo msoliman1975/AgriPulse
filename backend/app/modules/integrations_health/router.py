@@ -83,9 +83,7 @@ def _ensure_tenant(context: RequestContext) -> None:
     summary="Per-Farm integration health rollup.",
 )
 async def list_farm_health(
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -99,9 +97,7 @@ async def list_farm_health(
 )
 async def list_block_health(
     farm_id: UUID,
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -117,9 +113,7 @@ async def list_block_attempts(
     block_id: UUID,
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -132,9 +126,7 @@ async def list_block_attempts(
     summary="Provider liveness â€” tenant-scoped projection (PR-IH6).",
 )
 async def list_tenant_providers(
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: ProviderHealthService = Depends(_providers_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -151,9 +143,7 @@ async def list_queue(
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     state: Literal["overdue", "running", "stuck"] | None = Query(default=None),
     stuck_minutes: int = Query(default=30, ge=1, le=24 * 60),
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -172,9 +162,7 @@ async def list_recent_attempts(
     ),
     farm_id: UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(
-        requires_capability("tenant.read_integration_health")
-    ),
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
