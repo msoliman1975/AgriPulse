@@ -626,9 +626,11 @@ def get_tenant_users_service(
 
 
 # Silence unused-import warnings — kept for potential future caller use.
-_ = group_name_for
-_ = User
-_ = TenantMembership
-_ = TenantRoleAssignment
-_ = datetime
-_ = UTC
+_KEEP_IMPORTS: tuple[Any, ...] = (
+    group_name_for,
+    User,
+    TenantMembership,
+    TenantRoleAssignment,
+    datetime,
+    UTC,
+)

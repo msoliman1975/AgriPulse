@@ -18,11 +18,12 @@ Audit on every write under `platform.tenant_admin_*` event types.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -183,7 +184,7 @@ class PlatformAdminsService:
             ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
             {"mid": membership_id, "role": role},
         )
-        if (result.rowcount or 0) == 0:
+        if (cast("CursorResult[Any]", result).rowcount or 0) == 0:
             return  # idempotent — no active assignment of this role
         await self._audit.record_archive(
             event_type="platform.tenant_admin_removed",

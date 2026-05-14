@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
@@ -257,7 +257,8 @@ class RecommendationsRepository:
                 },
             )
         ).first()
-        return row.id
+        assert row is not None  # INSERT ... RETURNING always yields one row
+        return cast(UUID, row.id)
 
     async def insert_version(
         self,
@@ -298,7 +299,8 @@ class RecommendationsRepository:
                 },
             )
         ).first()
-        return row.id
+        assert row is not None  # INSERT ... RETURNING always yields one row
+        return cast(UUID, row.id)
 
     async def set_current_version(
         self,

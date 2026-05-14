@@ -84,7 +84,7 @@ async def _fetch_status(tenant_id: UUID) -> TenantStatus:
     if row is None:
         return "missing"
     if row in ("active", "suspended", "pending_delete", "archived"):
-        return row  # type: ignore[return-value]
+        return row
     return "active"
 
 

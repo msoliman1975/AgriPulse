@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -121,4 +122,4 @@ class UserUpdateRequest(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=200)
     phone: str | None = Field(default=None, max_length=32)
     avatar_url: str | None = Field(default=None, max_length=500)
-    preferences: dict | None = None  # partial preferences patch
+    preferences: dict[str, Any] | None = None  # partial preferences patch

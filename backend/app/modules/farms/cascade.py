@@ -30,12 +30,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -249,4 +250,4 @@ async def _scalar_count(session: AsyncSession, stmt: Any, params: dict[str, Any]
 
 async def _execute_rowcount(session: AsyncSession, stmt: Any, params: dict[str, Any]) -> int:
     result = await session.execute(stmt, params)
-    return int(result.rowcount or 0)
+    return int(cast("CursorResult[Any]", result).rowcount or 0)
