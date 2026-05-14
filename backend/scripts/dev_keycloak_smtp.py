@@ -45,8 +45,7 @@ def _build_smtp_block() -> dict[str, str]:
         raise SystemExit("SMTP_HOST is empty in settings; check backend/.env")
     if not s.smtp_username or not s.smtp_password:
         raise SystemExit(
-            "SMTP_USERNAME / SMTP_PASSWORD must be set in backend/.env "
-            "for Keycloak SMTP auth"
+            "SMTP_USERNAME / SMTP_PASSWORD must be set in backend/.env " "for Keycloak SMTP auth"
         )
 
     # SMTP_FROM is "Display Name <addr@host>" — Keycloak wants the parts split.
@@ -116,9 +115,7 @@ def _send_real_invite(http: httpx.Client, token: str, recipient_email: str) -> N
             user_id = users[0]["id"]
             break
     else:
-        raise SystemExit(
-            f"user {recipient_email!r} not found in realm by username or email"
-        )
+        raise SystemExit(f"user {recipient_email!r} not found in realm by username or email")
 
     # Make sure the user's email field is populated and verified, else
     # Keycloak will skip the send silently.
@@ -198,7 +195,7 @@ if __name__ == "__main__":
     except httpx.HTTPStatusError as exc:
         body = exc.response.text[:400] if exc.response is not None else ""
         print(f"\nKeycloak request failed: {exc} body={body}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc
     except Exception as exc:
         print(f"\nfailed: {exc}", file=sys.stderr)
         raise
