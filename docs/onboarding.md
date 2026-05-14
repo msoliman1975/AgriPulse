@@ -55,7 +55,9 @@ Full step-by-step including troubleshooting:
 
 ```bash
 cd backend
-# Use the pre-built venv; uv on Windows hits a TLS-trust bug.
+# Use the pre-built venv; uv on Windows hits a TLS-trust bug behind
+# Netskope/Zscaler. Two-line workaround in
+# docs/runbooks/local-stack-bootstrap.md if you need `uv` directly.
 .venv/Scripts/uvicorn.exe app.main:app --reload --host 0.0.0.0 --port 8000   # Windows
 # .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000        # macOS/Linux
 

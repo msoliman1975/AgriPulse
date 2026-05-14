@@ -23,10 +23,29 @@ piece that actually makes "first sign-in just works" possible.
   pipeline records a synthetic failed job, which is enough to smoke-test
   the UI's empty/error states.
 
-> **uv on Windows hits a TLS-trust bug** in our environment
-> (`InvalidCertificate(Other(OtherError(UnsupportedCriticalExtension)))`).
-> Use the existing `backend/.venv` directly (every shell-command in this
-> runbook works that way), or run `uv` from WSL.
+> **uv on Windows behind a TLS-MITM proxy (Netskope, Zscaler, etc.)** —
+> uv's default `rustls` TLS backend rejects the proxy's root CA with
+> `InvalidCertificate(Other(OtherError(UnsupportedCriticalExtension)))`
+> because the cert carries an X.509 critical extension `rustls` doesn't
+> parse. Two-line PowerShell workaround that flips uv to Windows
+> `schannel` (which loads the proxy cert from the OS trust store
+> instead, and is more permissive about unknown extensions):
+>
+> ```powershell
+> Remove-Item env:SSL_CERT_FILE -ErrorAction SilentlyContinue
+> $env:UV_NATIVE_TLS = "1"
+> # uv commands now work normally:
+> uv lock
+> uv sync --extra dev
+> uv run pytest
+> ```
+>
+> To make it permanent, paste those two lines into your PowerShell
+> `$PROFILE`. Note: unsetting `SSL_CERT_FILE` only affects uv — other
+> tools that key off it (git, node, grpc) keep working because the var
+> remains set elsewhere; we just don't want uv to read the offending
+> PEM. As a fallback, every shell-command in this runbook works against
+> the existing `backend/.venv` directly, no uv required.
 
 ## 2 — Compose dependencies
 
