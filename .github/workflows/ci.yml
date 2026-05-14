@@ -214,10 +214,12 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Configure AWS credentials (OIDC plan role)
-        # Only configure AWS on PRs against main â€” skips for forked PRs
-        # where OIDC subjects don't match, falling through to the
-        # backend-less validate path below.
-        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name
+        # Only configure AWS on same-repo PRs where the plan-role ARN is
+        # wired up. Skipped on fork PRs (OIDC subject won't match) and
+        # before the first `terraform apply` populates
+        # `AWS_TERRAFORM_PLAN_ROLE_ARN`. The backend-less validate path
+        # below picks up whichever case the OIDC path skips.
+        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name && vars.AWS_TERRAFORM_PLAN_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_TERRAFORM_PLAN_ROLE_ARN }}
@@ -226,17 +228,17 @@ jobs:
       - name: terraform init (no backend)
         # Validate path used on push-to-main and on fork PRs; the apply
         # workflow does a real `terraform init` with the backend.
-        if: github.event_name != 'pull_request' || github.repository != github.event.pull_request.base.repo.full_name
+        if: github.event_name != 'pull_request' || github.repository != github.event.pull_request.base.repo.full_name || vars.AWS_TERRAFORM_PLAN_ROLE_ARN == ''
         run: terraform init -backend=false
 
       - name: terraform validate
-        if: github.event_name != 'pull_request' || github.repository != github.event.pull_request.base.repo.full_name
+        if: github.event_name != 'pull_request' || github.repository != github.event.pull_request.base.repo.full_name || vars.AWS_TERRAFORM_PLAN_ROLE_ARN == ''
         run: terraform validate
         env:
           TF_VAR_environment: dev
 
       - name: terraform init (with backend)
-        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name
+        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name && vars.AWS_TERRAFORM_PLAN_ROLE_ARN != ''
         run: |
           terraform init \
             -backend-config="bucket=${{ vars.AWS_TF_STATE_BUCKET }}" \
@@ -246,7 +248,7 @@ jobs:
             -backend-config="dynamodb_table=${{ vars.AWS_TF_LOCK_TABLE }}"
 
       - name: terraform plan
-        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name
+        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name && vars.AWS_TERRAFORM_PLAN_ROLE_ARN != ''
         id: plan
         run: |
           terraform plan -no-color -out=plan.tfplan -input=false \
@@ -258,7 +260,7 @@ jobs:
         continue-on-error: true
 
       - name: Post plan as sticky PR comment
-        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name
+        if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name && vars.AWS_TERRAFORM_PLAN_ROLE_ARN != ''
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: terraform-plan-dev
