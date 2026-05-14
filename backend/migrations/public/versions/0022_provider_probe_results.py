@@ -14,7 +14,7 @@ not require a migration.
 Retention: 7 days; pruning is the probe task's responsibility.
 
 Revision ID: 0022
-Revises: 0021
+Revises: 0020
 Create Date: 2026-05-10
 """
 
@@ -27,7 +27,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0022"
-down_revision: str | None = "0021"
+down_revision: str | None = "0020"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
