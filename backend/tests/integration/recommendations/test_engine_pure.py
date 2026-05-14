@@ -13,8 +13,6 @@ from decimal import Decimal
 import pytest
 
 from app.modules.recommendations.engine import (
-    EvaluationResult,
-    TreeOutcome,
     evaluate_tree,
 )
 from app.shared.conditions import ConditionContext
@@ -33,7 +31,11 @@ _NDVI_TREE: dict[str, object] = {
             "condition": {
                 "tree": {
                     "op": "lt",
-                    "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"},
+                    "left": {
+                        "source": "indices",
+                        "index_code": "ndvi",
+                        "key": "baseline_deviation",
+                    },
                     "right": -0.5,
                 }
             },
@@ -44,7 +46,11 @@ _NDVI_TREE: dict[str, object] = {
             "condition": {
                 "tree": {
                     "op": "lt",
-                    "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"},
+                    "left": {
+                        "source": "indices",
+                        "index_code": "ndvi",
+                        "key": "baseline_deviation",
+                    },
                     "right": -1.5,
                 }
             },
@@ -85,7 +91,11 @@ _NDVI_TREE: dict[str, object] = {
 
 def _ctx_with_deviation(value: Decimal | None) -> ConditionContext:
     indices = (
-        {"ndvi": IndicesEntry(time=datetime.now(UTC), mean=Decimal("0.5"), baseline_deviation=value)}
+        {
+            "ndvi": IndicesEntry(
+                time=datetime.now(UTC), mean=Decimal("0.5"), baseline_deviation=value
+            )
+        }
         if value is not None
         else {}
     )
@@ -135,7 +145,17 @@ def test_dangling_pointer_returns_error_not_crash() -> None:
         "root": "root",
         "nodes": {
             "root": {
-                "condition": {"tree": {"op": "lt", "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"}, "right": 0}},
+                "condition": {
+                    "tree": {
+                        "op": "lt",
+                        "left": {
+                            "source": "indices",
+                            "index_code": "ndvi",
+                            "key": "baseline_deviation",
+                        },
+                        "right": 0,
+                    }
+                },
                 "on_match": "missing",
                 "on_miss": "leaf",
             },
@@ -155,12 +175,32 @@ def test_cycle_is_bounded() -> None:
         "root": "a",
         "nodes": {
             "a": {
-                "condition": {"tree": {"op": "lt", "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"}, "right": 100}},
+                "condition": {
+                    "tree": {
+                        "op": "lt",
+                        "left": {
+                            "source": "indices",
+                            "index_code": "ndvi",
+                            "key": "baseline_deviation",
+                        },
+                        "right": 100,
+                    }
+                },
                 "on_match": "b",
                 "on_miss": "leaf",
             },
             "b": {
-                "condition": {"tree": {"op": "lt", "left": {"source": "indices", "index_code": "ndvi", "key": "baseline_deviation"}, "right": 100}},
+                "condition": {
+                    "tree": {
+                        "op": "lt",
+                        "left": {
+                            "source": "indices",
+                            "index_code": "ndvi",
+                            "key": "baseline_deviation",
+                        },
+                        "right": 100,
+                    }
+                },
                 "on_match": "a",
                 "on_miss": "leaf",
             },

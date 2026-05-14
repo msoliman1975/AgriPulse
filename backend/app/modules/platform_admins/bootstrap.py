@@ -63,7 +63,7 @@ async def bootstrap_platform_admin(settings: Settings) -> None:
                 role="PlatformAdmin",
                 actor_user_id=None,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("platform_admin_bootstrap_failed", error=str(exc))
             return
         log.info(

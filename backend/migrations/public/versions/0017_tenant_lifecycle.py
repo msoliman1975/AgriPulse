@@ -69,9 +69,7 @@ def upgrade() -> None:
         ),
         sa.Column("event_type", sa.Text(), nullable=False),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column(
-            "actor_kind", sa.Text(), nullable=False, server_default=sa.text("'user'")
-        ),
+        sa.Column("actor_kind", sa.Text(), nullable=False, server_default=sa.text("'user'")),
         sa.Column("subject_kind", sa.Text(), nullable=False),
         sa.Column("subject_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(

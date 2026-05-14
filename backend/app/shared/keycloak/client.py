@@ -54,7 +54,7 @@ class KeycloakAdminClient(Protocol):
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
-        tenant_id: "UUID | str | None" = None,
+        tenant_id: UUID | str | None = None,
     ) -> str: ...
 
     async def add_existing_user_to_group(
@@ -63,7 +63,7 @@ class KeycloakAdminClient(Protocol):
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
-        tenant_id: "UUID | str | None" = None,
+        tenant_id: UUID | str | None = None,
     ) -> None: ...
 
     async def disable_users_in_group(self, slug: str) -> int: ...
@@ -86,9 +86,7 @@ class KeycloakAdminClient(Protocol):
         role: str = "PlatformAdmin",
     ) -> str: ...
 
-    async def set_platform_role(
-        self, *, keycloak_user_id: str, role: str
-    ) -> None: ...
+    async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None: ...
 
     async def clear_platform_role(self, *, keycloak_user_id: str) -> None: ...
 
@@ -125,7 +123,7 @@ class NoopKeycloakClient:
         full_name: str | None,
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
-        tenant_id: "UUID | str | None" = None,
+        tenant_id: UUID | str | None = None,
     ) -> str:
         del email, full_name, group_id, roles, tenant_id
         raise KeycloakNotConfiguredError(
@@ -138,7 +136,7 @@ class NoopKeycloakClient:
         keycloak_user_id: str,
         group_id: str,
         roles: tuple[str, ...] = (),
-        tenant_id: "UUID | str | None" = None,
+        tenant_id: UUID | str | None = None,
     ) -> None:
         del roles, tenant_id
         self._log.warning(
@@ -179,16 +177,12 @@ class NoopKeycloakClient:
         role: str = "PlatformAdmin",
     ) -> str:
         del full_name
-        self._log.warning(
-            "keycloak_noop_invite_platform_admin", email=email, role=role
-        )
+        self._log.warning("keycloak_noop_invite_platform_admin", email=email, role=role)
         raise KeycloakNotConfiguredError(
             "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
         )
 
-    async def set_platform_role(
-        self, *, keycloak_user_id: str, role: str
-    ) -> None:
+    async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None:
         self._log.warning(
             "keycloak_noop_set_platform_role",
             keycloak_user_id=keycloak_user_id,
@@ -196,9 +190,7 @@ class NoopKeycloakClient:
         )
 
     async def clear_platform_role(self, *, keycloak_user_id: str) -> None:
-        self._log.warning(
-            "keycloak_noop_clear_platform_role", keycloak_user_id=keycloak_user_id
-        )
+        self._log.warning("keycloak_noop_clear_platform_role", keycloak_user_id=keycloak_user_id)
 
     async def aclose(self) -> None:
         return None
@@ -249,15 +241,11 @@ class HttpxKeycloakAdminClient:
                 },
             )
             if resp.status_code >= 400:
-                raise KeycloakRequestError(
-                    resp.status_code, resp.text, operation="token"
-                )
+                raise KeycloakRequestError(resp.status_code, resp.text, operation="token")
             payload = resp.json()
             self._token = payload["access_token"]
             ttl = float(payload.get("expires_in", 60))
-            self._token_expires_at = time.monotonic() + max(
-                0.0, ttl - _TOKEN_REFRESH_SLACK_SECONDS
-            )
+            self._token_expires_at = time.monotonic() + max(0.0, ttl - _TOKEN_REFRESH_SLACK_SECONDS)
             return self._token  # type: ignore[return-value]
 
     async def _request(
@@ -280,9 +268,7 @@ class HttpxKeycloakAdminClient:
             params=params,
         )
         if resp.status_code not in expected:
-            raise KeycloakRequestError(
-                resp.status_code, resp.text, operation=operation
-            )
+            raise KeycloakRequestError(resp.status_code, resp.text, operation=operation)
         return resp
 
     # ---- public API --------------------------------------------------------
@@ -364,9 +350,7 @@ class HttpxKeycloakAdminClient:
                 # accounts — fall back to a username search.
                 user_id_opt = await self._find_user_id_by_email(email)
                 if user_id_opt is None:
-                    raise KeycloakRequestError(
-                        201, "no Location header", operation="create_user"
-                    )
+                    raise KeycloakRequestError(201, "no Location header", operation="create_user")
                 user_id = user_id_opt
             else:
                 user_id = location.rsplit("/", 1)[-1]
@@ -397,9 +381,7 @@ class HttpxKeycloakAdminClient:
                 error=str(exc),
             )
 
-        self._log.info(
-            "keycloak_invite_user", email=email, user_id=user_id, group_id=group_id
-        )
+        self._log.info("keycloak_invite_user", email=email, user_id=user_id, group_id=group_id)
         return user_id
 
     async def add_existing_user_to_group(
@@ -558,9 +540,7 @@ class HttpxKeycloakAdminClient:
             )
         return user_id
 
-    async def set_platform_role(
-        self, *, keycloak_user_id: str, role: str
-    ) -> None:
+    async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None:
         """Set the `platform_role` user attribute. Idempotent — if
         the attribute already has this value, no observable change."""
         await self._request(
@@ -773,5 +753,3 @@ def _split_full_name(full_name: str | None) -> tuple[str, str]:
     if len(parts) == 1:
         return parts[0], ""
     return parts[0], parts[1]
-
-

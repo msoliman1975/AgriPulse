@@ -53,9 +53,10 @@ class RecommendationsRepository:
         evaluator has nothing to run.
         """
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT t.id   AS tree_id,
                            t.code AS tree_code,
                            t.name_en, t.name_ar,
@@ -72,19 +73,26 @@ class RecommendationsRepository:
                       AND v.published_at IS NOT NULL
                     ORDER BY t.code
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return tuple(dict(r) for r in rows)
 
     async def get_tree_by_code(self, tree_code: str) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                select(DecisionTree).where(
-                    DecisionTree.code == tree_code, DecisionTree.deleted_at.is_(None)
+            (
+                await self._public.execute(
+                    select(DecisionTree).where(
+                        DecisionTree.code == tree_code, DecisionTree.deleted_at.is_(None)
+                    )
                 )
             )
-        ).scalars().one_or_none()
+            .scalars()
+            .one_or_none()
+        )
         if row is None:
             return None
         return {
@@ -102,10 +110,14 @@ class RecommendationsRepository:
 
     async def get_version(self, version_id: UUID) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                select(DecisionTreeVersion).where(DecisionTreeVersion.id == version_id)
+            (
+                await self._public.execute(
+                    select(DecisionTreeVersion).where(DecisionTreeVersion.id == version_id)
+                )
             )
-        ).scalars().one_or_none()
+            .scalars()
+            .one_or_none()
+        )
         if row is None:
             return None
         return {
@@ -123,9 +135,10 @@ class RecommendationsRepository:
         """Every non-deleted tree + the version number of its current
         published version (if any). Drives the editor's tree list."""
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT t.id, t.code, t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
                            t.crop_id, t.applicable_regions, t.is_active,
@@ -136,18 +149,22 @@ class RecommendationsRepository:
                     WHERE t.deleted_at IS NULL
                     ORDER BY t.code
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return tuple(dict(r) for r in rows)
 
     async def list_versions_for_tree(self, *, tree_id: UUID) -> tuple[dict[str, Any], ...]:
         """All versions for one tree, newest first. Includes raw YAML +
         compiled JSON so the editor can offer diff-between-versions."""
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT id, tree_id, version, tree_yaml, tree_compiled,
                            compiled_hash, published_at, notes,
                            created_at, updated_at
@@ -155,29 +172,34 @@ class RecommendationsRepository:
                     WHERE tree_id = :tid
                     ORDER BY version DESC
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tree_id},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tree_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return tuple(dict(r) for r in rows)
 
-    async def get_version_by_number(
-        self, *, tree_id: UUID, version: int
-    ) -> dict[str, Any] | None:
+    async def get_version_by_number(self, *, tree_id: UUID, version: int) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT id, tree_id, version, tree_yaml, tree_compiled,
                            compiled_hash, published_at, notes,
                            created_at, updated_at
                     FROM public.decision_tree_versions
                     WHERE tree_id = :tid AND version = :v
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tree_id, "v": version},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tree_id, "v": version},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row is not None else None
 
     async def get_latest_version_number(self, *, tree_id: UUID) -> int:
@@ -352,9 +374,7 @@ class RecommendationsRepository:
             return None
         row = (
             await self._public.execute(
-                text(
-                    "SELECT id FROM public.crops WHERE code = :c AND deleted_at IS NULL"
-                ),
+                text("SELECT id FROM public.crops WHERE code = :c AND deleted_at IS NULL"),
                 {"c": crop_code},
             )
         ).first()
@@ -443,9 +463,10 @@ class RecommendationsRepository:
 
     async def get_recommendation(self, *, recommendation_id: UUID) -> dict[str, Any] | None:
         row = (
-            await self._tenant.execute(
-                text(
-                    """
+            (
+                await self._tenant.execute(
+                    text(
+                        """
                     SELECT id, block_id, farm_id, tree_id, tree_code, tree_version,
                            block_crop_id, action_type, severity, parameters,
                            confidence, tree_path, text_en, text_ar,
@@ -456,10 +477,13 @@ class RecommendationsRepository:
                     FROM recommendations
                     WHERE id = :id AND deleted_at IS NULL
                     """
-                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
-                {"id": recommendation_id},
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": recommendation_id},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row is not None else None
 
     async def list_recommendations(
@@ -627,8 +651,7 @@ class RecommendationsRepository:
         row = (
             await self._tenant.execute(
                 text(
-                    "SELECT farm_id FROM blocks WHERE id = :block_id "
-                    "AND deleted_at IS NULL"
+                    "SELECT farm_id FROM blocks WHERE id = :block_id " "AND deleted_at IS NULL"
                 ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                 {"block_id": block_id},
             )

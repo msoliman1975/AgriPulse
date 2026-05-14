@@ -32,6 +32,7 @@ from sqlalchemy import text
 from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.audit import get_audit_service
+from app.modules.integrations_health.error_codes import classify_error as _classify_error
 from app.modules.weather.derivations import (
     HourlyRow,
     aggregate_one_day,
@@ -97,10 +98,10 @@ def reset_provider_factory() -> None:
 # --- Helpers ---------------------------------------------------------------
 
 
-# Local alias kept for backward compatibility with existing call sites.
-# Classifier body moved to integrations_health.error_codes so imagery can
-# share the same vocabulary — see PR-IH8.
-from app.modules.integrations_health.error_codes import classify_error as _classify_error
+# `_classify_error` is imported at the top alongside other module imports;
+# the alias is retained for backward compatibility with existing call sites.
+# Classifier body lives in integrations_health.error_codes so imagery shares
+# the same vocabulary - see PR-IH8.
 
 
 async def _set_tenant_context(session: Any, tenant_schema: str) -> None:

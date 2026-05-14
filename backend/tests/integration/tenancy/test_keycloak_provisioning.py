@@ -118,9 +118,7 @@ async def test_retry_provisioning_succeeds_after_failure(
     assert created.status == "pending_provision"
 
     # Retry: by now `fail_on` has been consumed, so subsequent calls work.
-    snapshot = await service.retry_provisioning(
-        created.tenant_id, actor_user_id=uuid4()
-    )
+    snapshot = await service.retry_provisioning(created.tenant_id, actor_user_id=uuid4())
     assert snapshot.status == "active"
     assert snapshot.keycloak_group_id is not None
     assert snapshot.pending_owner_email is None
@@ -161,9 +159,9 @@ async def test_retry_provisioning_without_pending_owner_raises(
     from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
     await admin_session.execute(
-        text(
-            "UPDATE public.tenants SET status='pending_provision' WHERE id = :tid"
-        ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+        text("UPDATE public.tenants SET status='pending_provision' WHERE id = :tid").bindparams(
+            bindparam("tid", type_=PG_UUID(as_uuid=True))
+        ),
         {"tid": created.tenant_id},
     )
 

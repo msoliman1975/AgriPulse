@@ -1,19 +1,19 @@
 <svg width="3200" height="800" viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
-  
+
   <!-- Icon circle -->
   <circle cx="100" cy="95" r="82" fill="#0F6E56" opacity="0.1"/>
   <circle cx="100" cy="95" r="82" fill="none" stroke="#1D9E75" stroke-width="2.5"/>
 
   <!-- Full mango leaf -->
-  <path d="M100 20 
-           Q120 40 130 62 
-           Q140 84 138 104 
-           Q135 124 125 140 
-           Q115 152 100 160 
-           Q85 152 75 140 
-           Q65 124 62 104 
-           Q60 84 70 62 
-           Q80 40 100 20Z" 
+  <path d="M100 20
+           Q120 40 130 62
+           Q140 84 138 104
+           Q135 124 125 140
+           Q115 152 100 160
+           Q85 152 75 140
+           Q65 124 62 104
+           Q60 84 70 62
+           Q80 40 100 20Z"
         fill="#1D9E75" stroke="#04342C" stroke-width="1.8"/>
 
   <!-- Midrib -->

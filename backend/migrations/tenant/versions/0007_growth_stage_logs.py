@@ -125,7 +125,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_growth_stage_logs_block_crop", table_name="growth_stage_logs")
-    op.drop_index(
-        "ix_growth_stage_logs_block_transition_desc", table_name="growth_stage_logs"
-    )
+    op.drop_index("ix_growth_stage_logs_block_transition_desc", table_name="growth_stage_logs")
     op.drop_table("growth_stage_logs")

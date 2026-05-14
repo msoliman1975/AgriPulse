@@ -21,7 +21,6 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 _LATEST_PROBE_CTE = """
 WITH latest AS (
     SELECT DISTINCT ON (provider_kind, provider_code)
@@ -47,10 +46,11 @@ class ProviderHealthService:
     async def list_platform_providers(self) -> list[dict[str, Any]]:
         """Every active provider in the public catalogs + latest probe."""
         rows = (
-            await self._pub.execute(
-                text(
-                    _LATEST_PROBE_CTE
-                    + """
+            (
+                await self._pub.execute(
+                    text(
+                        _LATEST_PROBE_CTE
+                        + """
                     SELECT 'weather'::text AS provider_kind,
                            wp.code AS provider_code,
                            latest.status AS last_status,
@@ -87,23 +87,25 @@ class ProviderHealthService:
 
                     ORDER BY provider_kind, provider_code
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
-    async def list_tenant_providers(
-        self, *, tenant_schema: str
-    ) -> list[dict[str, Any]]:
+    async def list_tenant_providers(self, *, tenant_schema: str) -> list[dict[str, Any]]:
         """Only providers this tenant uses. tenant_schema is set on the session."""
         # Resolve the subset first — public table, but joins look at the
         # tenant's subscription tables which require search_path set.
         # The caller is responsible for that (capability dep sets it).
         rows = (
-            await self._pub.execute(
-                text(
-                    _LATEST_PROBE_CTE
-                    + """
+            (
+                await self._pub.execute(
+                    text(
+                        _LATEST_PROBE_CTE
+                        + """
                     SELECT 'weather'::text AS provider_kind,
                            wp.code AS provider_code,
                            latest.status AS last_status,
@@ -156,9 +158,12 @@ class ProviderHealthService:
 
                     ORDER BY provider_kind, provider_code
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         # tenant_schema accepted to be explicit about the contract; the
         # actual search_path is set by the caller's auth middleware.
         _ = tenant_schema
@@ -207,9 +212,7 @@ class ProviderHealthService:
                 schema = sanitize_tenant_schema(t.schema_name)
             except ValueError:
                 continue
-            await self._pub.execute(
-                text(f"SET LOCAL search_path TO {schema}, public")
-            )
+            await self._pub.execute(text(f"SET LOCAL search_path TO {schema}, public"))
             try:
                 if provider_kind == "weather":
                     rows = (
@@ -249,8 +252,8 @@ class ProviderHealthService:
                             {"p": provider_code, "h": hours},
                         )
                     ).all()
-            except Exception:  # noqa: BLE001
-                # Tenant mid-migration / missing column — skip, don't fail
+            except Exception:  # noqa: S112 - intentional skip across tenants mid-migration
+                # Tenant mid-migration / missing column - skip, don't fail
                 # the whole rollup. Mirrors health_rollup.py behavior.
                 continue
             finally:
@@ -261,18 +264,17 @@ class ProviderHealthService:
 
         return [
             {"error_code": code, "count": count}
-            for code, count in sorted(
-                merged.items(), key=lambda kv: kv[1], reverse=True
-            )
+            for code, count in sorted(merged.items(), key=lambda kv: kv[1], reverse=True)
         ]
 
     async def list_recent_probes(
         self, *, provider_kind: str, provider_code: str, limit: int = 200
     ) -> list[dict[str, Any]]:
         rows = (
-            await self._pub.execute(
-                text(
-                    """
+            (
+                await self._pub.execute(
+                    text(
+                        """
                     SELECT probe_at, status, latency_ms, error_message
                     FROM public.provider_probe_results
                     WHERE provider_kind = :kind
@@ -280,12 +282,15 @@ class ProviderHealthService:
                     ORDER BY probe_at DESC
                     LIMIT :limit
                     """
-                ),
-                {
-                    "kind": provider_kind,
-                    "code": provider_code,
-                    "limit": max(1, min(limit, 1000)),
-                },
+                    ),
+                    {
+                        "kind": provider_kind,
+                        "code": provider_code,
+                        "limit": max(1, min(limit, 1000)),
+                    },
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]

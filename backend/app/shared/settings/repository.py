@@ -23,33 +23,41 @@ class SettingsRepository:
 
     async def list_defaults(self) -> list[dict[str, Any]]:
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, value_schema, description, category,
                            updated_at, updated_by
                     FROM public.platform_defaults
                     ORDER BY category, key
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     async def get_default(self, *, key: str) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, value_schema, description, category,
                            updated_at, updated_by
                     FROM public.platform_defaults
                     WHERE key = :key
                     """
-                ),
-                {"key": key},
+                    ),
+                    {"key": key},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row is not None else None
 
     async def update_default_value(
@@ -80,35 +88,41 @@ class SettingsRepository:
 
     async def list_tenant_overrides(self, *, tenant_id: UUID) -> list[dict[str, Any]]:
         rows = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, updated_at, updated_by
                     FROM public.tenant_settings_overrides
                     WHERE tenant_id = :tid
                     ORDER BY key
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tenant_id},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tenant_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
-    async def get_tenant_override(
-        self, *, tenant_id: UUID, key: str
-    ) -> dict[str, Any] | None:
+    async def get_tenant_override(self, *, tenant_id: UUID, key: str) -> dict[str, Any] | None:
         row = (
-            await self._public.execute(
-                text(
-                    """
+            (
+                await self._public.execute(
+                    text(
+                        """
                     SELECT key, value, updated_at, updated_by
                     FROM public.tenant_settings_overrides
                     WHERE tenant_id = :tid AND key = :key
                     """
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tenant_id, "key": key},
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tenant_id, "key": key},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row is not None else None
 
     async def upsert_tenant_override(
@@ -138,9 +152,7 @@ class SettingsRepository:
             {"tid": tenant_id, "key": key, "value": value_json, "actor": actor_user_id},
         )
 
-    async def delete_tenant_override(
-        self, *, tenant_id: UUID, key: str
-    ) -> bool:
+    async def delete_tenant_override(self, *, tenant_id: UUID, key: str) -> bool:
         result = await self._public.execute(
             text(
                 """

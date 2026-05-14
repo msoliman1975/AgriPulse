@@ -131,9 +131,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("acknowledged_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "acknowledged_by", postgresql.UUID(as_uuid=True), nullable=True
-        ),
+        sa.Column("acknowledged_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("resolved_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("snoozed_until", sa.DateTime(timezone=True), nullable=True),

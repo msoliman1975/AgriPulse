@@ -166,9 +166,7 @@ def upgrade() -> None:
         "ix_signal_assignments_farm_active",
         "signal_assignments",
         ["farm_id"],
-        postgresql_where=sa.text(
-            "farm_id IS NOT NULL AND is_active = TRUE AND deleted_at IS NULL"
-        ),
+        postgresql_where=sa.text("farm_id IS NOT NULL AND is_active = TRUE AND deleted_at IS NULL"),
     )
 
     # --- signal_observations (hypertable) ------------------------------
@@ -183,9 +181,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("uuid_generate_v7()"),
         ),
-        sa.Column(
-            "signal_definition_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("signal_definition_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("block_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("farm_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("value_numeric", sa.Numeric(14, 4), nullable=True),
@@ -261,23 +257,15 @@ def downgrade() -> None:
     op.drop_index("ix_signal_observations_block_time", table_name="signal_observations")
     op.drop_index("ix_signal_observations_definition_time", table_name="signal_observations")
     op.drop_index("ix_signal_observations_farm_time", table_name="signal_observations")
-    op.execute(
-        "SELECT remove_compression_policy('signal_observations', if_exists => TRUE)"
-    )
-    op.drop_constraint(
-        "ck_signal_observations_value_present", "signal_observations", type_="check"
-    )
+    op.execute("SELECT remove_compression_policy('signal_observations', if_exists => TRUE)")
+    op.drop_constraint("ck_signal_observations_value_present", "signal_observations", type_="check")
     op.drop_table("signal_observations")
 
     op.drop_index("ix_signal_assignments_farm_active", table_name="signal_assignments")
     op.drop_index("ix_signal_assignments_block_active", table_name="signal_assignments")
-    op.drop_index(
-        "ix_signal_assignments_definition_active", table_name="signal_assignments"
-    )
+    op.drop_index("ix_signal_assignments_definition_active", table_name="signal_assignments")
     op.drop_table("signal_assignments")
 
     op.drop_index("uq_signal_definitions_code_active", table_name="signal_definitions")
-    op.drop_constraint(
-        "ck_signal_definitions_value_kind", "signal_definitions", type_="check"
-    )
+    op.drop_constraint("ck_signal_definitions_value_kind", "signal_definitions", type_="check")
     op.drop_table("signal_definitions")

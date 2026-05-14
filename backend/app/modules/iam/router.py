@@ -57,9 +57,7 @@ def _ensure_tenant(context: RequestContext) -> str:
     return schema
 
 
-async def _resolve_tenant_id(
-    *, schema: str, session: AsyncSession
-) -> UUID:
+async def _resolve_tenant_id(*, schema: str, session: AsyncSession) -> UUID:
     row = (
         await session.execute(
             text("SELECT id FROM public.tenants WHERE schema_name = :s"),

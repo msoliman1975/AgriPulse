@@ -254,7 +254,7 @@ async def list_observations(
 @router.get(
     "/blocks/{block_id}/weather/derived",
     response_model=list[DerivedDailyRead],
-    summary="Daily derived weather signals (GDD, ETâ‚€, rolling rainfall).",
+    summary="Daily derived weather signals (GDD, ET0, rolling rainfall).",
 )
 async def list_derived_daily(
     block_id: UUID,

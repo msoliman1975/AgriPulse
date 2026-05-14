@@ -5,7 +5,7 @@ localhost:1025/8025. The test:
 
   1. Clears MailHog's inbox via its HTTP API.
   2. Fires an alert through the engine, which triggers the
-     notifications subscriber â†’ SMTP send.
+     notifications subscriber -> SMTP send.
   3. Polls MailHog's inbox until the message arrives, then asserts the
      subject/recipient match the rendered template.
 """

@@ -10,13 +10,13 @@ via the auth middleware.
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # Columns are listed explicitly so adding view columns can't accidentally
 # break the API contract — we'd see the schema mismatch immediately.
@@ -48,32 +48,40 @@ class IntegrationsHealthService:
 
     async def list_farms(self) -> list[dict[str, Any]]:
         rows = (
-            await self._tenant.execute(
-                text(
-                    f"""
+            (
+                await self._tenant.execute(
+                    text(
+                        f"""
                     SELECT {_FARM_COLUMNS}
                     FROM v_farm_integration_health
                     ORDER BY farm_name
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     async def list_blocks(self, *, farm_id: UUID) -> list[dict[str, Any]]:
         rows = (
-            await self._tenant.execute(
-                text(
-                    f"""
+            (
+                await self._tenant.execute(
+                    text(
+                        f"""
                     SELECT {_BLOCK_COLUMNS}
                     FROM v_block_integration_health
                     WHERE farm_id = :fid
                     ORDER BY block_name
                     """
-                ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
-                {"fid": farm_id},
+                    ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+                    {"fid": farm_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     # ---- Drill-down (PR-IH3) -----------------------------------------
@@ -95,19 +103,23 @@ class IntegrationsHealthService:
             clauses.append("kind = :kind")
             params["kind"] = kind
         rows = (
-            await self._tenant.execute(
-                text(
-                    f"""
+            (
+                await self._tenant.execute(
+                    text(
+                        f"""
                     SELECT {_ATTEMPT_COLUMNS}
                     FROM v_integration_recent_attempts
                     WHERE {' AND '.join(clauses)}
                     ORDER BY started_at DESC
                     LIMIT :limit
                     """
-                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
-                params,
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    params,
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     # ---- Queue (PR-IH4) ----------------------------------------------
@@ -138,9 +150,10 @@ class IntegrationsHealthService:
         # --- Weather --------------------------------------------------
         if wants_weather and (state is None or state == "overdue"):
             r = (
-                await self._tenant.execute(
-                    text(
-                        """
+                (
+                    await self._tenant.execute(
+                        text(
+                            """
                         SELECT ws.id AS subscription_id,
                                ws.block_id,
                                b.farm_id,
@@ -158,10 +171,13 @@ class IntegrationsHealthService:
                                                       :default_cadence)))
                         ORDER BY ws.last_successful_ingest_at NULLS FIRST
                         """
-                    ),
-                    {"default_cadence": default_weather_cadence_hours},
+                        ),
+                        {"default_cadence": default_weather_cadence_hours},
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
             for x in r:
                 d = dict(x)
                 d.update({"kind": "weather", "state": "overdue", "attempt_id": None})
@@ -169,9 +185,10 @@ class IntegrationsHealthService:
 
         if wants_weather and (state is None or state in ("running", "stuck")):
             r = (
-                await self._tenant.execute(
-                    text(
-                        """
+                (
+                    await self._tenant.execute(
+                        text(
+                            """
                         SELECT wa.id AS attempt_id,
                                wa.subscription_id,
                                wa.block_id,
@@ -182,20 +199,20 @@ class IntegrationsHealthService:
                         WHERE wa.status = 'running'
                         ORDER BY wa.started_at ASC
                         """
+                        )
                     )
                 )
-            ).mappings().all()
-            stuck_cutoff_sql = (
-                "EXTRACT(EPOCH FROM (now() - wa.started_at)) / 60 >= :stuck_minutes"
+                .mappings()
+                .all()
             )
+            stuck_cutoff_sql = "EXTRACT(EPOCH FROM (now() - wa.started_at)) / 60 >= :stuck_minutes"
             for x in r:
                 d = dict(x)
                 # Determine state per row in Python — re-running the query
                 # twice for stuck vs not-stuck is wasteful.
                 from datetime import datetime as _dt
-                from datetime import timezone as _tz
 
-                age_min = (_dt.now(_tz.utc) - d["since"]).total_seconds() / 60
+                age_min = (_dt.now(UTC) - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "weather", "state": row_state})
@@ -205,9 +222,10 @@ class IntegrationsHealthService:
         # --- Imagery --------------------------------------------------
         if wants_imagery and (state is None or state == "overdue"):
             r = (
-                await self._tenant.execute(
-                    text(
-                        """
+                (
+                    await self._tenant.execute(
+                        text(
+                            """
                         SELECT ias.id AS subscription_id,
                                ias.block_id,
                                b.farm_id,
@@ -226,10 +244,13 @@ class IntegrationsHealthService:
                                                       :default_cadence)))
                         ORDER BY ias.last_successful_ingest_at NULLS FIRST
                         """
-                    ),
-                    {"default_cadence": default_imagery_cadence_hours},
+                        ),
+                        {"default_cadence": default_imagery_cadence_hours},
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
             for x in r:
                 d = dict(x)
                 d.update({"kind": "imagery", "state": "overdue", "attempt_id": None})
@@ -237,9 +258,10 @@ class IntegrationsHealthService:
 
         if wants_imagery and (state is None or state in ("running", "stuck")):
             r = (
-                await self._tenant.execute(
-                    text(
-                        """
+                (
+                    await self._tenant.execute(
+                        text(
+                            """
                         SELECT ij.id AS attempt_id,
                                ij.subscription_id,
                                ij.block_id,
@@ -253,15 +275,17 @@ class IntegrationsHealthService:
                           AND b.deleted_at IS NULL
                         ORDER BY COALESCE(ij.started_at, ij.requested_at) ASC
                         """
+                        )
                     )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
             for x in r:
                 d = dict(x)
                 from datetime import datetime as _dt
-                from datetime import timezone as _tz
 
-                age_min = (_dt.now(_tz.utc) - d["since"]).total_seconds() / 60
+                age_min = (_dt.now(UTC) - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "imagery", "state": row_state})

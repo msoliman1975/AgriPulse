@@ -38,11 +38,7 @@ class SignalsRepository:
         clauses = [SignalDefinition.deleted_at.is_(None)]
         if not include_inactive:
             clauses.append(SignalDefinition.is_active.is_(True))
-        stmt = (
-            select(SignalDefinition)
-            .where(*clauses)
-            .order_by(SignalDefinition.code.asc())
-        )
+        stmt = select(SignalDefinition).where(*clauses).order_by(SignalDefinition.code.asc())
         rows = (await self._session.execute(stmt)).scalars().all()
         return tuple(_definition_to_dict(r) for r in rows)
 
@@ -57,8 +53,10 @@ class SignalsRepository:
         else:
             raise ValueError("must provide definition_id or code")
         row = (
-            await self._session.execute(select(SignalDefinition).where(*clauses))
-        ).scalars().one_or_none()
+            (await self._session.execute(select(SignalDefinition).where(*clauses)))
+            .scalars()
+            .one_or_none()
+        )
         return _definition_to_dict(row) if row is not None else None
 
     async def insert_definition(
@@ -152,7 +150,7 @@ class SignalsRepository:
         sets.extend(["updated_at = now()", "updated_by = :actor"])
         await self._session.execute(
             text(
-                f"UPDATE signal_definitions SET {', '.join(sets)} "  # noqa: S608
+                f"UPDATE signal_definitions SET {', '.join(sets)} "
                 "WHERE id = :id AND deleted_at IS NULL"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -180,9 +178,7 @@ class SignalsRepository:
 
     # ---- Assignments --------------------------------------------------
 
-    async def list_assignments(
-        self, *, definition_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_assignments(self, *, definition_id: UUID) -> tuple[dict[str, Any], ...]:
         stmt = (
             select(SignalAssignment)
             .where(
@@ -231,10 +227,14 @@ class SignalsRepository:
         )
         await self._session.flush()
         row = (
-            await self._session.execute(
-                select(SignalAssignment).where(SignalAssignment.id == assignment_id)
+            (
+                await self._session.execute(
+                    select(SignalAssignment).where(SignalAssignment.id == assignment_id)
+                )
             )
-        ).scalars().one()
+            .scalars()
+            .one()
+        )
         return _assignment_to_dict(row)
 
     async def soft_delete_assignment(
@@ -369,9 +369,10 @@ class SignalsRepository:
         callers can look up by stable identifier.
         """
         rows = (
-            await self._session.execute(
-                text(
-                    """
+            (
+                await self._session.execute(
+                    text(
+                        """
                     WITH applicable AS (
                         SELECT DISTINCT d.id, d.code
                         FROM signal_definitions d
@@ -402,13 +403,16 @@ class SignalsRepository:
                     FROM applicable a
                     LEFT JOIN latest l ON l.signal_definition_id = a.id
                     """
-                ).bindparams(
-                    bindparam("block_id", type_=PG_UUID(as_uuid=True)),
-                    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-                ),
-                {"block_id": block_id, "farm_id": farm_id},
+                    ).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"block_id": block_id, "farm_id": farm_id},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {
             row["code"]: {
                 "time": row["time"],

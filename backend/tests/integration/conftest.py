@@ -93,7 +93,7 @@ def _wire_settings(
 
     # Construct the publisher-side Celery app so `@shared_task.delay(...)`
     # resolves to the configured broker. Without this, `current_app`
-    # is Celery's implicit default with no broker â†’ connection refused.
+    # is Celery's implicit default with no broker -> connection refused.
     from workers.celery_factory import build_publisher
 
     build_publisher()

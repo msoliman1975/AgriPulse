@@ -61,9 +61,7 @@ async def _make_tenant(
     return result.tenant_id, result.schema_name
 
 
-def _users_service(
-    admin_session: AsyncSession, fake: FakeKeycloakClient
-) -> TenantUsersService:
+def _users_service(admin_session: AsyncSession, fake: FakeKeycloakClient) -> TenantUsersService:
     return TenantUsersService(public_session=admin_session, keycloak=fake)
 
 
@@ -187,7 +185,8 @@ async def test_invite_existing_global_user_attaches_to_new_tenant(
     # DB: same user_id appears in both tenants' membership lists.
     a_rows = await svc.list_users(tenant_id=tenant_a)
     b_rows = await svc.list_users(tenant_id=tenant_b)
-    assert len(a_rows) == 1 and len(b_rows) == 1
+    assert len(a_rows) == 1
+    assert len(b_rows) == 1
     assert a_rows[0]["id"] == b_rows[0]["id"]
     assert a_rows[0]["tenant_roles"] == ["TenantOwner"]
     assert b_rows[0]["tenant_roles"] == ["TenantAdmin"]

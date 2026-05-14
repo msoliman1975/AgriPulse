@@ -195,8 +195,7 @@ class FarmReactivationRequest(BaseModel):
     restore_blocks: bool = Field(
         default=False,
         description=(
-            "When true, every block currently inactive under this farm is "
-            "also reactivated."
+            "When true, every block currently inactive under this farm is " "also reactivated."
         ),
     )
 

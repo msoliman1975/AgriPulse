@@ -84,9 +84,7 @@ class FakeKeycloakClient:
             if user.email == email:
                 self.groups[group_id].member_ids.append(user.id)
                 user.realm_roles = tuple(set(user.realm_roles).union(roles))
-                user.actions_emailed = tuple(
-                    set(user.actions_emailed).union({"UPDATE_PASSWORD"})
-                )
+                user.actions_emailed = tuple(set(user.actions_emailed).union({"UPDATE_PASSWORD"}))
                 if tenant_id is not None and roles:
                     user.tenant_id = str(tenant_id)
                     user.tenant_role = roles[0]
@@ -196,9 +194,7 @@ class FakeKeycloakClient:
         )
         return uid
 
-    async def set_platform_role(
-        self, *, keycloak_user_id: str, role: str
-    ) -> None:
+    async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None:
         self._maybe_fail("set_platform_role")
         user = self.users.get(keycloak_user_id)
         if user is not None:

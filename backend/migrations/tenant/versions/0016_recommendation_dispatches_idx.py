@@ -31,9 +31,7 @@ def upgrade() -> None:
         "notification_dispatches",
         ["recommendation_id", "channel", "recipient_user_id"],
         unique=True,
-        postgresql_where=sa.text(
-            "status IN ('pending', 'sent') AND recommendation_id IS NOT NULL"
-        ),
+        postgresql_where=sa.text("status IN ('pending', 'sent') AND recommendation_id IS NOT NULL"),
     )
 
 

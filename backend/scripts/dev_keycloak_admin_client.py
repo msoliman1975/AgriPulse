@@ -23,7 +23,6 @@ roles; for dev, realm-admin is the path of least friction.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from typing import Any
 
@@ -90,9 +89,7 @@ def _create_admin_client(http: httpx.Client, token: str) -> str:
     return location.rsplit("/", 1)[-1]
 
 
-def _client_secret(
-    http: httpx.Client, token: str, client_uuid: str, *, rotate: bool
-) -> str:
+def _client_secret(http: httpx.Client, token: str, client_uuid: str, *, rotate: bool) -> str:
     if rotate:
         resp = http.post(
             f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/clients/{client_uuid}"
@@ -109,9 +106,7 @@ def _client_secret(
     return str(resp.json()["value"])
 
 
-def _service_account_user(
-    http: httpx.Client, token: str, client_uuid: str
-) -> dict[str, Any]:
+def _service_account_user(http: httpx.Client, token: str, client_uuid: str) -> dict[str, Any]:
     resp = http.get(
         f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/clients/{client_uuid}"
         "/service-account-user",
@@ -213,7 +208,7 @@ def main() -> None:
     print("\n" + "=" * 70)
     print("Set these in backend/.env (or your shell) and restart the backend:")
     print("=" * 70)
-    print(f"KEYCLOAK_PROVISIONING_ENABLED=true")
+    print("KEYCLOAK_PROVISIONING_ENABLED=true")
     print(f"KEYCLOAK_BASE_URL={KEYCLOAK_BASE_URL}")
     print(f"KEYCLOAK_REALM={KEYCLOAK_REALM}")
     print(f"KEYCLOAK_ADMIN_CLIENT_ID={CLIENT_ID}")
@@ -223,9 +218,9 @@ def main() -> None:
         "\nThe TenantOwner role must also exist in the realm. If "
         "invite_user logs 'keycloak_role_missing', create the role:\n"
         f"  curl -X POST {KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/roles \\\n"
-        "       -H \"Authorization: Bearer $TOKEN\" \\\n"
+        '       -H "Authorization: Bearer $TOKEN" \\\n'
         "       -H 'Content-Type: application/json' \\\n"
-        "       -d '{\"name\":\"TenantOwner\"}'"
+        '       -d \'{"name":"TenantOwner"}\''
     )
 
 
@@ -235,7 +230,7 @@ if __name__ == "__main__":
     except httpx.HTTPStatusError as exc:
         body = exc.response.text[:400] if exc.response is not None else ""
         print(f"\nKeycloak request failed: {exc} body={body}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc
     except Exception as exc:
         print(f"\nfailed: {exc}", file=sys.stderr)
         raise

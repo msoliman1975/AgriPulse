@@ -14,15 +14,15 @@ on-demand aggregation.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
-from uuid import UUID
 
 from app.core.logging import get_logger
 from app.modules.integrations_health.providers_service import ProviderHealthService
@@ -55,9 +55,7 @@ class TenantHealthRow(BaseModel):
 
 @router.get("/health", response_model=list[TenantHealthRow])
 async def cross_tenant_health(
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
@@ -85,9 +83,7 @@ async def cross_tenant_health(
             continue
 
         # Switch into the tenant schema and aggregate the view.
-        await public_session.execute(
-            text(f"SET LOCAL search_path TO {schema}, public")
-        )
+        await public_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
         try:
             row = (
                 await public_session.execute(
@@ -110,7 +106,7 @@ async def cross_tenant_health(
                     )
                 )
             ).first()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Tenant schema might be mid-migration / missing the view.
             log.warning(
                 "cross_tenant_health_query_failed",
@@ -147,9 +143,7 @@ async def cross_tenant_health(
 
 @router.get("/health/providers", response_model=list[ProviderHealthRow])
 async def list_platform_providers(
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     """Every active provider catalog row + its latest probe."""
@@ -163,9 +157,7 @@ async def list_recent_probes(
     provider_kind: str,
     provider_code: str,
     limit: int = 200,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     """Probe history for one provider — drill-down from the Providers tab."""
@@ -184,9 +176,7 @@ async def provider_error_histogram(
     provider_kind: str,
     provider_code: str,
     hours: int = 24,
-    context: RequestContext = Depends(
-        requires_capability("platform.manage_tenants")
-    ),
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     """Cross-tenant failure-cause histogram for one provider (PR-IH10)."""

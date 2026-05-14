@@ -263,9 +263,7 @@ class AlertsRepository:
             return await self.get_tenant_rule(rule_code=code)
         # Bump version on every save so an audit trail of changes
         # exists even though we don't snapshot prior states.
-        sets.extend(
-            ["version = version + 1", "updated_at = now()", "updated_by = :actor"]
-        )
+        sets.extend(["version = version + 1", "updated_at = now()", "updated_by = :actor"])
         await self._tenant.execute(
             text(
                 f"UPDATE tenant_rules SET {', '.join(sets)} "  # noqa: S608
@@ -275,9 +273,7 @@ class AlertsRepository:
         )
         return await self.get_tenant_rule(rule_code=code)
 
-    async def soft_delete_tenant_rule(
-        self, *, code: str, actor_user_id: UUID | None
-    ) -> bool:
+    async def soft_delete_tenant_rule(self, *, code: str, actor_user_id: UUID | None) -> bool:
         result = await self._tenant.execute(
             text(
                 "UPDATE tenant_rules "

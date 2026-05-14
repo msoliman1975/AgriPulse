@@ -46,9 +46,7 @@ class SignalDefinition(Base, TimestampedMixin):
     attachment_allowed: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("FALSE")
     )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("TRUE")
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
 class SignalAssignment(Base, TimestampedMixin):
@@ -69,9 +67,7 @@ class SignalAssignment(Base, TimestampedMixin):
     )
     farm_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     block_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("TRUE")
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
 class SignalObservation(Base):

@@ -34,7 +34,6 @@ from app.shared.settings import (
     SettingsResolver,
 )
 
-
 WEATHER_KEYS = (
     "weather.default_provider_code",
     "weather.default_cadence_hours",
@@ -81,9 +80,7 @@ class IntegrationsService:
 
     # ---- Tenant tier reads -------------------------------------------------
 
-    async def list_tenant(
-        self, *, tenant_id: UUID, keys: tuple[str, ...]
-    ) -> list[dict[str, Any]]:
+    async def list_tenant(self, *, tenant_id: UUID, keys: tuple[str, ...]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for key in keys:
             resolved = await self._resolver.get_tenant(tenant_id, key)
@@ -127,9 +124,7 @@ class IntegrationsService:
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]:
-        deleted = await self._repo.delete_tenant_override(
-            tenant_id=tenant_id, key=key
-        )
+        deleted = await self._repo.delete_tenant_override(tenant_id=tenant_id, key=key)
         if deleted:
             await self._audit.record(
                 tenant_schema=tenant_schema,
@@ -145,14 +140,10 @@ class IntegrationsService:
 
     # ---- Farm-weather tier ------------------------------------------------
 
-    async def get_farm_weather(
-        self, *, tenant_id: UUID, farm_id: UUID
-    ) -> list[dict[str, Any]]:
+    async def get_farm_weather(self, *, tenant_id: UUID, farm_id: UUID) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for key in WEATHER_KEYS:
-            resolved = await self._resolver.get_farm_weather(
-                tenant_id, farm_id, key
-            )
+            resolved = await self._resolver.get_farm_weather(tenant_id, farm_id, key)
             out.append(_resolved_dict(key, resolved))
         return out
 
@@ -172,9 +163,9 @@ class IntegrationsService:
         # reading the audit log.
         if provider_code is None and cadence_hours is None:
             await self._tenant.execute(
-                text(
-                    "DELETE FROM farm_weather_overrides WHERE farm_id = :fid"
-                ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+                text("DELETE FROM farm_weather_overrides WHERE farm_id = :fid").bindparams(
+                    bindparam("fid", type_=PG_UUID(as_uuid=True))
+                ),
                 {"fid": farm_id},
             )
         else:
@@ -218,9 +209,7 @@ class IntegrationsService:
 
     # ---- Farm-imagery tier ------------------------------------------------
 
-    async def get_farm_imagery(
-        self, *, tenant_id: UUID, farm_id: UUID
-    ) -> list[dict[str, Any]]:
+    async def get_farm_imagery(self, *, tenant_id: UUID, farm_id: UUID) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for key in IMAGERY_KEYS:
             resolved = await self._resolver.get_landunit_imagery(
@@ -244,9 +233,9 @@ class IntegrationsService:
     ) -> list[dict[str, Any]]:
         if product_code is None and cloud_cover_threshold_pct is None:
             await self._tenant.execute(
-                text(
-                    "DELETE FROM farm_imagery_overrides WHERE farm_id = :fid"
-                ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+                text("DELETE FROM farm_imagery_overrides WHERE farm_id = :fid").bindparams(
+                    bindparam("fid", type_=PG_UUID(as_uuid=True))
+                ),
                 {"fid": farm_id},
             )
         else:
@@ -351,9 +340,7 @@ class IntegrationsService:
             affected = result.rowcount or 0
         elif mode == "lock":
             # Write the Farm's resolved cloud-cover into every block.
-            farm_settings = await self.get_farm_imagery(
-                tenant_id=UUID(int=0), farm_id=farm_id
-            )
+            farm_settings = await self.get_farm_imagery(tenant_id=UUID(int=0), farm_id=farm_id)
             farm_cloud = next(
                 (
                     s["value"]
@@ -399,6 +386,4 @@ def get_integrations_service(
     public_session: AsyncSession,
     tenant_session: AsyncSession,
 ) -> IntegrationsService:
-    return IntegrationsService(
-        public_session=public_session, tenant_session=tenant_session
-    )
+    return IntegrationsService(public_session=public_session, tenant_session=tenant_session)

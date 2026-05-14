@@ -35,14 +35,10 @@ class Settings(BaseSettings):
 
     # --- Database ---------------------------------------------------------
     database_url: PostgresDsn = Field(
-        default=PostgresDsn(
-            "postgresql+asyncpg://agripulse:agripulse@localhost:5432/agripulse"
-        )
+        default=PostgresDsn("postgresql+asyncpg://agripulse:agripulse@localhost:5432/agripulse")
     )
     database_sync_url: PostgresDsn = Field(
-        default=PostgresDsn(
-            "postgresql+psycopg://agripulse:agripulse@localhost:5432/agripulse"
-        )
+        default=PostgresDsn("postgresql+psycopg://agripulse:agripulse@localhost:5432/agripulse")
     )
     database_pool_size: int = 5
     database_max_overflow: int = 10

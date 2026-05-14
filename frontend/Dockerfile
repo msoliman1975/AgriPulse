@@ -21,6 +21,9 @@ COPY vite.config.ts vitest.config.ts tailwind.config.ts postcss.config.js ./
 COPY index.html ./
 COPY src ./src
 COPY public ./public
+# Root tsconfig.json references ./e2e as a TS project; tsc -b fails without
+# it. e2e only lives in the discarded builder stage, so no runtime cost.
+COPY e2e ./e2e
 
 RUN pnpm build
 

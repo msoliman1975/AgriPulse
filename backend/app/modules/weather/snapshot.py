@@ -62,9 +62,7 @@ async def load_snapshot(
         now = datetime.now(UTC)
     provider_code = await _pick_provider(session, farm_id=farm_id)
 
-    latest = await _load_latest_observation(
-        session, farm_id=farm_id, provider_code=provider_code
-    )
+    latest = await _load_latest_observation(session, farm_id=farm_id, provider_code=provider_code)
     forecast_24h = await _load_forecast_window(
         session, farm_id=farm_id, provider_code=provider_code, now=now, hours=24
     )
@@ -129,9 +127,10 @@ async def _load_latest_observation(
     if provider_code is None:
         return None
     row = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT time, air_temp_c, humidity_pct, precipitation_mm,
                        wind_speed_m_s, wind_direction_deg, pressure_hpa,
                        solar_radiation_w_m2, cloud_cover_pct, et0_mm
@@ -141,17 +140,16 @@ async def _load_latest_observation(
                 ORDER BY time DESC
                 LIMIT 1
                 """
-            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-            {"farm_id": farm_id, "provider_code": provider_code},
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id, "provider_code": provider_code},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     if row is None:
         return None
-    out: dict[str, Decimal | None] = {
-        k: _to_decimal(v)
-        for k, v in row.items()
-        if k != "time"
-    }
+    out: dict[str, Decimal | None] = {k: _to_decimal(v) for k, v in row.items() if k != "time"}
     return out
 
 
@@ -173,9 +171,10 @@ async def _load_forecast_window(
         return None
     until = now + timedelta(hours=hours)
     row = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT
                     SUM(precipitation_mm)              AS precipitation_mm_total,
                     MAX(precipitation_probability_pct) AS precipitation_probability_pct_max,
@@ -198,21 +197,22 @@ async def _load_forecast_window(
                     ORDER BY time ASC, forecast_issued_at DESC
                 ) latest_per_hour
                 """
-            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-            {
-                "farm_id": farm_id,
-                "provider_code": provider_code,
-                "since": now,
-                "until": until,
-            },
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {
+                    "farm_id": farm_id,
+                    "provider_code": provider_code,
+                    "since": now,
+                    "until": until,
+                },
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     if row is None or (row.get("hours_observed") or 0) == 0:
         return None
     out: dict[str, Decimal | None] = {
-        k: _to_decimal(v)
-        for k, v in row.items()
-        if k != "hours_observed"
+        k: _to_decimal(v) for k, v in row.items() if k != "hours_observed"
     }
     # Surface coverage so a downstream consumer can tell partial windows
     # apart from full ones (e.g. "we only have 8h of forecast, not 24").
@@ -227,9 +227,10 @@ async def _load_derived_for_date(
     on_date: date,
 ) -> dict[str, Decimal | None] | None:
     row = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 SELECT gdd_base10, gdd_base15, gdd_cumulative_base10_season,
                        et0_mm_daily, precip_mm_daily,
                        precip_mm_7d, precip_mm_30d,
@@ -237,10 +238,13 @@ async def _load_derived_for_date(
                 FROM weather_derived_daily
                 WHERE farm_id = :farm_id AND date = :on_date
                 """
-            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-            {"farm_id": farm_id, "on_date": on_date},
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id, "on_date": on_date},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     if row is None:
         return None
     return {k: _to_decimal(v) for k, v in row.items()}

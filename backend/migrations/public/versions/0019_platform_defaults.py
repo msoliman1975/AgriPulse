@@ -80,9 +80,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.PrimaryKeyConstraint(
-            "tenant_id", "key", name="pk_tenant_settings_overrides"
-        ),
+        sa.PrimaryKeyConstraint("tenant_id", "key", name="pk_tenant_settings_overrides"),
         sa.ForeignKeyConstraint(
             ["tenant_id"],
             ["tenants.id"],

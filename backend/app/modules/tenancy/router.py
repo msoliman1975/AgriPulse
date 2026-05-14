@@ -28,9 +28,9 @@ from app.modules.tenancy.schemas import (
     UpdateTenantRequest,
 )
 from app.modules.tenancy.service import (
+    PURGE_GRACE_DAYS,
     InvalidStatusTransitionError,
     NothingToProvisionError,
-    PURGE_GRACE_DAYS,
     PurgeNotEligibleError,
     SlugAlreadyExistsError,
     SlugConfirmationMismatchError,
@@ -144,9 +144,7 @@ async def retry_provisioning(
     service: TenantService = Depends(_service),
 ) -> TenantDetailResponse:
     try:
-        snapshot = await service.retry_provisioning(
-            tenant_id, actor_user_id=context.user_id
-        )
+        snapshot = await service.retry_provisioning(tenant_id, actor_user_id=context.user_id)
     except TenantNotFoundError as exc:
         raise _not_found(tenant_id) from exc
     except InvalidStatusTransitionError as exc:
@@ -207,10 +205,7 @@ async def list_tenants(
     context: RequestContext = _ManageTenants,
     service: TenantService = Depends(_service),
     status_filter: Annotated[
-        Literal[
-            "active", "suspended", "pending_delete", "pending_provision", "archived"
-        ]
-        | None,
+        Literal["active", "suspended", "pending_delete", "pending_provision", "archived"] | None,
         Query(alias="status"),
     ] = None,
     search: Annotated[str | None, Query(max_length=64)] = None,
@@ -276,9 +271,7 @@ async def get_tenant_sidecar(
             else None
         ),
         subscription=(
-            TenantSubscriptionResponse.model_validate(
-                sidecar.subscription, from_attributes=True
-            )
+            TenantSubscriptionResponse.model_validate(sidecar.subscription, from_attributes=True)
             if sidecar.subscription is not None
             else None
         ),
@@ -354,9 +347,7 @@ async def reactivate_tenant(
     service: TenantService = Depends(_service),
 ) -> TenantDetailResponse:
     try:
-        snapshot = await service.reactivate_tenant(
-            tenant_id, actor_user_id=context.user_id
-        )
+        snapshot = await service.reactivate_tenant(tenant_id, actor_user_id=context.user_id)
     except TenantNotFoundError as exc:
         raise _not_found(tenant_id) from exc
     except InvalidStatusTransitionError as exc:
@@ -397,9 +388,7 @@ async def cancel_delete(
     service: TenantService = Depends(_service),
 ) -> TenantDetailResponse:
     try:
-        snapshot = await service.cancel_delete(
-            tenant_id, actor_user_id=context.user_id
-        )
+        snapshot = await service.cancel_delete(tenant_id, actor_user_id=context.user_id)
     except TenantNotFoundError as exc:
         raise _not_found(tenant_id) from exc
     except InvalidStatusTransitionError as exc:

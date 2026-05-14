@@ -27,9 +27,7 @@ def test_parse_signals_value_ref_default_key() -> None:
 
 
 def test_parse_signals_value_ref_explicit_key() -> None:
-    ref = parse_value_ref(
-        {"source": "signals", "code": "irrigation_event", "key": "value_event"}
-    )
+    ref = parse_value_ref({"source": "signals", "code": "irrigation_event", "key": "value_event"})
     assert isinstance(ref, SignalsValueRef)
     assert ref.key == "value_event"
 
@@ -41,9 +39,7 @@ def test_parse_signals_rejects_missing_code() -> None:
 
 def test_parse_signals_rejects_unknown_key() -> None:
     with pytest.raises(ConditionParseError, match="key"):
-        parse_value_ref(
-            {"source": "signals", "code": "soil_moisture", "key": "value_bogus"}
-        )
+        parse_value_ref({"source": "signals", "code": "soil_moisture", "key": "value_bogus"})
 
 
 def test_predicate_matches_numeric_signal_value() -> None:
@@ -54,13 +50,7 @@ def test_predicate_matches_numeric_signal_value() -> None:
     }
     matched, snapshot = evaluate(
         tree,
-        _ctx(
-            {
-                "soil_moisture": SignalEntry(
-                    time=datetime.now(UTC), value_numeric=Decimal("22.5")
-                )
-            }
-        ),
+        _ctx({"soil_moisture": SignalEntry(time=datetime.now(UTC), value_numeric=Decimal("22.5"))}),
     )
     assert matched is True
     assert snapshot["values"]["signals.soil_moisture.value_numeric"] == "22.5"
@@ -87,12 +77,6 @@ def test_predicate_misses_when_wrong_value_kind_read() -> None:
     }
     matched, _ = evaluate(
         tree,
-        _ctx(
-            {
-                "pest_status": SignalEntry(
-                    time=datetime.now(UTC), value_categorical="absent"
-                )
-            }
-        ),
+        _ctx({"pest_status": SignalEntry(time=datetime.now(UTC), value_categorical="absent")}),
     )
     assert matched is False

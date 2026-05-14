@@ -1,7 +1,7 @@
 """Notifications ORM models.
 
-  * ``NotificationTemplate`` lives in `public` (platform-curated catalog).
-  * ``NotificationDispatch`` and ``InAppInboxItem`` live per-tenant.
+* ``NotificationTemplate`` lives in `public` (platform-curated catalog).
+* ``NotificationDispatch`` and ``InAppInboxItem`` live per-tenant.
 """
 
 from __future__ import annotations

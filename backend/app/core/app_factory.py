@@ -30,7 +30,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("app_startup", env=get_settings().app_env)
     # Sync decision-tree YAML files into the public catalog so a fresh
     # process picks up authored changes without a manual migration. The
-    # loader is idempotent â€” same content on disk â†’ no DB writes.
+    # loader is idempotent - same content on disk -> no DB writes.
     try:
         from app.modules.recommendations.loader import sync_from_disk
         from app.shared.db.session import AsyncSessionLocal
@@ -38,7 +38,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         factory = AsyncSessionLocal()
         async with factory() as session:
             await sync_from_disk(session)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("decision_trees_sync_failed", error=str(exc))
     # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent â€”
     # only fires when zero active PlatformAdmins exist.
@@ -48,7 +48,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
         await bootstrap_platform_admin(get_settings())
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("platform_admin_bootstrap_lifespan_error", error=str(exc))
     try:
         yield
@@ -120,10 +120,20 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
-    from app.modules.integrations.router import router as integrations_router
-    from app.modules.platform_admins.router import (
-        router as platform_admins_router,
+    from app.modules.imagery.subscribers import (
+        register_subscribers as register_imagery_subscribers,
     )
+    from app.modules.indices.router import router as indices_router
+    from app.modules.integrations.router import router as integrations_router
+    from app.modules.integrations_health.router import (
+        router as integrations_health_router,
+    )
+    from app.modules.irrigation.router import router as irrigation_router
+    from app.modules.notifications.router import router as notifications_router
+    from app.modules.notifications.subscribers import (
+        register_subscribers as register_notifications_subscribers,
+    )
+    from app.modules.plans.router import router as plans_router
     from app.modules.platform_admins.admins_router import (
         router as platform_admins_self_router,
     )
@@ -133,25 +143,15 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.platform_admins.health_tenant_drill import (
         router as platform_health_tenant_drill_router,
     )
+    from app.modules.platform_admins.router import (
+        router as platform_admins_router,
+    )
     from app.modules.platform_admins.tenant_integrations import (
         router as platform_tenant_integrations_router,
     )
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
-    from app.modules.integrations_health.router import (
-        router as integrations_health_router,
-    )
-    from app.modules.imagery.subscribers import (
-        register_subscribers as register_imagery_subscribers,
-    )
-    from app.modules.indices.router import router as indices_router
-    from app.modules.irrigation.router import router as irrigation_router
-    from app.modules.notifications.router import router as notifications_router
-    from app.modules.notifications.subscribers import (
-        register_subscribers as register_notifications_subscribers,
-    )
-    from app.modules.plans.router import router as plans_router
     from app.modules.recommendations.router import router as recommendations_router
     from app.modules.signals.router import router as signals_router
     from app.modules.tenancy.router import router as tenancy_router

@@ -14,6 +14,7 @@ def _today_utc() -> date:
     """Match the server's UTC ``current_date`` semantics."""
     return datetime.now(UTC).date()
 
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import bindparam, text
@@ -60,9 +61,7 @@ def _square_polygon(lon: float, lat: float, side: float = 0.001) -> dict[str, ob
     }
 
 
-async def _create_user_in_tenant(
-    session: AsyncSession, *, tenant_id: UUID, user_id: UUID
-) -> None:
+async def _create_user_in_tenant(session: AsyncSession, *, tenant_id: UUID, user_id: UUID) -> None:
     await session.execute(
         text(
             "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
@@ -182,9 +181,7 @@ async def test_inactivate_preview_then_inactivate(
     # Seed an open alert + a future-pending irrigation schedule + a
     # future-scheduled plan activity + an active imagery subscription
     # for this block so the cascade has things to count.
-    await admin_session.execute(
-        text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
-    )
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
     await admin_session.execute(
         text(
             """
@@ -232,9 +229,7 @@ async def test_inactivate_preview_then_inactivate(
         assert get_resp.status_code == 404
 
     # Verify the alert was actually resolved + irrigation skipped.
-    await admin_session.execute(
-        text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
-    )
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
     alert_status = (
         await admin_session.execute(
             text("SELECT status FROM alerts WHERE block_id = :bid").bindparams(
@@ -246,9 +241,9 @@ async def test_inactivate_preview_then_inactivate(
     assert alert_status == "resolved"
     irrig_status = (
         await admin_session.execute(
-            text(
-                "SELECT status FROM irrigation_schedules WHERE block_id = :bid"
-            ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+            text("SELECT status FROM irrigation_schedules WHERE block_id = :bid").bindparams(
+                bindparam("bid", type_=PG_UUID(as_uuid=True))
+            ),
             {"bid": UUID(block_id)},
         )
     ).scalar_one()
@@ -275,9 +270,7 @@ async def test_reactivate_block_clears_active_window(
         block_id = block.json()["id"]
 
         # Inactivate, then reactivate.
-        inact = await c.post(
-            f"/api/v1/blocks/{block_id}/inactivate", json={"reason": "test"}
-        )
+        inact = await c.post(f"/api/v1/blocks/{block_id}/inactivate", json={"reason": "test"})
         assert inact.status_code == 200, inact.text
         react = await c.post(f"/api/v1/blocks/{block_id}/reactivate")
         assert react.status_code == 200, react.text
@@ -321,9 +314,7 @@ async def test_inactivate_farm_cascades_to_blocks(
         assert preview.json()["block_count"] == 3
 
         # Inactivate the farm
-        result = await c.post(
-            f"/api/v1/farms/{farm_id}/inactivate", json={"reason": "wind-down"}
-        )
+        result = await c.post(f"/api/v1/farms/{farm_id}/inactivate", json={"reason": "wind-down"})
         assert result.status_code == 200, result.text
         assert result.json()["block_count"] == 3
 
@@ -333,14 +324,12 @@ async def test_inactivate_farm_cascades_to_blocks(
             assert get_resp.status_code == 404
 
     # Verify in the database that every block carries active_to + deleted_at.
-    await admin_session.execute(
-        text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
-    )
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
     rows = (
         await admin_session.execute(
-            text(
-                "SELECT id, active_to, deleted_at FROM blocks WHERE farm_id = :fid"
-            ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+            text("SELECT id, active_to, deleted_at FROM blocks WHERE farm_id = :fid").bindparams(
+                bindparam("fid", type_=PG_UUID(as_uuid=True))
+            ),
             {"fid": UUID(farm_id)},
         )
     ).all()
@@ -373,9 +362,7 @@ async def test_reactivate_farm_with_restore_blocks(
         )
         await c.post(f"/api/v1/farms/{farm_id}/inactivate", json={"reason": "x"})
 
-        react = await c.post(
-            f"/api/v1/farms/{farm_id}/reactivate", json={"restore_blocks": True}
-        )
+        react = await c.post(f"/api/v1/farms/{farm_id}/reactivate", json={"restore_blocks": True})
         assert react.status_code == 200, react.text
         assert react.json()["restored_block_count"] == 2
 
@@ -406,18 +393,14 @@ async def test_list_blocks_excludes_inactive_by_default(
             f"/api/v1/farms/{farm_id}/blocks",
             json={"code": "Z", "boundary": _square_polygon(31.203, 30.001)},
         )
-        await c.post(
-            f"/api/v1/blocks/{zap.json()['id']}/inactivate", json={"reason": "test"}
-        )
+        await c.post(f"/api/v1/blocks/{zap.json()['id']}/inactivate", json={"reason": "test"})
 
         default = await c.get(f"/api/v1/farms/{farm_id}/blocks")
         assert default.status_code == 200
         codes = sorted(b["code"] for b in default.json()["items"])
         assert codes == ["K"]
 
-        inclusive = await c.get(
-            f"/api/v1/farms/{farm_id}/blocks?include_inactive=true"
-        )
+        inclusive = await c.get(f"/api/v1/farms/{farm_id}/blocks?include_inactive=true")
         assert inclusive.status_code == 200
         codes_all = sorted(b["code"] for b in inclusive.json()["items"])
         assert codes_all == ["K", "Z"]

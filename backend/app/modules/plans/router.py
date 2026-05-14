@@ -271,9 +271,9 @@ async def update_activity(
     metadata_changes = payload.model_dump(exclude={"state"}, exclude_unset=True)
 
     # State transitions and metadata edits gate on different capabilities:
-    #   * `complete` / `skip` (and `start` as the same flow's prelude) â†’
+    #   * `complete` / `skip` (and `start` as the same flow's prelude) ->
     #     `plan_activity.complete` so field operators can drive them.
-    #   * Editing scheduled_date / product / dosage / notes â†’ `plan.manage`
+    #   * Editing scheduled_date / product / dosage / notes -> `plan.manage`
     #     so only managers reshuffle the schedule.
     if state_action is not None and not has_capability(
         context, "plan_activity.complete", farm_id=plan["farm_id"]

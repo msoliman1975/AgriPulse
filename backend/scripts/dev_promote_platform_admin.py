@@ -52,7 +52,7 @@ def main() -> None:
         user = kc_get_user(client, token, args.user_email)
         if user is None:
             print(
-                f"  user not found in realm â€” run dev_bootstrap.py first",
+                "  user not found in realm â€” run dev_bootstrap.py first",
                 file=sys.stderr,
             )
             raise SystemExit(2)
@@ -77,7 +77,7 @@ def main() -> None:
             )
             print(f"  added protocol mapper platform_role-mapper on {CLIENT_ID}")
         else:
-            print(f"  protocol mapper platform_role-mapper already present (skipped)")
+            print("  protocol mapper platform_role-mapper already present (skipped)")
 
     print(
         "\nDone. Sign out fully (user menu -> sign out), then sign back in. "

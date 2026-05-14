@@ -46,9 +46,9 @@ from app.modules.integrations.schemas import (
 from app.modules.integrations.service import (
     EMAIL_KEYS,
     IMAGERY_KEYS,
-    IntegrationsService,
     WEATHER_KEYS,
     WEBHOOK_KEYS,
+    IntegrationsService,
     get_integrations_service,
 )
 from app.shared.auth.context import RequestContext
@@ -62,9 +62,7 @@ def _service(
     tenant_session: AsyncSession = Depends(get_db_session),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> IntegrationsService:
-    return get_integrations_service(
-        public_session=public_session, tenant_session=tenant_session
-    )
+    return get_integrations_service(public_session=public_session, tenant_session=tenant_session)
 
 
 def _ensure_tenant(context: RequestContext) -> tuple[UUID, str]:
@@ -153,9 +151,7 @@ async def get_weather_farm(
     service: IntegrationsService = Depends(_service),
 ) -> dict[str, Any]:
     tid, _ = _ensure_tenant(context)
-    return {
-        "settings": await service.get_farm_weather(tenant_id=tid, farm_id=farm_id)
-    }
+    return {"settings": await service.get_farm_weather(tenant_id=tid, farm_id=farm_id)}
 
 
 @router.put(

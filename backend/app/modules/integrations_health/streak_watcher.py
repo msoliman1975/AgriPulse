@@ -95,7 +95,7 @@ async def _check_failure_streaks_async() -> dict[str, Any]:
             continue
         try:
             sent = await _check_one_tenant(t.id, schema, threshold)
-        except Exception:  # noqa: BLE001
+        except Exception:
             _log.exception("streak_watcher_tenant_failed", tenant_id=str(t.id))
             continue
         total_alerts += sent
@@ -103,9 +103,7 @@ async def _check_failure_streaks_async() -> dict[str, Any]:
     return {"tenants_scanned": len(tenants), "alerts_sent": total_alerts}
 
 
-async def _check_one_tenant(
-    tenant_id: UUID, schema: str, threshold: int
-) -> int:
+async def _check_one_tenant(tenant_id: UUID, schema: str, threshold: int) -> int:
     """Returns the number of fresh alerts inserted for this tenant."""
     factory = AsyncSessionLocal()
     sent = 0
@@ -119,9 +117,10 @@ async def _check_one_tenant(
         # row's `started_at` is the streak's tail. Read it directly
         # from the view so the streak-counting logic stays in one place.
         candidates = (
-            await session.execute(
-                text(
-                    """
+            (
+                await session.execute(
+                    text(
+                        """
                     WITH ranked AS (
                         SELECT
                             attempt_id,
@@ -143,10 +142,13 @@ async def _check_one_tenant(
                     WHERE rn = 1
                       AND failed_streak_position >= :threshold
                     """
-                ),
-                {"threshold": threshold},
+                    ),
+                    {"threshold": threshold},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         if not candidates:
             return 0
@@ -207,8 +209,8 @@ async def _check_one_tenant(
                         "len": c["failed_streak_position"],
                     },
                 )
-            except Exception:  # noqa: BLE001  IntegrityError on uq_… constraint
-                # Already alerted on this streak — skip silently.
+            except Exception:  # noqa: S112 - de-dup INSERT raced; already alerted on this streak
+                # Already alerted on this streak - skip silently.
                 continue
 
             # Step 5: fan out to TenantOwner / TenantAdmin inboxes.
@@ -268,10 +270,7 @@ async def _fanout_inbox(
     if not rows:
         return
 
-    title = (
-        f"{kind.title()} integration failing"
-        + (f" ({provider_code})" if provider_code else "")
-    )
+    title = f"{kind.title()} integration failing" + (f" ({provider_code})" if provider_code else "")
     body = (
         f"{streak_length} consecutive failures on this block "
         f"since {streak_started_at:%Y-%m-%d %H:%M UTC}."

@@ -44,9 +44,10 @@ async def load_snapshot(
     on missing data).
     """
     rows = (
-        await session.execute(
-            text(
-                """
+        (
+            await session.execute(
+                text(
+                    """
                 WITH applicable AS (
                     SELECT DISTINCT d.id, d.code
                     FROM signal_definitions d
@@ -77,13 +78,16 @@ async def load_snapshot(
                 FROM applicable a
                 JOIN latest l ON l.signal_definition_id = a.id
                 """
-            ).bindparams(
-                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
-                bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-            ),
-            {"block_id": block_id, "farm_id": farm_id},
+                ).bindparams(
+                    bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"block_id": block_id, "farm_id": farm_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return {
         row["code"]: SignalEntry(
             time=row["time"],

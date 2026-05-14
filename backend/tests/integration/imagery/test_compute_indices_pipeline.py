@@ -334,7 +334,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     monkeypatch.setattr(compute_indices, "delay", lambda *a, **k: None)
 
     try:
-        # discover â†’ acquire â†’ register â†’ compute (all async cores).
+        # discover -> acquire -> register -> compute (all async cores).
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
         job_id_raw = (
             await admin_session.execute(

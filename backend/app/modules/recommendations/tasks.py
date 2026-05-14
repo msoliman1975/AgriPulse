@@ -67,9 +67,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         async with factory() as public_session:
-            svc = get_recommendations_service(
-                tenant_session=session, public_session=public_session
-            )
+            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             blocks = await svc._repo.list_active_block_ids()
 
     blocks_processed = 0

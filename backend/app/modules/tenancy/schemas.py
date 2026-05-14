@@ -82,9 +82,7 @@ class RequestDeleteRequest(BaseModel):
 class PurgeTenantRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    slug_confirmation: str = Field(
-        description="Type the tenant slug to confirm — typo-protection."
-    )
+    slug_confirmation: str = Field(description="Type the tenant slug to confirm — typo-protection.")
     force: bool = Field(
         default=False,
         description="Bypass the grace-window check. PlatformAdmin may not always have this.",
