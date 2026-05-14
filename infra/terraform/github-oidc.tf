@@ -73,12 +73,10 @@ data "aws_iam_policy_document" "gha_plan_trust" {
 }
 
 data "aws_iam_policy_document" "gha_plan_policy" {
-  statement {
-    sid       = "ReadEverything"
-    effect    = "Allow"
-    actions   = ["*:Get*", "*:List*", "*:Describe*"]
-    resources = ["*"]
-  }
+  # Read-everything is granted via the AWS-managed ReadOnlyAccess policy
+  # attached separately (see aws_iam_role_policy_attachment.gha_plan_readonly
+  # below). IAM rejects wildcards in the service vendor ("*:Get*") so we
+  # cannot express read-everything inline.
 
   statement {
     sid    = "TerraformStateRW"
@@ -119,6 +117,11 @@ resource "aws_iam_role_policy" "gha_plan" {
   name   = "gha-terraform-plan"
   role   = aws_iam_role.gha_plan.id
   policy = data.aws_iam_policy_document.gha_plan_policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "gha_plan_readonly" {
+  role       = aws_iam_role.gha_plan.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 
 # --- Apply role (push to main + environment approval) -------------------

@@ -28,7 +28,7 @@ module "iam_role_api" {
   role_policy_arns = {
     s3_imagery_rw = aws_iam_policy.s3_imagery_rw.arn
     s3_exports_rw = aws_iam_policy.s3_exports_rw.arn
-    secrets_read  = aws_iam_policy.secrets_read.arn
+    secrets_read  = aws_iam_policy.agripulse_secrets_read.arn
   }
 
   tags = local.common_tags
@@ -51,7 +51,7 @@ module "iam_role_workers" {
   role_policy_arns = {
     s3_imagery_rw = aws_iam_policy.s3_imagery_rw.arn
     s3_exports_rw = aws_iam_policy.s3_exports_rw.arn
-    secrets_read  = aws_iam_policy.secrets_read.arn
+    secrets_read  = aws_iam_policy.agripulse_secrets_read.arn
   }
 
   tags = local.common_tags
@@ -93,7 +93,7 @@ module "iam_role_external_secrets" {
   }
 
   role_policy_arns = {
-    secrets_read = aws_iam_policy.secrets_read.arn
+    secrets_read = aws_iam_policy.agripulse_secrets_read.arn
   }
 
   tags = local.common_tags
@@ -204,20 +204,8 @@ resource "aws_iam_policy" "s3_pg_backup_rw" {
   })
 }
 
-resource "aws_iam_policy" "secrets_read" {
-  name        = "agripulse-${var.environment}-secrets-read"
-  description = "Read access to the agripulse/* prefix in AWS Secrets Manager."
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-      ]
-      Resource = [
-        "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:agripulse/*",
-      ]
-    }]
-  })
-}
+# Secrets-read policy moved to secrets-manager.tf as
+# `aws_iam_policy.agripulse_secrets_read`. Both declarations used the same
+# IAM name (`agripulse-<env>-secrets-read`) which AWS rejects with
+# EntityAlreadyExists. Single source of truth lives next to the secret
+# resources it grants access to.

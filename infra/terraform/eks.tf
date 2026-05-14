@@ -30,6 +30,19 @@ module "eks" {
     }
     aws-ebs-csi-driver = {
       most_recent = true
+      # Controller pods must tolerate the system-only taint on the default
+      # node group; without this the addon hangs in CREATING because no
+      # node accepts the controller deployment.
+      configuration_values = jsonencode({
+        controller = {
+          tolerations = [
+            {
+              key      = "CriticalAddonsOnly"
+              operator = "Exists"
+            },
+          ]
+        }
+      })
     }
   }
 
