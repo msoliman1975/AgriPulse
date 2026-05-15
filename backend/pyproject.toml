@@ -9,7 +9,7 @@ authors = [{ name = "AgriPulse" }]
 
 dependencies = [
   # Web framework
-  "fastapi>=0.115,<0.116",
+  "fastapi>=0.115,<0.137",
   "uvicorn[standard]>=0.32,<0.33",
   "pydantic[email]>=2.9,<3",
   "pydantic-settings>=2.6,<3",
@@ -18,7 +18,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.36,<2.1",
   "asyncpg>=0.30,<0.31",
   "psycopg[binary]>=3.2,<3.3",   # used by Alembic in sync mode
-  "alembic>=1.14,<1.15",
+  "alembic>=1.14,<1.19",
   "geoalchemy2>=0.16,<0.17",
 
   # STAC catalog. We bootstrap pgstac as plain SQL via pypgstac (no
@@ -36,8 +36,8 @@ dependencies = [
   "shapely>=2,<3",
 
   # Background work
-  "celery>=5.4,<5.5",
-  "redis>=5.2,<5.3",
+  "celery>=5.4,<5.7",
+  "redis>=5.2,<7.5",
 
   # Auth
   "python-jose[cryptography]>=3.3,<3.4",
@@ -54,7 +54,7 @@ dependencies = [
   "timezonefinder>=6.5,<7",
 
   # Observability
-  "structlog>=24.4,<25",
+  "structlog>=24.4,<26",
   "opentelemetry-api>=1.28,<2",
   "opentelemetry-sdk>=1.28,<2",
   "opentelemetry-exporter-otlp>=1.28,<2",
