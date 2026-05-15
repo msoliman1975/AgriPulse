@@ -116,6 +116,11 @@ postgresCluster:
   # Per-CR databases living in the same Cluster. The primary
   # `agripulse` DB comes from bootstrap.initdb above; anything else
   # goes here so CNPG can reconcile it.
+  # NOTE: Database CRD requires CNPG operator >= v1.25.0; pinned chart
+  # 0.22.1 ships v1.24.1. Keep `declarativeDatabases.enabled: false` until
+  # the operator + cnpg-crds bundle is bumped.
+  declarativeDatabases:
+    enabled: false
   databases:
     - name: keycloak
       owner: keycloak

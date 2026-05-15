@@ -1,7 +1,7 @@
 {{- /*
 CD-13. CNPG `Database` CRs for non-primary databases that live in the
 same Cluster. The primary `agripulse` database is created by the
-Cluster's `bootstrap.initdb` â€” those are bootstrap-only and not
+Cluster's `bootstrap.initdb` — those are bootstrap-only and not
 reconcilable. Anything we want to add later (Keycloak realm DB here)
 goes through this CR so CNPG can drop+recreate without nuking the
 cluster.
@@ -9,8 +9,14 @@ cluster.
 The `keycloak` role referenced as `owner` is reconciled by the Cluster's
 `managed.roles` block in postgres-cluster.yaml; its password is sourced
 from the k8s Secret named in `postgresCluster.managed.roles[*].passwordSecret`.
+
+The Database CRD was introduced in CNPG operator v1.25.0; our pinned
+chart 0.22.1 ships operator v1.24.1 which does NOT include it. Gated
+behind `postgresCluster.declarativeDatabases.enabled` (default false) so
+the Cluster + initdb path works under v1.24.x. Flip to true once the
+chart and vendored cnpg-crds bundle are bumped to ≥v1.25.
 */ -}}
-{{- if and .Values.postgresCluster.enabled .Values.postgresCluster.databases }}
+{{- if and .Values.postgresCluster.enabled .Values.postgresCluster.declarativeDatabases.enabled .Values.postgresCluster.databases }}
 {{- range .Values.postgresCluster.databases }}
 ---
 apiVersion: postgresql.cnpg.io/v1
