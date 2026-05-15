@@ -71,6 +71,19 @@ prometheusOperator:
     - key: CriticalAddonsOnly
       operator: Exists
 
+# node-exporter is a DaemonSet — it needs to land on every node, including
+# the baseline node-group that carries the CriticalAddonsOnly taint. The
+# subchart's default tolerations are missing this key under our pinned
+# kube-prometheus-stack 65.5.1, so we add it explicitly. Subchart key is
+# `prometheus-node-exporter` (matches the upstream subchart name; the
+# top-level `nodeExporter.enabled` flag is separate).
+prometheus-node-exporter:
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+    - effect: NoSchedule
+      operator: Exists
+
 # Components we don't run (kube-state-metrics + node-exporter we keep).
 kubeApiServer:
   enabled: true
