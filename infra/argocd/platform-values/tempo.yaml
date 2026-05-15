@@ -11,5 +11,14 @@ tempo:
     enabled: true
     remoteWriteUrl: http://kube-prometheus-stack-prometheus.observability.svc:9090/api/v1/write
 
+# IRSA binding for the SA tempo uses to write traces to S3. Role lives in
+# infra/terraform/tempo.tf; ARN dev-hardcoded here for parity with karpenter
+# until per-env platform-app overlays are wired up.
+serviceAccount:
+  create: true
+  name: observability-tempo
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/agripulse-dev-tempo
+
 serviceMonitor:
   enabled: true
