@@ -3,7 +3,7 @@
 [Shared preamble — see README.md]
 
 ## Goal
-The strategy doc at `docs/proposals/app-containerization-strategy.md` has already been rewritten by the maintainer to reflect today's decisions (EKS + ArgoCD + CNPG, single AWS account, me-south-1). This PR's job is **not** to write it — it's to audit that doc against the live repo state and surface any drift before it ships.
+The strategy doc at `docs/proposals/app-containerization-strategy.md` has already been rewritten by the maintainer to reflect today's decisions (EKS + ArgoCD + CNPG, single AWS account, eu-south-1). This PR's job is **not** to write it — it's to audit that doc against the live repo state and surface any drift before it ships.
 
 ## Files to change
 - `docs/proposals/app-containerization-strategy.md` — minor corrections only.

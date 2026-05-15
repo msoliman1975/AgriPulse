@@ -1,7 +1,7 @@
 variable "region" {
-  description = "AWS region. ARCHITECTURE.md Â§ 3.2 commits me-south-1 (Bahrain)."
+  description = "AWS region. ARCHITECTURE.md Â§ 3.2 commits eu-south-1 (Milan)."
   type        = string
-  default     = "me-south-1"
+  default     = "eu-south-1"
 }
 
 variable "environment" {

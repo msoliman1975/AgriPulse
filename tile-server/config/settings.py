@@ -28,4 +28,4 @@ DEFAULT_MIN_ZOOM = int(os.getenv("DEFAULT_MIN_ZOOM", "0"))
 # (MinIO) and from the production S3 bucket in EKS. boto3 reads
 # AWS_S3_ENDPOINT_URL from the environment.
 AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL")  # None â†’ AWS default
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "me-south-1")
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "eu-south-1")

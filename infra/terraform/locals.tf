@@ -1,7 +1,7 @@
 locals {
   cluster_name = coalesce(var.cluster_name, "agripulse-${var.environment}")
 
-  # Three AZs; me-south-1 has 1a, 1b, 1c.
+  # Three AZs; eu-south-1 has 1a, 1b, 1c.
   azs = ["${var.region}a", "${var.region}b", "${var.region}c"]
 
   # Public subnets host the NLB; private subnets host EKS nodes and

@@ -16,11 +16,11 @@ sources:
   - ingress
   - service
 
-# ExternalDNS reads region from this env; me-south-1 stays consistent with
+# ExternalDNS reads region from this env; eu-south-1 stays consistent with
 # the Terraform default.
 env:
   - name: AWS_REGION
-    value: me-south-1
+    value: eu-south-1
 
 # IRSA ARN is injected per-env via the overlay (overlays/<env>/values.yaml
 # under `externalDns.serviceAccount.annotations`). Default left empty so a

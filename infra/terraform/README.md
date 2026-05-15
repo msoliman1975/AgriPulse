@@ -37,7 +37,7 @@ gets the values via `-backend-config`:
 terraform init \
   -backend-config="bucket=agripulse-tfstate-<account-id>" \
   -backend-config="key=<env>/terraform.tfstate" \
-  -backend-config="region=me-south-1" \
+  -backend-config="region=eu-south-1" \
   -backend-config="encrypt=true" \
   -backend-config="dynamodb_table=agripulse-tfstate-lock"
 ```

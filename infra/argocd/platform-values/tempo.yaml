@@ -5,8 +5,8 @@ tempo:
       backend: s3
       s3:
         bucket: agripulse-tempo-traces
-        endpoint: s3.me-south-1.amazonaws.com
-        region: me-south-1
+        endpoint: s3.eu-south-1.amazonaws.com
+        region: eu-south-1
   metricsGenerator:
     enabled: true
     remoteWriteUrl: http://kube-prometheus-stack-prometheus.observability.svc:9090/api/v1/write

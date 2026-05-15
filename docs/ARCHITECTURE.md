@@ -45,7 +45,7 @@ A multi-tenant, cloud-native SaaS for commercial agribusinesses in Egypt to moni
 
 ### 3.2 Deployment
 
-- **Cloud:** AWS me-south-1 (Bahrain) for MVP â€” co-located with Sentinel-2 Open Data on S3
+- **Cloud:** AWS eu-south-1 (Milan) for MVP â€” Italian/EU data residency
 - **Orchestration:** Kubernetes (EKS); 3 clusters (`dev`, `staging`, `production`)
 - **Operator-managed Postgres:** CloudNativePG (primary + 1 standby, PITR to S3)
 - **GitOps:** ArgoCD reading from Helm charts in the same repo

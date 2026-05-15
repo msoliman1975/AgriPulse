@@ -110,7 +110,7 @@ Set up the monorepo exactly as described in `ARCHITECTURE.md` Â§ 4. Create emp
 ## Infrastructure (`infra/`)
 
 - **Terraform** (`infra/terraform/`):
-  - VPC with public + private subnets in `me-south-1`.
+  - VPC with public + private subnets in `eu-south-1`.
   - EKS cluster (start with 3 `t3.large` nodes; upsize later).
   - S3 buckets: one for `imagery-raw`, one for `imagery-cogs`, one for `exports`. Versioning enabled. Lifecycle rule placeholders.
   - KMS key for secrets.
