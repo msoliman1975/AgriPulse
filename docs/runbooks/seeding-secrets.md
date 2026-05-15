@@ -6,7 +6,7 @@ in the Terraform state file.
 
 See `infra/terraform/secrets-manager.tf` for the resource list. The IAM
 policy attached to the External Secrets controller only grants
-`GetSecretValue` on `arn:aws:secretsmanager:me-south-1:<account>:secret:agripulse/*`,
+`GetSecretValue` on `arn:aws:secretsmanager:eu-south-1:<account>:secret:agripulse/*`,
 so a typo on a non-matching path will fail with `AccessDenied` rather
 than `NotFound` â€” useful debug signal.
 
@@ -21,19 +21,43 @@ value once:
 ENV=prod   # or dev / staging
 
 aws secretsmanager put-secret-value \
-  --region me-south-1 \
+  --region eu-south-1 \
   --secret-id "agripulse/$ENV/brevo-smtp-password" \
   --secret-string "<paste-actual-password>"
 ```
 
-Repeat for the four other purposes:
+Repeat for the five other purposes:
 
 - `agripulse/$ENV/keycloak-admin-password`
+- `agripulse/$ENV/keycloak-db-password`
+- `agripulse/$ENV/keycloak-smtp` — see "keycloak-smtp JSON shape" below
 - `agripulse/$ENV/sentinel-hub-client-secret`
 - `agripulse/$ENV/jwt-signing-key`
 - `agripulse/$ENV/postgres-superuser-password`
 
-After all five land, ArgoCD will reconcile the ExternalSecret resources
+### keycloak-smtp JSON shape
+
+`keycloak-smtp` is a single JSON document (one secret keeps rotation
+atomic — partial rotations across host/user/password would otherwise
+silently break the realm). The Keycloak realm-import substitutes each
+property into `${env:KC_SMTP_*}` placeholders in
+`infra/helm/keycloak/files/agripulse-realm.json`:
+
+```bash
+aws secretsmanager put-secret-value \
+  --region eu-south-1 \
+  --secret-id "agripulse/$ENV/keycloak-smtp" \
+  --secret-string '{
+    "host": "smtp-relay.brevo.com",
+    "port": "587",
+    "username": "<brevo-smtp-key-id>",
+    "password": "<brevo-smtp-secret>",
+    "from": "noreply@agripulse.cloud",
+    "starttls": "true"
+  }'
+```
+
+After all six land, ArgoCD will reconcile the ExternalSecret resources
 on the next refresh interval (`refreshInterval: 1h` by default â€” bump it
 temporarily during the seed if waiting).
 
@@ -70,7 +94,7 @@ Same `put-secret-value` call with a new value:
 
 ```bash
 aws secretsmanager put-secret-value \
-  --region me-south-1 \
+  --region eu-south-1 \
   --secret-id "agripulse/prod/brevo-smtp-password" \
   --secret-string "<new-password>"
 ```

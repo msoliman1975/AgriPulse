@@ -19,6 +19,13 @@ locals {
     # this via a k8s Secret synced by the keycloak chart's ExternalSecret;
     # Keycloak's externalDatabase block reads the same k8s Secret.
     "keycloak-db-password",
+    # CD-13 follow-up: per-env Brevo SMTP wiring for the Keycloak realm.
+    # The realm-import JSON references KC_SMTP_* env vars; the bitnami
+    # sub-chart's `extraEnvVarsSecret` reads them from the k8s Secret
+    # synced by templates/externalsecret-smtp.yaml. Shape (JSON):
+    # `{"host","port","username","password","from","starttls"}` — see
+    # docs/runbooks/seeding-secrets.md § "keycloak-smtp".
+    "keycloak-smtp",
     "sentinel-hub-client-secret",
     "jwt-signing-key",
     "postgres-superuser-password",

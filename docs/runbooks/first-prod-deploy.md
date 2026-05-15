@@ -32,10 +32,12 @@ If any box stays unchecked, stop. Fix it in staging first.
 
 Production secrets are not in Terraform state â€” they are seeded by hand
 once per environment. Follow `docs/runbooks/seeding-secrets.md` Â§ 1
-with `ENV=prod`. The five values you need before sync:
+with `ENV=prod`. The seven values you need before sync:
 
 - `agripulse/prod/brevo-smtp-password`
 - `agripulse/prod/keycloak-admin-password`
+- `agripulse/prod/keycloak-db-password`
+- `agripulse/prod/keycloak-smtp` (JSON; see seeding-secrets.md keycloak-smtp section)
 - `agripulse/prod/sentinel-hub-client-secret`
 - `agripulse/prod/jwt-signing-key`
 - `agripulse/prod/postgres-superuser-password`
@@ -44,9 +46,10 @@ Verify each is set (not just declared) before continuing:
 
 ```bash
 for s in brevo-smtp-password keycloak-admin-password \
+         keycloak-db-password keycloak-smtp \
          sentinel-hub-client-secret jwt-signing-key \
          postgres-superuser-password; do
-  aws secretsmanager describe-secret --region me-south-1 \
+  aws secretsmanager describe-secret --region eu-south-1 \
     --secret-id "agripulse/prod/$s" \
     --query 'VersionIdsToStages' --output text
 done

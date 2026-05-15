@@ -68,5 +68,16 @@
         }
       ]
     }
-  ]
+  ],
+  "smtpServer": {
+    "host": "${env:KC_SMTP_HOST}",
+    "port": "${env:KC_SMTP_PORT}",
+    "user": "${env:KC_SMTP_USERNAME}",
+    "password": "${env:KC_SMTP_PASSWORD}",
+    "from": "${env:KC_SMTP_FROM}",
+    "fromDisplayName": "AgriPulse",
+    "starttls": "${env:KC_SMTP_STARTTLS}",
+    "auth": "true",
+    "ssl": "false"
+  }
 }

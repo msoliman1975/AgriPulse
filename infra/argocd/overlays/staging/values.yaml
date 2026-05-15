@@ -55,6 +55,16 @@ keycloak:
     hostnameStrict: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-staging
+  # CD-13 follow-up: load the Brevo SMTP env vars from the k8s Secret
+  # synced by templates/externalsecret-smtp.yaml. The realm-import
+  # JSON resolves `${env:KC_SMTP_*}` against these at boot.
+  extraEnvVarsSecret: agripulse-keycloak-smtp
+
+# Enable the SMTP ExternalSecret. See `keycloak.extraEnvVarsSecret`
+# above for how it gets wired into the pod.
+externalSecrets:
+  smtp:
+    enabled: true
 
 # IRSA ARNs filled in by bootstrap (terraform output iam_role_arns).
 externalDns:

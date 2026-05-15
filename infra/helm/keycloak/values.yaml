@@ -23,6 +23,17 @@ externalSecrets:
     enabled: true
   db:
     enabled: true
+  # CD-13 follow-up. Per-env Brevo SMTP for invite/reset/verify emails.
+  # Off in the chart default so a fresh `helm template` doesn't try to
+  # reference a Secret that doesn't exist; staging + prod overlays flip
+  # this on AND set `keycloak.extraEnvVarsSecret: agripulse-keycloak-smtp`
+  # so the bitnami sub-chart loads the synced keys (KC_SMTP_HOST etc.)
+  # into the pod env. The realm-import JSON references them via
+  # `${env:KC_SMTP_*}`, so an empty (chart-default) state imports a
+  # no-op smtpServer and dev (which uses backend/scripts/dev_keycloak_smtp.py
+  # to PATCH the realm post-boot) keeps working unchanged.
+  smtp:
+    enabled: false
 
 keycloak:
   # CD-13: HA topology. `production: true` flips the bitnami chart to the
