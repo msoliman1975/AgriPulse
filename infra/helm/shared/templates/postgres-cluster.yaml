@@ -63,6 +63,12 @@ spec:
     {{- toYaml .Values.postgresCluster.resources | nindent 4 }}
 
   postgresql:
+    {{- with .Values.postgresCluster.postgresql.shared_preload_libraries }}
+    # CNPG rejects shared_preload_libraries under `parameters` (it's a
+    # "fixed" config param). Top-level array is the supported path.
+    shared_preload_libraries:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     parameters:
       {{- range $k, $v := .Values.postgresCluster.postgresql.parameters }}
       {{ $k }}: {{ $v | quote }}

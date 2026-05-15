@@ -129,8 +129,13 @@ postgresCluster:
   # backend/migrations/{public,tenant}/ and apply via the API pod's
   # init container.
   postgresql:
+    # CNPG's webhook flags shared_preload_libraries as a fixed parameter;
+    # render it as a top-level array on spec.postgresql, not under
+    # `parameters`.
+    shared_preload_libraries:
+      - timescaledb
+      - pgaudit
     parameters:
-      shared_preload_libraries: "timescaledb,pgaudit"
       max_connections: "200"
       log_statement: "ddl"
   # Backup target. Buckets + IRSA come from CD-6. `destinationPath` is
