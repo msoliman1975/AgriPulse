@@ -26,15 +26,16 @@ spec:
               elements:
                 # Native YAML booleans (no quotes) so templatePatch below
                 # renders them as proper bool, not string.
+                #
+                # Was originally a 3-env matrix (dev/staging/production) =
+                # 18 Applications, but the single cluster has no real
+                # staging or production destinations and the zombie Apps
+                # were confusing triage. When real staging/production
+                # clusters land, add a destination.server per env (probably
+                # via a third generator) and put those envs back here.
                 - env: dev
                   namespace: agripulse
                   prune: true
-                - env: staging
-                  namespace: agripulse
-                  prune: false
-                - env: production
-                  namespace: agripulse
-                  prune: false
   template:
     metadata:
       name: "{{.chart}}-{{.env}}"
