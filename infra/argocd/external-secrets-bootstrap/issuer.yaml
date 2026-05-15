@@ -1,0 +1,13 @@
+# Self-signed Issuer consumed by the external-secrets chart's webhook
+# Certificate. Chart values set `webhook.certManager.enabled: true` with
+# the default `issuerRef.name: my-issuer`, but the chart does not create
+# the issuer itself. Without this manifest, the webhook pod sits in
+# ContainerCreating forever waiting on the (uncreated) TLS secret, and
+# every ClusterSecretStore/ExternalSecret sync fails admission.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: my-issuer
+  namespace: external-secrets
+spec:
+  selfSigned: {}

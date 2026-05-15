@@ -17,6 +17,14 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
   name: {{ printf "%s-%s" $.Values.postgresCluster.name .name | quote }}
+  annotations:
+    # CNPG's Database webhook validates the parent Cluster exists at
+    # admission time. On a first-time sync the Cluster CR and the Database
+    # CR are applied in the same transaction, so the Database lookup
+    # races against Cluster creation and fails with "Database "" not
+    # found". Sync-wave 1 puts the Database one wave after the Cluster
+    # (wave 0) so the Cluster exists before admission runs.
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     {{- include "agripulse.shared.labels" $ | nindent 4 }}
 spec:

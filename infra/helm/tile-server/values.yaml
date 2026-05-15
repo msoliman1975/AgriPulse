@@ -84,6 +84,9 @@ env:
   DEFAULT_MAX_ZOOM: "22"
   DEFAULT_MIN_ZOOM: "0"
   GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+  # Upstream ghcr.io/developmentseed/titiler image binds gunicorn to $PORT
+  # (default 80). Service + probes target 8000, so pin PORT to match.
+  PORT: "8000"
 
 serviceMonitor:
   enabled: true

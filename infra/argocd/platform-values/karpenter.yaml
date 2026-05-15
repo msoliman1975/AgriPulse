@@ -3,7 +3,12 @@
 # carry the per-env values; this file only holds defaults that apply to
 # every env.
 
-replicas: 2
+# Single replica suffices in dev: the only schedulable spot for Karpenter
+# controllers is the tainted baseline node group (matched by
+# `agripulse.cloud/role: system` below), which is capped at 1× t4g.medium
+# in dev. A second replica sits Pending forever and trips the
+# OutOfSync/Degraded state on the ArgoCD App.
+replicas: 1
 
 # Controller runs on the system baseline managed node group; Karpenter
 # itself can't be auto-scheduled by Karpenter.

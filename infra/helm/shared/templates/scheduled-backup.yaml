@@ -3,6 +3,10 @@ apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: {{ .Values.postgresCluster.name }}-scheduled
+  annotations:
+    # Same reasoning as databases.yaml: ScheduledBackup references a
+    # Cluster and the CNPG webhook validates it on admission. Wave 1.
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:

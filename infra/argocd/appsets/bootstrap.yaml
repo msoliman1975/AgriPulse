@@ -22,7 +22,7 @@ spec:
       # cnpg-crds.yaml is a standalone Application (not an AppSet) that
       # vendors the cloudnative-pg operator's CRDs ahead of the chart;
       # see that file's header for why.
-      include: "{services.yaml,platform.yaml,observability.yaml,cnpg-crds.yaml}"
+      include: "{services.yaml,platform.yaml,observability.yaml,cnpg-crds.yaml,external-secrets-bootstrap.yaml}"
   syncPolicy:
     automated:
       prune: true
