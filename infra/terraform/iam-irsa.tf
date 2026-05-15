@@ -9,6 +9,28 @@
 # Keep app-specific (`api`, `workers`, `tile-server`) bindings in iam.tf so
 # the diff stays readable when we eventually fold those into this file.
 
+# --- EBS CSI driver ------------------------------------------------------
+# IRSA role for the aws-ebs-csi-driver addon's controller ServiceAccount.
+# EKS module v20+ no longer auto-creates this; without it the controller
+# pods can't call EC2 to create/attach volumes and the addon hangs in
+# CREATING until the 20-min Terraform timeout fires.
+module "iam_role_ebs_csi" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.50"
+
+  role_name             = "agripulse-${var.environment}-ebs-csi"
+  attach_ebs_csi_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+    }
+  }
+
+  tags = local.common_tags
+}
+
 # --- ExternalDNS ---------------------------------------------------------
 data "aws_iam_policy_document" "external_dns" {
   statement {

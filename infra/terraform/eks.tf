@@ -30,6 +30,9 @@ module "eks" {
     }
     aws-ebs-csi-driver = {
       most_recent = true
+      # IRSA role gives the controller pods the EC2 perms they need to
+      # create/attach volumes; without it the addon hangs in CREATING.
+      service_account_role_arn = module.iam_role_ebs_csi.iam_role_arn
       # Controller pods must tolerate the system-only taint on the default
       # node group; without this the addon hangs in CREATING because no
       # node accepts the controller deployment.
