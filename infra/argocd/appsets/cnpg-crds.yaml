@@ -1,0 +1,40 @@
+---
+# CNPG CRDs are vendored from the operator release manifest instead of
+# being relied upon to ship via the cloudnative-pg helm chart. Chart 0.22.1
+# (pinned in appsets/platform.yaml) does not include the Pooler CRD under
+# `--include-crds`, which makes the operator crashloop at startup with
+# `no matches for kind "Pooler" in version "postgresql.cnpg.io/v1"`. See
+# infra/argocd/cnpg-crds/crds.yaml header for the regeneration recipe.
+#
+# Sync wave -1 lands the CRDs before the operator Application (default wave
+# 0) so the cnpg-system controllers see every kind they expect on first
+# boot. Prune is intentionally disabled: removing a CNPG CRD cascade-deletes
+# every Cluster/Pooler/Backup in the cluster, so we never want ArgoCD to do
+# that automatically.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-cnpg-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  source:
+    repoURL: https://github.com/msoliman1975/AgriPulse.git
+    targetRevision: HEAD
+    path: infra/argocd/cnpg-crds
+    directory:
+      recurse: false
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
