@@ -92,3 +92,13 @@ celerybeat-schedule.dat
 celerybeat-schedule.dir
 celerybeat-schedule.bak
 celerybeat-schedule
+
+# --- Deployment secrets / local state ---
+# deployment-data.yaml carries real Brevo / Sentinel Hub / JWT / Postgres
+# secrets; the *.example.yaml template stays tracked.
+scripts/deployment-data.yaml
+scripts/deployment-data-backup.yaml
+scripts/.dev-stack-state.json
+# Terraform plan binaries contain rendered variable values, sometimes
+# including sensitive inputs.
+*.tfplan
