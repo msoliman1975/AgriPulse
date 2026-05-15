@@ -8,6 +8,9 @@ metadata:
   name: agripulse-services
   namespace: argocd
 spec:
+  # Required for Go template syntax (`{{.chart}}`, `{{.env}}`) below.
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   generators:
     - matrix:
         generators:
@@ -21,18 +24,17 @@ spec:
                 - chart: keycloak
           - list:
               elements:
+                # Native YAML booleans (no quotes) so templatePatch below
+                # renders them as proper bool, not string.
                 - env: dev
                   namespace: agripulse
-                  autoSync: "true"
-                  prune: "true"
+                  prune: true
                 - env: staging
                   namespace: agripulse
-                  autoSync: "true"
-                  prune: "false"
+                  prune: false
                 - env: production
                   namespace: agripulse
-                  autoSync: "false"
-                  prune: "false"
+                  prune: false
   template:
     metadata:
       name: "{{.chart}}-{{.env}}"
@@ -55,9 +57,15 @@ spec:
             - "../../argocd/overlays/{{.env}}/values.yaml"
       syncPolicy:
         automated:
-          prune: "{{.prune}}"
           selfHeal: true
         syncOptions:
           - ServerSideApply=true
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
+  # Inline template fields are stringly-typed; templatePatch is the only
+  # way to render a real boolean into syncPolicy.automated.prune.
+  templatePatch: |
+    spec:
+      syncPolicy:
+        automated:
+          prune: {{ .prune }}

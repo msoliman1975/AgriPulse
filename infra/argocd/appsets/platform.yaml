@@ -9,6 +9,11 @@ metadata:
   name: agripulse-platform
   namespace: argocd
 spec:
+  # Required for Go template syntax (`{{.name}}`) below; without this the
+  # default fasttemplate renderer leaves placeholders literal and generated
+  # Application names fail RFC 1123 validation.
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   generators:
     - list:
         elements:
