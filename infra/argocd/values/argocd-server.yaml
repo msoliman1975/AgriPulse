@@ -13,6 +13,15 @@ global:
   logging:
     format: json
     level: info
+  # Every ArgoCD pod (including pre-install Helm hook Jobs that install
+  # the CRDs) must tolerate the system-only taint on the default node
+  # group. Without this they sit Pending until the Helm timeout fires.
+  # Karpenter would normally spin up untainted nodes, but Karpenter itself
+  # is installed by ArgoCD downstream, so the bootstrap has to fit on the
+  # single tainted node.
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
 
 configs:
   params:
@@ -39,19 +48,23 @@ configs:
     policy.csv: |
       g, admin, role:admin
 
-# Controllers run two replicas each. ArgoCD shards Applications across
-# controller replicas via the operator-builtin sharding, so 2 gives us
-# headroom + a survive-one-pod-down property.
+# Replica counts intentionally squashed to 1 during bootstrap — the single
+# tainted t4g.medium node can't fit the HA topology. Karpenter (installed
+# downstream via the platform AppSet) will spin up untainted nodes; bump
+# these back to 2 once Karpenter is reconciling and we have headroom.
 controller:
-  replicas: 2
+  replicas: 1
   resources:
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 100m
+      memory: 512Mi
     limits:
-      memory: 2Gi
+      memory: 1Gi
 
 repoServer:
+  # 2 replicas + 1Gi mem — rendering Keycloak (Bitnami chart with many
+  # subcharts) OOM-killed a 256Mi single-replica repo-server during
+  # bootstrap and stalled every Application that needed a manifest.
   replicas: 2
   resources:
     requests:
@@ -66,13 +79,13 @@ applicationSet:
   replicas: 1
 
 server:
-  replicas: 2
+  replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      memory: 512Mi
+      memory: 256Mi
 
   ingress:
     enabled: true
