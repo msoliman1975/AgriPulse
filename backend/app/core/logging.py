@@ -48,9 +48,9 @@ def configure_logging() -> None:
     settings = get_settings()
     log_level = getattr(logging, settings.app_log_level)
 
-    shared_processors: list[structlog.types.Processor] = [
+    # Processors common to both pipelines (no logger-dependent ones).
+    common_processors: list[structlog.types.Processor] = [
         merge_contextvars,
-        filter_by_level,
         add_logger_name,
         add_log_level,
         TimeStamper(fmt="iso", utc=True),
@@ -67,7 +67,9 @@ def configure_logging() -> None:
     ]
 
     structlog.configure(
-        processors=[*shared_processors, JSONRenderer()],
+        # structlog's own pipeline has a real BoundLogger, so filter_by_level
+        # can safely call logger.isEnabledFor.
+        processors=[filter_by_level, *common_processors, JSONRenderer()],
         context_class=dict,
         logger_factory=LoggerFactory(),
         wrapper_class=BoundLogger,
@@ -76,8 +78,17 @@ def configure_logging() -> None:
 
     # Route stdlib logging (uvicorn, sqlalchemy, third-party libs) through
     # the same JSON pipeline.
+    #
+    # filter_by_level is intentionally omitted from foreign_pre_chain:
+    # ProcessorFormatter invokes the chain with logger=None for non-structlog
+    # records, and filter_by_level would crash on None.isEnabledFor. The
+    # underlying stdlib logger has already applied its level filter before
+    # the record reaches this handler, so re-filtering here would also be
+    # redundant. This used to produce ~thousands of tracebacks per minute
+    # when the OTLP exporter bg-thread emitted warnings against an
+    # unreachable Tempo endpoint.
     formatter = ProcessorFormatter(
-        foreign_pre_chain=shared_processors,
+        foreign_pre_chain=common_processors,
         processors=[ProcessorFormatter.remove_processors_meta, JSONRenderer()],
     )
     handler = logging.StreamHandler(stream=sys.stdout)
