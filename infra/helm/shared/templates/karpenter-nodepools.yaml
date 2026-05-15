@@ -24,7 +24,7 @@ spec:
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["spot", "on-demand"]
-        - key: karpenter.k8s.aws/instance-family
+        - key: karpenter.k8s.aws/instance-category
           operator: In
           values: ["t", "m", "c"]
         - key: karpenter.k8s.aws/instance-size
@@ -34,8 +34,10 @@ spec:
   limits:
     cpu: 100
   disruption:
-    consolidationPolicy: WhenUnderutilized
-    expireAfter: 720h
+    # Karpenter v1 dropped `WhenUnderutilized` and now requires
+    # `consolidateAfter` whenever consolidation is enabled.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
 ---
 apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
@@ -45,6 +47,11 @@ metadata:
     {{- include "agripulse.shared.labels" . | nindent 4 }}
 spec:
   amiFamily: AL2023
+  # Karpenter v1 requires amiSelectorTerms on EC2NodeClass. Using the
+  # AL2023 alias pins us to the latest EKS-optimized AL2023 AMI for the
+  # cluster's k8s version.
+  amiSelectorTerms:
+    - alias: al2023@latest
   role: {{ required "karpenter.nodeIAMRoleName must be set (terraform output karpenter.node_iam_role_name)" .Values.karpenter.nodeIAMRoleName | quote }}
   subnetSelectorTerms:
     - tags:

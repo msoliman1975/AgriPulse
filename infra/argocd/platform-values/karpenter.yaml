@@ -17,11 +17,16 @@ nodeSelector:
 serviceAccount:
   create: true
   name: karpenter
-  annotations: {}
+  # Dev-hardcoded IRSA role ARN. Long-term: per-env overlay should inject
+  # this the same way overlays/<env>/values does for services.
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/KarpenterController-20260514025042773900000039
 
 settings:
-  clusterName: "" # set per-env
-  interruptionQueue: "" # set per-env (SQS queue name from Terraform)
+  # Dev-hardcoded. Long-term: per-env overlay should inject these from
+  # `terraform output karpenter`.
+  clusterName: agripulse-dev
+  interruptionQueue: Karpenter-agripulse-dev
 
 resources:
   requests:
