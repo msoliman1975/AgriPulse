@@ -7,13 +7,29 @@
 import { useEffect, useState } from "react";
 
 import {
+  applyIrrigation,
+  applyOrg,
   ApplyPreview,
   applySubscriptions,
+  getIrrigationTemplate,
+  getLocks,
+  getOrgTemplate,
   getSubscriptionsTemplate,
   ImageryTemplateRow,
+  IrrigationTemplate,
+  lockCategory,
+  LockCategory,
+  LockState,
+  OrgTemplate,
+  previewApplyIrrigation,
+  previewApplyOrg,
   previewApplySubscriptions,
+  putIrrigationTemplate,
+  putOrgTemplate,
   replaceSubscriptionsTemplate,
+  SimpleApplyPreview,
   SubscriptionsTemplate,
+  unlockCategory,
   WeatherTemplateRow,
 } from "@/api/farmConfig";
 import { getConfig, ImageryConfigEntry } from "@/api/config";
@@ -35,17 +51,36 @@ export function FarmDefaultsTab({ farmId }: Props) {
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
 
+  // PR-3 additions: lock state + irrigation + org templates.
+  const [locks, setLocks] = useState<LockState | null>(null);
+  const [irrigation, setIrrigation] = useState<IrrigationTemplate | null>(null);
+  const [orgTpl, setOrgTpl] = useState<OrgTemplate | null>(null);
+
+  const reloadLocks = async () => {
+    try {
+      setLocks(await getLocks(farmId));
+    } catch {
+      // Ignore — leave previous state.
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [t, c] = await Promise.all([
+        const [t, c, l, irr, org] = await Promise.all([
           getSubscriptionsTemplate(farmId),
           getConfig(),
+          getLocks(farmId),
+          getIrrigationTemplate(farmId),
+          getOrgTemplate(farmId),
         ]);
         if (cancelled) return;
         setTemplate(t);
         setProducts(c.products);
+        setLocks(l);
+        setIrrigation(irr);
+        setOrgTpl(org);
       } catch (err) {
         if (cancelled) return;
         const status = (err as { response?: { status?: number } })?.response
@@ -198,8 +233,23 @@ export function FarmDefaultsTab({ farmId }: Props) {
     }
   };
 
+  const lockChip = (cat: LockCategory) => (
+    <LockChip
+      farmId={farmId}
+      category={cat}
+      locked={locks?.[cat] ?? false}
+      onChange={reloadLocks}
+    />
+  );
+
   return (
     <div className="space-y-3">
+      {/* Subscriptions header + lock */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-[12px] font-semibold text-slate-700">Subscriptions</h3>
+        {lockChip("subscriptions")}
+      </div>
+
       {/* Imagery template */}
       <div>
         <div className="flex items-center justify-between">
@@ -403,6 +453,400 @@ export function FarmDefaultsTab({ farmId }: Props) {
           applying={applying}
         />
       ) : null}
+
+      {/* Irrigation */}
+      <div className="border-t border-slate-200 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[12px] font-semibold text-slate-700">Irrigation</h3>
+          {lockChip("irrigation")}
+        </div>
+        {irrigation && (
+          <IrrigationSection
+            farmId={farmId}
+            value={irrigation}
+            onChange={setIrrigation}
+          />
+        )}
+      </div>
+
+      {/* Org */}
+      <div className="border-t border-slate-200 pt-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[12px] font-semibold text-slate-700">Org (tags)</h3>
+          {lockChip("org")}
+        </div>
+        {orgTpl && (
+          <OrgSection farmId={farmId} value={orgTpl} onChange={setOrgTpl} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Lock chip ------------------------------------------------------
+
+function LockChip({
+  farmId,
+  category,
+  locked,
+  onChange,
+}: {
+  farmId: string;
+  category: LockCategory;
+  locked: boolean;
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [conflict, setConflict] = useState<{ diff: unknown } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = async (force: boolean) => {
+    setBusy(true);
+    setError(null);
+    setConflict(null);
+    try {
+      if (locked) {
+        await unlockCategory(farmId, category);
+      } else {
+        await lockCategory(farmId, category, force);
+      }
+      onChange();
+    } catch (e) {
+      const err = e as {
+        response?: { status?: number; data?: { diff?: unknown; detail?: string } };
+      };
+      if (err.response?.status === 409 && err.response.data?.diff) {
+        setConflict({ diff: err.response.data.diff });
+      } else {
+        setError(err.response?.data?.detail ?? "Toggle failed.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => toggle(false)}
+        disabled={busy}
+        className={
+          "rounded border px-1.5 py-0.5 text-[10px] " +
+          (locked
+            ? "border-rose-400 bg-rose-50 text-rose-800"
+            : "border-emerald-400 bg-emerald-50 text-emerald-800")
+        }
+        title={locked ? "Locked — click to unlock" : "Unlocked — click to lock"}
+      >
+        {locked ? "🔒 locked" : "🔓 unlocked"}
+      </button>
+      {conflict ? (
+        <span className="text-[10px] text-amber-800">
+          divergent blocks —{" "}
+          <button
+            type="button"
+            onClick={() => toggle(true)}
+            disabled={busy}
+            className="underline"
+          >
+            Lock and overwrite
+          </button>
+        </span>
+      ) : null}
+      {error ? <span className="text-[10px] text-rose-700">{error}</span> : null}
+    </div>
+  );
+}
+
+// ---------- Irrigation section --------------------------------------------
+
+function IrrigationSection({
+  farmId,
+  value,
+  onChange,
+}: {
+  farmId: string;
+  value: IrrigationTemplate;
+  onChange: (next: IrrigationTemplate) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [preview, setPreview] = useState<SimpleApplyPreview | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const updated = await putIrrigationTemplate(farmId, value);
+      onChange(updated);
+      setMsg("Template saved.");
+    } catch (e) {
+      setMsg((e as Error).message ?? "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPreview = async () => {
+    setMsg(null);
+    try {
+      setPreview(await previewApplyIrrigation(farmId, null));
+    } catch (e) {
+      setMsg((e as Error).message ?? "Preview failed.");
+    }
+  };
+
+  const apply = async () => {
+    if (!preview) return;
+    setApplying(true);
+    setMsg(null);
+    try {
+      const counts = await applyIrrigation(farmId, null);
+      setMsg(`Applied to ${counts.blocks_touched} block(s).`);
+      setPreview(null);
+    } catch (e) {
+      setMsg((e as Error).message ?? "Apply failed.");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2 text-[11px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1">
+          system
+          <input
+            type="text"
+            value={value.irrigation_system ?? ""}
+            placeholder="drip / pivot / …"
+            onChange={(e) =>
+              onChange({
+                ...value,
+                irrigation_system: e.target.value || null,
+              })
+            }
+            className="w-28 rounded border border-slate-300 px-1 py-0.5"
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          source
+          <input
+            type="text"
+            value={value.irrigation_source ?? ""}
+            placeholder="well / canal / …"
+            onChange={(e) =>
+              onChange({ ...value, irrigation_source: e.target.value || null })
+            }
+            className="w-28 rounded border border-slate-300 px-1 py-0.5"
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          flow m³/h
+          <input
+            type="number"
+            min={0}
+            step={0.1}
+            value={value.flow_rate_m3_per_hour ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                flow_rate_m3_per_hour:
+                  e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+            className="w-20 rounded border border-slate-300 px-1 py-0.5"
+          />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save template"}
+        </button>
+        <button
+          type="button"
+          onClick={openPreview}
+          className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100"
+        >
+          Apply to blocks…
+        </button>
+        {msg ? <span className="text-[11px] text-slate-700">{msg}</span> : null}
+      </div>
+      {preview ? (
+        <SimpleApplyPanel
+          preview={preview}
+          onApply={apply}
+          onCancel={() => setPreview(null)}
+          applying={applying}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Org section ---------------------------------------------------
+
+function OrgSection({
+  farmId,
+  value,
+  onChange,
+}: {
+  farmId: string;
+  value: OrgTemplate;
+  onChange: (next: OrgTemplate) => void;
+}) {
+  const [raw, setRaw] = useState(value.default_tags.join(", "));
+  const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [preview, setPreview] = useState<SimpleApplyPreview | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const tags = raw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const updated = await putOrgTemplate(farmId, { default_tags: tags });
+      onChange(updated);
+      setRaw(updated.default_tags.join(", "));
+      setMsg("Template saved.");
+    } catch (e) {
+      setMsg((e as Error).message ?? "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPreview = async () => {
+    setMsg(null);
+    try {
+      setPreview(await previewApplyOrg(farmId, null));
+    } catch (e) {
+      setMsg((e as Error).message ?? "Preview failed.");
+    }
+  };
+
+  const apply = async () => {
+    setApplying(true);
+    setMsg(null);
+    try {
+      const counts = await applyOrg(farmId, null);
+      setMsg(`Merged tags into ${counts.blocks_touched} block(s).`);
+      setPreview(null);
+    } catch (e) {
+      setMsg((e as Error).message ?? "Apply failed.");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2 text-[11px]">
+      <p className="text-[10px] text-slate-500">
+        Comma-separated tags. Apply is additive — block-local tags are never
+        removed.
+      </p>
+      <input
+        type="text"
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        placeholder="#cotton, #south"
+        className="w-full rounded border border-slate-300 px-2 py-1"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save template"}
+        </button>
+        <button
+          type="button"
+          onClick={openPreview}
+          className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-emerald-800 hover:bg-emerald-100"
+        >
+          Apply to blocks…
+        </button>
+        {msg ? <span className="text-slate-700">{msg}</span> : null}
+      </div>
+      {preview ? (
+        <SimpleApplyPanel
+          preview={preview}
+          onApply={apply}
+          onCancel={() => setPreview(null)}
+          applying={applying}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Simple apply preview (irrigation + org) ----------------------
+
+function SimpleApplyPanel({
+  preview,
+  onApply,
+  onCancel,
+  applying,
+}: {
+  preview: SimpleApplyPreview;
+  onApply: () => void;
+  onCancel: () => void;
+  applying: boolean;
+}) {
+  return (
+    <div className="rounded border border-amber-300 bg-amber-50 p-2">
+      <p className="text-[11px] font-semibold text-amber-900">
+        Preview — {preview.matched_blocks} of {preview.total_blocks} blocks
+        already match.
+      </p>
+      <ul className="mt-2 max-h-40 divide-y divide-amber-200 overflow-y-auto text-[11px]">
+        {preview.blocks.map((d) => (
+          <li key={d.block_id} className="flex items-center gap-2 py-1">
+            <span className="flex-1 truncate font-mono text-[10px] text-slate-700">
+              {d.block_id.slice(0, 8)}…
+            </span>
+            <span
+              className={
+                "text-[10px] " +
+                (d.matches ? "text-emerald-700" : "text-amber-800")
+              }
+            >
+              {d.matches ? "matches" : "will change"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={applying}
+          className="rounded border border-emerald-500 bg-emerald-100 px-2 py-1 text-[11px] text-emerald-900 hover:bg-emerald-200 disabled:opacity-50"
+        >
+          {applying ? "Applying…" : "Confirm apply"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={applying}
+          className="rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

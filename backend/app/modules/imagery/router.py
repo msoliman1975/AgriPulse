@@ -80,6 +80,25 @@ def _ensure_tenant(context: RequestContext) -> str:
     return schema
 
 
+async def _guard_subscriptions_lock(
+    *, tenant_session: AsyncSession, farm_id: UUID
+) -> None:
+    """Reject writes when the farm's subscriptions category is locked.
+
+    Gated by the farm-config feature flag so the flag fully owns the
+    lock behavior. PR-3 of the farm-block-config-model rollout.
+    """
+    from app.core.settings import get_settings
+
+    if not get_settings().farm_config_template_enabled:
+        return
+    from app.modules.farms import config_template
+
+    await config_template.assert_category_unlocked(
+        tenant_session, farm_id=farm_id, category="subscriptions"
+    )
+
+
 async def _resolve_farm_id(*, block_id: UUID, tenant_session: AsyncSession) -> UUID:
     """Look up the farm_id that owns this block; 404 if missing.
 
@@ -115,6 +134,7 @@ async def create_subscription(
     farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
     if not has_capability(context, "imagery.subscription.manage", farm_id=farm_id):
         raise BlockNotVisibleError(str(block_id))
+    await _guard_subscriptions_lock(tenant_session=tenant_session, farm_id=farm_id)
     return await service.create_subscription(
         block_id=block_id,
         payload=payload,
@@ -161,6 +181,7 @@ async def revoke_subscription(
     farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
     if not has_capability(context, "imagery.subscription.manage", farm_id=farm_id):
         raise BlockNotVisibleError(str(block_id))
+    await _guard_subscriptions_lock(tenant_session=tenant_session, farm_id=farm_id)
     await service.revoke_subscription(
         subscription_id=subscription_id,
         actor_user_id=context.user_id,

@@ -407,6 +407,7 @@ async def update_block(
     request: Request,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     # We need to know which farm this block lives in to do per-farm RBAC.
     from app.modules.farms.errors import BlockNotFoundError
@@ -427,6 +428,26 @@ async def update_block(
         raise BlockNotFoundError(block_id)
     if needs_meta_cap and not has_capability(context, "block.update_metadata", farm_id=farm_id):
         raise BlockNotFoundError(block_id)
+
+    # PR-3: lock guard. When irrigation / org locked, reject writes to
+    # the corresponding fields. Gated by the feature flag so the flag
+    # owns all template-aware behavior.
+    from app.core.settings import get_settings
+
+    if get_settings().farm_config_template_enabled and data:
+        from app.modules.farms import config_template
+
+        if any(
+            k in data
+            for k in ("irrigation_system", "irrigation_source", "flow_rate_m3_per_hour")
+        ):
+            await config_template.assert_category_unlocked(
+                tenant_session, farm_id=farm_id, category="irrigation"
+            )
+        if "tags" in data:
+            await config_template.assert_category_unlocked(
+                tenant_session, farm_id=farm_id, category="org"
+            )
 
     return await service.update_block(
         block_id=block_id,

@@ -88,3 +88,151 @@ export async function applySubscriptions(
   );
   return data;
 }
+
+// ---------- PR-3: locks ---------------------------------------------------
+
+export type LockCategory = "subscriptions" | "irrigation" | "org";
+
+export interface LockState {
+  subscriptions: boolean;
+  irrigation: boolean;
+  org: boolean;
+}
+
+export async function getLocks(farmId: string): Promise<LockState> {
+  const { data } = await apiClient.get<LockState>(`/v1/farms/${farmId}/config/locks`);
+  return data;
+}
+
+export async function lockCategory(
+  farmId: string,
+  category: LockCategory,
+  forceOverwrite: boolean,
+): Promise<Record<string, unknown>> {
+  const { data } = await apiClient.post<Record<string, unknown>>(
+    `/v1/farms/${farmId}/config/${category}/lock`,
+    { force_overwrite: forceOverwrite },
+  );
+  return data;
+}
+
+export async function unlockCategory(
+  farmId: string,
+  category: LockCategory,
+): Promise<void> {
+  await apiClient.post(`/v1/farms/${farmId}/config/${category}/unlock`);
+}
+
+// ---------- PR-3: irrigation template ------------------------------------
+
+export interface IrrigationTemplate {
+  irrigation_system: string | null;
+  irrigation_source: string | null;
+  flow_rate_m3_per_hour: number | null;
+}
+
+export interface SimpleBlockDiff {
+  block_id: string;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  matches: boolean;
+}
+
+export interface SimpleApplyPreview {
+  blocks: SimpleBlockDiff[];
+  total_blocks: number;
+  matched_blocks: number;
+}
+
+export interface SimpleApplyCounts {
+  blocks_touched: number;
+  total_blocks: number;
+}
+
+export async function getIrrigationTemplate(
+  farmId: string,
+): Promise<IrrigationTemplate> {
+  const { data } = await apiClient.get<IrrigationTemplate>(
+    `/v1/farms/${farmId}/config/irrigation/template`,
+  );
+  return data;
+}
+
+export async function putIrrigationTemplate(
+  farmId: string,
+  body: IrrigationTemplate,
+): Promise<IrrigationTemplate> {
+  const { data } = await apiClient.put<IrrigationTemplate>(
+    `/v1/farms/${farmId}/config/irrigation/template`,
+    body,
+  );
+  return data;
+}
+
+export async function previewApplyIrrigation(
+  farmId: string,
+  blockIds: string[] | null = null,
+): Promise<SimpleApplyPreview> {
+  const { data } = await apiClient.post<SimpleApplyPreview>(
+    `/v1/farms/${farmId}/config/irrigation/apply-preview`,
+    { block_ids: blockIds },
+  );
+  return data;
+}
+
+export async function applyIrrigation(
+  farmId: string,
+  blockIds: string[] | null,
+): Promise<SimpleApplyCounts> {
+  const { data } = await apiClient.post<SimpleApplyCounts>(
+    `/v1/farms/${farmId}/config/irrigation/apply`,
+    { block_ids: blockIds },
+  );
+  return data;
+}
+
+// ---------- PR-3: org template ------------------------------------------
+
+export interface OrgTemplate {
+  default_tags: string[];
+}
+
+export async function getOrgTemplate(farmId: string): Promise<OrgTemplate> {
+  const { data } = await apiClient.get<OrgTemplate>(
+    `/v1/farms/${farmId}/config/org/template`,
+  );
+  return data;
+}
+
+export async function putOrgTemplate(
+  farmId: string,
+  body: OrgTemplate,
+): Promise<OrgTemplate> {
+  const { data } = await apiClient.put<OrgTemplate>(
+    `/v1/farms/${farmId}/config/org/template`,
+    body,
+  );
+  return data;
+}
+
+export async function previewApplyOrg(
+  farmId: string,
+  blockIds: string[] | null = null,
+): Promise<SimpleApplyPreview> {
+  const { data } = await apiClient.post<SimpleApplyPreview>(
+    `/v1/farms/${farmId}/config/org/apply-preview`,
+    { block_ids: blockIds },
+  );
+  return data;
+}
+
+export async function applyOrg(
+  farmId: string,
+  blockIds: string[] | null,
+): Promise<SimpleApplyCounts> {
+  const { data } = await apiClient.post<SimpleApplyCounts>(
+    `/v1/farms/${farmId}/config/org/apply`,
+    { block_ids: blockIds },
+  );
+  return data;
+}

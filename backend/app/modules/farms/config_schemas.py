@@ -90,3 +90,58 @@ class ApplyResponse(BaseModel):
     weather_added: int
     weather_updated: int
     weather_deactivated: int
+
+
+# ---------- PR-3: Locks ----------------------------------------------------
+
+
+class LockStateResponse(BaseModel):
+    subscriptions: bool
+    irrigation: bool
+    org: bool
+
+
+class LockToggleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    force_overwrite: bool = False
+
+
+# ---------- PR-3: Irrigation template -------------------------------------
+
+
+class IrrigationTemplateSchema(BaseModel):
+    """The shape of farm-level irrigation defaults. All nullable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    irrigation_system: str | None = None
+    irrigation_source: str | None = None
+    flow_rate_m3_per_hour: float | None = Field(default=None, ge=0)
+
+
+class SimpleBlockDiffSchema(BaseModel):
+    block_id: str
+    before: dict
+    after: dict
+    matches: bool
+
+
+class SimpleApplyPreviewResponse(BaseModel):
+    blocks: list[SimpleBlockDiffSchema]
+    total_blocks: int
+    matched_blocks: int
+
+
+class SimpleApplyResponse(BaseModel):
+    blocks_touched: int
+    total_blocks: int
+
+
+# ---------- PR-3: Org template --------------------------------------------
+
+
+class OrgTemplateSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_tags: list[str] = Field(default_factory=list)
