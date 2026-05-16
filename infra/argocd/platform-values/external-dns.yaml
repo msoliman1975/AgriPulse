@@ -22,13 +22,17 @@ env:
   - name: AWS_REGION
     value: eu-south-1
 
-# IRSA ARN is injected per-env via the overlay (overlays/<env>/values.yaml
-# under `externalDns.serviceAccount.annotations`). Default left empty so a
-# fresh install fails closed.
+# Dev-hardcoded IRSA role ARN. The platform ApplicationSet (appsets/platform.yaml)
+# reads only this single values file — it does NOT layer overlays/<env>/values.yaml,
+# so an empty `annotations: {}` here left the SA without its role-arn and
+# external-dns fell back to the node's IAM role (which can't ListHostedZones).
+# Long-term: extend the platform AppSet to layer a per-env values file, the
+# same way the services AppSet does. Same pattern as platform-values/karpenter.yaml.
 serviceAccount:
   create: true
   name: external-dns
-  annotations: {}
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/agripulse-dev-external-dns
 
 # Schedule on the system baseline node group; Karpenter (CD-8) adds more
 # nodes for workloads but ExternalDNS belongs with the cluster operators.

@@ -1,12 +1,14 @@
 installCRDs: true
 
-# IRSA-annotated ServiceAccount so the DNS-01 solver can write TXT records
-# in the agripulse.cloud zone. Real ARN is injected per-env via the overlay
-# (overlays/<env>/values.yaml under `certManagerController.serviceAccount`).
+# Dev-hardcoded IRSA role ARN for the DNS-01 solver. Same caveat as
+# platform-values/external-dns.yaml: the platform AppSet does not layer
+# overlays/<env>/values.yaml, so this must live here for now.
+# Long-term: extend the platform AppSet to layer a per-env values file.
 serviceAccount:
   create: true
   name: cert-manager
-  annotations: {}
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/agripulse-dev-cert-manager
 
 prometheus:
   enabled: true
