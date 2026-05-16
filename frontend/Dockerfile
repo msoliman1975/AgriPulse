@@ -19,6 +19,10 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.json tsconfig.app.json tsconfig.node.json global.d.ts ./
 COPY vite.config.ts vitest.config.ts tailwind.config.ts postcss.config.js ./
 COPY index.html ./
+# Vite inlines VITE_* env at build time. .env.production carries the
+# dev-cluster hostnames; override per-env with `docker build --build-arg`
+# once the staging/prod pipeline lands.
+COPY .env.production ./
 COPY src ./src
 COPY public ./public
 # Root tsconfig.json references ./e2e as a TS project; tsc -b fails without

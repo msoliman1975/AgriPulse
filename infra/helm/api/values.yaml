@@ -97,6 +97,9 @@ env:
   KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse"
   KEYCLOAK_AUDIENCE: agripulse-api
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
+  # SPA at app.<envHost> calls api.<envHost> cross-origin. CORS middleware
+  # only attaches when this list is non-empty (see app/core/app_factory.py).
+  CORS_ALLOWED_ORIGINS: '["https://app.{{ .Values.global.envHost }}"]'
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
   # On backend cold start, if no active PlatformAdmin exists in
   # public.platform_role_assignments, the lifespan seeds one from these

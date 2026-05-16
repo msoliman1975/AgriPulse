@@ -74,6 +74,11 @@ charts/*.tgz
 .env
 .env.*
 !.env.example
+# .env.development + .env.production carry committed dev-cluster
+# defaults so Vite has values to inline at build time. They contain
+# only public hostnames/client_ids, no secrets.
+!frontend/.env.development
+!frontend/.env.production
 *.pem
 *.key
 *.crt
