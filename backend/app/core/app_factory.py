@@ -81,6 +81,19 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
+    # Starlette wraps middleware in reverse order of addition: the LAST
+    # add_middleware call becomes the outermost layer.
+    #
+    # Desired stack from outermost to innermost:
+    #   CORSMiddleware     — answers OPTIONS preflights before auth runs,
+    #                        otherwise the browser sees 401 with no
+    #                        Access-Control-Allow-Origin header and the
+    #                        SPA can't even start its real request.
+    #   CorrelationIdMiddleware — runs before auth so a 401 from invalid
+    #                             JWT still carries a correlation ID.
+    #   AuthMiddleware     — innermost: parses bearer token.
+    app.add_middleware(AuthMiddleware)
+    app.add_middleware(CorrelationIdMiddleware)
     if settings.cors_allowed_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -89,13 +102,6 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
-    # Starlette wraps middleware in reverse order of addition: the LAST
-    # add_middleware call becomes the outermost layer. Correlation must
-    # run before auth so a 401 from invalid JWT still carries a
-    # correlation ID in logs and the response header.
-    app.add_middleware(AuthMiddleware)
-    app.add_middleware(CorrelationIdMiddleware)
 
     _register_module_routers(app)
 
