@@ -42,13 +42,15 @@ labels:
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
 
-# cert-manager issues against the staging Let's Encrypt directory so we
-# don't burn prod rate limits. The Ingress hostname per service is rendered
-# from `${ingress.hostPrefix}.${global.envHost}` inside each service chart;
-# overlays only flip the env-wide suffix.
+# cert-manager issues against the prod Let's Encrypt directory so the
+# certs are browser-trusted (Netskope MITM rejects the staging chain).
+# Rate limits: 50 certs/week per registered domain — fine for dev where
+# we have ~5 hostnames and rarely reissue. The Ingress hostname per
+# service is rendered from `${ingress.hostPrefix}.${global.envHost}`
+# inside each service chart; overlays only flip the env-wide suffix.
 ingress:
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 
 # Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
 # must be set explicitly per env. CD-13: `ingress.hostnameStrict` flows
@@ -60,7 +62,7 @@ keycloak:
     hostname: keycloak.dev.agripulse.cloud
     hostnameStrict: true
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-staging
+      cert-manager.io/cluster-issuer: letsencrypt-prod
 
 # ExternalDNS + cert-manager IRSA ARNs come from `terraform output
 # iam_role_arns` (keys: external_dns, cert_manager). Filled in by the
