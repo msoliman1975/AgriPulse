@@ -123,6 +123,7 @@ def _register_module_routers(app: FastAPI) -> None:
     """
     from app.modules.alerts.router import router as alerts_router
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
+    from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
@@ -168,6 +169,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(tenancy_router)
     app.include_router(farms_router)
     app.include_router(farms_blocks_summary_router)
+    app.include_router(farms_config_router)
     app.include_router(imagery_router)
     app.include_router(indices_router)
     app.include_router(weather_router)

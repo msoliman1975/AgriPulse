@@ -10,6 +10,7 @@ import type {
 } from "@/api/farms";
 import type { Block } from "@/api/blocks";
 import type { MultiPolygon } from "geojson";
+import { FarmDefaultsTab } from "./FarmDefaultsTab";
 
 export type FarmDrawerMode = "create" | "view" | "edit";
 
@@ -323,11 +324,14 @@ export function FarmDrawer({
         </Section>
 
         <Section title="Defaults">
-          <p className="text-[11px] text-slate-500">
-            Farm-level templates for subscriptions, irrigation, and org tags —
-            with per-category locks. Coming in PR-2 of the farm-block config
-            rollout.
-          </p>
+          {farm ? (
+            <FarmDefaultsTab farmId={farm.id} />
+          ) : (
+            <p className="text-[11px] text-slate-500">
+              Save the farm first, then return here to author the subscriptions
+              template.
+            </p>
+          )}
         </Section>
 
         <Section title="AOI">

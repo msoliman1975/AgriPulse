@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     # runbook for the kcadm.sh fallback). Production envs flip this on +
     # set the four credentials. Tests inject FakeKeycloakClient directly.
     keycloak_provisioning_enabled: bool = False
+
+    # --- Feature flags ---------------------------------------------------
+    # Gates the /v1/farms/{id}/config/subscriptions/* endpoints + the
+    # Defaults tab in FarmDrawer. OFF by default until backfill of
+    # existing per-block subscriptions into farm templates is verified
+    # in each tenant. Flipped on per-environment; removed in PR-4.
+    farm_config_template_enabled: bool = False
     keycloak_base_url: str = "https://keycloak.dev.agripulse.local"
     keycloak_realm: str = "agripulse"
     keycloak_admin_client_id: str = "agripulse-tenancy"

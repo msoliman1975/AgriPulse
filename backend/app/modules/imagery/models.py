@@ -94,6 +94,9 @@ class ImageryAoiSubscription(Base, TimestampedMixin):
     last_attempted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # When Apply last reconciled this row to the farm template (migration 0028).
+    # NULL = never touched by Apply (block-local creation or pre-PR-2 row).
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ImageryIngestionJob(Base):
