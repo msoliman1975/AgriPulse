@@ -252,7 +252,7 @@ async def test_apply_preview_three_diff_shapes(
     admin_session: AsyncSession,
 ) -> None:
     """Block-matches, block-has-divergent-knob, block-has-extra-row."""
-    _, context = await _bootstrap(admin_session, "cfg-diff")
+    tenant, context = await _bootstrap(admin_session, "cfg-diff")
     app = build_app(context, with_config=True)
     product_a = str(uuid4())
     product_b = str(uuid4())
@@ -306,6 +306,9 @@ async def test_apply_preview_three_diff_shapes(
         # Mutate block 1: change cadence (divergent knob).
         # Mutate block 2: add an extra subscription to product_b.
         await admin_session.execute(
+            text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
+        )
+        await admin_session.execute(
             text(
                 "UPDATE imagery_aoi_subscriptions "
                 "SET cadence_hours = 6 WHERE block_id = :bid"
@@ -349,7 +352,7 @@ async def test_apply_preview_three_diff_shapes(
 async def test_selective_apply_only_touches_passed_ids(
     admin_session: AsyncSession,
 ) -> None:
-    _, context = await _bootstrap(admin_session, "cfg-sel")
+    tenant, context = await _bootstrap(admin_session, "cfg-sel")
     app = build_app(context, with_config=True)
     product_a = str(uuid4())
 
@@ -398,6 +401,9 @@ async def test_selective_apply_only_touches_passed_ids(
         assert counts["imagery_added"] == 1
 
         # The second block should still have no subscription rows.
+        await admin_session.execute(
+            text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
+        )
         rows = (
             await admin_session.execute(
                 text(

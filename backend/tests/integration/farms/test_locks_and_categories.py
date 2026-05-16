@@ -126,7 +126,7 @@ def _enable_feature_flag(monkeypatch: pytest.MonkeyPatch):
 async def test_irrigation_lock_with_divergence_returns_409_then_force_succeeds(
     admin_session: AsyncSession,
 ) -> None:
-    _, context = await _bootstrap(admin_session, "lk-irrdiv")
+    tenant, context = await _bootstrap(admin_session, "lk-irrdiv")
     app = build_app(context, with_config=True)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -173,6 +173,9 @@ async def test_irrigation_lock_with_divergence_returns_409_then_force_succeeds(
         assert forced.json()["locked"] is True
 
         # Confirm the block now matches.
+        await admin_session.execute(
+            text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
+        )
         row = (
             await admin_session.execute(
                 text(
@@ -271,7 +274,7 @@ async def test_unlock_restores_block_edits(admin_session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_org_apply_is_additive(admin_session: AsyncSession) -> None:
     """Block keeps its local tags; farm template tags are merged in."""
-    _, context = await _bootstrap(admin_session, "lk-orgmerge")
+    tenant, context = await _bootstrap(admin_session, "lk-orgmerge")
     app = build_app(context, with_config=True)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -303,6 +306,9 @@ async def test_org_apply_is_additive(admin_session: AsyncSession) -> None:
         assert applied.json()["blocks_touched"] == 1
 
         # Verify the block has BOTH tags.
+        await admin_session.execute(
+            text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
+        )
         row = (
             await admin_session.execute(
                 text("SELECT tags FROM blocks WHERE id = :id").bindparams(
