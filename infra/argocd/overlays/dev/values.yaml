@@ -68,7 +68,7 @@ keycloak:
 externalDns:
   serviceAccount:
     annotations:
-      eks.amazonaws.com/role-arn: ""
+      eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-dev-external-dns"
 
 # Karpenter (CD-8). clusterName + nodeIAMRoleName come from
 # `terraform output karpenter`.
@@ -80,7 +80,7 @@ karpenter:
 certManagerController:
   serviceAccount:
     annotations:
-      eks.amazonaws.com/role-arn: ""
+      eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-dev-cert-manager"
 
 # Per-env api IRSA binding. ARN comes from
 # `terraform output agripulse_env_resources` â†’ .dev.api_irsa_arn.
@@ -88,7 +88,7 @@ certManagerController:
 serviceAccount:
   create: true
   annotations:
-    eks.amazonaws.com/role-arn: ""
+    eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-api-irsa-dev"
 
 # Dev DB is the same cluster CNPG instance, just smaller. CNPG IRSA ARN
 # comes from `terraform output agripulse_env_resources` â†’ .dev.cnpg_irsa_arn.
@@ -106,7 +106,7 @@ postgresCluster:
       cpu: "1"
       memory: 2Gi
   serviceAccountAnnotations:
-    eks.amazonaws.com/role-arn: ""
+    eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-cnpg-irsa-dev"
 
 # Alembic PreSync Job (api chart only â€” other charts ignore this key).
 # The Job runs `alembic upgrade head` before any Deployment rolls; failure

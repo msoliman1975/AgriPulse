@@ -86,7 +86,12 @@ module "eks" {
     }
   }
 
-  enable_cluster_creator_admin_permissions = true
+  # The cluster creator (whoever runs `terraform apply`) gets a managed
+  # access entry with cluster-admin via the module. Keep this disabled
+  # and use the explicit `access_entries` map below — that way the SSO
+  # admin role keeps cluster-admin even when a CI service-role (or any
+  # other principal) runs `terraform apply` later.
+  enable_cluster_creator_admin_permissions = false
 
   # Map the SSO Administrator role into the cluster so kubectl from a
   # laptop (via the SSO `agripulse` profile) is admin out of the gate.

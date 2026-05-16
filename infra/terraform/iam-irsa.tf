@@ -18,8 +18,18 @@ module "iam_role_ebs_csi" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.50"
 
-  role_name             = "agripulse-${var.environment}-ebs-csi"
-  attach_ebs_csi_policy = true
+  role_name = "agripulse-${var.environment}-ebs-csi"
+
+  # The module's `attach_ebs_csi_policy = true` helper silently no-ops in
+  # 5.50 (verified empirically: role ended up with zero policies attached),
+  # so attach AWS's managed policy explicitly. Symptom of the broken helper
+  # is the EBS CSI controller crashlooping with
+  #   `User ... is not authorized to perform: ec2:DescribeAvailabilityZones`
+  # which keeps the addon stuck in CREATING until the apply hits its 20-min
+  # timeout.
+  role_policy_arns = {
+    ebs_csi = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  }
 
   oidc_providers = {
     main = {
