@@ -94,7 +94,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["app", "workers"]
 
 # --- uv ---------------------------------------------------------------------
 [tool.uv]
