@@ -70,6 +70,17 @@ prometheusOperator:
   tolerations:
     - key: CriticalAddonsOnly
       operator: Exists
+  # The admission-webhook patch is a pre-install Helm hook Job that
+  # generates the webhook TLS secret. Its pod doesn't inherit the
+  # operator-level tolerations above, so on a fresh cluster (only the
+  # tainted baseline node available) it sits Pending forever and the
+  # chart never progresses past hook batch/Job. Spell out tolerations
+  # explicitly here.
+  admissionWebhooks:
+    patch:
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
 
 # node-exporter is a DaemonSet — it needs to land on every node, including
 # the baseline node-group that carries the CriticalAddonsOnly taint. The
