@@ -32,7 +32,12 @@ global:
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
 env:
-  PLATFORM_ADMIN_EMAIL: dev@agripulse.cloud
+  # Must match the Keycloak realm import's seed user
+  # (infra/helm/keycloak/files/agripulse-realm.json → users[0].email),
+  # otherwise the JWT email won't match the platform_role_assignments
+  # row the bootstrap creates and login lands in tenant-user mode
+  # instead of PlatformAdmin.
+  PLATFORM_ADMIN_EMAIL: dev@agripulse.local
   PLATFORM_ADMIN_FULL_NAME: Platform Admin
 
 # Common knobs across charts.
