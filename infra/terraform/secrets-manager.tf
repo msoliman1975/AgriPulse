@@ -78,6 +78,7 @@ resource "aws_iam_policy" "agripulse_secrets_read" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "SecretsManagerRead"
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue",
@@ -86,6 +87,25 @@ resource "aws_iam_policy" "agripulse_secrets_read" {
         Resource = [
           "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:agripulse/*",
         ]
+      },
+      {
+        # SM stores each secret encrypted with the agripulse KMS CMK
+        # (secrets-manager.tf above sets `kms_key_id = aws_kms_key.agripulse.arn`).
+        # Without `kms:Decrypt` against that key, GetSecretValue returns
+        # `AccessDeniedException: Access to KMS is not allowed`, which is
+        # what the external-secrets controller logs when this is missing.
+        Sid    = "KmsDecryptForSecretsManager"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey",
+        ]
+        Resource = [aws_kms_key.agripulse.arn]
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.region}.amazonaws.com"
+          }
+        }
       },
     ]
   })
