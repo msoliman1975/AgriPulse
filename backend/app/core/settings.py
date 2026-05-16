@@ -240,22 +240,28 @@ class Settings(BaseSettings):
         """Splice `database_password` into the DSNs if they carry no
         password of their own. Lets k8s deployments keep the secret out
         of the URL env var (URLs leak into logs and tracebacks).
+        Operates on the URL string because PostgresDsn is a multi-host
+        URL in pydantic v2 and `.password` lives per-host, not top-level.
         """
         if not self.database_password:
             return self
         from urllib.parse import quote
         pw = quote(self.database_password, safe="")
         for attr in ("database_url", "database_sync_url"):
-            dsn: PostgresDsn = getattr(self, attr)
-            if dsn.password:
+            raw = str(getattr(self, attr))
+            scheme, _, rest = raw.partition("://")
+            if not rest:
                 continue
-            user = dsn.username or "agripulse"
-            merged_str = f"{dsn.scheme}://{user}:{pw}@{dsn.host}"
-            if dsn.port:
-                merged_str += f":{dsn.port}"
-            if dsn.path:
-                merged_str += dsn.path
-            object.__setattr__(self, attr, PostgresDsn(merged_str))
+            authority, slash, path = rest.partition("/")
+            # `user@host` => splice password as `user:pw@host`. Skip if
+            # an `:password@` is already present so explicit URLs win.
+            userinfo, at, hostport = authority.partition("@")
+            if not at or ":" in userinfo:
+                continue
+            new_url = f"{scheme}://{userinfo}:{pw}@{hostport}"
+            if slash:
+                new_url += "/" + path
+            object.__setattr__(self, attr, PostgresDsn(new_url))
         return self
 
 
