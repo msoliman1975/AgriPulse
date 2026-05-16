@@ -20,11 +20,11 @@ global:
   # red, so dev tags are bumped by hand until that's fixed.
   images:
     api:
-      tag: "7b6c253"
+      tag: "cd383dd"
     workers:
-      tag: "7b6c253"
+      tag: "cd383dd"
     frontend:
-      tag: "7b6c253"
+      tag: "cd383dd"
     tileServer:
       tag: "cb81774"
 
