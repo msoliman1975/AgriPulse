@@ -322,6 +322,14 @@ export function FarmDrawer({
           </Field>
         </Section>
 
+        <Section title="Defaults">
+          <p className="text-[11px] text-slate-500">
+            Farm-level templates for subscriptions, irrigation, and org tags —
+            with per-category locks. Coming in PR-2 of the farm-block config
+            rollout.
+          </p>
+        </Section>
+
         <Section title="AOI">
           {drawingAoi ? (
             <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">

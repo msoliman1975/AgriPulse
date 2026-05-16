@@ -451,7 +451,7 @@ The operational subdivision of a farm — what gets monitored, alerted, and fore
 | `soil_ec_ds_per_m` | NUMERIC(5,2) | | P2 |
 | `soil_organic_matter_pct` | NUMERIC(5,2) | | P2 |
 | `last_soil_test_date` | DATE | | P2 |
-| `responsible_user_id` | UUID | | Cross-schema FK to `public.users.id` (logical) |
+| `agronomist_id` | UUID | | Cross-schema FK to `public.users.id` (logical). Renamed from `responsible_user_id` in tenant migration 0027. |
 | `status` | TEXT | NOT NULL, DEFAULT `'active'`, CHECK (`status IN ('active','fallow','abandoned','under_preparation','archived')`) | |
 | `tags` | TEXT[] | NOT NULL, DEFAULT `'{}'` | |
 | `notes` | TEXT | | |

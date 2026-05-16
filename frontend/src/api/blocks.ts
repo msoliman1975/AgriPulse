@@ -48,7 +48,7 @@ export interface Block {
   soil_texture: SoilTexture | null;
   salinity_class: SalinityClass | null;
   soil_ph: number | null;
-  responsible_user_id: string | null;
+  agronomist_id: string | null;
   notes: string | null;
   tags: string[];
   // Lifecycle replaces the old status enum (active/fallow/abandoned/...).
@@ -76,7 +76,7 @@ export interface BlockCreatePayload {
   soil_texture?: SoilTexture | null;
   salinity_class?: SalinityClass | null;
   soil_ph?: number | null;
-  responsible_user_id?: string | null;
+  agronomist_id?: string | null;
   notes?: string | null;
   tags?: string[];
   unit_type?: UnitType;

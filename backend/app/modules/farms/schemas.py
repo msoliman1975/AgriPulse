@@ -105,6 +105,7 @@ class FarmCreateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] = Field(default_factory=list)
+    farm_manager_id: UUID | None = None
     # Optional explicit activation date. Defaults to today server-side.
     # Allowed in past (historic backfill) or future (planned activation).
     active_from: date | None = None
@@ -131,6 +132,7 @@ class FarmUpdateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] | None = None
+    farm_manager_id: UUID | None = None
 
 
 class FarmResponse(BaseModel):
@@ -157,6 +159,16 @@ class FarmResponse(BaseModel):
     active_from: date
     active_to: date | None
     is_active: bool
+    farm_manager_id: UUID | None = None
+    # Defaults bucket (Shared) — surfaced read-only in PR-1; full
+    # template authoring + lock semantics arrive in PR-2 / PR-3.
+    default_irrigation_system: IrrigationSystem | None = None
+    default_irrigation_source: IrrigationSource | None = None
+    default_flow_rate_m3_per_hour: Decimal | None = None
+    default_tags: list[str] = Field(default_factory=list)
+    subscriptions_locked: bool = False
+    irrigation_locked: bool = False
+    org_locked: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -223,7 +235,7 @@ class BlockCreateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
-    responsible_user_id: UUID | None = None
+    agronomist_id: UUID | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
     # Land-unit polymorphism: defaults to plain `block` so existing
@@ -260,7 +272,7 @@ class BlockUpdateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
-    responsible_user_id: UUID | None = None
+    agronomist_id: UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
     irrigation_geometry: dict[str, Any] | None = None
@@ -284,7 +296,7 @@ class BlockResponse(BaseModel):
     soil_texture: SoilTexture | None
     salinity_class: SalinityClass | None
     soil_ph: Decimal | None
-    responsible_user_id: UUID | None
+    agronomist_id: UUID | None
     notes: str | None
     tags: list[str]
     active_from: date

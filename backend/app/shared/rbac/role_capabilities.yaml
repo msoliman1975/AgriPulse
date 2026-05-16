@@ -74,6 +74,7 @@ roles:
       - block.delete
       - block.attachment.read
       - block.attachment.write
+      - farm.manage_config
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
@@ -145,6 +146,7 @@ roles:
       - block.delete
       - block.attachment.read
       - block.attachment.write
+      - farm.manage_config
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
@@ -214,6 +216,7 @@ roles:
       - block.delete
       - block.attachment.read
       - block.attachment.write
+      - farm.manage_config
       - crop_assignment.create
       - crop_assignment.update
       - crop_assignment.delete
