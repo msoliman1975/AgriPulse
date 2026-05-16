@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     database_sync_url: PostgresDsn = Field(
         default=PostgresDsn("postgresql+psycopg://agripulse:agripulse@localhost:5432/agripulse")
     )
+    # When set, gets merged into database_url + database_sync_url if those
+    # DSNs have no password component. Lets k8s deployments keep the
+    # secret out of the URL string (which leaks into logs and tracebacks)
+    # and only join them at runtime. The CNPG-managed `agripulse-pg-app`
+    # k8s Secret exposes the rotating password as DATABASE_PASSWORD.
+    database_password: str = ""
     database_pool_size: int = 5
     database_max_overflow: int = 10
     database_echo: bool = False
@@ -228,6 +234,29 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _inject_database_password(self) -> "Settings":
+        """Splice `database_password` into the DSNs if they carry no
+        password of their own. Lets k8s deployments keep the secret out
+        of the URL env var (URLs leak into logs and tracebacks).
+        """
+        if not self.database_password:
+            return self
+        from urllib.parse import quote
+        pw = quote(self.database_password, safe="")
+        for attr in ("database_url", "database_sync_url"):
+            dsn: PostgresDsn = getattr(self, attr)
+            if dsn.password:
+                continue
+            user = dsn.username or "agripulse"
+            merged_str = f"{dsn.scheme}://{user}:{pw}@{dsn.host}"
+            if dsn.port:
+                merged_str += f":{dsn.port}"
+            if dsn.path:
+                merged_str += dsn.path
+            object.__setattr__(self, attr, PostgresDsn(merged_str))
+        return self
 
 
 @lru_cache(maxsize=1)
