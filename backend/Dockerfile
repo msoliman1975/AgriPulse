@@ -27,7 +27,7 @@ COPY uv.loc[k] ./
 # plain `if` test on the file's existence.
 RUN uv venv "$VIRTUAL_ENV" \
  && if [ -f uv.lock ]; then \
-        uv sync --frozen --no-dev --no-install-project ; \
+        uv sync --frozen --no-dev --no-install-project --active ; \
     else \
         uv pip compile pyproject.toml -o /tmp/requirements.txt \
         && uv pip install --python "$VIRTUAL_ENV/bin/python" -r /tmp/requirements.txt ; \
