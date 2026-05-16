@@ -25,7 +25,7 @@ serviceAccount:
   # Dev-hardcoded IRSA role ARN. Long-term: per-env overlay should inject
   # this the same way overlays/<env>/values does for services.
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/KarpenterController-20260514025042773900000039
+    eks.amazonaws.com/role-arn: arn:aws:iam::328972548541:role/KarpenterController-20260516050916502400000017
 
 settings:
   # Dev-hardcoded. Long-term: per-env overlay should inject these from
