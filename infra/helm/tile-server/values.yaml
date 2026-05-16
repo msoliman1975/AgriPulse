@@ -103,6 +103,8 @@ pdb:
   enabled: true
   minAvailable: 1
 
-nodeSelector: {}
+# Stopgap until multi-arch CI lands — see infra/helm/api/values.yaml.
+nodeSelector:
+  kubernetes.io/arch: amd64
 tolerations: []
 affinity: {}

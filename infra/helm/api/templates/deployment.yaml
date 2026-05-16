@@ -54,6 +54,14 @@ spec:
             - secretRef:
                 name: {{ include "agripulse-api.fullname" . }}-secrets
             {{- end }}
+          {{- with .Values.databasePasswordSecret }}
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name | quote }}
+                  key: {{ .key | quote }}
+          {{- end }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}
           readinessProbe:

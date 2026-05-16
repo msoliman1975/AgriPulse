@@ -15,6 +15,11 @@ locals {
   agripulse_secret_purposes = [
     "brevo-smtp-password",
     "keycloak-admin-password",
+    # OIDC client_secret for the `agripulse-api` confidential client. The
+    # api/workers charts pull this via crossRefs and inject it as
+    # KEYCLOAK_CLIENT_SECRET. Value must match the secret configured in
+    # the Keycloak realm for that client.
+    "keycloak-client-secret",
     # CD-13: per-env password for the `keycloak` CNPG role. CNPG reads
     # this via a k8s Secret synced by the keycloak chart's ExternalSecret;
     # Keycloak's externalDatabase block reads the same k8s Secret.

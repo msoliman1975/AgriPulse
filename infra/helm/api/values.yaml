@@ -106,26 +106,20 @@ env:
   PLATFORM_ADMIN_EMAIL: ""
   PLATFORM_ADMIN_FULL_NAME: "Platform Admin"
 
-# Secrets pulled from AWS Secrets Manager via ExternalSecret. The remote
-# JSON object's top-level keys are projected as env vars on the Pod.
+# Secrets pulled from AWS Secrets Manager via ExternalSecret. We use
+# crossRefs only (one SM secret per purpose at `agripulse/<env>/<purpose>`);
+# the older consolidated-JSON-blob approach (`remoteRef.key: agripulse/api`)
+# was removed because:
+#   - DATABASE_PASSWORD lives in the CNPG-managed `agripulse-pg-app` k8s
+#     Secret (CNPG owns its lifecycle — see extraEnv below).
+#   - AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY would override the SA's IRSA
+#     credentials at runtime, which we don't want.
 externalSecret:
   enabled: true
   refreshInterval: 1h
   secretStoreRef:
     name: aws-secretsmanager
     kind: ClusterSecretStore
-  remoteRef:
-    key: agripulse/api
-  # Map remote keys â†’ in-pod env names.
-  data:
-    - secretKey: DATABASE_PASSWORD
-      property: database_password
-    - secretKey: KEYCLOAK_CLIENT_SECRET
-      property: keycloak_client_secret
-    - secretKey: AWS_ACCESS_KEY_ID
-      property: aws_access_key_id
-    - secretKey: AWS_SECRET_ACCESS_KEY
-      property: aws_secret_access_key
   # CD-9 per-purpose secrets at `agripulse/<env>/<purpose>`. Each entry's
   # `remoteKey` is `tpl`-rendered against the chart context, so
   # `.Values.global.env` resolves from the overlay (dev/staging/prod).
@@ -136,6 +130,15 @@ externalSecret:
       remoteKey: "agripulse/{{ .Values.global.env }}/jwt-signing-key"
     - secretKey: SENTINEL_HUB_CLIENT_SECRET
       remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
+    - secretKey: KEYCLOAK_CLIENT_SECRET
+      remoteKey: "agripulse/{{ .Values.global.env }}/keycloak-client-secret"
+
+# DATABASE_PASSWORD is sourced from the k8s Secret CNPG creates for the
+# bootstrap app user (`<cluster>-app`, key `password`). This avoids
+# duplicating the credential in AWS Secrets Manager.
+databasePasswordSecret:
+  name: agripulse-pg-app
+  key: password
 
 serviceMonitor:
   enabled: true
@@ -155,6 +158,11 @@ pdb:
 networkPolicy:
   enabled: false # Enabled per-env in the production overlay.
 
-nodeSelector: {}
+# Stopgap until multi-arch CI lands: app images at
+# ghcr.io/msoliman1975/agripulse/api are amd64-only, so the chart needs
+# to pin pods to amd64 nodes to avoid "no match for platform in manifest"
+# errors when Karpenter places them on arm64 (cheaper Graviton) nodes.
+nodeSelector:
+  kubernetes.io/arch: amd64
 tolerations: []
 affinity: {}

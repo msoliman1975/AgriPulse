@@ -52,6 +52,14 @@ spec:
             - secretRef:
                 name: {{ include "agripulse-workers.fullname" $ }}-secrets
             {{- end }}
+          {{- with $.Values.databasePasswordSecret }}
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name | quote }}
+                  key: {{ .key | quote }}
+          {{- end }}
           resources:
             {{- toYaml $workload.resources | nindent 12 }}
           securityContext:

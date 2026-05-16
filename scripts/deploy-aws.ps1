@@ -98,7 +98,7 @@ function Invoke-Preflight($d) {
   }
   Write-Ok "AWS account $($callerJson.Account) ($($callerJson.Arn))"
 
-  foreach ($k in @('brevo.password','sentinel_hub.client_secret','keycloak.admin_password','jwt.signing_key','postgres.superuser_password')) {
+  foreach ($k in @('brevo.password','sentinel_hub.client_secret','keycloak.admin_password','keycloak.client_secret','jwt.signing_key','postgres.superuser_password')) {
     $parts = $k.Split('.')
     $val = $d[$parts[0]][$parts[1]]
     if ([string]::IsNullOrWhiteSpace($val) -or $val -eq 'SEED_ME') {
@@ -207,10 +207,11 @@ function Invoke-SeedSecrets($d) {
   Write-Step "Phase 5 â€” seed AWS Secrets Manager"
   $env = $d.environment
   $map = @{
-    "agripulse/$env/brevo-smtp-password"        = $d.brevo.password
-    "agripulse/$env/sentinel-hub-client-secret" = $d.sentinel_hub.client_secret
-    "agripulse/$env/keycloak-admin-password"    = $d.keycloak.admin_password
-    "agripulse/$env/jwt-signing-key"            = $d.jwt.signing_key
+    "agripulse/$env/brevo-smtp-password"         = $d.brevo.password
+    "agripulse/$env/sentinel-hub-client-secret"  = $d.sentinel_hub.client_secret
+    "agripulse/$env/keycloak-admin-password"     = $d.keycloak.admin_password
+    "agripulse/$env/keycloak-client-secret"      = $d.keycloak.client_secret
+    "agripulse/$env/jwt-signing-key"             = $d.jwt.signing_key
     "agripulse/$env/postgres-superuser-password" = $d.postgres.superuser_password
   }
 

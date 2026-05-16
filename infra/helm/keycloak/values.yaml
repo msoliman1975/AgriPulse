@@ -25,6 +25,16 @@ externalSecrets:
     enabled: true
 
 keycloak:
+  # Bitnami rotated the old `bitnami/keycloak:26.1.4-debian-12-r2` tag out
+  # of docker.io/bitnami/* — pulls returned `not found` and the keycloak
+  # pod went ImagePullBackOff. Repository tags continue to live on at
+  # `docker.io/bitnamilegacy/*`. Pin the registry+repo+tag explicitly so a
+  # silent upstream rotation can't break the dev cluster again.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/keycloak
+    tag: 26.1.4-debian-12-r2
+
   # CD-13: HA topology. `production: true` flips the bitnami chart to the
   # Quarkus-`start` runtime (not `start-dev`), enables Infinispan
   # distributed cache automatically, and turns on TLS-aware proxy

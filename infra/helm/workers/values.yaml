@@ -53,25 +53,17 @@ env:
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
 
+# Mirrors infra/helm/api/values.yaml — see that file for the rationale on
+# dropping the consolidated `agripulse/api` SM blob in favor of crossRefs
+# + a CNPG-managed k8s Secret for DATABASE_PASSWORD.
 externalSecret:
   enabled: true
   refreshInterval: 1h
   secretStoreRef:
     name: aws-secretsmanager
     kind: ClusterSecretStore
-  remoteRef:
-    key: agripulse/api # Same secret as API; keeps DB password in sync.
-  data:
-    - secretKey: DATABASE_PASSWORD
-      property: database_password
-    - secretKey: KEYCLOAK_CLIENT_SECRET
-      property: keycloak_client_secret
-    - secretKey: AWS_ACCESS_KEY_ID
-      property: aws_access_key_id
-    - secretKey: AWS_SECRET_ACCESS_KEY
-      property: aws_secret_access_key
   # CD-9 per-purpose secrets at `agripulse/<env>/<purpose>`. SMTP is
-  # included here because workers send notification email too â€” keeping
+  # included here because workers send notification email too — keeping
   # this in sync with the API chart is the documented gotcha in
   # docs/runbooks/seeding-secrets.md.
   crossRefs:
@@ -81,6 +73,13 @@ externalSecret:
       remoteKey: "agripulse/{{ .Values.global.env }}/jwt-signing-key"
     - secretKey: SENTINEL_HUB_CLIENT_SECRET
       remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
+    - secretKey: KEYCLOAK_CLIENT_SECRET
+      remoteKey: "agripulse/{{ .Values.global.env }}/keycloak-client-secret"
+
+# DATABASE_PASSWORD is sourced from the CNPG-managed `<cluster>-app` Secret.
+databasePasswordSecret:
+  name: agripulse-pg-app
+  key: password
 
 # Three workloads off the same image. light/heavy queues are conventional
 # names per ARCHITECTURE.md Â§ 3.1; beat is the singleton scheduler.
@@ -159,6 +158,8 @@ probes:
     periodSeconds: 60
     timeoutSeconds: 10
 
-nodeSelector: {}
+# Stopgap until multi-arch CI lands — see infra/helm/api/values.yaml.
+nodeSelector:
+  kubernetes.io/arch: amd64
 tolerations: []
 affinity: {}
