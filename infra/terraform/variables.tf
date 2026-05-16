@@ -74,6 +74,12 @@ variable "argocd_admin_allowlist_cidrs" {
   default     = []
 }
 
+variable "sso_admin_permission_set_id" {
+  description = "Trailing hash on the SSO permission-set role ARN — e.g. for `AWSReservedSSO_AdministratorAccess_519336c3efbae36e`, set this to `519336c3efbae36e`. Used by eks.tf's access_entries map to grant the SSO admin role cluster-admin so kubectl-from-laptop works without manual setup after a fresh bootstrap. Find via `aws iam list-roles --query \"Roles[?starts_with(RoleName, 'AWSReservedSSO_AdministratorAccess')].RoleName\"`."
+  type        = string
+  default     = "519336c3efbae36e"
+}
+
 variable "environments" {
   description = "Logical envs whose S3 buckets + IRSA roles this stack owns (regardless of var.environment). Imagery + pg-backup buckets are global resources; one TF stack owns all three so per-env apply doesn't drift."
   type        = list(string)

@@ -1,0 +1,36 @@
+---
+# Pre-creates the gp3 StorageClass (xfs) that CNPG + every persistent
+# workload expects as the cluster default. Synced at wave -1 so it
+# lands before any chart that creates PVCs.
+#
+# Why not in Terraform: see infra/argocd/storageclass-bootstrap/gp3.yaml
+# header — the ArgoCD Application pattern matches cnpg-crds/ and
+# external-secrets-bootstrap/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-storageclass-bootstrap
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  source:
+    repoURL: https://github.com/msoliman1975/AgriPulse.git
+    targetRevision: HEAD
+    path: infra/argocd/storageclass-bootstrap
+    directory:
+      recurse: false
+  syncPolicy:
+    automated:
+      # Prune off: deleting a default StorageClass cluster-wide is
+      # destructive enough that we want it to be a manual choice.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

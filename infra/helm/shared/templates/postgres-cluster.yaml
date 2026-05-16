@@ -62,6 +62,11 @@ spec:
   resources:
     {{- toYaml .Values.postgresCluster.resources | nindent 4 }}
 
+  {{- with .Values.postgresCluster.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
   postgresql:
     {{- with .Values.postgresCluster.postgresql.shared_preload_libraries }}
     # CNPG rejects shared_preload_libraries under `parameters` (it's a

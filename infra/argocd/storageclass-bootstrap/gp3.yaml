@@ -1,0 +1,30 @@
+# Default StorageClass for the cluster, backed by the AWS EBS CSI driver
+# (installed as an EKS managed addon — see infra/terraform/eks.tf).
+#
+# Why xfs and not ext4:
+#   ext4-formatted volumes ship a `lost+found` directory at the root, and
+#   CNPG's initdb refuses to bootstrap on a non-empty WAL volume:
+#     `initdb: error: directory "/var/lib/postgresql/wal/pg_wal" exists but is not empty`
+#   xfs has no such directory, so a freshly-mounted PVC looks empty.
+#
+# Why this file lives here (and not in Terraform):
+#   Cluster-scoped k8s resources are awkward to manage in Terraform's
+#   helm/kubernetes providers (every apply re-validates against the live
+#   API; doesn't play well with separate kubectl/Helm flows). The
+#   ArgoCD Application pattern matches how we vendor cnpg-crds/ and
+#   external-secrets-bootstrap/.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true"
+  # See header — xfs avoids the ext4 lost+found that breaks CNPG initdb.
+  csi.storage.k8s.io/fstype: xfs

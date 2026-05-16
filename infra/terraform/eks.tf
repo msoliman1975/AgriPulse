@@ -73,11 +73,40 @@ module "eks" {
         }
       }
 
+      # AmazonSSMManagedInstanceCore lets the EKS node register with SSM,
+      # which is the supported escape hatch for `kubectl` from a laptop
+      # behind Netskope (it MITMs *.eks.amazonaws.com; SSM port-forward
+      # bypasses that). Without this the first session-manager-plugin
+      # tunnel fails with TargetNotConnected.
+      iam_role_additional_policies = {
+        AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }
+
       tags = local.common_tags
     }
   }
 
   enable_cluster_creator_admin_permissions = true
+
+  # Map the SSO Administrator role into the cluster so kubectl from a
+  # laptop (via the SSO `agripulse` profile) is admin out of the gate.
+  # Without this entry, every fresh bootstrap requires manually running
+  # `aws eks create-access-entry` for the SSO role before kubectl works.
+  # The path-prefixed ARN form is required — EKS rejects the simpler
+  # `role/AWSReservedSSO_...` form.
+  access_entries = {
+    sso_admin = {
+      principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_${var.sso_admin_permission_set_id}"
+      policy_associations = {
+        cluster_admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
 
   tags = local.common_tags
 }

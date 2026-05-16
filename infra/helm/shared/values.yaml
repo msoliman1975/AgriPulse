@@ -75,7 +75,20 @@ postgresCluster:
   enabled: true
   name: agripulse-pg
   instances: 2
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.4-bookworm
+  # CNPG-aware community build that bundles PG 16 + TimescaleDB + PostGIS
+  # + pgaudit (matches shared_preload_libraries + the postInitSQL
+  # CREATE EXTENSION list). Upstream `ghcr.io/cloudnative-pg/postgresql`
+  # has no timescaledb, which causes PG startup to fail with
+  # `could not access file "timescaledb"` once shared_preload_libraries
+  # references it. The image is published amd64-only; CNPG pods are
+  # pinned to amd64 via `affinity` below.
+  imageName: ghcr.io/imusmanmalik/timescaledb-postgis:16-3.5-115
+  # Force CNPG pods onto amd64 nodes. Karpenter provisions both arm64
+  # (cheap default) and amd64 (when needed); this selector keeps PG on
+  # amd64 since the chosen image is amd64-only.
+  affinity:
+    nodeSelector:
+      kubernetes.io/arch: amd64
   # IRSA annotations applied to the CNPG-managed ServiceAccount via
   # `spec.serviceAccountTemplate.metadata.annotations`. Overlays set the
   # `eks.amazonaws.com/role-arn` key from `terraform output
