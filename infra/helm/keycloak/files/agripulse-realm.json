@@ -26,12 +26,16 @@
       "redirectUris": [
         "http://localhost:5173/*",
         "http://localhost:3000/*",
-        "http://localhost:8000/*"
+        "http://localhost:8000/*",
+        "https://app.dev.agripulse.cloud/*",
+        "https://api.dev.agripulse.cloud/*"
       ],
       "webOrigins": [
         "http://localhost:5173",
         "http://localhost:3000",
-        "http://localhost:8000"
+        "http://localhost:8000",
+        "https://app.dev.agripulse.cloud",
+        "https://api.dev.agripulse.cloud"
       ],
       "attributes": {
         "post.logout.redirect.uris": "+",
