@@ -30,6 +30,12 @@ keycloak:
   # pod went ImagePullBackOff. Repository tags continue to live on at
   # `docker.io/bitnamilegacy/*`. Pin the registry+repo+tag explicitly so a
   # silent upstream rotation can't break the dev cluster again.
+  # `global.security.allowInsecureImages: true` is required to let the
+  # bitnami chart's NOTES.txt guard accept a non-`bitnami/*` repository
+  # (see https://github.com/bitnami/charts/issues/30850).
+  global:
+    security:
+      allowInsecureImages: true
   image:
     registry: docker.io
     repository: bitnamilegacy/keycloak
