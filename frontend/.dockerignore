@@ -14,3 +14,6 @@ Dockerfile
 .env
 .env.*
 !.env.example
+# .env.production carries committed dev-cluster hostnames so Vite
+# inlines them at build time (no secrets — only public OIDC + API URLs).
+!.env.production
