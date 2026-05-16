@@ -90,7 +90,7 @@ workloads:
     command:
       - celery
       - --app
-      - workers.light.main:celery_app
+      - workers.light.main:app
       - worker
       - --loglevel=INFO
       - --queues=light
@@ -111,7 +111,7 @@ workloads:
     command:
       - celery
       - --app
-      - workers.heavy.main:celery_app
+      - workers.heavy.main:app
       - worker
       - --loglevel=INFO
       - --queues=heavy
@@ -131,7 +131,7 @@ workloads:
     command:
       - celery
       - --app
-      - workers.beat.main:celery_app
+      - workers.beat.main:app
       - beat
       - --loglevel=INFO
       - --schedule=/tmp/celerybeat-schedule
@@ -152,7 +152,7 @@ probes:
         [
           "sh",
           "-c",
-          "celery --app workers.light.main:celery_app inspect ping -d celery@$HOSTNAME || true",
+          "celery --app workers.light.main:app inspect ping -d celery@$HOSTNAME || true",
         ]
     initialDelaySeconds: 30
     periodSeconds: 60
