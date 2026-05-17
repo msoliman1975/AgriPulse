@@ -14,19 +14,20 @@ global:
   # renders. Only the dev overlay is auto-bumped; staging/production
   # promotion is hand-written.
   # Pinned to the latest main SHA where the CI `containers` matrix passed
-  # (commit cb81774, 2026-05-15). The auto-bump workflow in
-  # `.github/workflows/argocd-sync.yml` only fires when the CI workflow as
-  # a whole goes green — backend mypy and frontend eslint are currently
-  # red, so dev tags are bumped by hand until that's fixed.
+  # (commit 858949d, 2026-05-17 — first multi-arch run after BH-1..BH-4).
+  # The auto-bump workflow in `.github/workflows/argocd-sync.yml` only
+  # fires when the CI workflow as a whole goes green — backend ruff and
+  # frontend eslint + pre-commit are currently red, so dev tags are
+  # bumped by hand until that's fixed.
   images:
     api:
-      tag: "684cd54"
+      tag: "858949d"
     workers:
-      tag: "684cd54"
+      tag: "858949d"
     frontend:
-      tag: "cd383dd"
+      tag: "858949d"
     tileServer:
-      tag: "cb81774"
+      tag: "858949d"
 
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
