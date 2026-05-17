@@ -77,7 +77,7 @@ jobs:
           yq '{ "global": .global.images, "keycloak.image.tag": .keycloak.image.tag }' "$OVERLAY"
 
       - name: Open bump PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: argocd/dev-image-bump
           base: main
