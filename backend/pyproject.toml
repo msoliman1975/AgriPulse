@@ -10,7 +10,7 @@ authors = [{ name = "AgriPulse" }]
 dependencies = [
   # Web framework
   "fastapi>=0.115,<0.116",
-  "uvicorn[standard]>=0.32,<0.33",
+  "uvicorn[standard]>=0.32,<0.48",
   "pydantic[email]>=2.9,<3",
   "pydantic-settings>=2.6,<3",
 
