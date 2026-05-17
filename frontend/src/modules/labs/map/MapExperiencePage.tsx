@@ -106,11 +106,8 @@ function FarmPickerRedirect() {
   useEffect(() => {
     if (!farmsQ.data) return;
     const last =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(LAST_FARM_STORAGE_KEY)
-        : null;
-    const target =
-      farmsQ.data.items.find((f) => f.id === last) ?? farmsQ.data.items[0];
+      typeof window !== "undefined" ? window.localStorage.getItem(LAST_FARM_STORAGE_KEY) : null;
+    const target = farmsQ.data.items.find((f) => f.id === last) ?? farmsQ.data.items[0];
     if (target) navigate(`/labs/map/${target.id}`, { replace: true });
   }, [farmsQ.data, navigate]);
 
@@ -118,14 +115,14 @@ function FarmPickerRedirect() {
   if (farmsQ.isError) {
     return (
       <FullState>
-        <p>Couldn't load farms.</p>
+        <p>Couldn&apos;t load farms.</p>
       </FullState>
     );
   }
   if (farmsQ.data && farmsQ.data.items.length === 0) {
     return (
       <FullState>
-        <p>You don't have a farm yet — create one to begin.</p>
+        <p>You don&apos;t have a farm yet — create one to begin.</p>
       </FullState>
     );
   }
@@ -179,17 +176,13 @@ function MapForFarm({ farmId }: { farmId: string }) {
 
   // Block-create state — after a polygon is finalized, the form modal
   // collects code/name/irrigation.
-  const [pendingBlockPolygon, setPendingBlockPolygon] = useState<Polygon | null>(
-    null,
-  );
+  const [pendingBlockPolygon, setPendingBlockPolygon] = useState<Polygon | null>(null);
   const [pendingBlockArea, setPendingBlockArea] = useState<number>(0);
 
   // Farm-AOI state — captures the polygon that's been drawn for the farm
   // drawer to consume. Wrapped into a MultiPolygon at submit time.
   const [pendingFarmAoi, setPendingFarmAoi] = useState<MultiPolygon | null>(null);
-  const [pendingFarmAoiAreaM2, setPendingFarmAoiAreaM2] = useState<number | null>(
-    null,
-  );
+  const [pendingFarmAoiAreaM2, setPendingFarmAoiAreaM2] = useState<number | null>(null);
 
   // Pivot-create state — captured when the user finishes the click-center +
   // click-radius interaction. Modal collects code/name/sector_count.
@@ -217,15 +210,14 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [inactivateBlockOpen, setInactivateBlockOpen] = useState(false);
   const [inactivateBlockPreview, setInactivateBlockPreview] =
     useState<BlockInactivationPreview | null>(null);
-  const [inactivateBlockPreviewError, setInactivateBlockPreviewError] =
-    useState<string | null>(null);
+  const [inactivateBlockPreviewError, setInactivateBlockPreviewError] = useState<string | null>(
+    null,
+  );
 
   const [inactivateFarmOpen, setInactivateFarmOpen] = useState(false);
   const [inactivateFarmPreview, setInactivateFarmPreview] =
     useState<FarmInactivationPreview | null>(null);
-  const [inactivateFarmPreviewError, setInactivateFarmPreviewError] = useState<
-    string | null
-  >(null);
+  const [inactivateFarmPreviewError, setInactivateFarmPreviewError] = useState<string | null>(null);
 
   // ---- Data queries -------------------------------------------------------
 
@@ -269,7 +261,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
         blockId: selectedId!,
         blocksById,
         activePlan: summaryQ.data?.activePlan ?? null,
-        blockHealth: selectedId ? summaryQ.data?.blockHealth[selectedId] ?? null : null,
+        blockHealth: selectedId ? (summaryQ.data?.blockHealth[selectedId] ?? null) : null,
       }),
     enabled: Boolean(farmId && selectedId && blocksById.size > 0),
     staleTime: 30_000,
@@ -439,9 +431,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
       const data = await getBlockInactivationPreview(selectedId);
       setInactivateBlockPreview(data);
     } catch (err) {
-      setInactivateBlockPreviewError(
-        err instanceof Error ? err.message : "Failed to load preview",
-      );
+      setInactivateBlockPreviewError(err instanceof Error ? err.message : "Failed to load preview");
     }
   }
 
@@ -453,9 +443,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
       const data = await getFarmInactivationPreview(farmId);
       setInactivateFarmPreview(data);
     } catch (err) {
-      setInactivateFarmPreviewError(
-        err instanceof Error ? err.message : "Failed to load preview",
-      );
+      setInactivateFarmPreviewError(err instanceof Error ? err.message : "Failed to load preview");
     }
   }
 
@@ -491,7 +479,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
   if (summaryQ.isError || !summaryQ.data) {
     return (
       <FullState>
-        <p>Couldn't load map.</p>
+        <p>Couldn&apos;t load map.</p>
         <button
           type="button"
           onClick={() => summaryQ.refetch()}
@@ -509,19 +497,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const inactiveBlocks: Block[] = inactiveBlocksQ.data ?? [];
 
   return (
-    <div
-      className="-mx-4 -my-6 flex flex-col"
-      style={{ height: "calc(100vh - 56px)" }}
-    >
+    <div className="-mx-4 -my-6 flex flex-col" style={{ height: "calc(100vh - 56px)" }}>
       <Toolbar
         farmName={summary.farm.name}
         drawTarget={drawTarget}
-        onToggleDrawBlock={() =>
-          setDrawTarget((cur) => (cur === "block" ? null : "block"))
-        }
-        onToggleDrawPivot={() =>
-          setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))
-        }
+        onToggleDrawBlock={() => setDrawTarget((cur) => (cur === "block" ? null : "block"))}
+        onToggleDrawPivot={() => setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))}
         layerPrefs={layerPrefs}
         onLayerPrefsChange={setLayerPrefs}
         farmsList={farmsListQ.data?.items ?? []}
@@ -537,10 +518,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
         }}
       />
 
-      <FarmSummaryStrip
-        farm={summary.farm}
-        onOpenDrawer={() => setFarmDrawerMode("view")}
-      />
+      <FarmSummaryStrip farm={summary.farm} onOpenDrawer={() => setFarmDrawerMode("view")} />
 
       <div className="relative flex-1 overflow-hidden">
         {noUnits && !drawing ? (
@@ -584,9 +562,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
               });
             }}
             reshapeBlock={
-              reshapeTarget
-                ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary }
-                : null
+              reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
             }
             onReshape={(poly) => setReshapeCandidate(poly)}
             showAoi={layerPrefs.aoi}
@@ -609,9 +585,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
             editableBlock={editingBlock}
             onStartEdit={openEditBlock}
             onCancelEdit={() => setEditingBlock(null)}
-            onSaveEdit={(patch) =>
-              updateBlockMut.mutate({ blockId: selectedId, patch })
-            }
+            onSaveEdit={(patch) => updateBlockMut.mutate({ blockId: selectedId, patch })}
             saving={updateBlockMut.isPending}
             saveError={updateBlockMut.error?.message ?? null}
             reshaping={reshapeTarget?.id === selectedId}
@@ -660,29 +634,21 @@ function MapForFarm({ farmId }: { farmId: string }) {
               setPendingBlockPolygon(null);
               setPendingBlockArea(0);
             }}
-            onSubmit={(values) =>
-              createBlockMut.mutate({ polygon: pendingBlockPolygon, values })
-            }
+            onSubmit={(values) => createBlockMut.mutate({ polygon: pendingBlockPolygon, values })}
           />
         ) : null}
 
         {farmDrawerMode ? (
           <FarmDrawer
             mode={farmDrawerMode}
-            farm={
-              farmDrawerMode === "create"
-                ? null
-                : summary.farm
-            }
+            farm={farmDrawerMode === "create" ? null : summary.farm}
             inactiveBlocks={inactiveBlocks}
             draftBoundary={pendingFarmAoi}
             draftAreaM2={pendingFarmAoiAreaM2}
             width={drawerWidth}
             drawingAoi={drawTarget === "farm_aoi"}
             submitting={createFarmMut.isPending || updateFarmMut.isPending}
-            submitError={
-              createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null
-            }
+            submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
             onClose={() => {
               setFarmDrawerMode(null);
               setPendingFarmAoi(null);
@@ -702,9 +668,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
 
         {inactivateBlockOpen && selectedId ? (
           <InactivateConfirmModal
-            confirmKeyword={
-              summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"
-            }
+            confirmKeyword={summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"}
             entityLabel="block"
             preview={inactivateBlockPreview}
             previewError={inactivateBlockPreviewError}
@@ -715,9 +679,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
               setInactivateBlockPreview(null);
               setInactivateBlockPreviewError(null);
             }}
-            onSubmit={(reason) =>
-              inactivateBlockMut.mutate({ blockId: selectedId, reason })
-            }
+            onSubmit={(reason) => inactivateBlockMut.mutate({ blockId: selectedId, reason })}
           />
         ) : null}
 
@@ -924,10 +886,7 @@ function LayerToggle({
 function Swatch({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1">
-      <span
-        className="inline-block h-2.5 w-2.5 rounded-sm"
-        style={{ backgroundColor: color }}
-      />
+      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
       {label}
     </span>
   );
@@ -941,23 +900,22 @@ function MapNote({ drawTarget }: { drawTarget: DrawTarget | null }) {
     >
       {drawTarget === "block" ? (
         <div>
-          <strong>Drawing block</strong> · click to add vertices ·{" "}
-          <strong>double-click</strong> to finish
+          <strong>Drawing block</strong> · click to add vertices · <strong>double-click</strong> to
+          finish
         </div>
       ) : drawTarget === "farm_aoi" ? (
         <div>
-          <strong>Drawing farm AOI</strong> · click to add vertices ·{" "}
-          <strong>double-click</strong> to finish
+          <strong>Drawing farm AOI</strong> · click to add vertices · <strong>double-click</strong>{" "}
+          to finish
         </div>
       ) : drawTarget === "pivot" ? (
         <div>
-          <strong>Drawing pivot</strong> · click center · move to set radius ·{" "}
-          click to confirm · <strong>Esc</strong> cancels
+          <strong>Drawing pivot</strong> · click center · move to set radius · click to confirm ·{" "}
+          <strong>Esc</strong> cancels
         </div>
       ) : (
         <div>
-          <strong>Click</strong> any solid unit ·{" "}
-          <strong>click</strong> an index to expand chart
+          <strong>Click</strong> any solid unit · <strong>click</strong> an index to expand chart
         </div>
       )}
     </div>

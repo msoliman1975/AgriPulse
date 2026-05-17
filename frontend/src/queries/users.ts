@@ -33,11 +33,7 @@ export function useInviteTenantUser() {
 
 export function useUpdateTenantUser() {
   const qc = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    { userId: string; payload: UserUpdatePayload }
-  >({
+  return useMutation<void, Error, { userId: string; payload: UserUpdatePayload }>({
     mutationFn: ({ userId, payload }) => updateTenantUser(userId, payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tenant_users"] });

@@ -10,11 +10,7 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
-import {
-  HEALTH_FILL,
-  HEALTH_FILL_OPACITY,
-  HEALTH_STROKE,
-} from "./health";
+import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import type { UnitFeatureProps } from "./types";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 
@@ -72,7 +68,7 @@ const STYLE: StyleSpecification = {
   version: 8,
   glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources: {
-    "satellite": {
+    satellite: {
       type: "raster",
       tiles: [
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -192,11 +188,7 @@ export function MapCanvas({
             "case",
             ["==", ["get", "is_future"], true],
             0.25,
-            healthMatch(
-              "health",
-              HEALTH_FILL_OPACITY,
-              HEALTH_FILL_OPACITY.unknown,
-            ),
+            healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown),
           ],
         },
       });
@@ -294,15 +286,7 @@ export function MapCanvas({
             "#854F0B",
             "#999999",
           ],
-          "circle-radius": [
-            "match",
-            ["get", "alert_severity"],
-            "critical",
-            10,
-            "watch",
-            8,
-            6,
-          ],
+          "circle-radius": ["match", ["get", "alert_severity"], "critical", 10, "watch", 8, 6],
           "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 1.5,
           "circle-translate": [12, -12],
@@ -343,6 +327,9 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map) return;
     const apply = () => {
+      // tsc -b cannot narrow maplibre-gl's Source to GeoJSONSource for
+      // .setData; eslint thinks it can. Tsc wins — keep the cast.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       if (!src) return;
       src.setData(geojson);
@@ -358,6 +345,8 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map) return;
     const apply = () => {
+      // See SOURCE_ID note above — tsc requires the cast, eslint thinks it's redundant.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const src = map.getSource(AOI_SOURCE_ID) as GeoJSONSource | undefined;
       if (!src) return;
       if (!farmBoundary) {
@@ -454,12 +443,8 @@ export function MapCanvas({
     const onCreate = (evt: { features: GeoJSON.Feature[] }) => {
       const f = evt.features[0];
       if (!f || f.geometry.type !== "Polygon") return;
-      const poly = f.geometry as Polygon;
-      onPolygonDrawnRef.current?.(
-        poly,
-        approxPolygonAreaM2(poly),
-        drawTargetRef.current,
-      );
+      const poly = f.geometry;
+      onPolygonDrawnRef.current?.(poly, approxPolygonAreaM2(poly), drawTargetRef.current);
       try {
         draw.deleteAll();
       } catch {
@@ -520,7 +505,7 @@ export function MapCanvas({
       const all = draw.getAll();
       const f = all.features[0];
       if (!f || f.geometry.type !== "Polygon") return;
-      onReshapeRef.current?.(f.geometry as Polygon);
+      onReshapeRef.current?.(f.geometry);
     };
     map.on("draw.update", onUpdate);
 
@@ -575,6 +560,8 @@ export function MapCanvas({
     ensureSource();
 
     const setPreview = (c: [number, number] | null, radius_m: number) => {
+      // See SOURCE_ID note above — tsc requires the cast, eslint thinks it's redundant.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const src = map.getSource(PIVOT_SOURCE) as GeoJSONSource | undefined;
       if (!src) return;
       if (!c || radius_m <= 0) {
@@ -643,12 +630,7 @@ export function MapCanvas({
   }, [drawEnabled, drawTarget]);
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full"
-      role="application"
-      aria-label="Farm map"
-    />
+    <div ref={containerRef} className="h-full w-full" role="application" aria-label="Farm map" />
   );
 }
 
@@ -695,7 +677,7 @@ function approxPolygonAreaM2(poly: Polygon): number {
   const R = 6_378_137; // WGS-84 equatorial radius
   let total = 0;
   for (let i = 0; i < poly.coordinates.length; i++) {
-    const ring = poly.coordinates[i]!;
+    const ring = poly.coordinates[i];
     const a = ringAreaM2(ring, R);
     // First ring is exterior, subsequent rings are holes.
     total += i === 0 ? Math.abs(a) : -Math.abs(a);
@@ -711,9 +693,7 @@ function haversineMeters(a: [number, number], b: [number, number]): number {
   const phi2 = (lat2 * Math.PI) / 180;
   const dphi = ((lat2 - lat1) * Math.PI) / 180;
   const dl = ((lon2 - lon1) * Math.PI) / 180;
-  const x =
-    Math.sin(dphi / 2) ** 2 +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(dl / 2) ** 2;
+  const x = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dl / 2) ** 2;
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
@@ -733,7 +713,7 @@ function buildCircle(lat: number, lon: number, radius_m: number): Polygon {
     const dlon = ((dx / (R * cosLat)) * 180) / Math.PI;
     coords.push([lon + dlon, lat + dlat]);
   }
-  coords.push(coords[0]!);
+  coords.push(coords[0]);
   return { type: "Polygon", coordinates: [coords] };
 }
 
@@ -741,11 +721,11 @@ function ringAreaM2(ring: number[][], R: number): number {
   if (ring.length < 3) return 0;
   let total = 0;
   for (let i = 0; i < ring.length; i++) {
-    const [lon1, lat1] = ring[i]!;
-    const [lon2, lat2] = ring[(i + 1) % ring.length]!;
+    const [lon1, lat1] = ring[i];
+    const [lon2, lat2] = ring[(i + 1) % ring.length];
     total +=
-      ((lon2! - lon1!) * Math.PI) / 180 *
-      (2 + Math.sin((lat1! * Math.PI) / 180) + Math.sin((lat2! * Math.PI) / 180));
+      (((lon2 - lon1) * Math.PI) / 180) *
+      (2 + Math.sin((lat1 * Math.PI) / 180) + Math.sin((lat2 * Math.PI) / 180));
   }
   return (total * R * R) / 2;
 }

@@ -4,12 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
-import {
-  type InboxAction,
-  type InboxItem,
-  listInbox,
-  transitionInboxItem,
-} from "@/api/inbox";
+import { type InboxAction, type InboxItem, listInbox, transitionInboxItem } from "@/api/inbox";
 import { Skeleton } from "@/components/Skeleton";
 
 import { Drawer } from "./Drawer";
@@ -125,9 +120,6 @@ function SeverityDot({
           ? "bg-ap-accent"
           : "bg-ap-line";
   return (
-    <span
-      aria-hidden="true"
-      className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${cls}`}
-    />
+    <span aria-hidden="true" className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${cls}`} />
   );
 }

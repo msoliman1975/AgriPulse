@@ -2,12 +2,7 @@
 
 import { apiClient } from "./client";
 
-export type RecommendationState =
-  | "open"
-  | "applied"
-  | "dismissed"
-  | "deferred"
-  | "expired";
+export type RecommendationState = "open" | "applied" | "dismissed" | "deferred" | "expired";
 
 export type RecommendationSeverity = "info" | "warning" | "critical";
 
@@ -87,9 +82,7 @@ export async function listRecommendations(
 }
 
 export async function getRecommendation(recommendationId: string): Promise<Recommendation> {
-  const { data } = await apiClient.get<Recommendation>(
-    `/v1/recommendations/${recommendationId}`,
-  );
+  const { data } = await apiClient.get<Recommendation>(`/v1/recommendations/${recommendationId}`);
   return data;
 }
 

@@ -54,7 +54,7 @@ export function RulesConfigPage(): ReactNode {
     for (const o of overrides.data ?? []) overrideByCode.set(o.rule_code, o);
     return defaults.data.map((rule) => {
       const override = overrideByCode.get(rule.code) ?? null;
-      const effectiveSeverity = (override?.modified_severity ?? rule.severity) as AlertSeverity;
+      const effectiveSeverity = override?.modified_severity ?? rule.severity;
       return {
         rule,
         override,
@@ -107,12 +107,7 @@ export function RulesConfigPage(): ReactNode {
           ) : (
             <ul className="divide-y divide-ap-line">
               {merged.map((m) => (
-                <RuleRow
-                  key={m.rule.code}
-                  merged={m}
-                  isAr={isAr}
-                  canManage={canManage}
-                />
+                <RuleRow key={m.rule.code} merged={m} isAr={isAr} canManage={canManage} />
               ))}
             </ul>
           )}
@@ -151,8 +146,7 @@ function RuleRow({
 
   const name = (isAr ? merged.rule.name_ar : merged.rule.name_en) ?? merged.rule.name_en;
   const description =
-    (isAr ? merged.rule.description_ar : merged.rule.description_en) ??
-    merged.rule.description_en;
+    (isAr ? merged.rule.description_ar : merged.rule.description_en) ?? merged.rule.description_en;
 
   const save = (): void => {
     const payload: RuleOverrideUpsertPayload = {
@@ -220,9 +214,7 @@ function RuleRow({
             )}
           </div>
           <div className="mt-1 text-[11px] text-ap-muted">{cropTag}</div>
-          {description ? (
-            <p className="mt-1 text-sm text-ap-muted">{description}</p>
-          ) : null}
+          {description ? <p className="mt-1 text-sm text-ap-muted">{description}</p> : null}
           <button
             type="button"
             onClick={() => setExpanded((s) => !s)}
@@ -233,17 +225,13 @@ function RuleRow({
           {expanded ? (
             <div className="mt-2 grid gap-2 rounded-md border border-ap-line bg-ap-bg/40 p-3 text-[11px]">
               <div>
-                <div className="mb-1 font-semibold text-ap-ink">
-                  {t("row.conditionsHeader")}
-                </div>
+                <div className="mb-1 font-semibold text-ap-ink">{t("row.conditionsHeader")}</div>
                 <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[10px] text-ap-ink">
                   {JSON.stringify(merged.rule.conditions, null, 2)}
                 </pre>
               </div>
               <div>
-                <div className="mb-1 font-semibold text-ap-ink">
-                  {t("row.actionsHeader")}
-                </div>
+                <div className="mb-1 font-semibold text-ap-ink">{t("row.actionsHeader")}</div>
                 <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[10px] text-ap-ink">
                   {JSON.stringify(merged.rule.actions, null, 2)}
                 </pre>
@@ -264,14 +252,10 @@ function RuleRow({
             <span>{bufferDisabled ? t("row.disable") : t("row.enable")}</span>
           </label>
           <label className="inline-flex items-center gap-2">
-            <span className="text-xs font-medium text-ap-muted">
-              {t("row.severityOverride")}
-            </span>
+            <span className="text-xs font-medium text-ap-muted">{t("row.severityOverride")}</span>
             <select
               value={bufferSeverity}
-              onChange={(e) =>
-                setBufferSeverity(e.target.value as AlertSeverity | "default")
-              }
+              onChange={(e) => setBufferSeverity(e.target.value as AlertSeverity | "default")}
               className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
             >
               <option value="default">
@@ -311,27 +295,17 @@ function RuleRow({
         </p>
       )}
       {upsert.isError ? (
-        <p className="text-xs text-ap-crit">
-          {(upsert.error as Error)?.message ?? t("row.saveFailed")}
-        </p>
+        <p className="text-xs text-ap-crit">{upsert.error?.message ?? t("row.saveFailed")}</p>
       ) : null}
     </li>
   );
 }
 
-
 // =====================================================================
 // Tenant rules: list + create + edit
 // =====================================================================
 
-
-function TenantRulesSection({
-  canManage,
-  isAr,
-}: {
-  canManage: boolean;
-  isAr: boolean;
-}): ReactNode {
+function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boolean }): ReactNode {
   const { t } = useTranslation("rules");
   const tenantRules = useTenantRules();
   const deleteMut = useDeleteTenantRule();
@@ -395,7 +369,7 @@ function TenantRulesSection({
         )}
         {deleteMut.isError ? (
           <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
-            {(deleteMut.error as Error)?.message}
+            {deleteMut.error?.message}
           </p>
         ) : null}
       </div>
@@ -522,8 +496,11 @@ function TenantRuleForm({
     let conditions: Record<string, unknown>;
     let actions: Record<string, unknown>;
     try {
-      conditions = JSON.parse(conditionsText);
-      actions = JSON.parse(actionsText);
+      // JSON.parse returns `any` — cast to the intended shape since
+      // we hand it to the API as Record<string, unknown> downstream
+      // and the server validates against the rule schema.
+      conditions = JSON.parse(conditionsText) as Record<string, unknown>;
+      actions = JSON.parse(actionsText) as Record<string, unknown>;
     } catch {
       setError(t("form.invalidJson"));
       return;
@@ -543,10 +520,7 @@ function TenantRuleForm({
         conditions,
         actions,
       };
-      update.mutate(
-        { code: existing.code, payload },
-        { onSuccess: onClose },
-      );
+      update.mutate({ code: existing.code, payload }, { onSuccess: onClose });
     } else {
       const payload: TenantRuleCreatePayload = {
         code: code.trim(),
@@ -564,8 +538,7 @@ function TenantRuleForm({
   };
 
   const pending = create.isPending || update.isPending;
-  const submitErr =
-    (create.error as Error)?.message || (update.error as Error)?.message || null;
+  const submitErr = (create.error as Error)?.message || (update.error as Error)?.message || null;
 
   return (
     <form
@@ -660,11 +633,7 @@ function TenantRuleForm({
             className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-2 py-1 font-mono text-[11px] shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
           />
         </FormField>
-        <FormField
-          label={t("form.actions")}
-          hint={t("form.actionsHint")}
-          className="sm:col-span-2"
-        >
+        <FormField label={t("form.actions")} hint={t("form.actionsHint")} className="sm:col-span-2">
           <textarea
             required
             value={actionsText}

@@ -14,9 +14,7 @@ export async function readTenantIntegration(
   tenantId: string,
   category: Category,
 ): Promise<TenantSettingsBag> {
-  const { data } = await apiClient.get<TenantSettingsBag>(
-    base(tenantId, category),
-  );
+  const { data } = await apiClient.get<TenantSettingsBag>(base(tenantId, category));
   return data;
 }
 
@@ -39,9 +37,8 @@ export async function clearTenantIntegration(
   category: Category,
   key: string,
 ): Promise<ResolvedSetting> {
-  const { data } = await apiClient.delete<ResolvedSetting>(
-    base(tenantId, category),
-    { params: { key } },
-  );
+  const { data } = await apiClient.delete<ResolvedSetting>(base(tenantId, category), {
+    params: { key },
+  });
   return data;
 }

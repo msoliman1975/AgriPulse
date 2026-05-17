@@ -53,17 +53,12 @@ export async function listTenantUsers(): Promise<TenantUser[]> {
   return data;
 }
 
-export async function inviteTenantUser(
-  payload: UserInvitePayload,
-): Promise<UserInviteResponse> {
+export async function inviteTenantUser(payload: UserInvitePayload): Promise<UserInviteResponse> {
   const { data } = await apiClient.post<UserInviteResponse>("/v1/users:invite", payload);
   return data;
 }
 
-export async function updateTenantUser(
-  userId: string,
-  payload: UserUpdatePayload,
-): Promise<void> {
+export async function updateTenantUser(userId: string, payload: UserUpdatePayload): Promise<void> {
   await apiClient.patch(`/v1/users/${userId}`, payload);
 }
 

@@ -125,9 +125,7 @@ export async function updateFarm(farmId: string, payload: FarmUpdatePayload): Pr
   return normalizeFarm(data);
 }
 
-export async function getFarmInactivationPreview(
-  farmId: string,
-): Promise<FarmInactivationPreview> {
+export async function getFarmInactivationPreview(farmId: string): Promise<FarmInactivationPreview> {
   const { data } = await apiClient.get<FarmInactivationPreview>(
     `/v1/farms/${farmId}/inactivate-preview`,
   );

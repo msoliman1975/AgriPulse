@@ -81,11 +81,7 @@ export function useCreateTenantRule() {
 
 export function useUpdateTenantRule() {
   const qc = useQueryClient();
-  return useMutation<
-    TenantRule,
-    Error,
-    { code: string; payload: TenantRuleUpdatePayload }
-  >({
+  return useMutation<TenantRule, Error, { code: string; payload: TenantRuleUpdatePayload }>({
     mutationFn: ({ code, payload }) => updateTenantRule(code, payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["alert_rules", "tenant"] });

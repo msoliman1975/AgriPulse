@@ -50,10 +50,7 @@ function renderWizard() {
       <MemoryRouter initialEntries={["/platform/tenants/new"]}>
         <Routes>
           <Route path="/platform/tenants/new" element={<TenantCreatePage />} />
-          <Route
-            path="/platform/tenants/:tenantId"
-            element={<p>landed-on-detail</p>}
-          />
+          <Route path="/platform/tenants/:tenantId" element={<p>landed-on-detail</p>} />
           <Route path="/platform/tenants" element={<p>landed-on-list</p>} />
         </Routes>
       </MemoryRouter>
@@ -73,9 +70,7 @@ async function fillProfile(user: ReturnType<typeof userEvent.setup>): Promise<vo
  * owner_email and owner_full_name; the per-test mocks decide what the
  * server returns from the eventual `Create tenant` click.
  */
-async function advanceToReview(
-  user: ReturnType<typeof userEvent.setup>,
-): Promise<void> {
+async function advanceToReview(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await fillProfile(user);
   await user.click(screen.getByRole("button", { name: "Next" }));
   await screen.findByLabelText("Initial owner email");
@@ -124,9 +119,7 @@ describe("<TenantCreatePage>", () => {
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     expect(await screen.findByText("Tenant created")).toBeInTheDocument();
-    expect(
-      screen.getByText("Welcome email sent to owner@acme.test."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Welcome email sent to owner@acme.test.")).toBeInTheDocument();
     // useMutation invokes mutationFn with (variables, ctx); assert on the
     // first arg only.
     expect(createMock.mock.calls[0][0]).toEqual(
@@ -158,9 +151,7 @@ describe("<TenantCreatePage>", () => {
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("A tenant with this slug already exists."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("A tenant with this slug already exists.")).toBeInTheDocument();
     });
     expect(screen.getByLabelText("Slug")).toHaveValue("acme-farms");
   });
@@ -169,18 +160,14 @@ describe("<TenantCreatePage>", () => {
     // owner_email is required client-side; this test exercises the
     // post-create UX where the server completes the tenant row but
     // skipped Keycloak owner provisioning (returns owner_user_id: null).
-    createMock.mockResolvedValue(
-      buildSuccess({ status: "active", owner_user_id: null }),
-    );
+    createMock.mockResolvedValue(buildSuccess({ status: "active", owner_user_id: null }));
     const user = userEvent.setup();
     renderWizard();
 
     await advanceToReview(user);
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
-    expect(
-      await screen.findByText(/Provision the Keycloak owner manually/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Provision the Keycloak owner manually/)).toBeInTheDocument();
   });
 
   it("shows the pending-provision banner when create reports provisioning_failed", async () => {
@@ -193,9 +180,7 @@ describe("<TenantCreatePage>", () => {
     await advanceToReview(user);
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
-    expect(
-      await screen.findByText(/Keycloak provisioning failed/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Keycloak provisioning failed/)).toBeInTheDocument();
   });
 
   it("blocks Next on profile when slug is malformed", async () => {
@@ -209,9 +194,7 @@ describe("<TenantCreatePage>", () => {
     await user.type(screen.getByLabelText("Contact email"), "ops@acme.test");
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(
-      await screen.findByText("Slug must match [a-z0-9-]{3,32}."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Slug must match [a-z0-9-]{3,32}.")).toBeInTheDocument();
     expect(screen.queryByLabelText("Initial owner email")).not.toBeInTheDocument();
   });
 });

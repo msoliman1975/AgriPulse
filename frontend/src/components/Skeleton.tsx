@@ -8,13 +8,7 @@ interface SkeletonProps {
 
 export function Skeleton({ className, children }: SkeletonProps): ReactNode {
   return (
-    <div
-      className={clsx(
-        "animate-pulse rounded bg-ap-line/60",
-        className,
-      )}
-      aria-hidden="true"
-    >
+    <div className={clsx("animate-pulse rounded bg-ap-line/60", className)} aria-hidden="true">
       {children}
     </div>
   );

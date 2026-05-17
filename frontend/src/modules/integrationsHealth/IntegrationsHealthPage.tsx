@@ -64,17 +64,14 @@ export function IntegrationsHealthPage({
           { value: "providers", label: t("topTabs.providers") },
         ]}
         value={tab}
-        onChange={(v) => setTab(v as TabKey)}
+        onChange={(v) => setTab(v)}
       />
 
       {tab === "overview" && <OverviewTab basePath={basePath} />}
       {tab === "runs" && <RunsTab basePath={basePath} />}
       {tab === "queue" && <QueueTab basePath={basePath} />}
       {tab === "providers" && (
-        <ProvidersTab
-          basePath={basePath}
-          platformScope={platformProviderScope}
-        />
+        <ProvidersTab basePath={basePath} platformScope={platformProviderScope} />
       )}
     </div>
   );

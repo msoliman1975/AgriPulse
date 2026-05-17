@@ -14,10 +14,7 @@ import { listCrops, listCropVarieties, type Crop, type CropVariety } from "@/api
 import { getFarm, type FarmDetail } from "@/api/farms";
 import { getTimeseries, type IndexCode as ApiIndexCode } from "@/api/indices";
 import { listAlerts } from "@/api/alerts";
-import {
-  listBlockHealth,
-  type BlockIntegrationHealth,
-} from "@/api/integrationsHealth";
+import { listBlockHealth, type BlockIntegrationHealth } from "@/api/integrationsHealth";
 import { listIrrigationSchedules, type IrrigationSchedule } from "@/api/irrigation";
 import { listCalendar, listPlans, type Plan } from "@/api/plans";
 import { listRecommendations, type Recommendation } from "@/api/recommendations";
@@ -44,18 +41,18 @@ function trend(series: { time: string; value: number | null }[]): number | null 
   // Last point - point at most 7d before. Skip nulls.
   const valid = series.filter((p) => p.value != null);
   if (valid.length < 2) return null;
-  const last = valid[valid.length - 1]!;
+  const last = valid[valid.length - 1];
   const lastTime = new Date(last.time).getTime();
   const cutoff = lastTime - 7 * 24 * 3600 * 1000;
   const prior = [...valid].reverse().find((p) => new Date(p.time).getTime() <= cutoff);
-  const base = prior ?? valid[0]!;
+  const base = prior ?? valid[0];
   return (last.value as number) - (base.value as number);
 }
 
 function asoIndexSeries(points: { time: string; mean: string | null }[]): IndexSeries {
   const series_30d = points.map((p) => ({ time: p.time, value: num(p.mean) }));
   const valid = series_30d.filter((p) => p.value != null);
-  const current = valid.length > 0 ? (valid[valid.length - 1]!.value as number) : null;
+  const current = valid.length > 0 ? (valid[valid.length - 1].value as number) : null;
   return { current, trend_7d_delta: trend(series_30d), series_30d };
 }
 
@@ -125,8 +122,7 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
   for (const b of blocks) {
     const detail = detailById.get(b.id);
     if (!detail) continue;
-    const isLogicalPivot =
-      b.unit_type === "pivot" && (pivotChildren.get(b.id)?.length ?? 0) > 0;
+    const isLogicalPivot = b.unit_type === "pivot" && (pivotChildren.get(b.id)?.length ?? 0) > 0;
 
     const apiSummary = summaryByBlock.get(b.id);
     const summary: UnitSummary = {
@@ -244,38 +240,28 @@ export async function loadUnitDetail(args: {
     .filter((s) => s.block_id === args.blockId)
     .sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for));
   const today = new Date().toISOString().slice(0, 10);
-  const last = [...sortedSchedules]
-    .reverse()
-    .find((s) => s.status === "applied");
-  const next = sortedSchedules.find(
-    (s) => s.status === "pending" && s.scheduled_for >= today,
-  );
+  const last = [...sortedSchedules].reverse().find((s) => s.status === "applied");
+  const next = sortedSchedules.find((s) => s.status === "pending" && s.scheduled_for >= today);
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const next7dCutoff = new Date(Date.now() + 7 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const next7dCutoff = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
   const acts = (calendar?.activities ?? [])
     .filter((a) => a.block_id === args.blockId)
     .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))
     .slice(0, 12)
     .map((a) => ({
       date: a.scheduled_date,
-      label:
-        a.activity_type.charAt(0).toUpperCase() +
-        a.activity_type.slice(1).replace(/_/g, " "),
+      label: a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1).replace(/_/g, " "),
       phase:
         a.scheduled_date >= todayStr && a.scheduled_date <= next7dCutoff
           ? ("next7d" as const)
           : ("later" as const),
     }));
 
-  const weatherDays = (weather?.days ?? [])
-    .slice(0, 3)
-    .map((d, i) => ({
-      day: i === 0 ? "Today" : new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }),
-      temp_c_max: num(d.high_c),
-    }));
+  const weatherDays = (weather?.days ?? []).slice(0, 3).map((d, i) => ({
+    day: i === 0 ? "Today" : new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }),
+    temp_c_max: num(d.high_c),
+  }));
 
   const currentCrop = cropAssignments.find((c) => c.is_current) ?? null;
   const cropAssignmentSummary = await resolveCropAssignment(currentCrop);
@@ -370,12 +356,7 @@ function classifySoil(pct: number | null): "optimal" | "low" | "critical" | "unk
   return "optimal";
 }
 
-async function safeTimeseries(
-  blockId: string,
-  code: ApiIndexCode,
-  from: string,
-  to: string,
-) {
+async function safeTimeseries(blockId: string, code: ApiIndexCode, from: string, to: string) {
   try {
     const ts = await getTimeseries(blockId, code, { granularity: "daily", from, to });
     return ts.points;
@@ -432,10 +413,7 @@ async function safeBlockCrops(blockId: string): Promise<BlockCropAssignment[]> {
     return [];
   }
 }
-async function safeSignalObs(
-  blockId: string,
-  since: string,
-): Promise<SignalObservation[]> {
+async function safeSignalObs(blockId: string, since: string): Promise<SignalObservation[]> {
   try {
     return await listSignalObservations({ block_id: blockId, since, limit: 50 });
   } catch {

@@ -19,10 +19,7 @@ export function UserMenu(): ReactNode {
 
   return (
     <div className="flex items-center gap-2">
-      <span
-        className="hidden text-sm text-slate-700 sm:inline"
-        data-testid="user-display-name"
-      >
+      <span className="hidden text-sm text-slate-700 sm:inline" data-testid="user-display-name">
         {displayName}
       </span>
       <button

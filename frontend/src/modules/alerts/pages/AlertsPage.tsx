@@ -33,9 +33,7 @@ export function AlertsPage(): ReactNode {
   const canAck = useCapability("alert.acknowledge", { farmId });
   const canResolve = useCapability("alert.resolve", { farmId });
 
-  const { data, isLoading, isError } = useAlerts(
-    tab === "all" ? {} : { status: tab },
-  );
+  const { data, isLoading, isError } = useAlerts(tab === "all" ? {} : { status: tab });
   const transition = useTransitionAlert();
 
   if (!farmId) {
@@ -79,12 +77,8 @@ export function AlertsPage(): ReactNode {
                 farmId={farmId}
                 canAck={canAck}
                 canResolve={canResolve}
-                onAck={() =>
-                  transition.mutate({ alertId: a.id, payload: { acknowledge: true } })
-                }
-                onResolve={() =>
-                  transition.mutate({ alertId: a.id, payload: { resolve: true } })
-                }
+                onAck={() => transition.mutate({ alertId: a.id, payload: { acknowledge: true } })}
+                onResolve={() => transition.mutate({ alertId: a.id, payload: { resolve: true } })}
               />
             ))}
           </ul>
@@ -122,9 +116,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">
-            {a.diagnosis_en ?? a.rule_code}
-          </span>
+          <span className="text-sm font-medium text-ap-ink">{a.diagnosis_en ?? a.rule_code}</span>
           <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
           <Pill kind={a.status === "resolved" ? "ok" : a.status === "open" ? "crit" : "neutral"}>
             {t(`status.${a.status}`)}
@@ -175,9 +167,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
           type="button"
           onClick={() => {
             if (a.prescription_activity_id) {
-              navigate(
-                `/plan/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`,
-              );
+              navigate(`/plan/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
             } else {
               navigate(`/plan/${farmId}?lane=${a.block_id}`);
             }

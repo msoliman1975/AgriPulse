@@ -48,10 +48,7 @@ export function detectConflicts(activities: ReadonlyArray<PlanActivity>): Confli
   return out;
 }
 
-function sprayWashConflict(
-  a: PlanActivity,
-  b: PlanActivity,
-): ConflictEdge | null {
+function sprayWashConflict(a: PlanActivity, b: PlanActivity): ConflictEdge | null {
   const aIsSpray = a.activity_type === "spraying";
   const bIsSpray = b.activity_type === "spraying";
   const aIsWater = isWateringType(a.activity_type);
@@ -67,8 +64,7 @@ function sprayWashConflict(
 
   return {
     ruleId: "CFL-SPRAY-WASH",
-    message:
-      "Run irrigation AFTER spray dries (~14:00) to avoid washing product.",
+    message: "Run irrigation AFTER spray dries (~14:00) to avoid washing product.",
     activityIds: [a.id, b.id],
   };
 }

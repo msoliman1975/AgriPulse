@@ -68,9 +68,7 @@ function renderPanel(t: AdminTenant, days = 30) {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter
-        initialEntries={[`/platform/tenants/${t.id}`]}
-      >
+      <MemoryRouter initialEntries={[`/platform/tenants/${t.id}`]}>
         <Routes>
           <Route
             path="/platform/tenants/:tenantId"

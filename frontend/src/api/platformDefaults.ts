@@ -17,10 +17,7 @@ export async function listPlatformDefaults(): Promise<PlatformDefault[]> {
   return data;
 }
 
-export async function updatePlatformDefault(
-  key: string,
-  value: unknown,
-): Promise<PlatformDefault> {
+export async function updatePlatformDefault(key: string, value: unknown): Promise<PlatformDefault> {
   const { data } = await apiClient.put<PlatformDefault>(
     `/v1/admin/defaults/${encodeURIComponent(key)}`,
     { value },

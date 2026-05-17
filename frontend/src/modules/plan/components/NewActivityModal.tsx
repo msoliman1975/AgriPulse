@@ -77,7 +77,18 @@ export function NewActivityModal({
     return detectConflicts([...existingActivities, ...candidates]).filter((c) =>
       c.activityIds.some((id) => id.startsWith("__candidate-")),
     );
-  }, [type, selectedBlockIds, scheduledDate, durationDays, startTime, productName, dosage, notes, existingActivities, plan?.id]);
+  }, [
+    type,
+    selectedBlockIds,
+    scheduledDate,
+    durationDays,
+    startTime,
+    productName,
+    dosage,
+    notes,
+    existingActivities,
+    plan?.id,
+  ]);
 
   const reset = (): void => {
     setStep(0);
@@ -228,9 +239,7 @@ export function NewActivityModal({
             <button
               type="button"
               onClick={handleNext}
-              disabled={
-                (step === 0 && !type) || (step === 1 && selectedBlockIds.length === 0)
-              }
+              disabled={(step === 0 && !type) || (step === 1 && selectedBlockIds.length === 0)}
               className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               Next
@@ -503,10 +512,13 @@ function Step4Details({
           Summary
         </h3>
         <ul className="mt-1 list-inside list-disc text-ap-ink">
-          <li>{activityTypeLabel(type)} on {blocks.length} land unit{blocks.length === 1 ? "" : "s"}</li>
+          <li>
+            {activityTypeLabel(type)} on {blocks.length} land unit{blocks.length === 1 ? "" : "s"}
+          </li>
           <li>
             {scheduledDate}
-            {startTime ? ` at ${startTime}` : ""} for {durationDays} day{durationDays === 1 ? "" : "s"}
+            {startTime ? ` at ${startTime}` : ""} for {durationDays} day
+            {durationDays === 1 ? "" : "s"}
           </li>
           {productName ? <li>Product: {productName}</li> : null}
           {dosage ? <li>Dosage: {dosage}</li> : null}

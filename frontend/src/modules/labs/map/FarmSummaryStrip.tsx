@@ -29,9 +29,7 @@ export function FarmSummaryStrip({ farm, onOpenDrawer }: Props) {
         <span className="font-medium text-slate-900">{farm.code}</span>
         <span className="truncate text-slate-700">{farm.name}</span>
         <span className="text-slate-500">{hectares} ha</span>
-        {farm.governorate ? (
-          <span className="text-slate-500">{farm.governorate}</span>
-        ) : null}
+        {farm.governorate ? <span className="text-slate-500">{farm.governorate}</span> : null}
         <span className="text-slate-500">{farm.farm_type}</span>
         {farm.primary_water_source ? (
           <span className="text-slate-500">{farm.primary_water_source}</span>
@@ -54,13 +52,7 @@ export function FarmSummaryStrip({ farm, onOpenDrawer }: Props) {
   );
 }
 
-function StatusBadge({
-  active,
-  activeTo,
-}: {
-  active: boolean;
-  activeTo: string | null;
-}) {
+function StatusBadge({ active, activeTo }: { active: boolean; activeTo: string | null }) {
   if (active) {
     return (
       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">

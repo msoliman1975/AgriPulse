@@ -40,11 +40,7 @@ export function DrawBlockModal({
 
   const hectares = (polygonAreaM2 / 10_000).toFixed(3);
   const codeError =
-    code.length === 0
-      ? "Code is required"
-      : code.length > 64
-        ? "Code too long"
-        : null;
+    code.length === 0 ? "Code is required" : code.length > 64 ? "Code too long" : null;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,14 +54,9 @@ export function DrawBlockModal({
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-md bg-white p-4 shadow-xl"
-      >
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-md bg-white p-4 shadow-xl">
         <h2 className="text-[14px] font-semibold text-slate-900">Create block</h2>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Polygon area · {hectares} ha
-        </p>
+        <p className="mt-1 text-[11px] text-slate-500">Polygon area · {hectares} ha</p>
 
         <label className="mt-3 block text-[11px] font-medium text-slate-700">
           Code
@@ -75,14 +66,11 @@ export function DrawBlockModal({
             onChange={(e) => setCode(e.target.value)}
             className="mt-1 block w-full rounded border border-slate-300 px-2 py-1 text-[13px] focus:border-slate-500 focus:outline-none"
             placeholder="e.g. B-12"
-            autoFocus
             disabled={submitting}
             required
           />
           {codeError && code.length > 0 ? (
-            <span className="mt-0.5 block text-[10px] text-red-700">
-              {codeError}
-            </span>
+            <span className="mt-0.5 block text-[10px] text-red-700">{codeError}</span>
           ) : null}
         </label>
 
