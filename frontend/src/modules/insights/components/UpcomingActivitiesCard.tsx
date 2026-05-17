@@ -53,9 +53,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
             <Skeleton className="h-10 w-full" />
           </>
         ) : activities.length === 0 ? (
-          <p className="py-3 text-center text-sm text-ap-muted">
-            Nothing scheduled this week.
-          </p>
+          <p className="py-3 text-center text-sm text-ap-muted">Nothing scheduled this week.</p>
         ) : (
           activities.slice(0, 5).map((a) => {
             const d = parseISO(a.scheduled_date);
@@ -81,7 +79,11 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
                     {a.start_time ? ` · ${a.start_time.slice(0, 5)}` : ""}
                   </div>
                 </div>
-                <Badge kind={`type-${a.activity_type === "irrigation" ? "irrig" : a.activity_type === "harvesting" ? "harv" : a.activity_type === "spraying" ? "spray" : a.activity_type === "fertilizing" ? "fert" : a.activity_type === "pruning" ? "prune" : a.activity_type === "planting" ? "plant" : a.activity_type}` as const}>
+                <Badge
+                  kind={
+                    `type-${a.activity_type === "irrigation" ? "irrig" : a.activity_type === "harvesting" ? "harv" : a.activity_type === "spraying" ? "spray" : a.activity_type === "fertilizing" ? "fert" : a.activity_type === "pruning" ? "prune" : a.activity_type === "planting" ? "plant" : a.activity_type}` as const
+                  }
+                >
                   {a.activity_type.slice(0, 4)}
                 </Badge>
               </button>

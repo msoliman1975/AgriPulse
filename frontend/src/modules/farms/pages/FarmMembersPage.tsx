@@ -108,9 +108,7 @@ export function FarmMembersPage(): JSX.Element {
                 {tenantUsers.data
                   // Hide users already assigned to this farm so the dropdown
                   // doesn't suggest re-adding them.
-                  .filter(
-                    (u) => !members.some((m) => m.membership_id === u.membership_id),
-                  )
+                  .filter((u) => !members.some((m) => m.membership_id === u.membership_id))
                   .map((u) => (
                     <option key={u.membership_id} value={u.membership_id}>
                       {u.full_name} — {u.email}

@@ -64,10 +64,7 @@ export function Lane({ block, activities, conflicts, seasonStart, totalDays }: P
           const start = parseISO(a.scheduled_date);
           const startDays = differenceInCalendarDays(start, seasonStart);
           const leftPct = (startDays / totalDays) * 100;
-          const widthPct = Math.max(
-            (a.duration_days / totalDays) * 100,
-            MIN_BAR_WIDTH_PCT,
-          );
+          const widthPct = Math.max((a.duration_days / totalDays) * 100, MIN_BAR_WIDTH_PCT);
           if (leftPct < -widthPct || leftPct > 100) return null;
           const isPicked = activityId === a.id;
           const conflicting = conflictIds.has(a.id);

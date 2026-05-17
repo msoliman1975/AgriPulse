@@ -10,21 +10,14 @@ import {
   useProviderProbes,
   useProvidersHealth,
 } from "@/queries/integrationsHealth";
-import type {
-  AttemptKind,
-  ProbeStatus,
-  ProviderHealth,
-} from "@/api/integrationsHealth";
+import type { AttemptKind, ProbeStatus, ProviderHealth } from "@/api/integrationsHealth";
 
 export interface ProvidersTabProps {
   basePath: string;
   platformScope: boolean;
 }
 
-export function ProvidersTab({
-  basePath,
-  platformScope,
-}: ProvidersTabProps): ReactNode {
+export function ProvidersTab({ basePath, platformScope }: ProvidersTabProps): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   const providersQ = useProvidersHealth(platformScope, basePath);
   const [selected, setSelected] = useState<{
@@ -65,13 +58,7 @@ export function ProvidersTab({
   );
 }
 
-function ErrorHistogram({
-  kind,
-  code,
-}: {
-  kind: AttemptKind;
-  code: string;
-}): ReactNode {
+function ErrorHistogram({ kind, code }: { kind: AttemptKind; code: string }): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   const q = useProviderErrorHistogram(kind, code, 24);
   const entries = q.data ?? [];
@@ -80,9 +67,7 @@ function ErrorHistogram({
   return (
     <div className="rounded-xl border border-ap-line bg-ap-panel p-3">
       <header className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-ap-ink">
-          {t("providers.histogram.title")}
-        </h3>
+        <h3 className="text-sm font-medium text-ap-ink">{t("providers.histogram.title")}</h3>
         <span className="text-xs text-ap-muted">
           {t("providers.histogram.windowLabel", { h: 24 })}
         </span>
@@ -92,16 +77,12 @@ function ErrorHistogram({
       ) : q.isError ? (
         <p className="text-xs text-ap-crit">{t("loadFailed")}</p>
       ) : entries.length === 0 ? (
-        <p className="text-xs text-ap-muted">
-          {t("providers.histogram.empty")}
-        </p>
+        <p className="text-xs text-ap-muted">{t("providers.histogram.empty")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5 text-xs">
           {entries.map((e) => (
             <li key={e.error_code} className="flex items-center gap-2">
-              <span className="w-32 shrink-0 font-mono text-ap-ink">
-                {e.error_code}
-              </span>
+              <span className="w-32 shrink-0 font-mono text-ap-ink">{e.error_code}</span>
               <div className="flex-1 overflow-hidden rounded bg-ap-line/40">
                 <div
                   className="h-2 rounded bg-ap-crit"
@@ -110,9 +91,7 @@ function ErrorHistogram({
                   }}
                 />
               </div>
-              <span className="w-10 shrink-0 text-end font-mono text-ap-muted">
-                {e.count}
-              </span>
+              <span className="w-10 shrink-0 text-end font-mono text-ap-muted">{e.count}</span>
             </li>
           ))}
         </ul>
@@ -139,51 +118,37 @@ function ProvidersTable({
       <table className="min-w-full text-sm">
         <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
           <tr>
-            <th className="px-3 py-2 text-start">
-              {t("providers.col.provider")}
-            </th>
+            <th className="px-3 py-2 text-start">{t("providers.col.provider")}</th>
             <th className="px-3 py-2 text-start">{t("providers.col.kind")}</th>
             <th className="px-3 py-2 text-start">{t("providers.col.status")}</th>
-            <th className="px-3 py-2 text-start">
-              {t("providers.col.lastProbeAt")}
-            </th>
-            <th className="px-3 py-2 text-end">
-              {t("providers.col.latency")}
-            </th>
+            <th className="px-3 py-2 text-start">{t("providers.col.lastProbeAt")}</th>
+            <th className="px-3 py-2 text-end">{t("providers.col.latency")}</th>
             <th className="px-3 py-2 text-start">{t("providers.col.error")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ap-line">
           {rows.map((r) => {
             const isSelected =
-              selected?.kind === r.provider_kind &&
-              selected?.code === r.provider_code;
+              selected?.kind === r.provider_kind && selected?.code === r.provider_code;
             return (
               <tr
                 key={`${r.provider_kind}-${r.provider_code}`}
                 className={
                   platformScope
-                    ? "cursor-pointer hover:bg-ap-line/30 " +
-                      (isSelected ? "bg-ap-line/40" : "")
+                    ? "cursor-pointer hover:bg-ap-line/30 " + (isSelected ? "bg-ap-line/40" : "")
                     : ""
                 }
                 onClick={
                   platformScope
                     ? () =>
                         onSelect(
-                          isSelected
-                            ? null
-                            : { kind: r.provider_kind, code: r.provider_code },
+                          isSelected ? null : { kind: r.provider_kind, code: r.provider_code },
                         )
                     : undefined
                 }
               >
-                <td className="px-3 py-2 font-mono text-ap-ink">
-                  {r.provider_code}
-                </td>
-                <td className="px-3 py-2 text-ap-muted">
-                  {t(`kind.${r.provider_kind}`)}
-                </td>
+                <td className="px-3 py-2 font-mono text-ap-ink">{r.provider_code}</td>
+                <td className="px-3 py-2 text-ap-muted">{t(`kind.${r.provider_kind}`)}</td>
                 <td className="px-3 py-2">
                   <Pill kind={pillForProbe(r.last_status)}>
                     {t(
@@ -224,13 +189,7 @@ function ProvidersTable({
   );
 }
 
-function ProbeHistory({
-  kind,
-  code,
-}: {
-  kind: AttemptKind;
-  code: string;
-}): ReactNode {
+function ProbeHistory({ kind, code }: { kind: AttemptKind; code: string }): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   const probesQ = useProviderProbes(kind, code);
   const dateLocale = useDateLocale();
@@ -251,26 +210,18 @@ function ProbeHistory({
       ) : (
         <ul className="divide-y divide-ap-line text-xs">
           {(probesQ.data ?? []).map((p) => (
-            <li
-              key={p.probe_at}
-              className="flex items-center justify-between gap-2 py-1.5"
-            >
+            <li key={p.probe_at} className="flex items-center justify-between gap-2 py-1.5">
               <span className="text-ap-muted">
                 {formatDistanceToNow(parseISO(p.probe_at), {
                   addSuffix: true,
                   locale: dateLocale,
                 })}
               </span>
-              <Pill kind={pillForProbe(p.status)}>
-                {t(`providers.probeStatus.${p.status}`)}
-              </Pill>
+              <Pill kind={pillForProbe(p.status)}>{t(`providers.probeStatus.${p.status}`)}</Pill>
               <span className="text-ap-muted">
                 {p.latency_ms !== null ? `${p.latency_ms}ms` : "—"}
               </span>
-              <span
-                className="max-w-[12rem] truncate text-ap-muted"
-                title={p.error_message ?? ""}
-              >
+              <span className="max-w-[12rem] truncate text-ap-muted" title={p.error_message ?? ""}>
                 {p.error_message ?? ""}
               </span>
             </li>

@@ -98,10 +98,7 @@ function renderDetail() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[`/platform/tenants/${TENANT_ID}`]}>
         <Routes>
-          <Route
-            path="/platform/tenants/:tenantId"
-            element={<TenantAdminDetailPage />}
-          />
+          <Route path="/platform/tenants/:tenantId" element={<TenantAdminDetailPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -151,8 +148,6 @@ describe("<TenantAdminDetailPage>", () => {
     sidecarMock.mockResolvedValue(baseSidecar());
     renderDetail();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load tenant",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load tenant");
   });
 });

@@ -28,9 +28,7 @@ export function LaneSidebar({ blocks, isLoading }: Props): ReactNode {
             <Skeleton className="h-12 w-full" />
           </>
         ) : blocks.length === 0 ? (
-          <p className="px-2 py-3 text-sm text-ap-muted">
-            No land units in this farm yet.
-          </p>
+          <p className="px-2 py-3 text-sm text-ap-muted">No land units in this farm yet.</p>
         ) : (
           blocks.map((b) => (
             <button

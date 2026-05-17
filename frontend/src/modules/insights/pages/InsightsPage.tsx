@@ -65,25 +65,23 @@ export function InsightsPage(): ReactNode {
             className="h-12 w-12 shrink-0 object-contain"
           />
           <div>
-            <h1 className="text-2xl font-semibold text-ap-ink">
-              {greeting}.
-            </h1>
+            <h1 className="text-2xl font-semibold text-ap-ink">{greeting}.</h1>
             <div className="mt-1 text-sm text-ap-muted">
-            {isLoading ? (
-              <Skeleton className="inline-block h-4 w-64" />
-            ) : (
-              <>
-                <span className="font-medium text-ap-ink">{farm?.name ?? "â€”"}</span>
-                {farm ? (
-                  <>
-                    {" Â· "}
-                    {Number(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
-                    {" Â· "}
-                    {format(new Date(), "EEEE, MMMM d", { locale: dateLocale })}
-                  </>
-                ) : null}
-              </>
-            )}
+              {isLoading ? (
+                <Skeleton className="inline-block h-4 w-64" />
+              ) : (
+                <>
+                  <span className="font-medium text-ap-ink">{farm?.name ?? "â€”"}</span>
+                  {farm ? (
+                    <>
+                      {" Â· "}
+                      {Number(farm.area_value ?? 0).toFixed(1)} {farm.area_unit}
+                      {" Â· "}
+                      {format(new Date(), "EEEE, MMMM d", { locale: dateLocale })}
+                    </>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>

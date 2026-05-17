@@ -145,26 +145,32 @@ export function PlanPage(): ReactNode {
     return <Navigate to="/" replace />;
   }
 
-  return <PlanPageInner
-    farmId={farmId}
-    blocks={blocks}
-    blocksLoading={blocksQuery.isLoading}
-    realActivities={realActivities}
-    visibleActivities={visibleActivities}
-    conflicts={conflicts}
-    seasonStart={seasonStart}
-    seasonEnd={seasonEnd}
-    blockById={blockById}
-    selectedActivity={selectedActivity}
-    selectedIrrigation={selectedIrrigation}
-    activePlan={activePlan ?? null}
-    totals={totals}
-  />;
+  return (
+    <PlanPageInner
+      farmId={farmId}
+      blocks={blocks}
+      blocksLoading={blocksQuery.isLoading}
+      realActivities={realActivities}
+      visibleActivities={visibleActivities}
+      conflicts={conflicts}
+      seasonStart={seasonStart}
+      seasonEnd={seasonEnd}
+      blockById={blockById}
+      selectedActivity={selectedActivity}
+      selectedIrrigation={selectedIrrigation}
+      activePlan={activePlan ?? null}
+      totals={totals}
+    />
+  );
 }
 
 interface PlanPageInnerProps {
   farmId: string;
-  blocks: ReturnType<typeof listBlocks> extends Promise<infer T> ? T extends { items: (infer B)[] } ? B[] : never : never;
+  blocks: ReturnType<typeof listBlocks> extends Promise<infer T>
+    ? T extends { items: (infer B)[] }
+      ? B[]
+      : never
+    : never;
   blocksLoading: boolean;
   realActivities: PlanActivity[];
   visibleActivities: PlanActivity[];

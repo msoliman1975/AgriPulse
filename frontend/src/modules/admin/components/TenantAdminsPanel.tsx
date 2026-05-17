@@ -47,15 +47,12 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
   const [confirmSlug, setConfirmSlug] = useState("");
 
   const owner = adminsQ.data?.find((r) => r.role === "TenantOwner") ?? null;
-  const candidates =
-    (adminsQ.data ?? []).filter((r) => r.role !== "TenantOwner") ?? [];
+  const candidates = (adminsQ.data ?? []).filter((r) => r.role !== "TenantOwner") ?? [];
   const newOwner = candidates.find((c) => c.email === newOwnerEmail) ?? null;
 
   return (
     <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
-      <h2 className="text-sm font-semibold text-ap-ink">
-        {t("owner.title")}
-      </h2>
+      <h2 className="text-sm font-semibold text-ap-ink">{t("owner.title")}</h2>
       <p className="mt-1 text-xs text-ap-muted">{t("owner.subtitle")}</p>
 
       {adminsQ.isLoading ? (
@@ -65,10 +62,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
       ) : owner == null ? (
         <>
           <p className="mt-3 text-sm text-ap-warn">{t("owner.none")}</p>
-          <AssignFirstOwnerForm
-            tenantId={tenantId}
-            existingMembers={adminsQ.data ?? []}
-          />
+          <AssignFirstOwnerForm tenantId={tenantId} existingMembers={adminsQ.data ?? []} />
         </>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -91,9 +85,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
       {openTransfer && owner ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-xl bg-ap-panel p-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-ap-ink">
-              {t("admins.transfer.title")}
-            </h3>
+            <h3 className="text-sm font-semibold text-ap-ink">{t("admins.transfer.title")}</h3>
             <p className="mt-2 text-xs text-ap-muted">
               {t("owner.transferIntro", {
                 from: owner.full_name ?? owner.email,
@@ -116,15 +108,12 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
               </select>
             </label>
             {candidates.length === 0 ? (
-              <p className="mt-2 text-xs text-ap-warn">
-                {t("owner.noCandidates")}
-              </p>
+              <p className="mt-2 text-xs text-ap-warn">{t("owner.noCandidates")}</p>
             ) : null}
             <p className="mt-3 text-xs text-ap-warn">
               {t("admins.transfer.confirmHint", { slug: tenantSlug })}
             </p>
             <input
-              autoFocus
               value={confirmSlug}
               onChange={(e) => setConfirmSlug(e.target.value)}
               className="mt-2 w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
@@ -143,9 +132,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
               </button>
               <button
                 type="button"
-                disabled={
-                  !newOwner || confirmSlug !== tenantSlug || transferMut.isPending
-                }
+                disabled={!newOwner || confirmSlug !== tenantSlug || transferMut.isPending}
                 onClick={() => {
                   if (!newOwner) return;
                   transferMut.mutate(
@@ -170,9 +157,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
               </button>
             </div>
             {transferMut.error ? (
-              <p className="mt-2 text-xs text-ap-crit">
-                {(transferMut.error as Error).message}
-              </p>
+              <p className="mt-2 text-xs text-ap-crit">{transferMut.error.message}</p>
             ) : null}
           </div>
         </div>
@@ -197,11 +182,9 @@ function AssignFirstOwnerForm({
   const [fullName, setFullName] = useState("");
   const [pickedUserId, setPickedUserId] = useState("");
 
-  const inviteValid =
-    EMAIL_RE.test(email.trim()) && fullName.trim().length > 0;
+  const inviteValid = EMAIL_RE.test(email.trim()) && fullName.trim().length > 0;
   const promoteValid = pickedUserId !== "";
-  const canSubmit =
-    mode === "invite" ? inviteValid : promoteValid && existingMembers.length > 0;
+  const canSubmit = mode === "invite" ? inviteValid : promoteValid && existingMembers.length > 0;
 
   function submit(): void {
     if (mode === "invite") {
@@ -288,9 +271,7 @@ function AssignFirstOwnerForm({
 
       <div className="mt-3 flex items-center justify-end gap-2">
         {assignMut.error ? (
-          <p className="me-auto text-xs text-ap-crit">
-            {(assignMut.error as Error).message}
-          </p>
+          <p className="me-auto text-xs text-ap-crit">{assignMut.error.message}</p>
         ) : null}
         <button
           type="button"
@@ -298,9 +279,7 @@ function AssignFirstOwnerForm({
           onClick={submit}
           className="rounded-md bg-ap-primary px-3 py-1 text-xs font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
         >
-          {assignMut.isPending
-            ? t("owner.assignSubmitting")
-            : t("owner.assignSubmit")}
+          {assignMut.isPending ? t("owner.assignSubmitting") : t("owner.assignSubmit")}
         </button>
       </div>
     </div>

@@ -7,10 +7,7 @@ import {
   type Category,
 } from "@/api/platformTenantIntegrations";
 
-export function usePlatformTenantIntegration(
-  tenantId: string,
-  category: Category,
-) {
+export function usePlatformTenantIntegration(tenantId: string, category: Category) {
   return useQuery({
     queryKey: ["platform_tenant_integration", tenantId, category] as const,
     queryFn: () => readTenantIntegration(tenantId, category),
@@ -18,10 +15,7 @@ export function usePlatformTenantIntegration(
   });
 }
 
-export function usePutPlatformTenantIntegration(
-  tenantId: string,
-  category: Category,
-) {
+export function usePutPlatformTenantIntegration(tenantId: string, category: Category) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
@@ -34,10 +28,7 @@ export function usePutPlatformTenantIntegration(
   });
 }
 
-export function useClearPlatformTenantIntegration(
-  tenantId: string,
-  category: Category,
-) {
+export function useClearPlatformTenantIntegration(tenantId: string, category: Category) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (key: string) => clearTenantIntegration(tenantId, category, key),

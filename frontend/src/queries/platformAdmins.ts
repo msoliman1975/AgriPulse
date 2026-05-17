@@ -43,11 +43,7 @@ export function useRemoveTenantAdmin(tenantId: string) {
 
 export function useTransferOwnership(tenantId: string) {
   const qc = useQueryClient();
-  return useMutation<
-    void,
-    Error,
-    { newOwnerUserId: string; fromUserId: string }
-  >({
+  return useMutation<void, Error, { newOwnerUserId: string; fromUserId: string }>({
     mutationFn: ({ newOwnerUserId, fromUserId }) =>
       transferTenantOwnership(tenantId, newOwnerUserId, fromUserId),
     onSuccess: () => {

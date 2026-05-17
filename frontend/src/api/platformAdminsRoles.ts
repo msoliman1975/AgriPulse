@@ -35,16 +35,10 @@ export async function listPlatformAdmins(): Promise<PlatformAdminRow[]> {
 export async function invitePlatformAdmin(
   payload: InvitePlatformAdminPayload,
 ): Promise<InvitePlatformAdminResponse> {
-  const { data } = await apiClient.post<InvitePlatformAdminResponse>(
-    `${base}:invite`,
-    payload,
-  );
+  const { data } = await apiClient.post<InvitePlatformAdminResponse>(`${base}:invite`, payload);
   return data;
 }
 
-export async function removePlatformAdmin(
-  userId: string,
-  role: PlatformRole,
-): Promise<void> {
+export async function removePlatformAdmin(userId: string, role: PlatformRole): Promise<void> {
   await apiClient.delete(`${base}/${userId}`, { params: { role } });
 }

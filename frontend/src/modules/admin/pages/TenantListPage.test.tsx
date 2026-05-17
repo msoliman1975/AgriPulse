@@ -60,10 +60,7 @@ function renderList() {
       <MemoryRouter initialEntries={["/platform/tenants"]}>
         <Routes>
           <Route path="/platform/tenants" element={<TenantListPage />} />
-          <Route
-            path="/platform/tenants/:tenantId"
-            element={<p>detail-page</p>}
-          />
+          <Route path="/platform/tenants/:tenantId" element={<p>detail-page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -128,24 +125,18 @@ describe("<TenantListPage>", () => {
     await waitFor(() => {
       expect(screen.getByText("Beta")).toBeInTheDocument();
     });
-    expect(listMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ status: "suspended" }),
-    );
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ status: "suspended" }));
   });
 
   it("renders the empty state when the response has zero items", async () => {
     listMock.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
     renderList();
-    expect(
-      await screen.findByText("No tenants match your filters."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No tenants match your filters.")).toBeInTheDocument();
   });
 
   it("surfaces an error banner on failure", async () => {
     listMock.mockRejectedValue(new Error("boom"));
     renderList();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't load tenants",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load tenants");
   });
 });

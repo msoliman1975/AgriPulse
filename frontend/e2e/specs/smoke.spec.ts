@@ -26,9 +26,7 @@ test.describe("App shell smoke", () => {
     await expect(authedPage.getByRole("main")).toBeVisible();
   });
 
-  test("language switch flips html.dir to rtl when Arabic selected", async ({
-    authedPage,
-  }) => {
+  test("language switch flips html.dir to rtl when Arabic selected", async ({ authedPage }) => {
     // i18n init reads the saved language from `agripulse.lang` â€”
     // see src/i18n/index.ts (lookupLocalStorage). Setting it before
     // page load makes Arabic the active language at boot, which fires
@@ -37,8 +35,6 @@ test.describe("App shell smoke", () => {
       window.localStorage.setItem("agripulse.lang", "ar");
     });
     await authedPage.goto("/");
-    await expect
-      .poll(() => authedPage.evaluate(() => document.documentElement.dir))
-      .toBe("rtl");
+    await expect.poll(() => authedPage.evaluate(() => document.documentElement.dir)).toBe("rtl");
   });
 });

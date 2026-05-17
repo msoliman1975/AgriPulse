@@ -137,7 +137,12 @@ export function TenantCreatePage(): ReactNode {
   }
 
   if (success) {
-    return <SuccessPanel state={success} onDone={() => navigate(`/platform/tenants/${success.tenantId}`)} />;
+    return (
+      <SuccessPanel
+        state={success}
+        onDone={() => navigate(`/platform/tenants/${success.tenantId}`)}
+      />
+    );
   }
 
   return (
@@ -299,10 +304,7 @@ function ProfileStep({
           )}
         </Field>
       </div>
-      <Field
-        label={t("tenants.create.fields.contactEmail")}
-        error={errors.contact_email}
-      >
+      <Field label={t("tenants.create.fields.contactEmail")} error={errors.contact_email}>
         {(id) => (
           <input
             id={id}
@@ -349,10 +351,7 @@ function ProfileStep({
               id={id}
               value={form.default_unit_system}
               onChange={(e) =>
-                onChange(
-                  "default_unit_system",
-                  e.target.value as FormState["default_unit_system"],
-                )
+                onChange("default_unit_system", e.target.value as FormState["default_unit_system"])
               }
               className="w-full rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm shadow-sm"
             >
@@ -378,10 +377,7 @@ function OwnerStep({
   const { t } = useTranslation("admin");
   return (
     <div className="mt-6 space-y-4">
-      <Field
-        label={t("tenants.create.fields.tier")}
-        help={t("tenants.create.fields.tierHelp")}
-      >
+      <Field label={t("tenants.create.fields.tier")} help={t("tenants.create.fields.tierHelp")}>
         {(id) => (
           <select
             id={id}
@@ -412,10 +408,7 @@ function OwnerStep({
           />
         )}
       </Field>
-      <Field
-        label={t("tenants.create.fields.ownerFullName")}
-        error={errors.owner_full_name}
-      >
+      <Field label={t("tenants.create.fields.ownerFullName")} error={errors.owner_full_name}>
         {(id) => (
           <input
             id={id}
@@ -436,27 +429,12 @@ function ReviewStep({ form }: { form: FormState }): ReactNode {
     <div className="mt-6 space-y-3 rounded-md border border-ap-line bg-ap-panel p-4 text-sm">
       <ReviewRow label={t("tenants.create.fields.slug")} value={form.slug} mono />
       <ReviewRow label={t("tenants.create.fields.name")} value={form.name} />
-      <ReviewRow
-        label={t("tenants.create.fields.contactEmail")}
-        value={form.contact_email}
-      />
-      <ReviewRow
-        label={t("tenants.create.fields.locale")}
-        value={form.default_locale}
-      />
-      <ReviewRow
-        label={t("tenants.create.fields.unitSystem")}
-        value={form.default_unit_system}
-      />
+      <ReviewRow label={t("tenants.create.fields.contactEmail")} value={form.contact_email} />
+      <ReviewRow label={t("tenants.create.fields.locale")} value={form.default_locale} />
+      <ReviewRow label={t("tenants.create.fields.unitSystem")} value={form.default_unit_system} />
       <ReviewRow label={t("tenants.create.fields.tier")} value={form.initial_tier} />
-      <ReviewRow
-        label={t("tenants.create.fields.ownerEmail")}
-        value={form.owner_email}
-      />
-      <ReviewRow
-        label={t("tenants.create.fields.ownerFullName")}
-        value={form.owner_full_name}
-      />
+      <ReviewRow label={t("tenants.create.fields.ownerEmail")} value={form.owner_email} />
+      <ReviewRow label={t("tenants.create.fields.ownerFullName")} value={form.owner_full_name} />
       <p className="rounded-md bg-emerald-50 p-2 text-xs text-emerald-800">
         {t("tenants.create.review.ownerNote", { email: form.owner_email })}
       </p>
@@ -464,13 +442,7 @@ function ReviewStep({ form }: { form: FormState }): ReactNode {
   );
 }
 
-function SuccessPanel({
-  state,
-  onDone,
-}: {
-  state: SuccessState;
-  onDone: () => void;
-}): ReactNode {
+function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => void }): ReactNode {
   const { t } = useTranslation("admin");
   let body: string;
   if (state.status === "pending_provision") {

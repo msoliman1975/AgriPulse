@@ -65,7 +65,9 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
           />
           {t("app.name")}
         </Link>
-        <span aria-hidden="true" className="text-ap-line">/</span>
+        <span aria-hidden="true" className="text-ap-line">
+          /
+        </span>
         <FarmSwitcher />
         {toolbar ? <div className="ms-auto flex items-center gap-2">{toolbar}</div> : null}
         <div className={toolbar ? "flex items-center gap-2" : "ms-auto flex items-center gap-2"}>

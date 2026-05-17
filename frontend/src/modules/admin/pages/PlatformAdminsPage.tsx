@@ -34,12 +34,8 @@ export function PlatformAdminsPage(): ReactNode {
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">
-            {t("platformAdmins.title")}
-          </h1>
-          <p className="mt-1 text-sm text-ap-muted">
-            {t("platformAdmins.subtitle")}
-          </p>
+          <h1 className="text-2xl font-semibold text-ap-ink">{t("platformAdmins.title")}</h1>
+          <p className="mt-1 text-sm text-ap-muted">{t("platformAdmins.subtitle")}</p>
         </div>
         {canManage ? (
           <button
@@ -56,26 +52,16 @@ export function PlatformAdminsPage(): ReactNode {
         {adminsQ.isLoading ? (
           <Skeleton className="h-32 w-full" />
         ) : adminsQ.isError ? (
-          <p className="p-4 text-sm text-ap-crit">
-            {t("platformAdmins.loadFailed")}
-          </p>
+          <p className="p-4 text-sm text-ap-crit">{t("platformAdmins.loadFailed")}</p>
         ) : (adminsQ.data ?? []).length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">
-            {t("platformAdmins.empty")}
-          </p>
+          <p className="p-12 text-center text-sm text-ap-muted">{t("platformAdmins.empty")}</p>
         ) : (
           <table className="min-w-full text-sm">
             <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
               <tr>
-                <th className="px-4 py-2 text-start">
-                  {t("platformAdmins.col.user")}
-                </th>
-                <th className="px-4 py-2 text-start">
-                  {t("platformAdmins.col.role")}
-                </th>
-                <th className="px-4 py-2 text-end">
-                  {t("platformAdmins.col.actions")}
-                </th>
+                <th className="px-4 py-2 text-start">{t("platformAdmins.col.user")}</th>
+                <th className="px-4 py-2 text-start">{t("platformAdmins.col.role")}</th>
+                <th className="px-4 py-2 text-end">{t("platformAdmins.col.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ap-line">
@@ -84,9 +70,7 @@ export function PlatformAdminsPage(): ReactNode {
                   key={`${row.user_id}-${row.role}`}
                   row={row}
                   canManage={canManage}
-                  onRemove={() =>
-                    remove.mutate({ userId: row.user_id, role: row.role })
-                  }
+                  onRemove={() => remove.mutate({ userId: row.user_id, role: row.role })}
                   removing={remove.isPending}
                 />
               ))}
@@ -99,12 +83,8 @@ export function PlatformAdminsPage(): ReactNode {
       {openInvite ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-xl bg-ap-panel p-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-ap-ink">
-              {t("platformAdmins.inviteTitle")}
-            </h3>
-            <p className="mt-2 text-xs text-ap-muted">
-              {t("platformAdmins.inviteHint")}
-            </p>
+            <h3 className="text-sm font-semibold text-ap-ink">{t("platformAdmins.inviteTitle")}</h3>
+            <p className="mt-2 text-xs text-ap-muted">{t("platformAdmins.inviteHint")}</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -146,9 +126,7 @@ export function PlatformAdminsPage(): ReactNode {
                 {t("platformAdmins.invite.role")}
                 <select
                   value={role}
-                  onChange={(e) =>
-                    setRole(e.target.value as (typeof ROLES)[number])
-                  }
+                  onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
                   className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
                 >
                   {ROLES.map((r) => (
@@ -181,11 +159,7 @@ export function PlatformAdminsPage(): ReactNode {
                     : t("platformAdmins.invite.submit")}
                 </button>
               </div>
-              {invite.error ? (
-                <p className="text-xs text-ap-crit">
-                  {(invite.error as Error).message}
-                </p>
-              ) : null}
+              {invite.error ? <p className="text-xs text-ap-crit">{invite.error.message}</p> : null}
               {invite.data ? (
                 <p className="text-xs text-ap-muted">
                   {invite.data.keycloak_provisioning === "succeeded"
@@ -219,15 +193,11 @@ function Row({
         {row.full_name ? `${row.full_name} ` : ""}
         <span className="text-ap-muted">&lt;{row.email}&gt;</span>
         {row.keycloak_subject?.startsWith("pending::") ? (
-          <span className="ms-2 text-[11px] text-ap-warn">
-            {t("platformAdmins.pendingKc")}
-          </span>
+          <span className="ms-2 text-[11px] text-ap-warn">{t("platformAdmins.pendingKc")}</span>
         ) : null}
       </td>
       <td className="px-4 py-2">
-        <Pill kind={row.role === "PlatformAdmin" ? "warn" : "info"}>
-          {row.role}
-        </Pill>
+        <Pill kind={row.role === "PlatformAdmin" ? "warn" : "info"}>{row.role}</Pill>
       </td>
       <td className="px-4 py-2 text-end">
         {canManage ? (

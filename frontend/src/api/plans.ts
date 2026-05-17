@@ -118,10 +118,7 @@ export async function createActivity(
   planId: string,
   payload: ActivityCreatePayload,
 ): Promise<PlanActivity> {
-  const { data } = await apiClient.post<PlanActivity>(
-    `/v1/plans/${planId}/activities`,
-    payload,
-  );
+  const { data } = await apiClient.post<PlanActivity>(`/v1/plans/${planId}/activities`, payload);
   return data;
 }
 
@@ -145,9 +142,8 @@ export async function listCalendar(
   fromDate: string,
   toDate: string,
 ): Promise<CalendarResponse> {
-  const { data } = await apiClient.get<CalendarResponse>(
-    `/v1/farms/${farmId}/plans/calendar`,
-    { params: { from: fromDate, to: toDate } },
-  );
+  const { data } = await apiClient.get<CalendarResponse>(`/v1/farms/${farmId}/plans/calendar`, {
+    params: { from: fromDate, to: toDate },
+  });
   return data;
 }
