@@ -115,6 +115,12 @@ postgresCluster:
     - "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
     - "CREATE EXTENSION IF NOT EXISTS citext;"
     - "CREATE EXTENSION IF NOT EXISTS pgaudit;"
+    # pgstac (used by the imagery catalog migration 0007) creates its
+    # own roles (pgstac_admin, pgstac_ingest, pgstac_read) and needs
+    # btree_gist for catalog indexes. Without CREATEROLE on `agripulse`
+    # the migration aborts with "permission denied to create role".
+    - "CREATE EXTENSION IF NOT EXISTS btree_gist;"
+    - "ALTER ROLE agripulse WITH CREATEROLE;"
   # CD-13: roles managed by CNPG. The `keycloak` role owns the keycloak
   # database; its password is the k8s Secret synced from SM by the
   # keycloak chart's ExternalSecret (agripulse-keycloak-db).
@@ -172,6 +178,24 @@ postgresCluster:
     enabled: true
     schedule: "0 0 2 * * *"
     backupOwnerReference: self
+
+# ---------------------------------------------------------------------------
+# Redis — Celery broker + app-side cache. api/workers consume it via
+#   redis://agripulse-redis:6379/{0,1,2}
+# (REDIS_URL / CELERY_BROKER_URL / CELERY_RESULT_BACKEND, baked into
+# infra/helm/{api,workers}/values.yaml). Sized for dev — flip
+# `enabled: false` in higher envs that point at an external Redis.
+# ---------------------------------------------------------------------------
+redis:
+  enabled: true
+  image: redis:7.4-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 
 # ---------------------------------------------------------------------------
 # Namespace-scoped ConfigMap shared by every service chart.

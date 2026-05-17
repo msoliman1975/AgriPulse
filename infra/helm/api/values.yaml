@@ -168,6 +168,13 @@ databasePasswordSecret:
   name: agripulse-pg-app
   key: password
 
+# ArgoCD PreSync hook Job — runs `alembic upgrade head` against the
+# public schema before the api Deployment rolls. See
+# templates/migration-job.yaml. Disable per-env if you'd rather drive
+# migrations from a CI pipeline.
+migrationJob:
+  enabled: true
+
 serviceMonitor:
   enabled: true
   interval: 30s

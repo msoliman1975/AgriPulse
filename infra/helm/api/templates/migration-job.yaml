@@ -1,0 +1,77 @@
+{{- /*
+ArgoCD PreSync hook Job — runs `alembic upgrade head` against the
+public schema before any new ReplicaSet of the api Deployment goes
+live. Without this, fresh deployments (or schema changes) require an
+operator to kubectl-cp alembic.ini into a pod and run alembic by hand.
+
+The Job uses the same image + envFrom (configmap + ExternalSecret) as
+the api Deployment, plus DATABASE_PASSWORD from the CNPG-managed
+agripulse-pg-app Secret. Settings.merge_database_password splices the
+password into DATABASE_SYNC_URL at runtime; alembic env.py then uses
+that URL.
+
+Notes
+-----
+- hook-delete-policy `before-hook-creation,hook-succeeded` keeps a
+  failed job's Pod around for inspection (delete it manually after).
+- The Job mounts no PVC; pgstac is memory-hungry, so 1500Mi limit.
+- amd64 pin matches the api Deployment (image is amd64-only today).
+*/ -}}
+{{- if .Values.migrationJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agripulse-api.fullname" . }}-migrate
+  labels:
+    {{- include "agripulse-api.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "agripulse-api.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "agripulse-api.serviceAccountName" . }}
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: alembic
+          image: {{ include "agripulse-api.imageRef" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /opt/venv/bin/alembic
+            - -c
+            - /app/alembic.ini
+            - -n
+            - public
+            - upgrade
+            - head
+          workingDir: /app
+          envFrom:
+            - configMapRef:
+                name: agripulse-app-config
+            - configMapRef:
+                name: {{ include "agripulse-api.fullname" . }}
+            - secretRef:
+                name: {{ include "agripulse-api.fullname" . }}-secrets
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.databasePasswordSecret.name }}
+                  key: {{ .Values.databasePasswordSecret.key }}
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1500Mi
+{{- end }}

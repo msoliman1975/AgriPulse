@@ -1,0 +1,76 @@
+{{- /*
+Minimal Redis instance for app-side caching + Celery broker/result.
+
+Sized for dev — 1 replica, ephemeral storage, no auth. The chart's
+`global.env` overlay can flip `redis.enabled: false` and point
+api/workers at an external Redis if needed in higher envs.
+
+API + workers consume it via:
+  REDIS_URL              = redis://agripulse-redis:6379/0
+  CELERY_BROKER_URL      = redis://agripulse-redis:6379/1
+  CELERY_RESULT_BACKEND  = redis://agripulse-redis:6379/2
+
+Those env vars are baked into infra/helm/{api,workers}/values.yaml
+already; the service name here MUST match `agripulse-redis`.
+*/ -}}
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agripulse-redis
+  labels:
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
+    app.kubernetes.io/name: agripulse-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agripulse-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agripulse-redis
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--save"
+            - ""
+            - "--appendonly"
+            - "no"
+          ports:
+            - name: tcp
+              containerPort: 6379
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agripulse-redis
+  labels:
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
+    app.kubernetes.io/name: agripulse-redis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: agripulse-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: tcp
+{{- end }}
