@@ -111,13 +111,19 @@ kubectl patch validatingwebhookconfiguration platform-ingress-nginx-admission `
   -p="[{`"op`":`"add`",`"path`":`"/webhooks/0/clientConfig/caBundle`",`"value`":`"$ca`"}]"
 ```
 
-## 6. Backfill the seed dev user's `users.id` ↔ Keycloak subject
+## 6. Backfill the seed dev user's `users.id` ↔ Keycloak subject (recovery only)
 
-The api uses the JWT `sub` claim directly as `public.users.id`. The
-bootstrap-on-first-boot inserts `dev@agripulse.local` with a fresh
-uuid_generate_v7 — which then mismatches the KC subject UUID. Only
-matters if you want `dev@agripulse.local` to be the actor on
-`invited_by` columns (creating tenants, etc.).
+> **Skip on a fresh install.** The normal `invite_admin` flow sets
+> `users.id = JWT.sub` correctly the first time the user signs in,
+> so the columns match by construction. This section is the
+> recovery path if a previous session manually `INSERT`-ed a row
+> into `public.users` (e.g. seed script with `uuid_generate_v7`)
+> before the user existed in Keycloak — the manual UUID won't
+> match the KC subject and `invited_by` lookups will fail.
+
+The api uses the JWT `sub` claim directly as `public.users.id`. If
+those don't match, the dev user can't be the actor on `invited_by`
+columns (creating tenants, etc.). Realign:
 
 ```sql
 -- pick up the KC subject UUID from the agripulse realm first
