@@ -173,7 +173,7 @@ describe("ImageryPanel", () => {
     );
 
     // Wait for the scene picker to mount.
-    const select = await screen.findByLabelText(/Ø§Ù„Ù…Ø´Ù‡Ø¯/);
+    const select = await screen.findByLabelText(/المشهد/);
     expect(select).toBeInTheDocument();
     // The mocked NDVIMap surfaces the tile-URL template â€” assert it
     // contains the index COG asset path and the rescale window.
