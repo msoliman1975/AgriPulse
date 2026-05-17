@@ -32,10 +32,7 @@ export function useFarmIntegrationHealth(basePath: string = "/v1") {
   });
 }
 
-export function useBlockIntegrationHealth(
-  farmId: string | null,
-  basePath: string = "/v1",
-) {
+export function useBlockIntegrationHealth(farmId: string | null, basePath: string = "/v1") {
   return useQuery({
     queryKey: ["integrations", "health", "blocks", basePath, farmId] as const,
     queryFn: () => listBlockHealth(farmId!, basePath),
@@ -51,10 +48,7 @@ export interface RecentAttemptsFilters {
   farm_id?: string;
 }
 
-export function useRecentAttempts(
-  filters: RecentAttemptsFilters = {},
-  basePath: string = "/v1",
-) {
+export function useRecentAttempts(filters: RecentAttemptsFilters = {}, basePath: string = "/v1") {
   return useQuery({
     queryKey: [
       "integrations",
@@ -77,24 +71,14 @@ export function useIntegrationQueue(
   basePath: string = "/v1",
 ) {
   return useQuery({
-    queryKey: [
-      "integrations",
-      "health",
-      "queue",
-      basePath,
-      kind ?? "all",
-      state ?? "all",
-    ] as const,
+    queryKey: ["integrations", "health", "queue", basePath, kind ?? "all", state ?? "all"] as const,
     queryFn: () => listQueue({ kind, state }, basePath),
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS / 2,
   });
 }
 
-export function useProvidersHealth(
-  platformScope: boolean,
-  basePath: string = "/v1",
-) {
+export function useProvidersHealth(platformScope: boolean, basePath: string = "/v1") {
   return useQuery({
     queryKey: [
       "integrations",
@@ -103,8 +87,7 @@ export function useProvidersHealth(
       platformScope ? "platform" : "tenant",
       basePath,
     ] as const,
-    queryFn: () =>
-      platformScope ? listPlatformProviders() : listProviders(basePath),
+    queryFn: () => (platformScope ? listPlatformProviders() : listProviders(basePath)),
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS / 2,
   });
@@ -131,10 +114,7 @@ export function useProviderErrorHistogram(
   });
 }
 
-export function useProviderProbes(
-  provider_kind: AttemptKind | null,
-  provider_code: string | null,
-) {
+export function useProviderProbes(provider_kind: AttemptKind | null, provider_code: string | null) {
   return useQuery({
     queryKey: [
       "integrations",

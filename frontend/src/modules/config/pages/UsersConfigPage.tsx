@@ -62,9 +62,7 @@ export function UsersConfigPage(): ReactNode {
       </header>
 
       {inviting ? <InviteForm onClose={() => setInviting(false)} /> : null}
-      {editing ? (
-        <EditForm user={editing} onClose={() => setEditing(null)} />
-      ) : null}
+      {editing ? <EditForm user={editing} onClose={() => setEditing(null)} /> : null}
 
       <div className="rounded-xl border border-ap-line bg-ap-panel">
         {isLoading ? (
@@ -105,7 +103,7 @@ export function UsersConfigPage(): ReactNode {
             </tbody>
           </table>
         )}
-        {(suspendMut.isError || reactivateMut.isError || deleteMut.isError) ? (
+        {suspendMut.isError || reactivateMut.isError || deleteMut.isError ? (
           <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
             {(suspendMut.error || reactivateMut.error || deleteMut.error)?.message}
           </p>
@@ -155,18 +153,14 @@ function UserRow({
         <div className="flex flex-wrap items-center gap-1">
           <Pill
             kind={
-              memberStatus === "active"
-                ? "ok"
-                : memberStatus === "suspended"
-                  ? "crit"
-                  : "neutral"
+              memberStatus === "active" ? "ok" : memberStatus === "suspended" ? "crit" : "neutral"
             }
           >
-            {t(`row.${memberStatus === "active" ? "active" : memberStatus === "suspended" ? "suspended" : "archived"}`)}
+            {t(
+              `row.${memberStatus === "active" ? "active" : memberStatus === "suspended" ? "suspended" : "archived"}`,
+            )}
           </Pill>
-          {isPending ? (
-            <Pill kind="warn">{t("row.pendingProvisioning")}</Pill>
-          ) : null}
+          {isPending ? <Pill kind="warn">{t("row.pendingProvisioning")}</Pill> : null}
         </div>
       </td>
       <td className="px-4 py-2 text-xs text-ap-muted">
@@ -290,11 +284,7 @@ function InviteForm({ onClose }: { onClose: () => void }): ReactNode {
           />
         </FormField>
         <FormField label={t("invite.phone")}>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={inputCls}
-          />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
         </FormField>
         <FormField label={t("invite.tenantRole")}>
           <select
@@ -311,12 +301,10 @@ function InviteForm({ onClose }: { onClose: () => void }): ReactNode {
         </FormField>
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {successMsg ? (
-          <span className="text-xs text-ap-ok">{successMsg}</span>
-        ) : null}
+        {successMsg ? <span className="text-xs text-ap-ok">{successMsg}</span> : null}
         {invite.isError ? (
           <span className="text-xs text-ap-crit">
-            {(invite.error as Error)?.message ?? t("invite.saveFailed")}
+            {invite.error?.message ?? t("invite.saveFailed")}
           </span>
         ) : null}
         <button
@@ -331,13 +319,7 @@ function InviteForm({ onClose }: { onClose: () => void }): ReactNode {
   );
 }
 
-function EditForm({
-  user,
-  onClose,
-}: {
-  user: TenantUser;
-  onClose: () => void;
-}): ReactNode {
+function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }): ReactNode {
   const { t } = useTranslation("users");
   const update = useUpdateTenantUser();
   const [fullName, setFullName] = useState(user.full_name);
@@ -379,11 +361,7 @@ function EditForm({
           />
         </FormField>
         <FormField label={t("edit.phone")}>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={inputCls}
-          />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
         </FormField>
         <FormField label={t("edit.language")}>
           <select
@@ -399,7 +377,7 @@ function EditForm({
       <div className="mt-3 flex items-center justify-end gap-2">
         {update.isError ? (
           <span className="text-xs text-ap-crit">
-            {(update.error as Error)?.message ?? t("edit.saveFailed")}
+            {update.error?.message ?? t("edit.saveFailed")}
           </span>
         ) : null}
         <button
@@ -417,13 +395,7 @@ function EditForm({
 const inputCls =
   "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm text-ap-ink shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary";
 
-function FormField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}): ReactNode {
+function FormField({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-ap-muted">{label}</span>

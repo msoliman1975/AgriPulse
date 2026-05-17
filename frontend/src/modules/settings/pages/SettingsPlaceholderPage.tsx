@@ -30,12 +30,8 @@ export function SettingsPlaceholderPage({ i18nKey, requires }: Props): ReactNode
   }
   return (
     <div className="rounded-xl border border-dashed border-ap-line bg-ap-panel/50 p-10 text-center">
-      <h1 className="text-lg font-semibold text-ap-ink">
-        {t(`placeholder.${i18nKey}.title`)}
-      </h1>
-      <p className="mt-2 text-sm text-ap-muted">
-        {t(`placeholder.${i18nKey}.body`)}
-      </p>
+      <h1 className="text-lg font-semibold text-ap-ink">{t(`placeholder.${i18nKey}.title`)}</h1>
+      <p className="mt-2 text-sm text-ap-muted">{t(`placeholder.${i18nKey}.body`)}</p>
     </div>
   );
 }

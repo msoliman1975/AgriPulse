@@ -144,7 +144,9 @@ export function ActivityDetail({ farmId, activity, block, irrigation }: Props): 
           <>
             <button
               type="button"
-              disabled={!canComplete || activity.status === "completed" || activity.status === "skipped"}
+              disabled={
+                !canComplete || activity.status === "completed" || activity.status === "skipped"
+              }
               onClick={() =>
                 updateActivity.mutate({
                   activityId: activity.id,
@@ -157,7 +159,9 @@ export function ActivityDetail({ farmId, activity, block, irrigation }: Props): 
             </button>
             <button
               type="button"
-              disabled={!canComplete || activity.status === "completed" || activity.status === "skipped"}
+              disabled={
+                !canComplete || activity.status === "completed" || activity.status === "skipped"
+              }
               onClick={() =>
                 updateActivity.mutate({
                   activityId: activity.id,

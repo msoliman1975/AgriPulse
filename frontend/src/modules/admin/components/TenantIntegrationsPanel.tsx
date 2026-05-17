@@ -28,19 +28,11 @@ export function TenantIntegrationsPanel({ tenantId }: Props): ReactNode {
   return (
     <div className="flex flex-col gap-4">
       <header>
-        <h2 className="text-sm font-semibold text-ap-ink">
-          {t("integrations.title")}
-        </h2>
-        <p className="mt-1 text-xs text-ap-muted">
-          {t("integrations.subtitle")}
-        </p>
+        <h2 className="text-sm font-semibold text-ap-ink">{t("integrations.title")}</h2>
+        <p className="mt-1 text-xs text-ap-muted">{t("integrations.subtitle")}</p>
       </header>
       {CATEGORIES.map((category) => (
-        <CategorySection
-          key={category}
-          tenantId={tenantId}
-          category={category}
-        />
+        <CategorySection key={category} tenantId={tenantId} category={category} />
       ))}
     </div>
   );

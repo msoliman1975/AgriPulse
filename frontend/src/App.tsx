@@ -102,119 +102,110 @@ export function App(): ReactNode {
                   Platform staff don't see the AgriPulse tree at all
                   (persona-separation rule from the portal-restructure). */}
               <Route element={<AgriPulseGuard />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
-              <Route path="/farms" element={<FarmListPage />} />
-              <Route path="/farms/new" element={<FarmCreatePage />} />
-              <Route path="/farms/:farmId" element={<FarmDetailPage />} />
-              <Route path="/farms/:farmId/edit" element={<FarmEditPage />} />
-              <Route path="/farms/:farmId/members" element={<FarmMembersPage />} />
-              <Route path="/farms/:farmId/blocks/new" element={<BlockCreatePage />} />
-              <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
-              <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
-              <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
-              {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
+                <Route path="/" element={<HomePage />} />
+                <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
+                <Route path="/farms" element={<FarmListPage />} />
+                <Route path="/farms/new" element={<FarmCreatePage />} />
+                <Route path="/farms/:farmId" element={<FarmDetailPage />} />
+                <Route path="/farms/:farmId/edit" element={<FarmEditPage />} />
+                <Route path="/farms/:farmId/members" element={<FarmMembersPage />} />
+                <Route path="/farms/:farmId/blocks/new" element={<BlockCreatePage />} />
+                <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
+                <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
+                <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
+                {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
                   IMPLEMENTATION_PLAN Â§3). */}
-              {/* Labs: experimental map-first surface for live validation.
+                {/* Labs: experimental map-first surface for live validation.
                   Complements the existing list/table flow â€” does not
                   replace it. See docs/proposals/map-first.md. */}
-              <Route path="/labs/map" element={<MapExperiencePage />} />
-              <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
-              <Route path="/insights/:farmId" element={<InsightsPage />} />
-              <Route path="/plan/:farmId" element={<PlanPage />} />
-              <Route path="/alerts/:farmId" element={<AlertsPage />} />
-              <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />
-              <Route path="/signals/:farmId" element={<SignalsLogPage />} />
-              <Route path="/reports/:farmId" element={<ReportsPage />} />
-              <Route path="/config/signals/:farmId" element={<SignalsConfigPage />} />
-              {/* Rules + Users are tenant-wide â€” redirect to the Settings hub. */}
-              <Route
-                path="/config/rules/:farmId"
-                element={<Navigate to="/settings/rules" replace />}
-              />
-              <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
-              <Route
-                path="/config/users/:farmId"
-                element={<Navigate to="/settings/users" replace />}
-              />
-              {/* Legacy /config/decision-trees/:farmId paths redirect to
+                <Route path="/labs/map" element={<MapExperiencePage />} />
+                <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
+                <Route path="/insights/:farmId" element={<InsightsPage />} />
+                <Route path="/plan/:farmId" element={<PlanPage />} />
+                <Route path="/alerts/:farmId" element={<AlertsPage />} />
+                <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />
+                <Route path="/signals/:farmId" element={<SignalsLogPage />} />
+                <Route path="/reports/:farmId" element={<ReportsPage />} />
+                <Route path="/config/signals/:farmId" element={<SignalsConfigPage />} />
+                {/* Rules + Users are tenant-wide â€” redirect to the Settings hub. */}
+                <Route
+                  path="/config/rules/:farmId"
+                  element={<Navigate to="/settings/rules" replace />}
+                />
+                <Route path="/config/imagery/:farmId" element={<ImageryWeatherConfigPage />} />
+                <Route
+                  path="/config/users/:farmId"
+                  element={<Navigate to="/settings/users" replace />}
+                />
+                {/* Legacy /config/decision-trees/:farmId paths redirect to
                   /settings/decision-trees (settings are tenant-wide). */}
-              <Route
-                path="/config/decision-trees/:farmId"
-                element={<Navigate to="/settings/decision-trees" replace />}
-              />
-              <Route
-                path="/config/decision-trees/:farmId/new"
-                element={<Navigate to="/settings/decision-trees/new" replace />}
-              />
-              {/* /config/decision-trees/:farmId/:code â†’ /settings/decision-trees/:code */}
-              <Route
-                path="/config/decision-trees/:farmId/:code"
-                element={<RedirectDecisionTreeDetail />}
-              />
-              {/* Tenant Settings Hub. Capability checks live on each
+                <Route
+                  path="/config/decision-trees/:farmId"
+                  element={<Navigate to="/settings/decision-trees" replace />}
+                />
+                <Route
+                  path="/config/decision-trees/:farmId/new"
+                  element={<Navigate to="/settings/decision-trees/new" replace />}
+                />
+                {/* /config/decision-trees/:farmId/:code â†’ /settings/decision-trees/:code */}
+                <Route
+                  path="/config/decision-trees/:farmId/:code"
+                  element={<RedirectDecisionTreeDetail />}
+                />
+                {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
-              <Route path="/settings" element={<SettingsLayout />}>
-                <Route index element={<SettingsIndexPage />} />
-                <Route
-                  path="org"
-                  element={
-                    <SettingsPlaceholderPage
-                      i18nKey="org"
-                      requires="tenant.manage_integrations"
-                    />
-                  }
-                />
-                <Route
-                  path="notifications"
-                  element={
-                    <SettingsPlaceholderPage
-                      i18nKey="notifications"
-                      requires="tenant.manage_integrations"
-                    />
-                  }
-                />
-                <Route path="integrations" element={<IntegrationsLayout />}>
+                <Route path="/settings" element={<SettingsLayout />}>
+                  <Route index element={<SettingsIndexPage />} />
                   <Route
-                    index
-                    element={<Navigate to="health" replace />}
-                  />
-                  <Route path="health" element={<IntegrationsHealthPage />} />
-                  <Route path="weather" element={<IntegrationsWeatherPage />} />
-                  <Route path="imagery" element={<IntegrationsImageryPage />} />
-                  <Route
-                    path="email"
+                    path="org"
                     element={
-                      <IntegrationsTenantOnlyPage
-                        category="email"
-                        i18nTitleKey="email.title"
-                        i18nSubtitleKey="email.subtitle"
+                      <SettingsPlaceholderPage
+                        i18nKey="org"
+                        requires="tenant.manage_integrations"
                       />
                     }
                   />
                   <Route
-                    path="webhook"
+                    path="notifications"
                     element={
-                      <IntegrationsTenantOnlyPage
-                        category="webhook"
-                        i18nTitleKey="webhook.title"
-                        i18nSubtitleKey="webhook.subtitle"
+                      <SettingsPlaceholderPage
+                        i18nKey="notifications"
+                        requires="tenant.manage_integrations"
                       />
                     }
                   />
+                  <Route path="integrations" element={<IntegrationsLayout />}>
+                    <Route index element={<Navigate to="health" replace />} />
+                    <Route path="health" element={<IntegrationsHealthPage />} />
+                    <Route path="weather" element={<IntegrationsWeatherPage />} />
+                    <Route path="imagery" element={<IntegrationsImageryPage />} />
+                    <Route
+                      path="email"
+                      element={
+                        <IntegrationsTenantOnlyPage
+                          category="email"
+                          i18nTitleKey="email.title"
+                          i18nSubtitleKey="email.subtitle"
+                        />
+                      }
+                    />
+                    <Route
+                      path="webhook"
+                      element={
+                        <IntegrationsTenantOnlyPage
+                          category="webhook"
+                          i18nTitleKey="webhook.title"
+                          i18nSubtitleKey="webhook.subtitle"
+                        />
+                      }
+                    />
+                  </Route>
+                  <Route path="users" element={<UsersConfigPage />} />
+                  <Route path="rules" element={<RulesConfigPage />} />
+                  <Route path="decision-trees" element={<DecisionTreeListPage />} />
+                  <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />
+                  <Route path="decision-trees/:code" element={<DecisionTreeEditorPage />} />
                 </Route>
-                <Route path="users" element={<UsersConfigPage />} />
-                <Route path="rules" element={<RulesConfigPage />} />
-                <Route path="decision-trees" element={<DecisionTreeListPage />} />
-                <Route
-                  path="decision-trees/new"
-                  element={<DecisionTreeCreatePage />}
-                />
-                <Route
-                  path="decision-trees/:code"
-                  element={<DecisionTreeEditorPage />}
-                />
-              </Route>
               </Route>
               {/* Platform Management Portal â€” capability gate sits
                   inside PlatformLayout (PR-Reorg2). PlatformAdmin
@@ -236,18 +227,12 @@ export function App(): ReactNode {
               {/* Back-compat: old /admin/* paths redirect to /platform/*
                   so bookmarks keep working through the URL rename. */}
               <Route path="/admin" element={<Navigate to="/platform" replace />} />
-              <Route
-                path="/admin/tenants"
-                element={<Navigate to="/platform/tenants" replace />}
-              />
+              <Route path="/admin/tenants" element={<Navigate to="/platform/tenants" replace />} />
               <Route
                 path="/admin/tenants/new"
                 element={<Navigate to="/platform/tenants/new" replace />}
               />
-              <Route
-                path="/admin/tenants/:tenantId"
-                element={<RedirectLegacyAdminTenant />}
-              />
+              <Route path="/admin/tenants/:tenantId" element={<RedirectLegacyAdminTenant />} />
               <Route
                 path="/admin/defaults"
                 element={<Navigate to="/platform/defaults" replace />}

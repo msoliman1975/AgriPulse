@@ -2,11 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
-import type {
-  SignalDefinition,
-  SignalDefinitionCreatePayload,
-  ValueKind,
-} from "@/api/signals";
+import type { SignalDefinition, SignalDefinitionCreatePayload, ValueKind } from "@/api/signals";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -18,13 +14,7 @@ import {
   useUpdateSignalDefinition,
 } from "@/queries/signals";
 
-const VALUE_KINDS: ValueKind[] = [
-  "numeric",
-  "categorical",
-  "event",
-  "boolean",
-  "geopoint",
-];
+const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
 
 interface FormState {
   code: string;
@@ -138,9 +128,7 @@ export function SignalsConfigPage(): ReactNode {
             <Field label={t("config.form.valueKind")}>
               <select
                 value={form.value_kind}
-                onChange={(e) =>
-                  setForm({ ...form, value_kind: e.target.value as ValueKind })
-                }
+                onChange={(e) => setForm({ ...form, value_kind: e.target.value as ValueKind })}
                 className={inputCls}
               >
                 {VALUE_KINDS.map((k) => (
@@ -180,16 +168,11 @@ export function SignalsConfigPage(): ReactNode {
               </>
             ) : null}
             {form.value_kind === "categorical" ? (
-              <Field
-                label={t("config.form.categoricalValues")}
-                className="sm:col-span-2"
-              >
+              <Field label={t("config.form.categoricalValues")} className="sm:col-span-2">
                 <input
                   required
                   value={form.categorical_values}
-                  onChange={(e) =>
-                    setForm({ ...form, categorical_values: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, categorical_values: e.target.value })}
                   placeholder={t("config.form.categoricalPlaceholder")}
                   className={inputCls}
                 />
@@ -207,9 +190,7 @@ export function SignalsConfigPage(): ReactNode {
                 <input
                   type="checkbox"
                   checked={form.attachment_allowed}
-                  onChange={(e) =>
-                    setForm({ ...form, attachment_allowed: e.target.checked })
-                  }
+                  onChange={(e) => setForm({ ...form, attachment_allowed: e.target.checked })}
                 />
                 <span>{t("config.form.attachmentHint")}</span>
               </label>
@@ -218,7 +199,7 @@ export function SignalsConfigPage(): ReactNode {
           <div className="mt-3 flex items-center justify-end gap-2">
             {createMut.isError ? (
               <span className="text-xs text-ap-crit">
-                {(createMut.error as Error)?.message ?? t("config.form.saveFailed")}
+                {createMut.error?.message ?? t("config.form.saveFailed")}
               </span>
             ) : null}
             <button
@@ -241,9 +222,7 @@ export function SignalsConfigPage(): ReactNode {
         ) : isError ? (
           <p className="p-4 text-sm text-ap-crit">{t("config.loadFailed")}</p>
         ) : !data || data.length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">
-            {t("config.empty")}
-          </p>
+          <p className="p-12 text-center text-sm text-ap-muted">{t("config.empty")}</p>
         ) : (
           <ul className="divide-y divide-ap-line">
             {data.map((d) => (
@@ -291,24 +270,16 @@ function DefinitionRow({
             {defn.is_active ? t("config.row.active") : t("config.row.inactive")}
           </Pill>
           <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
-          {defn.attachment_allowed ? (
-            <Pill kind="neutral">{t("config.row.photos")}</Pill>
-          ) : null}
+          {defn.attachment_allowed ? <Pill kind="neutral">{t("config.row.photos")}</Pill> : null}
         </div>
-        {defn.description ? (
-          <p className="mt-1 text-sm text-ap-muted">{defn.description}</p>
-        ) : null}
+        {defn.description ? <p className="mt-1 text-sm text-ap-muted">{defn.description}</p> : null}
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ap-muted">
           {defn.value_kind === "numeric" && defn.unit ? (
             <span>{t("config.row.unit", { unit: defn.unit })}</span>
           ) : null}
-          {valueRange ? (
-            <span>{t("config.row.range", { range: valueRange })}</span>
-          ) : null}
+          {valueRange ? <span>{t("config.row.range", { range: valueRange })}</span> : null}
           {defn.categorical_values ? (
-            <span>
-              {t("config.row.values", { values: defn.categorical_values.join(", ") })}
-            </span>
+            <span>{t("config.row.values", { values: defn.categorical_values.join(", ") })}</span>
           ) : null}
         </div>
       </div>

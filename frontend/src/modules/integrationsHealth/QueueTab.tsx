@@ -69,8 +69,7 @@ function QueueSection({
 }): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   const dateLocale = useDateLocale();
-  const pill: PillKind =
-    kind === "stuck" ? "crit" : kind === "overdue" ? "warn" : "info";
+  const pill: PillKind = kind === "stuck" ? "crit" : kind === "overdue" ? "warn" : "info";
 
   return (
     <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-3">
@@ -88,15 +87,10 @@ function QueueSection({
       ) : (
         <ul className="divide-y divide-ap-line text-xs">
           {rows.map((r) => (
-            <li
-              key={`${r.kind}-${r.subscription_id}-${r.attempt_id ?? "none"}`}
-              className="py-2"
-            >
+            <li key={`${r.kind}-${r.subscription_id}-${r.attempt_id ?? "none"}`} className="py-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ap-ink">{t(`kind.${r.kind}`)}</span>
-                <span className="font-mono text-ap-muted">
-                  {r.provider_code ?? "—"}
-                </span>
+                <span className="font-mono text-ap-muted">{r.provider_code ?? "—"}</span>
               </div>
               <div className="mt-0.5 flex items-center justify-between gap-2 text-ap-muted">
                 <span className="truncate font-mono">{r.block_id}</span>
@@ -114,9 +108,7 @@ function QueueSection({
         </ul>
       )}
 
-      {footer ? (
-        <p className="text-[10px] text-ap-muted">{footer}</p>
-      ) : null}
+      {footer ? <p className="text-[10px] text-ap-muted">{footer}</p> : null}
     </section>
   );
 }

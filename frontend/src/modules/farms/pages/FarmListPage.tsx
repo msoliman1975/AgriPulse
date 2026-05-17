@@ -89,9 +89,7 @@ export function FarmListPage(): JSX.Element {
                     <AreaDisplay areaM2={Number(f.area_m2)} />
                   </td>
                   <td className="py-2">
-                    {f.is_active
-                      ? t("status.active")
-                      : t("status.archived")}
+                    {f.is_active ? t("status.active") : t("status.archived")}
                   </td>
                 </tr>
               ))}

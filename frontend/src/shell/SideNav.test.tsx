@@ -16,8 +16,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 function jwt(payload: object): string {
-  const b64 = (s: string) =>
-    btoa(s).replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const b64 = (s: string) => btoa(s).replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   return `${b64("{}")}.${b64(JSON.stringify(payload))}.sig`;
 }
 

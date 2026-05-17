@@ -22,9 +22,7 @@ export function PlatformAdminGuard({ children }: Props): ReactNode {
   if (!granted) {
     return (
       <div role="alert" className="mx-auto max-w-lg rounded-md bg-ap-panel p-6 shadow-card">
-        <h1 className="text-base font-semibold text-ap-ink">
-          {t("guard.forbiddenTitle")}
-        </h1>
+        <h1 className="text-base font-semibold text-ap-ink">{t("guard.forbiddenTitle")}</h1>
         <p className="mt-2 text-sm text-ap-muted">{t("guard.forbiddenBody")}</p>
       </div>
     );

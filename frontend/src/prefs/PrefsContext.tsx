@@ -11,10 +11,7 @@ export const SUPPORTED_AREA_UNITS: readonly AreaUnit[] = ["feddan", "acre", "hec
 
 export type WeatherUnitSystem = "metric" | "imperial";
 
-export const SUPPORTED_WEATHER_UNIT_SYSTEMS: readonly WeatherUnitSystem[] = [
-  "metric",
-  "imperial",
-];
+export const SUPPORTED_WEATHER_UNIT_SYSTEMS: readonly WeatherUnitSystem[] = ["metric", "imperial"];
 
 interface PrefsState {
   unit: AreaUnit;

@@ -39,9 +39,7 @@ export function IntegrationsWeatherPage(): ReactNode {
 
       {/* Tenant tier */}
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
-        <h2 className="text-sm font-semibold text-ap-ink">
-          {t("section.tenant")}
-        </h2>
+        <h2 className="text-sm font-semibold text-ap-ink">{t("section.tenant")}</h2>
         {tenantQ.isLoading ? (
           <Skeleton className="mt-3 h-24 w-full" />
         ) : tenantQ.isError ? (
@@ -49,9 +47,7 @@ export function IntegrationsWeatherPage(): ReactNode {
         ) : (
           <SettingTable
             settings={tenantQ.data?.settings ?? []}
-            onSave={(key, value) =>
-              putTenant.mutate({ key, value })
-            }
+            onSave={(key, value) => putTenant.mutate({ key, value })}
             isPending={putTenant.isPending}
           />
         )}
@@ -78,9 +74,7 @@ export function IntegrationsWeatherPage(): ReactNode {
           </select>
         </label>
 
-        {selectedFarmId ? (
-          <FarmWeatherForm farmId={selectedFarmId} />
-        ) : null}
+        {selectedFarmId ? <FarmWeatherForm farmId={selectedFarmId} /> : null}
       </section>
     </div>
   );
@@ -173,18 +167,10 @@ function FarmWeatherForm({ farmId }: { farmId: string }): ReactNode {
 
   useEffect(() => {
     const settings = farmQ.data?.settings ?? [];
-    const provSetting = settings.find(
-      (s) => s.key === "weather.default_provider_code",
-    );
-    const cadSetting = settings.find(
-      (s) => s.key === "weather.default_cadence_hours",
-    );
-    setProvider(
-      provSetting && provSetting.source === "farm" ? String(provSetting.value) : "",
-    );
-    setCadence(
-      cadSetting && cadSetting.source === "farm" ? String(cadSetting.value) : "",
-    );
+    const provSetting = settings.find((s) => s.key === "weather.default_provider_code");
+    const cadSetting = settings.find((s) => s.key === "weather.default_cadence_hours");
+    setProvider(provSetting && provSetting.source === "farm" ? String(provSetting.value) : "");
+    setCadence(cadSetting && cadSetting.source === "farm" ? String(cadSetting.value) : "");
   }, [farmQ.data]);
 
   if (farmQ.isLoading) return <Skeleton className="mt-3 h-24 w-full" />;
@@ -207,7 +193,9 @@ function FarmWeatherForm({ farmId }: { farmId: string }): ReactNode {
             <tr key={s.key}>
               <td className="py-2 pr-4 font-mono text-xs">{s.key}</td>
               <td className="py-2 pr-4 text-ap-ink">{formatValue(s.value)}</td>
-              <td className="py-2"><SourcePill source={s.source} /></td>
+              <td className="py-2">
+                <SourcePill source={s.source} />
+              </td>
             </tr>
           ))}
         </tbody>

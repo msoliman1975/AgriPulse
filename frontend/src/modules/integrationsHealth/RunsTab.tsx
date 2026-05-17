@@ -5,15 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
-import {
-  useFarmIntegrationHealth,
-  useRecentAttempts,
-} from "@/queries/integrationsHealth";
-import type {
-  AttemptKind,
-  AttemptStatus,
-  IntegrationAttempt,
-} from "@/api/integrationsHealth";
+import { useFarmIntegrationHealth, useRecentAttempts } from "@/queries/integrationsHealth";
+import type { AttemptKind, AttemptStatus, IntegrationAttempt } from "@/api/integrationsHealth";
 
 export interface RunsTabProps {
   basePath: string;
@@ -63,9 +56,7 @@ export function RunsTab({ basePath }: RunsTabProps): ReactNode {
           <span className="text-ap-muted">{t("filters.status")}</span>
           <select
             value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as AttemptStatus | "all")
-            }
+            onChange={(e) => setStatus(e.target.value as AttemptStatus | "all")}
             className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
           >
             <option value="all">{t("filters.all")}</option>
@@ -144,17 +135,11 @@ function RunsTable({
                   className="cursor-pointer hover:bg-ap-line/30"
                   onClick={() => onToggle(r.attempt_id)}
                 >
-                  <td className="px-3 py-2 text-ap-ink">
-                    {t(`kind.${r.kind}`)}
-                  </td>
-                  <td className="px-3 py-2 text-ap-muted">
-                    {r.provider_code ?? "—"}
-                  </td>
+                  <td className="px-3 py-2 text-ap-ink">{t(`kind.${r.kind}`)}</td>
+                  <td className="px-3 py-2 text-ap-muted">{r.provider_code ?? "—"}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap items-center gap-1">
-                      <Pill kind={pillForStatus(r.status)}>
-                        {t(`attemptStatus.${r.status}`)}
-                      </Pill>
+                      <Pill kind={pillForStatus(r.status)}>{t(`attemptStatus.${r.status}`)}</Pill>
                       {r.failed_streak_position > 1 ? (
                         <Pill kind="crit">
                           {t("runs.attemptN", { n: r.failed_streak_position })}
@@ -180,9 +165,7 @@ function RunsTable({
                         ? formatDuration(r.duration_ms)
                         : "—"}
                   </td>
-                  <td className="px-3 py-2 text-ap-muted">
-                    {summaryFor(r, t)}
-                  </td>
+                  <td className="px-3 py-2 text-ap-muted">{summaryFor(r, t)}</td>
                 </tr>
                 {isOpen ? (
                   <tr className="bg-ap-bg/30">
@@ -214,17 +197,10 @@ function DetailBlock({ row }: { row: IntegrationAttempt }): ReactNode {
       <Field label={t("detail.startedAt")} value={row.started_at} />
       <Field label={t("detail.completedAt")} value={row.completed_at ?? "—"} />
       {row.rows_ingested !== null ? (
-        <Field
-          label={t("detail.rowsIngested")}
-          value={String(row.rows_ingested)}
-        />
+        <Field label={t("detail.rowsIngested")} value={String(row.rows_ingested)} />
       ) : null}
-      {row.scene_id ? (
-        <Field label={t("detail.sceneId")} value={row.scene_id} />
-      ) : null}
-      {row.error_code ? (
-        <Field label={t("detail.errorCode")} value={row.error_code} />
-      ) : null}
+      {row.scene_id ? <Field label={t("detail.sceneId")} value={row.scene_id} /> : null}
+      {row.error_code ? <Field label={t("detail.errorCode")} value={row.error_code} /> : null}
       {row.error_message ? (
         <div className="sm:col-span-2">
           <div className="text-ap-muted">{t("detail.errorMessage")}</div>

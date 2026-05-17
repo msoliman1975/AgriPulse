@@ -5,10 +5,7 @@ import type { PlatformDefault, ValueSchema } from "@/api/platformDefaults";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
-import {
-  usePlatformDefaults,
-  useUpdatePlatformDefault,
-} from "@/queries/platformDefaults";
+import { usePlatformDefaults, useUpdatePlatformDefault } from "@/queries/platformDefaults";
 
 /**
  * /admin/defaults — PlatformAdmin can edit `public.platform_defaults`.
@@ -34,14 +31,10 @@ export function PlatformDefaultsPage(): ReactNode {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
       <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">
-          {t("defaults.title")}
-        </h1>
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("defaults.title")}</h1>
         <p className="mt-1 text-sm text-ap-muted">{t("defaults.subtitle")}</p>
         {!canManage ? (
-          <p className="mt-2 text-xs text-ap-warn">
-            {t("defaults.readonlyHint")}
-          </p>
+          <p className="mt-2 text-xs text-ap-warn">{t("defaults.readonlyHint")}</p>
         ) : null}
       </header>
 
@@ -53,10 +46,7 @@ export function PlatformDefaultsPage(): ReactNode {
         <p className="text-sm text-ap-muted">{t("defaults.empty")}</p>
       ) : (
         grouped.map(([category, rows]) => (
-          <section
-            key={category}
-            className="rounded-xl border border-ap-line bg-ap-panel"
-          >
+          <section key={category} className="rounded-xl border border-ap-line bg-ap-panel">
             <h2 className="border-b border-ap-line px-4 py-2 text-sm font-semibold capitalize text-ap-ink">
               {category}
             </h2>
@@ -72,13 +62,7 @@ export function PlatformDefaultsPage(): ReactNode {
   );
 }
 
-function DefaultRow({
-  row,
-  canManage,
-}: {
-  row: PlatformDefault;
-  canManage: boolean;
-}): ReactNode {
+function DefaultRow({ row, canManage }: { row: PlatformDefault; canManage: boolean }): ReactNode {
   const { t } = useTranslation("admin");
   const update = useUpdatePlatformDefault();
   const [draft, setDraft] = useState(formatValue(row.value));
@@ -102,7 +86,7 @@ function DefaultRow({
     update.mutate(
       { key: row.key, value: parsed },
       {
-        onError: (e) => setErr((e as Error).message),
+        onError: (e) => setErr(e.message),
       },
     );
   };
@@ -112,9 +96,7 @@ function DefaultRow({
       <div className="flex flex-wrap items-center gap-2">
         <code className="font-mono text-xs text-ap-primary">{row.key}</code>
         <Pill kind="neutral">{row.value_schema}</Pill>
-        {row.description ? (
-          <span className="text-xs text-ap-muted">{row.description}</span>
-        ) : null}
+        {row.description ? <span className="text-xs text-ap-muted">{row.description}</span> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -175,7 +157,10 @@ function parseAndValidate(raw: string, schema: ValueSchema): unknown {
   if (schema === "array" && !Array.isArray(parsed)) {
     throw new Error("Expected a JSON array.");
   }
-  if (schema === "object" && (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))) {
+  if (
+    schema === "object" &&
+    (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+  ) {
     throw new Error("Expected a JSON object.");
   }
   return parsed;

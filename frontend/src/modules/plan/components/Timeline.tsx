@@ -38,10 +38,8 @@ export function Timeline({
           {months.map((m) => {
             const monthStart = m.start;
             const monthEnd = m.end;
-            const startPct =
-              (differenceInCalendarDays(monthStart, seasonStart) / totalDays) * 100;
-            const widthPct =
-              (differenceInCalendarDays(monthEnd, monthStart) / totalDays) * 100;
+            const startPct = (differenceInCalendarDays(monthStart, seasonStart) / totalDays) * 100;
+            const widthPct = (differenceInCalendarDays(monthEnd, monthStart) / totalDays) * 100;
             return (
               <div
                 key={m.start.toISOString()}

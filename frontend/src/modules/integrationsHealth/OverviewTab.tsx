@@ -6,10 +6,7 @@ import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
-import {
-  useBlockIntegrationHealth,
-  useFarmIntegrationHealth,
-} from "@/queries/integrationsHealth";
+import { useBlockIntegrationHealth, useFarmIntegrationHealth } from "@/queries/integrationsHealth";
 
 type Status = "ok" | "warn" | "crit" | "neutral";
 
@@ -43,10 +40,7 @@ export function OverviewTab({ basePath }: OverviewTabProps): ReactNode {
   const [selectedFarmId, setSelectedFarmId] = useState<string | null>(null);
 
   const farmsQ = useFarmIntegrationHealth(basePath);
-  const blocksQ = useBlockIntegrationHealth(
-    scope === "blocks" ? selectedFarmId : null,
-    basePath,
-  );
+  const blocksQ = useBlockIntegrationHealth(scope === "blocks" ? selectedFarmId : null, basePath);
 
   return (
     <div className="flex flex-col gap-3">
@@ -57,7 +51,7 @@ export function OverviewTab({ basePath }: OverviewTabProps): ReactNode {
           { value: "blocks", label: t("tabs.blocks") },
         ]}
         value={scope}
-        onChange={(v) => setScope(v as "farms" | "blocks")}
+        onChange={(v) => setScope(v)}
       />
 
       {scope === "farms" ? (
@@ -113,10 +107,8 @@ function FarmsTable({
 }): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   if (isLoading) return <Skeleton className="h-32 w-full" />;
-  if (isError)
-    return <p className="text-sm text-ap-crit">{t("loadFailed")}</p>;
-  if (rows.length === 0)
-    return <p className="text-sm text-ap-muted">{t("empty")}</p>;
+  if (isError) return <p className="text-sm text-ap-crit">{t("loadFailed")}</p>;
+  if (rows.length === 0) return <p className="text-sm text-ap-muted">{t("empty")}</p>;
   return (
     <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
       <table className="min-w-full text-sm">

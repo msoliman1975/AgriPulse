@@ -93,11 +93,7 @@ export function FarmDetailPage(): JSX.Element {
       </div>
 
       {canReadWeather && blocks.length > 0 ? (
-        <WeatherForecastPanel
-          blockId={blocks[0].id}
-          farmId={farm.id}
-          farmName={farm.name}
-        />
+        <WeatherForecastPanel blockId={blocks[0].id} farmId={farm.id} farmName={farm.name} />
       ) : null}
 
       <div className="card">

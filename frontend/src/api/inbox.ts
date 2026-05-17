@@ -32,10 +32,7 @@ export async function getUnreadCount(): Promise<number> {
   return data.count;
 }
 
-export async function transitionInboxItem(
-  itemId: string,
-  action: InboxAction,
-): Promise<InboxItem> {
+export async function transitionInboxItem(itemId: string, action: InboxAction): Promise<InboxItem> {
   const { data } = await apiClient.patch<InboxItem>(`/v1/inbox/${itemId}`, { action });
   return data;
 }

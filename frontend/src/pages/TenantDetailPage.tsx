@@ -79,7 +79,8 @@ export function TenantDetailPage(): ReactNode {
       <div>
         <h1 className="text-2xl font-semibold text-brand-800">{membership.tenant_name}</h1>
         <p className="text-sm text-slate-600">
-          {membership.tenant_slug} · {t(`shell.tenantStatus.${membership.status}`, membership.status)}
+          {membership.tenant_slug} ·{" "}
+          {t(`shell.tenantStatus.${membership.status}`, membership.status)}
         </p>
       </div>
 
@@ -91,11 +92,7 @@ export function TenantDetailPage(): ReactNode {
           <Row label={t("tenant.status")} value={membership.status} />
           <Row
             label={t("tenant.joinedAt")}
-            value={
-              membership.joined_at
-                ? new Date(membership.joined_at).toLocaleDateString()
-                : "—"
-            }
+            value={membership.joined_at ? new Date(membership.joined_at).toLocaleDateString() : "—"}
           />
           <Row
             label={t("tenant.roles")}
@@ -143,7 +140,9 @@ export function TenantDetailPage(): ReactNode {
                     <td className="py-2">
                       <AreaDisplay areaM2={Number(f.area_m2)} />
                     </td>
-                    <td className="py-2">{tFarms(f.is_active ? "status.active" : "status.archived")}</td>
+                    <td className="py-2">
+                      {tFarms(f.is_active ? "status.active" : "status.archived")}
+                    </td>
                   </tr>
                 ))}
               </tbody>

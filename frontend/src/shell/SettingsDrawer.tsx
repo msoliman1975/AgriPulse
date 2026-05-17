@@ -49,9 +49,7 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
         </h3>
         <div className="flex flex-col gap-3">
           <div>
-            <span className="mb-1 block text-xs text-slate-500">
-              {tc("shell.languageToggle")}
-            </span>
+            <span className="mb-1 block text-xs text-slate-500">{tc("shell.languageToggle")}</span>
             <LanguageToggle />
           </div>
           <div>
@@ -136,8 +134,7 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
             {me.tenant_memberships.map((m) => (
               <li key={m.tenant_id} className="rounded-md border border-slate-200 p-2">
                 <p className="font-medium text-slate-800">
-                  {m.tenant_name}{" "}
-                  <span className="text-xs text-slate-500">({m.tenant_slug})</span>
+                  {m.tenant_name} <span className="text-xs text-slate-500">({m.tenant_slug})</span>
                 </p>
                 <p className="text-xs text-slate-500">
                   {t("me.status")}: {m.status}

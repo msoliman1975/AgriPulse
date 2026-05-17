@@ -20,9 +20,7 @@ export function PlatformHealthTenantDrillPage(): ReactNode {
   if (!tenantId) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">
-        <p className="text-sm text-ap-muted">
-          {t("platformHealth.drill.missingTenant")}
-        </p>
+        <p className="text-sm text-ap-muted">{t("platformHealth.drill.missingTenant")}</p>
       </div>
     );
   }
@@ -32,10 +30,7 @@ export function PlatformHealthTenantDrillPage(): ReactNode {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
       <div className="text-sm">
-        <Link
-          to="/platform/integrations/health"
-          className="text-ap-muted hover:text-ap-primary"
-        >
+        <Link to="/platform/integrations/health" className="text-ap-muted hover:text-ap-primary">
           ← {t("platformHealth.drill.back")}
         </Link>
       </div>

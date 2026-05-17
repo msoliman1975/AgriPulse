@@ -12,11 +12,7 @@ import type {
 import { KPICard } from "@/components/KPICard";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
-import {
-  useAdminTenant,
-  useAdminTenantMeta,
-  useAdminTenantSidecar,
-} from "@/queries/admin/tenants";
+import { useAdminTenant, useAdminTenantMeta, useAdminTenantSidecar } from "@/queries/admin/tenants";
 
 import { TenantActionPanel } from "../components/TenantActionPanel";
 import { TenantAdminsPanel } from "../components/TenantAdminsPanel";
@@ -50,7 +46,10 @@ export function TenantAdminDetailPage(): ReactNode {
   }
   if (tenantQuery.isError || !tenantQuery.data) {
     return (
-      <div role="alert" className="mx-auto max-w-lg rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+      <div
+        role="alert"
+        className="mx-auto max-w-lg rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
+      >
         {t("tenants.detail.errorTitle")}
       </div>
     );
@@ -83,13 +82,7 @@ export function TenantAdminDetailPage(): ReactNode {
       <div className="grid gap-4 md:grid-cols-3">
         <KPICard
           title={t("tenants.detail.kpi.members")}
-          value={
-            sidecar ? (
-              sidecar.active_member_count
-            ) : (
-              <Skeleton className="h-8 w-12" />
-            )
-          }
+          value={sidecar ? sidecar.active_member_count : <Skeleton className="h-8 w-12" />}
         />
         <KPICard
           title={t("tenants.detail.fields.tier")}
@@ -104,7 +97,13 @@ export function TenantAdminDetailPage(): ReactNode {
         ) : null}
       </div>
 
-      <DetailTabs tenant={tenant} sidecar={sidecar} sidecarLoading={sidecarQuery.isLoading} formatter={dateTimeFormatter} purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30} />
+      <DetailTabs
+        tenant={tenant}
+        sidecar={sidecar}
+        sidecarLoading={sidecarQuery.isLoading}
+        formatter={dateTimeFormatter}
+        purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30}
+      />
     </section>
   );
 }
@@ -116,7 +115,11 @@ interface FormatterProps {
 interface DetailTabsProps {
   tenant: AdminTenant;
   sidecar:
-    | { settings?: AdminTenantSettings | null; subscription?: AdminTenantSubscription | null; recent_events?: AdminTenantArchiveEvent[] | null }
+    | {
+        settings?: AdminTenantSettings | null;
+        subscription?: AdminTenantSubscription | null;
+        recent_events?: AdminTenantArchiveEvent[] | null;
+      }
     | undefined;
   sidecarLoading: boolean;
   formatter: Intl.DateTimeFormat;
@@ -143,17 +146,14 @@ function DetailTabs({
           { value: "lifecycle", label: t("tenants.detail.tabs.lifecycle") },
         ]}
         value={tab}
-        onChange={(v) => setTab(v as Tab)}
+        onChange={(v) => setTab(v)}
       />
       {tab === "profile" ? (
         <>
           <ProfileCard tenant={tenant} formatter={formatter} />
           {sidecar?.settings ? <SettingsCard settings={sidecar.settings} /> : null}
           {sidecar?.subscription ? (
-            <SubscriptionCard
-              subscription={sidecar.subscription}
-              formatter={formatter}
-            />
+            <SubscriptionCard subscription={sidecar.subscription} formatter={formatter} />
           ) : null}
           <AuditCard
             events={sidecar?.recent_events ?? []}
@@ -172,16 +172,11 @@ function DetailTabs({
   );
 }
 
-function StatusBanner({
-  tenant,
-  formatter,
-}: { tenant: AdminTenant } & FormatterProps): ReactNode {
+function StatusBanner({ tenant, formatter }: { tenant: AdminTenant } & FormatterProps): ReactNode {
   const { t } = useTranslation("admin");
   if (tenant.status === "active") return null;
   const key = `tenants.detail.banner.${tenant.status}` as const;
-  const when = tenant.purge_eligible_at
-    ? formatter.format(new Date(tenant.purge_eligible_at))
-    : "";
+  const when = tenant.purge_eligible_at ? formatter.format(new Date(tenant.purge_eligible_at)) : "";
   return (
     <div
       role="status"
@@ -195,17 +190,20 @@ function StatusBanner({
   );
 }
 
-function ProfileCard({
-  tenant,
-  formatter,
-}: { tenant: AdminTenant } & FormatterProps): ReactNode {
+function ProfileCard({ tenant, formatter }: { tenant: AdminTenant } & FormatterProps): ReactNode {
   const { t } = useTranslation("admin");
   return (
     <Card title={t("tenants.detail.profileTitle")}>
       <FieldRow label={t("tenants.detail.fields.id")} value={<code>{tenant.id}</code>} />
-      <FieldRow label={t("tenants.detail.fields.schema")} value={<code>{tenant.schema_name}</code>} />
+      <FieldRow
+        label={t("tenants.detail.fields.schema")}
+        value={<code>{tenant.schema_name}</code>}
+      />
       <FieldRow label={t("tenants.detail.fields.contactEmail")} value={tenant.contact_email} />
-      <FieldRow label={t("tenants.detail.fields.contactPhone")} value={tenant.contact_phone ?? "—"} />
+      <FieldRow
+        label={t("tenants.detail.fields.contactPhone")}
+        value={tenant.contact_phone ?? "—"}
+      />
       <FieldRow label={t("tenants.detail.fields.locale")} value={tenant.default_locale} />
       <FieldRow label={t("tenants.detail.fields.unitSystem")} value={tenant.default_unit_system} />
       <FieldRow label={t("tenants.detail.fields.timezone")} value={tenant.default_timezone} />
@@ -261,21 +259,14 @@ function SubscriptionCard({
   return (
     <Card title={t("tenants.detail.subscriptionTitle")}>
       <FieldRow label={t("tenants.detail.fields.tier")} value={subscription.tier} />
-      <FieldRow
-        label={t("tenants.detail.fields.planType")}
-        value={subscription.plan_type ?? "—"}
-      />
+      <FieldRow label={t("tenants.detail.fields.planType")} value={subscription.plan_type ?? "—"} />
       <FieldRow
         label={t("tenants.detail.fields.startedAt")}
         value={formatter.format(new Date(subscription.started_at))}
       />
       <FieldRow
         label={t("tenants.detail.fields.expiresAt")}
-        value={
-          subscription.expires_at
-            ? formatter.format(new Date(subscription.expires_at))
-            : "—"
-        }
+        value={subscription.expires_at ? formatter.format(new Date(subscription.expires_at)) : "—"}
       />
       {subscription.trial_start || subscription.trial_end ? (
         <FieldRow
@@ -321,9 +312,7 @@ function AuditCard({
 function Card({ title, children }: { title: string; children: ReactNode }): ReactNode {
   return (
     <section className="rounded-lg border border-ap-line bg-ap-panel p-4 shadow-card">
-      <h2 className="border-b border-ap-line pb-2 text-sm font-semibold text-ap-ink">
-        {title}
-      </h2>
+      <h2 className="border-b border-ap-line pb-2 text-sm font-semibold text-ap-ink">{title}</h2>
       <dl className="mt-3 space-y-2">{children}</dl>
     </section>
   );

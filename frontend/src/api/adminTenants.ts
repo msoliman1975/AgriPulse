@@ -161,10 +161,7 @@ export async function getAdminTenantMeta(): Promise<AdminTenantMeta> {
 export async function createAdminTenant(
   payload: CreateAdminTenantPayload,
 ): Promise<CreateAdminTenantResponse> {
-  const { data } = await apiClient.post<CreateAdminTenantResponse>(
-    "/v1/admin/tenants",
-    payload,
-  );
+  const { data } = await apiClient.post<CreateAdminTenantResponse>("/v1/admin/tenants", payload);
   return data;
 }
 
@@ -172,10 +169,9 @@ export async function suspendAdminTenant(
   tenantId: string,
   reason: string | null,
 ): Promise<AdminTenant> {
-  const { data } = await apiClient.post<AdminTenant>(
-    `/v1/admin/tenants/${tenantId}/suspend`,
-    { reason },
-  );
+  const { data } = await apiClient.post<AdminTenant>(`/v1/admin/tenants/${tenantId}/suspend`, {
+    reason,
+  });
   return data;
 }
 
@@ -191,10 +187,9 @@ export async function requestDeleteAdminTenant(
   tenantId: string,
   reason: string | null,
 ): Promise<AdminTenant> {
-  const { data } = await apiClient.post<AdminTenant>(
-    `/v1/admin/tenants/${tenantId}/delete`,
-    { reason },
-  );
+  const { data } = await apiClient.post<AdminTenant>(`/v1/admin/tenants/${tenantId}/delete`, {
+    reason,
+  });
   return data;
 }
 
@@ -218,9 +213,7 @@ export async function purgeAdminTenant(
   await apiClient.post(`/v1/admin/tenants/${tenantId}/purge`, payload);
 }
 
-export async function retryProvisioningAdminTenant(
-  tenantId: string,
-): Promise<AdminTenant> {
+export async function retryProvisioningAdminTenant(tenantId: string): Promise<AdminTenant> {
   const { data } = await apiClient.post<AdminTenant>(
     `/v1/admin/tenants/${tenantId}/retry-provisioning`,
     {},

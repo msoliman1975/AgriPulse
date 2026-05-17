@@ -32,8 +32,7 @@ export function IndexChart({ code, series }: Props) {
   const yMax = Math.max(1, ...validValues);
   const xMax = points.length - 1;
 
-  const xScale = (i: number) =>
-    PAD.left + (i / xMax) * (W - PAD.left - PAD.right);
+  const xScale = (i: number) => PAD.left + (i / xMax) * (W - PAD.left - PAD.right);
   const yScale = (v: number) =>
     PAD.top + (1 - (v - yMin) / (yMax - yMin)) * (H - PAD.top - PAD.bottom);
 
@@ -56,11 +55,10 @@ export function IndexChart({ code, series }: Props) {
     }
   }
 
-  const current = series.current ?? validValues[validValues.length - 1]!;
+  const current = series.current ?? validValues[validValues.length - 1];
   const trend = series.trend_7d_delta ?? 0;
   const baseline = meta.baseline;
-  const lineColor =
-    trend >= 0 ? "#3B6D11" : current < baseline ? "#A32D2D" : "#854F0B";
+  const lineColor = trend >= 0 ? "#3B6D11" : current < baseline ? "#A32D2D" : "#854F0B";
 
   const lastIdx = points.findLastIndex((v) => v != null);
   const cx = xScale(lastIdx);
@@ -103,19 +101,10 @@ export function IndexChart({ code, series }: Props) {
           healthy ≥ {baseline}
         </text>
         {/* Area + line */}
-        {areaD ? (
-          <path d={areaD} fill={lineColor} fillOpacity={0.13} stroke="none" />
-        ) : null}
+        {areaD ? <path d={areaD} fill={lineColor} fillOpacity={0.13} stroke="none" /> : null}
         <path d={pathD} fill="none" stroke={lineColor} strokeWidth={1.6} />
         {/* Current point */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={3.5}
-          fill={lineColor}
-          stroke="#ffffff"
-          strokeWidth={1.5}
-        />
+        <circle cx={cx} cy={cy} r={3.5} fill={lineColor} stroke="#ffffff" strokeWidth={1.5} />
         <text
           x={cx - 6}
           y={cy - 8}
@@ -133,13 +122,7 @@ export function IndexChart({ code, series }: Props) {
         <text x={W / 2} y={H - 4} fontSize="9" fill="#888" textAnchor="middle">
           {meta.description}
         </text>
-        <text
-          x={W - PAD.right}
-          y={H - 4}
-          fontSize="9"
-          fill="#666"
-          textAnchor="end"
-        >
+        <text x={W - PAD.right} y={H - 4} fontSize="9" fill="#666" textAnchor="end">
           today
         </text>
       </svg>

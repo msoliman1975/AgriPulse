@@ -14,8 +14,6 @@ export interface PlatformTenantHealthRow {
 }
 
 export async function listCrossTenantHealth(): Promise<PlatformTenantHealthRow[]> {
-  const { data } = await apiClient.get<PlatformTenantHealthRow[]>(
-    "/v1/admin/integrations/health",
-  );
+  const { data } = await apiClient.get<PlatformTenantHealthRow[]>("/v1/admin/integrations/health");
   return data;
 }

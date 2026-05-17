@@ -15,10 +15,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
-import {
-  useRecommendations,
-  useTransitionRecommendation,
-} from "@/queries/recommendations";
+import { useRecommendations, useTransitionRecommendation } from "@/queries/recommendations";
 
 const STATE_TAB_VALUES: ReadonlyArray<RecommendationState | "all"> = [
   "open",
@@ -122,7 +119,8 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
   const { t, i18n } = useTranslation("recommendations");
   const dateLocale = useDateLocale();
   const [expanded, setExpanded] = useState(false);
-  const isTerminal = rec.state === "applied" || rec.state === "dismissed" || rec.state === "expired";
+  const isTerminal =
+    rec.state === "applied" || rec.state === "dismissed" || rec.state === "expired";
   const isAr = i18n.language === "ar";
   // Pick the localized recommendation text written by the decision-tree
   // YAML at evaluation time. Fall back to text_en when ar is missing.
@@ -152,7 +150,9 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
             <span className="text-ap-muted/70">·v{rec.tree_version}</span>
           </span>
           <span>·</span>
-          <span>{formatDistanceToNow(parseISO(rec.created_at), { addSuffix: true, locale: dateLocale })}</span>
+          <span>
+            {formatDistanceToNow(parseISO(rec.created_at), { addSuffix: true, locale: dateLocale })}
+          </span>
           <span>·</span>
           <span>{t("row.confidence", { percent: confidencePercent(rec.confidence) })}</span>
           {rec.valid_until ? (
@@ -160,7 +160,10 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
               <span>·</span>
               <span>
                 {t("row.expiresIn", {
-                  when: formatDistanceToNow(parseISO(rec.valid_until), { addSuffix: true, locale: dateLocale }),
+                  when: formatDistanceToNow(parseISO(rec.valid_until), {
+                    addSuffix: true,
+                    locale: dateLocale,
+                  }),
                 })}
               </span>
             </>
@@ -170,7 +173,10 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
               <span>·</span>
               <span>
                 {t("row.deferredUntil", {
-                  when: formatDistanceToNow(parseISO(rec.deferred_until), { addSuffix: true, locale: dateLocale }),
+                  when: formatDistanceToNow(parseISO(rec.deferred_until), {
+                    addSuffix: true,
+                    locale: dateLocale,
+                  }),
                 })}
               </span>
             </>
@@ -225,7 +231,7 @@ function TreePath({ path }: { path: TreePathStepDTO[] }): ReactNode {
   return (
     <ol className="mt-2 flex flex-col gap-1 rounded-md border border-ap-line bg-ap-bg/40 p-3 text-[11px]">
       {path.map((step, i) => {
-        const label = (isAr ? step.label_ar ?? step.label_en : step.label_en) ?? null;
+        const label = (isAr ? (step.label_ar ?? step.label_en) : step.label_en) ?? null;
         return (
           <li key={`${step.node_id}-${i}`} className="flex items-start gap-2">
             <span className="mt-0.5 flex-none text-ap-muted">{i + 1}.</span>

@@ -84,10 +84,7 @@ function SettingsSideNav({ entries, title }: SettingsSideNavProps): ReactNode {
     return null;
   }
   return (
-    <nav
-      aria-label={t("title")}
-      className="hidden w-56 flex-shrink-0 md:block"
-    >
+    <nav aria-label={t("title")} className="hidden w-56 flex-shrink-0 md:block">
       <h2 className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-ap-muted">
         {title}
       </h2>

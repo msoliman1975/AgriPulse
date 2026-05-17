@@ -4,10 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { ResolvedSetting } from "@/api/integrations";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
-import {
-  usePutTenantIntegration,
-  useTenantIntegration,
-} from "@/queries/integrations";
+import { usePutTenantIntegration, useTenantIntegration } from "@/queries/integrations";
 
 interface Props {
   category: "email" | "webhook";

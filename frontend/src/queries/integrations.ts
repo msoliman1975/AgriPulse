@@ -12,9 +12,7 @@ export function useTenantIntegration(category: "weather" | "imagery" | "email" |
   });
 }
 
-export function usePutTenantIntegration(
-  category: "weather" | "imagery" | "email" | "webhook",
-) {
+export function usePutTenantIntegration(category: "weather" | "imagery" | "email" | "webhook") {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
@@ -93,13 +91,8 @@ export function usePutFarmImagery() {
 export function useApplyImageryToBlocks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      farmId,
-      mode,
-    }: {
-      farmId: string;
-      mode: "inherit" | "lock";
-    }) => integrationsApi.imagery.applyToBlocks(farmId, mode),
+    mutationFn: ({ farmId, mode }: { farmId: string; mode: "inherit" | "lock" }) =>
+      integrationsApi.imagery.applyToBlocks(farmId, mode),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["integrations", "imagery"] });
     },

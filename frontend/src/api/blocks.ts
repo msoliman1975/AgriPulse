@@ -209,10 +209,7 @@ export async function createPivot(
   farmId: string,
   payload: PivotCreatePayload,
 ): Promise<PivotCreateResult> {
-  const { data } = await apiClient.post<PivotCreateResult>(
-    `/v1/farms/${farmId}/pivots`,
-    payload,
-  );
+  const { data } = await apiClient.post<PivotCreateResult>(`/v1/farms/${farmId}/pivots`, payload);
   return {
     pivot: normalizeBlock(data.pivot),
     sectors: data.sectors.map(normalizeBlock),

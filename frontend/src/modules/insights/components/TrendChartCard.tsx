@@ -42,9 +42,7 @@ export function TrendChartCard({ farmId }: Props): ReactNode {
         {isLoading ? (
           <Skeleton className="h-56 w-full" />
         ) : !firstBlock ? (
-          <p className="py-12 text-center text-sm text-ap-muted">
-            No blocks to chart yet.
-          </p>
+          <p className="py-12 text-center text-sm text-ap-muted">No blocks to chart yet.</p>
         ) : (
           <IndexTrendChart blockId={firstBlock.id} />
         )}
