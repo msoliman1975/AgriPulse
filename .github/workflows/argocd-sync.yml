@@ -68,8 +68,13 @@ jobs:
           for img in api workers frontend tileServer; do
             yq -i ".global.images.${img}.tag = strenv(NEW_TAG)" "$OVERLAY"
           done
+          # Keycloak custom image uses the bitnami sub-chart's own
+          # `image.tag` key (the sub-chart doesn't tpl values, so
+          # global.images.keycloak.tag wouldn't be read). Write directly
+          # to keycloak.image.tag.
+          yq -i ".keycloak.image.tag = strenv(NEW_TAG)" "$OVERLAY"
           echo "Bumped overlay to $NEW_TAG:"
-          yq '.global.images' "$OVERLAY"
+          yq '{ "global": .global.images, "keycloak.image.tag": .keycloak.image.tag }' "$OVERLAY"
 
       - name: Open bump PR
         uses: peter-evans/create-pull-request@v7
@@ -96,6 +101,7 @@ jobs:
             - `ghcr.io/${{ github.repository_owner }}/agripulse/workers:${{ steps.sha.outputs.short }}`
             - `ghcr.io/${{ github.repository_owner }}/agripulse/tile-server:${{ steps.sha.outputs.short }}`
             - `ghcr.io/${{ github.repository_owner }}/agripulse/frontend:${{ steps.sha.outputs.short }}`
+            - `ghcr.io/${{ github.repository_owner }}/agripulse/keycloak:${{ steps.sha.outputs.short }}`
 
             Merging this triggers ArgoCD's auto-sync in the dev environment.
             Staging and production overlays are intentionally not touched â€”
