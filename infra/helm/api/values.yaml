@@ -117,7 +117,11 @@ env:
   # SPA at app.<envHost> calls api.<envHost> cross-origin. CORS middleware
   # only attaches when this list is non-empty (see app/core/app_factory.py).
   CORS_ALLOWED_ORIGINS: '["https://app.{{ .Values.global.envHost }}"]'
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
+  # Tempo's service in the observability ns is named `observability-tempo`
+  # (release-name + chart-name pattern), not bare `tempo`. Sending to the
+  # wrong host caused per-request OTLP retry storms that starved the
+  # asyncio loop and made client-side requests look like "Network error".
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://observability-tempo.observability.svc.cluster.local:4318
   # On backend cold start, if no active PlatformAdmin exists in
   # public.platform_role_assignments, the lifespan seeds one from these
   # two values. Empty email skips the bootstrap. Per-env overlays set the

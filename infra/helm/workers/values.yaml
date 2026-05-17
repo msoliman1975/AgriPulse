@@ -51,7 +51,8 @@ env:
   KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse"
   KEYCLOAK_AUDIENCE: agripulse-api
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo.observability.svc.cluster.local:4318
+  # See api/values.yaml — service is `observability-tempo`, not `tempo`.
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://observability-tempo.observability.svc.cluster.local:4318
 
 # Mirrors infra/helm/api/values.yaml — see that file for the rationale on
 # dropping the consolidated `agripulse/api` SM blob in favor of crossRefs
