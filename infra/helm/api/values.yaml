@@ -129,6 +129,13 @@ env:
   # rendered without an overlay never silently provisions an admin.
   PLATFORM_ADMIN_EMAIL: ""
   PLATFORM_ADMIN_FULL_NAME: "Platform Admin"
+  # Sentinel Hub OAuth client_id. Public (not secret) — paired with
+  # SENTINEL_HUB_CLIENT_SECRET pulled via ExternalSecret below. Empty
+  # default makes SentinelHubProvider raise SentinelHubNotConfiguredError
+  # so dev clusters without creds surface the misconfig loudly. Override
+  # in the per-env overlay with the value from the Sentinel Hub OAuth
+  # client dashboard.
+  SENTINEL_HUB_CLIENT_ID: ""
 
 # Secrets pulled from AWS Secrets Manager via ExternalSecret. We use
 # crossRefs only (one SM secret per purpose at `agripulse/<env>/<purpose>`);

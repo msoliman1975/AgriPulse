@@ -53,6 +53,11 @@ env:
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   # See api/values.yaml — service is `observability-tempo`, not `tempo`.
   OTEL_EXPORTER_OTLP_ENDPOINT: http://observability-tempo.observability.svc.cluster.local:4318
+  # Sentinel Hub OAuth client_id — see api/values.yaml for rationale.
+  # Must be set in the per-env overlay alongside the SENTINEL_HUB_CLIENT_SECRET
+  # crossRef; both halves are required or imagery.discover_scenes writes the
+  # `__not_configured__` failed-job marker every refresh.
+  SENTINEL_HUB_CLIENT_ID: ""
 
 # Mirrors infra/helm/api/values.yaml — see that file for the rationale on
 # dropping the consolidated `agripulse/api` SM blob in favor of crossRefs

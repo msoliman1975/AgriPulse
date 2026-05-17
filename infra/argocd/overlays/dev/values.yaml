@@ -40,6 +40,13 @@ env:
   # instead of PlatformAdmin.
   PLATFORM_ADMIN_EMAIL: dev@agripulse.local
   PLATFORM_ADMIN_FULL_NAME: Platform Admin
+  # Sentinel Hub OAuth client_id for the dev account. The matching
+  # client_secret is in AWS Secrets Manager at
+  # agripulse/dev/sentinel-hub-client-secret. Fill from the 1Password
+  # entry "agripulse/sentinel-hub-dev" — must be the UUID that pairs with
+  # whatever was loaded into SM, otherwise discover_scenes still fails
+  # at the OAuth token call (401), not at startup.
+  SENTINEL_HUB_CLIENT_ID: "67611d57-1a8d-4833-9a7b-02abde5b23b8"
 
 # Common knobs across charts.
 labels:
