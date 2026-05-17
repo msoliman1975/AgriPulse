@@ -216,19 +216,50 @@ function Invoke-SeedSecrets($d) {
     "agripulse/$env/postgres-superuser-password" = $d.postgres.superuser_password
   }
 
+  $skipped = @()
+  $seeded  = 0
+  $unchanged = 0
+
+  # BH-2: idempotent. Skip SEED_ME values with a warning (don't fail the
+  # whole phase — partial seeding is a legitimate workflow when one
+  # secret has yet to be generated). Compare current SM value against
+  # incoming and skip the put if identical to avoid version churn.
   foreach ($id in $map.Keys) {
     $val = $map[$id]
     if ([string]::IsNullOrWhiteSpace($val) -or $val -eq 'SEED_ME') {
-      Write-Fail "$id is still SEED_ME â€” fill in $DataFile first."
+      $skipped += $id
+      Write-Host "  skip (SEED_ME): $id" -ForegroundColor Yellow
+      continue
+    }
+    $current = $null
+    try {
+      $current = aws secretsmanager get-secret-value `
+        --secret-id $id `
+        --region $d.aws_region `
+        --query SecretString --output text 2>$null
+    } catch { $current = $null }
+    if ($current -eq $val) {
+      $unchanged += 1
+      Write-Host "  unchanged:    $id" -ForegroundColor DarkGray
+      continue
     }
     Write-Step "  put-secret-value $id"
     aws secretsmanager put-secret-value `
       --secret-id $id `
       --secret-string $val `
       --region $d.aws_region | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Fail "put-secret-value $id failed (exit $LASTEXITCODE)" }
+    $seeded += 1
     Write-Ok "$id seeded"
   }
 
+  Write-Host ""
+  Write-Host "  Summary: $seeded seeded, $unchanged unchanged, $($skipped.Count) skipped" -ForegroundColor Cyan
+  if ($skipped.Count -gt 0) {
+    Write-Host "  Skipped (still SEED_ME in $DataFile):" -ForegroundColor Yellow
+    $skipped | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+    Write-Host "  Re-run -Phase seed-secrets after filling them in." -ForegroundColor Yellow
+  }
   Write-Ok "ExternalSecret refreshInterval is 1h â€” restart pods or wait an hour for propagation."
 }
 

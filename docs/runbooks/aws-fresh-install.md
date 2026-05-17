@@ -45,55 +45,33 @@ Pushes the values from `deployment-data.yaml` into SM. External Secrets
 Operator syncs them into k8s Secrets within ~1 hr (or force-refresh
 the ExternalSecret CRs).
 
-## 4. Bootstrap Keycloak runtime config (one-shot)
+## 4. Bootstrap Keycloak runtime config (automated since BH-2)
 
-The realm import can't carry these — KC won't expose them via JSON
-import (`unmanagedAttributePolicy` lives at User Profile, not realm
-attributes; `smtpServer` needs the Brevo password from SM; the
-tenancy client secret must match SM, not the placeholder).
+Per BH-2 the three `promote-kc-*.py` scripts now run automatically as
+a PostSync hook Job on the keycloak chart
+(`infra/helm/keycloak/templates/promote-bootstrap-job.yaml`). The Job
+runs in the api image, mounts the scripts via ConfigMap, pulls
+`TENANCY_CLIENT_SECRET` + `BREVO_PASSWORD` from SM via
+`agripulse-keycloak-promote-bootstrap` ExternalSecret, and waits for
+keycloak's admin REST to answer before firing. All three scripts are
+idempotent, so re-syncs are safe.
 
-Pipe the existing helper from inside the api pod (it ships
-`scripts/dev_bootstrap.py` and has cluster DNS to keycloak):
+If you ever need to re-run by hand (e.g. you tweaked a script and
+don't want to bump the chart):
 
 ```powershell
-$env:AWS_PROFILE = "agripulse"
-$pod = (kubectl get pods -n agripulse `
-        -l app.kubernetes.io/name=agripulse-api `
-        --no-headers -o custom-columns=N:.metadata.name | Select-Object -First 1).Trim()
-
-$tenancySecret = aws secretsmanager get-secret-value `
-    --secret-id agripulse/dev/keycloak-client-secret `
-    --region eu-south-1 --query SecretString --output text
-
-$brevoPw = aws secretsmanager get-secret-value `
-    --secret-id agripulse/dev/brevo-smtp-password `
-    --region eu-south-1 --query SecretString --output text
-
-# Copy the standalone helpers into the pod and run them.
-Get-Content scripts/promote-kc-admin.py -Raw |
-  kubectl exec -i -n agripulse $pod -- sh -c "cat > /tmp/p1.py"
-Get-Content scripts/promote-kc-tenancy.py -Raw |
-  kubectl exec -i -n agripulse $pod -- sh -c "cat > /tmp/p2.py"
-Get-Content scripts/add-tenant-mappers.py -Raw |
-  kubectl exec -i -n agripulse $pod -- sh -c "cat > /tmp/p3.py"
-
-# p1 — unmanagedAttributePolicy + platform_role attr/mapper for dev user.
-kubectl exec -n agripulse $pod -- sh -c "PYTHONPATH=/app /opt/venv/bin/python /tmp/p1.py"
-
-# p2 — create agripulse-tenancy client (secret = SM value), grant realm-mgmt roles, set realm smtpServer.
-kubectl exec -n agripulse $pod -- sh -c "
-  TENANCY_CLIENT_SECRET='$tenancySecret' `
-  BREVO_LOGIN='aac72b001@smtp-brevo.com' `
-  BREVO_PASSWORD='$brevoPw' `
-  BREVO_FROM_EMAIL='admin@agripulse.tech' `
-  /opt/venv/bin/python /tmp/p2.py
-"
-
-# p3 — tenant_id, tenant_role, farm_scopes mappers on agripulse-api client
-# (idempotent; safe to re-run; realm import already includes these so this
-# is only needed if the import was applied before the JSON was updated).
-kubectl exec -n agripulse $pod -- sh -c "PYTHONPATH=/app /opt/venv/bin/python /tmp/p3.py"
+kubectl -n agripulse delete job agripulse-keycloak-promote --ignore-not-found
+kubectl -n argocd patch app keycloak-dev --type merge -p '{"operation":{"sync":{}}}'
+# ArgoCD recreates the PostSync Job on the next sync.
 ```
+
+Failure modes worth knowing:
+- The Job's first 60 attempts (5s apart, 5 min total) poll for
+  keycloak admin REST. If keycloak is unhealthy the Job exits with
+  the loop counter exhausted and ArgoCD shows the Job as failed.
+- `KEYCLOAK_PASSWORD` is sourced from the `agripulse-keycloak-admin`
+  Secret. If that ExternalSecret hasn't propagated yet, the Job's
+  authentication step fails — bounce the Job after the Secret lands.
 
 ## 5. Fix the ingress-nginx admission webhook `caBundle`
 

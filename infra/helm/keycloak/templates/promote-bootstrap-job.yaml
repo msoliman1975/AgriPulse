@@ -1,0 +1,147 @@
+{{- /*
+PostSync hook Job that drives Keycloak into the realm shape the api
+expects, without any manual `kubectl cp` + `python scripts/promote-*`
+dance after every fresh deploy.
+
+The three scripts run sequentially:
+  1. promote-kc-admin.py     — enables unmanagedAttributePolicy on the
+                               agripulse realm and sets the dev user's
+                               platform_role attribute + matching mapper.
+  2. promote-kc-tenancy.py   — creates/updates the agripulse-tenancy
+                               service-account client (secret comes from
+                               SM via ExternalSecret), grants
+                               realm-management roles, and writes the
+                               realm smtpServer with Brevo creds.
+  3. add-tenant-mappers.py   — adds the three tenant attribute mappers
+                               (tenant_id, tenant_role, farm_scopes) on
+                               the agripulse-api client. Idempotent.
+
+Why a hook and not init container on the keycloak StatefulSet itself:
+the bitnami keycloak chart is a sub-chart — we can't inject containers
+into it cleanly. A PostSync hook on the keycloak-dev parent App is
+the supported path.
+
+The Job uses the api image because /app/scripts/dev_bootstrap.py is
+already there and httpx is in /opt/venv — no need to invent a parallel
+runtime. Tag follows the same auto-bump path as the api Deployment.
+*/ -}}
+{{- if .Values.promoteBootstrap.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agripulse-keycloak-promote
+  labels:
+    {{- include "agripulse-keycloak.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "agripulse-keycloak.labels" . | nindent 8 }}
+        app.kubernetes.io/component: kc-promote
+    spec:
+      restartPolicy: OnFailure
+      # api image is amd64-only today (Gap 3 from
+      # project_aws_rebuild_2026_05_16). Pin until BH-4 (multi-arch CI)
+      # lands.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: promote
+          image: {{ include "agripulse-keycloak.apiImageRef" . | quote }}
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          env:
+            # KC admin user is `user` per bitnami default; password comes
+            # from the same Secret the bitnami chart's `auth.existingSecret`
+            # consumes, so the Job's view is always consistent with the
+            # running Keycloak.
+            - name: KEYCLOAK_ADMIN
+              value: "user"
+            - name: KC_ADMIN
+              value: "user"
+            - name: KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agripulse-keycloak-admin
+                  key: admin_password
+            - name: KC_ADMIN_PW
+              valueFrom:
+                secretKeyRef:
+                  name: agripulse-keycloak-admin
+                  key: admin_password
+            # Default in-cluster URL — scripts use os.environ.setdefault
+            # so this can be overridden via env if the keycloak service
+            # ever gets renamed.
+            - name: KEYCLOAK_BASE_URL
+              value: {{ .Values.promoteBootstrap.keycloakBaseUrl | quote }}
+            - name: KEYCLOAK_REALM
+              value: "agripulse"
+            # Brevo SMTP non-secret bits — login + from-email rarely
+            # change. Override via overlay if they do.
+            - name: BREVO_HOST
+              value: {{ .Values.promoteBootstrap.brevo.host | quote }}
+            - name: BREVO_PORT
+              value: {{ .Values.promoteBootstrap.brevo.port | quote }}
+            - name: BREVO_LOGIN
+              value: {{ .Values.promoteBootstrap.brevo.login | quote }}
+            - name: BREVO_FROM_EMAIL
+              value: {{ .Values.promoteBootstrap.brevo.fromEmail | quote }}
+            - name: BREVO_FROM_NAME
+              value: {{ .Values.promoteBootstrap.brevo.fromName | quote }}
+          envFrom:
+            # TENANCY_CLIENT_SECRET + BREVO_PASSWORD from the
+            # ExternalSecret-backed k8s Secret.
+            - secretRef:
+                name: agripulse-keycloak-promote-bootstrap
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              # Wait until keycloak is actually answering admin requests.
+              # ArgoCD considers a Deployment "Healthy" as soon as readiness
+              # probes pass, but bitnami keycloak's readiness checks
+              # /realms/master/.well-known/openid-configuration which can
+              # answer before the admin REST API is fully wired.
+              echo "Waiting for keycloak admin REST to answer..."
+              for i in $(seq 1 60); do
+                if /opt/venv/bin/python -c "import httpx; httpx.post('${KEYCLOAK_BASE_URL}/realms/master/protocol/openid-connect/token', data={'grant_type':'password','client_id':'admin-cli','username':'${KEYCLOAK_ADMIN}','password':'${KEYCLOAK_PASSWORD}'}, timeout=10).raise_for_status()" 2>/dev/null; then
+                  echo "Keycloak admin REST is up (attempt $i)"
+                  break
+                fi
+                echo "  not ready yet (attempt $i/60)"
+                sleep 5
+              done
+              echo ""
+              echo "=== 1/3 promote-kc-admin.py ==="
+              /opt/venv/bin/python /promote/promote-kc-admin.py
+              echo ""
+              echo "=== 2/3 promote-kc-tenancy.py ==="
+              /opt/venv/bin/python /promote/promote-kc-tenancy.py
+              echo ""
+              echo "=== 3/3 add-tenant-mappers.py ==="
+              /opt/venv/bin/python /promote/add-tenant-mappers.py
+              echo ""
+              echo "Keycloak promotion complete."
+          volumeMounts:
+            - name: promote-scripts
+              mountPath: /promote
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: promote-scripts
+          configMap:
+            name: agripulse-keycloak-promote
+            defaultMode: 0o555
+{{- end }}

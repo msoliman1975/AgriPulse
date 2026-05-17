@@ -10,6 +10,12 @@
 global:
   env: dev
   envHost: dev.agripulse.cloud
+  # Tag map for the per-image bumps written by argocd-sync.yml. The
+  # promote-bootstrap Job's `apiImageRef` helper reads this; overlay
+  # values.yaml fills the api.tag per env.
+  images:
+    api:
+      tag: ""
 
 # CD-13: ExternalSecret wiring for the admin + DB passwords. Toggle each
 # off only for unit-level `helm template` smoke testing â€” in real envs
@@ -23,6 +29,41 @@ externalSecrets:
     enabled: true
   db:
     enabled: true
+  # BH-2: ExternalSecret feeding the promote-bootstrap Job with the
+  # tenancy client_secret + Brevo SMTP password. Toggle off only if
+  # promoteBootstrap.enabled is also off.
+  promote:
+    enabled: true
+
+# BH-2: PostSync hook that drives Keycloak into the realm shape the api
+# expects (tenancy client + service-account roles + smtpServer + tenant
+# attribute mappers + dev-user platform_role + unmanagedAttributePolicy).
+# Without this, every fresh deploy needs manual `kubectl cp` + `python
+# scripts/promote-*` runs.
+#
+# Runs the three `scripts/promote-kc-*.py` scripts bundled into a
+# ConfigMap (see infra/helm/keycloak/files/promote-scripts/) inside the
+# api image (Python + httpx + scripts/dev_bootstrap.py already there).
+promoteBootstrap:
+  enabled: true
+  # In-cluster URL the scripts hit. The bitnami chart's Service name is
+  # `keycloak-dev` per ArgoCD App `keycloak-dev`. Override per overlay
+  # if the App name changes.
+  keycloakBaseUrl: "http://keycloak-dev"
+  apiImage:
+    # Tag resolution: overlay `global.images.api.tag` â†’ this key â†’ "latest".
+    # Hand-bump only matters for `helm template` outside the overlay.
+    repository: ghcr.io/msoliman1975/agripulse/api
+    tag: ""
+  # Brevo SMTP — non-secret bits. Password comes from SM via the
+  # `agripulse-keycloak-promote-bootstrap` ExternalSecret.
+  brevo:
+    host: smtp-relay.brevo.com
+    port: "587"
+    login: "aac72b001@smtp-brevo.com"
+    fromEmail: "admin@agripulse.tech"
+    fromName: "AgriPulse"
+
 
 keycloak:
   # Bitnami rotated the old `bitnami/keycloak:26.1.4-debian-12-r2` tag out

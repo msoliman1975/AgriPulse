@@ -1,0 +1,31 @@
+{{- /*
+ConfigMap that bundles the three KC promote scripts so the PostSync Job
+can mount them as files. Source-of-truth lives in
+`infra/helm/keycloak/files/promote-scripts/*.py`; standalone copies at
+`scripts/promote-kc-*.py` are kept in sync (the scripts use
+`os.environ.setdefault` for KC creds so they work both ad-hoc and inside
+this Job).
+
+We do NOT bundle `backend/scripts/dev_bootstrap.py` here — the api image
+already ships it at `/app/scripts/dev_bootstrap.py`, and the Job runs
+with `workingDir: /app` so `from scripts.dev_bootstrap import ...`
+resolves natively.
+*/ -}}
+{{- if .Values.promoteBootstrap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agripulse-keycloak-promote
+  labels:
+    {{- include "agripulse-keycloak.labels" . | nindent 4 }}
+  annotations:
+    # Re-render the ConfigMap (and trigger a Job re-run) whenever any
+    # script content changes. Without this, `helm upgrade` would keep
+    # the stale CM in place even though the files on disk changed.
+    checksum/scripts: {{ tpl (.Files.Glob "files/promote-scripts/*.py").AsConfig . | sha256sum }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/promote-scripts/*.py" }}
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}
+{{- end }}
