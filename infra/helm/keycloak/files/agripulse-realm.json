@@ -12,6 +12,8 @@
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
+  "loginTheme": "agripulse",
+  "accountTheme": "agripulse",
   "clients": [
     {
       "clientId": "agripulse-api",

@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1.10
+#
+# AgriPulse Keycloak image — tiny overlay that bakes our custom `agripulse`
+# login theme into the bitnami/keycloak base. We keep the bitnami base for
+# its production-ready Quarkus runtime + Infinispan cache + ingress-aware
+# proxy mode (see [[project_admin_portal_rollout]] for why we don't roll
+# our own).
+#
+# Base image is pinned by tag + digest — same shape as the chart's
+# image.{tag,digest} keys in values.yaml (BH-3). `bitnamilegacy/*` is the
+# fork-after-rotation home for older bitnami tags (see
+# [[project_aws_rebuild_2026_05_16]] for the original tag-deletion
+# incident that drove the digest pin).
+#
+# To regenerate the digest after a base bump:
+#   $tok = (Invoke-RestMethod "https://auth.docker.io/token?service=registry.docker.io&scope=repository:bitnamilegacy/keycloak:pull").token
+#   $r = Invoke-WebRequest "https://registry-1.docker.io/v2/bitnamilegacy/keycloak/manifests/<tag>" `
+#        -Headers @{ Authorization="Bearer $tok"; Accept='application/vnd.oci.image.index.v1+json' } `
+#        -Method Head -UseBasicParsing
+#   $r.Headers['Docker-Content-Digest']
+FROM docker.io/bitnamilegacy/keycloak:26.1.4-debian-12-r2@sha256:865d3fe1a1fd6410d7d5fe34247dc0ae536c0b7cb158255405997a0ffb58fb07
+
+# The bitnami image runs as uid 1001 (non-root). Themes live under
+# /opt/bitnami/keycloak/themes; that dir is already world-readable so we
+# don't need a chown — but stay explicit so a future base rotation
+# can't silently turn the COPY into root-owned files.
+USER 0
+COPY --chown=1001:0 themes/agripulse /opt/bitnami/keycloak/themes/agripulse
+RUN chmod -R a+r /opt/bitnami/keycloak/themes/agripulse
+USER 1001
+
+# Sanity: the file Keycloak loads first to confirm the theme is
+# wired. Failing here means the COPY didn't land where Keycloak looks.
+RUN test -f /opt/bitnami/keycloak/themes/agripulse/login/theme.properties \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/template.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/css/login.css \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/img/mark.svg

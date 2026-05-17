@@ -1,0 +1,368 @@
+/*
+ * AgriPulse — locked login theme.
+ * Mirror of docs/login-mockups/option-1-field.html. Palette + layout
+ * decisions are locked in [[project-login-page-locked-design]] — do
+ * not retune without re-reading that memo.
+ */
+
+:root {
+  --ink:       #0f2a1f;
+  --ink-soft:  #2e4a3d;
+  --muted:     #5e7669;
+  --line:      #e3e0d6;
+  --paper:     #ffffff;
+
+  --mint-50:   #f1faf3;
+  --mint-100:  #dfeee5;
+  --mint-200:  #c5e1cf;
+  --mint-300:  #a7d2b9;
+  --mint-400:  #8cc2a3;
+  --sage-500:  #6fab8a;
+
+  --green-500: #1D9E75;
+  --green-600: #168661;
+  --green-700: #0F6E56;
+  --green-900: #04342C;
+  --pulse:     #E24B4A;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 900px) {
+  .stage { grid-template-columns: 1fr; }
+  .hero  { min-height: 320px; }
+}
+
+/* ---------------------------------------------------------------- HERO */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 0% 0%,    var(--mint-50)  0%, transparent 55%),
+    radial-gradient(80% 70% at 100% 100%, var(--mint-300) 0%, transparent 60%),
+    linear-gradient(160deg, var(--mint-100) 0%, var(--mint-200) 55%, var(--mint-400) 100%);
+  color: var(--ink);
+  padding: 56px 64px;
+  display: flex;
+  flex-direction: column;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(85deg,
+    rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 1px,
+    transparent 1px, transparent 30px);
+  pointer-events: none;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  right: -160px;
+  bottom: -180px;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+.brand-mark {
+  width: 104px;
+  height: 104px;
+  filter:
+    drop-shadow(0 8px 18px rgba(4,52,44,0.22))
+    drop-shadow(0 2px  4px rgba(4,52,44,0.18));
+}
+.brand-name {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -.8px;
+  color: var(--green-900);
+  line-height: 1;
+}
+.brand-name .pulse-word { color: var(--green-500); }
+
+@media (max-width: 900px) {
+  .brand-mark { width: 80px; height: 80px; }
+  .brand-name { font-size: 28px; }
+}
+
+.hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  max-width: 540px;
+  margin: 36px 0;
+}
+
+.hero h1 {
+  font-size: 40px;
+  line-height: 1.18;
+  margin: 0 0 16px;
+  font-weight: 700;
+  letter-spacing: -.6px;
+  color: var(--green-900);
+}
+.hero h1 .accent { color: var(--green-600); }
+
+.hero p.lead {
+  font-size: 16px;
+  color: var(--ink-soft);
+  max-width: 480px;
+  margin: 0 0 28px;
+}
+
+.hero-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------- FORM */
+.form-side {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 56px;
+}
+
+.form-wrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 0 40px;
+}
+
+.form-card {
+  width: 100%;
+  max-width: 380px;
+}
+.form-card h2 {
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -.3px;
+  color: var(--ink);
+}
+.form-card .sub {
+  color: var(--muted);
+  margin: 0 0 28px;
+  font-size: 14px;
+}
+
+/* Keycloak emits its own h1/h2 for some flows — re-style. */
+.form-card h1 {
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -.3px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+label, .form-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 14px 0 6px;
+}
+
+.field input,
+.form-card input[type="text"],
+.form-card input[type="email"],
+.form-card input[type="password"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  transition: border-color .12s, box-shadow .12s;
+}
+
+.field input:focus,
+.form-card input[type="text"]:focus,
+.form-card input[type="email"]:focus,
+.form-card input[type="password"]:focus {
+  outline: 0;
+  border-color: var(--green-500);
+  box-shadow: 0 0 0 3px rgba(29,158,117,.15);
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.field-row a {
+  color: var(--green-700);
+  text-decoration: none;
+  font-weight: 600;
+}
+.field-row a:hover { text-decoration: underline; }
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 13px;
+  margin: 0;
+}
+.checkbox input { accent-color: var(--green-500); }
+
+.btn-primary,
+button[type="submit"],
+.form-card button[type="submit"] {
+  width: 100%;
+  margin-top: 22px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(180deg, var(--green-500) 0%, var(--green-700) 100%);
+  color: #fff;
+  font: 600 15px/1 inherit;
+  cursor: pointer;
+  letter-spacing: .2px;
+  box-shadow: 0 4px 14px rgba(15,110,86,.20);
+  transition: transform .06s ease-out, box-shadow .12s;
+}
+.btn-primary:hover,
+button[type="submit"]:hover { box-shadow: 0 6px 20px rgba(15,110,86,.28); }
+.btn-primary:active,
+button[type="submit"]:active { transform: translateY(1px); }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 14px;
+  color: #94a09a;
+  font-size: 12px;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.help {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.help a {
+  color: var(--green-700);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footnote {
+  text-align: center;
+  color: #9aa39d;
+  font-size: 11.5px;
+  padding-top: 18px;
+}
+
+/* Keycloak alerts — styled to match the form-card chrome. */
+.alert {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 13.5px;
+}
+.alert-success { background: var(--mint-50);  color: var(--green-700); border: 1px solid var(--mint-300); }
+.alert-warning { background: #fff7e6;         color: #8a5a00;          border: 1px solid #ffe1a8; }
+.alert-error,
+.alert-danger  { background: #fdecea;         color: #a3211a;          border: 1px solid #f6b4ad; }
+.alert-info    { background: #ecf6ff;         color: #1b5293;          border: 1px solid #bcdcff; }
+
+.field-error {
+  display: block;
+  margin-top: 6px;
+  color: #a3211a;
+  font-size: 12.5px;
+}
+
+/* "Form info" block — used by some flows for back-to-login links. */
+.form-info {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.form-info a {
+  color: var(--green-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Social provider list (rendered only if realm has them). */
+.social-providers ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.social-providers .social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color .12s, background .12s;
+}
+.social-providers .social-link:hover {
+  border-color: var(--green-500);
+  background: var(--mint-50);
+}
+
+/* Mobile: collapse to a single column with hero on top, form below. */
+@media (max-width: 900px) {
+  .hero { padding: 32px 24px; }
+  .form-side { padding: 20px 24px; }
+  .hero h1 { font-size: 32px; }
+  .hero p.lead { font-size: 15px; }
+}

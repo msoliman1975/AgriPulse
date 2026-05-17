@@ -77,17 +77,28 @@ keycloak:
   global:
     security:
       allowInsecureImages: true
-  # BH-3: pin by digest in addition to tag. The
-  # bitnami/keycloak:26.1.4-debian-12-r2 tag deletion (rotated to
-  # bitnamilegacy/*) burned us once already (see
-  # project_aws_rebuild_2026_05_16); a digest pin makes the pull
-  # resolve to the exact image bytes even if a tag-side rotation
-  # happens. Renovate's `digest` updateType keeps this current.
+  # Custom keycloak image baked from `infra/helm/keycloak/Dockerfile.theme`:
+  # tiny overlay on top of bitnamilegacy/keycloak:26.1.4-debian-12-r2 that
+  # adds the `agripulse` login theme under
+  # /opt/bitnami/keycloak/themes/agripulse. The base bitnami image (and
+  # therefore its digest pin from BH-3) lives inside the Dockerfile.
+  #
+  # Tag is bumped per merge by `.github/workflows/argocd-sync.yml` which
+  # writes directly to `keycloak.image.tag` in the dev overlay (unlike
+  # api/workers/frontend/tile-server, the bitnami sub-chart doesn't
+  # respect `global.images.keycloak.tag` so we target the chart's own
+  # image.tag key).
+  #
+  # `allowInsecureImages: true` (set under `global.security` below) stays
+  # required: the bitnami NOTES.txt template hard-fails `helm template`
+  # when image.repository doesn't start with `bitnami/`
+  # (https://github.com/bitnami/charts/issues/30850).
   image:
-    registry: docker.io
-    repository: bitnamilegacy/keycloak
-    tag: 26.1.4-debian-12-r2
-    digest: sha256:865d3fe1a1fd6410d7d5fe34247dc0ae536c0b7cb158255405997a0ffb58fb07
+    registry: ghcr.io
+    repository: msoliman1975/agripulse/keycloak
+    # Seeded with a chart-rendering-safe default so a bare `helm template`
+    # (no overlay) still resolves; overlay always overrides.
+    tag: latest
 
   # CD-13: HA topology. `production: true` flips the bitnami chart to the
   # Quarkus-`start` runtime (not `start-dev`), enables Infinispan

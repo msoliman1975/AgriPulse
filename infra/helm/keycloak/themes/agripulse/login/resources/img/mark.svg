@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AgriPulse brand mark — gradient mango leaf + zigzag canopy rim +
+  glowing red ECG pulse + drop-shadow. CSP-safe: the 24-tooth zigzag
+  polygon points are pre-computed (no inline JS). Source of design:
+  docs/login-mockups/option-1-field.html, locked per
+  [[project-login-page-locked-design]].
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="ap-leaf-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#a7d2b9"/>
+      <stop offset="55%"  stop-color="#3FB58A"/>
+      <stop offset="100%" stop-color="#0F6E56"/>
+    </linearGradient>
+    <radialGradient id="ap-ring-fill" cx="50%" cy="40%" r="55%">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.55)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <filter id="ap-pulse-glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="1.3"/>
+    </filter>
+    <filter id="ap-leaf-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#04342C" flood-opacity=".25"/>
+    </filter>
+  </defs>
+
+  <circle cx="100" cy="100" r="92" fill="url(#ap-ring-fill)"/>
+
+  <polygon
+    points="100.00,4.00 111.23,14.74 124.85,7.27 132.91,20.55 148.00,16.86 152.35,31.77 167.88,32.12 168.23,47.65 183.14,52.00 179.45,67.09 192.73,75.15 185.26,88.77 196.00,100.00 185.26,111.23 192.73,124.85 179.45,132.91 183.14,148.00 168.23,152.35 167.88,167.88 152.35,168.23 148.00,183.14 132.91,179.45 124.85,192.73 111.23,185.26 100.00,196.00 88.77,185.26 75.15,192.73 67.09,179.45 52.00,183.14 47.65,168.23 32.12,167.88 31.77,152.35 16.86,148.00 20.55,132.91 7.27,124.85 14.74,111.23 4.00,100.00 14.74,88.77 7.27,75.15 20.55,67.09 16.86,52.00 31.77,47.65 32.12,32.12 47.65,31.77 52.00,16.86 67.09,20.55 75.15,7.27 88.77,14.74"
+    fill="none" stroke="#1D9E75" stroke-width="1.8" stroke-linejoin="round"/>
+
+  <path filter="url(#ap-pulse-glow)" opacity=".55"
+        d="M22 102 L62 102 L72 86 L82 116 L100 76 L118 112 L126 96 L140 102 L178 100"
+        fill="none" stroke="#E24B4A" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 102 L62 102 L72 86 L82 116 L100 76 L118 112 L126 96 L140 102 L178 100"
+        fill="none" stroke="#E24B4A" stroke-width="2.8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g filter="url(#ap-leaf-shadow)">
+    <path d="M100 22 Q122 42 132 64 Q142 86 140 108 Q137 128 126 144 Q115 156 100 164 Q85 156 74 144 Q63 128 60 108 Q58 86 68 64 Q78 42 100 22Z"
+          fill="url(#ap-leaf-grad)" stroke="#04342C" stroke-width="1.2" stroke-opacity=".5"/>
+    <path d="M100 28 L100 158" stroke="#04342C" stroke-width="1.1" opacity=".35"/>
+    <path d="M100 46 Q92 51 84 60 M100 46 Q108 51 116 60
+             M100 66 Q90 72 80 84 M100 66 Q110 72 120 84
+             M100 86 Q88 93 76 106 M100 86 Q112 93 124 106
+             M100 106 Q90 111 80 122 M100 106 Q110 111 120 122"
+          stroke="#04342C" stroke-width=".9" opacity=".28" fill="none"/>
+  </g>
+</svg>

@@ -309,6 +309,17 @@ jobs:
             context: frontend
             dockerfile: frontend/Dockerfile
             platforms: linux/amd64,linux/arm64
+          - name: keycloak
+            # Tiny overlay on bitnamilegacy/keycloak that bakes the
+            # `agripulse` login theme (see
+            # infra/helm/keycloak/Dockerfile.theme). Context is the
+            # chart dir so the COPY can see `themes/agripulse`.
+            # amd64-only: bitnamilegacy keycloak images ship amd64
+            # only, and the chart pins the pod to amd64 nodes via
+            # nodeSelector anyway.
+            context: infra/helm/keycloak
+            dockerfile: infra/helm/keycloak/Dockerfile.theme
+            platforms: linux/amd64
     steps:
       - uses: actions/checkout@v6
 
