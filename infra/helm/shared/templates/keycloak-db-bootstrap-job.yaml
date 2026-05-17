@@ -1,0 +1,92 @@
+{{- /*
+Idempotent ArgoCD post-sync hook that ensures the `keycloak` database
+exists, owned by the CNPG-managed `keycloak` role. Required because the
+CNPG Database CR (which would handle this declaratively) was only
+introduced in operator v1.25 and our pinned chart 0.22.1 ships v1.24.1.
+Without this Job, `keycloak` pods CrashLoopBackOff on `database
+"keycloak" does not exist` every fresh deploy — currently fixed by a
+manual `CREATE DATABASE` documented in three different resume memories.
+
+The Job is idempotent (no-op if DB already present) so repeated syncs
+are safe. PostSync (not PreSync) so the Cluster + managed role have
+been reconciled by the operator. retry loop covers the gap between
+"Cluster is Ready" and "managed role exists" (typically seconds).
+
+When CNPG is bumped to ≥ v1.25 and `declarativeDatabases.enabled: true`,
+this Job becomes redundant — drop it via the chart flag below.
+*/ -}}
+{{- if and .Values.postgresCluster.enabled .Values.postgresCluster.keycloakDbBootstrap.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.postgresCluster.name }}-keycloak-db-bootstrap
+  labels:
+    {{- include "agripulse.shared.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "agripulse.shared.labels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak-db-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: psql
+          image: {{ .Values.postgresCluster.imageName | quote }}
+          env:
+            - name: PGHOST
+              value: {{ printf "%s-rw" .Values.postgresCluster.name | quote }}
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-superuser" .Values.postgresCluster.name | quote }}
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-superuser" .Values.postgresCluster.name | quote }}
+                  key: password
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              # Wait up to 2 minutes for the keycloak role to exist
+              # (CNPG managed.roles reconciliation is async after the
+              # Cluster reaches Ready).
+              for i in $(seq 1 24); do
+                if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='keycloak'" | grep -q 1; then
+                  break
+                fi
+                echo "keycloak role not yet reconciled; sleeping (attempt $i/24)"
+                sleep 5
+              done
+              psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='keycloak'" | grep -q 1 || {
+                echo "keycloak role never appeared; failing so operator can retry"
+                exit 1
+              }
+              # Idempotent CREATE DATABASE: psql exits 0 on the "already
+              # exists" notice if wrapped in \gexec.
+              psql -v ON_ERROR_STOP=1 -tAc \
+                "SELECT 'CREATE DATABASE keycloak OWNER keycloak' \
+                 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='keycloak')\gexec"
+              echo "keycloak database is present."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+{{- end }}

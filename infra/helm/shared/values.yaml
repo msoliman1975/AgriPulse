@@ -144,6 +144,14 @@ postgresCluster:
     - name: keycloak
       owner: keycloak
       ensure: present
+  # Interim bootstrap for the keycloak database while declarativeDatabases
+  # is off. A PostSync Job runs `CREATE DATABASE keycloak OWNER keycloak`
+  # idempotently so first-time deploys don't require the manual
+  # `CREATE DATABASE` step that surfaced three times in resume memories.
+  # Flip to `false` once CNPG is bumped to >= v1.25 and Database CRs are
+  # in charge.
+  keycloakDbBootstrap:
+    enabled: true
   # Postgres-wide config; tenant migrations are in
   # backend/migrations/{public,tenant}/ and apply via the API pod's
   # init container.

@@ -19,10 +19,11 @@ spec:
     path: infra/argocd/appsets
     directory:
       recurse: false
-      # cnpg-crds.yaml is a standalone Application (not an AppSet) that
-      # vendors the cloudnative-pg operator's CRDs ahead of the chart;
-      # see that file's header for why.
-      include: "{services.yaml,platform.yaml,observability.yaml,cnpg-crds.yaml,external-secrets-bootstrap.yaml,storageclass-bootstrap.yaml}"
+      # cnpg-crds.yaml and kube-prometheus-stack-crds.yaml are standalone
+      # Applications (not AppSets) that vendor CRDs ahead of their charts
+      # to break first-boot chicken-and-egg cycles; see each file's
+      # header for why.
+      include: "{services.yaml,platform.yaml,observability.yaml,cnpg-crds.yaml,kube-prometheus-stack-crds.yaml,external-secrets-bootstrap.yaml,storageclass-bootstrap.yaml}"
   syncPolicy:
     automated:
       prune: true

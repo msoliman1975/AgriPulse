@@ -12,6 +12,18 @@ controller:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  admissionWebhooks:
+    # The admission webhook's caBundle is filled by a one-shot patch
+    # Job (see chart's admission-webhooks/job-patch.yaml). On a fresh
+    # install with `patch.enabled=false`, the caBundle stays empty and
+    # every Ingress apply fails with `x509: certificate signed by
+    # unknown authority`. Keep enabled to make the bootstrap reproducible.
+    enabled: true
+    patch:
+      enabled: true
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
   service:
     annotations:
       service.beta.kubernetes.io/aws-load-balancer-type: nlb

@@ -129,7 +129,29 @@ INSERT INTO public.platform_role_assignments (user_id, role)
 VALUES ('<kc-sub-uuid>', 'PlatformAdmin');
 ```
 
-## 7. Smoke test
+## 7. Cross-SG pod traffic (only if you see RPC timeouts)
+
+`module.eks.node_security_group_id` is attached to Karpenter-launched
+nodes only; the EKS-auto primary cluster SG is attached to every
+worker node. Cross-SG pod traffic between managed-NG pods and
+Karpenter pods normally works because both attach the primary SG and
+the primary SG has a self-rule (EKS-managed). If you ever observe
+intra-cluster RPC timeouts (e.g. argocd app-controller → repo-server
+gRPC on 8081) after a fresh apply, add this rule once — it has
+persisted across rebuilds since:
+
+```powershell
+$cluster = aws ec2 describe-security-groups --filters "Name=group-name,Values=eks-cluster-sg-agripulse-dev-*" --query "SecurityGroups[0].GroupId" --output text
+$nodeSg  = aws ec2 describe-security-groups --filters "Name=group-name,Values=agripulse-dev-node-*"        --query "SecurityGroups[0].GroupId" --output text
+aws ec2 authorize-security-group-ingress --group-id $cluster --source-group $nodeSg --protocol -1
+```
+
+(History: this surfaced 3× during the 2026-05-15/16 sessions; not
+codified in terraform because the live cluster already has it and
+adding it as a managed resource would conflict with the existing
+rule.)
+
+## 8. Smoke test
 
 ```powershell
 ./scripts/deploy-aws.ps1 -Phase smoke

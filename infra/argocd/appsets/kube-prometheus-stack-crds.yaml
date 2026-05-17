@@ -1,0 +1,46 @@
+---
+# kube-prometheus-stack CRDs are vendored from the prometheus-operator
+# release manifest instead of being installed by the chart's pre-install
+# Helm hook Job. On a fresh cluster the hook Job cannot schedule (only
+# tainted baseline node exists; Karpenter cannot provision more without
+# the ServiceMonitor CRD this hook is installing — chicken and egg).
+# See infra/argocd/kube-prometheus-stack-crds/crds.yaml header for the
+# regeneration recipe.
+#
+# Sync wave -2 lands these CRDs before cnpg-crds (-1) and the operator
+# Application (default wave 0) so every platform chart's ServiceMonitor
+# resources can apply on the first sync attempt.
+#
+# Prune is intentionally disabled: removing a Prometheus/Alertmanager
+# CRD cascade-deletes every matching custom resource in the cluster, so
+# we never want ArgoCD to do that automatically on a regenerate diff.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-kube-prometheus-stack-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  source:
+    repoURL: https://github.com/msoliman1975/AgriPulse.git
+    targetRevision: HEAD
+    path: infra/argocd/kube-prometheus-stack-crds
+    directory:
+      recurse: false
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      # CRDs are big (1.3MB total, ~30k lines on the Prometheus CRD
+      # alone). Skip the dry-run pass so apply doesn't time out.
+      - SkipDryRunOnMissingResource=true

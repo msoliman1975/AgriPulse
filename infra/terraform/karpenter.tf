@@ -47,3 +47,24 @@ resource "aws_ec2_tag" "node_sg_karpenter" {
   key         = "karpenter.sh/discovery"
   value       = module.eks.cluster_name
 }
+
+# Service-linked role required before any EC2 Spot launch can succeed.
+# Brand-new AWS accounts do not have this role; Karpenter's first Spot
+# fleet then fails with AuthFailure.ServiceLinkedRoleCreationNotPermitted.
+# AWS auto-creates the role on first console-launched Spot instance, so
+# accounts that have used Spot before will already have it.
+#
+# Conditional create: if the role already exists on the account (auto-
+# created by AWS, manually created via `aws iam create-service-linked-role`,
+# or carried over from a prior cluster), the data lookup succeeds and the
+# resource is not created. Otherwise terraform creates it.
+data "aws_iam_roles" "spot_slr" {
+  name_regex  = "^AWSServiceRoleForEC2Spot$"
+  path_prefix = "/aws-service-role/spot.amazonaws.com/"
+}
+
+resource "aws_iam_service_linked_role" "spot" {
+  count            = length(data.aws_iam_roles.spot_slr.names) == 0 ? 1 : 0
+  aws_service_name = "spot.amazonaws.com"
+  description      = "Required for Karpenter Spot launches (managed by AgriPulse terraform)"
+}
