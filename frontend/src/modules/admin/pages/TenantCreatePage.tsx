@@ -119,9 +119,15 @@ export function TenantCreatePage(): ReactNode {
     setSubmitError(null);
     create.mutate(buildPayload(), {
       onSuccess: (data) => {
+        // Drive the success copy from the SERVER state, not the form.
+        // The wizard requires owner_email client-side, but Keycloak
+        // provisioning is best-effort on the server — if it failed (or
+        // the API returned owner_user_id: null for any other reason),
+        // we want the "provision manually" copy, not "welcome email
+        // sent to <form-typed email>".
         setSuccess({
           tenantId: data.id,
-          ownerEmail: form.owner_email.trim() || null,
+          ownerEmail: data.owner_user_id ? form.owner_email.trim() || null : null,
           status: data.status,
         });
       },

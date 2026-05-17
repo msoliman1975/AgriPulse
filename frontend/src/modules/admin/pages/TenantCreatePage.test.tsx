@@ -67,6 +67,24 @@ async function fillProfile(user: ReturnType<typeof userEvent.setup>): Promise<vo
   await user.type(screen.getByLabelText("Contact email"), "ops@acme.test");
 }
 
+/**
+ * Walk profile → owner → review for tests that only care about the
+ * server-call behaviour. `validateOwner()` requires both
+ * owner_email and owner_full_name; the per-test mocks decide what the
+ * server returns from the eventual `Create tenant` click.
+ */
+async function advanceToReview(
+  user: ReturnType<typeof userEvent.setup>,
+): Promise<void> {
+  await fillProfile(user);
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  await screen.findByLabelText("Initial owner email");
+  await user.type(screen.getByLabelText("Initial owner email"), "owner@acme.test");
+  await user.type(screen.getByLabelText("Initial owner full name"), "Owner Name");
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  await screen.findByText("Step 3 of 3 — Review & create");
+}
+
 describe("<TenantCreatePage>", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
@@ -81,8 +99,16 @@ describe("<TenantCreatePage>", () => {
     });
   });
 
-  it("walks the happy path through profile â†’ owner â†’ review â†’ create", async () => {
-    createMock.mockResolvedValue(buildSuccess({ status: "active" }));
+  it("walks the happy path through profile → owner → review → create", async () => {
+    // Owner provisioning succeeded → server returns a non-null
+    // owner_user_id. The success page uses that to decide between the
+    // "welcome email sent" and "provision manually" copy.
+    createMock.mockResolvedValue(
+      buildSuccess({
+        status: "active",
+        owner_user_id: "22222222-2222-2222-2222-222222222222",
+      }),
+    );
     const user = userEvent.setup();
     renderWizard();
 
@@ -94,7 +120,7 @@ describe("<TenantCreatePage>", () => {
     await user.type(screen.getByLabelText("Initial owner full name"), "Owner Name");
     await user.click(screen.getByRole("button", { name: "Next" }));
 
-    await screen.findByText("Step 3 of 3 â€” Review & create");
+    await screen.findByText("Step 3 of 3 — Review & create");
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     expect(await screen.findByText("Tenant created")).toBeInTheDocument();
@@ -128,10 +154,7 @@ describe("<TenantCreatePage>", () => {
     const user = userEvent.setup();
     renderWizard();
 
-    await fillProfile(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await screen.findByLabelText("Initial owner email");
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await advanceToReview(user);
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     await waitFor(() => {
@@ -142,17 +165,17 @@ describe("<TenantCreatePage>", () => {
     expect(screen.getByLabelText("Slug")).toHaveValue("acme-farms");
   });
 
-  it("shows the no-owner success message when owner_email is omitted", async () => {
+  it("shows the no-owner success message when the API returns owner_user_id=null", async () => {
+    // owner_email is required client-side; this test exercises the
+    // post-create UX where the server completes the tenant row but
+    // skipped Keycloak owner provisioning (returns owner_user_id: null).
     createMock.mockResolvedValue(
       buildSuccess({ status: "active", owner_user_id: null }),
     );
     const user = userEvent.setup();
     renderWizard();
 
-    await fillProfile(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await screen.findByLabelText("Initial owner email");
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await advanceToReview(user);
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     expect(
@@ -167,11 +190,7 @@ describe("<TenantCreatePage>", () => {
     const user = userEvent.setup();
     renderWizard();
 
-    await fillProfile(user);
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await screen.findByLabelText("Initial owner email");
-    await user.type(screen.getByLabelText("Initial owner email"), "owner@acme.test");
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await advanceToReview(user);
     await user.click(screen.getByRole("button", { name: "Create tenant" }));
 
     expect(

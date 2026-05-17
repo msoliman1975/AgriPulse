@@ -42,7 +42,7 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ø£Ø¬Ø±ÙŠ.Ø¨ÙŽÙ„Ø³" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "تسجيل الدخول إلى أجري.بَلس" })).toBeInTheDocument();
     expect(document.documentElement.getAttribute("dir")).toBe("rtl");
   });
 });
