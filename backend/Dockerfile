@@ -62,10 +62,15 @@ RUN apt-get update \
  && chown -R app:app "$APP_HOME"
 
 COPY --from=builder --chown=app:app /opt/venv /opt/venv
-COPY --chown=app:app app       "$APP_HOME/app"
-COPY --chown=app:app workers   "$APP_HOME/workers"
-COPY --chown=app:app migrations "$APP_HOME/migrations"
-COPY --chown=app:app scripts   "$APP_HOME/scripts"
+COPY --chown=app:app app         "$APP_HOME/app"
+COPY --chown=app:app workers     "$APP_HOME/workers"
+COPY --chown=app:app migrations  "$APP_HOME/migrations"
+COPY --chown=app:app scripts     "$APP_HOME/scripts"
+# Tenant-create runs `alembic upgrade head` against the [tenant]
+# section at runtime (app/modules/tenancy/bootstrap.py), so the ini
+# file has to ship inside the image; without it POST /admin/tenants
+# 500s with "No config file '/app/alembic.ini' found".
+COPY --chown=app:app alembic.ini "$APP_HOME/alembic.ini"
 
 WORKDIR $APP_HOME
 USER app
