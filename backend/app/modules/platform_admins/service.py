@@ -236,7 +236,8 @@ class PlatformAdminsService:
                 """
                 INSERT INTO public.tenant_role_assignments
                     (id, membership_id, role, granted_by)
-                VALUES (:rid, :mid, 'TenantOwner', :actor)
+                VALUES (:rid, :mid, 'TenantOwner',
+                        (SELECT id FROM public.users WHERE id = :actor))
                 """
             ).bindparams(
                 bindparam("rid", type_=PG_UUID(as_uuid=True)),
@@ -365,7 +366,8 @@ class PlatformAdminsService:
                 """
                 INSERT INTO public.tenant_role_assignments
                     (id, membership_id, role, granted_by)
-                VALUES (:rid, :mid, 'TenantOwner', :actor)
+                VALUES (:rid, :mid, 'TenantOwner',
+                        (SELECT id FROM public.users WHERE id = :actor))
                 """
             ).bindparams(
                 bindparam("rid", type_=PG_UUID(as_uuid=True)),
