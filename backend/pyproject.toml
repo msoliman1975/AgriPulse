@@ -209,6 +209,10 @@ filterwarnings = [
   # testcontainers 4.x emits a DeprecationWarning at import time about its
   # own deprecated decorator; harmless for our use.
   "ignore::DeprecationWarning:testcontainers.*",
+  # testcontainers 4.13.x raises stacklevel=2 from wait_for_logs, so the
+  # warning is attributed to our conftest instead of the testcontainers
+  # package. Match by message text instead.
+  "ignore:The wait_for_logs function with string or callable predicates:DeprecationWarning",
   # pypgstac pins `python-dateutil ==2.8.*`, which calls the deprecated
   # `datetime.utcfromtimestamp` at module import time. We don't use the
   # offending API ourselves; ignore until pypgstac upstream updates the
