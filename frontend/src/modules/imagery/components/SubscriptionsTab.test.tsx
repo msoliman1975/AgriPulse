@@ -125,7 +125,7 @@ describe("SubscriptionsTab", () => {
     useCapabilityMock.mockReturnValue(false);
 
     render(withConfig(<SubscriptionsTab blockId={BLOCK_ID} farmId={FARM_ID} />));
-    await screen.findByText(/Ø§Ø´ØªØ±Ø§ÙƒØ§Øª Ø§Ù„ØµÙˆØ±/);
+    await screen.findByText(/اشتراكات الصور/);
     expect(document.documentElement.getAttribute("dir")).toBe("rtl");
   });
 });
