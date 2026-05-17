@@ -1,8 +1,8 @@
 """Integration-test fixtures.
 
-Spins up a single PostgreSQL+TimescaleDB+PostGIS container and a Redis
-container per test session. Migrations run once at module import; each
-test gets its own AsyncSession.
+Spins up a single PostgreSQL+TimescaleDB+PostGIS container, a Redis
+container, and a MailHog SMTP sink per test session. Migrations run
+once at module import; each test gets its own AsyncSession.
 
 Skipped if Docker / testcontainers are not available â€” the marker
 `integration` lets CI gate this whole tree on presence of containers.
@@ -19,11 +19,15 @@ import pytest
 pytestmark = pytest.mark.integration
 
 try:
+    from testcontainers.core.container import DockerContainer  # type: ignore[import-untyped]
+    from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore[import-untyped]
     from testcontainers.postgres import PostgresContainer  # type: ignore[import-untyped]
     from testcontainers.redis import RedisContainer  # type: ignore[import-untyped]
 except ImportError:  # pragma: no cover
+    DockerContainer = None  # type: ignore[assignment]
     PostgresContainer = None  # type: ignore[assignment]
     RedisContainer = None  # type: ignore[assignment]
+    wait_for_logs = None  # type: ignore[assignment]
 
 
 # Image with TimescaleDB + PostGIS already installed; pgcrypto and citext
@@ -58,10 +62,29 @@ def redis_container() -> Iterator[object]:
         container.stop()
 
 
+@pytest.fixture(scope="session")
+def mailhog_container() -> Iterator[object]:
+    """SMTP sink for the notifications email channel.
+
+    Without it, ``send_email`` raises ``Connection refused`` and the
+    fan-out tests record ``status='failed'`` instead of ``'sent'``.
+    """
+    if DockerContainer is None:  # pragma: no cover
+        pytest.skip("testcontainers not installed")
+    container = DockerContainer("mailhog/mailhog:v1.0.1").with_exposed_ports(1025, 8025)
+    container.start()
+    wait_for_logs(container, "Creating API v2")
+    try:
+        yield container
+    finally:
+        container.stop()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _wire_settings(
     postgres_container: object,
     redis_container: object,
+    mailhog_container: object,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Iterator[None]:
     """Point Settings at the live containers, then run public migrations."""
@@ -77,6 +100,12 @@ def _wire_settings(
     os.environ["DATABASE_URL"] = async_url
     os.environ["DATABASE_SYNC_URL"] = sync_url
     os.environ["REDIS_URL"] = redis_url
+    mh = mailhog_container
+    os.environ["SMTP_HOST"] = mh.get_container_host_ip()  # type: ignore[attr-defined]
+    os.environ["SMTP_PORT"] = str(mh.get_exposed_port(1025))  # type: ignore[attr-defined]
+    os.environ["SMTP_STARTTLS"] = "false"
+    os.environ["SMTP_USERNAME"] = ""
+    os.environ["SMTP_PASSWORD"] = ""
     # Point Celery broker at the test Redis so module-side `.delay()`
     # calls â€” e.g. weather.fetch_weather chaining derive_weather_daily â€”
     # enqueue against a reachable broker instead of falling through to
