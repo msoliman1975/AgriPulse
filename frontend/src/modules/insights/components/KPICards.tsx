@@ -49,10 +49,7 @@ export function KPICards({ farmId }: Props): ReactNode {
     to: weekOut,
   });
   const dueCount = irrigationQuery.data?.length ?? 0;
-  const totalMm = irrigationQuery.data?.reduce(
-    (acc, r) => acc + Number(r.recommended_mm ?? 0),
-    0,
-  );
+  const totalMm = irrigationQuery.data?.reduce((acc, r) => acc + Number(r.recommended_mm ?? 0), 0);
 
   const calendarQuery = useCalendar(farmId, today, weekOut);
   const upcomingCount = calendarQuery.data?.activities.length ?? 0;
@@ -81,11 +78,7 @@ export function KPICards({ farmId }: Props): ReactNode {
             </span>
           )
         }
-        hint={
-          openAlertCount === 0
-            ? t("kpi.alerts.hintAllClear")
-            : t("kpi.alerts.hintHasAlerts")
-        }
+        hint={openAlertCount === 0 ? t("kpi.alerts.hintAllClear") : t("kpi.alerts.hintHasAlerts")}
         delta={
           openAlertCount > 0 ? (
             <Pill kind="crit">{t("kpi.alerts.deltaCrit")}</Pill>
@@ -97,13 +90,9 @@ export function KPICards({ farmId }: Props): ReactNode {
       />
       <KPICard
         title={t("kpi.recommendations.title")}
-        value={
-          recsQuery.isLoading ? <Skeleton className="h-8 w-12" /> : openRecCount
-        }
+        value={recsQuery.isLoading ? <Skeleton className="h-8 w-12" /> : openRecCount}
         hint={
-          openRecCount === 0
-            ? t("kpi.recommendations.hintEmpty")
-            : t("kpi.recommendations.hintHas")
+          openRecCount === 0 ? t("kpi.recommendations.hintEmpty") : t("kpi.recommendations.hintHas")
         }
         onClick={() => navigate(`/recommendations/${farmId}`)}
       />
@@ -133,11 +122,7 @@ export function KPICards({ farmId }: Props): ReactNode {
             t("kpi.latestSignal.valueEmpty")
           )
         }
-        hint={
-          latestSignalAt
-            ? t("kpi.latestSignal.hintHas")
-            : t("kpi.latestSignal.hintEmpty")
-        }
+        hint={latestSignalAt ? t("kpi.latestSignal.hintHas") : t("kpi.latestSignal.hintEmpty")}
         onClick={() => navigate(`/signals/${farmId}`)}
       />
     </div>

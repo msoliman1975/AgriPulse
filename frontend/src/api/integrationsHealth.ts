@@ -67,9 +67,7 @@ export interface IntegrationAttempt {
   failed_streak_position: number;
 }
 
-export async function listFarmHealth(
-  basePath: string = "/v1",
-): Promise<FarmIntegrationHealth[]> {
+export async function listFarmHealth(basePath: string = "/v1"): Promise<FarmIntegrationHealth[]> {
   const { data } = await apiClient.get<FarmIntegrationHealth[]>(
     `${basePath}/integrations/health/farms`,
   );
@@ -127,10 +125,9 @@ export async function listQueue(
   params: QueueParams = {},
   basePath: string = "/v1",
 ): Promise<QueueEntry[]> {
-  const { data } = await apiClient.get<QueueEntry[]>(
-    `${basePath}/integrations/health/queue`,
-    { params },
-  );
+  const { data } = await apiClient.get<QueueEntry[]>(`${basePath}/integrations/health/queue`, {
+    params,
+  });
   return data;
 }
 
@@ -170,9 +167,7 @@ export async function listProviderErrorHistogram(
   return data;
 }
 
-export async function listProviders(
-  basePath: string = "/v1",
-): Promise<ProviderHealth[]> {
+export async function listProviders(basePath: string = "/v1"): Promise<ProviderHealth[]> {
   const { data } = await apiClient.get<ProviderHealth[]>(
     `${basePath}/integrations/health/providers`,
   );
@@ -180,9 +175,7 @@ export async function listProviders(
 }
 
 export async function listPlatformProviders(): Promise<ProviderHealth[]> {
-  const { data } = await apiClient.get<ProviderHealth[]>(
-    "/v1/admin/integrations/health/providers",
-  );
+  const { data } = await apiClient.get<ProviderHealth[]>("/v1/admin/integrations/health/providers");
   return data;
 }
 
@@ -191,10 +184,9 @@ export async function listRecentProbes(
   provider_code: string,
   limit: number = 100,
 ): Promise<ProviderProbe[]> {
-  const { data } = await apiClient.get<ProviderProbe[]>(
-    "/v1/admin/integrations/health/probes",
-    { params: { provider_kind, provider_code, limit } },
-  );
+  const { data } = await apiClient.get<ProviderProbe[]>("/v1/admin/integrations/health/probes", {
+    params: { provider_kind, provider_code, limit },
+  });
   return data;
 }
 

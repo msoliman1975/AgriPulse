@@ -77,9 +77,7 @@ export function DecisionTreeListPage(): ReactNode {
                   </td>
                   <td className="px-4 py-2 text-end">
                     {tree.current_version != null ? (
-                      <Pill kind="ok">
-                        {t("list.row.v", { n: tree.current_version })}
-                      </Pill>
+                      <Pill kind="ok">{t("list.row.v", { n: tree.current_version })}</Pill>
                     ) : (
                       <Pill kind="neutral">{t("list.row.draft")}</Pill>
                     )}

@@ -34,9 +34,7 @@ export function IntegrationsImageryPage(): ReactNode {
       </header>
 
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
-        <h2 className="text-sm font-semibold text-ap-ink">
-          {t("section.tenant")}
-        </h2>
+        <h2 className="text-sm font-semibold text-ap-ink">{t("section.tenant")}</h2>
         {tenantQ.isLoading ? (
           <Skeleton className="mt-3 h-24 w-full" />
         ) : tenantQ.isError ? (
@@ -182,7 +180,9 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
             <tr key={s.key}>
               <td className="py-2 pr-4 font-mono text-xs">{s.key}</td>
               <td className="py-2 pr-4 text-ap-ink">{formatValue(s.value)}</td>
-              <td className="py-2"><SourcePill source={s.source} /></td>
+              <td className="py-2">
+                <SourcePill source={s.source} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -232,9 +232,7 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
       </form>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-ap-line pt-3">
-        <span className="text-xs text-ap-muted">
-          {t("imagery.applyToBlocksHint")}
-        </span>
+        <span className="text-xs text-ap-muted">{t("imagery.applyToBlocksHint")}</span>
         <button
           type="button"
           onClick={() => apply.mutate({ farmId, mode: "inherit" })}

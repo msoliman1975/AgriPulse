@@ -163,9 +163,7 @@ export async function listTenantRules(): Promise<TenantRule[]> {
   return data;
 }
 
-export async function createTenantRule(
-  payload: TenantRuleCreatePayload,
-): Promise<TenantRule> {
+export async function createTenantRule(payload: TenantRuleCreatePayload): Promise<TenantRule> {
   const { data } = await apiClient.post<TenantRule>("/v1/rules/tenant", payload);
   return data;
 }
@@ -174,10 +172,7 @@ export async function updateTenantRule(
   code: string,
   payload: TenantRuleUpdatePayload,
 ): Promise<TenantRule> {
-  const { data } = await apiClient.patch<TenantRule>(
-    `/v1/rules/tenant/${code}`,
-    payload,
-  );
+  const { data } = await apiClient.patch<TenantRule>(`/v1/rules/tenant/${code}`, payload);
   return data;
 }
 

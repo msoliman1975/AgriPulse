@@ -48,8 +48,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
   // service layer + auth middleware — these toggles are pure operator UX.
   const canSuspend = tenant.status === "active";
   const canReactivate = tenant.status === "suspended";
-  const canRequestDelete =
-    tenant.status === "active" || tenant.status === "suspended";
+  const canRequestDelete = tenant.status === "active" || tenant.status === "suspended";
   const canCancelDelete = tenant.status === "pending_delete";
   const canPurge = tenant.status === "pending_delete";
   const canRetry = tenant.status === "pending_provision";
@@ -113,9 +112,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
           role="alert"
           className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
         >
-          <span className="font-semibold">
-            {t("tenants.detail.errorTitleAction")}
-          </span>
+          <span className="font-semibold">{t("tenants.detail.errorTitleAction")}</span>
           {": "}
           {extractError(anyError)}
         </p>
@@ -125,24 +122,14 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
         open={open === "suspend"}
         pending={suspend.isPending}
         onClose={() => setOpen(null)}
-        onSubmit={(reason) =>
-          suspend.mutate(
-            { reason },
-            { onSuccess: () => setOpen(null) },
-          )
-        }
+        onSubmit={(reason) => suspend.mutate({ reason }, { onSuccess: () => setOpen(null) })}
       />
       <RequestDeleteModal
         open={open === "requestDelete"}
         pending={requestDelete.isPending}
         graceDays={purgeGraceDays}
         onClose={() => setOpen(null)}
-        onSubmit={(reason) =>
-          requestDelete.mutate(
-            { reason },
-            { onSuccess: () => setOpen(null) },
-          )
-        }
+        onSubmit={(reason) => requestDelete.mutate({ reason }, { onSuccess: () => setOpen(null) })}
       />
       <PurgeModal
         open={open === "purge"}
@@ -213,9 +200,7 @@ function SuspendModal({ open, pending, onClose, onSubmit }: SuspendModalProps): 
       <h2 id="suspend-modal-title" className="text-lg font-semibold text-ap-ink">
         {t("tenants.detail.modals.suspend.title")}
       </h2>
-      <p className="mt-2 text-sm text-ap-muted">
-        {t("tenants.detail.modals.suspend.body")}
-      </p>
+      <p className="mt-2 text-sm text-ap-muted">{t("tenants.detail.modals.suspend.body")}</p>
       <label className="mt-4 block text-sm">
         <span className="block text-xs font-semibold uppercase tracking-wide text-ap-muted">
           {t("tenants.detail.modals.suspend.reasonLabel")}
@@ -241,9 +226,7 @@ function SuspendModal({ open, pending, onClose, onSubmit }: SuspendModalProps): 
           disabled={pending}
           className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
         >
-          {pending
-            ? t("tenants.detail.actionPending")
-            : t("tenants.detail.modals.suspend.confirm")}
+          {pending ? t("tenants.detail.actionPending") : t("tenants.detail.modals.suspend.confirm")}
         </button>
       </div>
     </Modal>
@@ -334,9 +317,7 @@ function PurgeModal({
 
   // Within grace window? If purgeEligibleAt is set and in the future, the
   // backend will reject without `force=true`. Offer the toggle in that case.
-  const insideGrace = Boolean(
-    purgeEligibleAt && new Date(purgeEligibleAt).getTime() > Date.now(),
-  );
+  const insideGrace = Boolean(purgeEligibleAt && new Date(purgeEligibleAt).getTime() > Date.now());
   const canSubmit = confirmation === slug && (!insideGrace || force);
 
   return (
@@ -344,13 +325,10 @@ function PurgeModal({
       <h2 id="purge-modal-title" className="text-lg font-semibold text-rose-700">
         {t("tenants.detail.modals.purge.title")}
       </h2>
-      <p className="mt-2 text-sm text-ap-ink">
-        {t("tenants.detail.modals.purge.body")}
-      </p>
+      <p className="mt-2 text-sm text-ap-ink">{t("tenants.detail.modals.purge.body")}</p>
       <label className="mt-4 block text-sm">
         <span className="block text-xs font-semibold uppercase tracking-wide text-ap-muted">
-          {t("tenants.detail.modals.purge.confirmLabel")}{" "}
-          <code className="font-mono">{slug}</code>
+          {t("tenants.detail.modals.purge.confirmLabel")} <code className="font-mono">{slug}</code>
         </span>
         <input
           type="text"
@@ -361,8 +339,18 @@ function PurgeModal({
         />
       </label>
       {insideGrace ? (
-        <label className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+        // The accessible text lives in the nested `{t(...)}` spans
+        // below; the lint rule's static analysis can't see through
+        // i18n calls and flags the label as "no accessible text". The
+        // visible label IS the accessible name at runtime — the
+        // htmlFor + id pair correctly associates the input.
+        // eslint-disable-next-line jsx-a11y/label-has-associated-control
+        <label
+          htmlFor="purge-force-checkbox"
+          className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"
+        >
           <input
+            id="purge-force-checkbox"
             type="checkbox"
             checked={force}
             onChange={(e) => setForce(e.target.checked)}
@@ -392,9 +380,7 @@ function PurgeModal({
           disabled={pending || !canSubmit}
           className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
         >
-          {pending
-            ? t("tenants.detail.actionPending")
-            : t("tenants.detail.modals.purge.confirm")}
+          {pending ? t("tenants.detail.actionPending") : t("tenants.detail.modals.purge.confirm")}
         </button>
       </div>
     </Modal>

@@ -22,11 +22,7 @@ export interface BlocksSummaryResponse {
   units: BlockSummary[];
 }
 
-export async function getBlocksSummary(
-  farmId: string,
-): Promise<BlocksSummaryResponse> {
-  const { data } = await apiClient.get<BlocksSummaryResponse>(
-    `/v1/farms/${farmId}/blocks/summary`,
-  );
+export async function getBlocksSummary(farmId: string): Promise<BlocksSummaryResponse> {
+  const { data } = await apiClient.get<BlocksSummaryResponse>(`/v1/farms/${farmId}/blocks/summary`);
   return data;
 }

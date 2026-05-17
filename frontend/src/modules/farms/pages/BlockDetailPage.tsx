@@ -238,9 +238,7 @@ export function BlockDetailPage(): JSX.Element {
 
       {canReadWeather ? <WeatherForecastPanel blockId={block.id} farmId={farmId} /> : null}
 
-      {canReadWeather ? (
-        <WeatherSubscriptionsTab blockId={block.id} farmId={farmId} />
-      ) : null}
+      {canReadWeather ? <WeatherSubscriptionsTab blockId={block.id} farmId={farmId} /> : null}
     </div>
   );
 }

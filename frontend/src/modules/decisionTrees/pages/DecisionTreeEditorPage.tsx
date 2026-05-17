@@ -101,18 +101,14 @@ export function DecisionTreeEditorPage(): ReactNode {
       dryRunMode === "editor"
         ? { block_id: dryRunBlockId.trim(), tree_yaml: yamlBuffer ?? "" }
         : { block_id: dryRunBlockId.trim(), version: currentVersionNumber ?? undefined };
-    dryRun.mutate(
-      { code: tree.code, payload },
-      { onSuccess: (res) => setDryRunResult(res) },
-    );
+    dryRun.mutate({ code: tree.code, payload }, { onSuccess: (res) => setDryRunResult(res) });
   };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4">
       <header>
         <h1 className="text-2xl font-semibold text-ap-ink">
-          {tree.name_en}{" "}
-          <span className="font-mono text-base text-ap-muted">{tree.code}</span>
+          {tree.name_en} <span className="font-mono text-base text-ap-muted">{tree.code}</span>
         </h1>
         {tree.description_en ? (
           <p className="mt-1 text-sm text-ap-muted">{tree.description_en}</p>
@@ -120,16 +116,11 @@ export function DecisionTreeEditorPage(): ReactNode {
       </header>
 
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm">
-        <h2 className="mb-2 text-sm font-semibold text-ap-ink">
-          {t("edit.metadata.heading")}
-        </h2>
+        <h2 className="mb-2 text-sm font-semibold text-ap-ink">{t("edit.metadata.heading")}</h2>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
           <Row label={t("edit.metadata.code")} value={<code>{tree.code}</code>} />
           <Row label={t("edit.metadata.name")} value={tree.name_en} />
-          <Row
-            label={t("edit.metadata.description")}
-            value={tree.description_en ?? "—"}
-          />
+          <Row label={t("edit.metadata.description")} value={tree.description_en ?? "—"} />
           <Row
             label={t("edit.metadata.crop")}
             value={tree.crop_id ? tree.crop_id.slice(0, 8) + "…" : "any"}
@@ -154,9 +145,7 @@ export function DecisionTreeEditorPage(): ReactNode {
             </div>
             <div className="flex items-center gap-2">
               {hydratedFromId && hydratedFromId !== latestVersion?.id ? (
-                <span className="text-[11px] text-ap-warn">
-                  loaded from older version
-                </span>
+                <span className="text-[11px] text-ap-warn">loaded from older version</span>
               ) : null}
             </div>
           </header>
@@ -179,7 +168,7 @@ export function DecisionTreeEditorPage(): ReactNode {
                 />
                 {append.isError ? (
                   <span className="text-xs text-ap-crit">
-                    {(append.error as Error)?.message ?? t("edit.yaml.saveFailed")}
+                    {append.error?.message ?? t("edit.yaml.saveFailed")}
                   </span>
                 ) : !dirty ? (
                   <span className="text-xs text-ap-muted">{t("edit.yaml.noChange")}</span>
@@ -199,14 +188,13 @@ export function DecisionTreeEditorPage(): ReactNode {
 
         <section className="rounded-xl border border-ap-line bg-ap-panel">
           <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
-            <h2 className="text-sm font-semibold text-ap-ink">
-              {t("edit.versions.heading")}
-            </h2>
+            <h2 className="text-sm font-semibold text-ap-ink">{t("edit.versions.heading")}</h2>
             <span className="text-xs text-ap-muted">{versions.length}</span>
           </header>
           <ul className="divide-y divide-ap-line">
             {versions.map((v) => {
-              const isCurrent = v.id === tree.versions.find((x) => x.version === currentVersionNumber)?.id;
+              const isCurrent =
+                v.id === tree.versions.find((x) => x.version === currentVersionNumber)?.id;
               return (
                 <li key={v.id} className="flex flex-col gap-1 px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
@@ -219,9 +207,7 @@ export function DecisionTreeEditorPage(): ReactNode {
                       <Pill kind="neutral">{t("edit.versions.draftBadge")}</Pill>
                     )}
                     {v.notes ? (
-                      <span className="text-[11px] italic text-ap-muted">
-                        {v.notes}
-                      </span>
+                      <span className="text-[11px] italic text-ap-muted">{v.notes}</span>
                     ) : null}
                   </div>
                   <div className="text-[11px] text-ap-muted">
@@ -266,7 +252,7 @@ export function DecisionTreeEditorPage(): ReactNode {
           </ul>
           {publish.isError ? (
             <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
-              {(publish.error as Error)?.message ?? t("edit.versions.publishFailed")}
+              {publish.error?.message ?? t("edit.versions.publishFailed")}
             </p>
           ) : null}
         </section>
@@ -274,17 +260,13 @@ export function DecisionTreeEditorPage(): ReactNode {
 
       <section className="rounded-xl border border-ap-line bg-ap-panel">
         <header className="border-b border-ap-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-ap-ink">
-            {t("edit.dryRun.heading")}
-          </h2>
+          <h2 className="text-sm font-semibold text-ap-ink">{t("edit.dryRun.heading")}</h2>
           <p className="text-xs text-ap-muted">{t("edit.dryRun.subtitle")}</p>
         </header>
         <div className="flex flex-col gap-3 p-4 text-sm">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-xs font-medium text-ap-muted">
-                {t("edit.dryRun.blockId")}
-              </span>
+              <span className="text-xs font-medium text-ap-muted">{t("edit.dryRun.blockId")}</span>
               <input
                 value={dryRunBlockId}
                 onChange={(e) => setDryRunBlockId(e.target.value)}
@@ -329,9 +311,7 @@ export function DecisionTreeEditorPage(): ReactNode {
           {dryRunResult ? (
             <DryRunResult result={dryRunResult} />
           ) : dryRun.isError ? (
-            <p className="text-xs text-ap-crit">
-              {(dryRun.error as Error)?.message}
-            </p>
+            <p className="text-xs text-ap-crit">{dryRun.error?.message}</p>
           ) : null}
         </div>
       </section>
@@ -345,9 +325,7 @@ function DryRunResult({ result }: { result: DryRunResponse }): ReactNode {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <div className="rounded-md border border-ap-line bg-ap-bg/40 p-3 text-sm">
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs font-semibold text-ap-muted">
-            {t("edit.dryRun.outcome")}
-          </span>
+          <span className="text-xs font-semibold text-ap-muted">{t("edit.dryRun.outcome")}</span>
           {result.matched ? (
             <Pill kind="ok">{t("edit.dryRun.matched")}</Pill>
           ) : (
@@ -369,9 +347,7 @@ function DryRunResult({ result }: { result: DryRunResponse }): ReactNode {
       </div>
 
       <div className="rounded-md border border-ap-line bg-ap-bg/40 p-3 text-sm">
-        <div className="mb-2 text-xs font-semibold text-ap-muted">
-          {t("edit.dryRun.path")}
-        </div>
+        <div className="mb-2 text-xs font-semibold text-ap-muted">{t("edit.dryRun.path")}</div>
         <ol className="flex flex-col gap-1 text-[11px]">
           {result.path.map((s, i) => (
             <li key={`${s.node_id}-${i}`} className="flex items-center gap-1.5">

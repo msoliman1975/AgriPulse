@@ -123,7 +123,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       <footer className="flex flex-wrap items-center justify-end gap-2">
         {create.isError ? (
           <span className="text-xs text-ap-crit">
-            {(create.error as Error)?.message ?? t("create.saveFailed")}
+            {create.error?.message ?? t("create.saveFailed")}
           </span>
         ) : null}
         <button

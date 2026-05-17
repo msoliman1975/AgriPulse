@@ -84,9 +84,7 @@ export async function getDecisionTree(code: string): Promise<DecisionTreeDetail>
   return data;
 }
 
-export async function listDecisionTreeVersions(
-  code: string,
-): Promise<DecisionTreeVersion[]> {
+export async function listDecisionTreeVersions(code: string): Promise<DecisionTreeVersion[]> {
   const { data } = await apiClient.get<DecisionTreeVersion[]>(
     `/v1/decision-trees/${code}/versions`,
   );
@@ -96,10 +94,7 @@ export async function listDecisionTreeVersions(
 export async function createDecisionTree(
   payload: DecisionTreeCreatePayload,
 ): Promise<DecisionTreeDetail> {
-  const { data } = await apiClient.post<DecisionTreeDetail>(
-    "/v1/decision-trees",
-    payload,
-  );
+  const { data } = await apiClient.post<DecisionTreeDetail>("/v1/decision-trees", payload);
   return data;
 }
 

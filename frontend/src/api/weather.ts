@@ -79,14 +79,11 @@ export async function getForecast(
   blockId: string,
   options: { horizon_days?: number; provider_code?: string } = {},
 ): Promise<ForecastResponse> {
-  const { data } = await apiClient.get<ForecastResponse>(
-    `/v1/blocks/${blockId}/weather/forecast`,
-    {
-      params: {
-        horizon_days: options.horizon_days ?? 5,
-        provider_code: options.provider_code ?? "open_meteo",
-      },
+  const { data } = await apiClient.get<ForecastResponse>(`/v1/blocks/${blockId}/weather/forecast`, {
+    params: {
+      horizon_days: options.horizon_days ?? 5,
+      provider_code: options.provider_code ?? "open_meteo",
     },
-  );
+  });
   return data;
 }

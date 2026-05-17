@@ -16,17 +16,11 @@ export interface SettingsBag {
 // ---- Tenant tier ---------------------------------------------------------
 
 async function getTenant(category: string): Promise<SettingsBag> {
-  const { data } = await apiClient.get<SettingsBag>(
-    `/v1/integrations/${category}/tenant`,
-  );
+  const { data } = await apiClient.get<SettingsBag>(`/v1/integrations/${category}/tenant`);
   return data;
 }
 
-async function putTenant(
-  category: string,
-  key: string,
-  value: unknown,
-): Promise<ResolvedSetting> {
+async function putTenant(category: string, key: string, value: unknown): Promise<ResolvedSetting> {
   const { data } = await apiClient.put<ResolvedSetting>(
     `/v1/integrations/${category}/tenant`,
     { value },
@@ -35,14 +29,10 @@ async function putTenant(
   return data;
 }
 
-async function deleteTenant(
-  category: string,
-  key: string,
-): Promise<ResolvedSetting> {
-  const { data } = await apiClient.delete<ResolvedSetting>(
-    `/v1/integrations/${category}/tenant`,
-    { params: { key } },
-  );
+async function deleteTenant(category: string, key: string): Promise<ResolvedSetting> {
+  const { data } = await apiClient.delete<ResolvedSetting>(`/v1/integrations/${category}/tenant`, {
+    params: { key },
+  });
   return data;
 }
 
@@ -52,9 +42,7 @@ export const integrationsApi = {
     putTenant: (key: string, value: unknown) => putTenant("weather", key, value),
     deleteTenant: (key: string) => deleteTenant("weather", key),
     getFarm: async (farmId: string): Promise<SettingsBag> => {
-      const { data } = await apiClient.get<SettingsBag>(
-        `/v1/integrations/weather/farms/${farmId}`,
-      );
+      const { data } = await apiClient.get<SettingsBag>(`/v1/integrations/weather/farms/${farmId}`);
       return data;
     },
     putFarm: async (
@@ -73,9 +61,7 @@ export const integrationsApi = {
     putTenant: (key: string, value: unknown) => putTenant("imagery", key, value),
     deleteTenant: (key: string) => deleteTenant("imagery", key),
     getFarm: async (farmId: string): Promise<SettingsBag> => {
-      const { data } = await apiClient.get<SettingsBag>(
-        `/v1/integrations/imagery/farms/${farmId}`,
-      );
+      const { data } = await apiClient.get<SettingsBag>(`/v1/integrations/imagery/farms/${farmId}`);
       return data;
     },
     putFarm: async (
@@ -95,21 +81,21 @@ export const integrationsApi = {
       blockId: string,
       payload: { cloud_cover_max_pct: number | null },
     ): Promise<{ block_id: string; cloud_cover_max_pct: number | null }> => {
-      const { data } = await apiClient.put(
-        `/v1/integrations/imagery/blocks/${blockId}`,
-        payload,
-      );
-      return data as { block_id: string; cloud_cover_max_pct: number | null };
+      const { data } = await apiClient.put<{
+        block_id: string;
+        cloud_cover_max_pct: number | null;
+      }>(`/v1/integrations/imagery/blocks/${blockId}`, payload);
+      return data;
     },
     applyToBlocks: async (
       farmId: string,
       mode: "inherit" | "lock",
     ): Promise<{ mode: string; blocks_affected: number }> => {
-      const { data } = await apiClient.post(
+      const { data } = await apiClient.post<{ mode: string; blocks_affected: number }>(
         `/v1/integrations/imagery/farms/${farmId}:apply-to-blocks`,
         { mode },
       );
-      return data as { mode: string; blocks_affected: number };
+      return data;
     },
   },
   email: {

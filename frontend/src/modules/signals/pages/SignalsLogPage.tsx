@@ -71,9 +71,7 @@ export function SignalsLogPage(): ReactNode {
                     type="button"
                     onClick={() => setSelectedDefId(d.id)}
                     className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-ap-line/40 ${
-                      selectedDefId === d.id
-                        ? "bg-ap-primary-soft text-ap-primary"
-                        : "text-ap-ink"
+                      selectedDefId === d.id ? "bg-ap-primary-soft text-ap-primary" : "text-ap-ink"
                     }`}
                   >
                     <span className="font-medium">{d.name}</span>
@@ -108,13 +106,7 @@ export function SignalsLogPage(): ReactNode {
   );
 }
 
-function RecordForm({
-  defn,
-  farmId,
-}: {
-  defn: SignalDefinition;
-  farmId: string;
-}): ReactNode {
+function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }): ReactNode {
   const { t } = useTranslation("signals");
   const create = useCreateSignalObservation();
   const [valueText, setValueText] = useState("");
@@ -182,9 +174,7 @@ function RecordForm({
         <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
         <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
         {defn.unit ? (
-          <span className="text-xs text-ap-muted">
-            {t("config.row.unit", { unit: defn.unit })}
-          </span>
+          <span className="text-xs text-ap-muted">{t("config.row.unit", { unit: defn.unit })}</span>
         ) : null}
       </div>
       <ValueInput
@@ -261,11 +251,7 @@ function ValueInput({
   if (defn.value_kind === "numeric") {
     return (
       <Field
-        label={
-          defn.unit
-            ? t("log.form.valueWithUnit", { unit: defn.unit })
-            : t("log.form.value")
-        }
+        label={defn.unit ? t("log.form.valueWithUnit", { unit: defn.unit }) : t("log.form.value")}
       >
         <input
           required
@@ -432,13 +418,7 @@ function formatValue(o: {
 const inputCls =
   "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary";
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}): ReactNode {
+function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-ap-muted">{label}</span>

@@ -66,10 +66,7 @@ export function IntegrationsLayout(): ReactNode {
 
   return (
     <div className="flex flex-col gap-4">
-      <nav
-        aria-label={t("integrationsTabs.label")}
-        className="flex gap-1 border-b border-ap-line"
-      >
+      <nav aria-label={t("integrationsTabs.label")} className="flex gap-1 border-b border-ap-line">
         {entries.map((entry) => {
           const isActive = location.pathname.startsWith(entry.to);
           return (

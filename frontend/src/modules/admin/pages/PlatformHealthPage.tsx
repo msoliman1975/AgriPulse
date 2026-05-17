@@ -10,11 +10,7 @@ import { useCrossTenantHealth } from "@/queries/platformHealthRollup";
 
 type Status = "ok" | "warn" | "crit" | "neutral";
 
-function statusFor(
-  lastSyncIso: string | null,
-  failed24h: number,
-  activeSubs: number,
-): Status {
+function statusFor(lastSyncIso: string | null, failed24h: number, activeSubs: number): Status {
   if (activeSubs === 0) return "neutral";
   if (failed24h > 0) return "crit";
   if (!lastSyncIso) return "crit";
@@ -39,12 +35,8 @@ export function PlatformHealthPage(): ReactNode {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
       <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">
-          {t("platformHealth.title")}
-        </h1>
-        <p className="mt-1 text-sm text-ap-muted">
-          {t("platformHealth.subtitle")}
-        </p>
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("platformHealth.title")}</h1>
+        <p className="mt-1 text-sm text-ap-muted">{t("platformHealth.subtitle")}</p>
       </header>
 
       {q.isLoading ? (
@@ -58,18 +50,10 @@ export function PlatformHealthPage(): ReactNode {
           <table className="min-w-full text-sm">
             <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
               <tr>
-                <th className="px-3 py-2 text-start">
-                  {t("platformHealth.col.tenant")}
-                </th>
-                <th className="px-3 py-2 text-end">
-                  {t("platformHealth.col.farms")}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t("platformHealth.col.weather")}
-                </th>
-                <th className="px-3 py-2 text-start">
-                  {t("platformHealth.col.imagery")}
-                </th>
+                <th className="px-3 py-2 text-start">{t("platformHealth.col.tenant")}</th>
+                <th className="px-3 py-2 text-end">{t("platformHealth.col.farms")}</th>
+                <th className="px-3 py-2 text-start">{t("platformHealth.col.weather")}</th>
+                <th className="px-3 py-2 text-start">{t("platformHealth.col.imagery")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ap-line">
@@ -92,9 +76,7 @@ export function PlatformHealthPage(): ReactNode {
                         className="hover:text-ap-primary"
                       >
                         {row.tenant_name}{" "}
-                        <span className="font-mono text-xs text-ap-muted">
-                          ({row.tenant_slug})
-                        </span>
+                        <span className="font-mono text-xs text-ap-muted">({row.tenant_slug})</span>
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-end">{row.farms_count}</td>
@@ -147,9 +129,7 @@ function Cell({
         <Pill kind={status === "neutral" ? "neutral" : status}>
           {t(`platformHealth.status.${status}`)}
         </Pill>
-        <span className="text-xs text-ap-muted">
-          {t("platformHealth.subs", { n: activeSubs })}
-        </span>
+        <span className="text-xs text-ap-muted">{t("platformHealth.subs", { n: activeSubs })}</span>
       </div>
       <span className="text-[11px] text-ap-muted">
         {activeSubs === 0
@@ -162,9 +142,7 @@ function Cell({
                 }),
               })
             : t("platformHealth.neverSynced")}
-        {failed24h > 0
-          ? ` · ${t("platformHealth.failed24h", { n: failed24h })}`
-          : ""}
+        {failed24h > 0 ? ` · ${t("platformHealth.failed24h", { n: failed24h })}` : ""}
       </span>
     </div>
   );

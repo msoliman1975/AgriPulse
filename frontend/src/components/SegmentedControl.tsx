@@ -39,9 +39,7 @@ export function SegmentedControl<T extends string>({
             className={clsx(
               "rounded-md px-3 py-1 text-xs font-medium transition-colors",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary",
-              isActive
-                ? "bg-ap-ink text-white"
-                : "text-ap-muted hover:bg-ap-line/40",
+              isActive ? "bg-ap-ink text-white" : "text-ap-muted hover:bg-ap-line/40",
             )}
           >
             {item.label}

@@ -1,9 +1,4 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   type AdminTenant,
@@ -47,10 +42,7 @@ export function useAdminTenant(tenantId: string | undefined) {
   });
 }
 
-export function useAdminTenantSidecar(
-  tenantId: string | undefined,
-  auditLimit = 20,
-) {
+export function useAdminTenantSidecar(tenantId: string | undefined, auditLimit = 20) {
   return useQuery<AdminTenantSidecar>({
     queryKey: [ADMIN_TENANTS_KEY, "sidecar", tenantId, auditLimit] as const,
     queryFn: () => getAdminTenantSidecar(tenantId as string, auditLimit),

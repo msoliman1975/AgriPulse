@@ -46,15 +46,11 @@ export function ImageryWeatherConfigPage(): ReactNode {
         <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div className="flex items-center justify-between gap-2 border-b border-ap-line pb-2 sm:border-0 sm:pb-0">
             <dt className="text-ap-muted">{t("platform.vizCloudCover")}</dt>
-            <dd className="font-mono text-ap-ink">
-              ≤ {config.cloud_cover_visualization_max_pct}%
-            </dd>
+            <dd className="font-mono text-ap-ink">≤ {config.cloud_cover_visualization_max_pct}%</dd>
           </div>
           <div className="flex items-center justify-between gap-2 border-b border-ap-line pb-2 sm:border-0 sm:pb-0">
             <dt className="text-ap-muted">{t("platform.aggCloudCover")}</dt>
-            <dd className="font-mono text-ap-ink">
-              ≤ {config.cloud_cover_aggregation_max_pct}%
-            </dd>
+            <dd className="font-mono text-ap-ink">≤ {config.cloud_cover_aggregation_max_pct}%</dd>
           </div>
         </dl>
         <div className="mt-4">
@@ -80,9 +76,7 @@ export function ImageryWeatherConfigPage(): ReactNode {
       <section className="rounded-xl border border-ap-line bg-ap-panel">
         <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
           <h2 className="text-sm font-semibold text-ap-ink">{t("blocks.heading")}</h2>
-          <span className="text-xs text-ap-muted">
-            {blocksQuery.data?.items.length ?? 0}
-          </span>
+          <span className="text-xs text-ap-muted">{blocksQuery.data?.items.length ?? 0}</span>
         </header>
         {blocksQuery.isLoading ? (
           <div className="flex flex-col gap-2 p-4">
@@ -101,13 +95,7 @@ export function ImageryWeatherConfigPage(): ReactNode {
   );
 }
 
-function BlocksTable({
-  farmId,
-  blocks,
-}: {
-  farmId: string;
-  blocks: Block[];
-}): ReactNode {
+function BlocksTable({ farmId, blocks }: { farmId: string; blocks: Block[] }): ReactNode {
   const { t } = useTranslation("imageryWeatherConfig");
   const dateLocale = useDateLocale();
 
@@ -150,9 +138,7 @@ function BlocksTable({
               <tr key={b.id}>
                 <td className="px-4 py-2">
                   <span className="font-mono text-xs text-ap-muted">{b.code}</span>
-                  {b.name ? (
-                    <span className="ms-2 text-ap-ink">{b.name}</span>
-                  ) : null}
+                  {b.name ? <span className="ms-2 text-ap-ink">{b.name}</span> : null}
                 </td>
                 <SubsCell query={imagery} />
                 <LastCell
@@ -186,7 +172,11 @@ function BlocksTable({
 function SubsCell({
   query,
 }: {
-  query: { data?: ImagerySubscription[] | WeatherSubscription[]; isLoading: boolean; isError: boolean };
+  query: {
+    data?: ImagerySubscription[] | WeatherSubscription[];
+    isLoading: boolean;
+    isError: boolean;
+  };
 }): ReactNode {
   const { t } = useTranslation("imageryWeatherConfig");
   if (query.isLoading) {
@@ -209,9 +199,7 @@ function SubsCell({
   }
   return (
     <td className="px-4 py-2">
-      <span className="text-xs">
-        {t("blocks.row.subsCount", { count: subs.length })}
-      </span>
+      <span className="text-xs">{t("blocks.row.subsCount", { count: subs.length })}</span>
     </td>
   );
 }
@@ -221,7 +209,11 @@ function LastCell({
   pick,
   dateLocale,
 }: {
-  query: { data?: (ImagerySubscription | WeatherSubscription)[]; isLoading: boolean; isError: boolean };
+  query: {
+    data?: (ImagerySubscription | WeatherSubscription)[];
+    isLoading: boolean;
+    isError: boolean;
+  };
   pick: (s: ImagerySubscription | WeatherSubscription) => string | null;
   dateLocale: ReturnType<typeof useDateLocale>;
 }): ReactNode {

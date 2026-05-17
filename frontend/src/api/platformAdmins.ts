@@ -22,8 +22,7 @@ export interface InviteAdminResponse {
   keycloak_subject: string | null;
 }
 
-const base = (tenantId: string): string =>
-  `/v1/admin/tenants/${tenantId}/admins`;
+const base = (tenantId: string): string => `/v1/admin/tenants/${tenantId}/admins`;
 
 export async function listTenantAdmins(tenantId: string): Promise<TenantAdminRow[]> {
   const { data } = await apiClient.get<TenantAdminRow[]>(base(tenantId));
@@ -34,17 +33,11 @@ export async function inviteTenantAdmin(
   tenantId: string,
   payload: InviteAdminPayload,
 ): Promise<InviteAdminResponse> {
-  const { data } = await apiClient.post<InviteAdminResponse>(
-    `${base(tenantId)}:invite`,
-    payload,
-  );
+  const { data } = await apiClient.post<InviteAdminResponse>(`${base(tenantId)}:invite`, payload);
   return data;
 }
 
-export async function removeTenantAdmin(
-  tenantId: string,
-  userId: string,
-): Promise<void> {
+export async function removeTenantAdmin(tenantId: string, userId: string): Promise<void> {
   await apiClient.delete(`${base(tenantId)}/${userId}`);
 }
 
@@ -53,15 +46,12 @@ export async function transferTenantOwnership(
   newOwnerUserId: string,
   fromUserId: string,
 ): Promise<void> {
-  await apiClient.post(
-    `${base(tenantId)}/${newOwnerUserId}:transfer-ownership`,
-    { from_user_id: fromUserId },
-  );
+  await apiClient.post(`${base(tenantId)}/${newOwnerUserId}:transfer-ownership`, {
+    from_user_id: fromUserId,
+  });
 }
 
-export type AssignOwnerPayload =
-  | { email: string; full_name: string }
-  | { user_id: string };
+export type AssignOwnerPayload = { email: string; full_name: string } | { user_id: string };
 
 export interface AssignOwnerResponse {
   user_id: string;

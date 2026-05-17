@@ -158,8 +158,7 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
                   <p className="mt-1 text-slate-700">
                     <span className="font-semibold">{high.display}</span>
                     {" / "}
-                    <span className="text-slate-500">{low.display}</span>
-                    {" "}
+                    <span className="text-slate-500">{low.display}</span>{" "}
                     <span className="text-xs text-slate-400">{high.unit}</span>
                   </p>
                   <p className="mt-1 text-slate-600">
