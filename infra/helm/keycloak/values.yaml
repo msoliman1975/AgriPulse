@@ -64,7 +64,6 @@ promoteBootstrap:
     fromEmail: "admin@agripulse.tech"
     fromName: "AgriPulse"
 
-
 keycloak:
   # Bitnami rotated the old `bitnami/keycloak:26.1.4-debian-12-r2` tag out
   # of docker.io/bitnami/* — pulls returned `not found` and the keycloak

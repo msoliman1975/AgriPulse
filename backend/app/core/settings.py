@@ -236,7 +236,7 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _inject_database_password(self) -> "Settings":
+    def _inject_database_password(self) -> Settings:
         """Splice `database_password` into the DSNs if they carry no
         password of their own. Lets k8s deployments keep the secret out
         of the URL env var (URLs leak into logs and tracebacks).
@@ -246,6 +246,7 @@ class Settings(BaseSettings):
         if not self.database_password:
             return self
         from urllib.parse import quote
+
         pw = quote(self.database_password, safe="")
         for attr in ("database_url", "database_sync_url"):
             raw = str(getattr(self, attr))
