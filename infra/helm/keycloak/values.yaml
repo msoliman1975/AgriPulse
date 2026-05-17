@@ -77,10 +77,17 @@ keycloak:
   global:
     security:
       allowInsecureImages: true
+  # BH-3: pin by digest in addition to tag. The
+  # bitnami/keycloak:26.1.4-debian-12-r2 tag deletion (rotated to
+  # bitnamilegacy/*) burned us once already (see
+  # project_aws_rebuild_2026_05_16); a digest pin makes the pull
+  # resolve to the exact image bytes even if a tag-side rotation
+  # happens. Renovate's `digest` updateType keeps this current.
   image:
     registry: docker.io
     repository: bitnamilegacy/keycloak
     tag: 26.1.4-debian-12-r2
+    digest: sha256:865d3fe1a1fd6410d7d5fe34247dc0ae536c0b7cb158255405997a0ffb58fb07
 
   # CD-13: HA topology. `production: true` flips the bitnami chart to the
   # Quarkus-`start` runtime (not `start-dev`), enables Infinispan

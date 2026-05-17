@@ -10,7 +10,7 @@
 # ARCHITECTURE.md Â§ 3.1 commits TiTiler as the COG â†’ XYZ/WMTS layer; this
 # image stays close to upstream so security updates flow in via Dependabot.
 
-FROM ghcr.io/developmentseed/titiler:0.21.1
+FROM ghcr.io/developmentseed/titiler:0.21.1@sha256:33c57b3c3b2f5e4c8aa54cfea185d76f8024c5f8446283ead274cca492389993
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

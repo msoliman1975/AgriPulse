@@ -20,6 +20,13 @@ keywords:
   - oidc
 
 dependencies:
+  # BH-3: pinned to an exact version so `helm dependency build` is
+  # reproducible across machines and CI. Renovate (config in repo root
+  # `renovate.json`) keeps this current via the `helm-values` manager.
+  # The bitnami `bitnami/*` repo also lives at `bitnamilegacy/*` (some
+  # tags get rotated out of the active repo); the chart-version pin
+  # here is independent of the *image* repo pin in
+  # infra/helm/keycloak/values.yaml (keycloak.image.repository).
   - name: keycloak
-    version: 24.4.x
+    version: 24.4.14
     repository: https://charts.bitnami.com/bitnami

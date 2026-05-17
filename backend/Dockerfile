@@ -3,7 +3,7 @@
 # --- Builder ----------------------------------------------------------------
 # Resolves and installs dependencies into a virtualenv that the runtime stage
 # copies as-is. uv is used as the package manager per ARCHITECTURE.md § 3.1.
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm@sha256:d193c6f51a7dbd10395d6328de3a7edb0516fb0608ca138036576f574c3e07d2 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VIRTUAL_ENV=/opt/venv
 
 # uv installer pins are kept here so reproducible builds don't drift.
-COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5 /uv /uvx /usr/local/bin/
 
 WORKDIR /build
 COPY pyproject.toml ./
@@ -44,7 +44,7 @@ COPY scripts ./scripts
 RUN uv pip install --python "$VIRTUAL_ENV/bin/python" --no-deps .
 
 # --- Runtime ----------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.12-slim-bookworm@sha256:d193c6f51a7dbd10395d6328de3a7edb0516fb0608ca138036576f574c3e07d2 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":timezone(Africa/Cairo)",
+    "schedule:weekly"
+  ],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 12,
+  "rebaseWhen": "behind-base-branch",
+  "$comments": [
+    "BH-3: Renovate covers the surface Dependabot can't:",
+    "  - Helm chart versions referenced in ArgoCD ApplicationSets",
+    "    (infra/argocd/appsets/*.yaml -> generators.list.elements[*].chartVersion)",
+    "  - Helm subchart dependencies in Chart.yaml",
+    "  - Docker base-image digest pinning (Dependabot updates tags but",
+    "    not digests; we lock both)",
+    "Dependabot continues to handle pip / npm / terraform / github-actions",
+    "(see .github/dependabot.yml).",
+    "Note: needs the Renovate GitHub App installed on the repo. Without",
+    "the app this config is inert."
+  ],
+  "argocd": {
+    "fileMatch": ["infra/argocd/appsets/.+\\.yaml$"]
+  },
+  "helm-values": {
+    "fileMatch": ["infra/helm/.+/values\\.yaml$"]
+  },
+  "helmv3": {
+    "fileMatch": ["infra/helm/.+/Chart\\.yaml$"]
+  },
+  "dockerfile": {
+    "pinDigests": true
+  },
+  "packageRules": [
+    {
+      "$description": "Group platform-chart bumps so they review together.",
+      "matchManagers": ["argocd", "helmv3", "helm-values"],
+      "matchPackageNames": [
+        "cert-manager",
+        "external-secrets",
+        "cloudnative-pg",
+        "ingress-nginx",
+        "external-dns",
+        "karpenter",
+        "keycloak"
+      ],
+      "groupName": "platform-charts",
+      "labels": ["dependencies", "helm", "platform"]
+    },
+    {
+      "$description": "Observability charts roll together too.",
+      "matchManagers": ["argocd", "helmv3", "helm-values"],
+      "matchPackageNames": [
+        "kube-prometheus-stack",
+        "loki",
+        "promtail",
+        "tempo",
+        "glitchtip"
+      ],
+      "groupName": "observability-charts",
+      "labels": ["dependencies", "helm", "observability"]
+    },
+    {
+      "$description": "Base-image bumps: tag + digest together, one PR per Dockerfile.",
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["major", "minor", "patch", "digest"],
+      "labels": ["dependencies", "docker"]
+    },
+    {
+      "$description": "Pin digests automatically for any newly-added FROM/COPY-from base image.",
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["pinDigest"],
+      "automerge": false,
+      "labels": ["dependencies", "docker", "digest-pin"]
+    },
+    {
+      "$description": "Bitnami keycloak image digest in values.yaml — match by custom datasource since helm-values doesn't auto-detect it.",
+      "matchManagers": ["regex"],
+      "matchPackageNames": ["bitnamilegacy/keycloak"],
+      "groupName": "platform-charts",
+      "labels": ["dependencies", "helm", "platform"]
+    },
+    {
+      "$description": "Hold majors for hand-review — they tend to require chart-values migrations.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-bump", "needs-review"]
+    },
+    {
+      "$description": "Vendored CRDs (prometheus-operator + cnpg) — auto-regen recipe lives in each crds.yaml header; Renovate handles the version bumps that drive that.",
+      "matchFileNames": [
+        "infra/argocd/kube-prometheus-stack-crds/**",
+        "infra/argocd/cnpg-crds/**"
+      ],
+      "enabled": false,
+      "$comment": "Disabled: Renovate can't manage the regen pipeline for these vendored bundles. Bump cnpg / kube-prometheus-stack chart first, then run the regen recipe documented in each crds.yaml."
+    }
+  ],
+  "customManagers": [
+    {
+      "$description": "Track the bitnamilegacy/keycloak image digest pinned in values.yaml so Renovate keeps it aligned when the upstream tag content changes.",
+      "customType": "regex",
+      "fileMatch": ["infra/helm/keycloak/values\\.yaml$"],
+      "matchStrings": [
+        "repository:\\s*(?<depName>bitnamilegacy/keycloak)\\s*\\n\\s*tag:\\s*(?<currentValue>[^\\n]+)\\s*\\n\\s*digest:\\s*(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "registryUrlTemplate": "https://index.docker.io"
+    }
+  ]
+}
