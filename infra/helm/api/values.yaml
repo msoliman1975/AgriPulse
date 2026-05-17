@@ -97,6 +97,23 @@ env:
   KEYCLOAK_ISSUER: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse"
   KEYCLOAK_AUDIENCE: agripulse-api
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
+  # Provisioning: api creates KC groups + invites users when a tenant is
+  # created. Disabled by default in settings.py — flipping here so the
+  # cluster deploys with it on. Requires the `agripulse-tenancy` client
+  # to exist in the realm with realm-management roles on its service
+  # account; the client secret comes via ExternalSecret below.
+  KEYCLOAK_PROVISIONING_ENABLED: "true"
+  KEYCLOAK_BASE_URL: "https://keycloak.{{ .Values.global.envHost }}"
+  KEYCLOAK_REALM: agripulse
+  KEYCLOAK_ADMIN_CLIENT_ID: agripulse-tenancy
+  # SMTP for app-side emails (notifications, etc.). Keycloak's own
+  # realm.smtpServer is configured separately — it sends the
+  # execute-actions-email invite from KC, not the api.
+  SMTP_HOST: smtp-relay.brevo.com
+  SMTP_PORT: "587"
+  SMTP_USERNAME: "aac72b001@smtp-brevo.com"
+  SMTP_STARTTLS: "true"
+  SMTP_FROM: "AgriPulse <admin@agripulse.tech>"
   # SPA at app.<envHost> calls api.<envHost> cross-origin. CORS middleware
   # only attaches when this list is non-empty (see app/core/app_factory.py).
   CORS_ALLOWED_ORIGINS: '["https://app.{{ .Values.global.envHost }}"]'
@@ -133,7 +150,11 @@ externalSecret:
       remoteKey: "agripulse/{{ .Values.global.env }}/jwt-signing-key"
     - secretKey: SENTINEL_HUB_CLIENT_SECRET
       remoteKey: "agripulse/{{ .Values.global.env }}/sentinel-hub-client-secret"
-    - secretKey: KEYCLOAK_CLIENT_SECRET
+    # Settings reads `keycloak_admin_client_secret` from env
+    # `KEYCLOAK_ADMIN_CLIENT_SECRET`. Source secret is unchanged
+    # (agripulse/<env>/keycloak-client-secret); we just bind it to the
+    # name the code expects.
+    - secretKey: KEYCLOAK_ADMIN_CLIENT_SECRET
       remoteKey: "agripulse/{{ .Values.global.env }}/keycloak-client-secret"
 
 # DATABASE_PASSWORD is sourced from the k8s Secret CNPG creates for the
