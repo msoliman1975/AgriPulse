@@ -284,6 +284,9 @@ jobs:
           - name: api
             context: backend
             dockerfile: backend/Dockerfile
+            # Backend is multi-arch capable once build-essential is in
+            # the builder stage (no arm64 wheel for timezonefinder).
+            platforms: linux/amd64,linux/arm64
           - name: workers
             # Workers and the API ship from the same image â€” Celery picks
             # the entrypoint via the chart's command override. We tag the
@@ -291,12 +294,21 @@ jobs:
             # paths in GHCR.
             context: backend
             dockerfile: backend/Dockerfile
+            platforms: linux/amd64,linux/arm64
           - name: tile-server
             context: tile-server
             dockerfile: tile-server/Dockerfile
+            # BH-4: upstream `ghcr.io/developmentseed/titiler:0.21.1`
+            # ships linux/amd64 only — no arm64 variant in the manifest.
+            # Pin tile-server to amd64 until titiler upstream goes
+            # multi-arch (tracked in titiler issue list); the chart
+            # already keeps tile-server pods on amd64 nodes via
+            # nodeSelector, so this matches the current cluster shape.
+            platforms: linux/amd64
           - name: frontend
             context: frontend
             dockerfile: frontend/Dockerfile
+            platforms: linux/amd64,linux/arm64
     steps:
       - uses: actions/checkout@v6
 
@@ -337,12 +349,14 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          # BH-4: always build both arches. Both arches build on every
-          # PR (build-only, not push) so the three chained image-build
-          # bugs from project_aws_resume_2026_05_16_late (uv sync
-          # --active, workers/ hatch packaging, celery `:app` symbol)
-          # get caught pre-merge instead of on the cluster.
-          platforms: linux/amd64,linux/arm64
+          # BH-4: per-matrix-entry platforms so tile-server can stay
+          # amd64-only (titiler upstream isn't multi-arch yet) while the
+          # backend / frontend builds emit linux/amd64 + linux/arm64
+          # manifest lists. Catching the three chained build bugs from
+          # project_aws_resume_2026_05_16_late (uv sync --active,
+          # workers/ hatch packaging, celery `:app`) was the original
+          # driver.
+          platforms: ${{ matrix.platforms }}
           # Push only on merge to main; PR runs build-only to keep
           # turn-around fast and avoid polluting GHCR with PR images.
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

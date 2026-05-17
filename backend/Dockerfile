@@ -13,6 +13,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     VIRTUAL_ENV=/opt/venv
 
+# Build tools for source-built C extensions on platforms PyPI doesn't
+# ship wheels for. timezonefinder 6.6.3 has no arm64 wheel for cp312 on
+# glibc, so the builder needs gcc + python-dev headers to compile from
+# source. Slim/runtime stage doesn't carry these — they're only in the
+# discarded builder layer.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential python3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
 # uv installer pins are kept here so reproducible builds don't drift.
 COPY --from=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5 /uv /uvx /usr/local/bin/
 
