@@ -192,12 +192,16 @@ class PlatformAdminsRoleService:
         # re-invites safe — a UniqueViolation here means the role was
         # already active (handled above), so we treat it as a soft no-op.
         try:
+            # `granted_by` is FK→users.id (nullable); null-coerce so a
+            # missing actor doesn't raise IntegrityError. Same pattern
+            # as `iam.users_service.invite_user`.
             await self._public.execute(
                 text(
                     """
                     INSERT INTO public.platform_role_assignments
                         (id, user_id, role, granted_by)
-                    VALUES (:id, :uid, :role, :actor)
+                    VALUES (:id, :uid, :role,
+                            (SELECT id FROM public.users WHERE id = :actor))
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),

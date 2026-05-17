@@ -290,6 +290,11 @@ class TenantUsersService:
             user_id = global_user_row.id
 
         membership_id = uuid4()
+        # `invited_by` has a FK to public.users but is nullable. Wrap the
+        # bind in a SELECT so an actor UUID that doesn't exist in
+        # public.users null-coerces instead of raising IntegrityError.
+        # The audit slots (created_by / updated_by) are bare nullable
+        # UUIDs with no FK, so they keep the raw bind.
         try:
             await self._public.execute(
                 text(
@@ -297,8 +302,9 @@ class TenantUsersService:
                     INSERT INTO public.tenant_memberships
                         (id, tenant_id, user_id, status, invited_by, joined_at,
                          created_by, updated_by)
-                    VALUES (:id, :tid, :uid, 'active', :actor, NULL,
-                            :actor, :actor)
+                    VALUES (:id, :tid, :uid, 'active',
+                            (SELECT id FROM public.users WHERE id = :actor),
+                            NULL, :actor, :actor)
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -316,13 +322,16 @@ class TenantUsersService:
         except IntegrityError as exc:
             raise TenantUserAlreadyExistsError(email) from exc
 
-        # Initial tenant role assignment.
+        # Initial tenant role assignment. `granted_by` is FK→users.id
+        # (nullable) — null-coerce on miss, same pattern as the
+        # tenant_memberships INSERT above.
         await self._public.execute(
             text(
                 """
                 INSERT INTO public.tenant_role_assignments
                     (membership_id, role, granted_by)
-                VALUES (:mid, :role, :actor)
+                VALUES (:mid, :role,
+                        (SELECT id FROM public.users WHERE id = :actor))
                 """
             ).bindparams(
                 bindparam("mid", type_=PG_UUID(as_uuid=True)),

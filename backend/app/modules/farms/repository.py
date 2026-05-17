@@ -927,10 +927,14 @@ class FarmsRepository:
             raise FarmNotFoundError(farm_id)
 
         # Insert into public.farm_scopes — logical cross-schema FK.
+        # `granted_by` is FK→users.id (nullable); wrap the bind in a
+        # SELECT so a missing actor UUID null-coerces instead of raising
+        # FK violation (e.g. fixture tests with synthetic actor IDs).
         sql = text(
             """
             INSERT INTO public.farm_scopes (membership_id, farm_id, role, granted_by)
-            VALUES (:mid, :fid, :role, :actor)
+            VALUES (:mid, :fid, :role,
+                    (SELECT id FROM public.users WHERE id = :actor))
             RETURNING id, granted_at
             """
         ).bindparams(_bind_uuid("mid"), _bind_uuid("fid"), _bind_uuid("actor"))
