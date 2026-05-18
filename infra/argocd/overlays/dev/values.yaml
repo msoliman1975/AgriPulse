@@ -21,14 +21,13 @@ global:
   # bumped by hand until that's fixed.
   images:
     api:
-      tag: "858949d"
+      tag: "ec0ba22"
     workers:
-      tag: "858949d"
+      tag: "ec0ba22"
     frontend:
-      tag: "858949d"
+      tag: "ec0ba22"
     tileServer:
-      tag: "858949d"
-
+      tag: "ec0ba22"
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
@@ -47,14 +46,11 @@ env:
   # whatever was loaded into SM, otherwise discover_scenes still fails
   # at the OAuth token call (401), not at startup.
   SENTINEL_HUB_CLIENT_ID: "67611d57-1a8d-4833-9a7b-02abde5b23b8"
-
 # Common knobs across charts.
 labels:
   partOf: agripulse
-
 # Smaller footprint, single-AZ tolerable.
 replicaCount: 1
-
 # cert-manager issues against the prod Let's Encrypt directory so the
 # certs are browser-trusted (Netskope MITM rejects the staging chain).
 # Rate limits: 50 certs/week per registered domain — fine for dev where
@@ -64,7 +60,6 @@ replicaCount: 1
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-
 # Keycloak chart's bitnami sub-chart does not tpl values, so its hostname
 # must be set explicitly per env. CD-13: `ingress.hostnameStrict` flows
 # into KEYCLOAK_HOSTNAME_STRICT so the issuer URL is pinned (every JWT
@@ -76,7 +71,8 @@ keycloak:
     hostnameStrict: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-
+  image:
+    tag: ec0ba22
 # ExternalDNS + cert-manager IRSA ARNs come from `terraform output
 # iam_role_arns` (keys: external_dns, cert_manager). Filled in by the
 # bootstrap step in CD-10.
@@ -84,19 +80,16 @@ externalDns:
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-dev-external-dns"
-
 # Karpenter (CD-8). clusterName + nodeIAMRoleName come from
 # `terraform output karpenter`.
 karpenter:
   enabled: true
   clusterName: agripulse-dev
   nodeIAMRoleName: agripulse-dev-karpenter-node
-
 certManagerController:
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-dev-cert-manager"
-
 # Per-env api IRSA binding. ARN comes from
 # `terraform output agripulse_env_resources` â†’ .dev.api_irsa_arn.
 # Filled in at deploy time by CD-10 bootstrap.
@@ -104,7 +97,6 @@ serviceAccount:
   create: true
   annotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-api-irsa-dev"
-
 # Dev DB is the same cluster CNPG instance, just smaller. CNPG IRSA ARN
 # comes from `terraform output agripulse_env_resources` â†’ .dev.cnpg_irsa_arn.
 postgresCluster:
@@ -122,14 +114,12 @@ postgresCluster:
       memory: 2Gi
   serviceAccountAnnotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::328972548541:role/agripulse-cnpg-irsa-dev"
-
 # Alembic PreSync Job (api chart only â€” other charts ignore this key).
 # The Job runs `alembic upgrade head` before any Deployment rolls; failure
 # blocks the sync and the previous version keeps serving. Runbook:
 # docs/runbooks/failed-migration-recovery.md.
 migrations:
   enabled: true
-
 # Tighter resources across services in dev.
 resources:
   requests:
