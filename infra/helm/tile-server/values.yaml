@@ -18,11 +18,12 @@ replicaCount: 2
 revisionHistoryLimit: 5
 
 serviceAccount:
-  create: true
-  name: ""
+  # irsa: required-from-overlay              # tile-server reads COGs from
+  create: true                              # the imagery S3 bucket via boto3
+  name: ""                                  # — ARN is set per-env in
   # IRSA: the role ARN is set per-env in the ApplicationSet overlay so
   # tile-server pods can read COGs from the imagery bucket directly.
-  annotations: {}
+  annotations: {}                           # infra/argocd/overlays/<env>/values.yaml.
 
 service:
   type: ClusterIP
