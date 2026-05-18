@@ -28,9 +28,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
+from app.modules.signals.csv_import import (
+    MAX_BYTES as CSV_MAX_BYTES,
+)
+from app.modules.signals.csv_import import (
+    CsvRowError,
+    parse_csv,
+)
 from app.modules.signals.errors import (
     AttachmentMissingError,
     AttachmentNotPermittedError,
+    CsvImportFailedError,
+    CsvImportTooLargeError,
     InvalidSignalValueError,
     SignalAssignmentNotFoundError,
     SignalDefinitionNotFoundError,
@@ -998,6 +1007,148 @@ class SignalsServiceImpl:
                 )
         else:
             raise InvalidSignalValueError(detail=f"Unknown location_mode {location_mode!r}.")
+
+    # ---- CSV import (CS-7) --------------------------------------------
+
+    async def import_observations_csv(
+        self,
+        *,
+        farm_id: UUID,
+        csv_bytes: bytes,
+        recorded_by: UUID,
+        tenant_schema: str,
+    ) -> dict[str, int]:
+        """Strict-mode CSV import. Either every row is inserted in one
+        transaction, or none are and we raise CsvImportFailedError with
+        the per-row diagnostics (D4).
+
+        Validation runs in two passes:
+
+          1. csv_import.parse_csv — shape errors (missing required
+             columns, unparseable timestamps, multiple value columns
+             set, etc.).
+          2. Service-level business-rule validation — each row's
+             signal_code resolves to an active definition, the value
+             column matches its value_kind, numeric bounds hold,
+             categorical-membership holds.
+
+        The two passes accumulate into one error list; the caller
+        either sees `rows_imported` on success or the combined
+        error report on failure.
+        """
+        if len(csv_bytes) > CSV_MAX_BYTES:
+            raise CsvImportTooLargeError(size_bytes=len(csv_bytes), limit_bytes=CSV_MAX_BYTES)
+
+        try:
+            text_body = csv_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise CsvImportFailedError(
+                errors=[
+                    {
+                        "row_number": 1,
+                        "field": None,
+                        "message": (
+                            "Could not decode file as UTF-8. Save the CSV "
+                            f"as UTF-8 and re-upload. (decode error: {exc})"
+                        ),
+                    }
+                ]
+            ) from exc
+
+        parsed = parse_csv(text_body)
+
+        # Resolve unique signal_codes referenced in the file → load
+        # each definition once. Codes missing from the catalog produce
+        # a row-level error.
+        codes_referenced = {r.signal_code for r in parsed.rows}
+        defs_by_code: dict[str, dict[str, Any]] = {}
+        for code in sorted(codes_referenced):
+            defn = await self._repo.get_definition(code=code)
+            if defn is not None:
+                defs_by_code[code] = defn
+
+        # Second-pass: business-rule validation.
+        business_errors: list[CsvRowError] = []
+        for row in parsed.rows:
+            defn = defs_by_code.get(row.signal_code)
+            if defn is None:
+                business_errors.append(
+                    CsvRowError(
+                        row_number=row.row_number,
+                        field="signal_code",
+                        message=(
+                            f"No active signal definition with code "
+                            f"{row.signal_code!r} in this tenant."
+                        ),
+                    )
+                )
+                continue
+            try:
+                self._validate_value(
+                    defn=defn,
+                    request_values={
+                        "value_numeric": row.value_numeric,
+                        "value_categorical": row.value_categorical,
+                        "value_event": row.value_event,
+                        "value_boolean": row.value_boolean,
+                        "value_geopoint": None,
+                    },
+                )
+            except InvalidSignalValueError as exc:
+                # exc.detail is typed `str | None` on the base APIError
+                # but InvalidSignalValueError always passes a detail; the
+                # fallback is defensive only.
+                business_errors.append(
+                    CsvRowError(
+                        row_number=row.row_number,
+                        field=None,
+                        message=exc.detail or "Invalid signal value.",
+                    )
+                )
+
+        all_errors = parsed.errors + business_errors
+        if all_errors:
+            raise CsvImportFailedError(
+                errors=[
+                    {"row_number": e.row_number, "field": e.field, "message": e.message}
+                    for e in all_errors
+                ]
+            )
+
+        # All-or-nothing insert. Caller's session wraps the whole
+        # batch in a single transaction so a mid-loop DB error rolls
+        # back the partial insertion.
+        for row in parsed.rows:
+            defn = defs_by_code[row.signal_code]
+            await self._repo.insert_observation(
+                observation_id=uuid7(),
+                time=row.observed_at,
+                signal_definition_id=defn["id"],
+                farm_id=farm_id,
+                block_id=row.block_id,
+                value_numeric=row.value_numeric,
+                value_categorical=row.value_categorical,
+                value_event=row.value_event,
+                value_boolean=row.value_boolean,
+                value_geopoint_wkt=None,
+                attachment_s3_key=None,
+                notes=row.notes,
+                recorded_by=recorded_by,
+            )
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.observations_csv_imported",
+            actor_user_id=recorded_by,
+            subject_kind="signal_observation",
+            subject_id=None,
+            farm_id=farm_id,
+            details={
+                "rows_imported": len(parsed.rows),
+                "signal_codes": sorted(codes_referenced),
+            },
+        )
+        return {"rows_imported": len(parsed.rows)}
 
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:
