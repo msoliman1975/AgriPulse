@@ -34,9 +34,15 @@ from app.modules.signals.errors import (
     InvalidSignalValueError,
     SignalAssignmentNotFoundError,
     SignalDefinitionNotFoundError,
+    SignalTemplateMembersInvalidError,
+    SignalTemplateNotFoundError,
 )
 from app.modules.signals.repository import SignalsRepository
-from app.modules.signals.schemas import GeopointModel
+from app.modules.signals.schemas import (
+    GeopointModel,
+    SignalTemplateDefinitionMember,
+    _coerce_aggregation_for_value_kind,
+)
 from app.shared.db.ids import uuid7
 from app.shared.storage.client import (
     PresignedUpload,
@@ -65,6 +71,8 @@ class SignalsService(Protocol):
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
+        aggregation: str,
+        aggregation_window_days: int | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
@@ -77,6 +85,45 @@ class SignalsService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
+
+    # ---- Templates (CS-2/3) ----
+
+    async def list_templates(
+        self, *, include_inactive: bool = False
+    ) -> tuple[dict[str, Any], ...]: ...
+
+    async def get_template(
+        self, *, template_id: UUID
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
+
+    async def create_template(
+        self,
+        *,
+        code: str,
+        name: str,
+        description: str | None,
+        members: tuple[SignalTemplateDefinitionMember, ...],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
+
+    async def update_template(
+        self,
+        *,
+        template_id: UUID,
+        updates: dict[str, Any],
+        members: tuple[SignalTemplateDefinitionMember, ...] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
+
+    async def delete_template(
+        self,
+        *,
+        template_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None: ...
 
     async def delete_definition(
         self,
@@ -186,6 +233,8 @@ class SignalsServiceImpl:
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
+        aggregation: str,
+        aggregation_window_days: int | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]:
@@ -199,6 +248,16 @@ class SignalsServiceImpl:
             )
         if value_min is not None and value_max is not None and value_min > value_max:
             raise InvalidSignalValueError(detail="value_min must be ≤ value_max.")
+        # CS-1 D3 — non-numeric value_kinds always use `latest`. The
+        # schema-layer coercion runs here (not in the Pydantic model)
+        # because the relevant value_kind comes from the request body
+        # alongside the aggregation field.
+        coerced_aggregation = _coerce_aggregation_for_value_kind(value_kind, aggregation)
+        if coerced_aggregation == "latest" and aggregation_window_days is not None:
+            # Window only meaningful for non-latest rules; clamp instead
+            # of erroring so non-numeric defs (which always coerce to
+            # latest) don't 400 when a UI sends a window unconditionally.
+            aggregation_window_days = None
 
         definition_id = uuid7()
         row = await self._repo.insert_definition(
@@ -212,6 +271,8 @@ class SignalsServiceImpl:
             value_min=value_min,
             value_max=value_max,
             attachment_allowed=attachment_allowed,
+            aggregation=coerced_aggregation,
+            aggregation_window_days=aggregation_window_days,
             actor_user_id=actor_user_id,
         )
         await self._audit.record(
@@ -242,6 +303,16 @@ class SignalsServiceImpl:
             and updates["value_min"] > updates["value_max"]
         ):
             raise InvalidSignalValueError(detail="value_min must be ≤ value_max.")
+        # CS-1 D3 — if the caller is changing aggregation, coerce
+        # against the existing value_kind (kind itself isn't updatable
+        # per SignalDefinitionUpdateRequest). Window-day cleanup mirrors
+        # create_definition: `latest` always has window = NULL.
+        if "aggregation" in updates and updates["aggregation"] is not None:
+            updates["aggregation"] = _coerce_aggregation_for_value_kind(
+                str(existing["value_kind"]), updates["aggregation"]
+            )
+            if updates["aggregation"] == "latest":
+                updates["aggregation_window_days"] = None
         out = await self._repo.update_definition(
             definition_id=definition_id, updates=updates, actor_user_id=actor_user_id
         )
@@ -541,6 +612,175 @@ class SignalsServiceImpl:
             limit=limit,
         )
         return tuple(_enrich_observation(r, storage=self._storage) for r in rows)
+
+    # ---- Templates (CS-2/3) -------------------------------------------
+
+    async def list_templates(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_templates(include_inactive=include_inactive)
+
+    async def get_template(
+        self, *, template_id: UUID
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        tpl = await self._repo.get_template(template_id=template_id)
+        if tpl is None:
+            raise SignalTemplateNotFoundError(template_id)
+        members = await self._repo.get_template_members(template_id=template_id)
+        return tpl, members
+
+    async def create_template(
+        self,
+        *,
+        code: str,
+        name: str,
+        description: str | None,
+        members: tuple[SignalTemplateDefinitionMember, ...],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        self._validate_template_members(members)
+        await self._assert_all_definitions_exist(members)
+
+        template_id = uuid7()
+        repo_members = tuple((m.signal_definition_id, m.position, m.is_required) for m in members)
+        tpl = await self._repo.insert_template(
+            template_id=template_id,
+            code=code,
+            name=name,
+            description=description,
+            members=repo_members,
+            actor_user_id=actor_user_id,
+        )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.template_created",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_template",
+            subject_id=template_id,
+            farm_id=None,
+            details={"code": code, "member_count": len(members)},
+        )
+        member_rows = await self._repo.get_template_members(template_id=template_id)
+        return tpl, member_rows
+
+    async def update_template(
+        self,
+        *,
+        template_id: UUID,
+        updates: dict[str, Any],
+        members: tuple[SignalTemplateDefinitionMember, ...] | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
+        existing = await self._repo.get_template(template_id=template_id)
+        if existing is None:
+            raise SignalTemplateNotFoundError(template_id)
+
+        repo_members: tuple[tuple[UUID, int, bool], ...] | None = None
+        if members is not None:
+            if len(members) == 0:
+                # The UX layer should never send an empty member list
+                # (would leave the template unusable); reject explicitly
+                # so we don't accidentally write a half-defined template.
+                raise SignalTemplateMembersInvalidError(
+                    detail="Template member list cannot be empty on update."
+                )
+            self._validate_template_members(members)
+            await self._assert_all_definitions_exist(members)
+            repo_members = tuple(
+                (m.signal_definition_id, m.position, m.is_required) for m in members
+            )
+
+        out = await self._repo.update_template(
+            template_id=template_id,
+            updates=updates,
+            members=repo_members,
+            actor_user_id=actor_user_id,
+        )
+        if out is None:
+            raise SignalTemplateNotFoundError(template_id)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.template_updated",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_template",
+            subject_id=template_id,
+            farm_id=None,
+            details={
+                "code": existing["code"],
+                "fields": sorted(updates.keys()),
+                "members_replaced": members is not None,
+            },
+        )
+        member_rows = await self._repo.get_template_members(template_id=template_id)
+        return out, member_rows
+
+    async def delete_template(
+        self,
+        *,
+        template_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None:
+        existing = await self._repo.get_template(template_id=template_id)
+        if existing is None:
+            raise SignalTemplateNotFoundError(template_id)
+        deleted = await self._repo.soft_delete_template(
+            template_id=template_id, actor_user_id=actor_user_id
+        )
+        if not deleted:
+            return
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.template_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_template",
+            subject_id=template_id,
+            farm_id=None,
+            details={"code": existing["code"]},
+        )
+
+    @staticmethod
+    def _validate_template_members(
+        members: tuple[SignalTemplateDefinitionMember, ...],
+    ) -> None:
+        """Pre-DB checks for member-shape constraints. The two unique
+        constraints in migration 0029 would catch these too, but we'd
+        have to do error-message string matching on IntegrityError to
+        distinguish them — easier to enforce here so the 400 carries
+        which conflict was hit."""
+        if not members:
+            raise SignalTemplateMembersInvalidError(
+                detail="Template must include at least one member."
+            )
+        seen_defs: set[UUID] = set()
+        seen_positions: set[int] = set()
+        for m in members:
+            if m.signal_definition_id in seen_defs:
+                raise SignalTemplateMembersInvalidError(
+                    detail=(
+                        f"Duplicate signal_definition_id "
+                        f"{m.signal_definition_id} in template members."
+                    ),
+                )
+            seen_defs.add(m.signal_definition_id)
+            if m.position in seen_positions:
+                raise SignalTemplateMembersInvalidError(
+                    detail=f"Duplicate position {m.position} in template members.",
+                )
+            seen_positions.add(m.position)
+
+    async def _assert_all_definitions_exist(
+        self, members: tuple[SignalTemplateDefinitionMember, ...]
+    ) -> None:
+        def_ids = tuple(m.signal_definition_id for m in members)
+        missing = await self._repo.missing_definitions(definition_ids=def_ids)
+        if missing:
+            raise SignalTemplateMembersInvalidError(
+                detail=(
+                    f"Template references unknown or deleted signal definitions: "
+                    f"{', '.join(str(d) for d in missing)}"
+                ),
+            )
 
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:

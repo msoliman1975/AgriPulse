@@ -80,3 +80,42 @@ class AttachmentMissingError(APIError):
             type_=f"{_TYPE_BASE}/attachment-missing",
             extras={"attachment_s3_key": key},
         )
+
+
+# ---- CS-2/3: signal templates ----------------------------------------------
+
+
+class SignalTemplateNotFoundError(APIError):
+    def __init__(self, template_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Signal template not found",
+            detail=f"No signal template with id {template_id} in this tenant.",
+            type_=f"{_TYPE_BASE}/template-not-found",
+            extras={"template_id": str(template_id)},
+        )
+
+
+class SignalTemplateCodeAlreadyExistsError(APIError):
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Signal template code already exists",
+            detail=f"An active signal template with code {code!r} already exists.",
+            type_=f"{_TYPE_BASE}/template-code-exists",
+            extras={"code": code},
+        )
+
+
+class SignalTemplateMembersInvalidError(APIError):
+    """Catch-all for template-member shape errors caught pre-DB:
+    duplicate definition_ids, duplicate positions, or member rows
+    pointing at definitions that don't exist (or are soft-deleted)."""
+
+    def __init__(self, *, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid template members",
+            detail=detail,
+            type_=f"{_TYPE_BASE}/template-members-invalid",
+        )

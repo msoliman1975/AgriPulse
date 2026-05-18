@@ -17,10 +17,15 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.signals.errors import SignalCodeAlreadyExistsError
+from app.modules.signals.errors import (
+    SignalCodeAlreadyExistsError,
+    SignalTemplateCodeAlreadyExistsError,
+)
 from app.modules.signals.models import (
     SignalAssignment,
     SignalDefinition,
+    SignalTemplate,
+    SignalTemplateDefinition,
 )
 
 
@@ -72,6 +77,8 @@ class SignalsRepository:
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
+        aggregation: str = "latest",
+        aggregation_window_days: int | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         try:
@@ -82,11 +89,13 @@ class SignalsRepository:
                         id, code, name, description, value_kind, unit,
                         categorical_values, value_min, value_max,
                         attachment_allowed, is_active,
+                        aggregation, aggregation_window_days,
                         created_by, updated_by
                     ) VALUES (
                         :id, :code, :name, :description, :value_kind, :unit,
                         :categorical_values, :value_min, :value_max,
                         :attachment_allowed, TRUE,
+                        :aggregation, :aggregation_window_days,
                         :actor, :actor
                     )
                     """
@@ -105,6 +114,8 @@ class SignalsRepository:
                     "value_min": value_min,
                     "value_max": value_max,
                     "attachment_allowed": attachment_allowed,
+                    "aggregation": aggregation,
+                    "aggregation_window_days": aggregation_window_days,
                     "actor": actor_user_id,
                 },
             )
@@ -137,6 +148,11 @@ class SignalsRepository:
             "value_max",
             "attachment_allowed",
             "is_active",
+            # CS-1 D3 — clients can change the rule + window on existing
+            # definitions; service layer is responsible for coercing
+            # non-numeric value_kinds to 'latest' before calling in.
+            "aggregation",
+            "aggregation_window_days",
         }
         sets: list[str] = []
         params: dict[str, Any] = {"id": definition_id, "actor": actor_user_id}
@@ -252,6 +268,194 @@ class SignalsRepository:
             {"id": assignment_id, "actor": actor_user_id},
         )
         return bool(getattr(result, "rowcount", 0) or 0)
+
+    # ---- Templates (CS-2/3) -------------------------------------------
+    #
+    # Templates group N SignalDefinitions for entry UX (D1). Member
+    # uniqueness within a template is DB-enforced via the two unique
+    # constraints in migration 0029 (one on template_id+definition_id,
+    # one on template_id+position). The service layer pre-checks both
+    # so we can raise a tidy 400 instead of relying on IntegrityError
+    # text matching for two different constraints.
+
+    async def list_templates(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
+        clauses = [SignalTemplate.deleted_at.is_(None)]
+        if not include_inactive:
+            clauses.append(SignalTemplate.is_active.is_(True))
+        stmt = select(SignalTemplate).where(*clauses).order_by(SignalTemplate.code.asc())
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return tuple(_template_to_dict(r) for r in rows)
+
+    async def get_template(self, *, template_id: UUID) -> dict[str, Any] | None:
+        stmt = select(SignalTemplate).where(
+            SignalTemplate.id == template_id,
+            SignalTemplate.deleted_at.is_(None),
+        )
+        row = (await self._session.execute(stmt)).scalars().one_or_none()
+        return _template_to_dict(row) if row is not None else None
+
+    async def get_template_members(self, *, template_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Returns members ordered by `position` ascending."""
+        stmt = (
+            select(SignalTemplateDefinition)
+            .where(SignalTemplateDefinition.template_id == template_id)
+            .order_by(SignalTemplateDefinition.position.asc())
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return tuple(_template_member_to_dict(r) for r in rows)
+
+    async def insert_template(
+        self,
+        *,
+        template_id: UUID,
+        code: str,
+        name: str,
+        description: str | None,
+        members: tuple[tuple[UUID, int, bool], ...],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Atomic: insert the template row then its N members.
+
+        Caller wraps in their own transaction. On code collision we
+        raise SignalTemplateCodeAlreadyExistsError; member-side
+        violations are pre-checked by the service layer (see class
+        docstring), so an IntegrityError here is unexpected.
+        """
+        try:
+            await self._session.execute(
+                text(
+                    """
+                    INSERT INTO signal_templates (
+                        id, code, name, description,
+                        is_active, created_by, updated_by
+                    ) VALUES (
+                        :id, :code, :name, :description,
+                        TRUE, :actor, :actor
+                    )
+                    """
+                ).bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {
+                    "id": template_id,
+                    "code": code,
+                    "name": name,
+                    "description": description,
+                    "actor": actor_user_id,
+                },
+            )
+        except IntegrityError as exc:
+            if "uq_signal_templates_code_alive" in str(exc):
+                raise SignalTemplateCodeAlreadyExistsError(code) from exc
+            raise
+        await self._insert_template_members(template_id=template_id, members=members)
+        await self._session.flush()
+        out = await self.get_template(template_id=template_id)
+        if out is None:
+            raise RuntimeError("Template insert succeeded but row is missing")
+        return out
+
+    async def update_template(
+        self,
+        *,
+        template_id: UUID,
+        updates: dict[str, Any],
+        members: tuple[tuple[UUID, int, bool], ...] | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        """Patch template scalars + optionally replace the member list
+        atomically (delete-then-insert). `members=None` leaves members
+        untouched."""
+        allowed = {"name", "description", "is_active"}
+        sets: list[str] = []
+        params: dict[str, Any] = {"id": template_id, "actor": actor_user_id}
+        for col, value in updates.items():
+            if col not in allowed:
+                continue
+            sets.append(f"{col} = :{col}")
+            params[col] = value
+        if sets:
+            sets.extend(["updated_at = now()", "updated_by = :actor"])
+            await self._session.execute(
+                text(
+                    f"UPDATE signal_templates SET {', '.join(sets)} "
+                    "WHERE id = :id AND deleted_at IS NULL"
+                ).bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                params,
+            )
+        if members is not None:
+            await self._session.execute(
+                text("DELETE FROM signal_template_definitions WHERE template_id = :id").bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True))
+                ),
+                {"id": template_id},
+            )
+            await self._insert_template_members(template_id=template_id, members=members)
+        return await self.get_template(template_id=template_id)
+
+    async def soft_delete_template(self, *, template_id: UUID, actor_user_id: UUID | None) -> bool:
+        result = await self._session.execute(
+            text(
+                "UPDATE signal_templates "
+                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+                "WHERE id = :id AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": template_id, "actor": actor_user_id},
+        )
+        return bool(getattr(result, "rowcount", 0) or 0)
+
+    async def missing_definitions(self, *, definition_ids: tuple[UUID, ...]) -> tuple[UUID, ...]:
+        """Return the subset of ids that don't exist (or are soft-deleted).
+        Empty tuple means everything resolves; service raises a 400 otherwise.
+        (Not named `assert_*` to avoid collision with Mock's auto-protected
+        assertion helpers in tests.)"""
+        if not definition_ids:
+            return ()
+        stmt = select(SignalDefinition.id).where(
+            SignalDefinition.id.in_(definition_ids),
+            SignalDefinition.deleted_at.is_(None),
+        )
+        present = set((await self._session.execute(stmt)).scalars().all())
+        return tuple(d for d in definition_ids if d not in present)
+
+    async def _insert_template_members(
+        self,
+        *,
+        template_id: UUID,
+        members: tuple[tuple[UUID, int, bool], ...],
+    ) -> None:
+        # Bulk INSERT — VALUES list with one row per member. Empty
+        # members tuple is a no-op (the create-request schema enforces
+        # min_length=1 but an update-request may legitimately replace
+        # with an empty list; UX layer is expected to reject that).
+        if not members:
+            return
+        # SQLAlchemy text-based VALUES expansion needs distinct param
+        # names per row.
+        value_rows = []
+        params: dict[str, Any] = {"template_id": template_id}
+        binds: list[Any] = [bindparam("template_id", type_=PG_UUID(as_uuid=True))]
+        for i, (def_id, position, is_required) in enumerate(members):
+            value_rows.append(f"(:def_id_{i}, :template_id, :position_{i}, :is_required_{i})")
+            params[f"def_id_{i}"] = def_id
+            params[f"position_{i}"] = position
+            params[f"is_required_{i}"] = is_required
+            binds.append(bindparam(f"def_id_{i}", type_=PG_UUID(as_uuid=True)))
+        await self._session.execute(
+            text(
+                "INSERT INTO signal_template_definitions "
+                "(signal_definition_id, template_id, position, is_required) "
+                f"VALUES {', '.join(value_rows)}"
+            ).bindparams(*binds),
+            params,
+        )
 
     # ---- Observations -------------------------------------------------
 
@@ -441,6 +645,11 @@ def _definition_to_dict(row: SignalDefinition) -> dict[str, Any]:
         "value_max": row.value_max,
         "attachment_allowed": row.attachment_allowed,
         "is_active": row.is_active,
+        # CS-1 D3 — round-tripped from DB to API. Defaults applied by
+        # migration 0029's server_default so pre-CS-1 rows surface as
+        # ('latest', None) on read.
+        "aggregation": row.aggregation,
+        "aggregation_window_days": row.aggregation_window_days,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
@@ -455,6 +664,26 @@ def _assignment_to_dict(row: SignalAssignment) -> dict[str, Any]:
         "is_active": row.is_active,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+    }
+
+
+def _template_to_dict(row: SignalTemplate) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "code": row.code,
+        "name": row.name,
+        "description": row.description,
+        "is_active": row.is_active,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    }
+
+
+def _template_member_to_dict(row: SignalTemplateDefinition) -> dict[str, Any]:
+    return {
+        "signal_definition_id": row.signal_definition_id,
+        "position": row.position,
+        "is_required": row.is_required,
     }
 
 
