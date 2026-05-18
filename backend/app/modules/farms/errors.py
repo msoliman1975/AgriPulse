@@ -188,6 +188,42 @@ class AttachmentUploadMissingError(APIError):
         )
 
 
+class CategoryLockedError(APIError):
+    """A write to a block-side field that lives in a locked Shared category."""
+
+    def __init__(self, *, farm_id: UUID, category: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Category locked",
+            detail=(
+                f"Category {category!r} is centrally managed by the farm "
+                f"template. Unlock it before editing the corresponding fields."
+            ),
+            type_=f"{_TYPE_BASE}/category-locked",
+            extras={"farm_id": str(farm_id), "category": category},
+        )
+
+
+class LockDivergenceError(APIError):
+    """Attempted to lock a category while blocks diverge from the template.
+
+    The diff payload lets the UI render a "Lock and overwrite" confirm
+    modal that resubmits with force_overwrite=true.
+    """
+
+    def __init__(self, *, farm_id: UUID, category: str, diff: dict[str, Any]) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Lock would overwrite blocks",
+            detail=(
+                f"Locking {category!r} would overwrite divergent blocks. Resubmit "
+                f"with force_overwrite=true to apply the template first."
+            ),
+            type_=f"{_TYPE_BASE}/lock-divergence",
+            extras={"farm_id": str(farm_id), "category": category, "diff": diff},
+        )
+
+
 class AttachmentUploadMismatchError(APIError):
     """Uploaded object's size or content-type doesn't match what init declared."""
 

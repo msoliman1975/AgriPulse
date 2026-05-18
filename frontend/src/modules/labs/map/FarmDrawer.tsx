@@ -10,6 +10,7 @@ import type {
 } from "@/api/farms";
 import type { Block } from "@/api/blocks";
 import type { MultiPolygon } from "geojson";
+import { FarmDefaultsTab } from "./FarmDefaultsTab";
 
 export type FarmDrawerMode = "create" | "view" | "edit";
 
@@ -320,6 +321,17 @@ export function FarmDrawer({
               className="w-full rounded border border-slate-300 px-2 py-1 text-[12px] disabled:bg-slate-50"
             />
           </Field>
+        </Section>
+
+        <Section title="Defaults">
+          {farm ? (
+            <FarmDefaultsTab farmId={farm.id} />
+          ) : (
+            <p className="text-[11px] text-slate-500">
+              Save the farm first, then return here to author the subscriptions
+              template.
+            </p>
+          )}
         </Section>
 
         <Section title="AOI">

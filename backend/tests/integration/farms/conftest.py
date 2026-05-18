@@ -21,6 +21,7 @@ from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.errors import install_exception_handlers
+from app.modules.farms.config_router import router as farms_config_router
 from app.modules.farms.router import router as farms_router
 from app.shared.auth.context import (
     FarmRole,
@@ -49,11 +50,13 @@ class StubAuth:
         await self._app(scope, receive, send)
 
 
-def build_app(context: RequestContext) -> FastAPI:
-    """Mount only the farms router with a stubbed auth middleware."""
+def build_app(context: RequestContext, *, with_config: bool = False) -> FastAPI:
+    """Mount the farms router (+ optionally config_router) with stubbed auth."""
     app = FastAPI()
     install_exception_handlers(app)
     app.include_router(farms_router)
+    if with_config:
+        app.include_router(farms_config_router)
     app.add_middleware(StubAuth, context=context)
     return app
 

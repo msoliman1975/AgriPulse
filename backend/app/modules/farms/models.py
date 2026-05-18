@@ -135,6 +135,28 @@ class Farm(Base, TimestampedMixin):
     )
     active_to: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Farm-block config model PR-1 (tenant migration 0027): Farm-only
+    # "manager" role + Shared-bucket templates + per-category locks.
+    # Templates and locks are inert until PR-2/PR-3 wire them up.
+    farm_manager_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    default_irrigation_system: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_irrigation_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_flow_rate_m3_per_hour: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 2), nullable=True
+    )
+    default_tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
+    )
+    subscriptions_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+    irrigation_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+    org_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+
 
 class Block(Base, TimestampedMixin):
     __tablename__ = "blocks"
@@ -174,7 +196,7 @@ class Block(Base, TimestampedMixin):
     soil_ec_ds_per_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     soil_organic_matter_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     last_soil_test_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    responsible_user_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    agronomist_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     # Lifecycle: see Farm.active_from / active_to.
     active_from: Mapped[date] = mapped_column(
         Date, nullable=False, server_default=text("current_date")
@@ -198,6 +220,59 @@ class Block(Base, TimestampedMixin):
         nullable=True,
     )
     irrigation_geometry: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+
+class FarmImageryTemplate(Base):
+    """Farm-level imagery subscription template.
+
+    Multi-row per ``(farm_id, product_id)`` — what blocks should
+    inherit when Apply is invoked. Distinct from
+    ``farm_imagery_overrides`` (single-row resolver knobs from PR #65).
+    See tenant migration 0028.
+    """
+
+    __tablename__ = "farm_imagery_template"
+
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    # Logical cross-schema FK to public.imagery_products.id.
+    product_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cadence_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    cloud_cover_max_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
+class FarmWeatherTemplate(Base):
+    """Farm-level weather subscription template. See ``FarmImageryTemplate``."""
+
+    __tablename__ = "farm_weather_template"
+
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    # Logical cross-schema FK to public.weather_providers.code.
+    provider_code: Mapped[str] = mapped_column(Text, primary_key=True)
+    cadence_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class BlockCrop(Base, TimestampedMixin):

@@ -88,6 +88,24 @@ async def _resolve_farm_id(*, block_id: UUID, tenant_session: AsyncSession) -> U
     return block["farm_id"]
 
 
+async def _guard_subscriptions_lock(
+    *, tenant_session: AsyncSession, farm_id: UUID
+) -> None:
+    """Reject writes when the farm's subscriptions category is locked.
+
+    Gated by the farm-config feature flag. PR-3 of farm-block-config-model.
+    """
+    from app.core.settings import get_settings
+
+    if not get_settings().farm_config_template_enabled:
+        return
+    from app.modules.farms import config_template
+
+    await config_template.assert_category_unlocked(
+        tenant_session, farm_id=farm_id, category="subscriptions"
+    )
+
+
 # --- Subscriptions ---------------------------------------------------------
 
 
@@ -109,6 +127,7 @@ async def create_subscription(
     farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
     if not has_capability(context, "weather.subscription.manage", farm_id=farm_id):
         raise BlockNotVisibleError(str(block_id))
+    await _guard_subscriptions_lock(tenant_session=tenant_session, farm_id=farm_id)
     return await service.create_subscription(
         block_id=block_id,
         payload=payload,
@@ -155,6 +174,7 @@ async def revoke_subscription(
     farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
     if not has_capability(context, "weather.subscription.manage", farm_id=farm_id):
         raise BlockNotVisibleError(str(block_id))
+    await _guard_subscriptions_lock(tenant_session=tenant_session, farm_id=farm_id)
     await service.revoke_subscription(
         block_id=block_id,
         subscription_id=subscription_id,

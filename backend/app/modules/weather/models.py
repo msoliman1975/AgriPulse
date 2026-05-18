@@ -98,6 +98,8 @@ class WeatherSubscription(Base, TimestampedMixin):
     last_attempted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # When Apply last reconciled this row to the farm template (migration 0028).
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WeatherIngestionAttempt(Base):

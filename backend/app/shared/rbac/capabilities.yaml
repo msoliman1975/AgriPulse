@@ -171,6 +171,13 @@ capabilities:
     description: Upload or remove a block's photos and documents.
     scope: farm
     status: active
+  farm.manage_config:
+    description: Edit farm-level config templates (subscriptions, irrigation,
+      org) and per-category lock state. Granted to FarmManager + TenantAdmin.
+      Storage lands in PR-1; authoring and lock semantics arrive in PR-2/PR-3
+      of the farm-block-config-model rollout.
+    scope: farm
+    status: stub
   crop_assignment.create:
     description: Assign a crop to a block for a season.
     scope: farm
