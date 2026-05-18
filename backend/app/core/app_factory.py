@@ -159,6 +159,7 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
+    from app.modules.insights.router import router as insights_router
     from app.modules.recommendations.router import router as recommendations_router
     from app.modules.signals.router import router as signals_router
     from app.modules.tenancy.router import router as tenancy_router
@@ -178,6 +179,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(irrigation_router)
     app.include_router(notifications_router)
     app.include_router(recommendations_router)
+    app.include_router(insights_router)
     app.include_router(signals_router)
     app.include_router(integrations_health_router)
     app.include_router(integrations_router)

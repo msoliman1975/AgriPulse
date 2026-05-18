@@ -11,8 +11,9 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
+import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
+import { FarmTrendChart } from "../components/FarmTrendChart";
 import { KPICards } from "../components/KPICards";
-import { TrendChartCard } from "../components/TrendChartCard";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -22,9 +23,10 @@ import { TrendChartCard } from "../components/TrendChartCard";
 // still link to them so they remain discoverable. The "New plan" CTA
 // belongs to /plan, not here.
 //
-// B.2 will add FarmTrendChart + BlockHealthScorecard once the new
-// /farms/{id}/index-timeseries + /farms/{id}/health-summary endpoints
-// land. B.1 stays minimal.
+// B.2 swaps the single-block TrendChartCard for FarmTrendChart
+// (multi-block timeseries from /farms/{id}/index-timeseries) +
+// BlockHealthScorecard (per-block rollup from /farms/{id}/health-
+// summary).
 export function InsightsPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("insights");
@@ -90,7 +92,9 @@ export function InsightsPage(): ReactNode {
 
       <KPICards farmId={farmId} />
 
-      <TrendChartCard farmId={farmId} />
+      <FarmTrendChart farmId={farmId} />
+
+      <BlockHealthScorecard farmId={farmId} />
 
       {canReadWeather && firstBlock ? (
         <WeatherForecastPanel
