@@ -11,7 +11,10 @@
 -->
 <#macro registrationLayout displayInfo=false displayMessage=true displayRequiredFields=false displayWide=false showAnonymousReqdActions=false>
 <!DOCTYPE html>
-<html lang="${locale.currentLanguageTag}" dir="ltr">
+<#-- `locale` isn't always set in the FTL context (e.g. when the realm
+     doesn't have `internationalizationEnabled=true`, which we don't —
+     EN-only per the locked design). Hardcode the language attribute. -->
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
