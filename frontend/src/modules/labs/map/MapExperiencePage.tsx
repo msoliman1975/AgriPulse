@@ -28,13 +28,14 @@ import {
   type FarmUpdatePayload,
 } from "@/api/farms";
 import { loadMapSummary, loadUnitDetail } from "./api";
-import { MapCanvas, type DrawTarget } from "./MapCanvas";
+import { MapCanvas, type DrawProgress, type DrawTarget } from "./MapCanvas";
 import { SignalOverlayControl } from "./SignalOverlayControl";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { DetailPanel } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
+import { DrawReadout } from "./DrawReadout";
 import { InactivateConfirmModal } from "./InactivateConfirmModal";
 import { FarmDrawer, type FarmDrawerMode } from "./FarmDrawer";
 import { FarmSummaryStrip } from "./FarmSummaryStrip";
@@ -176,6 +177,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
   // the farm drawer. The MapCanvas takes whichever target is active when
   // the user finishes a polygon.
   const [drawTarget, setDrawTarget] = useState<DrawTarget | null>(null);
+  const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
 
   // Block-create state — after a polygon is finalized, the form modal
   // collects code/name/irrigation.
@@ -607,6 +609,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
             drawEnabled={drawing}
             drawTarget={drawTarget ?? "block"}
             onPolygonDrawn={(poly, areaM2, target) => {
+              setDrawProgress(null);
               if (target === "block") {
                 setPendingBlockPolygon(poly);
                 setPendingBlockArea(areaM2);
@@ -619,6 +622,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
                 setDrawTarget(null);
               }
             }}
+            onDrawProgress={setDrawProgress}
             onPivotDrawn={(r) => {
               setPendingPivot({
                 lat: r.center_lat,
@@ -647,6 +651,14 @@ function MapForFarm({ farmId }: { farmId: string }) {
         )}
 
         <MapNote drawTarget={drawTarget} />
+
+        <DrawReadout
+          progress={drawProgress}
+          onCancel={() => {
+            setDrawTarget(null);
+            setDrawProgress(null);
+          }}
+        />
 
         <SignalOverlayControl
           definitions={signalDefinitionsQ.data ?? []}

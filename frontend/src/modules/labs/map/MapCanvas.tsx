@@ -11,6 +11,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
+import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
 import type { SignalOverlayProps } from "./signalOverlay";
 import type { UnitFeatureProps } from "./types";
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
@@ -28,6 +29,16 @@ export interface PivotDrawResult {
   radius_m: number;
 }
 
+// Live progress emitted while a polygon draw is in flight. `vertices`
+// counts the points the user has actually clicked (excludes the
+// mouse-follow tail vertex that mapbox-gl-draw maintains internally).
+export interface DrawProgress {
+  vertices: number;
+  areaM2: number;
+  perimeterM: number;
+  target: DrawTarget;
+}
+
 interface Props {
   geojson: FeatureCollection<Polygon, UnitFeatureProps>;
   farmBoundary?: MultiPolygon | null;
@@ -37,6 +48,10 @@ interface Props {
   drawEnabled?: boolean;
   drawTarget?: DrawTarget;
   onPolygonDrawn?: (polygon: Polygon, areaM2: number, target: DrawTarget) => void;
+  // Fires on every render tick while a polygon draw is in progress.
+  // Null = no draw in progress (or draw just finished/cancelled).
+  // Used by the page to render a live readout overlay.
+  onDrawProgress?: (progress: DrawProgress | null) => void;
   onPivotDrawn?: (result: PivotDrawResult) => void;
   // When set, MapCanvas enters direct-select mode against the supplied
   // polygon so the user can drag vertices. Every edit emits the new
@@ -122,6 +137,7 @@ export function MapCanvas({
   drawEnabled,
   drawTarget = "block",
   onPolygonDrawn,
+  onDrawProgress,
   onPivotDrawn,
   reshapeBlock = null,
   onReshape,
@@ -139,6 +155,8 @@ export function MapCanvas({
   onSelectRef.current = onSelect;
   const onPolygonDrawnRef = useRef(onPolygonDrawn);
   onPolygonDrawnRef.current = onPolygonDrawn;
+  const onDrawProgressRef = useRef(onDrawProgress);
+  onDrawProgressRef.current = onDrawProgress;
   const drawTargetRef = useRef(drawTarget);
   drawTargetRef.current = drawTarget;
   const onPivotDrawnRef = useRef(onPivotDrawn);
@@ -530,6 +548,7 @@ export function MapCanvas({
       if (!f || f.geometry.type !== "Polygon") return;
       const poly = f.geometry;
       onPolygonDrawnRef.current?.(poly, approxPolygonAreaM2(poly), drawTargetRef.current);
+      onDrawProgressRef.current?.(null);
       try {
         draw.deleteAll();
       } catch {
@@ -538,8 +557,67 @@ export function MapCanvas({
     };
     map.on("draw.create", onCreate);
 
+    // While in draw_polygon mode, draw.render fires on every tick the
+    // user moves the mouse or clicks a vertex. We compute live stats
+    // off the in-progress feature so the page can show area/perimeter
+    // /vertex-count without waiting for double-click finish.
+    //
+    // The in-progress polygon's outer ring is [v1, v2, ..., vn, mouse,
+    // v1] — the trailing v1 closes the ring for rendering and the
+    // pre-last vertex is the mouse cursor. We strip those two and
+    // report only the clicked-vertex count. Perimeter follows the same
+    // trimmed ring so the readout doesn't jitter as the mouse moves.
+    const onRender = () => {
+      if (!drawRef.current) {
+        onDrawProgressRef.current?.(null);
+        return;
+      }
+      const fc = drawRef.current.getAll();
+      const f = fc.features[0];
+      if (!f || f.geometry.type !== "Polygon") {
+        onDrawProgressRef.current?.(null);
+        return;
+      }
+      const fullRing = f.geometry.coordinates[0] ?? [];
+      // Need at least mouse + closing-point to have a meaningful trim.
+      if (fullRing.length < 2) {
+        onDrawProgressRef.current?.({
+          vertices: 0,
+          areaM2: 0,
+          perimeterM: 0,
+          target: drawTargetRef.current,
+        });
+        return;
+      }
+      const clicked = fullRing.slice(0, -2);
+      if (clicked.length < 1) {
+        onDrawProgressRef.current?.({
+          vertices: 0,
+          areaM2: 0,
+          perimeterM: 0,
+          target: drawTargetRef.current,
+        });
+        return;
+      }
+      const trimmed: Polygon = { type: "Polygon", coordinates: [clicked] };
+      const areaM2 = clicked.length >= 3 ? approxPolygonAreaM2(trimmed) : 0;
+      const perimeterM = clicked.length >= 2 ? polygonPerimeterM(trimmed) : 0;
+      onDrawProgressRef.current?.({
+        vertices: clicked.length,
+        areaM2,
+        perimeterM,
+        target: drawTargetRef.current,
+      });
+    };
+    map.on("draw.render", onRender);
+
     return () => {
       map.off("draw.create", onCreate);
+      map.off("draw.render", onRender);
+      // Clear any leftover progress state so the page overlay disappears
+      // immediately when draw mode is exited (vs. waiting for the next
+      // render tick that never fires).
+      onDrawProgressRef.current?.(null);
     };
   }, [drawEnabled, drawTarget]);
 
@@ -756,31 +834,8 @@ function computeBounds(
   ];
 }
 
-// Spherical-excess approximation, accurate enough for human-scale block
-// previews (sub-1% error up to ~50 km). Returns area in square metres.
-function approxPolygonAreaM2(poly: Polygon): number {
-  const R = 6_378_137; // WGS-84 equatorial radius
-  let total = 0;
-  for (let i = 0; i < poly.coordinates.length; i++) {
-    const ring = poly.coordinates[i];
-    const a = ringAreaM2(ring, R);
-    // First ring is exterior, subsequent rings are holes.
-    total += i === 0 ? Math.abs(a) : -Math.abs(a);
-  }
-  return total;
-}
-
-function haversineMeters(a: [number, number], b: [number, number]): number {
-  const R = 6_378_137;
-  const [lon1, lat1] = a;
-  const [lon2, lat2] = b;
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const dphi = ((lat2 - lat1) * Math.PI) / 180;
-  const dl = ((lon2 - lon1) * Math.PI) / 180;
-  const x = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dl / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
+// approxPolygonAreaM2 + haversineMeters live in ./geo.ts so they can be
+// unit-tested without loading maplibre. polygonPerimeterM is new there.
 
 // Spherical-approximation circle for the on-map preview. Matches the
 // backend's circle_polygon helper closely enough that the saved pivot
@@ -802,15 +857,4 @@ function buildCircle(lat: number, lon: number, radius_m: number): Polygon {
   return { type: "Polygon", coordinates: [coords] };
 }
 
-function ringAreaM2(ring: number[][], R: number): number {
-  if (ring.length < 3) return 0;
-  let total = 0;
-  for (let i = 0; i < ring.length; i++) {
-    const [lon1, lat1] = ring[i];
-    const [lon2, lat2] = ring[(i + 1) % ring.length];
-    total +=
-      (((lon2 - lon1) * Math.PI) / 180) *
-      (2 + Math.sin((lat1 * Math.PI) / 180) + Math.sin((lat2 * Math.PI) / 180));
-  }
-  return (total * R * R) / 2;
-}
+// ringAreaM2 now lives in ./geo.ts.
