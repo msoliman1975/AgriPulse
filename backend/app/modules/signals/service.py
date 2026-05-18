@@ -179,6 +179,8 @@ class SignalsService(Protocol):
         value_geopoint: GeopointModel | None,
         attachment_s3_key: str | None,
         notes: str | None,
+        location_mode: str = "entity",
+        location_point: GeopointModel | None = None,
         recorded_by: UUID,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
@@ -191,6 +193,7 @@ class SignalsService(Protocol):
         block_id: UUID | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
+        template_observation_id: UUID | None = None,
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]: ...
 
@@ -542,6 +545,12 @@ class SignalsServiceImpl:
         value_geopoint: GeopointModel | None,
         attachment_s3_key: str | None,
         notes: str | None,
+        # CS-5 — location_mode/point now reach the single-shot route too
+        # (previously only validated on the template-submission endpoint).
+        # Defaults preserve the pre-CS-1 API shape: callers who don't pass
+        # location_* get the historical entity-mode behaviour.
+        location_mode: str = "entity",
+        location_point: GeopointModel | None = None,
         recorded_by: UUID,
         tenant_schema: str,
     ) -> dict[str, Any]:
@@ -558,6 +567,7 @@ class SignalsServiceImpl:
                 "value_geopoint": value_geopoint,
             },
         )
+        self._validate_location_presence(location_mode=location_mode, location_point=location_point)
         if attachment_s3_key is not None:
             if not defn["attachment_allowed"]:
                 raise AttachmentNotPermittedError(code=defn["code"])
@@ -571,6 +581,11 @@ class SignalsServiceImpl:
         wkt = (
             f"POINT({value_geopoint.longitude} {value_geopoint.latitude})"
             if value_geopoint is not None
+            else None
+        )
+        location_point_wkt = (
+            f"POINT({location_point.longitude} {location_point.latitude})"
+            if location_point is not None
             else None
         )
         await self._repo.insert_observation(
@@ -587,6 +602,8 @@ class SignalsServiceImpl:
             attachment_s3_key=attachment_s3_key,
             notes=notes,
             recorded_by=recorded_by,
+            location_mode=location_mode,
+            location_point_wkt=location_point_wkt,
         )
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -616,6 +633,7 @@ class SignalsServiceImpl:
         block_id: UUID | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
+        template_observation_id: UUID | None = None,
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]:
         rows = await self._repo.list_observations(
@@ -624,6 +642,7 @@ class SignalsServiceImpl:
             block_id=block_id,
             since=since,
             until=until,
+            template_observation_id=template_observation_id,
             limit=limit,
         )
         return tuple(_enrich_observation(r, storage=self._storage) for r in rows)
@@ -983,23 +1002,26 @@ class SignalsServiceImpl:
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:
     """Map repository row → API shape: rename geopoint, attach a
-    short-lived presigned download URL when an attachment is set."""
+    short-lived presigned download URL when an attachment is set.
+    CS-5 also unwraps the location_point GeoJSON Point the same way
+    value_geopoint is unwrapped."""
     out = dict(row)
-    geo = out.pop("value_geopoint_geojson", None)
-    if isinstance(geo, dict) and geo.get("type") == "Point":
-        coords = geo.get("coordinates") or []
-        if len(coords) == 2:
-            out["value_geopoint"] = {"longitude": coords[0], "latitude": coords[1]}
-        else:
-            out["value_geopoint"] = None
-    else:
-        out["value_geopoint"] = None
+    out["value_geopoint"] = _geojson_point_to_geopoint(out.pop("value_geopoint_geojson", None))
+    out["location_point"] = _geojson_point_to_geopoint(out.pop("location_point_geojson", None))
     key = out.get("attachment_s3_key")
     if key:
         out["attachment_download_url"] = storage.presign_download(key=key).url
     else:
         out["attachment_download_url"] = None
     return out
+
+
+def _geojson_point_to_geopoint(geo: Any) -> dict[str, float] | None:
+    if isinstance(geo, dict) and geo.get("type") == "Point":
+        coords = geo.get("coordinates") or []
+        if len(coords) == 2:
+            return {"longitude": coords[0], "latitude": coords[1]}
+    return None
 
 
 def get_signals_service(*, tenant_session: AsyncSession) -> SignalsServiceImpl:

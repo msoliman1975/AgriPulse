@@ -491,6 +491,8 @@ async def create_observation(
         value_geopoint=payload.value_geopoint,
         attachment_s3_key=payload.attachment_s3_key,
         notes=payload.notes,
+        location_mode=payload.location_mode,
+        location_point=payload.location_point,
         recorded_by=context.user_id,
         tenant_schema=schema,
     )
@@ -507,6 +509,10 @@ async def list_observations(
     block_id: UUID | None = Query(default=None),
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
+    # CS-5: lets the FE fetch every sibling of a template submission.
+    # The submit endpoint returns the shared template_observation_id;
+    # the FE can pass it back through here to hydrate the full group.
+    template_observation_id: UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     context: RequestContext = Depends(requires_capability("signal.read")),
     service: SignalsServiceImpl = Depends(_service),
@@ -519,6 +525,7 @@ async def list_observations(
             block_id=block_id,
             since=since,
             until=until,
+            template_observation_id=template_observation_id,
             limit=limit,
         )
     )
