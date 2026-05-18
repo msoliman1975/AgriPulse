@@ -13,6 +13,12 @@ dependencies = [
   "uvicorn[standard]>=0.32,<0.33",
   "pydantic[email]>=2.9,<3",
   "pydantic-settings>=2.6,<3",
+  # Required by FastAPI's UploadFile / multipart form parsing.
+  # FastAPI raises at IMPORT time (not request time) when this is
+  # missing, so a route that uses UploadFile breaks the whole app at
+  # boot. Pulled in by CS-7 /signals/csv-import. Pinned to the same
+  # major as fastapi expects via Starlette.
+  "python-multipart>=0.0.20,<0.1",
 
   # Database
   "sqlalchemy[asyncio]>=2.0.36,<2.1",

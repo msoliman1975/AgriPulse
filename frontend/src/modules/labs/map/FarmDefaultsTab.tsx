@@ -9,30 +9,33 @@ import { useEffect, useState } from "react";
 import {
   applyIrrigation,
   applyOrg,
-  ApplyPreview,
   applySubscriptions,
   getIrrigationTemplate,
   getLocks,
   getOrgTemplate,
   getSubscriptionsTemplate,
-  ImageryTemplateRow,
-  IrrigationTemplate,
   lockCategory,
-  LockCategory,
-  LockState,
-  OrgTemplate,
   previewApplyIrrigation,
   previewApplyOrg,
   previewApplySubscriptions,
   putIrrigationTemplate,
   putOrgTemplate,
   replaceSubscriptionsTemplate,
+  unlockCategory,
+} from "@/api/farmConfig";
+import type {
+  ApplyPreview,
+  ImageryTemplateRow,
+  IrrigationTemplate,
+  LockCategory,
+  LockState,
+  OrgTemplate,
   SimpleApplyPreview,
   SubscriptionsTemplate,
-  unlockCategory,
   WeatherTemplateRow,
 } from "@/api/farmConfig";
-import { getConfig, ImageryConfigEntry } from "@/api/config";
+import { getConfig } from "@/api/config";
+import type { ImageryConfigEntry } from "@/api/config";
 
 interface Props {
   farmId: string;
