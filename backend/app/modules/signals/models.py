@@ -1,8 +1,21 @@
-"""Signals ORM models. All three tables live in the per-tenant schema.
+"""Signals ORM models. All tables live in the per-tenant schema.
 
 `signal_observations` is a TimescaleDB hypertable (no `PRIMARY KEY`
 that excludes the time column); we expose `time` + `id` as the replay
 unique key. Application-level UUID v7 keeps inserts ordered.
+
+Custom Signals (CS-1) additions:
+- `observed_at` / `recorded_at` SQLAlchemy synonyms over the existing
+  `time` / `inserted_at` columns. New code uses the synonym; the
+  underlying DB columns stay unchanged. The hypertable partition key
+  rename was deferred (see migrations/tenant/versions/0029_*.py).
+- `location_mode` + `location_point` on observations (D2). The
+  ST_Within trigger that enforces `point_in_entity` lives in the
+  migration; access through the repository as PostGIS rendering.
+- `aggregation` + `aggregation_window_days` on definitions (D3).
+- `template_observation_id` self-ref on observations (D8).
+- `SignalTemplate` + `SignalTemplateDefinition` for the
+  group-N-defs-for-UX pattern (D1).
 """
 
 from __future__ import annotations
@@ -15,6 +28,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     Text,
     UniqueConstraint,
@@ -22,7 +36,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
@@ -47,6 +61,15 @@ class SignalDefinition(Base, TimestampedMixin):
         Boolean, nullable=False, server_default=text("FALSE")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+    # CS-1 D3: per-definition aggregation rule. The recommendations
+    # engine uses `aggregation` + `aggregation_window_days` to collapse
+    # multiple observations to a single block-level value. Non-numeric
+    # value_kinds (categorical, event, boolean, geopoint) must always
+    # use `latest` — validated at the schema layer, not in DB, so legacy
+    # rows with NULL aggregation_window_days continue to work.
+    aggregation: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'latest'"))
+    aggregation_window_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class SignalAssignment(Base, TimestampedMixin):
@@ -100,9 +123,86 @@ class SignalObservation(Base):
     value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # value_geopoint stored as PostGIS geometry(Point,4326); not exposed via ORM
     # (consumers go through the repository which renders GeoJSON).
+    # location_point follows the same pattern — see CS-1 migration 0029.
     attachment_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     recorded_by: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     inserted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+    # CS-1 D2: how the observation is geolocated.
+    #   entity           → the observation refers to the whole block/farm;
+    #                      location_point is NULL.
+    #   point_in_entity  → location_point is a precise lat/lon that must
+    #                      lie within the referenced block (ST_Within
+    #                      trigger enforces this in DB).
+    #   free_point       → location_point is anywhere on earth; block_id
+    #                      may be NULL.
+    location_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'entity'")
+    )
+
+    # CS-1 D8: self-reference for template-grouped observations. The
+    # lead row of a template-group stores its own id; siblings carry
+    # the lead row's id. NULL = standalone observation. Application-
+    # enforced (no FK — see migration for rationale).
+    template_observation_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
+    # CS-1 D7 (synonym path — full rename deferred): new code can read
+    # / write `observed_at` and `recorded_at`. The underlying DB
+    # columns (`time`, `inserted_at`) are unchanged so the TimescaleDB
+    # hypertable partition stays valid. When CS-1b ships the real
+    # rename, drop these synonyms and rename the columns.
+    observed_at = synonym("time")
+    recorded_at = synonym("inserted_at")
+
+
+class SignalTemplate(Base, TimestampedMixin):
+    """`tenant_<id>.signal_templates` — CS-1 D1.
+
+    Groups N `SignalDefinition`s for the entry/log UX. The engine
+    still sees flat per-definition observations; templates are a
+    UX-only construct. Codes are unique among live rows.
+    """
+
+    __tablename__ = "signal_templates"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
+class SignalTemplateDefinition(Base):
+    """`tenant_<id>.signal_template_definitions` — junction table.
+
+    Ordered (`position`) and optionally `is_required`. The
+    per-template UX uses `position` for field order and `is_required`
+    to mark fields the operator must fill before submitting the
+    grouped log. The underlying per-definition observations are always
+    nullable — required-ness is a UX hint only.
+    """
+
+    __tablename__ = "signal_template_definitions"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    template_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("signal_templates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    signal_definition_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("signal_definitions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))

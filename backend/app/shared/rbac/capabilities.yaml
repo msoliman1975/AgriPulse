@@ -233,6 +233,13 @@ capabilities:
     description: Record an observation against an existing signal.
     scope: farm
     status: active
+  # CS-1 D5. Recording an observation is a routine field action
+  # (signal.record above); deleting one is an admin correction path,
+  # so it gets its own capability that we can grant separately.
+  signal.delete_observation:
+    description: Delete a previously-recorded signal observation.
+    scope: tenant
+    status: active
 
   # --- Vegetation plans ------------------------------------------------
   plan.read:
