@@ -15,6 +15,25 @@ need to import ``SignalsRepository``.
   * farm-scoped assignment for the block's farm (``farm_id = farm AND
     block_id IS NULL``)
   * block-scoped assignment (``block_id = block``)
+
+CS-6 aggregation:
+  Each ``signal_definitions`` row carries an ``aggregation`` mode +
+  optional ``aggregation_window_days``. The snapshot collapses
+  observations to a single block-level value per signal using the
+  rule:
+
+  * ``aggregation = 'latest'`` OR ``value_kind != 'numeric'`` →
+    take the most recent observation's value (legacy behaviour).
+  * ``aggregation ∈ {mean, median, max, min}`` on a numeric def →
+    GROUP BY signal_definition_id over the window (or all history
+    when ``aggregation_window_days IS NULL``), apply the SQL
+    aggregate, and report the window-max ``time`` so consumers can
+    still answer "how recent is this".
+
+  Non-numeric kinds are forced to ``latest`` by the service-layer
+  ``_coerce_aggregation_for_value_kind`` at write time, but we
+  belt-and-brace it here so a hand-edited definitions row can't
+  bypass the rule and return a nonsensical AVG over text values.
 """
 
 from __future__ import annotations
@@ -30,6 +49,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.conditions.context import SignalEntry
 
+# All five SQL aggregates collapsed into one CASE so the query stays
+# single-pass. PERCENTILE_CONT requires a float ordering expression,
+# hence the double-cast; the outer cast back to numeric keeps the
+# returned column type uniform with MAX/MIN/AVG (which preserve numeric).
+_AGGREGATE_SQL = """
+    CASE a.aggregation
+        WHEN 'mean'   THEN AVG(o.value_numeric)
+        WHEN 'median' THEN (
+            PERCENTILE_CONT(0.5)
+                WITHIN GROUP (ORDER BY o.value_numeric::double precision)
+        )::numeric
+        WHEN 'max'    THEN MAX(o.value_numeric)
+        WHEN 'min'    THEN MIN(o.value_numeric)
+    END
+"""
+
 
 async def load_snapshot(
     session: AsyncSession,
@@ -37,19 +72,23 @@ async def load_snapshot(
     block_id: UUID,
     farm_id: UUID,
 ) -> dict[str, SignalEntry]:
-    """Latest observation per applicable signal.
+    """Aggregated observation per applicable signal.
 
-    Signals with no observations yet are omitted — predicates that
-    reference them resolve to ``None`` in the evaluator (permissive
-    on missing data).
+    Signals with no observations in their window are omitted —
+    predicates that reference them resolve to ``None`` in the
+    evaluator (permissive on missing data).
     """
+    # _AGGREGATE_SQL is a module-level constant, not request input;
+    # all data params bind through :name placeholders.
     rows = (
         (
             await session.execute(
                 text(
-                    """
+                    f"""
                 WITH applicable AS (
-                    SELECT DISTINCT d.id, d.code
+                    SELECT DISTINCT
+                           d.id, d.code, d.value_kind,
+                           d.aggregation, d.aggregation_window_days
                     FROM signal_definitions d
                     JOIN signal_assignments a ON a.signal_definition_id = d.id
                     WHERE d.deleted_at IS NULL
@@ -62,22 +101,56 @@ async def load_snapshot(
                          OR (a.farm_id = :farm_id AND a.block_id IS NULL)
                       )
                 ),
-                latest AS (
+                -- CS-6: latest-mode rows + every non-numeric value_kind.
+                -- DISTINCT ON gives us the most recent observation per
+                -- signal_definition_id (ORDER BY DESC then dedupes).
+                latest_per_def AS (
                     SELECT DISTINCT ON (o.signal_definition_id)
                            o.signal_definition_id, o.time,
                            o.value_numeric, o.value_categorical,
                            o.value_event, o.value_boolean
                     FROM signal_observations o
-                    WHERE o.signal_definition_id IN (SELECT id FROM applicable)
+                    JOIN applicable a ON a.id = o.signal_definition_id
+                    WHERE (a.aggregation = 'latest' OR a.value_kind != 'numeric')
                       AND (o.block_id = :block_id OR o.block_id IS NULL)
                       AND o.farm_id = :farm_id
                     ORDER BY o.signal_definition_id, o.time DESC
+                ),
+                -- CS-6: aggregated rows for numeric defs with a non-
+                -- latest rule. NULL aggregation_window_days means
+                -- "use all history" — only meaningful for `latest`
+                -- but we guard here so a misconfigured row doesn't
+                -- silently filter to zero observations.
+                aggregated_per_def AS (
+                    SELECT o.signal_definition_id,
+                           MAX(o.time)  AS time,
+                           {_AGGREGATE_SQL} AS value_numeric,
+                           NULL::text     AS value_categorical,
+                           NULL::text     AS value_event,
+                           NULL::boolean  AS value_boolean
+                    FROM signal_observations o
+                    JOIN applicable a ON a.id = o.signal_definition_id
+                    WHERE a.aggregation != 'latest'
+                      AND a.value_kind = 'numeric'
+                      AND (o.block_id = :block_id OR o.block_id IS NULL)
+                      AND o.farm_id = :farm_id
+                      AND (
+                          a.aggregation_window_days IS NULL
+                          OR o.time >= now()
+                                     - make_interval(days => a.aggregation_window_days)
+                      )
+                    GROUP BY o.signal_definition_id, a.aggregation
+                ),
+                resolved AS (
+                    SELECT * FROM latest_per_def
+                    UNION ALL
+                    SELECT * FROM aggregated_per_def
                 )
-                SELECT a.code, l.time, l.value_numeric, l.value_categorical,
-                       l.value_event, l.value_boolean
+                SELECT a.code, r.time, r.value_numeric, r.value_categorical,
+                       r.value_event, r.value_boolean
                 FROM applicable a
-                JOIN latest l ON l.signal_definition_id = a.id
-                """
+                JOIN resolved r ON r.signal_definition_id = a.id
+                """  # noqa: S608 — only interp is the _AGGREGATE_SQL constant
                 ).bindparams(
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
