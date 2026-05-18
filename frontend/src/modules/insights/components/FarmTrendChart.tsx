@@ -6,13 +6,19 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-import { getFarmIndexTimeseries, type FarmIndexTimeseriesPoint } from "@/api/insights";
+import {
+  getFarmAnnotations,
+  getFarmIndexTimeseries,
+  type AnnotationSeverity,
+  type FarmIndexTimeseriesPoint,
+} from "@/api/insights";
 import { Skeleton } from "@/components/Skeleton";
 
 interface Props {
@@ -35,6 +41,15 @@ export function FarmTrendChart({ farmId, indexCode = "ndvi" }: Props): ReactNode
   const { data, isLoading, isError } = useQuery({
     queryKey: ["insights", "trend", farmId, indexCode] as const,
     queryFn: () => getFarmIndexTimeseries(farmId, { index_code: indexCode }),
+    enabled: Boolean(farmId),
+    staleTime: 60_000,
+  });
+  // B.3 annotations — independent query so a slow alerts join can't
+  // delay the chart's first paint. The trend chart renders without
+  // annotations if this fails or is still loading.
+  const annotationsQ = useQuery({
+    queryKey: ["insights", "annotations", farmId] as const,
+    queryFn: () => getFarmAnnotations(farmId),
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });
@@ -96,6 +111,20 @@ export function FarmTrendChart({ farmId, indexCode = "ndvi" }: Props): ReactNode
                   connectNulls
                 />
               ))}
+              {/* B.3: alert-opened markers. ReferenceLine stroke
+                  carries the severity colour; recharts doesn't
+                  expose per-line tooltips so the label rides in
+                  the line's `label` prop. */}
+              {(annotationsQ.data?.annotations ?? []).map((a) => (
+                <ReferenceLine
+                  key={`${a.time}-${a.block_id ?? "farm"}`}
+                  x={a.time}
+                  stroke={_annotationColor(a.severity)}
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  ifOverflow="hidden"
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -122,6 +151,15 @@ const PALETTE = [
 
 function _lineColor(index: number): string {
   return PALETTE[index % PALETTE.length];
+}
+
+// Annotation colour palette — matches the HEALTH_CHIP scheme in
+// BlockHealthScorecard so the operator's eye reads the same colour
+// language across both surfaces.
+function _annotationColor(severity: AnnotationSeverity): string {
+  if (severity === "critical") return "#A32D2D";
+  if (severity === "warning") return "#854F0B";
+  return "#9C9C9C";
 }
 
 function _fmtDateTick(value: string): string {

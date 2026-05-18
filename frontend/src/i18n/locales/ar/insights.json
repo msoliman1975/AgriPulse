@@ -8,6 +8,13 @@
     "loadFailed": "تعذر تحميل الاتجاه.",
     "empty": "لا توجد ملاحظات بعد. ستظهر النقاط هنا عند ابتلاع مشاهد Sentinel لأي حقل."
   },
+  "season": {
+    "regionLabel": "سياق الموسم",
+    "label": "في هذه المزرعة:",
+    "blockCount": "حقل {{count}}",
+    "blockCount_other": "{{count}} حقول",
+    "noCrops": "{{count}} حقول نشطة · لم تُسند المحاصيل بعد"
+  },
   "scorecard": {
     "title": "بطاقة صحة الحقول",
     "subtitle": "مرتَّبة حسب أولوية الانتباه",

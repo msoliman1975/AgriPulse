@@ -8,6 +8,13 @@
     "loadFailed": "Failed to load trend.",
     "empty": "No observations yet. Once Sentinel scenes are ingested for any block, points will appear here."
   },
+  "season": {
+    "regionLabel": "Season context",
+    "label": "On this farm:",
+    "blockCount": "{{count}} block",
+    "blockCount_other": "{{count}} blocks",
+    "noCrops": "{{count}} active blocks · no crops assigned yet"
+  },
   "scorecard": {
     "title": "Block health scorecard",
     "subtitle": "Sorted by attention-needed first",

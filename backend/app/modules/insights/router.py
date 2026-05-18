@@ -20,8 +20,11 @@ from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import requires_capability
 
 from .schemas import (
+    FarmAlertTrendResponse,
+    FarmAnnotationsResponse,
     FarmHealthSummaryResponse,
     FarmIndexTimeseriesResponse,
+    FarmSeasonContextResponse,
     TimeseriesGranularity,
 )
 from .service import InsightsService, get_insights_service
@@ -93,4 +96,52 @@ async def get_farm_health_summary(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     out = await service.get_farm_health_summary(farm_id=farm_id)
+    return out.model_dump(mode="json")
+
+
+@router.get(
+    "/farms/{farm_id}/insights-annotations",
+    response_model=FarmAnnotationsResponse,
+    summary="Vertical markers for the farm trend chart (B.3).",
+)
+async def get_farm_annotations(
+    farm_id: UUID,
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    context: RequestContext = Depends(requires_capability("alert.read", farm_id_param="farm_id")),
+    service: InsightsService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    out = await service.get_farm_annotations(farm_id=farm_id, since=since, until=until)
+    return out.model_dump(mode="json")
+
+
+@router.get(
+    "/farms/{farm_id}/season-context",
+    response_model=FarmSeasonContextResponse,
+    summary="Crop mix + block counts for the season-context bar (B.3).",
+)
+async def get_farm_season_context(
+    farm_id: UUID,
+    context: RequestContext = Depends(requires_capability("farm.read", farm_id_param="farm_id")),
+    service: InsightsService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    out = await service.get_farm_season_context(farm_id=farm_id)
+    return out.model_dump(mode="json")
+
+
+@router.get(
+    "/farms/{farm_id}/alert-trend",
+    response_model=FarmAlertTrendResponse,
+    summary="Daily open-alert count for the alerts KPI sparkline (B.3).",
+)
+async def get_farm_alert_trend(
+    farm_id: UUID,
+    days: int = Query(default=7, ge=1, le=90),
+    context: RequestContext = Depends(requires_capability("alert.read", farm_id_param="farm_id")),
+    service: InsightsService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    out = await service.get_farm_alert_trend(farm_id=farm_id, days=days)
     return out.model_dump(mode="json")

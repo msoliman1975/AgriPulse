@@ -14,6 +14,7 @@ import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForeca
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
 import { KPICards } from "../components/KPICards";
+import { SeasonContextBar } from "../components/SeasonContextBar";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -91,6 +92,8 @@ export function InsightsPage(): ReactNode {
       </header>
 
       <KPICards farmId={farmId} />
+
+      <SeasonContextBar farmId={farmId} />
 
       <FarmTrendChart farmId={farmId} />
 
