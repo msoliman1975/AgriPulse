@@ -2,6 +2,32 @@
   "page": {
     "title": "Farm health overview"
   },
+  "trend": {
+    "title": "Vegetation index trend",
+    "indexLabel": "{{code}}, all blocks",
+    "loadFailed": "Failed to load trend.",
+    "empty": "No observations yet. Once Sentinel scenes are ingested for any block, points will appear here."
+  },
+  "scorecard": {
+    "title": "Block health scorecard",
+    "subtitle": "Sorted by attention-needed first",
+    "loadFailed": "Failed to load scorecard.",
+    "empty": "No blocks in this farm yet.",
+    "headers": {
+      "block": "Block",
+      "health": "Health",
+      "current": "NDVI",
+      "trend": "30d trend",
+      "alerts": "Alerts",
+      "lastObs": "Last obs"
+    },
+    "health": {
+      "healthy": "Healthy",
+      "watch": "Watch",
+      "critical": "Critical",
+      "unknown": "Unknown"
+    }
+  },
   "greeting": {
     "morning": "Good morning",
     "afternoon": "Good afternoon",
