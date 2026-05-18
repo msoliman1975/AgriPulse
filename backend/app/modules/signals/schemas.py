@@ -218,6 +218,75 @@ class SignalTemplateUpdateRequest(BaseModel):
     members: list[SignalTemplateDefinitionMember] | None = None
 
 
+# ---- CS-4: template-observation submission --------------------------------
+
+
+class SignalTemplateObservationMemberSubmission(BaseModel):
+    """One observation slot inside a template submission.
+
+    Each member POSTs at most one value (matching the referenced
+    definition's value_kind). The omission of a member is fine — the
+    flat-observation row is always nullable and `is_required` is a
+    UX-layer hint (CS-1 D1). Empty member list at the top level is
+    rejected by the service layer.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    signal_definition_id: UUID
+    value_numeric: Decimal | None = None
+    value_categorical: str | None = None
+    value_event: str | None = Field(default=None, max_length=500)
+    value_boolean: bool | None = None
+    value_geopoint: GeopointModel | None = None
+    attachment_s3_key: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class SignalTemplateObservationCreateRequest(BaseModel):
+    """POST /api/v1/signals/templates/{template_id}/observations.
+
+    Atomically inserts one signal_observations row per member. All
+    siblings share a single `template_observation_id` (the lead row's
+    id) — the lead row stores its own id, every other row carries
+    that same id. CS-1 D8.
+
+    `observed_at` (or `time` for backwards-compat — see CS-1's
+    SQLAlchemy synonym) and the location fields apply to every
+    sibling: the operator's mental model is "one field observation,
+    disaggregated into N signal rows."
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    farm_id: UUID
+    block_id: UUID | None = None
+    # `observed_at` is preferred per CS-1 D7; `time` is accepted as a
+    # legacy alias so old clients keep working. The service treats
+    # them as the same value.
+    observed_at: datetime | None = None
+    time: datetime | None = None
+    location_mode: LocationMode = "entity"
+    location_point: GeopointModel | None = None
+    members: list[SignalTemplateObservationMemberSubmission] = Field(min_length=1)
+
+
+class SignalTemplateObservationCreateResponse(BaseModel):
+    """Lean response — full per-observation hydration is available via
+    GET /signals/observations?template_observation_id=... if needed.
+    Keeping this small avoids re-reading N rows + N presign roundtrips
+    on the hot ingestion path."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    template_observation_id: UUID
+    template_id: UUID
+    farm_id: UUID
+    block_id: UUID | None
+    observed_at: datetime
+    observation_count: int
+
+
 class SignalAttachmentInitRequest(BaseModel):
     """POST /api/v1/signals/observations:upload-init.
 

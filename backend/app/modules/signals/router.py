@@ -43,6 +43,8 @@ from app.modules.signals.schemas import (
     SignalObservationResponse,
     SignalTemplateCreateRequest,
     SignalTemplateDefinitionMember,
+    SignalTemplateObservationCreateRequest,
+    SignalTemplateObservationCreateResponse,
     SignalTemplateResponse,
     SignalTemplateUpdateRequest,
 )
@@ -371,6 +373,46 @@ async def delete_template(
     await service.delete_template(
         template_id=template_id,
         actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.post(
+    "/signals/templates/{template_id}/observations",
+    response_model=SignalTemplateObservationCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Atomically log N observations against a template (CS-4).",
+)
+async def create_template_observation(
+    template_id: UUID,
+    payload: SignalTemplateObservationCreateRequest,
+    # signal.record is the same farm-scoped capability used by the
+    # one-shot observation endpoint. We auth at the function level
+    # then body-check the farm scope because farm_id lives in the JSON
+    # body (same pattern as create_observation below).
+    context: RequestContext = Depends(get_current_context),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    _ensure_farm_capability(context, "signal.record", payload.farm_id)
+    if context.user_id is None:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="User id required",
+            detail="Template-observation submission requires an authenticated user id.",
+            type_="https://agripulse.cloud/problems/user-id-required",
+        )
+    return await service.create_template_observation(
+        template_id=template_id,
+        farm_id=payload.farm_id,
+        block_id=payload.block_id,
+        observed_at=payload.observed_at or payload.time,
+        location_mode=payload.location_mode,
+        location_point=payload.location_point,
+        members=tuple(payload.members),
+        recorded_by=context.user_id,
         tenant_schema=schema,
     )
 

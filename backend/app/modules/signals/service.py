@@ -41,6 +41,7 @@ from app.modules.signals.repository import SignalsRepository
 from app.modules.signals.schemas import (
     GeopointModel,
     SignalTemplateDefinitionMember,
+    SignalTemplateObservationMemberSubmission,
     _coerce_aggregation_for_value_kind,
 )
 from app.shared.db.ids import uuid7
@@ -192,6 +193,20 @@ class SignalsService(Protocol):
         until: datetime | None = None,
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]: ...
+
+    async def create_template_observation(
+        self,
+        *,
+        template_id: UUID,
+        farm_id: UUID,
+        block_id: UUID | None,
+        observed_at: datetime | None,
+        location_mode: str,
+        location_point: GeopointModel | None,
+        members: tuple[SignalTemplateObservationMemberSubmission, ...],
+        recorded_by: UUID,
+        tenant_schema: str,
+    ) -> dict[str, Any]: ...
 
 
 class SignalsServiceImpl:
@@ -781,6 +796,189 @@ class SignalsServiceImpl:
                     f"{', '.join(str(d) for d in missing)}"
                 ),
             )
+
+    # ---- Template-observation submission (CS-4) -----------------------
+
+    async def create_template_observation(
+        self,
+        *,
+        template_id: UUID,
+        farm_id: UUID,
+        block_id: UUID | None,
+        observed_at: datetime | None,
+        location_mode: str,
+        location_point: GeopointModel | None,
+        members: tuple[SignalTemplateObservationMemberSubmission, ...],
+        recorded_by: UUID,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        """Atomic N-row insert with shared template_observation_id (D8).
+
+        Validation gates (all surfaced as 400 / 404):
+          1. Template exists + not soft-deleted.
+          2. Every submitted member's signal_definition_id is actually
+             a member of this template (template-bound).
+          3. Each submitted value matches its definition's value_kind +
+             bounds (delegates to _validate_value).
+          4. Attachments respect each definition's attachment_allowed
+             + presence in object storage.
+          5. location_mode/location_point combo respects the CS-1 D2
+             rules (entity ⇒ NULL location_point; point_in_entity /
+             free_point ⇒ non-NULL). The ST_Within DB trigger is the
+             ultimate authority for point_in_entity correctness; we
+             pre-check only the presence rule here.
+
+        Returns the lean response shape: shared template_observation_id
+        + counts. Full per-row hydration is `GET
+        /signals/observations?template_observation_id=...`.
+        """
+        if not members:
+            # Defensive: schema enforces min_length=1 but a future
+            # caller path might bypass Pydantic.
+            raise SignalTemplateMembersInvalidError(
+                detail="Template submission must include at least one member."
+            )
+        self._validate_location_presence(location_mode=location_mode, location_point=location_point)
+
+        template = await self._repo.get_template(template_id=template_id)
+        if template is None:
+            raise SignalTemplateNotFoundError(template_id)
+
+        # Build the set of definition ids this template binds, then
+        # reject submitted member ids that aren't bound. This prevents
+        # callers from sneaking observations into a template that
+        # doesn't actually contain that definition.
+        template_members = await self._repo.get_template_members(template_id=template_id)
+        bound_def_ids = {m["signal_definition_id"] for m in template_members}
+        submitted_def_ids = [m.signal_definition_id for m in members]
+        if len(set(submitted_def_ids)) != len(submitted_def_ids):
+            raise SignalTemplateMembersInvalidError(
+                detail="Duplicate signal_definition_id in submission members."
+            )
+        out_of_scope = [d for d in submitted_def_ids if d not in bound_def_ids]
+        if out_of_scope:
+            raise SignalTemplateMembersInvalidError(
+                detail=(
+                    f"Members reference signal definitions not bound to template "
+                    f"{template_id}: {', '.join(str(d) for d in out_of_scope)}"
+                ),
+            )
+
+        # Pre-load each definition once; validate every submitted value
+        # before any insert fires so a single bad member can't leave
+        # half the batch in the DB.
+        defs_by_id: dict[UUID, dict[str, Any]] = {}
+        for member in members:
+            defn = await self._repo.get_definition(definition_id=member.signal_definition_id)
+            if defn is None:
+                # Race: a definition was soft-deleted between
+                # get_template_members and now. Surface as the
+                # same 400 the bound-check uses.
+                raise SignalTemplateMembersInvalidError(
+                    detail=(
+                        f"Signal definition {member.signal_definition_id} "
+                        f"was deleted between template fetch and submit; retry."
+                    ),
+                )
+            defs_by_id[member.signal_definition_id] = defn
+            self._validate_value(
+                defn=defn,
+                request_values={
+                    "value_numeric": member.value_numeric,
+                    "value_categorical": member.value_categorical,
+                    "value_event": member.value_event,
+                    "value_boolean": member.value_boolean,
+                    "value_geopoint": member.value_geopoint,
+                },
+            )
+            if member.attachment_s3_key is not None:
+                if not defn["attachment_allowed"]:
+                    raise AttachmentNotPermittedError(code=defn["code"])
+                try:
+                    self._storage.head_object(key=member.attachment_s3_key)
+                except StorageObjectMissingError as exc:
+                    raise AttachmentMissingError(key=member.attachment_s3_key) from exc
+
+        # Lead row id is the shared template_observation_id (D8: the
+        # lead row stores its own id, siblings carry it).
+        lead_observation_id = uuid7()
+        observation_time = observed_at or datetime.now(UTC)
+        location_point_wkt = (
+            f"POINT({location_point.longitude} {location_point.latitude})"
+            if location_point is not None
+            else None
+        )
+
+        for index, member in enumerate(members):
+            obs_id = lead_observation_id if index == 0 else uuid7()
+            value_geopoint_wkt = (
+                f"POINT({member.value_geopoint.longitude} {member.value_geopoint.latitude})"
+                if member.value_geopoint is not None
+                else None
+            )
+            await self._repo.insert_observation(
+                observation_id=obs_id,
+                time=observation_time,
+                signal_definition_id=member.signal_definition_id,
+                farm_id=farm_id,
+                block_id=block_id,
+                value_numeric=member.value_numeric,
+                value_categorical=member.value_categorical,
+                value_event=member.value_event,
+                value_boolean=member.value_boolean,
+                value_geopoint_wkt=value_geopoint_wkt,
+                attachment_s3_key=member.attachment_s3_key,
+                notes=member.notes,
+                recorded_by=recorded_by,
+                template_observation_id=lead_observation_id,
+                location_mode=location_mode,
+                location_point_wkt=location_point_wkt,
+            )
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.template_observation_recorded",
+            actor_user_id=recorded_by,
+            subject_kind="signal_template_observation",
+            subject_id=lead_observation_id,
+            farm_id=farm_id,
+            details={
+                "template_id": str(template_id),
+                "template_code": template["code"],
+                "block_id": str(block_id) if block_id else None,
+                "observation_count": len(members),
+                "location_mode": location_mode,
+            },
+        )
+
+        return {
+            "template_observation_id": lead_observation_id,
+            "template_id": template_id,
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "observed_at": observation_time,
+            "observation_count": len(members),
+        }
+
+    @staticmethod
+    def _validate_location_presence(
+        *, location_mode: str, location_point: GeopointModel | None
+    ) -> None:
+        """CS-1 D2 presence rule. The DB CHECK constraint enforces the
+        same shape, but checking here surfaces a clean 400 with field
+        context instead of a low-level IntegrityError."""
+        if location_mode == "entity":
+            if location_point is not None:
+                raise InvalidSignalValueError(
+                    detail="location_mode='entity' must not include a location_point."
+                )
+        elif location_mode in {"point_in_entity", "free_point"}:
+            if location_point is None:
+                raise InvalidSignalValueError(
+                    detail=f"location_mode={location_mode!r} requires a location_point."
+                )
+        else:
+            raise InvalidSignalValueError(detail=f"Unknown location_mode {location_mode!r}.")
 
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:
