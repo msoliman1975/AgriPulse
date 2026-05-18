@@ -29,6 +29,9 @@ import {
 } from "@/api/farms";
 import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawTarget } from "./MapCanvas";
+import { SignalOverlayControl } from "./SignalOverlayControl";
+import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
+import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { DetailPanel } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
@@ -205,6 +208,13 @@ function MapForFarm({ farmId }: { farmId: string }) {
 
   const [farmDrawerMode, setFarmDrawerMode] = useState<FarmDrawerMode | null>(null);
 
+  // ---- Signal overlay state (CS-8) ---------------------------------------
+  //
+  // Null = no overlay shown. When set to a definition id, the page
+  // fetches that signal's observations for the active farm and
+  // converts them to a Point FeatureCollection MapCanvas can render.
+  const [signalOverlayDefId, setSignalOverlayDefId] = useState<string | null>(null);
+
   // ---- Inactivate flows ---------------------------------------------------
 
   const [inactivateBlockOpen, setInactivateBlockOpen] = useState(false);
@@ -245,6 +255,29 @@ function MapForFarm({ farmId }: { farmId: string }) {
     queryKey: ["labs/map/farmsList"],
     queryFn: () => listFarms({ limit: 50 }),
     staleTime: 60_000,
+  });
+
+  // CS-8: signal definitions list (powers the overlay picker).
+  // Tenant-scoped; one fetch covers the whole session. Cached 5 min.
+  const signalDefinitionsQ = useQuery({
+    queryKey: ["labs/map/signalDefinitions"],
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 5 * 60_000,
+  });
+
+  // CS-8: observations for the picked signal in the active farm.
+  // Disabled until the operator picks something; limit 500 is the
+  // current backend cap.
+  const signalObservationsQ = useQuery({
+    queryKey: ["labs/map/signalObservations", farmId, signalOverlayDefId],
+    queryFn: () =>
+      listSignalObservations({
+        farm_id: farmId,
+        signal_definition_id: signalOverlayDefId ?? undefined,
+        limit: 500,
+      }),
+    enabled: Boolean(farmId && signalOverlayDefId),
+    staleTime: 30_000,
   });
 
   const blocksById = useMemo(() => {
@@ -472,6 +505,38 @@ function MapForFarm({ farmId }: { farmId: string }) {
   );
 
   // ---- Render -------------------------------------------------------------
+  //
+  // The two CS-8 useMemo hooks sit ABOVE the early returns so they
+  // run on every render (rules-of-hooks). They guard internally on
+  // summaryQ.data being undefined.
+
+  const selectedSignalDefinition =
+    signalDefinitionsQ.data?.find((d) => d.id === signalOverlayDefId) ?? null;
+  const blockCentroids = useMemo(
+    () =>
+      summaryQ.data
+        ? blockCentroidsFromGeojson(summaryQ.data.geojson)
+        : new Map<string, [number, number]>(),
+    [summaryQ.data],
+  );
+  const signalOverlay = useMemo(() => {
+    if (!signalOverlayDefId) return { fc: null, observationCount: 0, skippedCount: 0 };
+    if (!signalObservationsQ.data) {
+      return {
+        fc: { type: "FeatureCollection" as const, features: [] },
+        observationCount: 0,
+        skippedCount: 0,
+      };
+    }
+    const built = buildSignalOverlay(signalObservationsQ.data, blockCentroids, {
+      valueKind: selectedSignalDefinition?.value_kind ?? null,
+    });
+    return {
+      fc: built.features,
+      observationCount: built.features.features.length,
+      skippedCount: built.skippedCount,
+    };
+  }, [signalOverlayDefId, signalObservationsQ.data, blockCentroids, selectedSignalDefinition]);
 
   if (summaryQ.isLoading) {
     return <FullState>Loading farm map…</FullState>;
@@ -569,10 +634,29 @@ function MapForFarm({ farmId }: { farmId: string }) {
             showBlockBorders={layerPrefs.borders}
             showBlockLabels={layerPrefs.labels}
             borderOpacity={layerPrefs.borderOpacity}
+            signalOverlay={signalOverlay.fc}
+            onSignalClick={(observationId) => {
+              // V1 — surface the observation id via the URL so a
+              // future side-panel can read it without prop-drilling.
+              // Behavioural sink (mini popup) is a follow-up.
+              const next = new URLSearchParams(search);
+              next.set("signal_obs", observationId);
+              setSearch(next, { replace: true });
+            }}
           />
         )}
 
         <MapNote drawTarget={drawTarget} />
+
+        <SignalOverlayControl
+          definitions={signalDefinitionsQ.data ?? []}
+          selectedDefinitionId={signalOverlayDefId}
+          observationCount={signalOverlay.observationCount}
+          skippedCount={signalOverlay.skippedCount}
+          isLoading={signalObservationsQ.isLoading}
+          isError={signalObservationsQ.isError}
+          onChange={setSignalOverlayDefId}
+        />
 
         {selectedId && farmDrawerMode === null ? (
           <DetailPanel
