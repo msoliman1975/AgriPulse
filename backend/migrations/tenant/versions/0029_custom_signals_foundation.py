@@ -96,7 +96,7 @@ def upgrade() -> None:
             "id",
             sa.dialects.postgresql.UUID(as_uuid=True),
             primary_key=True,
-            server_default=sa.text("uuid_v7()"),
+            server_default=sa.text("uuid_generate_v7()"),
         ),
         sa.Column("code", sa.Text(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
@@ -131,13 +131,15 @@ def upgrade() -> None:
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_unique_constraint(
+    # Codes are unique among live rows. Soft-deleted rows free up the
+    # code namespace — matches the convention from the
+    # `signal_definitions` table. Partial uniqueness requires an
+    # Index (CONSTRAINT doesn't accept WHERE in Postgres / SQLAlchemy).
+    op.create_index(
         "uq_signal_templates_code_alive",
         "signal_templates",
         ["code"],
-        # Codes are unique among live rows. Soft-deleted rows free up
-        # the code namespace — matches the convention from the
-        # `signal_definitions` table.
+        unique=True,
         postgresql_where=sa.text("deleted_at IS NULL"),
     )
 
@@ -147,7 +149,7 @@ def upgrade() -> None:
             "id",
             sa.dialects.postgresql.UUID(as_uuid=True),
             primary_key=True,
-            server_default=sa.text("uuid_v7()"),
+            server_default=sa.text("uuid_generate_v7()"),
         ),
         sa.Column(
             "template_id",
