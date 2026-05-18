@@ -475,6 +475,15 @@ class SignalsRepository:
         attachment_s3_key: str | None,
         notes: str | None,
         recorded_by: UUID,
+        # CS-1 / CS-4 additive params. Defaults preserve the pre-CS-1
+        # call shape so existing one-shot observations keep working
+        # without code changes elsewhere. Location_point WKT is
+        # rendered as `POINT(lon lat)` by the service layer; the
+        # ST_Within trigger from migration 0029 enforces the
+        # within-block constraint when location_mode='point_in_entity'.
+        template_observation_id: UUID | None = None,
+        location_mode: str = "entity",
+        location_point_wkt: str | None = None,
     ) -> None:
         await self._session.execute(
             text(
@@ -482,13 +491,17 @@ class SignalsRepository:
                 INSERT INTO signal_observations (
                     time, id, signal_definition_id, farm_id, block_id,
                     value_numeric, value_categorical, value_event, value_boolean,
-                    value_geopoint, attachment_s3_key, notes, recorded_by
+                    value_geopoint, attachment_s3_key, notes, recorded_by,
+                    template_observation_id, location_mode, location_point
                 ) VALUES (
                     :time, :id, :def_id, :farm_id, :block_id,
                     :value_numeric, :value_categorical, :value_event, :value_boolean,
                     CASE WHEN :geopoint IS NULL THEN NULL
                          ELSE ST_GeomFromText(:geopoint, 4326) END,
-                    :attachment_s3_key, :notes, :recorded_by
+                    :attachment_s3_key, :notes, :recorded_by,
+                    :template_observation_id, :location_mode,
+                    CASE WHEN :location_point IS NULL THEN NULL
+                         ELSE ST_GeomFromText(:location_point, 4326) END
                 )
                 """
             ).bindparams(
@@ -497,6 +510,7 @@ class SignalsRepository:
                 bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("recorded_by", type_=PG_UUID(as_uuid=True)),
+                bindparam("template_observation_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "time": time,
@@ -512,6 +526,9 @@ class SignalsRepository:
                 "attachment_s3_key": attachment_s3_key,
                 "notes": notes,
                 "recorded_by": recorded_by,
+                "template_observation_id": template_observation_id,
+                "location_mode": location_mode,
+                "location_point": location_point_wkt,
             },
         )
 
