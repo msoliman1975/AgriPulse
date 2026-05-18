@@ -1,4 +1,15 @@
 {
+  "overlay": {
+    "regionLabel": "Signal observations map overlay",
+    "title": "Signal overlay",
+    "selectLabel": "Choose a signal to overlay",
+    "none": "— none —",
+    "loading": "Loading observations…",
+    "loadFailed": "Failed to load observations.",
+    "count": "{{count}} observation",
+    "count_other": "{{count}} observations",
+    "withSkipped": "{{shown}} shown · {{skipped}} skipped (no location)"
+  },
   "config": {
     "title": "Custom signals",
     "subtitle": "Define data streams your team can record from the field — soil moisture, scout pest counts, irrigation events.",

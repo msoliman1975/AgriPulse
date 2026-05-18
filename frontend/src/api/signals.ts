@@ -59,6 +59,8 @@ export interface Geopoint {
   longitude: number;
 }
 
+export type LocationMode = "entity" | "point_in_entity" | "free_point";
+
 export interface SignalObservation {
   id: string;
   time: string;
@@ -76,6 +78,11 @@ export interface SignalObservation {
   notes: string | null;
   recorded_by: string;
   inserted_at: string;
+  // CS-5 surface — defaults preserve old shape for FE consumers that
+  // haven't been updated. `entity` mode has no location_point.
+  location_mode?: LocationMode;
+  location_point?: Geopoint | null;
+  template_observation_id?: string | null;
 }
 
 export interface SignalObservationCreatePayload {
@@ -112,6 +119,9 @@ export interface ListObservationParams {
   block_id?: string;
   since?: string;
   until?: string;
+  // CS-5: lets the FE hydrate every sibling of a template submission
+  // in one query (the submit response returns this id).
+  template_observation_id?: string;
   limit?: number;
 }
 

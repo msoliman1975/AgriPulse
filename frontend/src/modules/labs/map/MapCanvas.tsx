@@ -11,8 +11,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
+import type { SignalOverlayProps } from "./signalOverlay";
 import type { UnitFeatureProps } from "./types";
-import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 
 // Block drawing produces a Polygon. Farm AOI drawing also produces a
 // Polygon under the hood, but we wrap it into a single-polygon
@@ -48,6 +49,11 @@ interface Props {
   showBlockLabels?: boolean;
   // 0..1 multiplier applied to AOI line opacity and block stroke opacity.
   borderOpacity?: number;
+  // CS-8: signal-observation overlay. `null` hides the layer; an FC
+  // (possibly empty) shows it. Click on a marker fires onSignalClick
+  // with the underlying observation id.
+  signalOverlay?: FeatureCollection<Point, SignalOverlayProps> | null;
+  onSignalClick?: (observationId: string) => void;
 }
 
 const SOURCE_ID = "units";
@@ -60,9 +66,19 @@ const ALERT_BADGE_LAYER = "alert-badges";
 const AOI_SOURCE_ID = "farm-aoi";
 const AOI_FILL_LAYER = "farm-aoi-fill";
 const AOI_LINE_LAYER = "farm-aoi-line";
+// CS-8: signal-observation overlay. One source + one circle layer
+// per active overlay; the map page swaps the source data when the
+// operator picks a different signal definition.
+const SIGNAL_SOURCE_ID = "signal-overlay";
+const SIGNAL_CIRCLE_LAYER = "signal-overlay-circle";
+const SIGNAL_HALO_LAYER = "signal-overlay-halo";
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
+// Visually distinct from block fills + alert badges. Amber-500 chosen
+// because the existing alert palette uses red/orange and we want the
+// overlay to read as informational, not warning-level.
+const SIGNAL_OVERLAY_COLOR = "#f59e0b";
 
 const STYLE: StyleSpecification = {
   version: 8,
@@ -113,6 +129,8 @@ export function MapCanvas({
   showBlockBorders = true,
   showBlockLabels = true,
   borderOpacity = 0.9,
+  signalOverlay = null,
+  onSignalClick,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -127,6 +145,8 @@ export function MapCanvas({
   onPivotDrawnRef.current = onPivotDrawn;
   const onReshapeRef = useRef(onReshape);
   onReshapeRef.current = onReshape;
+  const onSignalClickRef = useRef(onSignalClick);
+  onSignalClickRef.current = onSignalClick;
 
   // Initial mount.
   useEffect(() => {
@@ -293,10 +313,45 @@ export function MapCanvas({
         },
       });
 
+      // CS-8: signal overlay source + two layers. The halo is a wider
+      // semi-transparent ring under the solid circle so markers stay
+      // visible against satellite imagery without dominating the map.
+      map.addSource(SIGNAL_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: SIGNAL_HALO_LAYER,
+        type: "circle",
+        source: SIGNAL_SOURCE_ID,
+        paint: {
+          "circle-color": SIGNAL_OVERLAY_COLOR,
+          "circle-radius": 10,
+          "circle-opacity": 0.25,
+        },
+      });
+      map.addLayer({
+        id: SIGNAL_CIRCLE_LAYER,
+        type: "circle",
+        source: SIGNAL_SOURCE_ID,
+        paint: {
+          "circle-color": SIGNAL_OVERLAY_COLOR,
+          "circle-radius": 5,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5,
+        },
+      });
+
       map.on("mousemove", FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
       map.on("mouseleave", FILL_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mousemove", SIGNAL_CIRCLE_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", SIGNAL_CIRCLE_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
 
@@ -305,6 +360,14 @@ export function MapCanvas({
         if (!f) return;
         const props = f.properties as Pick<UnitFeatureProps, "id">;
         onSelectRef.current(props.id);
+      });
+      map.on("click", SIGNAL_CIRCLE_LAYER, (ev) => {
+        const f = ev.features?.[0];
+        if (!f) return;
+        const props = f.properties as { observation_id?: string };
+        if (props.observation_id) {
+          onSignalClickRef.current?.(props.observation_id);
+        }
       });
     });
 
@@ -367,6 +430,28 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [farmBoundary]);
+
+  // CS-8: push signal overlay data + toggle visibility. `null` ⇒
+  // hide; an empty FC ⇒ visible-but-empty (clears any stale markers
+  // from a previous picker selection).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const src = map.getSource(SIGNAL_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+      const visible = signalOverlay !== null;
+      const fc = signalOverlay ?? { type: "FeatureCollection", features: [] };
+      src.setData(fc);
+      for (const layerId of [SIGNAL_CIRCLE_LAYER, SIGNAL_HALO_LAYER]) {
+        if (!map.getLayer(layerId)) continue;
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [signalOverlay]);
 
   // Visibility + opacity toggles. Each prop maps to one or two MapLibre
   // layers; if a layer hasn't been added yet (style still loading) we
