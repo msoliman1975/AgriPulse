@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "AgriPulse",
+    "name": "Agri.Pulse",
     "tagline": "Satellite-driven farm management"
   },
   "nav": {
@@ -11,14 +11,14 @@
   "shell": {
     "languageToggle": "Language",
     "languageEnglish": "English",
-    "languageArabic": "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
+    "languageArabic": "العربية",
     "unitToggle": "Area unit",
     "unitFeddan": "Feddan",
     "unitAcre": "Acre",
     "unitHectare": "Hectare",
     "weatherUnitToggle": "Weather units",
-    "weatherUnitMetric": "Metric (Â°C, mm)",
-    "weatherUnitImperial": "Imperial (Â°F, in)",
+    "weatherUnitMetric": "Metric (°C, mm)",
+    "weatherUnitImperial": "Imperial (°F, in)",
     "userMenu": "Account menu",
     "signOut": "Sign out",
     "settingsTitle": "Settings",
@@ -60,6 +60,6 @@
   "actions": {
     "retry": "Retry",
     "close": "Close",
-    "loading": "Loadingâ€¦"
+    "loading": "Loading…"
   }
 }
