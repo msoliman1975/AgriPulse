@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -493,6 +493,40 @@ async def create_observation(
         notes=payload.notes,
         location_mode=payload.location_mode,
         location_point=payload.location_point,
+        recorded_by=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.post(
+    "/signals/csv-import",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Strict CSV import for signal observations (CS-7).",
+)
+async def import_observations_csv(
+    farm_id: UUID = Query(..., description="Target farm; all rows are recorded against it."),
+    file: UploadFile = File(..., description="UTF-8 CSV file. See module docstring for schema."),
+    context: RequestContext = Depends(get_current_context),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, int]:
+    schema = _ensure_tenant(context)
+    # signal.record on the target farm; per-row farm_id is fixed by
+    # the query param so we authorize once instead of N times.
+    _ensure_farm_capability(context, "signal.record", farm_id)
+    if context.user_id is None:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="User context required",
+            detail="CSV import requires an authenticated user.",
+            type_="https://agripulse.cloud/problems/user-required",
+        )
+    csv_bytes = await file.read()
+    return await service.import_observations_csv(
+        farm_id=farm_id,
+        csv_bytes=csv_bytes,
         recorded_by=context.user_id,
         tenant_schema=schema,
     )

@@ -119,3 +119,39 @@ class SignalTemplateMembersInvalidError(APIError):
             detail=detail,
             type_=f"{_TYPE_BASE}/template-members-invalid",
         )
+
+
+class CsvImportFailedError(APIError):
+    """CS-7: strict-mode CSV import rejected the whole batch because at
+    least one row failed validation. The ``errors`` extras carry a list
+    of ``{row_number, field, message}`` dicts the FE can render inline
+    next to the rows the operator uploaded."""
+
+    def __init__(self, *, errors: list[dict[str, object]]) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Signal CSV import rejected",
+            detail=(
+                f"{len(errors)} row(s) failed validation; no observations were "
+                f"inserted. Fix the rows and re-upload."
+            ),
+            type_=f"{_TYPE_BASE}/csv-import-failed",
+            extras={"errors": errors},
+        )
+
+
+class CsvImportTooLargeError(APIError):
+    """File exceeded the byte cap. Distinct from CsvImportFailedError
+    so the FE can render a specific message ("file too large") vs the
+    per-row validation list."""
+
+    def __init__(self, *, size_bytes: int, limit_bytes: int) -> None:
+        super().__init__(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            title="Signal CSV import too large",
+            detail=(
+                f"Uploaded file ({size_bytes} bytes) exceeds the " f"{limit_bytes}-byte limit."
+            ),
+            type_=f"{_TYPE_BASE}/csv-import-too-large",
+            extras={"size_bytes": size_bytes, "limit_bytes": limit_bytes},
+        )
