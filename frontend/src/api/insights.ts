@@ -61,3 +61,70 @@ export async function getFarmHealthSummary(farmId: string): Promise<FarmHealthSu
   );
   return data;
 }
+
+// ---- B.3: annotations + season + alerts sparkline ------------------------
+
+export type AnnotationKind = "alert_opened";
+export type AnnotationSeverity = "critical" | "warning" | "info" | null;
+
+export interface TimeseriesAnnotation {
+  time: string;
+  kind: AnnotationKind;
+  label: string;
+  severity: AnnotationSeverity;
+  block_id: string | null;
+}
+
+export interface FarmAnnotationsResponse {
+  farm_id: string;
+  annotations: TimeseriesAnnotation[];
+}
+
+export async function getFarmAnnotations(
+  farmId: string,
+  params: { since?: string; until?: string } = {},
+): Promise<FarmAnnotationsResponse> {
+  const { data } = await apiClient.get<FarmAnnotationsResponse>(
+    `/v1/farms/${farmId}/insights-annotations`,
+    { params },
+  );
+  return data;
+}
+
+export interface SeasonContextCrop {
+  crop_id: string;
+  name_en: string;
+  name_ar: string | null;
+  block_count: number;
+}
+
+export interface FarmSeasonContextResponse {
+  farm_id: string;
+  crops: SeasonContextCrop[];
+  active_block_count: number;
+}
+
+export async function getFarmSeasonContext(farmId: string): Promise<FarmSeasonContextResponse> {
+  const { data } = await apiClient.get<FarmSeasonContextResponse>(
+    `/v1/farms/${farmId}/season-context`,
+  );
+  return data;
+}
+
+export interface AlertTrendPoint {
+  date: string;
+  open_count: number;
+}
+
+export interface FarmAlertTrendResponse {
+  farm_id: string;
+  days: number;
+  points: AlertTrendPoint[];
+}
+
+export async function getFarmAlertTrend(farmId: string, days = 7): Promise<FarmAlertTrendResponse> {
+  const { data } = await apiClient.get<FarmAlertTrendResponse>(`/v1/farms/${farmId}/alert-trend`, {
+    params: { days },
+  });
+  return data;
+}

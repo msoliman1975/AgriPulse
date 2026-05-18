@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useAlerts } from "@/queries/alerts";
+import { AlertsSparkline } from "./AlertsSparkline";
 import { useIrrigationSchedules } from "@/queries/irrigation";
 import { useCalendar } from "@/queries/plans";
 import { useRecommendations } from "@/queries/recommendations";
@@ -86,6 +87,7 @@ export function KPICards({ farmId }: Props): ReactNode {
             <Pill kind="ok">{t("kpi.alerts.deltaOk")}</Pill>
           )
         }
+        sparkline={<AlertsSparkline farmId={farmId} />}
         onClick={() => navigate(`/alerts/${farmId}`)}
       />
       <KPICard
