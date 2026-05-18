@@ -2,12 +2,15 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import type { DecisionTreeVersion, DryRunResponse } from "@/api/decisionTrees";
+import { listSignalDefinitions } from "@/api/signals";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
+import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
@@ -25,6 +28,13 @@ export function DecisionTreeEditorPage(): ReactNode {
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
   const dryRun = useDryRunDecisionTree();
+  // CS-7 D6: signal definitions list powers the SignalRefPicker
+  // helper above the YAML editor. Tenant-scoped, 5-min stale.
+  const signalDefsQ = useQuery({
+    queryKey: ["dtree-editor/signalDefinitions"],
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 5 * 60_000,
+  });
 
   // Editor buffer — initialised from the latest version once data loads.
   const [yamlBuffer, setYamlBuffer] = useState<string | null>(null);
@@ -150,6 +160,16 @@ export function DecisionTreeEditorPage(): ReactNode {
             </div>
           </header>
           <div className="p-4">
+            {canManage ? (
+              <div className="mb-3">
+                <SignalRefPicker
+                  definitions={signalDefsQ.data ?? []}
+                  isLoading={signalDefsQ.isLoading}
+                  isError={signalDefsQ.isError}
+                  format="yaml"
+                />
+              </div>
+            ) : null}
             <textarea
               value={yamlBuffer ?? ""}
               onChange={(e) => setYamlBuffer(e.target.value)}
