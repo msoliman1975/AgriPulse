@@ -540,6 +540,7 @@ class SignalsRepository:
         block_id: UUID | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
+        template_observation_id: UUID | None = None,
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]:
         clauses: list[str] = []
@@ -559,6 +560,11 @@ class SignalsRepository:
         if until is not None:
             clauses.append("o.time < :until")
             params["until"] = until
+        if template_observation_id is not None:
+            # CS-5: lets the FE fetch every sibling of a template
+            # submission in one query — the lead row plus its peers.
+            clauses.append("o.template_observation_id = :template_observation_id")
+            params["template_observation_id"] = template_observation_id
         where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         sql = (
             "SELECT o.id, o.time, o.signal_definition_id, "
@@ -567,7 +573,14 @@ class SignalsRepository:
             "       o.value_numeric, o.value_categorical, o.value_event, o.value_boolean, "
             "       CASE WHEN o.value_geopoint IS NULL THEN NULL "
             "            ELSE ST_AsGeoJSON(o.value_geopoint)::jsonb END AS value_geopoint_geojson, "
-            "       o.attachment_s3_key, o.notes, o.recorded_by, o.inserted_at "
+            "       o.attachment_s3_key, o.notes, o.recorded_by, o.inserted_at, "
+            # CS-5: surface the CS-1 columns on the read path so existing
+            # FE consumers can render them (defaults preserve old shape
+            # — entity-mode rows just emit NULL for location_point).
+            "       o.location_mode, "
+            "       CASE WHEN o.location_point IS NULL THEN NULL "
+            "            ELSE ST_AsGeoJSON(o.location_point)::jsonb END AS location_point_geojson, "
+            "       o.template_observation_id "
             "FROM signal_observations o "
             "JOIN signal_definitions d ON d.id = o.signal_definition_id "
             f"{where_sql} "
