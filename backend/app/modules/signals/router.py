@@ -27,6 +27,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,10 @@ from app.modules.signals.schemas import (
     SignalDefinitionUpdateRequest,
     SignalObservationCreateRequest,
     SignalObservationResponse,
+    SignalTemplateCreateRequest,
+    SignalTemplateDefinitionMember,
+    SignalTemplateResponse,
+    SignalTemplateUpdateRequest,
 )
 from app.modules.signals.service import SignalsServiceImpl, get_signals_service
 from app.shared.auth.context import RequestContext
@@ -130,6 +135,8 @@ async def create_definition(
         value_min=payload.value_min,
         value_max=payload.value_max,
         attachment_allowed=payload.attachment_allowed,
+        aggregation=payload.aggregation,
+        aggregation_window_days=payload.aggregation_window_days,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
@@ -242,6 +249,127 @@ async def delete_assignment(
     schema = _ensure_tenant(context)
     await service.delete_assignment(
         assignment_id=assignment_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+# ---------- Templates (CS-2/3) --------------------------------------------
+#
+# Templates group N SignalDefinitions for the entry UX. The engine
+# still sees flat per-definition observations; templates are a
+# tenant-admin concept gated on signal.define (no per-farm grant).
+
+
+class SignalTemplateWithMembersResponse(BaseModel):
+    """Template detail + ordered members. The detail endpoint returns
+    this; the list endpoint returns SignalTemplateResponse only
+    (members fetched on demand)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    template: SignalTemplateResponse
+    members: list[SignalTemplateDefinitionMember]
+
+
+@router.get(
+    "/signals/templates",
+    response_model=list[SignalTemplateResponse],
+    summary="List signal templates in the current tenant.",
+)
+async def list_templates(
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("signal.read")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return list(await service.list_templates(include_inactive=include_inactive))
+
+
+@router.post(
+    "/signals/templates",
+    response_model=SignalTemplateWithMembersResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a signal template (tenant admins).",
+)
+async def create_template(
+    payload: SignalTemplateCreateRequest,
+    context: RequestContext = Depends(requires_capability("signal.define")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    tpl, members = await service.create_template(
+        code=payload.code,
+        name=payload.name,
+        description=payload.description,
+        members=tuple(payload.members),
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    return {"template": tpl, "members": list(members)}
+
+
+@router.get(
+    "/signals/templates/{template_id}",
+    response_model=SignalTemplateWithMembersResponse,
+    summary="Read a signal template + its ordered members.",
+)
+async def get_template(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("signal.read")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    tpl, members = await service.get_template(template_id=template_id)
+    return {"template": tpl, "members": list(members)}
+
+
+@router.patch(
+    "/signals/templates/{template_id}",
+    response_model=SignalTemplateWithMembersResponse,
+    summary="Patch a signal template; optionally replace member list.",
+)
+async def update_template(
+    template_id: UUID,
+    payload: SignalTemplateUpdateRequest,
+    context: RequestContext = Depends(requires_capability("signal.define")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    # `members` is an explicit kwarg on the service; the rest get sent
+    # via `updates`. Use exclude_unset so unset == "leave alone" (vs
+    # explicit null which an UPDATE can't express for these scalars).
+    body = payload.model_dump(exclude_unset=True)
+    members_payload = body.pop("members", None)
+    members_tuple: tuple[SignalTemplateDefinitionMember, ...] | None
+    if members_payload is None and "members" not in payload.model_fields_set:
+        members_tuple = None
+    else:
+        members_tuple = tuple(payload.members or [])
+    tpl, members = await service.update_template(
+        template_id=template_id,
+        updates=body,
+        members=members_tuple,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    return {"template": tpl, "members": list(members)}
+
+
+@router.delete(
+    "/signals/templates/{template_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Soft-delete a signal template.",
+)
+async def delete_template(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("signal.define")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> None:
+    schema = _ensure_tenant(context)
+    await service.delete_template(
+        template_id=template_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
