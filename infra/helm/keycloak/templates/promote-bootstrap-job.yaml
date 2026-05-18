@@ -57,6 +57,13 @@ spec:
           imagePullPolicy: IfNotPresent
           workingDir: /app
           env:
+            # `python /promote/X.py` adds /promote to sys.path, not /app.
+            # The promote scripts do `from scripts.dev_bootstrap import …`
+            # which lives at /app/scripts/dev_bootstrap.py in the api
+            # image, so we need PYTHONPATH=/app to make that import
+            # resolve.
+            - name: PYTHONPATH
+              value: /app
             # KC admin user is `user` per bitnami default; password comes
             # from the same Secret the bitnami chart's `auth.existingSecret`
             # consumes, so the Job's view is always consistent with the
