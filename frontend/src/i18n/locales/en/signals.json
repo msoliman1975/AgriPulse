@@ -1,4 +1,18 @@
 {
+  "refPicker": {
+    "title": "Signal reference",
+    "selectLabel": "Pick a signal definition",
+    "valueKeyLabel": "Value column the reference resolves against",
+    "placeholder": "— pick a signal —",
+    "loading": "Loading signals…",
+    "loadFailed": "Failed to load signals.",
+    "empty": "No signals defined in this tenant yet.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "unsupportedKind": "Geopoint signals aren't predicateable — they can't be used in a condition reference.",
+    "unsupportedKindShort": "n/a",
+    "hint": "Paste the snippet into the condition body at the spot you want."
+  },
   "overlay": {
     "regionLabel": "Signal observations map overlay",
     "title": "Signal overlay",

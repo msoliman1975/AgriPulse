@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 
 import type {
   AlertSeverity,
@@ -10,10 +11,12 @@ import type {
   TenantRuleCreatePayload,
   TenantRuleUpdatePayload,
 } from "@/api/alerts";
+import { listSignalDefinitions } from "@/api/signals";
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
+import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
 import {
   useCreateTenantRule,
   useDefaultRules,
@@ -454,6 +457,14 @@ function TenantRuleForm({
   const { t } = useTranslation("rules");
   const create = useCreateTenantRule();
   const update = useUpdateTenantRule();
+  // CS-7 D6: signal definitions list powers the SignalRefPicker.
+  // Tenant-scoped, one fetch per editor open. 5 min staleTime so a
+  // freshly-created signal shows up after switching back to this tab.
+  const signalDefsQ = useQuery({
+    queryKey: ["rules-editor/signalDefinitions"],
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 5 * 60_000,
+  });
 
   const [code, setCode] = useState(existing?.code ?? "");
   const [nameEn, setNameEn] = useState(existing?.name_en ?? "");
@@ -624,13 +635,19 @@ function TenantRuleForm({
           hint={t("form.conditionsHint")}
           className="sm:col-span-2"
         >
+          <SignalRefPicker
+            definitions={signalDefsQ.data ?? []}
+            isLoading={signalDefsQ.isLoading}
+            isError={signalDefsQ.isError}
+            format="json"
+          />
           <textarea
             required
             value={conditionsText}
             onChange={(e) => setConditionsText(e.target.value)}
             rows={10}
             spellCheck={false}
-            className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-2 py-1 font-mono text-[11px] shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
+            className="mt-2 w-full rounded-md border border-ap-line bg-ap-bg/40 px-2 py-1 font-mono text-[11px] shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
           />
         </FormField>
         <FormField label={t("form.actions")} hint={t("form.actionsHint")} className="sm:col-span-2">
