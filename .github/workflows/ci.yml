@@ -226,6 +226,17 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Set up Python (for lint_irsa)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint_irsa deps
+        run: pip install --quiet pyyaml
+
+      - name: lint IRSA hygiene
+        run: python scripts/lint_irsa.py
+
   infra-tf:
     name: infra-tf
     runs-on: ubuntu-24.04

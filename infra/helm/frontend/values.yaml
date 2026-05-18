@@ -18,8 +18,9 @@ replicaCount: 2
 revisionHistoryLimit: 5
 
 serviceAccount:
-  create: true
-  name: ""
+  # irsa: not-required                       # nginx serves the SPA bundle
+  create: true                              # only; no AWS API calls. Node-role
+  name: ""                                  # is fine here.
   annotations: {}
 
 service:

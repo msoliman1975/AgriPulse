@@ -20,9 +20,10 @@ global:
 revisionHistoryLimit: 5
 
 serviceAccount:
-  create: true
-  name: ""
-  annotations: {}
+  # irsa: required-from-overlay              # workers share the api role
+  create: true                              # (same image, same AWS calls). ARN
+  name: ""                                  # is set per-env in
+  annotations: {}                           # infra/argocd/overlays/<env>/values.yaml.
 
 podSecurityContext:
   runAsNonRoot: true

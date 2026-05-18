@@ -22,9 +22,10 @@ replicaCount: 2
 revisionHistoryLimit: 5
 
 serviceAccount:
-  create: true
-  name: "" # Empty â†’ "{{ Release.Name }}-api"
-  annotations: {}
+  # irsa: required-from-overlay              # api hits SM via ExternalSecret + S3 via boto3.
+  create: true                              # Per-env IRSA ARN is in
+  name: "" # Empty â†’ "{{ Release.Name }}-api"  # infra/argocd/overlays/<env>/values.yaml
+  annotations: {}                           # under .serviceAccount.annotations.
 
 service:
   type: ClusterIP
