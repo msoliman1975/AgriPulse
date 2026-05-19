@@ -1,0 +1,95 @@
+---
+import Base from "../layouts/Base.astro";
+---
+<Base title="Contact" description="Get in touch with AgriPulse — request a demo, talk to sales or just say hello.">
+  <section class="border-b border-sand-300 bg-white">
+    <div class="container-pad py-20 md:py-24">
+      <p class="eyebrow">Contact</p>
+      <h1 class="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight md:text-5xl">
+        Tell us about your farm.
+      </h1>
+      <p class="mt-5 max-w-2xl lead">
+        One short note is enough. We'll reply within a working day — usually
+        with a calendar link and a list of two or three questions.
+      </p>
+    </div>
+  </section>
+
+  <section id="demo" class="py-20">
+    <div class="container-pad grid gap-12 md:grid-cols-[1.3fr_1fr]">
+      <form
+        id="contact-form"
+        class="card space-y-5"
+        method="POST"
+        action="mailto:platform@agripulse.tech"
+        enctype="text/plain"
+      >
+        <div>
+          <label for="name" class="text-sm font-semibold text-ink">Your name</label>
+          <input id="name" name="name" type="text" required class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200" />
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <div>
+            <label for="email" class="text-sm font-semibold text-ink">Email</label>
+            <input id="email" name="email" type="email" required class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200" />
+          </div>
+          <div>
+            <label for="company" class="text-sm font-semibold text-ink">Company / farm</label>
+            <input id="company" name="company" type="text" class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200" />
+          </div>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <div>
+            <label for="role" class="text-sm font-semibold text-ink">Role</label>
+            <select id="role" name="role" class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200">
+              <option>Farm manager</option>
+              <option>Agronomist</option>
+              <option>Owner / GM</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label for="blocks" class="text-sm font-semibold text-ink">Approx. block count</label>
+            <input id="blocks" name="blocks" type="text" placeholder="e.g. 25 blocks across 2 farms" class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200" />
+          </div>
+        </div>
+        <div>
+          <label for="message" class="text-sm font-semibold text-ink">What's on your mind?</label>
+          <textarea id="message" name="message" rows="5" class="mt-2 w-full rounded-lg border border-sand-300 bg-white px-3 py-2.5 text-sm focus:border-leaf-500 focus:outline-none focus:ring-2 focus:ring-leaf-200" placeholder="The one thing you'd want AgriPulse to solve first…"></textarea>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <button type="submit" class="btn-primary">Send</button>
+          <span class="text-xs text-muted">We never share your contact details.</span>
+        </div>
+      </form>
+
+      <aside class="space-y-6">
+        <div class="card">
+          <p class="eyebrow">Direct</p>
+          <ul class="mt-4 space-y-3 text-sm">
+            <li>
+              <p class="font-semibold text-ink">Email</p>
+              <a href="mailto:platform@agripulse.tech" class="text-muted hover:text-leaf-700">platform@agripulse.tech</a>
+            </li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="eyebrow">Office</p>
+          <ul class="mt-4 space-y-3 text-sm text-muted">
+            <li>
+              <p class="font-semibold text-ink">Cairo</p>
+              <p>Cairo, Egypt</p>
+            </li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="eyebrow">Booking a demo?</p>
+          <p class="mt-3 text-sm text-muted">
+            Add your block count and the one decision you'd want AgriPulse to
+            sharpen first — we tailor the walkthrough around it.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </section>
+</Base>

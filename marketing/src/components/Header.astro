@@ -1,0 +1,32 @@
+---
+import Logo from "./Logo.astro";
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+const nav = [
+  { href: "/capabilities", label: "Capabilities" },
+  { href: "/customers", label: "Customers" },
+  { href: "/where-we-operate", label: "Where we operate" },
+  { href: "/contact", label: "Contact" },
+];
+---
+<header class="sticky top-0 z-30 border-b border-sand-300/80 bg-sand-100/85 backdrop-blur supports-[backdrop-filter]:bg-sand-100/70">
+  <div class="container-pad flex h-16 items-center gap-8">
+    <Logo />
+    <nav class="ml-auto hidden items-center gap-1 md:flex" aria-label="Primary">
+      {nav.map((item) => {
+        const active = path === item.href;
+        return (
+          <a
+            href={item.href}
+            class={`rounded-md px-3 py-2 text-sm font-medium transition ${active ? "text-leaf-700" : "text-ink hover:text-leaf-700"}`}
+            aria-current={active ? "page" : undefined}
+          >
+            {item.label}
+          </a>
+        );
+      })}
+    </nav>
+    <div class="ml-auto flex items-center gap-2 md:ml-0">
+      <a href="/contact#demo" class="btn-primary">Request a demo</a>
+    </div>
+  </div>
+</header>

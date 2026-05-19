@@ -1,0 +1,231 @@
+---
+import Base from "../layouts/Base.astro";
+
+const capabilities = [
+  {
+    name: "Crop health monitoring",
+    body: "Continuous visibility across every block — from above and on the ground. The orchard reports itself, every day, in fine detail, so nothing depends on who happens to walk where this week.",
+  },
+  {
+    name: "Built-in health indices",
+    body: "Vegetation vigor, water status, growth pace, canopy density — ready-made measures the agronomist already trusts, computed for every block and tracked over time.",
+  },
+  {
+    name: "Farm planning",
+    body: "Plan the season once — pruning, fertigation, sprays, harvest — then watch it unfold against what's actually happening on the ground. Drift between plan and reality is visible the moment it appears.",
+  },
+  {
+    name: "Intelligent recommendations",
+    body: "Your agronomist's playbook, running automatically across every block. When conditions match, you get a clear recommendation — apply, dismiss, or defer — not a chart to interpret.",
+  },
+  {
+    name: "Proactive alerting",
+    body: "When a block drifts off its own normal — or anything threatens the season — the right person hears about it immediately, with the recommended action attached.",
+  },
+  {
+    name: "Custom signals",
+    body: "Whatever you measure — pest counts, soil readings, lab results, scout notes — becomes data the system can act on. Configure a signal in minutes, start collecting in the field today.",
+  },
+  {
+    name: "Bilingual",
+    body: "Arabic and English from day one. Crop names, rules, recommendations and alerts all read naturally in either language — for the agronomist, the manager and the crew.",
+  },
+];
+
+const problems = [
+  {
+    p: "I can't be in every block, every day.",
+    s: "AgriPulse watches every block continuously and scores each against its own normal. You hear about a problem before you'd see it on a walk.",
+  },
+  {
+    p: "My best agronomist's playbook lives in their head.",
+    s: "Encode the playbook once and it runs across every farm automatically. Every recommendation explains itself — your team can audit it and tune it.",
+  },
+  {
+    p: "Problems show up too late, when the season's already short.",
+    s: "Drift, plan slip, and threshold breaches surface the moment they happen, routed to the person who can act — by email, in-app, or webhook.",
+  },
+];
+---
+<Base
+  title="AgriPulse"
+  description="The always-on agronomist for every farm. AgriPulse plans the season, watches every block continuously, and runs your agronomist's playbook around the clock — so problems surface while they're still fixable."
+>
+  {/* HERO */}
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10">
+      <div class="absolute inset-x-0 top-0 h-[560px] bg-gradient-to-b from-leaf-50 via-sand-100 to-sand-100"></div>
+      <svg class="absolute -right-32 top-10 hidden h-[560px] w-[560px] opacity-[0.07] md:block" viewBox="0 0 200 200" aria-hidden="true">
+        <path d="M100 20 Q120 40 130 62 Q140 84 138 104 Q135 124 125 140 Q115 152 100 160 Q85 152 75 140 Q65 124 62 104 Q60 84 70 62 Q80 40 100 20Z" fill="#1d9e75"/>
+      </svg>
+    </div>
+
+    <div class="container-pad pt-20 pb-24 md:pt-28 md:pb-32">
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="pill">For orchards · MENA</span>
+        <span class="pill">Arabic · English</span>
+      </div>
+      <h1 class="mt-6 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
+        The always-on agronomist<br />
+        <span class="text-leaf-700">for every farm.</span>
+      </h1>
+      <p class="mt-7 max-w-2xl text-lg text-muted md:text-xl">
+        You can't walk every block every day. AgriPulse can. It plans the season,
+        watches every block continuously, and runs your agronomist's playbook
+        around the clock — so problems get caught while they're still small, not
+        after they hit the canopy.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center gap-3">
+        <a href="/contact#demo" class="btn-primary">Request a demo</a>
+        <a href="/capabilities" class="btn-ghost">See the capabilities →</a>
+      </div>
+    </div>
+  </section>
+
+  {/* PROBLEMS WE SOLVE */}
+  <section class="bg-white py-20 md:py-24">
+    <div class="container-pad">
+      <p class="eyebrow">Why AgriPulse</p>
+      <h2 class="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
+        The three things that quietly cost a season.
+      </h2>
+      <p class="mt-4 max-w-2xl lead">
+        Most orchard losses don't come from a single bad decision — they come
+        from blind spots, slow signals, and knowledge that doesn't scale across
+        the operation. AgriPulse closes those three gaps.
+      </p>
+
+      <div class="mt-12 grid gap-6 md:grid-cols-3">
+        {problems.map((row) => (
+          <article class="card">
+            <p class="text-base font-semibold text-ink">"{row.p}"</p>
+            <div class="mt-4 h-px w-10 bg-leaf-500"></div>
+            <p class="mt-4 text-sm text-muted">{row.s}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  {/* CAPABILITY STRIP — priority order, no numbers */}
+  <section class="py-20">
+    <div class="container-pad">
+      <p class="eyebrow">Capabilities</p>
+      <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
+        One platform. Seven capabilities working together.
+      </h2>
+      <p class="mt-4 max-w-2xl lead">
+        Each one is useful on its own — and built to feed the others, so the
+        rules can see your signals, the recommendations know the plan, and the
+        alerts know who to reach.
+      </p>
+
+      <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {capabilities.map((c) => (
+          <div class="card !p-5">
+            <h3 class="text-base font-semibold text-ink">{c.name}</h3>
+            <p class="mt-2 text-sm text-muted">{c.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="mt-10">
+        <a href="/capabilities" class="btn-ghost">See every capability in depth →</a>
+      </div>
+    </div>
+  </section>
+
+  {/* OUTCOME MOMENT */}
+  <section class="bg-white py-20">
+    <div class="container-pad grid items-center gap-12 md:grid-cols-2">
+      <div>
+        <p class="eyebrow">A morning on AgriPulse</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
+          You open the app. The decisions are already made.
+        </h2>
+        <p class="mt-4 lead">
+          Overnight, the platform compared every block to its own normal,
+          checked the weather, ran your rules, and queued the recommendations
+          that need a human. You start your day looking at three actions —
+          ranked, explained, and ready to apply.
+        </p>
+        <ul class="mt-6 space-y-3 text-sm text-muted">
+          <li class="flex items-start gap-2"><span class="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-leaf-500"></span>Drift caught before the walk would have caught it</li>
+          <li class="flex items-start gap-2"><span class="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-leaf-500"></span>Recommendation cites the rule that fired</li>
+          <li class="flex items-start gap-2"><span class="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-leaf-500"></span>One tap to apply, defer, or dismiss</li>
+        </ul>
+      </div>
+
+      <div class="relative">
+        <div class="rounded-2xl border border-sand-300 bg-sand-50 p-4 shadow-card">
+          <div class="flex items-center justify-between border-b border-sand-300 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-pulse/70"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-sand-300"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-sand-300"></span>
+              <span class="ml-3 text-xs text-muted">This morning · Farm 4</span>
+            </div>
+            <span class="text-xs text-muted">3 to review</span>
+          </div>
+          <div class="mt-4 grid grid-cols-6 gap-2">
+            {Array.from({ length: 24 }).map((_, i) => {
+              const palette = ["#1d9e75", "#3eae7c", "#7fc7a4", "#b5e0c8", "#c98a18", "#b24430"];
+              const c = palette[(i * 7) % palette.length];
+              return <div class="aspect-square rounded-md" style={`background:${c}; opacity:${0.55 + ((i * 13) % 45) / 100}`}></div>;
+            })}
+          </div>
+          <div class="mt-4 flex items-center justify-between text-xs text-muted">
+            <span>Block health · today</span>
+            <span class="flex items-center gap-1">
+              <span class="h-2 w-2 rounded-full bg-leaf-600"></span>healthy
+              <span class="ml-2 h-2 w-2 rounded-full bg-[#c98a18]"></span>drifting
+              <span class="ml-2 h-2 w-2 rounded-full bg-[#b24430]"></span>stressed
+            </span>
+          </div>
+
+          <div class="mt-5 space-y-2">
+            <div class="rounded-xl border border-sand-300 bg-white p-3">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold text-ink">Pull fertigation forward 48h</div>
+                <span class="rounded-full bg-[#f7e7c2] px-2 py-0.5 text-[11px] font-semibold text-[#7a560a]">warn</span>
+              </div>
+              <div class="text-xs text-muted">Blocks 12, 14, 17 · drifting below normal · no rain forecast</div>
+            </div>
+            <div class="rounded-xl border border-sand-300 bg-white p-3">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold text-ink">Scout for hopper</div>
+                <span class="rounded-full bg-[#dceaf3] px-2 py-0.5 text-[11px] font-semibold text-[#1f6f9a]">info</span>
+              </div>
+              <div class="text-xs text-muted">Block 3 · growth pace behind peers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* CTA */}
+  <section class="py-20">
+    <div class="container-pad">
+      <div class="overflow-hidden rounded-3xl bg-leaf-800 px-8 py-14 text-white md:px-14 md:py-20">
+        <div class="grid items-center gap-10 md:grid-cols-[1.4fr_1fr]">
+          <div>
+            <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">
+              See your next season — before it starts.
+            </h2>
+            <p class="mt-4 max-w-xl text-leaf-100/85">
+              Bring one farm. We'll set up the blocks, get a season of history
+              flowing, and encode one decision rule end-to-end with your
+              agronomist — so you can judge AgriPulse on your own ground, not
+              ours.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-3 md:justify-end">
+            <a href="/contact#demo" class="btn bg-white text-leaf-800 hover:bg-leaf-50">Request a demo</a>
+            <a href="mailto:platform@agripulse.tech" class="btn border border-leaf-100/40 text-white hover:bg-leaf-700">Email us</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

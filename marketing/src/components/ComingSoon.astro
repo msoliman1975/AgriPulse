@@ -1,0 +1,32 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  body: string;
+}
+const { eyebrow, title, body } = Astro.props;
+---
+<section class="relative overflow-hidden">
+  <div class="absolute inset-0 -z-10">
+    <div class="absolute inset-x-0 top-0 h-[520px] bg-gradient-to-b from-leaf-50 via-sand-100 to-sand-100"></div>
+    <svg class="absolute -right-32 top-10 hidden h-[520px] w-[520px] opacity-[0.06] md:block" viewBox="0 0 200 200" aria-hidden="true">
+      <path d="M100 20 Q120 40 130 62 Q140 84 138 104 Q135 124 125 140 Q115 152 100 160 Q85 152 75 140 Q65 124 62 104 Q60 84 70 62 Q80 40 100 20Z" fill="#1d9e75"/>
+    </svg>
+  </div>
+
+  <div class="container-pad py-24 md:py-36">
+    <span class="pill">Coming soon</span>
+    <p class="eyebrow mt-6">{eyebrow}</p>
+    <h1 class="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight md:text-5xl">{title}</h1>
+    <p class="mt-5 max-w-2xl lead">{body}</p>
+
+    <div class="mt-10 flex flex-wrap items-center gap-3">
+      <a href="/contact#demo" class="btn-primary">Request a demo</a>
+      <a href="/capabilities" class="btn-ghost">See the capabilities →</a>
+    </div>
+
+    <p class="mt-10 text-xs text-muted-soft">
+      Want to be the first to see this page when it ships? <a href="mailto:platform@agripulse.tech" class="text-leaf-700 hover:underline">Drop us a line</a>.
+    </p>
+  </div>
+</section>

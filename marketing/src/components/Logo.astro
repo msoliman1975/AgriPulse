@@ -1,0 +1,34 @@
+---
+interface Props {
+  mono?: boolean;
+  size?: number;
+  showWordmark?: boolean;
+}
+const { mono = false, size = 36, showWordmark = true } = Astro.props;
+const ink = mono ? "#ffffff" : "#1f2420";
+const leaf = "#1d9e75";
+const dark = "#04342c";
+const muted = mono ? "rgba(255,255,255,.7)" : "#5f5e5a";
+---
+<a href="/" class="inline-flex items-center gap-2.5" aria-label="AgriPulse home">
+  <svg width={size} height={size} viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="100" cy="100" r="92" fill={leaf} opacity="0.10"/>
+    <circle cx="100" cy="100" r="92" fill="none" stroke={leaf} stroke-width="2.5"/>
+    <path d="M100 25 Q120 45 130 67 Q140 89 138 109 Q135 129 125 145 Q115 157 100 165 Q85 157 75 145 Q65 129 62 109 Q60 89 70 67 Q80 45 100 25Z" fill={leaf} stroke={dark} stroke-width="1.8"/>
+    <path d="M100 31 L100 160" fill="none" stroke={dark} stroke-width="1.2" opacity="0.35"/>
+    <path d="M100 50 Q92 55 84 65 M100 50 Q108 55 116 65" fill="none" stroke={dark} stroke-width="0.9" opacity="0.28"/>
+    <path d="M100 70 Q90 76 80 89 M100 70 Q110 76 120 89" fill="none" stroke={dark} stroke-width="0.9" opacity="0.28"/>
+    <path d="M100 90 Q88 97 76 110 M100 90 Q112 97 124 110" fill="none" stroke={dark} stroke-width="0.9" opacity="0.28"/>
+    <path d="M22 103 L62 103 L72 87 L82 117 L100 77 L118 113 L126 97 L140 103 L178 101" fill="none" stroke="#e24b4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  {showWordmark && (
+    <span class="flex flex-col leading-tight">
+      <span class="text-[1.15rem] font-semibold tracking-tight" style={`color:${ink}`}>
+        Agri<span style={`color:${leaf}`}>Pulse</span>
+      </span>
+      <span class="text-[10px] font-medium uppercase tracking-[0.14em]" style={`color:${muted}`}>
+        Orchard intelligence platform
+      </span>
+    </span>
+  )}
+</a>

@@ -1,0 +1,337 @@
+---
+import Base from "../layouts/Base.astro";
+
+const features = [
+  {
+    id: "crop-health-monitoring",
+    eyebrow: "Crop health monitoring",
+    title: "Every block reports itself, every day.",
+    body:
+      "Walking every block every day isn't possible — and the gap is where surprises live. AgriPulse closes the gap by combining a continuous view from above with a continuous view from on the ground. Every block is observed from imagery, weather and your own field signals — reconciled together, refreshed automatically, and ready for the agronomist to act on.",
+    bullets: [
+      "Continuous view of every block, not just the ones someone visited",
+      "Imagery, weather and field signals reconciled to the same block",
+      "Each block scored against its own history — not a generic crop model",
+      "Refreshed automatically, no one has to remember to update it",
+    ],
+  },
+  {
+    id: "built-in-health-indices",
+    eyebrow: "Built-in health indices",
+    title: "The measures your agronomist already trusts.",
+    body:
+      "AgriPulse computes the indices agronomists use every day — vegetation vigor, water status, growth pace, canopy density — for every block, over time. You see the absolute reading and the trend; the system sees the drift from each block's own normal and uses that to drive recommendations and alerts.",
+    bullets: [
+      "Vegetation vigor — overall canopy health",
+      "Water status — moisture stress and recovery",
+      "Growth pace — accumulated heat against the crop's stage",
+      "Canopy density — structure and infill",
+      "Every index tracked against the block's own normal, not a one-size model",
+    ],
+  },
+  {
+    id: "farm-planning",
+    eyebrow: "Farm planning",
+    title: "Plan once. Watch it unfold.",
+    body:
+      "A season plan in AgriPulse is a living document, not a spreadsheet that drifts. Activities — pruning, fertigation, spray, harvest — are scheduled per block and tied to the calendar, the crop's stage, or a trigger condition. The plan and the actual ground truth sit on the same screen, so when reality moves, you see it immediately.",
+    bullets: [
+      "Per-farm season plan with block-level activities",
+      "Activities tied to calendar, crop stage, or trigger conditions",
+      "Crew assignment and status — draft, scheduled, completed",
+      "Plan vs. execution surfaced on one timeline",
+    ],
+  },
+  {
+    id: "intelligent-recommendations",
+    eyebrow: "Intelligent recommendations",
+    title: "Your playbook, running across every block.",
+    body:
+      "Your agronomist's experience is the most valuable asset in the operation — and the hardest to scale. AgriPulse encodes that experience as readable rules that run automatically across every block. When a rule's conditions are met, you get a recommendation with the action attached, the reasoning attached, and a one-tap way to apply, dismiss, or defer it.",
+    bullets: [
+      "Out-of-the-box rules grounded in agronomic best practice",
+      "Override any default for your region, your variety, your farm",
+      "Every recommendation explains the rule and the reading that fired it",
+      "Lifecycle: apply · dismiss · defer with a reason",
+    ],
+  },
+  {
+    id: "proactive-alerting",
+    eyebrow: "Proactive alerting",
+    title: "Hear about it the moment it matters.",
+    body:
+      "When a block drifts off its own normal, when a queue stalls, or when a critical rule fires — the right person knows immediately, with the recommended action attached. Thresholds, channels and recipients are configurable per farm, so the agronomist gets the agronomy alerts and the farm manager gets the operational ones.",
+    bullets: [
+      "Out-of-the-box alerts for drift, plan slip and rule fires",
+      "Per-farm thresholds, channels and recipients",
+      "Delivered by email, in-app, or webhook",
+      "Idempotent — no duplicate noise while a recommendation is still open",
+    ],
+  },
+  {
+    id: "custom-signals",
+    eyebrow: "Custom signals",
+    title: "Whatever you measure, the system can act on.",
+    body:
+      "Soil readings, pest counts, lab results, scout observations, brix samples, photos — anything your team captures in the field becomes structured data that feeds rules, recommendations and alerts. Configure a new signal in minutes, choose how it's collected, and your team starts adding it on the next walk.",
+    bullets: [
+      "Numbers, categories, events, true/false, or geo-points",
+      "Pinned to a block, a point inside a block, or anywhere on the farm",
+      "Bundled into scout templates so a single walk captures many signals",
+      "Collected from mobile, spreadsheet upload, or an API",
+    ],
+  },
+  {
+    id: "bilingual",
+    eyebrow: "Bilingual",
+    title: "Arabic and English. By design, not by translation.",
+    body:
+      "AgriPulse was built from the first day to read natively in Arabic and English — for the agronomist drafting rules, the manager reviewing alerts, the field crew capturing signals. The languages live on the data itself: crop names, rule names, recommendations, alerts. The interface flips right-to-left where it should, and the meaning carries through.",
+    bullets: [
+      "Both languages on every record — crops, rules, recommendations, alerts",
+      "Right-to-left flows tested across map, timeline, forms and inbox",
+      "Notification templates carry the user's locale automatically",
+      "Local units and structures (feddan, governorate, salinity-aware soil) built in",
+    ],
+  },
+];
+---
+<Base
+  title="Capabilities"
+  description="The seven capabilities of AgriPulse — crop health monitoring, built-in health indices, farm planning, intelligent recommendations, proactive alerting, custom signals and bilingual support."
+>
+  <section class="border-b border-sand-300 bg-white">
+    <div class="container-pad py-20 md:py-28">
+      <p class="eyebrow">Capabilities</p>
+      <h1 class="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight md:text-5xl">
+        Seven capabilities behind the always-on agronomist.
+      </h1>
+      <p class="mt-5 max-w-2xl lead">
+        AgriPulse brings these together on one platform. Each is useful on its
+        own — and built to feed the others. The rules see your signals, the
+        recommendations know the plan, and the alerts know who to reach.
+      </p>
+      <nav class="mt-10 flex flex-wrap gap-2 text-sm">
+        {features.map((f) => (
+          <a
+            href={`#${f.id}`}
+            class="rounded-full border border-sand-300 bg-white px-3.5 py-1.5 font-medium text-ink hover:border-leaf-500 hover:text-leaf-700"
+          >
+            {f.eyebrow}
+          </a>
+        ))}
+      </nav>
+    </div>
+  </section>
+
+  {features.map((f, i) => (
+    <section id={f.id} class={`py-20 ${i % 2 === 0 ? "" : "bg-white"}`}>
+      <div class="container-pad grid items-start gap-12 md:grid-cols-2">
+        <div class={i % 2 === 0 ? "md:order-1" : "md:order-2"}>
+          <p class="eyebrow">{f.eyebrow}</p>
+          <h2 class="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">{f.title}</h2>
+          <p class="mt-4 lead">{f.body}</p>
+          <ul class="mt-6 space-y-3 text-sm text-ink">
+            {f.bullets.map((b) => (
+              <li class="flex items-start gap-2.5">
+                <span class="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-leaf-600"></span>
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div class={i % 2 === 0 ? "md:order-2" : "md:order-1"}>
+          <div class="rounded-2xl border border-sand-300 bg-sand-50 p-5 shadow-card">
+            {f.id === "crop-health-monitoring" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Block health · today</div>
+                <div class="mt-4 grid grid-cols-6 gap-2">
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const palette = ["#1d9e75", "#3eae7c", "#7fc7a4", "#b5e0c8", "#c98a18", "#b24430"];
+                    const c = palette[(i * 7) % palette.length];
+                    return <div class="aspect-square rounded-md" style={`background:${c}; opacity:${0.55 + ((i * 13) % 45) / 100}`}></div>;
+                  })}
+                </div>
+                <div class="mt-4 flex items-center justify-between text-xs text-muted">
+                  <span>24 blocks · Farm 4</span>
+                  <span class="flex items-center gap-1">
+                    <span class="h-2 w-2 rounded-full bg-leaf-600"></span>healthy
+                    <span class="ml-2 h-2 w-2 rounded-full bg-[#c98a18]"></span>drifting
+                    <span class="ml-2 h-2 w-2 rounded-full bg-[#b24430]"></span>stressed
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {f.id === "built-in-health-indices" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Block 12 · this week</div>
+                <div class="mt-4 space-y-3">
+                  {[
+                    { n: "Vegetation vigor", v: "Strong", d: "in line with prior seasons", c: "leaf" },
+                    { n: "Water status", v: "Drifting low", d: "9 days below this block's norm", c: "amber" },
+                    { n: "Growth pace", v: "On schedule", d: "tracking the variety's stage", c: "leaf" },
+                    { n: "Canopy density", v: "Steady", d: "no structural change", c: "leaf" },
+                  ].map((row) => (
+                    <div class="rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                      <div class="flex items-center justify-between">
+                        <div class="text-[11px] uppercase tracking-wider text-muted">{row.n}</div>
+                        <span class={`text-[11px] font-semibold ${row.c === "amber" ? "text-[#7a560a]" : "text-leaf-700"}`}>{row.v}</span>
+                      </div>
+                      <div class="mt-1 text-xs text-muted">{row.d}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {f.id === "farm-planning" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Season plan · Farm 4</div>
+                <div class="mt-4 space-y-2">
+                  {["Block 12 · Keitt", "Block 14 · Keitt", "Block 17 · Tommy", "Block 21 · Naomi"].map((row, ri) => (
+                    <div class="grid grid-cols-[110px_1fr] items-center gap-3">
+                      <div class="text-xs font-semibold text-ink">{row}</div>
+                      <div class="relative h-6 rounded-md bg-sand-200">
+                        <div class="absolute top-0 h-6 rounded-md" style={`left:${5 + ri * 7}%; width:${18 - ri * 2}%; background:#1f6f9a`}></div>
+                        <div class="absolute top-0 h-6 rounded-md" style={`left:${35 + ri * 5}%; width:${15}%; background:#1d9e75`}></div>
+                        <div class="absolute top-0 h-6 rounded-md" style={`left:${62 + ri * 3}%; width:${10}%; background:#c98a18`}></div>
+                        <div class="absolute top-0 h-6 rounded-md" style={`left:${82 - ri * 2}%; width:${8}%; background:#b24430`}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div class="mt-4 flex flex-wrap gap-3 text-xs text-muted">
+                  <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-[#1f6f9a]"></span>fertigation</span>
+                  <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-[#1d9e75]"></span>spray</span>
+                  <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-[#c98a18]"></span>prune</span>
+                  <span class="flex items-center gap-1"><span class="h-2 w-2 rounded bg-[#b24430]"></span>harvest</span>
+                </div>
+              </div>
+            )}
+
+            {f.id === "intelligent-recommendations" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Open today · Farm 4</div>
+                <div class="mt-4 space-y-3">
+                  <div class="rounded-xl bg-white p-4 ring-1 ring-sand-300">
+                    <div class="flex items-center justify-between">
+                      <div class="text-sm font-semibold text-ink">Pull fertigation forward 48 hours</div>
+                      <span class="rounded-full bg-[#f7e7c2] px-2 py-0.5 text-[11px] font-semibold text-[#7a560a]">warn</span>
+                    </div>
+                    <p class="mt-1 text-xs text-muted">
+                      Blocks 12, 14, 17 are drifting below their water-status norm and the next three days are dry.
+                    </p>
+                    <p class="mt-1 text-[11px] text-muted-soft">
+                      Rule: water drift, sandy-soil override (your version)
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                      <button class="rounded-md bg-leaf-700 px-3 py-1 font-semibold text-white">Apply</button>
+                      <button class="rounded-md border border-sand-300 bg-white px-3 py-1 font-semibold text-ink">Defer…</button>
+                      <button class="rounded-md border border-sand-300 bg-white px-3 py-1 font-semibold text-muted">Dismiss</button>
+                    </div>
+                  </div>
+                  <div class="rounded-xl bg-white p-4 ring-1 ring-sand-300">
+                    <div class="flex items-center justify-between">
+                      <div class="text-sm font-semibold text-ink">Scout Block 3 for hopper</div>
+                      <span class="rounded-full bg-[#dceaf3] px-2 py-0.5 text-[11px] font-semibold text-[#1f6f9a]">info</span>
+                    </div>
+                    <p class="mt-1 text-xs text-muted">Growth pace 12% behind neighbouring blocks.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {f.id === "proactive-alerting" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Alerts · today</div>
+                <ul class="mt-4 space-y-3">
+                  <li class="flex items-start gap-3 rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                    <span class="mt-1 h-2 w-2 flex-none rounded-full bg-[#b24430]"></span>
+                    <div>
+                      <div class="text-sm font-semibold">Water drift — Blocks 12, 14, 17</div>
+                      <div class="text-xs text-muted">Sent to: agronomist, farm manager · email + in-app</div>
+                    </div>
+                  </li>
+                  <li class="flex items-start gap-3 rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                    <span class="mt-1 h-2 w-2 flex-none rounded-full bg-[#c98a18]"></span>
+                    <div>
+                      <div class="text-sm font-semibold">Imagery delayed — Farm 7</div>
+                      <div class="text-xs text-muted">No new scenes in 6 days. Investigating with provider.</div>
+                    </div>
+                  </li>
+                  <li class="flex items-start gap-3 rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                    <span class="mt-1 h-2 w-2 flex-none rounded-full bg-[#1f6f9a]"></span>
+                    <div>
+                      <div class="text-sm font-semibold">Bloom window opening — Keitt blocks</div>
+                      <div class="text-xs text-muted">Heat accumulation threshold crossed across 6 blocks.</div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {f.id === "custom-signals" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Scout template · today</div>
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                  {[
+                    { n: "Soil moisture · 30cm", v: "19%", d: "−2 vs 7-day avg" },
+                    { n: "Hopper trap count", v: "6 / day", d: "above the 4/day threshold" },
+                    { n: "Leaf wetness", v: "0.7 h", d: "low disease risk" },
+                    { n: "Brix · sample 3", v: "12.4", d: "target 14 at harvest" },
+                  ].map((s) => (
+                    <div class="rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                      <div class="text-[11px] uppercase tracking-wider text-muted">{s.n}</div>
+                      <div class="mt-1 text-lg font-semibold text-ink">{s.v}</div>
+                      <div class="text-xs text-muted">{s.d}</div>
+                    </div>
+                  ))}
+                </div>
+                <p class="mt-3 text-xs text-muted">Four signals, one walk, one template.</p>
+              </div>
+            )}
+
+            {f.id === "bilingual" && (
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-widest text-muted">Crops — every record carries both languages</div>
+                <div class="mt-4 space-y-2 text-sm">
+                  {[
+                    { en: "Mango", ar: "مانجو" },
+                    { en: "Olive", ar: "زيتون" },
+                    { en: "Pomegranate", ar: "رمان" },
+                    { en: "Citrus", ar: "موالح" },
+                  ].map((c) => (
+                    <div class="grid grid-cols-2 items-center gap-3 rounded-xl bg-white p-3 ring-1 ring-sand-300">
+                      <div class="font-medium text-ink">{c.en}</div>
+                      <div class="text-right font-medium text-ink" dir="rtl" lang="ar">{c.ar}</div>
+                    </div>
+                  ))}
+                </div>
+                <div class="mt-4 rounded-xl bg-leaf-50 p-3 text-xs text-leaf-800 ring-1 ring-leaf-100">
+                  Same record. Same data. Rendered in whichever language each user prefers.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <section class="border-t border-sand-300 py-20">
+    <div class="container-pad text-center">
+      <h2 class="mx-auto max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
+        Want to see it on your own farm?
+      </h2>
+      <p class="mx-auto mt-4 max-w-xl lead">
+        Bring one farm. We'll set up the blocks, get a season of history
+        flowing, and encode one decision rule end-to-end with your agronomist.
+      </p>
+      <div class="mt-7 flex flex-wrap justify-center gap-3">
+        <a href="/contact#demo" class="btn-primary">Request a demo</a>
+      </div>
+    </div>
+  </section>
+</Base>
