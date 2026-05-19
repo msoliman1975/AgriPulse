@@ -14,21 +14,21 @@ global:
   # renders. Only the dev overlay is auto-bumped; staging/production
   # promotion is hand-written.
   # Pinned to the latest main SHA where the CI `containers` matrix passed
-  # (commit c6d7b3c, 2026-05-18 — head of main after Insights B.2/B.3:
-  # #130 farm trend + scorecard, #131 annotations + season + sparkline).
+  # (commit 3842b8b, 2026-05-18 — adds #132 CSV import FE form on the
+  # Signals Config page + #133 observation popup on the Labs map overlay).
   # The auto-bump workflow in `.github/workflows/argocd-sync.yml` only
   # fires when the CI workflow as a whole goes green — backend ruff and
   # frontend eslint + pre-commit are currently red, so dev tags are
   # bumped by hand until that's fixed.
   images:
     api:
-      tag: "c6d7b3c"
+      tag: "3842b8b"
     workers:
-      tag: "c6d7b3c"
+      tag: "3842b8b"
     frontend:
-      tag: "c6d7b3c"
+      tag: "3842b8b"
     tileServer:
-      tag: "c6d7b3c"
+      tag: "3842b8b"
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
