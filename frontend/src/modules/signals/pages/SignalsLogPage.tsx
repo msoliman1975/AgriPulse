@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
+import { SignalsCsvImport } from "../components/SignalsCsvImport";
 import {
   useCreateSignalObservation,
   useSignalDefinitions,
@@ -54,6 +55,11 @@ export function SignalsLogPage(): ReactNode {
         <h1 className="text-2xl font-semibold text-ap-ink">{t("log.title")}</h1>
         <p className="mt-1 text-sm text-ap-muted">{t("log.subtitle")}</p>
       </header>
+
+      {/* Bulk import — same capability gate as the record form (signal.record).
+          Operators who can submit one observation can submit many. The
+          widget renders its own success/error state inline. */}
+      {canRecord ? <SignalsCsvImport farmId={farmId} /> : null}
 
       {defsLoading ? (
         <Skeleton className="h-64 w-full rounded-xl" />
