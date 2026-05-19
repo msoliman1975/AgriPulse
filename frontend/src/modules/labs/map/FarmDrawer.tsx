@@ -16,9 +16,15 @@ import { FarmMembersTab } from "./FarmMembersTab";
 import { approxPolygonAreaM2 } from "./geo";
 
 export type FarmDrawerMode = "create" | "view" | "edit";
+export type FarmPanel = "details" | "defaults" | "members";
 
 interface Props {
   mode: FarmDrawerMode;
+  // Which sub-view is rendered. Controlled by the page so the toolbar
+  // buttons (Farm details / Block defaults / Members) can switch
+  // between sibling panels — the drawer no longer owns its own
+  // tab strip.
+  panel: FarmPanel;
   // When mode is "view"/"edit", farm is the loaded FarmDetail.
   farm: FarmDetail | null;
   // Inactive blocks under this farm — surfaced in the Archive section
@@ -51,10 +57,9 @@ const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
 const OWNERSHIPS: OwnershipType[] = ["owned", "leased", "partnership", "other"];
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
 
-type Panel = "details" | "defaults" | "members";
-
 export function FarmDrawer({
   mode,
+  panel,
   farm,
   inactiveBlocks,
   draftBoundary,
@@ -73,7 +78,6 @@ export function FarmDrawer({
   onAoiUploaded,
 }: Props) {
   const editing = mode === "create" || mode === "edit";
-  const [panel, setPanel] = useState<Panel>("details");
 
   // Form state — seeded from the farm or empty for create.
   const [code, setCode] = useState(farm?.code ?? "");
@@ -151,10 +155,6 @@ export function FarmDrawer({
   const baseTitle = mode === "create" ? "New farm" : mode === "edit" ? "Edit farm" : "Farm details";
   const title =
     panel === "defaults" ? "Block defaults" : panel === "members" ? "Members" : baseTitle;
-  // Side panels (defaults / members) only make sense for a saved farm,
-  // and only in view mode — otherwise switching would discard in-flight
-  // detail edits. Create mode never offers them.
-  const canOpenSidePanels = mode === "view" && farm !== null;
 
   return (
     <aside className="relative z-10 max-h-[60vh] overflow-y-auto border-b border-slate-200 bg-white px-4 py-4 shadow-md">
@@ -175,41 +175,18 @@ export function FarmDrawer({
         </p>
       ) : null}
 
-      {canOpenSidePanels ? (
+      {/* Edit lives inside the Details panel — it's a mode transition on
+          the form, not a sibling panel. Sibling panels (defaults /
+          members) are reached via the toolbar buttons. */}
+      {panel === "details" && mode === "view" && farm !== null ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {panel === "details" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onModeChange("edit")}
-                className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => setPanel("defaults")}
-                className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-              >
-                Block defaults
-              </button>
-              <button
-                type="button"
-                onClick={() => setPanel("members")}
-                className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-              >
-                Members
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPanel("details")}
-              className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-            >
-              ← Farm details
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onModeChange("edit")}
+            className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+          >
+            Edit
+          </button>
         </div>
       ) : null}
 
