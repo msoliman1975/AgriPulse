@@ -39,7 +39,6 @@ import { CreatePivotModal } from "./CreatePivotModal";
 import { DrawReadout } from "./DrawReadout";
 import { InactivateConfirmModal } from "./InactivateConfirmModal";
 import { FarmDrawer, type FarmDrawerMode } from "./FarmDrawer";
-import { FarmSummaryStrip } from "./FarmSummaryStrip";
 import type { MultiPolygon, Polygon } from "geojson";
 
 const SUMMARY_POLL_MS = 60_000;
@@ -54,16 +53,20 @@ const LAST_FARM_STORAGE_KEY = "labs.map.last_farm";
 
 interface LayerPrefs {
   aoi: boolean;
+  showBlocks: boolean;
   borders: boolean;
   labels: boolean;
   borderOpacity: number; // 0..1
+  blockFillOpacity: number; // 0..1
 }
 
 const DEFAULT_LAYER_PREFS: LayerPrefs = {
   aoi: true,
+  showBlocks: true,
   borders: true,
   labels: true,
   borderOpacity: 0.9,
+  blockFillOpacity: 1,
 };
 
 function loadLayerPrefs(): LayerPrefs {
@@ -74,12 +77,17 @@ function loadLayerPrefs(): LayerPrefs {
     const parsed = JSON.parse(raw) as Partial<LayerPrefs>;
     return {
       aoi: parsed.aoi ?? DEFAULT_LAYER_PREFS.aoi,
+      showBlocks: parsed.showBlocks ?? DEFAULT_LAYER_PREFS.showBlocks,
       borders: parsed.borders ?? DEFAULT_LAYER_PREFS.borders,
       labels: parsed.labels ?? DEFAULT_LAYER_PREFS.labels,
       borderOpacity:
         typeof parsed.borderOpacity === "number"
           ? Math.max(0.1, Math.min(1, parsed.borderOpacity))
           : DEFAULT_LAYER_PREFS.borderOpacity,
+      blockFillOpacity:
+        typeof parsed.blockFillOpacity === "number"
+          ? Math.max(0, Math.min(1, parsed.blockFillOpacity))
+          : DEFAULT_LAYER_PREFS.blockFillOpacity,
     };
   } catch {
     return DEFAULT_LAYER_PREFS;
@@ -207,9 +215,20 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [reshapeTarget, setReshapeTarget] = useState<BlockDetail | null>(null);
   const [reshapeCandidate, setReshapeCandidate] = useState<Polygon | null>(null);
 
-  // ---- Farm drawer state --------------------------------------------------
-
+  // ---- Farm details panel state -------------------------------------------
+  //
+  // Renders as a horizontal panel between the toolbar and the map (not a
+  // right-edge drawer any more). User spec: "if user clicks a block while
+  // farm panel is opened, the app closes the panel first" — so we auto-
+  // close whenever a block becomes selected.
   const [farmDrawerMode, setFarmDrawerMode] = useState<FarmDrawerMode | null>(null);
+  useEffect(() => {
+    if (selectedId && farmDrawerMode !== null) {
+      setFarmDrawerMode(null);
+      setPendingFarmAoi(null);
+      setPendingFarmAoiAreaM2(null);
+    }
+  }, [selectedId, farmDrawerMode]);
 
   // ---- Signal overlay state (CS-8) ---------------------------------------
   //
@@ -251,13 +270,6 @@ function MapForFarm({ farmId }: { farmId: string }) {
     },
     enabled: Boolean(farmId) && farmDrawerMode !== null,
     staleTime: 30_000,
-  });
-
-  // Farm picker dropdown source.
-  const farmsListQ = useQuery({
-    queryKey: ["labs/map/farmsList"],
-    queryFn: () => listFarms({ limit: 50 }),
-    staleTime: 60_000,
   });
 
   // CS-8: signal definitions list (powers the overlay picker).
@@ -574,30 +586,64 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const noUnits = summary.geojson.features.length === 0;
   const drawing = drawTarget !== null;
   const inactiveBlocks: Block[] = inactiveBlocksQ.data ?? [];
+  // Auto-Block is only meaningful when the farm has zero active operational
+  // units — the gridder lays out a fresh grid and would otherwise collide
+  // with manual work.
+  const hasActiveBlocks = summary.blocks.length > 0;
 
   return (
     <div className="-mx-4 -my-6 flex flex-col" style={{ height: "calc(100vh - 56px)" }}>
       <Toolbar
-        farmName={summary.farm.name}
         drawTarget={drawTarget}
         onToggleDrawBlock={() => setDrawTarget((cur) => (cur === "block" ? null : "block"))}
         onToggleDrawPivot={() => setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))}
         layerPrefs={layerPrefs}
         onLayerPrefsChange={setLayerPrefs}
-        farmsList={farmsListQ.data?.items ?? []}
-        currentFarmId={farmId}
-        onSwitchFarm={(id) => {
-          if (id === farmId) return;
-          navigate(`/labs/map/${id}`);
+        farmDetailsOpen={farmDrawerMode !== null}
+        onToggleFarmDetails={() => {
+          if (farmDrawerMode !== null) {
+            setFarmDrawerMode(null);
+            setPendingFarmAoi(null);
+            setPendingFarmAoiAreaM2(null);
+            setDrawTarget(null);
+          } else {
+            setFarmDrawerMode("view");
+          }
         }}
         onCreateFarm={() => {
           setPendingFarmAoi(null);
           setPendingFarmAoiAreaM2(null);
           setFarmDrawerMode("create");
         }}
+        hasActiveBlocks={hasActiveBlocks}
+        onOpenAutoBlock={() => navigate(`/farms/${farmId}/blocks/auto-grid`)}
       />
 
-      <FarmSummaryStrip farm={summary.farm} onOpenDrawer={() => setFarmDrawerMode("view")} />
+      {farmDrawerMode ? (
+        <FarmDrawer
+          mode={farmDrawerMode}
+          farm={farmDrawerMode === "create" ? null : summary.farm}
+          inactiveBlocks={inactiveBlocks}
+          draftBoundary={pendingFarmAoi}
+          draftAreaM2={pendingFarmAoiAreaM2}
+          drawingAoi={drawTarget === "farm_aoi"}
+          submitting={createFarmMut.isPending || updateFarmMut.isPending}
+          submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
+          onClose={() => {
+            setFarmDrawerMode(null);
+            setPendingFarmAoi(null);
+            setPendingFarmAoiAreaM2(null);
+            setDrawTarget(null);
+          }}
+          onModeChange={setFarmDrawerMode}
+          onStartDrawAoi={() => setDrawTarget("farm_aoi")}
+          onCancelDrawAoi={() => setDrawTarget(null)}
+          onSubmitCreate={(payload) => createFarmMut.mutate(payload)}
+          onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
+          onInactivateFarm={openInactivateFarm}
+          onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
+        />
+      ) : null}
 
       <div className="relative flex-1 overflow-hidden">
         {noUnits && !drawing ? (
@@ -647,9 +693,11 @@ function MapForFarm({ farmId }: { farmId: string }) {
             }
             onReshape={(poly) => setReshapeCandidate(poly)}
             showAoi={layerPrefs.aoi}
+            showBlocks={layerPrefs.showBlocks}
             showBlockBorders={layerPrefs.borders}
             showBlockLabels={layerPrefs.labels}
             borderOpacity={layerPrefs.borderOpacity}
+            blockFillOpacity={layerPrefs.blockFillOpacity}
             signalOverlay={signalOverlay.fc}
             onSignalClick={(observationId) => {
               // The URL `?signal_obs=` drives the SignalObservationPanel
@@ -759,34 +807,6 @@ function MapForFarm({ farmId }: { farmId: string }) {
           />
         ) : null}
 
-        {farmDrawerMode ? (
-          <FarmDrawer
-            mode={farmDrawerMode}
-            farm={farmDrawerMode === "create" ? null : summary.farm}
-            inactiveBlocks={inactiveBlocks}
-            draftBoundary={pendingFarmAoi}
-            draftAreaM2={pendingFarmAoiAreaM2}
-            width={drawerWidth}
-            drawingAoi={drawTarget === "farm_aoi"}
-            submitting={createFarmMut.isPending || updateFarmMut.isPending}
-            submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
-            onClose={() => {
-              setFarmDrawerMode(null);
-              setPendingFarmAoi(null);
-              setPendingFarmAoiAreaM2(null);
-              setDrawTarget(null);
-            }}
-            onModeChange={setFarmDrawerMode}
-            onStartDrawAoi={() => setDrawTarget("farm_aoi")}
-            onCancelDrawAoi={() => setDrawTarget(null)}
-            onSubmitCreate={(payload) => createFarmMut.mutate(payload)}
-            onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
-            onInactivateFarm={openInactivateFarm}
-            onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
-            onResizeMouseDown={onResizeMouseDown}
-          />
-        ) : null}
-
         {inactivateBlockOpen && selectedId ? (
           <InactivateConfirmModal
             confirmKeyword={summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"}
@@ -842,48 +862,64 @@ function MapForFarm({ farmId }: { farmId: string }) {
 // ---------- Sub-components --------------------------------------------------
 
 function Toolbar({
-  farmName,
   drawTarget,
   onToggleDrawBlock,
   onToggleDrawPivot,
   layerPrefs,
   onLayerPrefsChange,
-  farmsList,
-  currentFarmId,
-  onSwitchFarm,
+  farmDetailsOpen,
+  onToggleFarmDetails,
   onCreateFarm,
+  hasActiveBlocks,
+  onOpenAutoBlock,
 }: {
-  farmName: string;
   drawTarget: DrawTarget | null;
   onToggleDrawBlock: () => void;
   onToggleDrawPivot: () => void;
   layerPrefs: LayerPrefs;
   onLayerPrefsChange: (next: LayerPrefs) => void;
-  farmsList: { id: string; code: string; name: string }[];
-  currentFarmId: string;
-  onSwitchFarm: (id: string) => void;
+  farmDetailsOpen: boolean;
+  onToggleFarmDetails: () => void;
   onCreateFarm: () => void;
+  hasActiveBlocks: boolean;
+  onOpenAutoBlock: () => void;
 }) {
+  // The active-farm context (name, area, governorate, status) now lives
+  // in the shell header next to the tenant badge — that's why this
+  // toolbar no longer carries a farm switcher or farm-name label.
   return (
-    <header className="flex h-10 items-center justify-between border-b border-slate-200 bg-white px-3">
-      <div className="flex items-center gap-2 text-[13px] font-medium text-slate-800">
-        <span aria-hidden>🌱</span>
-        <FarmSwitcher
-          farmsList={farmsList}
-          currentFarmId={currentFarmId}
-          farmName={farmName}
-          onSwitchFarm={onSwitchFarm}
-          onCreateFarm={onCreateFarm}
-        />
-        <span className="ms-2 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-800">
-          Lab
-        </span>
+    <header className="flex h-10 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3">
+      <div className="flex items-center gap-2 text-[12px] text-slate-700">
+        <button
+          type="button"
+          onClick={onToggleFarmDetails}
+          aria-pressed={farmDetailsOpen}
+          className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+            farmDetailsOpen
+              ? "bg-slate-900 text-white"
+              : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          {farmDetailsOpen ? "Hide farm details" : "Farm details"}
+        </button>
+        <button
+          type="button"
+          onClick={onCreateFarm}
+          className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+        >
+          + New farm
+        </button>
       </div>
-      <div className="flex items-center gap-3 text-[12px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-500">
         <LayerToggle
           label="AOI"
           checked={layerPrefs.aoi}
           onChange={(v) => onLayerPrefsChange({ ...layerPrefs, aoi: v })}
+        />
+        <LayerToggle
+          label="Blocks"
+          checked={layerPrefs.showBlocks}
+          onChange={(v) => onLayerPrefsChange({ ...layerPrefs, showBlocks: v })}
         />
         <LayerToggle
           label="Borders"
@@ -896,7 +932,7 @@ function Toolbar({
           onChange={(v) => onLayerPrefsChange({ ...layerPrefs, labels: v })}
         />
         <label className="flex items-center gap-1" title="Border opacity">
-          <span className="text-[10px] text-slate-500">Opacity</span>
+          <span className="text-[10px] text-slate-500">Borders</span>
           <input
             type="range"
             min={10}
@@ -913,14 +949,45 @@ function Toolbar({
             aria-label="Border opacity"
           />
         </label>
+        <label className="flex items-center gap-1" title="Block fill transparency">
+          <span className="text-[10px] text-slate-500">Fill</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(layerPrefs.blockFillOpacity * 100)}
+            onChange={(e) =>
+              onLayerPrefsChange({
+                ...layerPrefs,
+                blockFillOpacity: Number(e.target.value) / 100,
+              })
+            }
+            className="h-1 w-20 cursor-pointer"
+            aria-label="Block fill opacity"
+          />
+        </label>
         <span className="text-slate-300">|</span>
         <Swatch color="#97C459" label="Healthy" />
         <Swatch color="#EF9F27" label="Watch" />
         <Swatch color="#E24B4A" label="Critical" />
         <button
           type="button"
+          onClick={onOpenAutoBlock}
+          disabled={hasActiveBlocks}
+          title={
+            hasActiveBlocks
+              ? "Auto-Block lays out a fresh grid — disabled while active blocks exist."
+              : "Generate a grid of blocks across the farm AOI"
+          }
+          className="ms-2 rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Auto-Block
+        </button>
+        <button
+          type="button"
           onClick={onToggleDrawBlock}
-          className={`ms-2 rounded px-2 py-0.5 text-[11px] font-medium ${
+          className={`rounded px-2 py-0.5 text-[11px] font-medium ${
             drawTarget === "block"
               ? "bg-slate-900 text-white"
               : "border border-slate-300 text-slate-700 hover:bg-slate-50"
@@ -941,44 +1008,6 @@ function Toolbar({
         </button>
       </div>
     </header>
-  );
-}
-
-function FarmSwitcher({
-  farmsList,
-  currentFarmId,
-  farmName,
-  onSwitchFarm,
-  onCreateFarm,
-}: {
-  farmsList: { id: string; code: string; name: string }[];
-  currentFarmId: string;
-  farmName: string;
-  onSwitchFarm: (id: string) => void;
-  onCreateFarm: () => void;
-}) {
-  // Native <select> for keyboard/a11y; "+ new" routes through onCreateFarm.
-  return (
-    <select
-      aria-label="Select farm"
-      value={currentFarmId}
-      onChange={(e) => {
-        if (e.target.value === "__new__") onCreateFarm();
-        else onSwitchFarm(e.target.value);
-      }}
-      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[12px] font-medium text-slate-800"
-    >
-      {farmsList.length === 0 ? (
-        <option value={currentFarmId}>{farmName}</option>
-      ) : (
-        farmsList.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.code} — {f.name}
-          </option>
-        ))
-      )}
-      <option value="__new__">+ New farm…</option>
-    </select>
   );
 }
 

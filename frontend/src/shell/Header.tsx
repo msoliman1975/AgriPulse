@@ -5,9 +5,11 @@ import { useTranslation } from "react-i18next";
 
 import { getUnreadCount } from "@/api/inbox";
 import { openInboxStream } from "@/realtime/inboxStream";
+import { ActiveFarmContext } from "./ActiveFarmContext";
 import { AlertsDrawer } from "./AlertsDrawer";
 import { FarmSwitcher } from "./FarmSwitcher";
 import { SettingsDrawer } from "./SettingsDrawer";
+import { TenantBadge } from "./TenantBadge";
 import { TenantTreeDrawer } from "./TenantTreeDrawer";
 import { UserMenu } from "./UserMenu";
 import { BellIcon, GearIcon, TenantIcon } from "./icons";
@@ -68,7 +70,9 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
         <span aria-hidden="true" className="text-ap-line">
           /
         </span>
+        <TenantBadge />
         <FarmSwitcher />
+        <ActiveFarmContext />
         {toolbar ? <div className="ms-auto flex items-center gap-2">{toolbar}</div> : null}
         <div className={toolbar ? "flex items-center gap-2" : "ms-auto flex items-center gap-2"}>
           <UserMenu />

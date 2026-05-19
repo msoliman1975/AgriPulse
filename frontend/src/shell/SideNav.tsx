@@ -154,14 +154,14 @@ export function SideNav(): ReactNode {
         />
         <SideNavItem
           to={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
-          label="Land units"
+          label="Farm management"
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
         {/* Legacy form-based view kept as a fallback while we iterate. */}
         <SideNavItem
           to={hasFarm ? `/farms/${farmSegment}` : "/farms"}
-          label="Land units (legacy)"
+          label="Farm management (legacy)"
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/farms/${farmSegment}` : "/farms"}
         />
