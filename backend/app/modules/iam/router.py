@@ -94,7 +94,11 @@ async def get_me(
     service: UserService = Depends(_service),
 ) -> MeResponse:
     try:
-        return await service.get_me(context.user_id)
+        return await service.get_me(
+            context.user_id,
+            email=context.email,
+            full_name=context.full_name,
+        )
     except UserNotFoundError as exc:
         raise APIError(
             status_code=status.HTTP_404_NOT_FOUND,

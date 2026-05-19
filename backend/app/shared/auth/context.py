@@ -65,6 +65,12 @@ class RequestContext:
 
     user_id: UUID
     keycloak_subject: str
+    # JWT identity claims surfaced so the iam upsert handler can refresh
+    # public.users from a valid token without an extra round-trip. Empty
+    # string when the token omits the claim (rare — Keycloak always
+    # includes email when the openid scope is requested).
+    email: str = ""
+    full_name: str = ""
     tenant_id: UUID | None = None
     tenant_role: TenantRole | None = None
     platform_role: PlatformRole | None = None

@@ -19,25 +19,47 @@ from app.modules.iam.schemas import (
 
 
 class UserNotFoundError(LookupError):
-    """The user_id from the JWT does not exist in `public.users`.
+    """A request carries a valid JWT but no usable `public.users` row.
 
-    For MVP this is a 404 — first login should provision the row before
-    a /me call ever runs (a Phase 2 sync handler upserts on token issuance).
+    Only raised when the upsert handler itself fails to produce a row
+    (e.g. the JWT lacks both `sub` and `email`). Normal "first /me call
+    after sign-in" no longer raises — `UserServiceImpl.get_me` upserts
+    from the JWT claims before reading.
     """
 
 
 class UserService(Protocol):
     """Public contract for the iam module."""
 
-    async def get_me(self, user_id: UUID) -> MeResponse: ...
+    async def get_me(
+        self,
+        user_id: UUID,
+        *,
+        email: str = "",
+        full_name: str = "",
+    ) -> MeResponse: ...
 
 
 class UserServiceImpl:
     def __init__(self, session: AsyncSession) -> None:
         self._repo = UserRepository(session)
 
-    async def get_me(self, user_id: UUID) -> MeResponse:
-        user = await self._repo.get_by_id(user_id)
+    async def get_me(
+        self,
+        user_id: UUID,
+        *,
+        email: str = "",
+        full_name: str = "",
+    ) -> MeResponse:
+        # Phase 2 sync: ensure the `public.users` row matches the JWT
+        # before reading. Handles three cases — new user, returning
+        # user, and Keycloak-recreated user (same email, new sub).
+        # Migration 0023 added ON UPDATE CASCADE to the seven FKs into
+        # public.users.id so the rekey path cascades memberships +
+        # preferences + role grants automatically.
+        user = await self._repo.upsert_from_jwt(
+            sub=user_id, email=email, full_name=full_name
+        )
         if user is None or user.deleted_at is not None:
             raise UserNotFoundError(f"user {user_id} not found")
 

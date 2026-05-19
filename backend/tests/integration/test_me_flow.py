@@ -152,15 +152,114 @@ async def test_me_returns_profile_preferences_memberships_scopes(
 
 
 @pytest.mark.asyncio
-async def test_me_returns_404_for_unknown_user() -> None:
+async def test_me_upserts_user_for_first_login(admin_session: AsyncSession) -> None:
+    """Phase-2 sync handler: a valid JWT for a user not yet in
+    `public.users` auto-creates the row on first /me call instead of
+    returning 404 (the old behavior). The upsert is keyed on the JWT
+    `sub` so re-issued tokens still find the row."""
+    sub = uuid4()
     context = RequestContext(
-        user_id=uuid4(),
-        keycloak_subject="kc-ghost",
-        tenant_id=uuid4(),
+        user_id=sub,
+        keycloak_subject=str(sub),
+        email=f"first-login-{sub}@example.test",
+        full_name="First Login User",
+        tenant_id=None,
         platform_role=PlatformRole.PLATFORM_ADMIN,
     )
     app = _build_app(context)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.get("/api/v1/me")
-    assert resp.status_code == 404
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["id"] == str(sub)
+    assert body["email"] == f"first-login-{sub}@example.test"
+    assert body["full_name"] == "First Login User"
+
+    # Row really did land in the DB — not just an in-memory MeResponse.
+    row = (
+        await admin_session.execute(
+            text("SELECT email, keycloak_subject FROM public.users WHERE id = :id").bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True))
+            ),
+            {"id": sub},
+        )
+    ).one()
+    assert row.keycloak_subject == str(sub)
+
+
+@pytest.mark.asyncio
+async def test_me_rekeys_user_when_keycloak_sub_changes(admin_session: AsyncSession) -> None:
+    """When the same email exists but the JWT carries a new sub
+    (Keycloak user delete+recreate), the upsert handler re-keys the
+    public.users row to the new sub. ON UPDATE CASCADE (migration 0023)
+    moves tenant_memberships + role assignments to the new id so the
+    user keeps their access. This is the scenario that originally
+    surfaced today's bug — see fix/iam-jwt-sync."""
+    old_id = uuid4()
+    new_sub = uuid4()
+    email = f"recreated-{new_sub}@example.test"
+
+    # Seed: old row + a tenant membership pointing at it.
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug=f"rekey-{new_sub.hex[:10]}",
+        name="Rekey Test Tenant",
+        contact_email="ops@rekey.test",
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
+            "VALUES (:id, :sub, :email, 'Old Name')"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {"id": old_id, "sub": f"kc-old-{old_id}", "email": email},
+    )
+    membership_id = uuid4()
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.tenant_memberships (id, user_id, tenant_id, status) "
+            "VALUES (:mid, :uid, :tid, 'active')"
+        ).bindparams(
+            bindparam("mid", type_=PG_UUID(as_uuid=True)),
+            bindparam("uid", type_=PG_UUID(as_uuid=True)),
+            bindparam("tid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"mid": membership_id, "uid": old_id, "tid": tenant.tenant_id},
+    )
+    await admin_session.commit()
+
+    # New JWT carries new_sub but same email.
+    context = RequestContext(
+        user_id=new_sub,
+        keycloak_subject=str(new_sub),
+        email=email,
+        full_name="New Display Name",
+        tenant_id=tenant.tenant_id,
+    )
+    app = _build_app(context)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/me")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["id"] == str(new_sub)
+
+    # The old id is gone; the membership now references new_sub
+    # courtesy of the ON UPDATE CASCADE.
+    remaining_old = (
+        await admin_session.execute(
+            text("SELECT count(*) FROM public.users WHERE id = :id").bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True))
+            ),
+            {"id": old_id},
+        )
+    ).scalar_one()
+    assert remaining_old == 0
+    memb_user_id = (
+        await admin_session.execute(
+            text("SELECT user_id FROM public.tenant_memberships WHERE id = :id").bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True))
+            ),
+            {"id": membership_id},
+        )
+    ).scalar_one()
+    assert memb_user_id == new_sub

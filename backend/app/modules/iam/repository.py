@@ -39,6 +39,82 @@ class UserRepository:
     async def get_by_id(self, user_id: UUID) -> User | None:
         return await self._session.get(User, user_id)
 
+    async def upsert_from_jwt(
+        self,
+        *,
+        sub: UUID,
+        email: str,
+        full_name: str,
+    ) -> User:
+        """Ensure a `public.users` row exists matching the current JWT.
+
+        Three cases, in order:
+
+        1. **Row exists with id == sub** — return as-is. Hot path; one
+           query, no writes.
+        2. **Row exists by email, id != sub** — Keycloak re-issued the
+           user (delete+recreate). Re-key the row: id := sub,
+           keycloak_subject := sub. The FK targets carry through via
+           ON UPDATE CASCADE (migration 0023) so memberships,
+           preferences, role grants follow. Refresh display name + email
+           verification flag while we're here.
+        3. **No row** — first-ever login for this email. Insert a new
+           row with id = sub.
+
+        The upsert is idempotent and safe under concurrent first-logins
+        for the same user (PK + email unique constraints serialise the
+        write).
+        """
+        # Case 1: fast path.
+        user = await self._session.get(User, sub)
+        if user is not None and user.deleted_at is None:
+            return user
+
+        # Case 2: same email, different sub (KC user recreated).
+        # Use a raw UPDATE so the PK change cascades cleanly through the
+        # ON UPDATE CASCADE FKs (migration 0023). ORM identity-map can
+        # mis-handle PK mutation, hence the textual SQL and the
+        # session.expire() afterwards.
+        if email:
+            stmt = select(User).where(User.email == email, User.deleted_at.is_(None))
+            existing = (await self._session.execute(stmt)).scalar_one_or_none()
+            if existing is not None:
+                await self._session.execute(
+                    text(
+                        "UPDATE public.users "
+                        "SET id = :new_id, keycloak_subject = :new_sub, "
+                        "    full_name = COALESCE(NULLIF(:full_name, ''), full_name) "
+                        "WHERE id = :old_id"
+                    ).bindparams(
+                        bindparam("new_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("old_id", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {
+                        "new_id": sub,
+                        "new_sub": str(sub),
+                        "old_id": existing.id,
+                        "full_name": full_name or "",
+                    },
+                )
+                # Drop the now-stale ORM object so the next get() re-reads
+                # the (rekeyed) row from the database.
+                await self._session.flush()
+                self._session.expire(existing)
+                refreshed = await self._session.get(User, sub)
+                if refreshed is not None:
+                    return refreshed
+
+        # Case 3: brand-new user.
+        user = User(
+            id=sub,
+            keycloak_subject=str(sub),
+            email=email or f"{sub}@no-email.local",
+            full_name=full_name or email or str(sub),
+        )
+        self._session.add(user)
+        await self._session.flush()
+        return user
+
     async def get_preferences(self, user_id: UUID) -> UserPreferences | None:
         return await self._session.get(UserPreferences, user_id)
 
