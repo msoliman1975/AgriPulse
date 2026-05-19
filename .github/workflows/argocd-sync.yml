@@ -1,17 +1,28 @@
 name: argocd-sync
 
-# After CI's containers job pushes images to GHCR with the commit SHA, this
-# workflow opens a small PR that bumps the per-image tags under
-# `global.images.<chart>.tag` in the dev overlay so ArgoCD picks up the
-# new build. Staging and production stay manual.
+# After CI's `containers` matrix pushes images to GHCR with the commit
+# SHA, this workflow direct-pushes a bump of `global.images.<chart>.tag`
+# in the dev overlay so ArgoCD picks up the new build. Staging and
+# production stay manual.
 #
-# CD-12: replaced an earlier single-`image.tag` shim that left tile-server
-# pinned to an old tag because its image was never bumped. yq writes each
-# chart's key independently.
+# Gate: we inspect the individual `containers (*)` jobs of the triggering
+# CI run, NOT the overall workflow conclusion. CI has perma-red lint /
+# format / pre-commit jobs against current main that don't affect what
+# we deploy; gating on overall success would (and did) keep this
+# workflow permanently skipped, forcing manual overlay bumps that race
+# with the merge SHA's still-in-progress containers job and end up
+# requiring a "repoint" cleanup commit.
 #
-# The alternative â€” installing ArgoCD Image Updater into the cluster and
-# letting it poll GHCR â€” is a P2 upgrade. PR-bumping is auditable and
-# gives reviewers a one-line diff per release.
+# We bump only the containers that actually succeeded for this SHA — so
+# a transient keycloak build failure doesn't block api/workers/frontend/
+# tile-server deploys.
+#
+# The bump commit carries `[skip ci]` so it doesn't trigger another CI
+# run that would loop us right back here.
+#
+# CD-12: replaced an earlier single-`image.tag` shim that left
+# tile-server pinned to an old tag because its image was never bumped.
+# yq writes each chart's key independently.
 
 on:
   workflow_run:
@@ -21,27 +32,83 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
+  actions: read
 
 jobs:
   bump-dev-image-tags:
     name: bump dev image tags
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    # Only react to push-triggered CI runs (covers merge commits and
+    # direct pushes); ignore PR / re-run / manual triggers.
+    if: ${{ github.event.workflow_run.event == 'push' }}
     steps:
+      - name: Inspect containers job results for triggering CI run
+        id: containers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -eu
+          jobs=$(gh api --paginate \
+            "repos/${REPO}/actions/runs/${RUN_ID}/jobs" \
+            --jq '.jobs[] | "\(.name)\t\(.conclusion)"')
+          printf '%s\n' "$jobs"
+
+          # is_green <matrix-key>  → echoes "true" or "false"
+          is_green() {
+            local key="$1" line concl
+            line=$(printf '%s\n' "$jobs" | grep "^containers (${key}," || true)
+            concl=$(printf '%s' "$line" | awk -F'\t' '{print $2}')
+            [ "$concl" = "success" ] && echo true || echo false
+          }
+
+          api=$(is_green api)
+          workers=$(is_green workers)
+          frontend=$(is_green frontend)
+          tileserver=$(is_green tile-server)
+          keycloak=$(is_green keycloak)
+
+          {
+            echo "api=${api}"
+            echo "workers=${workers}"
+            echo "frontend=${frontend}"
+            echo "tileserver=${tileserver}"
+            echo "keycloak=${keycloak}"
+          } >> "$GITHUB_OUTPUT"
+
+          # The four app containers must all be green. keycloak is
+          # optional — we bump it only if it succeeded.
+          if [ "$api" = "true" ] && [ "$workers" = "true" ] \
+              && [ "$frontend" = "true" ] && [ "$tileserver" = "true" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Required containers did not all succeed (api=$api workers=$workers frontend=$frontend tile-server=$tileserver) — skipping bump"
+          fi
+
+      - name: Stop if not deployable
+        if: steps.containers.outputs.go != 'true'
+        run: |
+          echo "Required containers job(s) did not succeed for SHA ${{ github.event.workflow_run.head_sha }}; nothing to bump."
+          exit 0
+
       - uses: actions/checkout@v6
+        if: steps.containers.outputs.go == 'true'
         with:
           ref: main
-          # Need history to find the commit the CI run was for.
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute short SHA
+        if: steps.containers.outputs.go == 'true'
         id: sha
         run: echo "short=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
       - name: Verify yq v4 available
-        # Mike Farah's yq v4 â€” atomic, validates YAML, won't accidentally
+        if: steps.containers.outputs.go == 'true'
+        # Mike Farah's yq v4 — atomic, validates YAML, won't accidentally
         # bump unrelated fields the way the previous regex could. The
         # ubuntu-24.04 runner image ships yq v4; this is a sanity check
         # so a future image swap that drops it surfaces here, not silently.
@@ -55,8 +122,10 @@ jobs:
           yq --version | grep -q 'version v4\.' || { echo "yq must be v4 (Mike Farah)"; exit 1; }
 
       - name: Bump dev overlay image tags
+        if: steps.containers.outputs.go == 'true'
         env:
           NEW_TAG: ${{ steps.sha.outputs.short }}
+          BUMP_KC: ${{ steps.containers.outputs.keycloak }}
         run: |
           set -eu
           OVERLAY=infra/argocd/overlays/dev/values.yaml
@@ -71,38 +140,48 @@ jobs:
           # Keycloak custom image uses the bitnami sub-chart's own
           # `image.tag` key (the sub-chart doesn't tpl values, so
           # global.images.keycloak.tag wouldn't be read). Write directly
-          # to keycloak.image.tag.
-          yq -i ".keycloak.image.tag = strenv(NEW_TAG)" "$OVERLAY"
-          echo "Bumped overlay to $NEW_TAG:"
+          # to keycloak.image.tag — but only if the keycloak container
+          # job actually succeeded for this SHA, otherwise we'd pin to
+          # an image that doesn't exist in GHCR.
+          if [ "$BUMP_KC" = "true" ]; then
+            yq -i ".keycloak.image.tag = strenv(NEW_TAG)" "$OVERLAY"
+          fi
+          echo "Bumped overlay to $NEW_TAG (keycloak=$BUMP_KC):"
           yq '{ "global": .global.images, "keycloak.image.tag": .keycloak.image.tag }' "$OVERLAY"
 
-      - name: Open bump PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: argocd/dev-image-bump
-          base: main
-          delete-branch: true
-          title: "chore(argocd): bump dev image tag to ${{ steps.sha.outputs.short }}"
-          commit-message: |
-            chore(argocd): bump dev image tag to ${{ steps.sha.outputs.short }}
+      - name: Commit and push
+        if: steps.containers.outputs.go == 'true'
+        env:
+          NEW_TAG: ${{ steps.sha.outputs.short }}
+          BUMP_KC: ${{ steps.containers.outputs.keycloak }}
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-            Auto-generated by .github/workflows/argocd-sync.yml after the
-            containers CI job pushed `${{ steps.sha.outputs.short }}` to
-            ghcr.io/${{ github.repository_owner }}/agripulse/*.
-          labels: |
-            argocd
-            automation
-          body: |
-            Auto-bump from `main` CI run
-            [`${{ github.event.workflow_run.id }}`](${{ github.event.workflow_run.html_url }}).
+          if git diff --quiet -- infra/argocd/overlays/dev/values.yaml; then
+            echo "Overlay already at ${NEW_TAG}; nothing to push."
+            exit 0
+          fi
 
-            New images:
-            - `ghcr.io/${{ github.repository_owner }}/agripulse/api:${{ steps.sha.outputs.short }}`
-            - `ghcr.io/${{ github.repository_owner }}/agripulse/workers:${{ steps.sha.outputs.short }}`
-            - `ghcr.io/${{ github.repository_owner }}/agripulse/tile-server:${{ steps.sha.outputs.short }}`
-            - `ghcr.io/${{ github.repository_owner }}/agripulse/frontend:${{ steps.sha.outputs.short }}`
-            - `ghcr.io/${{ github.repository_owner }}/agripulse/keycloak:${{ steps.sha.outputs.short }}`
+          kc_suffix=""
+          if [ "$BUMP_KC" != "true" ]; then
+            kc_suffix=" (keycloak skipped — container build failed)"
+          fi
 
-            Merging this triggers ArgoCD's auto-sync in the dev environment.
-            Staging and production overlays are intentionally not touched â€”
-            promotion happens via a hand-written PR after smoke testing.
+          git add infra/argocd/overlays/dev/values.yaml
+          git commit -m "chore(argocd): bump dev image tags to ${NEW_TAG}${kc_suffix} [skip ci]" \
+                     -m "Auto-bumped by .github/workflows/argocd-sync.yml after CI containers job pushed ${NEW_TAG} to ghcr.io/${{ github.repository_owner }}/agripulse/*."
+
+          # Handle a race where another bump landed between our checkout
+          # and push — rebase the auto-bump onto whatever is now on main.
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Pushed bump on attempt ${attempt}."
+              exit 0
+            fi
+            echo "Push rejected (likely non-fast-forward); rebasing and retrying."
+            git pull --rebase --autostash origin main
+          done
+          echo "::error::Failed to push bump after 3 attempts." >&2
+          exit 1
