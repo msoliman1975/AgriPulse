@@ -107,3 +107,9 @@ scripts/.dev-stack-state.json
 # Terraform plan binaries contain rendered variable values, sometimes
 # including sensitive inputs.
 *.tfplan
+
+# --- Local working artefacts ---
+# AOIs/ holds ad-hoc GeoJSON/AOI experiments — not source of truth.
+AOIs/
+# Playwright MCP browser cache (driven by Claude Code's MCP server).
+.playwright-mcp/
