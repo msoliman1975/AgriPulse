@@ -81,9 +81,16 @@ def _build_context(claims: dict[str, Any]) -> RequestContext:
     if preferred_unit not in ("feddan", "acre", "hectare"):
         preferred_unit = "feddan"
 
+    email = str(claims.get("email") or "")
+    # Keycloak emits `name` (display) and `preferred_username`. We prefer
+    # `name`; falling back to email when both are absent.
+    full_name = str(claims.get("name") or claims.get("preferred_username") or email)
+
     return RequestContext(
         user_id=user_id,
         keycloak_subject=str(claims.get("sub")),
+        email=email,
+        full_name=full_name,
         tenant_id=tenant_id,
         tenant_role=tenant_role,
         platform_role=platform_role,
