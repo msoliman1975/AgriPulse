@@ -29,6 +29,7 @@ import {
 } from "@/api/farms";
 import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawProgress, type DrawTarget } from "./MapCanvas";
+import { SignalObservationPanel } from "./SignalObservationPanel";
 import { SignalOverlayControl } from "./SignalOverlayControl";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
@@ -540,6 +541,17 @@ function MapForFarm({ farmId }: { farmId: string }) {
     };
   }, [signalOverlayDefId, signalObservationsQ.data, blockCentroids, selectedSignalDefinition]);
 
+  // CS-8 popup: URL ?signal_obs=<id> drives a side panel that
+  // hydrates from the same observations the overlay already loaded
+  // — no extra round-trip. When the picker is off or the id no
+  // longer matches a loaded observation (e.g. operator changed
+  // signal), the panel quietly stays hidden.
+  const selectedObservationId = search.get("signal_obs");
+  const selectedObservation = useMemo(() => {
+    if (!selectedObservationId || !signalObservationsQ.data) return null;
+    return signalObservationsQ.data.find((o) => o.id === selectedObservationId) ?? null;
+  }, [selectedObservationId, signalObservationsQ.data]);
+
   if (summaryQ.isLoading) {
     return <FullState>Loading farm map…</FullState>;
   }
@@ -640,9 +652,9 @@ function MapForFarm({ farmId }: { farmId: string }) {
             borderOpacity={layerPrefs.borderOpacity}
             signalOverlay={signalOverlay.fc}
             onSignalClick={(observationId) => {
-              // V1 — surface the observation id via the URL so a
-              // future side-panel can read it without prop-drilling.
-              // Behavioural sink (mini popup) is a follow-up.
+              // The URL `?signal_obs=` drives the SignalObservationPanel
+              // (rendered below). Keeping the id in the URL means a
+              // deep-link to a specific observation works on its own.
               const next = new URLSearchParams(search);
               next.set("signal_obs", observationId);
               setSearch(next, { replace: true });
@@ -669,6 +681,19 @@ function MapForFarm({ farmId }: { farmId: string }) {
           isError={signalObservationsQ.isError}
           onChange={setSignalOverlayDefId}
         />
+
+        {selectedObservationId ? (
+          <SignalObservationPanel
+            observation={selectedObservation}
+            definition={selectedSignalDefinition}
+            isLoading={signalObservationsQ.isLoading}
+            onClose={() => {
+              const next = new URLSearchParams(search);
+              next.delete("signal_obs");
+              setSearch(next, { replace: true });
+            }}
+          />
+        ) : null}
 
         {selectedId && farmDrawerMode === null ? (
           <DetailPanel

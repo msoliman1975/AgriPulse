@@ -18,6 +18,27 @@
       "message": "الرسالة"
     }
   },
+  "observationPanel": {
+    "title": "ملاحظة إشارة",
+    "close": "إغلاق",
+    "loading": "جارٍ تحميل الملاحظة…",
+    "notFound": "الملاحظة ليست ضمن الطبقة الحالية. اختر الإشارة المطابقة في تحكم الطبقة.",
+    "value": "القيمة",
+    "observedAt": "وقت الملاحظة",
+    "recordedAt": "وقت التسجيل",
+    "locationMode": "الموقع",
+    "locationPoint": "الإحداثيات",
+    "block": "الحقل",
+    "template": "النموذج",
+    "templateLead": "صف رئيسي لإرسال نموذج",
+    "templateSibling": "جزء من إرسال نموذج",
+    "attachment": "فتح المرفق",
+    "locationModes": {
+      "entity": "على مستوى الحقل (دون نقطة دقيقة)",
+      "point_in_entity": "مُثبتة داخل الحقل",
+      "free_point": "نقطة حرة"
+    }
+  },
   "refPicker": {
     "title": "مرجع إشارة",
     "selectLabel": "اختر تعريف إشارة",

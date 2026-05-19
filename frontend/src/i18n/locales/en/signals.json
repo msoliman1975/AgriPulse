@@ -18,6 +18,27 @@
       "message": "Message"
     }
   },
+  "observationPanel": {
+    "title": "Signal observation",
+    "close": "Close",
+    "loading": "Loading observation…",
+    "notFound": "Observation not in the current overlay. Pick the matching signal in the overlay control.",
+    "value": "Value",
+    "observedAt": "Observed",
+    "recordedAt": "Recorded",
+    "locationMode": "Location",
+    "locationPoint": "Coords",
+    "block": "Block",
+    "template": "Template",
+    "templateLead": "Lead row of a template submission",
+    "templateSibling": "Part of a template submission",
+    "attachment": "Open attachment",
+    "locationModes": {
+      "entity": "Block-level (no precise point)",
+      "point_in_entity": "Pinned inside the block",
+      "free_point": "Free-floating point"
+    }
+  },
   "refPicker": {
     "title": "Signal reference",
     "selectLabel": "Pick a signal definition",
