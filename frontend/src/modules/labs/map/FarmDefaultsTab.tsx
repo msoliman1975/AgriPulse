@@ -3,6 +3,12 @@
 // PR-2 of the farm-block config rollout. Embedded as a section in
 // FarmDrawer; gated server-side by FARM_CONFIG_TEMPLATE_ENABLED (a 404
 // is treated as "feature off" and renders an inline notice).
+//
+// Two-step model:
+// 1. "Save template" persists at FARM level only — no block change.
+// 2. "Apply to blocks…" propagates the saved template to selected
+//    blocks via a preview/confirm flow. The lock chip prevents blocks
+//    from diverging from the saved farm template once locked.
 
 import { useEffect, useState } from "react";
 
@@ -36,6 +42,19 @@ import type {
 } from "@/api/farmConfig";
 import { getConfig } from "@/api/config";
 import type { ImageryConfigEntry } from "@/api/config";
+import { listWeatherProviders, type WeatherProvider } from "@/api/weather";
+import type { IrrigationSource, IrrigationSystem } from "@/api/blocks";
+
+const IRRIGATION_SYSTEMS: IrrigationSystem[] = [
+  "drip",
+  "micro_sprinkler",
+  "pivot",
+  "furrow",
+  "flood",
+  "surface",
+  "none",
+];
+const IRRIGATION_SOURCES: IrrigationSource[] = ["well", "canal", "nile", "mixed"];
 
 interface Props {
   farmId: string;
@@ -44,6 +63,7 @@ interface Props {
 export function FarmDefaultsTab({ farmId }: Props) {
   const [template, setTemplate] = useState<SubscriptionsTemplate | null>(null);
   const [products, setProducts] = useState<ImageryConfigEntry[]>([]);
+  const [weatherProviders, setWeatherProviders] = useState<WeatherProvider[]>([]);
   const [featureOff, setFeatureOff] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -71,12 +91,13 @@ export function FarmDefaultsTab({ farmId }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [t, c, l, irr, org] = await Promise.all([
+        const [t, c, l, irr, org, wp] = await Promise.all([
           getSubscriptionsTemplate(farmId),
           getConfig(),
           getLocks(farmId),
           getIrrigationTemplate(farmId),
           getOrgTemplate(farmId),
+          listWeatherProviders(),
         ]);
         if (cancelled) return;
         setTemplate(t);
@@ -84,10 +105,10 @@ export function FarmDefaultsTab({ farmId }: Props) {
         setLocks(l);
         setIrrigation(irr);
         setOrgTpl(org);
+        setWeatherProviders(wp);
       } catch (err) {
         if (cancelled) return;
-        const status = (err as { response?: { status?: number } })?.response
-          ?.status;
+        const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) {
           setFeatureOff(true);
         } else {
@@ -103,8 +124,8 @@ export function FarmDefaultsTab({ farmId }: Props) {
   if (featureOff) {
     return (
       <p className="text-[11px] text-slate-500">
-        Farm subscription templates are not enabled in this environment. Ask
-        the platform admin to flip the <code>farm_config_template_enabled</code>
+        Farm subscription templates are not enabled in this environment. Ask the platform admin to
+        flip the <code>farm_config_template_enabled</code>
         flag.
       </p>
     );
@@ -152,12 +173,17 @@ export function FarmDefaultsTab({ farmId }: Props) {
   };
 
   const addWeatherRow = () => {
+    // Seed with the first not-already-picked provider, then fall back
+    // to the first catalog entry, then empty. Empty would reject on
+    // save server-side (provider_code is non-nullable + FK'd) so the
+    // empty case is only reachable when the catalog is also empty.
+    const remaining = weatherProviders.filter(
+      (p) => !template.weather.some((r) => r.provider_code === p.code),
+    );
+    const seed = remaining[0]?.code ?? weatherProviders[0]?.code ?? "";
     setTemplate({
       ...template,
-      weather: [
-        ...template.weather,
-        { provider_code: "", cadence_hours: 6, is_active: true },
-      ],
+      weather: [...template.weather, { provider_code: seed, cadence_hours: 6, is_active: true }],
     });
   };
 
@@ -247,187 +273,236 @@ export function FarmDefaultsTab({ farmId }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Subscriptions header + lock */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-[12px] font-semibold text-slate-700">Subscriptions</h3>
-        {lockChip("subscriptions")}
+      <p className="rounded bg-slate-50 px-2 py-1 text-[10px] text-slate-600">
+        <strong>Save template</strong> persists at farm level only. <strong>Apply to blocks</strong>{" "}
+        rolls the saved template to blocks with a preview / opt-out step. Locking after apply
+        prevents blocks from diverging.
+      </p>
+
+      <div className="grid grid-cols-1 gap-x-6 gap-y-4 lg:grid-cols-3">
+        {/* Column 1 — Imagery (subscriptions lock lives here; weather
+            shares the same lock category, called out in col 2 below). */}
+        <section>
+          <div className="flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-slate-700">Imagery</h3>
+            {lockChip("subscriptions")}
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <h4 className="text-[11px] font-semibold uppercase text-slate-600">
+                Imagery products
+              </h4>
+              <button
+                type="button"
+                onClick={addImageryRow}
+                disabled={products.length === template.imagery.length}
+                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] hover:bg-slate-50 disabled:opacity-50"
+              >
+                + Add product
+              </button>
+            </div>
+            {template.imagery.length === 0 ? (
+              <p className="mt-1 text-[11px] text-slate-500">
+                No imagery products in the template yet.
+              </p>
+            ) : (
+              <ul className="mt-1 divide-y divide-slate-100">
+                {template.imagery.map((row, i) => {
+                  const meta = productById.get(row.product_id);
+                  return (
+                    <li key={i} className="flex flex-wrap items-center gap-2 py-1.5 text-[11px]">
+                      <select
+                        value={row.product_id}
+                        onChange={(e) => updateImageryRow(i, { product_id: e.target.value })}
+                        className="rounded border border-slate-300 px-1 py-0.5"
+                      >
+                        {products.map((p) => (
+                          <option key={p.product_id} value={p.product_id}>
+                            {p.product_name}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="flex items-center gap-1">
+                        cadence
+                        <input
+                          type="number"
+                          min={1}
+                          value={row.cadence_hours}
+                          onChange={(e) =>
+                            updateImageryRow(i, {
+                              cadence_hours: Math.max(1, Number(e.target.value)),
+                            })
+                          }
+                          className="w-14 rounded border border-slate-300 px-1 py-0.5"
+                        />
+                        h
+                      </label>
+                      <label className="flex items-center gap-1">
+                        cloud ≤
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={row.cloud_cover_max_pct ?? ""}
+                          onChange={(e) =>
+                            updateImageryRow(i, {
+                              cloud_cover_max_pct:
+                                e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
+                          className="w-14 rounded border border-slate-300 px-1 py-0.5"
+                        />
+                        %
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={row.is_active}
+                          onChange={(e) => updateImageryRow(i, { is_active: e.target.checked })}
+                        />
+                        active
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeImageryRow(i)}
+                        className="ms-auto rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-50"
+                      >
+                        Remove
+                      </button>
+                      {!meta ? (
+                        <span className="basis-full text-[10px] text-amber-700">
+                          Product not in catalog.
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Column 2 — Weather (shares the subscriptions lock with Imagery). */}
+        <section>
+          <div className="flex items-center justify-between">
+            <h3 className="text-[12px] font-semibold text-slate-700">Weather</h3>
+            <span className="text-[10px] text-slate-500">(lock shared with Imagery)</span>
+          </div>
+          <div className="mt-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[11px] font-semibold uppercase text-slate-600">Providers</h4>
+              <button
+                type="button"
+                onClick={addWeatherRow}
+                disabled={weatherProviders.length === 0}
+                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] hover:bg-slate-50 disabled:opacity-50"
+              >
+                + Add provider
+              </button>
+            </div>
+            {weatherProviders.length === 0 ? (
+              <p className="mt-1 text-[11px] text-amber-700">
+                No active providers in the catalog. Ask platform admin to populate
+                <code className="ms-1">public.weather_providers</code>.
+              </p>
+            ) : template.weather.length === 0 ? (
+              <p className="mt-1 text-[11px] text-slate-500">
+                No weather providers in the template yet.
+              </p>
+            ) : (
+              <ul className="mt-1 divide-y divide-slate-100">
+                {template.weather.map((row, i) => {
+                  const inCatalog = weatherProviders.some((p) => p.code === row.provider_code);
+                  return (
+                    <li key={i} className="flex flex-wrap items-center gap-2 py-1.5 text-[11px]">
+                      <select
+                        value={row.provider_code}
+                        onChange={(e) => updateWeatherRow(i, { provider_code: e.target.value })}
+                        className="rounded border border-slate-300 px-1 py-0.5"
+                      >
+                        {/* Surface a stale provider_code as a one-off option
+                            so the editor doesn't silently rewrite it to the
+                            first catalog entry. */}
+                        {!inCatalog && row.provider_code ? (
+                          <option value={row.provider_code}>
+                            {row.provider_code} (not in catalog)
+                          </option>
+                        ) : null}
+                        {weatherProviders.map((p) => (
+                          <option key={p.code} value={p.code}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="flex items-center gap-1">
+                        cadence
+                        <input
+                          type="number"
+                          min={1}
+                          value={row.cadence_hours}
+                          onChange={(e) =>
+                            updateWeatherRow(i, {
+                              cadence_hours: Math.max(1, Number(e.target.value)),
+                            })
+                          }
+                          className="w-14 rounded border border-slate-300 px-1 py-0.5"
+                        />
+                        h
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={row.is_active}
+                          onChange={(e) => updateWeatherRow(i, { is_active: e.target.checked })}
+                        />
+                        active
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeWeatherRow(i)}
+                        className="ms-auto rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-50"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Column 3 — Irrigation + Org tags */}
+        <section className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[12px] font-semibold text-slate-700">Irrigation</h3>
+              {lockChip("irrigation")}
+            </div>
+            {irrigation && (
+              <IrrigationSection farmId={farmId} value={irrigation} onChange={setIrrigation} />
+            )}
+          </div>
+          <div className="border-t border-slate-200 pt-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[12px] font-semibold text-slate-700">Tags</h3>
+              {lockChip("org")}
+            </div>
+            {orgTpl && <OrgSection farmId={farmId} value={orgTpl} onChange={setOrgTpl} />}
+          </div>
+        </section>
       </div>
 
-      {/* Imagery template */}
-      <div>
-        <div className="flex items-center justify-between">
-          <h4 className="text-[11px] font-semibold uppercase text-slate-600">
-            Imagery products
-          </h4>
-          <button
-            type="button"
-            onClick={addImageryRow}
-            disabled={products.length === template.imagery.length}
-            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] hover:bg-slate-50 disabled:opacity-50"
-          >
-            + Add product
-          </button>
-        </div>
-        {template.imagery.length === 0 ? (
-          <p className="mt-1 text-[11px] text-slate-500">
-            No imagery products in the template yet.
-          </p>
-        ) : (
-          <ul className="mt-1 divide-y divide-slate-100">
-            {template.imagery.map((row, i) => {
-              const meta = productById.get(row.product_id);
-              return (
-                <li key={i} className="flex flex-wrap items-center gap-2 py-1.5 text-[11px]">
-                  <select
-                    value={row.product_id}
-                    onChange={(e) => updateImageryRow(i, { product_id: e.target.value })}
-                    className="rounded border border-slate-300 px-1 py-0.5"
-                  >
-                    {products.map((p) => (
-                      <option key={p.product_id} value={p.product_id}>
-                        {p.product_name}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="flex items-center gap-1">
-                    cadence
-                    <input
-                      type="number"
-                      min={1}
-                      value={row.cadence_hours}
-                      onChange={(e) =>
-                        updateImageryRow(i, {
-                          cadence_hours: Math.max(1, Number(e.target.value)),
-                        })
-                      }
-                      className="w-14 rounded border border-slate-300 px-1 py-0.5"
-                    />
-                    h
-                  </label>
-                  <label className="flex items-center gap-1">
-                    cloud ≤
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={row.cloud_cover_max_pct ?? ""}
-                      onChange={(e) =>
-                        updateImageryRow(i, {
-                          cloud_cover_max_pct:
-                            e.target.value === "" ? null : Number(e.target.value),
-                        })
-                      }
-                      className="w-14 rounded border border-slate-300 px-1 py-0.5"
-                    />
-                    %
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={row.is_active}
-                      onChange={(e) =>
-                        updateImageryRow(i, { is_active: e.target.checked })
-                      }
-                    />
-                    active
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => removeImageryRow(i)}
-                    className="ms-auto rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-50"
-                  >
-                    Remove
-                  </button>
-                  {!meta ? (
-                    <span className="basis-full text-[10px] text-amber-700">
-                      Product not in catalog.
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Weather template */}
-      <div>
-        <div className="flex items-center justify-between">
-          <h4 className="text-[11px] font-semibold uppercase text-slate-600">
-            Weather providers
-          </h4>
-          <button
-            type="button"
-            onClick={addWeatherRow}
-            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] hover:bg-slate-50"
-          >
-            + Add provider
-          </button>
-        </div>
-        {template.weather.length === 0 ? (
-          <p className="mt-1 text-[11px] text-slate-500">
-            No weather providers in the template yet.
-          </p>
-        ) : (
-          <ul className="mt-1 divide-y divide-slate-100">
-            {template.weather.map((row, i) => (
-              <li key={i} className="flex flex-wrap items-center gap-2 py-1.5 text-[11px]">
-                <input
-                  type="text"
-                  value={row.provider_code}
-                  placeholder="provider code"
-                  onChange={(e) =>
-                    updateWeatherRow(i, { provider_code: e.target.value })
-                  }
-                  className="w-32 rounded border border-slate-300 px-1 py-0.5"
-                />
-                <label className="flex items-center gap-1">
-                  cadence
-                  <input
-                    type="number"
-                    min={1}
-                    value={row.cadence_hours}
-                    onChange={(e) =>
-                      updateWeatherRow(i, {
-                        cadence_hours: Math.max(1, Number(e.target.value)),
-                      })
-                    }
-                    className="w-14 rounded border border-slate-300 px-1 py-0.5"
-                  />
-                  h
-                </label>
-                <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={row.is_active}
-                    onChange={(e) =>
-                      updateWeatherRow(i, { is_active: e.target.checked })
-                    }
-                  />
-                  active
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removeWeatherRow(i)}
-                  className="ms-auto rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-rose-700 hover:bg-rose-50"
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Save + Apply */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Subscriptions Save + Apply — spans Imagery + Weather since the
+          subscriptions template is one bucket carrying both. */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
         <button
           type="button"
           onClick={save}
           disabled={saving}
           className="rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50 disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save template"}
+          {saving ? "Saving…" : "Save subscriptions template"}
         </button>
         <button
           type="button"
@@ -435,17 +510,14 @@ export function FarmDefaultsTab({ farmId }: Props) {
           disabled={previewLoading}
           className="rounded border border-emerald-400 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
         >
-          {previewLoading ? "Preview…" : "Apply to blocks…"}
+          {previewLoading ? "Preview…" : "Apply subscriptions to blocks…"}
         </button>
-        {saveError ? (
-          <span className="text-[11px] text-rose-700">{saveError}</span>
-        ) : null}
-        {applyMessage ? (
-          <span className="text-[11px] text-emerald-700">{applyMessage}</span>
-        ) : null}
+        <span className="text-[10px] text-slate-500">covers Imagery + Weather</span>
+        {saveError ? <span className="text-[11px] text-rose-700">{saveError}</span> : null}
+        {applyMessage ? <span className="text-[11px] text-emerald-700">{applyMessage}</span> : null}
       </div>
 
-      {/* Preview / Apply confirm */}
+      {/* Subscriptions Apply preview / confirm */}
       {preview ? (
         <ApplyPreviewPanel
           preview={preview}
@@ -456,32 +528,6 @@ export function FarmDefaultsTab({ farmId }: Props) {
           applying={applying}
         />
       ) : null}
-
-      {/* Irrigation */}
-      <div className="border-t border-slate-200 pt-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-slate-700">Irrigation</h3>
-          {lockChip("irrigation")}
-        </div>
-        {irrigation && (
-          <IrrigationSection
-            farmId={farmId}
-            value={irrigation}
-            onChange={setIrrigation}
-          />
-        )}
-      </div>
-
-      {/* Org */}
-      <div className="border-t border-slate-200 pt-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-slate-700">Org (tags)</h3>
-          {lockChip("org")}
-        </div>
-        {orgTpl && (
-          <OrgSection farmId={farmId} value={orgTpl} onChange={setOrgTpl} />
-        )}
-      </div>
     </div>
   );
 }
@@ -547,12 +593,7 @@ function LockChip({
       {conflict ? (
         <span className="text-[10px] text-amber-800">
           divergent blocks —{" "}
-          <button
-            type="button"
-            onClick={() => toggle(true)}
-            disabled={busy}
-            className="underline"
-          >
+          <button type="button" onClick={() => toggle(true)} disabled={busy} className="underline">
             Lock and overwrite
           </button>
         </span>
@@ -621,30 +662,38 @@ function IrrigationSection({
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1">
           system
-          <input
-            type="text"
+          <select
             value={value.irrigation_system ?? ""}
-            placeholder="drip / pivot / …"
             onChange={(e) =>
               onChange({
                 ...value,
                 irrigation_system: e.target.value || null,
               })
             }
-            className="w-28 rounded border border-slate-300 px-1 py-0.5"
-          />
+            className="rounded border border-slate-300 bg-white px-1 py-0.5"
+          >
+            <option value="">—</option>
+            {IRRIGATION_SYSTEMS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex items-center gap-1">
           source
-          <input
-            type="text"
+          <select
             value={value.irrigation_source ?? ""}
-            placeholder="well / canal / …"
-            onChange={(e) =>
-              onChange({ ...value, irrigation_source: e.target.value || null })
-            }
-            className="w-28 rounded border border-slate-300 px-1 py-0.5"
-          />
+            onChange={(e) => onChange({ ...value, irrigation_source: e.target.value || null })}
+            className="rounded border border-slate-300 bg-white px-1 py-0.5"
+          >
+            <option value="">—</option>
+            {IRRIGATION_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex items-center gap-1">
           flow m³/h
@@ -656,8 +705,7 @@ function IrrigationSection({
             onChange={(e) =>
               onChange({
                 ...value,
-                flow_rate_m3_per_hour:
-                  e.target.value === "" ? null : Number(e.target.value),
+                flow_rate_m3_per_hour: e.target.value === "" ? null : Number(e.target.value),
               })
             }
             className="w-20 rounded border border-slate-300 px-1 py-0.5"
@@ -756,8 +804,7 @@ function OrgSection({
   return (
     <div className="mt-2 space-y-2 text-[11px]">
       <p className="text-[10px] text-slate-500">
-        Comma-separated tags. Apply is additive — block-local tags are never
-        removed.
+        Comma-separated tags. Apply is additive — block-local tags are never removed.
       </p>
       <input
         type="text"
@@ -812,8 +859,7 @@ function SimpleApplyPanel({
   return (
     <div className="rounded border border-amber-300 bg-amber-50 p-2">
       <p className="text-[11px] font-semibold text-amber-900">
-        Preview — {preview.matched_blocks} of {preview.total_blocks} blocks
-        already match.
+        Preview — {preview.matched_blocks} of {preview.total_blocks} blocks already match.
       </p>
       <ul className="mt-2 max-h-40 divide-y divide-amber-200 overflow-y-auto text-[11px]">
         {preview.blocks.map((d) => (
@@ -821,12 +867,7 @@ function SimpleApplyPanel({
             <span className="flex-1 truncate font-mono text-[10px] text-slate-700">
               {d.block_id.slice(0, 8)}…
             </span>
-            <span
-              className={
-                "text-[10px] " +
-                (d.matches ? "text-emerald-700" : "text-amber-800")
-              }
-            >
+            <span className={"text-[10px] " + (d.matches ? "text-emerald-700" : "text-amber-800")}>
               {d.matches ? "matches" : "will change"}
             </span>
           </li>
@@ -878,8 +919,7 @@ function ApplyPreviewPanel({
   return (
     <div className="rounded border border-amber-300 bg-amber-50 p-2">
       <p className="text-[11px] font-semibold text-amber-900">
-        Apply preview — {preview.matched_blocks} of {preview.total_blocks} blocks
-        already match.
+        Apply preview — {preview.matched_blocks} of {preview.total_blocks} blocks already match.
       </p>
       <ul className="mt-2 max-h-56 divide-y divide-amber-200 overflow-y-auto text-[11px]">
         {[...allIds].map((blockId) => {

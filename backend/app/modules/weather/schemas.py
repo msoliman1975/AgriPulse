@@ -51,6 +51,21 @@ class SubscriptionRead(BaseModel):
     updated_at: datetime
 
 
+class WeatherProviderRead(BaseModel):
+    """One row of `public.weather_providers` — catalog of active providers.
+
+    Surfaced via `GET /api/v1/weather/providers` so the SPA can populate
+    provider pickers (e.g. the subscriptions template editor) without
+    hard-coding the list against the DB.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    name: str
+    kind: str
+
+
 class HourlyObservationRead(BaseModel):
     """One row of `weather_observations`. All numeric fields nullable
     because Open-Meteo can return NULL for individual variables on
