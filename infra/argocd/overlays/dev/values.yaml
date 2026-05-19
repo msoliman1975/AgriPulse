@@ -14,23 +14,26 @@ global:
   # renders. Only the dev overlay is auto-bumped; staging/production
   # promotion is hand-written.
   # Pinned to the latest main SHA where the CI `containers` matrix passed
-  # (commit b9bfdf3, 2026-05-19 — Farm Management page redesign #135:
+  # (commit ac5f4f8, 2026-05-19 — Farm Management page redesign #135:
   # tenant + active-farm context move to the shell header, FarmDrawer
   # becomes a horizontal panel, new Auto-Block / Blocks-toggle / fill
-  # transparency toolbar controls).
+  # transparency toolbar controls. ac5f4f8 is the tag-bump commit that
+  # bundles the b9bfdf3 squash-merge — b9bfdf3's own CI was cancelled
+  # by the immediate follow-up push, so its container images were never
+  # published; ac5f4f8 contains the same code and has all images).
   # The auto-bump workflow in `.github/workflows/argocd-sync.yml` only
   # fires when the CI workflow as a whole goes green — backend ruff and
   # frontend eslint + pre-commit are currently red, so dev tags are
   # bumped by hand until that's fixed.
   images:
     api:
-      tag: "b9bfdf3"
+      tag: "ac5f4f8"
     workers:
-      tag: "b9bfdf3"
+      tag: "ac5f4f8"
     frontend:
-      tag: "b9bfdf3"
+      tag: "ac5f4f8"
     tileServer:
-      tag: "b9bfdf3"
+      tag: "ac5f4f8"
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
