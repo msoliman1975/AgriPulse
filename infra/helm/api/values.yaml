@@ -107,6 +107,18 @@ env:
   KEYCLOAK_BASE_URL: "https://keycloak.{{ .Values.global.envHost }}"
   KEYCLOAK_REALM: agripulse
   KEYCLOAK_ADMIN_CLIENT_ID: agripulse-tenancy
+  # S3 (object storage) — in-cluster defaults override the dev-machine
+  # MinIO values that ship in backend/app/core/settings.py. The empty
+  # endpoint_url tells boto3 to talk to real AWS S3; empty creds tell
+  # storage/client.py to fall through to the IRSA credential chain.
+  # Bucket name templates per environment and matches what the IRSA
+  # role policy grants (see infra/terraform/iam.tf → s3_imagery_rw).
+  S3_ENDPOINT_URL: ""
+  S3_REGION: eu-south-1
+  S3_PATH_STYLE: "false"
+  S3_ACCESS_KEY_ID: ""
+  S3_SECRET_ACCESS_KEY: ""
+  S3_BUCKET_UPLOADS: "agripulse-imagery-{{ .Values.global.env }}"
   # SMTP for app-side emails (notifications, etc.). Keycloak's own
   # realm.smtpServer is configured separately — it sends the
   # execute-actions-email invite from KC, not the api.

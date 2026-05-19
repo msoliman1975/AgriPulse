@@ -59,6 +59,17 @@ env:
   # crossRef; both halves are required or imagery.discover_scenes writes the
   # `__not_configured__` failed-job marker every refresh.
   SENTINEL_HUB_CLIENT_ID: ""
+  # S3 (object storage) — see api/values.yaml for rationale. Imagery
+  # workers write raw S2 bands + COGs into this bucket; without these
+  # overrides the worker falls back to the dev-machine MinIO defaults
+  # in backend/app/core/settings.py and every acquire_scene job dies
+  # with `s3_put_failed: Could not connect to ... http://localhost:9000`.
+  S3_ENDPOINT_URL: ""
+  S3_REGION: eu-south-1
+  S3_PATH_STYLE: "false"
+  S3_ACCESS_KEY_ID: ""
+  S3_SECRET_ACCESS_KEY: ""
+  S3_BUCKET_UPLOADS: "agripulse-imagery-{{ .Values.global.env }}"
 
 # Mirrors infra/helm/api/values.yaml — see that file for the rationale on
 # dropping the consolidated `agripulse/api` SM blob in favor of crossRefs
