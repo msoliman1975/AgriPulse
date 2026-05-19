@@ -1,4 +1,23 @@
 {
+  "csvImport": {
+    "title": "Bulk import observations",
+    "subtitle": "Upload a CSV to record many observations at once. Strict mode: any row error rejects the whole batch.",
+    "sampleLink": "Download sample CSV",
+    "dropPrompt": "Drop a CSV here",
+    "browseLink": "or browse",
+    "limits": "Max 5 MB / 5,000 rows · UTF-8 encoded",
+    "uploading": "Uploading…",
+    "success": "Imported {{count}} observation",
+    "success_other": "Imported {{count}} observations",
+    "failureBanner": "{{count}} row failed validation — no observations were inserted.",
+    "failureBanner_other": "{{count}} rows failed validation — no observations were inserted.",
+    "failureHint": "Fix the rows in your CSV and re-upload.",
+    "errorTable": {
+      "row": "Row",
+      "field": "Field",
+      "message": "Message"
+    }
+  },
   "refPicker": {
     "title": "Signal reference",
     "selectLabel": "Pick a signal definition",

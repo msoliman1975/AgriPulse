@@ -219,3 +219,31 @@ export async function listSignalObservations(
   });
   return data;
 }
+
+// CS-7 CSV import. Multipart upload — the backend's UploadFile reads
+// the whole body, so we pass a real File via FormData (axios sets the
+// boundary). Errors come back as a 422 with extras.errors = [...] or
+// a 413 with extras.size_bytes/limit_bytes; both are surfaced through
+// the standard apiClient error interceptor.
+export interface CsvImportSuccess {
+  rows_imported: number;
+}
+
+export interface CsvImportRowError {
+  row_number: number;
+  field: string | null;
+  message: string;
+}
+
+export async function importSignalObservationsCsv(
+  farmId: string,
+  file: File,
+): Promise<CsvImportSuccess> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const { data } = await apiClient.post<CsvImportSuccess>("/v1/signals/csv-import", fd, {
+    params: { farm_id: farmId },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
