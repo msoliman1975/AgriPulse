@@ -10,7 +10,10 @@ import type {
 } from "@/api/farms";
 import type { Block } from "@/api/blocks";
 import type { MultiPolygon } from "geojson";
+import { AoiUploader } from "@/modules/farms/components/AoiUploader";
 import { FarmDefaultsTab } from "./FarmDefaultsTab";
+import { FarmMembersTab } from "./FarmMembersTab";
+import { approxPolygonAreaM2 } from "./geo";
 
 export type FarmDrawerMode = "create" | "view" | "edit";
 
@@ -37,13 +40,18 @@ interface Props {
   onSubmitUpdate: (payload: FarmUpdatePayload) => void;
   onInactivateFarm: () => void;
   onReactivateBlock: (blockId: string) => void;
+  // File upload alternative to drawing the AOI on the map. The page
+  // converts parsed PolygonalFeatures into a MultiPolygon + computed
+  // area and feeds them back via draftBoundary/draftAreaM2 — same
+  // contract the draw flow uses.
+  onAoiUploaded: (boundary: MultiPolygon, areaM2: number) => void;
 }
 
 const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
 const OWNERSHIPS: OwnershipType[] = ["owned", "leased", "partnership", "other"];
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
 
-type Panel = "details" | "defaults";
+type Panel = "details" | "defaults" | "members";
 
 export function FarmDrawer({
   mode,
@@ -62,6 +70,7 @@ export function FarmDrawer({
   onSubmitUpdate,
   onInactivateFarm,
   onReactivateBlock,
+  onAoiUploaded,
 }: Props) {
   const editing = mode === "create" || mode === "edit";
   const [panel, setPanel] = useState<Panel>("details");
@@ -140,8 +149,12 @@ export function FarmDrawer({
   }
 
   const baseTitle = mode === "create" ? "New farm" : mode === "edit" ? "Edit farm" : "Farm details";
-  const title = panel === "defaults" ? "Block defaults" : baseTitle;
-  const canOpenDefaults = mode === "view" && farm !== null;
+  const title =
+    panel === "defaults" ? "Block defaults" : panel === "members" ? "Members" : baseTitle;
+  // Side panels (defaults / members) only make sense for a saved farm,
+  // and only in view mode — otherwise switching would discard in-flight
+  // detail edits. Create mode never offers them.
+  const canOpenSidePanels = mode === "view" && farm !== null;
 
   return (
     <aside className="relative z-10 max-h-[60vh] overflow-y-auto border-b border-slate-200 bg-white px-4 py-4 shadow-md">
@@ -162,7 +175,7 @@ export function FarmDrawer({
         </p>
       ) : null}
 
-      {canOpenDefaults ? (
+      {canOpenSidePanels ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {panel === "details" ? (
             <>
@@ -180,6 +193,13 @@ export function FarmDrawer({
               >
                 Block defaults
               </button>
+              <button
+                type="button"
+                onClick={() => setPanel("members")}
+                className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+              >
+                Members
+              </button>
             </>
           ) : (
             <button
@@ -196,6 +216,10 @@ export function FarmDrawer({
       {panel === "defaults" && farm ? (
         <div className="mt-4">
           <FarmDefaultsTab farmId={farm.id} />
+        </div>
+      ) : panel === "members" && farm ? (
+        <div className="mt-4">
+          <FarmMembersTab farmId={farm.id} />
         </div>
       ) : (
         <form
@@ -371,13 +395,36 @@ export function FarmDrawer({
               </p>
             )}
             {editing && !drawingAoi ? (
-              <button
-                type="button"
-                onClick={onStartDrawAoi}
-                className="mt-1 rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-              >
-                {draftBoundary ? "Re-draw AOI" : "Draw AOI on map"}
-              </button>
+              <div className="mt-1 space-y-2">
+                <button
+                  type="button"
+                  onClick={onStartDrawAoi}
+                  className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                >
+                  {draftBoundary ? "Re-draw AOI" : "Draw AOI on map"}
+                </button>
+                <div className="text-[10px] text-slate-500">— or upload a file —</div>
+                <AoiUploader
+                  onFeaturesParsed={(features) => {
+                    if (features.length === 0) return;
+                    const geom = features[0].geometry;
+                    const mp: MultiPolygon =
+                      geom.type === "MultiPolygon"
+                        ? geom
+                        : { type: "MultiPolygon", coordinates: [geom.coordinates] };
+                    // Sum each polygon's area for the MultiPolygon total.
+                    // approxPolygonAreaM2 is the same spherical-excess
+                    // helper the draw flow uses, so the "X.XX ha"
+                    // readout stays consistent between paths.
+                    const areaM2 = mp.coordinates.reduce(
+                      (sum, ring) =>
+                        sum + approxPolygonAreaM2({ type: "Polygon", coordinates: ring }),
+                      0,
+                    );
+                    onAoiUploaded(mp, areaM2);
+                  }}
+                />
+              </div>
             ) : null}
           </Section>
 
@@ -409,6 +456,12 @@ export function FarmDrawer({
           {submitError ? (
             <p className="rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 md:col-span-2">
               {submitError}
+            </p>
+          ) : null}
+
+          {mode === "create" && !draftBoundary ? (
+            <p className="rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800 md:col-span-2">
+              Draw or upload the farm boundary before saving.
             </p>
           ) : null}
 

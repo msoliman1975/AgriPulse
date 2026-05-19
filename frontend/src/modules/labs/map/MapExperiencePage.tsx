@@ -621,6 +621,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
 
       {farmDrawerMode ? (
         <FarmDrawer
+          // Remount when switching between create and view of a
+          // particular farm so the form state (code/name/etc) is
+          // re-seeded from the right source — otherwise create-mode
+          // would inherit the previously-viewed farm's values via
+          // useState initializers and submit a duplicate `code`.
+          key={farmDrawerMode === "create" ? "create" : `view:${summary.farm.id}`}
           mode={farmDrawerMode}
           farm={farmDrawerMode === "create" ? null : summary.farm}
           inactiveBlocks={inactiveBlocks}
@@ -642,6 +648,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
           onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
           onInactivateFarm={openInactivateFarm}
           onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
+          onAoiUploaded={(boundary, areaM2) => {
+            setPendingFarmAoi(boundary);
+            setPendingFarmAoiAreaM2(areaM2);
+            // Uploading replaces any in-progress draw.
+            setDrawTarget(null);
+          }}
         />
       ) : null}
 
