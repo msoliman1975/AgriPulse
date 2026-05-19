@@ -28,7 +28,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from app.modules.weather.errors import BlockNotVisibleError
+from app.modules.weather.models import WeatherProvider
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.schemas import (
     DerivedDailyRead,
@@ -37,6 +40,7 @@ from app.modules.weather.schemas import (
     RefreshResponse,
     SubscriptionCreate,
     SubscriptionRead,
+    WeatherProviderRead,
 )
 from app.modules.weather.service import WeatherServiceImpl, get_weather_service
 from app.shared.auth.context import RequestContext
@@ -104,6 +108,39 @@ async def _guard_subscriptions_lock(
     await config_template.assert_category_unlocked(
         tenant_session, farm_id=farm_id, category="subscriptions"
     )
+
+
+# --- Catalog ---------------------------------------------------------------
+
+
+@router.get(
+    "/weather/providers",
+    response_model=list[WeatherProviderRead],
+    summary="List active weather providers from public.weather_providers.",
+)
+async def list_weather_providers(
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[WeatherProviderRead]:
+    """Catalog endpoint for the SPA's provider picker.
+
+    Mirrors `/api/v1/config` (imagery): tenant scope is enough; the
+    rows are platform-wide curated catalog data, not per-farm. Active
+    rows only, ordered by name for stable picker order.
+    """
+    _ensure_tenant(context)
+    rows = (
+        (
+            await tenant_session.execute(
+                select(WeatherProvider)
+                .where(WeatherProvider.is_active.is_(True))
+                .order_by(WeatherProvider.name.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [WeatherProviderRead.model_validate(r) for r in rows]
 
 
 # --- Subscriptions ---------------------------------------------------------

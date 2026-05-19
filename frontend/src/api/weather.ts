@@ -40,6 +40,19 @@ export interface ForecastResponse {
   days: DailyForecast[];
 }
 
+// --- Provider catalog -----------------------------------------------------
+
+export interface WeatherProvider {
+  code: string;
+  name: string;
+  kind: string;
+}
+
+export async function listWeatherProviders(): Promise<WeatherProvider[]> {
+  const { data } = await apiClient.get<WeatherProvider[]>("/v1/weather/providers");
+  return data;
+}
+
 // --- Subscriptions --------------------------------------------------------
 
 export async function listSubscriptions(
