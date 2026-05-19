@@ -139,9 +139,7 @@ export function FarmDrawer({
   const title = mode === "create" ? "New farm" : mode === "edit" ? "Edit farm" : "Farm details";
 
   return (
-    <aside
-      className="relative z-10 max-h-[60vh] overflow-y-auto border-b border-slate-200 bg-white px-4 py-4 shadow-md"
-    >
+    <aside className="relative z-10 max-h-[60vh] overflow-y-auto border-b border-slate-200 bg-white px-4 py-4 shadow-md">
       <button
         type="button"
         aria-label="Close"
@@ -325,8 +323,7 @@ export function FarmDrawer({
             <FarmDefaultsTab farmId={farm.id} />
           ) : (
             <p className="text-[11px] text-slate-500">
-              Save the farm first, then return here to author the subscriptions
-              template.
+              Save the farm first, then return here to author the subscriptions template.
             </p>
           )}
         </Section>
@@ -461,4 +458,3 @@ function Field({
     </label>
   );
 }
-
