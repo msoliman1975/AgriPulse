@@ -26,7 +26,6 @@ interface Props {
   // non-null before submit is enabled.
   draftBoundary: MultiPolygon | null;
   draftAreaM2: number | null;
-  width: number;
   drawingAoi: boolean;
   submitting: boolean;
   submitError: string | null;
@@ -38,7 +37,6 @@ interface Props {
   onSubmitUpdate: (payload: FarmUpdatePayload) => void;
   onInactivateFarm: () => void;
   onReactivateBlock: (blockId: string) => void;
-  onResizeMouseDown: (e: React.MouseEvent) => void;
 }
 
 const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
@@ -51,7 +49,6 @@ export function FarmDrawer({
   inactiveBlocks,
   draftBoundary,
   draftAreaM2,
-  width,
   drawingAoi,
   submitting,
   submitError,
@@ -63,7 +60,6 @@ export function FarmDrawer({
   onSubmitUpdate,
   onInactivateFarm,
   onReactivateBlock,
-  onResizeMouseDown,
 }: Props) {
   const editing = mode === "create" || mode === "edit";
 
@@ -144,10 +140,8 @@ export function FarmDrawer({
 
   return (
     <aside
-      className="absolute right-0 top-0 z-20 h-full overflow-y-auto bg-white px-4 py-4 shadow-2xl"
-      style={{ width }}
+      className="relative z-10 max-h-[60vh] overflow-y-auto border-b border-slate-200 bg-white px-4 py-4 shadow-md"
     >
-      <ResizeHandle onMouseDown={onResizeMouseDown} />
       <button
         type="button"
         aria-label="Close"
@@ -175,7 +169,10 @@ export function FarmDrawer({
         </button>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 lg:grid-cols-3"
+      >
         <Section title="Basic">
           <Field label="Code" required={mode === "create"}>
             <input
@@ -392,11 +389,13 @@ export function FarmDrawer({
         ) : null}
 
         {submitError ? (
-          <p className="rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">{submitError}</p>
+          <p className="rounded bg-red-50 px-2 py-1 text-[11px] text-red-700 md:col-span-2 lg:col-span-3">
+            {submitError}
+          </p>
         ) : null}
 
         {editing ? (
-          <div className="flex justify-between gap-2">
+          <div className="flex justify-between gap-2 md:col-span-2 lg:col-span-3">
             {mode === "edit" ? (
               <button
                 type="button"
@@ -463,20 +462,3 @@ function Field({
   );
 }
 
-function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
-  return (
-    // ARIA `separator` is the documented role for resize handles; the
-    // mouse-down interaction is the whole point of the control. Keyboard
-    // resize (arrow keys) would be the proper a11y completion but is a
-    // feature, not a lint fix — suppress the false positive here.
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize panel"
-      onMouseDown={onMouseDown}
-      className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize select-none bg-transparent hover:bg-slate-200/70"
-      style={{ touchAction: "none" }}
-    />
-  );
-}

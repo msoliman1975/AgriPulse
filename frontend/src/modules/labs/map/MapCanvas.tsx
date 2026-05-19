@@ -60,10 +60,14 @@ interface Props {
   onReshape?: (polygon: Polygon) => void;
   // Visibility / styling toggles from the page toolbar.
   showAoi?: boolean;
+  showBlocks?: boolean;
   showBlockBorders?: boolean;
   showBlockLabels?: boolean;
   // 0..1 multiplier applied to AOI line opacity and block stroke opacity.
   borderOpacity?: number;
+  // 0..1 multiplier applied to block fill opacity (on top of the
+  // per-feature health-based opacity). 1 = full opacity (default).
+  blockFillOpacity?: number;
   // CS-8: signal-observation overlay. `null` hides the layer; an FC
   // (possibly empty) shows it. Click on a marker fires onSignalClick
   // with the underlying observation id.
@@ -142,9 +146,11 @@ export function MapCanvas({
   reshapeBlock = null,
   onReshape,
   showAoi = true,
+  showBlocks = true,
   showBlockBorders = true,
   showBlockLabels = true,
   borderOpacity = 0.9,
+  blockFillOpacity = 1,
   signalOverlay = null,
   onSignalClick,
 }: Props) {
@@ -484,10 +490,16 @@ export function MapCanvas({
       };
       setVis(AOI_FILL_LAYER, !!showAoi);
       setVis(AOI_LINE_LAYER, !!showAoi);
-      setVis(STROKE_LAYER, !!showBlockBorders);
-      setVis(STROKE_LAYER + "-future", !!showBlockBorders);
-      setVis(LOGICAL_PIVOT_LAYER, !!showBlockBorders);
-      setVis(LABEL_LAYER, !!showBlockLabels);
+      // showBlocks is the master toggle — when off, every block-derived
+      // layer (fill, strokes, labels, alert badges, logical-pivot ring)
+      // hides so the operator sees only the base map + AOI border.
+      setVis(FILL_LAYER, !!showBlocks);
+      setVis(SELECTED_LAYER, !!showBlocks);
+      setVis(ALERT_BADGE_LAYER, !!showBlocks);
+      setVis(STROKE_LAYER, !!showBlocks && !!showBlockBorders);
+      setVis(STROKE_LAYER + "-future", !!showBlocks && !!showBlockBorders);
+      setVis(LOGICAL_PIVOT_LAYER, !!showBlocks && !!showBlockBorders);
+      setVis(LABEL_LAYER, !!showBlocks && !!showBlockLabels);
 
       const op = Math.max(0, Math.min(1, borderOpacity));
       if (map.getLayer(AOI_LINE_LAYER)) {
@@ -499,10 +511,29 @@ export function MapCanvas({
       if (map.getLayer(STROKE_LAYER + "-future")) {
         map.setPaintProperty(STROKE_LAYER + "-future", "line-opacity", 0.7 * op);
       }
+
+      // Block fill opacity: multiply the per-health base by the
+      // operator's chosen multiplier. Future-dated blocks keep their
+      // own halved opacity (0.25) so the future-vs-current distinction
+      // survives the slider.
+      const fillMul = Math.max(0, Math.min(1, blockFillOpacity));
+      if (map.getLayer(FILL_LAYER)) {
+        const scaledHealth: ExpressionSpecification = [
+          "*",
+          fillMul,
+          healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown),
+        ] as unknown as ExpressionSpecification;
+        map.setPaintProperty(FILL_LAYER, "fill-opacity", [
+          "case",
+          ["==", ["get", "is_future"], true],
+          0.25 * fillMul,
+          scaledHealth,
+        ] as ExpressionSpecification);
+      }
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [showAoi, showBlockBorders, showBlockLabels, borderOpacity]);
+  }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, borderOpacity, blockFillOpacity]);
 
   // Selection highlight via filter swap.
   useEffect(() => {
