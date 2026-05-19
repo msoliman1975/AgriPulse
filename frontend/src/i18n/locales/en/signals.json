@@ -65,8 +65,8 @@
     "withSkipped": "{{shown}} shown · {{skipped}} skipped (no location)"
   },
   "config": {
-    "title": "Custom signals",
-    "subtitle": "Define data streams your team can record from the field — soil moisture, scout pest counts, irrigation events.",
+    "title": "Signal definitions",
+    "subtitle": "Tenant-admin space: define what signal types your team can record (soil moisture, scout severity, irrigation events). For recording observations + CSV import, go to the Signals log.",
     "newDefinition": "New definition",
     "cancel": "Cancel",
     "loadFailed": "Failed to load definitions.",
@@ -103,8 +103,8 @@
     }
   },
   "log": {
-    "title": "Signals log",
-    "subtitle": "Record manual observations from the field. They feed alerts and recommendations and live in the dashboard.",
+    "title": "Signals — entry & log",
+    "subtitle": "Record observations one at a time, or import many at once via CSV. They feed alerts, recommendations, and the dashboard.",
     "noDefinitions": "No signal definitions yet. Ask a tenant admin to define one in Configuration → Signals.",
     "missingCapability": "You need the {{capability}} capability on this farm to log observations.",
     "form": {

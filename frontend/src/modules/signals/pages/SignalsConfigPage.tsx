@@ -13,7 +13,6 @@ import {
   useSignalDefinitions,
   useUpdateSignalDefinition,
 } from "@/queries/signals";
-import { SignalsCsvImport } from "../components/SignalsCsvImport";
 
 const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
 
@@ -45,9 +44,6 @@ export function SignalsConfigPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("signals");
   const canDefine = useCapability("signal.define");
-  // CSV-import endpoint is gated on signal.record (farm-scoped) —
-  // operators who can record observations can also bulk-import them.
-  const canRecord = useCapability("signal.record", { farmId });
   const { data, isLoading, isError } = useSignalDefinitions(true);
   const createMut = useCreateSignalDefinition();
   const deleteMut = useDeleteSignalDefinition();
@@ -103,8 +99,6 @@ export function SignalsConfigPage(): ReactNode {
           </button>
         ) : null}
       </header>
-
-      {canRecord ? <SignalsCsvImport farmId={farmId} /> : null}
 
       {showForm && canDefine ? (
         <form
