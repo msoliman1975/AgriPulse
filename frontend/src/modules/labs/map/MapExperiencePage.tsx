@@ -38,7 +38,7 @@ import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
 import { DrawReadout } from "./DrawReadout";
 import { InactivateConfirmModal } from "./InactivateConfirmModal";
-import { FarmDrawer, type FarmDrawerMode } from "./FarmDrawer";
+import { FarmDrawer, type FarmDrawerMode, type FarmPanel } from "./FarmDrawer";
 import type { MultiPolygon, Polygon } from "geojson";
 
 const SUMMARY_POLL_MS = 60_000;
@@ -222,9 +222,11 @@ function MapForFarm({ farmId }: { farmId: string }) {
   // farm panel is opened, the app closes the panel first" — so we auto-
   // close whenever a block becomes selected.
   const [farmDrawerMode, setFarmDrawerMode] = useState<FarmDrawerMode | null>(null);
+  const [farmPanel, setFarmPanel] = useState<FarmPanel>("details");
   useEffect(() => {
     if (selectedId && farmDrawerMode !== null) {
       setFarmDrawerMode(null);
+      setFarmPanel("details");
       setPendingFarmAoi(null);
       setPendingFarmAoiAreaM2(null);
     }
@@ -430,6 +432,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
     onSuccess: (newFarm) => {
       queryClient.invalidateQueries({ queryKey: ["labs/map/farmsList"] });
       setFarmDrawerMode(null);
+      setFarmPanel("details");
       setPendingFarmAoi(null);
       setPendingFarmAoiAreaM2(null);
       navigate(`/labs/map/${newFarm.id}`, { replace: false });
@@ -455,6 +458,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
       setInactivateFarmPreview(null);
       setInactivateFarmPreviewError(null);
       setFarmDrawerMode(null);
+      setFarmPanel("details");
       // Navigate away because the farm is now hidden.
       navigate("/labs/map", { replace: true });
     },
@@ -599,20 +603,31 @@ function MapForFarm({ farmId }: { farmId: string }) {
         onToggleDrawPivot={() => setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))}
         layerPrefs={layerPrefs}
         onLayerPrefsChange={setLayerPrefs}
-        farmDetailsOpen={farmDrawerMode !== null}
-        onToggleFarmDetails={() => {
-          if (farmDrawerMode !== null) {
+        // Farm-scoped panel buttons. The "active" panel is whichever
+        // sub-view is showing in the drawer right now; clicking the
+        // active one closes the drawer. Sibling panels (defaults /
+        // members) are hidden in edit/create modes to avoid losing
+        // in-flight detail edits.
+        farmDrawerMode={farmDrawerMode}
+        farmPanel={farmPanel}
+        onOpenPanel={(target) => {
+          if (farmDrawerMode !== null && farmPanel === target) {
+            // Clicking the active panel button closes the drawer.
             setFarmDrawerMode(null);
+            setFarmPanel("details");
             setPendingFarmAoi(null);
             setPendingFarmAoiAreaM2(null);
             setDrawTarget(null);
-          } else {
-            setFarmDrawerMode("view");
+            return;
           }
+          // Open or switch panel.
+          setFarmPanel(target);
+          if (farmDrawerMode === null) setFarmDrawerMode("view");
         }}
         onCreateFarm={() => {
           setPendingFarmAoi(null);
           setPendingFarmAoiAreaM2(null);
+          setFarmPanel("details");
           setFarmDrawerMode("create");
         }}
         hasActiveBlocks={hasActiveBlocks}
@@ -628,6 +643,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
           // useState initializers and submit a duplicate `code`.
           key={farmDrawerMode === "create" ? "create" : `view:${summary.farm.id}`}
           mode={farmDrawerMode}
+          panel={farmPanel}
           farm={farmDrawerMode === "create" ? null : summary.farm}
           inactiveBlocks={inactiveBlocks}
           draftBoundary={pendingFarmAoi}
@@ -637,6 +653,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
           submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
           onClose={() => {
             setFarmDrawerMode(null);
+            setFarmPanel("details");
             setPendingFarmAoi(null);
             setPendingFarmAoiAreaM2(null);
             setDrawTarget(null);
@@ -879,8 +896,9 @@ function Toolbar({
   onToggleDrawPivot,
   layerPrefs,
   onLayerPrefsChange,
-  farmDetailsOpen,
-  onToggleFarmDetails,
+  farmDrawerMode,
+  farmPanel,
+  onOpenPanel,
   onCreateFarm,
   hasActiveBlocks,
   onOpenAutoBlock,
@@ -890,8 +908,9 @@ function Toolbar({
   onToggleDrawPivot: () => void;
   layerPrefs: LayerPrefs;
   onLayerPrefsChange: (next: LayerPrefs) => void;
-  farmDetailsOpen: boolean;
-  onToggleFarmDetails: () => void;
+  farmDrawerMode: FarmDrawerMode | null;
+  farmPanel: FarmPanel;
+  onOpenPanel: (target: FarmPanel) => void;
   onCreateFarm: () => void;
   hasActiveBlocks: boolean;
   onOpenAutoBlock: () => void;
@@ -899,21 +918,57 @@ function Toolbar({
   // The active-farm context (name, area, governorate, status) now lives
   // in the shell header next to the tenant badge — that's why this
   // toolbar no longer carries a farm switcher or farm-name label.
+  //
+  // Three farm-scoped panel buttons live as siblings (no nesting under
+  // "Farm details"). The active button — drawer open AND current
+  // panel matches — gets the filled style; clicking it closes. The
+  // sibling panels (defaults / members) are hidden during edit/create
+  // so the user can't accidentally lose in-flight edits.
+  const drawerOpen = farmDrawerMode !== null;
+  const showSiblings = farmDrawerMode === null || farmDrawerMode === "view";
+
+  function panelClass(target: FarmPanel) {
+    const active = drawerOpen && farmPanel === target;
+    return `rounded px-2 py-0.5 text-[11px] font-medium ${
+      active
+        ? "bg-slate-900 text-white"
+        : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+    }`;
+  }
+
   return (
     <header className="flex h-10 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3">
       <div className="flex items-center gap-2 text-[12px] text-slate-700">
-        <button
-          type="button"
-          onClick={onToggleFarmDetails}
-          aria-pressed={farmDetailsOpen}
-          className={`rounded px-2 py-0.5 text-[11px] font-medium ${
-            farmDetailsOpen
-              ? "bg-slate-900 text-white"
-              : "border border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          {farmDetailsOpen ? "Hide farm details" : "Farm details"}
-        </button>
+        <div className="flex items-center gap-1 border-r border-slate-200 pe-2">
+          <button
+            type="button"
+            onClick={() => onOpenPanel("details")}
+            aria-pressed={drawerOpen && farmPanel === "details"}
+            className={panelClass("details")}
+          >
+            Farm details
+          </button>
+          {showSiblings ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onOpenPanel("defaults")}
+                aria-pressed={drawerOpen && farmPanel === "defaults"}
+                className={panelClass("defaults")}
+              >
+                Block defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenPanel("members")}
+                aria-pressed={drawerOpen && farmPanel === "members"}
+                className={panelClass("members")}
+              >
+                Members
+              </button>
+            </>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={onCreateFarm}
