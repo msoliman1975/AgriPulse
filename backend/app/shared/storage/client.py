@@ -94,17 +94,26 @@ class _Boto3StorageClient:
         settings = get_settings()
         self._bucket = settings.s3_bucket_uploads
         self._default_expires = settings.s3_presign_expires_seconds
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=settings.s3_endpoint_url,
-            region_name=settings.s3_region,
-            aws_access_key_id=settings.s3_access_key_id,
-            aws_secret_access_key=settings.s3_secret_access_key,
-            config=Config(
+        # In-cluster the workloads run with IRSA — we want boto3 to walk
+        # its default credential chain (which finds the IRSA-projected
+        # token). Passing empty-string creds to boto3.client overrides
+        # that chain with broken creds, so only forward explicit creds
+        # when they're actually set. Same for endpoint_url: an empty
+        # string is the "no override → real AWS S3" signal from the
+        # chart overlay.
+        kwargs: dict[str, Any] = {
+            "region_name": settings.s3_region,
+            "config": Config(
                 signature_version="s3v4",
                 s3={"addressing_style": "path" if settings.s3_path_style else "auto"},
             ),
-        )
+        }
+        if settings.s3_endpoint_url:
+            kwargs["endpoint_url"] = settings.s3_endpoint_url
+        if settings.s3_access_key_id and settings.s3_secret_access_key:
+            kwargs["aws_access_key_id"] = settings.s3_access_key_id
+            kwargs["aws_secret_access_key"] = settings.s3_secret_access_key
+        self._client = boto3.client("s3", **kwargs)
 
     @property
     def bucket(self) -> str:
