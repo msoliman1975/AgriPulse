@@ -262,6 +262,16 @@ capabilities:
     scope: farm
     status: active
 
+  # --- Resources (workers + equipment catalog) -------------------------
+  resource.read:
+    description: View workers and equipment on a farm.
+    scope: farm
+    status: active
+  resource.manage:
+    description: Create, edit, archive, attach, or detach workers / equipment.
+    scope: farm
+    status: active
+
   # --- Irrigation schedules --------------------------------------------
   irrigation.schedule.read:
     description: View model-driven irrigation recommendations.

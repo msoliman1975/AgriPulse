@@ -141,6 +141,7 @@ def _register_module_routers(app: FastAPI) -> None:
         register_subscribers as register_notifications_subscribers,
     )
     from app.modules.plans.router import router as plans_router
+    from app.modules.resources.router import router as resources_router
     from app.modules.platform_admins.admins_router import (
         router as platform_admins_self_router,
     )
@@ -176,6 +177,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(weather_router)
     app.include_router(alerts_router)
     app.include_router(plans_router)
+    app.include_router(resources_router)
     app.include_router(irrigation_router)
     app.include_router(notifications_router)
     app.include_router(recommendations_router)
