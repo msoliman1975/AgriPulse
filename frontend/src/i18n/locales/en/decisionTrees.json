@@ -116,7 +116,10 @@
       "saveDraft": "Save as new draft",
       "saving": "Saving…",
       "saveFailed": "Save failed — the YAML editor has more detail.",
-      "discardAll": "Discard all"
+      "discardAll": "Discard all",
+      "publish": "Publish v{{n}}",
+      "publishing": "Publishing…",
+      "publishFailed": "Publish failed — the YAML editor has more detail."
     },
     "panel": {
       "nodeId": "Node id",
@@ -146,6 +149,48 @@
         "onMatch": "on_match →",
         "onMiss": "on_miss →"
       }
+    }
+  },
+  "parameters": {
+    "heading": "Tree parameters",
+    "empty": "This tree doesn't declare any parameters yet.",
+    "addNew": "Add parameter",
+    "cancelAdd": "Cancel",
+    "add": "Add",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "done": "Done",
+    "delete": "Delete",
+    "pendingBadge": "pending",
+    "fields": {
+      "name": "Name",
+      "type": "Type",
+      "default": "Default",
+      "min": "Min",
+      "max": "Max",
+      "range": "Range",
+      "values": "Values (comma-separated)",
+      "description": "Description"
+    },
+    "errors": {
+      "nameTaken": "A parameter with that name already exists."
+    }
+  },
+  "overrides": {
+    "heading": "Your overrides",
+    "empty": "This tree has no declared parameters to override yet.",
+    "loadFailed": "Failed to load overrides.",
+    "saveFailed": "Failed to save override.",
+    "readOnlyHint": "Read-only (you don't have the manage capability).",
+    "save": "Save",
+    "saving": "Saving…",
+    "clear": "Clear",
+    "clearing": "Clearing…",
+    "fields": {
+      "default": "Default",
+      "current": "Current",
+      "newValue": "New value",
+      "usingDefault": "(using default)"
     }
   }
 }

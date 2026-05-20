@@ -40,6 +40,9 @@ export interface CompiledNode {
 export interface CompiledTree {
   root?: string;
   nodes?: Record<string, CompiledNode>;
+  // Mirrors backend `compile_tree` output. PR-B; PR-D3 reads this on
+  // the viewer page to surface the parameters editor.
+  parameters?: Record<string, unknown>;
 }
 
 export type NodeRole = "decision" | "leaf-recommendation" | "leaf-alert" | "leaf-noop";

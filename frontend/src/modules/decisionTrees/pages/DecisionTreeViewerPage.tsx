@@ -23,11 +23,20 @@ import { useCapability } from "@/rbac/useCapability";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
+  usePublishDecisionTreeVersion,
 } from "@/queries/decisionTrees";
 
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
+import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
+import { ParametersPanel } from "../components/ParametersPanel";
 import { TreeCanvas } from "../components/TreeCanvas";
 import { layoutTree, type CompiledTree } from "../layout/treeLayout";
+import {
+  applyParameterEditsToYaml,
+  hasParameterEdits,
+  type ParameterDeclaration,
+  type ParametersEditBuffer,
+} from "../lib/parametersEdit";
 import {
   applyEditsToYaml,
   hasEdits,
@@ -42,11 +51,16 @@ export function DecisionTreeViewerPage(): ReactNode {
   const canManage = useCapability("decision_tree.manage");
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
+  const publish = usePublishDecisionTreeVersion();
 
   // PR-D2: edit buffer + selection. Selection survives across re-renders
   // even when the tree refetches because the node id is stable.
   const [editBuffer, setEditBuffer] = useState<NodeEditBuffer>({});
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // PR-D3: parameters declaration buffer (separate from node edit
+  // buffer because parameter edits patch the top-level `parameters:`
+  // block rather than per-node `nodes.<id>`).
+  const [paramsBuffer, setParamsBuffer] = useState<ParametersEditBuffer>({});
 
   const compiled = useMemo<CompiledTree | null>(() => {
     const versions = detail.data?.versions ?? [];
@@ -97,7 +111,19 @@ export function DecisionTreeViewerPage(): ReactNode {
 
   const tree = detail.data;
   const isDraftOnly = tree.current_version == null;
-  const dirty = hasEdits(editBuffer);
+  const dirty = hasEdits(editBuffer) || hasParameterEdits(paramsBuffer);
+  // PR-D3: surface declared parameters off the compiled JSON so the
+  // ParametersPanel can render them without an extra fetch.
+  const declaredParams: Record<string, ParameterDeclaration> =
+    (compiled?.parameters as Record<string, ParameterDeclaration> | undefined) ?? {};
+  // The latest draft (whether or not it's published) drives the
+  // "Publish" button. When `current_version` lags the latest version,
+  // there's an unpublished draft to push live.
+  const latestVersion = tree.versions[0];
+  const hasUnpublishedDraft =
+    latestVersion !== undefined &&
+    (latestVersion.published_at == null ||
+      tree.current_version !== latestVersion.version);
 
   const onPatch = (nodeId: string, patch: NodePatch): void => {
     setEditBuffer((buf) => patchBuffer(buf, nodeId, patch));
@@ -111,15 +137,29 @@ export function DecisionTreeViewerPage(): ReactNode {
   };
   const onDiscardAll = (): void => {
     setEditBuffer({});
+    setParamsBuffer({});
   };
   const onSave = async (): Promise<void> => {
     if (!sourceYaml) return;
-    const nextYaml = applyEditsToYaml(sourceYaml, editBuffer);
+    // Apply both buffers in sequence (order doesn't matter — node
+    // edits patch `nodes.*`, parameter edits patch the top-level
+    // `parameters:` block; they don't intersect).
+    let nextYaml = applyEditsToYaml(sourceYaml, editBuffer);
+    nextYaml = applyParameterEditsToYaml(nextYaml, paramsBuffer);
     await append.mutateAsync({ code, payload: { tree_yaml: nextYaml } });
-    // Drop the buffer after a successful save — the refetch will
-    // bring in the new draft as the latest version.
     setEditBuffer({});
+    setParamsBuffer({});
     setSelectedNodeId(null);
+  };
+  const onPublishLatest = async (): Promise<void> => {
+    if (!latestVersion) return;
+    await publish.mutateAsync({ code, version: latestVersion.version });
+  };
+  const onParameterChange = (
+    name: string,
+    decl: ParameterDeclaration | null,
+  ): void => {
+    setParamsBuffer((buf) => ({ ...buf, [name]: decl }));
   };
 
   return (
@@ -165,6 +205,23 @@ export function DecisionTreeViewerPage(): ReactNode {
               </button>
             </>
           ) : null}
+          {/* PR-D3: publish-from-canvas. Visible only when there's an
+              unpublished draft AND the buffer is clean (we don't want
+              to publish a version that lags the user's pending edits). */}
+          {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
+            <button
+              type="button"
+              onClick={() => {
+                void onPublishLatest();
+              }}
+              disabled={publish.isPending}
+              className="rounded-md bg-ap-info px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-info/90 disabled:opacity-50"
+            >
+              {publish.isPending
+                ? t("editor.header.publishing")
+                : t("editor.header.publish", { n: latestVersion.version })}
+            </button>
+          ) : null}
           <Link
             to={`/settings/decision-trees/${tree.code}`}
             className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60"
@@ -179,16 +236,39 @@ export function DecisionTreeViewerPage(): ReactNode {
           {t("editor.header.saveFailed")}
         </p>
       ) : null}
+      {publish.isError ? (
+        <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
+          {t("editor.header.publishFailed")}
+        </p>
+      ) : null}
 
       <Legend />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-        <TreeCanvas
-          layout={layout}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={setSelectedNodeId}
-          dirtyNodeIds={dirtyIds}
-        />
+        <div className="flex flex-col gap-4">
+          <TreeCanvas
+            layout={layout}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            dirtyNodeIds={dirtyIds}
+          />
+          {/* PR-D3: author-side parameters declaration editor. Renders
+              under the canvas so it's discoverable without taking
+              over the right-side selection panel. */}
+          <ParametersPanel
+            declared={declaredParams}
+            buffer={paramsBuffer}
+            canEdit={canManage}
+            onChange={onParameterChange}
+          />
+          {/* PR-D3 consumer of PR-C: tenant-side overrides. Only
+              renders when the tree declares at least one parameter
+              the tenant can override; otherwise it stays empty and
+              clutters the layout, so we gate on declaredParams. */}
+          {Object.keys(declaredParams).length > 0 ? (
+            <ParameterOverridesPanel code={tree.code} canManage={canManage} />
+          ) : null}
+        </div>
         {selectedNode ? (
           <NodeDetailsPanel
             node={selectedNode}
