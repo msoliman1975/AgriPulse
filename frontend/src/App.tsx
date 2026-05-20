@@ -34,6 +34,7 @@ import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
 import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
 import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
+import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
@@ -219,6 +220,14 @@ export function App(): ReactNode {
                   <Route path="decision-trees" element={<DecisionTreeListPage />} />
                   <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />
                   <Route path="decision-trees/:code" element={<DecisionTreeEditorPage />} />
+                  {/* PR-D1: read-only visual viewer. The /view suffix
+                      keeps it cleanly separate from the editor route so
+                      a user navigating from the list can switch views
+                      without losing editor state. */}
+                  <Route
+                    path="decision-trees/:code/view"
+                    element={<DecisionTreeViewerPage />}
+                  />
                 </Route>
               </Route>
               {/* Platform Management Portal â€” capability gate sits

@@ -11,11 +11,13 @@
       "name": "Name",
       "crop": "Crop",
       "version": "Version",
+      "actions": "",
       "anyCrop": "any"
     },
     "row": {
       "draft": "draft only",
-      "v": "v{{n}}"
+      "v": "v{{n}}",
+      "view": "View →"
     }
   },
   "create": {
@@ -81,6 +83,31 @@
       "path": "Path walked",
       "snapshot": "Values resolved",
       "error": "Error"
+    }
+  },
+  "viewer": {
+    "emptyTree": "Tree has no nodes to display yet.",
+    "compiledMissing": "The published version is missing its compiled body — re-publish the version to regenerate it.",
+    "svgAria": "Decision-tree diagram",
+    "header": {
+      "draftOnly": "draft only",
+      "openYamlEditor": "Open YAML editor"
+    },
+    "edges": {
+      "match": "✓ match",
+      "miss": "✗ miss"
+    },
+    "chips": {
+      "decision": "decision",
+      "recommendation": "rec",
+      "noop": "no action"
+    },
+    "legend": {
+      "title": "Legend",
+      "decision": "Decision",
+      "recommendation": "Recommendation",
+      "alert": "Alert",
+      "noop": "No action"
     }
   }
 }

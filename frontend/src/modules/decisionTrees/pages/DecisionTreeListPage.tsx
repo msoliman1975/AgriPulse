@@ -54,6 +54,7 @@ export function DecisionTreeListPage(): ReactNode {
                 <th className="px-4 py-2 text-start">{t("list.table.name")}</th>
                 <th className="px-4 py-2 text-start">{t("list.table.crop")}</th>
                 <th className="px-4 py-2 text-end">{t("list.table.version")}</th>
+                <th className="px-4 py-2 text-end">{t("list.table.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ap-line">
@@ -81,6 +82,14 @@ export function DecisionTreeListPage(): ReactNode {
                     ) : (
                       <Pill kind="neutral">{t("list.row.draft")}</Pill>
                     )}
+                  </td>
+                  <td className="px-4 py-2 text-end">
+                    <Link
+                      to={`/settings/decision-trees/${tree.code}/view`}
+                      className="text-xs font-medium text-ap-primary hover:underline"
+                    >
+                      {t("list.row.view")}
+                    </Link>
                   </td>
                 </tr>
               ))}
