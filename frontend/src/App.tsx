@@ -38,6 +38,8 @@ import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
+import { ResourcesWorkersPage } from "@/modules/settings/pages/ResourcesWorkersPage";
+import { ResourcesEquipmentPage } from "@/modules/settings/pages/ResourcesEquipmentPage";
 import { IntegrationsLayout } from "@/modules/settings/pages/IntegrationsLayout";
 import { IntegrationsHealthPage } from "@/modules/settings/pages/IntegrationsHealthPage";
 import { IntegrationsWeatherPage } from "@/modules/settings/pages/IntegrationsWeatherPage";
@@ -201,6 +203,8 @@ export function App(): ReactNode {
                     />
                   </Route>
                   <Route path="users" element={<UsersConfigPage />} />
+                  <Route path="workers" element={<ResourcesWorkersPage />} />
+                  <Route path="equipment" element={<ResourcesEquipmentPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />
                   <Route path="decision-trees" element={<DecisionTreeListPage />} />
                   <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />

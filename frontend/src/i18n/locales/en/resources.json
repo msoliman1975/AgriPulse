@@ -1,0 +1,59 @@
+{
+  "pickFarm": "Farm",
+  "noFarm": "Select a farm…",
+  "showArchived": "Show archived",
+  "loadFailed": "Couldn't load — try again.",
+  "createFailed": "Couldn't create — check the form.",
+  "workers": {
+    "title": "Workers",
+    "subtitle": "People who can be assigned to a plan activity.",
+    "heading": "Team",
+    "add": "Add worker",
+    "namePlaceholder": "Full name",
+    "phonePlaceholder": "+20 1xx xxx xxxx",
+    "empty": "Pick a farm to see its workers.",
+    "emptyList": "No workers yet. Add one to get started."
+  },
+  "equipment": {
+    "title": "Equipment",
+    "subtitle": "Machinery that can be assigned to a plan activity.",
+    "heading": "Equipment",
+    "add": "Add equipment",
+    "namePlaceholder": "e.g. Tractor #2",
+    "empty": "Pick a farm to see its equipment.",
+    "emptyList": "No equipment yet. Add one to get started."
+  },
+  "col": {
+    "name": "Name",
+    "role": "Role",
+    "phone": "Phone",
+    "type": "Type",
+    "status": "Status"
+  },
+  "role": {
+    "agronomist": "Agronomist",
+    "operator": "Operator",
+    "scout": "Scout / Observer",
+    "field_worker": "Field worker",
+    "manager": "Manager"
+  },
+  "equipmentType": {
+    "tractor": "Tractor",
+    "sprayer": "Sprayer",
+    "irrigation_pump": "Irrigation pump",
+    "harvester": "Harvester",
+    "other": "Other"
+  },
+  "status": {
+    "active": "Active",
+    "archived": "Archived"
+  },
+  "action": {
+    "create": "Create",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "archive": "Archive",
+    "restore": "Restore"
+  }
+}

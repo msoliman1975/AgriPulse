@@ -40,6 +40,8 @@ export type Capability =
   | "plan.read"
   | "plan.manage"
   | "plan_activity.complete"
+  | "resource.read"
+  | "resource.manage"
   | "irrigation.schedule.read"
   | "irrigation.schedule.manage"
   | "recommendation.read"
@@ -122,6 +124,8 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan.manage",
     "plan_activity.complete",
+    "resource.read",
+    "resource.manage",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
     "recommendation.read",
@@ -150,6 +154,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan.manage",
     "plan_activity.complete",
+    "resource.read",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
     "recommendation.read",
@@ -170,6 +175,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "alert.read",
     "plan.read",
     "plan_activity.complete",
+    "resource.read",
     "irrigation.schedule.read",
     "recommendation.read",
     "signal.read",
@@ -185,6 +191,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "weather.read",
     "alert.read",
     "plan.read",
+    "resource.read",
     "recommendation.read",
     "signal.read",
     "signal.record",
@@ -199,6 +206,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "weather.read",
     "alert.read",
     "plan.read",
+    "resource.read",
     "irrigation.schedule.read",
     "recommendation.read",
     "signal.read",
@@ -242,6 +250,8 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "plan.read",
     "plan.manage",
     "plan_activity.complete",
+    "resource.read",
+    "resource.manage",
     "irrigation.schedule.read",
     "irrigation.schedule.manage",
     "recommendation.read",
