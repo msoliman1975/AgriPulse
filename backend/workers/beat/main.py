@@ -48,15 +48,24 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.indices_baseline_recompute_seconds),
         "options": {"queue": "light"},
     },
-    # Alerts engine: walk every active block in every active tenant and
-    # evaluate the rule catalog against the latest signals. Insertion is
-    # idempotent (partial UNIQUE on (block_id, rule_code) WHERE
-    # status IN open/ack/snoozed), so re-running is cheap.
-    "alerts.evaluate_alerts_sweep": {
-        "task": "alerts.evaluate_alerts_sweep",
-        "schedule": float(_settings.alerts_evaluate_sweep_seconds),
-        "options": {"queue": "light"},
-    },
+    # PR-F (sunset rules engine): the rules-based alerts sweep is
+    # disabled. Alerts now flow from decision-tree leaves with
+    # `kind: alert` via the recommendations engine sweep below; the
+    # ndvi_baseline_alert_v1 seed tree replaces the platform
+    # default_rules entries 1:1. The alerts table, repository, and
+    # service stay live (trees write into them via
+    # `_open_alert_from_tree` in PR-E), and `alerts/engine.py` +
+    # `alerts/tasks.py` remain importable so existing integration
+    # tests keep exercising the legacy code path until follow-up
+    # tickets retire them. To re-enable temporarily for parity
+    # debugging, re-add the entry below and bump
+    # `alerts_evaluate_sweep_seconds`.
+    #
+    # "alerts.evaluate_alerts_sweep": {
+    #     "task": "alerts.evaluate_alerts_sweep",
+    #     "schedule": float(_settings.alerts_evaluate_sweep_seconds),
+    #     "options": {"queue": "light"},
+    # },
     # Irrigation engine: per-block daily recommendations from ET₀ +
     # crop Kc + recent precip. Idempotent on the partial UNIQUE
     # `(block_id, scheduled_for) WHERE status='pending'` so re-runs

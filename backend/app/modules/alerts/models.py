@@ -1,6 +1,15 @@
 """Alerts ORM models. `default_rules` lives in `public`; `rule_overrides`
 and `alerts` live in the per-tenant schema (no `__table_args__["schema"]`
 — search_path resolves). data_model § 11.
+
+PR-F (sunset rules engine): `DefaultRule`, `RuleOverride`, and
+`TenantRule` are DEPRECATED. The tables stay in place for one
+release cycle so dev/staging can verify alert parity with the new
+tree-as-alert path (PR-E + `ndvi_baseline_alert_v1.yaml` seed). A
+follow-up PR drops the tables once parity is confirmed. The
+`Alert` model below stays — it's still the lifecycle table that
+both legacy rule-sourced alerts AND new tree-sourced alerts write
+into.
 """
 
 from __future__ import annotations

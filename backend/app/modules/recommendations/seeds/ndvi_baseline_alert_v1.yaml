@@ -1,0 +1,132 @@
+# ndvi_baseline_alert_v1 — alert when a block's NDVI drops below its
+# seasonal baseline. Replaces the platform `default_rules` rows
+# `ndvi_severe_drop` + `ndvi_warning_drop` as PR-F retires the rules
+# engine and the trees engine takes over alert generation.
+#
+# Why one tree instead of two rules: PR-E's leaf-kind discriminator
+# lets the same walk emit a *critical* or a *warning* alert based on
+# the severity of the drop. The two former rules become two leaves
+# under a single severity-check branch. Tenants who want to tune the
+# trigger thresholds use PR-C parameter overrides on this tree
+# rather than the now-retired `rule_overrides` table.
+#
+# Pairs with scout_for_stress_v1: that tree emits a *recommendation*
+# (kind: recommendation) to scout; this tree emits an *alert* (kind:
+# alert) on the same signal. Both fire together when a block is in
+# trouble — the existing notifications fan-out (alerts + recs both
+# render via `notifications`) surfaces them in the inbox together.
+
+code: ndvi_baseline_alert_v1
+name_en: NDVI below seasonal baseline
+name_ar: انخفاض NDVI عن المعدل الموسمي
+description_en: >-
+  Fires an alert when a block's NDVI baseline deviation drops below
+  the configured threshold. Critical when the drop is severe; warning
+  when it's moderate. Successor to the retired `ndvi_severe_drop` +
+  `ndvi_warning_drop` rules (PR-F sunset).
+description_ar: >-
+  ينطلق تنبيه عندما يهبط انحراف NDVI عن المعدل الموسمي تحت العتبة
+  المحددة. حرج للانخفاض الحاد، تحذيري للمتوسط. خليفة قاعدتي
+  `ndvi_severe_drop` و `ndvi_warning_drop` المنسحبتين (PR-F).
+
+crop_code: null
+applicable_regions: []
+
+# Parameter knobs let tenants tighten or loosen the thresholds via
+# PR-C without forking the tree. Defaults match the original
+# `default_rules` row values so behaviour is unchanged out of the box.
+parameters:
+  warning_threshold:
+    type: number
+    default: -0.75
+    min: -3.0
+    max: 0.0
+    description: >-
+      NDVI baseline deviation below which a `warning` alert fires
+      (default −0.75 σ, matching the legacy `ndvi_warning_drop` rule).
+  critical_threshold:
+    type: number
+    default: -1.5
+    min: -3.0
+    max: 0.0
+    description: >-
+      NDVI baseline deviation below which the alert escalates to
+      `critical` (default −1.5 σ, matching the legacy
+      `ndvi_severe_drop` rule). Must be ≤ `warning_threshold` for
+      the escalation gate to be reachable.
+
+root: root
+nodes:
+  root:
+    label_en: Is NDVI below the warning threshold?
+    label_ar: هل NDVI أقل من عتبة التحذير؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right:
+          source: params
+          name: warning_threshold
+    on_match: severity_gate
+    on_miss: leaf_no_alert
+
+  severity_gate:
+    label_en: Is the drop severe enough to escalate?
+    label_ar: هل الانخفاض حاد بما يكفي للتصعيد؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right:
+          source: params
+          name: critical_threshold
+    on_match: leaf_alert_critical
+    on_miss: leaf_alert_warning
+
+  leaf_alert_critical:
+    label_en: Critical alert — severe NDVI drop
+    label_ar: تنبيه حرج — تراجع حاد في NDVI
+    outcome:
+      kind: alert
+      action_type: inspect
+      severity: critical
+      valid_for_hours: 72
+      text_en: >-
+        NDVI is significantly below the block's historical baseline.
+        Common causes: water stress, pest/disease pressure, nutrient
+        deficiency, or recent damage. Schedule a field inspection
+        within 48 hours.
+      text_ar: >-
+        NDVI أقل بشكل ملحوظ من المعدل التاريخي للحقل. أسباب شائعة:
+        إجهاد مائي، آفات/أمراض، نقص عناصر، أو ضرر حديث. حدّد زيارة
+        فحص خلال 48 ساعة.
+
+  leaf_alert_warning:
+    label_en: Warning alert — NDVI below baseline
+    label_ar: تنبيه تحذيري — NDVI أقل من المعدل
+    outcome:
+      kind: alert
+      action_type: inspect
+      severity: warning
+      valid_for_hours: 168
+      text_en: >-
+        NDVI is trending below the historical baseline. Not yet
+        severe, but worth a closer look. Add this block to your next
+        routine scouting round.
+      text_ar: >-
+        NDVI يتراجع عن المعدل التاريخي. ليس حادًا بعد لكنه يستحق
+        المتابعة. أضف هذا الحقل إلى جولة الفحص الروتينية التالية.
+
+  leaf_no_alert:
+    label_en: No alert — NDVI within baseline
+    label_ar: لا تنبيه — NDVI ضمن المعدل
+    outcome:
+      action_type: no_action
+      text_en: NDVI is within the seasonal baseline; no alert.
+      text_ar: NDVI ضمن المعدل الموسمي؛ لا تنبيه.

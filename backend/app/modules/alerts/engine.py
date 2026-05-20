@@ -1,5 +1,17 @@
 """Pure-function rule evaluation for the alerts engine.
 
+DEPRECATED (PR-F): the rules engine is retired. Alerts now flow from
+decision-tree leaves with ``kind: alert`` via
+``recommendations.service._open_alert_from_tree`` (PR-E). The Celery
+beat task that drove the rules sweep is unregistered in
+``workers/beat/main.py``; this module and its callers remain only so
+existing integration tests can exercise the legacy code path until
+follow-up tickets remove the rule tables + this engine. Do NOT add
+new predicate kinds or wire new code into ``evaluate_rule`` — author
+a decision-tree YAML in ``app/modules/recommendations/seeds/``
+instead (see ``ndvi_baseline_alert_v1.yaml`` for the migration
+shape).
+
 The Beat task and the on-demand `evaluate_block` service path both feed
 their loaded rules + signal snapshots through these helpers; the DB
 layer never sees the merged-rule structure.
