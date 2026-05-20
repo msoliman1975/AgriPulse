@@ -1,5 +1,12 @@
 """Celery tasks for the alerts engine.
 
+DEPRECATED (PR-F): the rules-driven sweep is unregistered from Beat
+in ``workers/beat/main.py``. Alerts now flow from decision-tree
+leaves with ``kind: alert`` via the recommendations sweep.
+``evaluate_alerts_sweep`` + ``evaluate_alerts_for_tenant`` remain
+importable so existing integration tests can call them directly;
+they will not fire on a schedule.
+
 Two tasks:
 
   * ``evaluate_alerts_for_tenant(tenant_schema)`` — walks every active
