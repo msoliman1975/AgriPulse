@@ -29,15 +29,16 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
-from app.modules.alerts.service import get_alerts_service
 from app.modules.notifications.subscribers import register_subscribers
+from app.modules.recommendations.loader import sync_from_disk
+from app.modules.recommendations.service import get_recommendations_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
 from app.shared.eventbus import get_default_bus
-from tests.integration.alerts.test_alerts_pipeline import _seed_block_with_ndvi_row
 from tests.integration.farms.test_farms_crud import _create_user_in_tenant
 from tests.integration.notifications.test_inbox_dispatch_on_alert_opened import (
     _attach_user_to_farm,
+    _seed_block_with_ndvi_row,
 )
 
 pytestmark = [pytest.mark.integration]
@@ -80,13 +81,14 @@ async def test_webhook_post_carries_valid_hmac_signature(
     admin_session: AsyncSession,
 ) -> None:
     register_subscribers(get_default_bus())
+    await sync_from_disk(admin_session)
     _CaptureHandler.captured.clear()
 
     server, port = _start_capture_server()
     try:
         tenancy = get_tenant_service(admin_session)
         tenant = await tenancy.create_tenant(
-            slug="pr-s4e-webhook",
+            slug=f"pr-s4e-webhook-{uuid4().hex[:6]}",
             name="PR-S4-E webhook",
             contact_email="ops@pr-s4e.test",
         )
@@ -119,11 +121,14 @@ async def test_webhook_post_carries_valid_hmac_signature(
         async with factory() as session, session.begin():
             await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
             async with factory() as public_session:
-                svc = get_alerts_service(tenant_session=session, public_session=public_session)
+                svc = get_recommendations_service(
+                    tenant_session=session, public_session=public_session
+                )
                 await svc.evaluate_block(
                     block_id=block_id,
                     actor_user_id=None,
                     tenant_schema=tenant.schema_name,
+                    tenant_id=tenant.tenant_id,
                 )
 
         # Wait briefly for the (sync, in-process) handler to land â€” the
@@ -150,25 +155,33 @@ async def test_webhook_post_carries_valid_hmac_signature(
 
         body = json.loads(captured["body"])
         assert body["event"] == "alert.opened"
-        assert body["rule_code"] == "ndvi_severe_drop"
+        # Tree-sourced rule_code shape (PR-E): `tree:<tree_code>:<leaf>`.
+        # ndvi_baseline_alert_v1 is the platform tree that replaces the
+        # legacy ndvi_severe_drop rule (PR-F).
+        assert body["rule_code"] == "tree:ndvi_baseline_alert_v1:leaf_alert_critical"
         assert body["severity"] == "critical"
         assert body["block_id"] == str(block_id)
 
-        # Dispatch row records the success.
-        row = (
+        # Dispatch rows: one per firing tree (alert + recommendation
+        # both produce a webhook dispatch). Assert the alert's webhook
+        # dispatch landed as `sent`.
+        rows = (
             (
                 await admin_session.execute(
                     text(
-                        f'SELECT status, recipient_address FROM "{tenant.schema_name}"'
-                        f".notification_dispatches WHERE channel = 'webhook'"
+                        f"SELECT status, recipient_address, alert_id, recommendation_id "
+                        f'FROM "{tenant.schema_name}".notification_dispatches '
+                        "WHERE channel = 'webhook'"
                     )
                 )
             )
             .mappings()
-            .one()
+            .all()
         )
-        assert row["status"] == "sent"
-        assert row["recipient_address"] == url
+        alert_dispatch = next((r for r in rows if r["alert_id"] is not None), None)
+        assert alert_dispatch is not None, f"no alert webhook dispatch: {[dict(r) for r in rows]}"
+        assert alert_dispatch["status"] == "sent"
+        assert alert_dispatch["recipient_address"] == url
     finally:
         server.shutdown()
         server.server_close()
@@ -179,10 +192,11 @@ async def test_webhook_skipped_when_url_unset(admin_session: AsyncSession) -> No
     """A tenant with the webhook channel enabled but no URL gets a
     ``skipped`` dispatch with a clear reason."""
     register_subscribers(get_default_bus())
+    await sync_from_disk(admin_session)
 
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
-        slug="pr-s4e-no-url",
+        slug=f"pr-s4e-no-url-{uuid4().hex[:6]}",
         name="PR-S4-E no URL",
         contact_email="ops@pr-s4e-nourl.test",
     )
@@ -209,14 +223,20 @@ async def test_webhook_skipped_when_url_unset(admin_session: AsyncSession) -> No
     async with factory() as session, session.begin():
         await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
         async with factory() as public_session:
-            svc = get_alerts_service(tenant_session=session, public_session=public_session)
+            svc = get_recommendations_service(
+                tenant_session=session, public_session=public_session
+            )
             await svc.evaluate_block(
                 block_id=block_id,
                 actor_user_id=None,
                 tenant_schema=tenant.schema_name,
+                tenant_id=tenant.tenant_id,
             )
 
-    row = (
+    # Both the alert tree and the recommendation tree produce a
+    # webhook dispatch row; both should land as `skipped` with the
+    # same reason since the tenant has no URL configured.
+    rows = (
         (
             await admin_session.execute(
                 text(
@@ -226,7 +246,9 @@ async def test_webhook_skipped_when_url_unset(admin_session: AsyncSession) -> No
             )
         )
         .mappings()
-        .one()
+        .all()
     )
-    assert row["status"] == "skipped"
-    assert "no webhook_endpoint_url" in (row["error"] or "")
+    assert rows, "expected at least one webhook dispatch row"
+    for row in rows:
+        assert row["status"] == "skipped"
+        assert "no webhook_endpoint_url" in (row["error"] or "")

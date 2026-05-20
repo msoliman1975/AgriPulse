@@ -1,13 +1,14 @@
 """Async DB access for the alerts module. Internal to the module.
 
-Two sessions:
-
-  * `tenant_session` — ``rule_overrides`` and ``alerts``, plus the
-    cross-module read of ``block_index_aggregates`` for the latest
-    per-index values feeding the engine.
-  * `public_session` — ``default_rules`` catalog. The catalog is
-    tenant-agnostic; reads happen on the admin connection that lives
-    alongside every tenant request.
+Stage 2 of the rules sunset: this repository now holds only the alert
+lifecycle methods (insert, list, get, transition). The rule-catalog
+methods (`list_default_rules`, `list_overrides`, `list_tenant_rules`,
+etc.) and the cross-module signal loaders (`get_latest_aggregate_per_index`,
+`get_block_farm_id`, `get_block_crop_category`, `list_active_block_ids`)
+were removed when the rules engine retired. The recommendations engine
+now owns signal loading + tree evaluation; tree leaves with
+``kind: alert`` insert rows here via
+``recommendations.service._open_alert_from_tree`` (PR-E).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.alerts.models import Alert, DefaultRule, RuleOverride, TenantRule
+from app.modules.alerts.models import Alert
 
 
 def _serialize_jsonb(value: dict[str, Any] | None) -> str | None:
@@ -30,259 +31,20 @@ def _serialize_jsonb(value: dict[str, Any] | None) -> str | None:
 
 
 class AlertsRepository:
-    """Internal repository — service is the only consumer."""
+    """Internal repository — service is the only consumer.
+
+    Holds the alert lifecycle CRUD only. Both legacy rule-sourced
+    alerts (now retired) and tree-sourced alerts (PR-E) wrote/write
+    into the same ``alerts`` table; this repo doesn't care about the
+    source.
+    """
 
     def __init__(self, *, tenant_session: AsyncSession, public_session: AsyncSession) -> None:
         self._tenant = tenant_session
+        # Kept on the API surface for backwards compatibility with the
+        # service constructor; no method here uses the public session
+        # after Stage 2 (rule catalog reads are gone).
         self._public = public_session
-
-    # ---- Default rules (public catalog) -------------------------------
-
-    async def list_default_rules(
-        self, *, status_filter: str = "active"
-    ) -> tuple[dict[str, Any], ...]:
-        stmt = select(DefaultRule).where(DefaultRule.deleted_at.is_(None))
-        if status_filter:
-            stmt = stmt.where(DefaultRule.status == status_filter)
-        stmt = stmt.order_by(DefaultRule.code)
-        rows = (await self._public.execute(stmt)).scalars().all()
-        return tuple(
-            {
-                "code": r.code,
-                "name_en": r.name_en,
-                "name_ar": r.name_ar,
-                "description_en": r.description_en,
-                "description_ar": r.description_ar,
-                "severity": r.severity,
-                "status": r.status,
-                "applies_to_crop_categories": list(r.applies_to_crop_categories or []),
-                "conditions": r.conditions,
-                "actions": r.actions,
-                "version": r.version,
-            }
-            for r in rows
-        )
-
-    async def get_default_rule(self, *, rule_code: str) -> dict[str, Any] | None:
-        stmt = select(DefaultRule).where(
-            DefaultRule.code == rule_code, DefaultRule.deleted_at.is_(None)
-        )
-        row = (await self._public.execute(stmt)).scalars().one_or_none()
-        if row is None:
-            return None
-        return {
-            "code": row.code,
-            "name_en": row.name_en,
-            "name_ar": row.name_ar,
-            "description_en": row.description_en,
-            "description_ar": row.description_ar,
-            "severity": row.severity,
-            "status": row.status,
-            "applies_to_crop_categories": list(row.applies_to_crop_categories or []),
-            "conditions": row.conditions,
-            "actions": row.actions,
-            "version": row.version,
-        }
-
-    # ---- Rule overrides (tenant) ---------------------------------------
-
-    async def list_overrides(self) -> tuple[dict[str, Any], ...]:
-        stmt = (
-            select(RuleOverride)
-            .where(RuleOverride.deleted_at.is_(None))
-            .order_by(RuleOverride.rule_code)
-        )
-        rows = (await self._tenant.execute(stmt)).scalars().all()
-        return tuple(_override_to_dict(r) for r in rows)
-
-    async def get_override(self, *, rule_code: str) -> dict[str, Any] | None:
-        stmt = select(RuleOverride).where(
-            RuleOverride.rule_code == rule_code, RuleOverride.deleted_at.is_(None)
-        )
-        row = (await self._tenant.execute(stmt)).scalars().one_or_none()
-        return _override_to_dict(row) if row is not None else None
-
-    async def upsert_override(
-        self,
-        *,
-        rule_code: str,
-        modified_conditions: dict[str, Any] | None,
-        modified_actions: dict[str, Any] | None,
-        modified_severity: str | None,
-        is_disabled: bool,
-        actor_user_id: UUID | None,
-    ) -> dict[str, Any]:
-        """Insert-or-update one override row for the given rule_code.
-
-        Conflicts on the partial UNIQUE `(rule_code) WHERE deleted_at
-        IS NULL` index — overwriting is intentional, since each rule
-        has at most one effective override per tenant.
-        """
-        await self._tenant.execute(
-            text(
-                """
-                INSERT INTO rule_overrides (
-                    rule_code, modified_conditions, modified_actions,
-                    modified_severity, is_disabled,
-                    created_by, updated_by
-                )
-                VALUES (
-                    :rule_code,
-                    CAST(:conditions AS jsonb), CAST(:actions AS jsonb),
-                    :severity, :is_disabled,
-                    :actor, :actor
-                )
-                ON CONFLICT (rule_code) WHERE deleted_at IS NULL
-                DO UPDATE SET
-                    modified_conditions = EXCLUDED.modified_conditions,
-                    modified_actions = EXCLUDED.modified_actions,
-                    modified_severity = EXCLUDED.modified_severity,
-                    is_disabled = EXCLUDED.is_disabled,
-                    updated_by = EXCLUDED.updated_by,
-                    updated_at = now()
-                """
-            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
-            {
-                "rule_code": rule_code,
-                "conditions": _serialize_jsonb(modified_conditions),
-                "actions": _serialize_jsonb(modified_actions),
-                "severity": modified_severity,
-                "is_disabled": is_disabled,
-                "actor": actor_user_id,
-            },
-        )
-        await self._tenant.flush()
-        out = await self.get_override(rule_code=rule_code)
-        if out is None:
-            raise RuntimeError("Override upsert succeeded but row is missing")
-        return out
-
-    # ---- Tenant rules (tenant-authored) -------------------------------
-
-    async def list_tenant_rules(
-        self, *, status_filter: str | None = "active"
-    ) -> tuple[dict[str, Any], ...]:
-        stmt = select(TenantRule).where(TenantRule.deleted_at.is_(None))
-        if status_filter:
-            stmt = stmt.where(TenantRule.status == status_filter)
-        stmt = stmt.order_by(TenantRule.code)
-        rows = (await self._tenant.execute(stmt)).scalars().all()
-        return tuple(_tenant_rule_to_dict(r) for r in rows)
-
-    async def get_tenant_rule(self, *, rule_code: str) -> dict[str, Any] | None:
-        stmt = select(TenantRule).where(
-            TenantRule.code == rule_code, TenantRule.deleted_at.is_(None)
-        )
-        row = (await self._tenant.execute(stmt)).scalars().one_or_none()
-        return _tenant_rule_to_dict(row) if row is not None else None
-
-    async def insert_tenant_rule(
-        self,
-        *,
-        code: str,
-        name_en: str,
-        name_ar: str | None,
-        description_en: str | None,
-        description_ar: str | None,
-        severity: str,
-        status: str,
-        applies_to_crop_categories: list[str],
-        conditions: dict[str, Any],
-        actions: dict[str, Any],
-        actor_user_id: UUID | None,
-    ) -> dict[str, Any]:
-        await self._tenant.execute(
-            text(
-                """
-                INSERT INTO tenant_rules (
-                    code, name_en, name_ar, description_en, description_ar,
-                    severity, status, applies_to_crop_categories,
-                    conditions, actions, version,
-                    created_by, updated_by
-                ) VALUES (
-                    :code, :name_en, :name_ar, :description_en, :description_ar,
-                    :severity, :status, :crops,
-                    CAST(:conditions AS jsonb), CAST(:actions AS jsonb), 1,
-                    :actor, :actor
-                )
-                """
-            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
-            {
-                "code": code,
-                "name_en": name_en,
-                "name_ar": name_ar,
-                "description_en": description_en,
-                "description_ar": description_ar,
-                "severity": severity,
-                "status": status,
-                "crops": applies_to_crop_categories,
-                "conditions": _serialize_jsonb(conditions),
-                "actions": _serialize_jsonb(actions),
-                "actor": actor_user_id,
-            },
-        )
-        await self._tenant.flush()
-        out = await self.get_tenant_rule(rule_code=code)
-        if out is None:
-            raise RuntimeError("tenant rule insert succeeded but row is missing")
-        return out
-
-    async def update_tenant_rule(
-        self,
-        *,
-        code: str,
-        updates: dict[str, Any],
-        actor_user_id: UUID | None,
-    ) -> dict[str, Any] | None:
-        if not updates:
-            return await self.get_tenant_rule(rule_code=code)
-        # Static allow-list — no caller-supplied identifiers reach the SQL.
-        allowed = {
-            "name_en",
-            "name_ar",
-            "description_en",
-            "description_ar",
-            "severity",
-            "status",
-            "applies_to_crop_categories",
-            "conditions",
-            "actions",
-        }
-        sets: list[str] = []
-        params: dict[str, Any] = {"code": code, "actor": actor_user_id}
-        for col, value in updates.items():
-            if col not in allowed:
-                continue
-            if col in ("conditions", "actions"):
-                sets.append(f"{col} = CAST(:{col} AS jsonb)")
-                params[col] = _serialize_jsonb(value)
-            else:
-                sets.append(f"{col} = :{col}")
-                params[col] = value
-        if not sets:
-            return await self.get_tenant_rule(rule_code=code)
-        # Bump version on every save so an audit trail of changes
-        # exists even though we don't snapshot prior states.
-        sets.extend(["version = version + 1", "updated_at = now()", "updated_by = :actor"])
-        await self._tenant.execute(
-            text(
-                f"UPDATE tenant_rules SET {', '.join(sets)} "  # noqa: S608
-                "WHERE code = :code AND deleted_at IS NULL"
-            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
-            params,
-        )
-        return await self.get_tenant_rule(rule_code=code)
-
-    async def soft_delete_tenant_rule(self, *, code: str, actor_user_id: UUID | None) -> bool:
-        result = await self._tenant.execute(
-            text(
-                "UPDATE tenant_rules "
-                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
-                "WHERE code = :code AND deleted_at IS NULL"
-            ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
-            {"code": code, "actor": actor_user_id},
-        )
-        return bool(getattr(result, "rowcount", 0) or 0)
 
     # ---- Alerts (tenant) ----------------------------------------------
 
@@ -304,6 +66,11 @@ class AlertsRepository:
         """Open one alert. Returns True if a row was inserted, False if
         the partial UNIQUE on (block_id, rule_code) blocked it (an
         active alert already exists).
+
+        Tree-sourced alerts pass ``rule_code`` of the form
+        ``tree:<tree_code>:<leaf_node_id>`` so the same partial UNIQUE
+        on ``(block_id, rule_code) WHERE status IN open/ack/snoozed``
+        keeps re-evaluation idempotent without needing schema changes.
         """
         try:
             await self._tenant.execute(
@@ -439,138 +206,6 @@ class AlertsRepository:
             ),
             params,
         )
-
-    # ---- Cross-module reader for the engine ----------------------------
-
-    async def get_latest_aggregate_per_index(self, *, block_id: UUID) -> dict[str, dict[str, Any]]:
-        """Pull the latest `block_index_aggregates` row per index_code.
-
-        Used by the engine to assemble a `BlockSignals` snapshot. We
-        DISTINCT ON (index_code) ORDER BY time DESC so each index
-        contributes exactly its most recent observation.
-        """
-        rows = (
-            (
-                await self._tenant.execute(
-                    text(
-                        """
-                    SELECT DISTINCT ON (index_code)
-                           index_code, time, mean, baseline_deviation
-                    FROM block_index_aggregates
-                    WHERE block_id = :block_id
-                    ORDER BY index_code, time DESC
-                    """
-                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
-                    {"block_id": block_id},
-                )
-            )
-            .mappings()
-            .all()
-        )
-        return {
-            row["index_code"]: {
-                "time": row["time"],
-                "mean": row["mean"],
-                "baseline_deviation": row["baseline_deviation"],
-            }
-            for row in rows
-        }
-
-    async def get_block_farm_id(self, *, block_id: UUID) -> UUID | None:
-        row = (
-            await self._tenant.execute(
-                text(
-                    "SELECT farm_id FROM blocks WHERE id = :block_id " "  AND deleted_at IS NULL"
-                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
-                {"block_id": block_id},
-            )
-        ).first()
-        return row.farm_id if row is not None else None
-
-    async def get_block_crop_category(self, *, block_id: UUID) -> str | None:
-        """Look up the block's *current* crop's category.
-
-        Returns None if the block has no current assignment.
-        """
-        row = (
-            await self._tenant.execute(
-                text(
-                    """
-                    SELECT bc.crop_id
-                    FROM block_crops bc
-                    WHERE bc.block_id = :block_id
-                      AND bc.is_current = TRUE
-                      AND bc.deleted_at IS NULL
-                    LIMIT 1
-                    """
-                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
-                {"block_id": block_id},
-            )
-        ).first()
-        if row is None:
-            return None
-        crop_row = (
-            await self._public.execute(
-                text("SELECT category FROM public.crops WHERE id = :crop_id").bindparams(
-                    bindparam("crop_id", type_=PG_UUID(as_uuid=True))
-                ),
-                {"crop_id": row.crop_id},
-            )
-        ).first()
-        return crop_row.category if crop_row is not None else None
-
-    async def list_active_block_ids(self) -> tuple[UUID, ...]:
-        """Every active block in the tenant — Beat sweep input.
-
-        Inactivation now stamps ``active_to`` AND ``deleted_at``, so
-        ``deleted_at IS NULL`` alone suffices to scope to live blocks.
-        Future-dated activations (``active_from > current_date``) are
-        excluded — Beat shouldn't fire alerts on a block that isn't
-        operational yet.
-        """
-        rows = (
-            await self._tenant.execute(
-                text(
-                    "SELECT id FROM blocks "
-                    "WHERE deleted_at IS NULL "
-                    "  AND active_from <= current_date "
-                    "  AND (active_to IS NULL OR active_to > current_date)"
-                )
-            )
-        ).all()
-        return tuple(r.id for r in rows)
-
-
-def _tenant_rule_to_dict(row: TenantRule) -> dict[str, Any]:
-    return {
-        "code": row.code,
-        "name_en": row.name_en,
-        "name_ar": row.name_ar,
-        "description_en": row.description_en,
-        "description_ar": row.description_ar,
-        "severity": row.severity,
-        "status": row.status,
-        "applies_to_crop_categories": list(row.applies_to_crop_categories or []),
-        "conditions": row.conditions,
-        "actions": row.actions,
-        "version": row.version,
-        "id": row.id,
-        "created_at": row.created_at,
-        "updated_at": row.updated_at,
-    }
-
-
-def _override_to_dict(row: RuleOverride) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "rule_code": row.rule_code,
-        "modified_conditions": row.modified_conditions,
-        "modified_actions": row.modified_actions,
-        "modified_severity": row.modified_severity,
-        "is_disabled": row.is_disabled,
-        "created_at": row.created_at,
-        "updated_at": row.updated_at,
-    }
 
 
 def _alert_to_dict(row: Alert) -> dict[str, Any]:
