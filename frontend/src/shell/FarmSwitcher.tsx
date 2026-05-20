@@ -7,7 +7,14 @@ import { listFarms } from "@/api/farms";
 import { useCapability } from "@/rbac/useCapability";
 import { ChevronIcon } from "./icons";
 
-const PINNED_PREFIXES = ["/insights/", "/plan/", "/alerts/", "/reports/", "/config/"];
+const PINNED_PREFIXES = [
+  "/insights/",
+  "/board/",
+  "/plan/",
+  "/alerts/",
+  "/reports/",
+  "/config/",
+];
 
 /**
  * Breadcrumb-anchored farm switcher. Keeps the user on the current view
