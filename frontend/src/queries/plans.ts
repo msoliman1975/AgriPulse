@@ -106,6 +106,9 @@ export function useUpdateActivity() {
     onSuccess: (activity) => {
       void qc.invalidateQueries({ queryKey: ["plans", "activities", activity.plan_id] });
       void qc.invalidateQueries({ queryKey: ["plans", "calendar"] });
+      // Board-flow activities have plan_id = null; invalidate the board
+      // grid for the activity's farm so completes/skips reflect immediately.
+      void qc.invalidateQueries({ queryKey: ["board", activity.farm_id] });
     },
   });
 }
