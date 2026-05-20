@@ -154,6 +154,13 @@ class RecommendationsServiceImpl:
             signals=signals,
         )
 
+        # PR-C: bulk-load tenant parameter overrides for every tree the
+        # sweep will walk. One query, grouped by tree_id; engine falls
+        # back to declared defaults for trees with no overrides.
+        param_overrides_per_tree = await self._repo.list_all_param_overrides_visible_to_tenant(
+            tree_ids=tuple(t["tree_id"] for t in trees)
+        )
+
         trees_evaluated = 0
         trees_skipped_crop = 0
         recommendations_opened = 0
@@ -165,7 +172,10 @@ class RecommendationsServiceImpl:
                 continue
             trees_evaluated += 1
 
-            result = evaluate_tree(tree["tree_compiled"], ctx)
+            overrides = param_overrides_per_tree.get(tree["tree_id"], {})
+            result = evaluate_tree(
+                tree["tree_compiled"], ctx, param_overrides=overrides
+            )
             if result.error is not None:
                 self._log.warning(
                     "decision_tree_walk_error",
@@ -367,6 +377,129 @@ class RecommendationsServiceImpl:
             )
         )
         return True
+
+    # ---- Tree parameter overrides (tenant) ----------------------------
+
+    async def list_tree_param_overrides(
+        self, *, code: str, tenant_id: UUID
+    ) -> dict[str, Any]:
+        """Return ``{declarations: [...], overrides: {name: value}}`` for
+        the named tree, so the UI can render every declared parameter
+        with its default + current override side by side. The tree
+        must be visible to ``tenant_id`` (platform OR own); otherwise
+        returns ``None``-equivalent and the caller raises 404.
+
+        PR-C: this is the read endpoint behind the "Customize tree"
+        settings page.
+        """
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            return {"found": False}
+        declarations = await self._param_decls_for_current_version(tree)
+        overrides = await self._repo.list_param_overrides_for_tree(tree_id=tree["id"])
+        return {
+            "found": True,
+            "tree_id": tree["id"],
+            "code": code,
+            "declarations": declarations,
+            "overrides": overrides,
+        }
+
+    async def upsert_tree_param_override(
+        self,
+        *,
+        code: str,
+        tenant_id: UUID,
+        param_name: str,
+        value: Any,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Set a single override. Validates that ``param_name`` is a
+        declared parameter on the tree's current published version;
+        rejects with a sentinel so the router can map to 404 / 400.
+
+        Type-coerces ``value`` against the declared type so a string
+        ``"-0.15"`` saved by a number-typed input becomes a numeric
+        JSONB at storage time. Bad coercions raise a parse error the
+        router maps to 400.
+        """
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        decls = await self._param_decls_for_current_version(tree)
+        if param_name not in decls:
+            raise _ParamNameUnknownError(code=code, param_name=param_name)
+        coerced = _coerce_override_value(value, declared=decls[param_name])
+        await self._repo.upsert_param_override(
+            tree_id=tree["id"],
+            param_name=param_name,
+            value=coerced,
+            actor_user_id=actor_user_id,
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.tree_param_override_set",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code, "param_name": param_name},
+        )
+        return {"code": code, "param_name": param_name, "value": coerced}
+
+    async def delete_tree_param_override(
+        self,
+        *,
+        code: str,
+        tenant_id: UUID,
+        param_name: str,
+        actor_user_id: UUID | None,
+    ) -> bool:
+        """Remove a single override so the tree falls back to its
+        declared default. Returns True if a row was deleted."""
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        deleted = await self._repo.delete_param_override(
+            tree_id=tree["id"], param_name=param_name
+        )
+        if deleted:
+            await self._audit.record(
+                tenant_schema=None,
+                event_type="recommendations.tree_param_override_deleted",
+                actor_user_id=actor_user_id,
+                actor_kind="user" if actor_user_id else "system",
+                subject_kind="decision_tree",
+                subject_id=tree["id"],
+                farm_id=None,
+                details={"code": code, "param_name": param_name},
+            )
+        return deleted
+
+    async def _param_decls_for_current_version(
+        self, tree: dict[str, Any]
+    ) -> dict[str, dict[str, Any]]:
+        """Read the `parameters:` declaration block off the tree's
+        current published version. Returns ``{}`` when the tree has
+        no published version yet (override CRUD still allowed but
+        every name fails validation — keeps the editor's draft flow
+        honest)."""
+        version_id = tree.get("current_version_id")
+        if version_id is None:
+            return {}
+        version = await self._repo.get_version(version_id)
+        if version is None:
+            return {}
+        compiled = version.get("tree_compiled") or {}
+        decls = compiled.get("parameters") or {}
+        return decls if isinstance(decls, dict) else {}
 
     # ---- Reads --------------------------------------------------------
 
@@ -984,6 +1117,120 @@ class _DecisionTreeNoPublishedVersionError(_DecisionTreeAuthoringError):
     def __init__(self, code: str) -> None:
         super().__init__(f"Decision tree {code!r} has no published version yet")
         self.code = code
+
+
+class _ParamNameUnknownError(_DecisionTreeAuthoringError):
+    """A tenant tried to set an override for a parameter the current
+    published tree version doesn't declare. Router maps to 400."""
+
+    def __init__(self, *, code: str, param_name: str) -> None:
+        super().__init__(
+            f"Tree {code!r} has no declared parameter {param_name!r} in its "
+            "current published version"
+        )
+        self.code = code
+        self.param_name = param_name
+
+
+class _ParamValueCoercionError(_DecisionTreeAuthoringError):
+    """An override value couldn't be coerced into the parameter's
+    declared type (e.g. ``"banana"`` for a number-typed param).
+    Router maps to 400."""
+
+    def __init__(self, *, param_name: str, type_: str, detail: str) -> None:
+        super().__init__(
+            f"Override value for {param_name!r} ({type_}) is invalid: {detail}"
+        )
+        self.param_name = param_name
+        self.type_ = type_
+        self.detail = detail
+
+
+def _coerce_override_value(value: Any, *, declared: dict[str, Any]) -> Any:  # noqa: PLR0911, PLR0912 - dispatch over declared types
+    """Coerce ``value`` (typically from JSON over HTTP) into the
+    parameter's declared type. Throws ``_ParamValueCoercionError``
+    when the coercion fails or violates min/max/enum constraints.
+
+    Defensive: a permissive form would let a typo'd string slip into
+    a numeric parameter and silently break evaluation; we'd rather
+    fail loud at the override write than silently at sweep time.
+    """
+    type_ = declared.get("type")
+    if type_ == "number":
+        if isinstance(value, bool):
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"),
+                type_=type_,
+                detail="boolean is not a number",
+            )
+        try:
+            num = float(value)  # accepts int/float/numeric string
+        except (TypeError, ValueError) as exc:
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"), type_=type_, detail=str(exc)
+            ) from exc
+        return _enforce_min_max(num, declared)
+    if type_ == "integer":
+        if isinstance(value, bool):
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"),
+                type_=type_,
+                detail="boolean is not an integer",
+            )
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"), type_=type_, detail=str(exc)
+            ) from exc
+        return int(_enforce_min_max(num, declared))
+    if type_ == "boolean":
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.lower() in ("true", "false"):
+            return value.lower() == "true"
+        raise _ParamValueCoercionError(
+            param_name=declared.get("name", "?"),
+            type_="boolean",
+            detail=f"expected boolean, got {type(value).__name__}",
+        )
+    if type_ == "string":
+        if not isinstance(value, str):
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"),
+                type_="string",
+                detail=f"expected string, got {type(value).__name__}",
+            )
+        return value
+    if type_ == "enum":
+        values = declared.get("values") or []
+        if value not in values:
+            raise _ParamValueCoercionError(
+                param_name=declared.get("name", "?"),
+                type_="enum",
+                detail=f"value {value!r} not in {values}",
+            )
+        return value
+    # Unknown declared type — should never happen because the loader
+    # enforces _PARAM_TYPES; pass-through defensively.
+    return value
+
+
+def _enforce_min_max(num: float, declared: dict[str, Any]) -> float:
+    lo, hi = declared.get("min"), declared.get("max")
+    if lo is not None and num < lo:
+        raise _ParamValueCoercionError(
+            param_name=declared.get("name", "?"),
+            type_=str(declared.get("type")),
+            detail=f"value {num} is below min {lo}",
+        )
+    if hi is not None and num > hi:
+        raise _ParamValueCoercionError(
+            param_name=declared.get("name", "?"),
+            type_=str(declared.get("type")),
+            detail=f"value {num} is above max {hi}",
+        )
+    return num
 
 
 def get_decision_trees_author_service(

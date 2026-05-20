@@ -127,6 +127,24 @@ class Recommendation(Base, TimestampedMixin):
     evaluation_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
 
+class TreeParameterOverride(Base, TimestampedMixin):
+    """`tenant_<id>.tree_parameter_overrides` — per-tenant overrides
+    on a decision-tree parameter declared by the tree author (PR-C).
+
+    The engine layers these on top of the tree's declared defaults at
+    evaluation time (see ``engine._build_params``). Override names
+    that don't correspond to a declared parameter in the current tree
+    version are silently dropped — defends against stale overrides
+    referring to a parameter a tree author later renamed or removed.
+    """
+
+    __tablename__ = "tree_parameter_overrides"
+
+    tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    param_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[Any] = mapped_column(JSONB, nullable=False)
+
+
 class RecommendationHistoryEntry(Base):
     """`tenant_<id>.recommendations_history` — state-transition log."""
 

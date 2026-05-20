@@ -197,3 +197,56 @@ class DecisionTreeDryRunResponse(BaseModel):
     path: list[dict[str, Any]]
     evaluation_snapshot: dict[str, Any]
     error: str | None
+
+
+# =====================================================================
+# Tree parameter overrides (PR-C)
+# =====================================================================
+
+
+class TreeParameterDeclaration(BaseModel):
+    """One declared parameter from a tree's current published version.
+
+    The settings UI renders one form row per declaration, prefilling
+    with the current override value (if any), otherwise the declared
+    default.
+    """
+
+    type: str
+    default: Any
+    description: str | None = None
+    min: float | None = None
+    max: float | None = None
+    values: list[Any] | None = None  # only set for enum types
+
+
+class TreeParameterOverridesResponse(BaseModel):
+    """GET /api/v1/decision-trees/{code}/parameter-overrides response.
+
+    Bundles the declared shape AND the current override values so the
+    UI renders from a single payload.
+    """
+
+    code: str
+    tree_id: UUID
+    declarations: dict[str, TreeParameterDeclaration]
+    overrides: dict[str, Any]
+
+
+class TreeParameterOverrideUpsertRequest(BaseModel):
+    """PUT /api/v1/decision-trees/{code}/parameter-overrides/{param_name}.
+
+    ``value`` is intentionally permissive at the schema layer; the
+    service coerces against the declared type and returns 400 on
+    mismatch / range violation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: Any
+
+
+class TreeParameterOverrideResponse(BaseModel):
+    code: str
+    param_name: str
+    value: Any
