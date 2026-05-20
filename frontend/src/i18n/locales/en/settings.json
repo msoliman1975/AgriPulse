@@ -5,6 +5,8 @@
     "notifications": "Notifications",
     "integrations": "Integrations",
     "users": "Users",
+    "workers": "Workers",
+    "equipment": "Equipment",
     "rules": "Rules & thresholds",
     "decisionTrees": "Decision trees"
   },

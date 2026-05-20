@@ -1,0 +1,59 @@
+{
+  "pickFarm": "المزرعة",
+  "noFarm": "اختر مزرعة…",
+  "showArchived": "عرض المؤرشف",
+  "loadFailed": "تعذّر التحميل — حاول مرة أخرى.",
+  "createFailed": "تعذّر الإنشاء — راجع البيانات.",
+  "workers": {
+    "title": "العاملون",
+    "subtitle": "الأشخاص الذين يمكن تعيينهم لمهمة في الخطة.",
+    "heading": "الفريق",
+    "add": "إضافة عامل",
+    "namePlaceholder": "الاسم الكامل",
+    "phonePlaceholder": "+20 1xx xxx xxxx",
+    "empty": "اختر مزرعة لعرض العاملين بها.",
+    "emptyList": "لا يوجد عاملون بعد. أضف أحدهم للبدء."
+  },
+  "equipment": {
+    "title": "المعدات",
+    "subtitle": "الآلات التي يمكن تعيينها لمهمة في الخطة.",
+    "heading": "المعدات",
+    "add": "إضافة معدة",
+    "namePlaceholder": "مثال: جرار رقم ٢",
+    "empty": "اختر مزرعة لعرض معداتها.",
+    "emptyList": "لا توجد معدات بعد. أضف واحدة للبدء."
+  },
+  "col": {
+    "name": "الاسم",
+    "role": "الدور",
+    "phone": "الهاتف",
+    "type": "النوع",
+    "status": "الحالة"
+  },
+  "role": {
+    "agronomist": "مهندس زراعي",
+    "operator": "مشغّل",
+    "scout": "مراقب",
+    "field_worker": "عامل ميداني",
+    "manager": "مدير"
+  },
+  "equipmentType": {
+    "tractor": "جرار",
+    "sprayer": "رشاش",
+    "irrigation_pump": "مضخة ري",
+    "harvester": "حصّادة",
+    "other": "أخرى"
+  },
+  "status": {
+    "active": "نشط",
+    "archived": "مؤرشف"
+  },
+  "action": {
+    "create": "إنشاء",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "archive": "أرشفة",
+    "restore": "استعادة"
+  }
+}
