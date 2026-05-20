@@ -26,9 +26,16 @@ Table shape:
 
 PK = (tree_id, param_name). One row per override; upserts replace.
 
-Revision ID: 0030
-Revises: 0029
+Revision ID: 0032
+Revises: 0031
 Create Date: 2026-05-19
+
+History note (Stage 2 repair): this migration originally landed on
+PR-C (#160) as revision `0030`, colliding with the board session's
+`0030_plan_activities_board_columns` that merged just before us.
+The Stage 2 PR renumbers us to `0032` (behind the board chain at
+0030 → 0031). Safe to do because the collision would have errored
+on `alembic upgrade head` — no env ran past it.
 """
 
 from __future__ import annotations
@@ -39,8 +46,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0030"
-down_revision: str | Sequence[str] | None = "0029"
+revision: str = "0032"
+down_revision: str | Sequence[str] | None = "0031"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

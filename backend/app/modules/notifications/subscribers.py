@@ -105,18 +105,36 @@ def _load_block_and_farm(
 
 
 def _load_default_rule(session: Session, rule_code: str) -> dict[str, Any] | None:
-    row = (
-        session.execute(
-            text(
-                "SELECT name_en, name_ar FROM public.default_rules "
-                "WHERE code = :c AND deleted_at IS NULL"
-            ),
-            {"c": rule_code},
-        )
-        .mappings()
-        .first()
-    )
-    return dict(row) if row is not None else None
+    """Resolve a display name for an alert's `rule_code`.
+
+    Stage 2 of the rules sunset dropped `public.default_rules`. After
+    that drop:
+      * Tree-sourced alerts have `rule_code = tree:<tree_code>:<leaf>`;
+        we look the tree up in `public.decision_trees` by code and
+        return its `name_en`/`name_ar` if found.
+      * Legacy rule-sourced alerts whose `rule_code` lacks the `tree:`
+        prefix (rows that pre-date PR-F) — there's no catalog table to
+        look up anymore; we return `None` and the renderer falls back
+        to the alert's `diagnosis_en` as the title.
+    """
+    if rule_code.startswith("tree:"):
+        # Format: "tree:<tree_code>:<leaf_node_id>".
+        parts = rule_code.split(":", 2)
+        if len(parts) >= 2:
+            tree_code = parts[1]
+            row = (
+                session.execute(
+                    text(
+                        "SELECT name_en, name_ar FROM public.decision_trees "
+                        "WHERE code = :c AND deleted_at IS NULL"
+                    ),
+                    {"c": tree_code},
+                )
+                .mappings()
+                .first()
+            )
+            return dict(row) if row is not None else None
+    return None
 
 
 def _load_recipients(session: Session, *, farm_id: UUID, tenant_id: UUID) -> list[dict[str, Any]]:

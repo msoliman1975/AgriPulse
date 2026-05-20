@@ -22,17 +22,6 @@ class AlertNotFoundError(APIError):
         )
 
 
-class RuleNotFoundError(APIError):
-    def __init__(self, rule_code: str) -> None:
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            title="Rule not found",
-            detail=f"No active default rule with code {rule_code!r}.",
-            type_=f"{_TYPE_BASE}/rule-not-found",
-            extras={"rule_code": rule_code},
-        )
-
-
 class InvalidAlertTransitionError(APIError):
     """Caller asked to acknowledge / resolve / snooze an alert in a state
     that doesn't allow it (e.g. acknowledging a resolved alert)."""
