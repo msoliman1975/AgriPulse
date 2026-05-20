@@ -96,6 +96,10 @@ class PlansService(Protocol):
 
     async def list_activities(self, *, plan_id: UUID) -> tuple[dict[str, Any], ...]: ...
 
+    async def get_activity(
+        self, *, activity_id: UUID
+    ) -> dict[str, Any] | None: ...
+
     async def update_activity(
         self,
         *,
@@ -307,6 +311,18 @@ class PlansServiceImpl:
         if await self._repo.get_plan(plan_id=plan_id) is None:
             raise PlanNotFoundError(plan_id)
         return await self._repo.list_activities(plan_id=plan_id)
+
+    async def get_activity(
+        self, *, activity_id: UUID
+    ) -> dict[str, Any] | None:
+        """Fetch a single activity row by id, or None if missing.
+
+        Used by adjacent modules (resources, recommendations) to gate
+        on the activity's `farm_id` before performing per-farm RBAC
+        checks. Does not raise — returns None so the caller can pick
+        the right error type.
+        """
+        return await self._repo.get_activity(activity_id=activity_id)
 
     async def update_activity(
         self,

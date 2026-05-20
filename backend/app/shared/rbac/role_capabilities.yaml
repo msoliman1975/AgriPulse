@@ -99,6 +99,8 @@ roles:
       - plan.read
       - plan.manage
       - plan_activity.complete
+      - resource.read
+      - resource.manage
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
@@ -171,6 +173,8 @@ roles:
       - plan.read
       - plan.manage
       - plan_activity.complete
+      - resource.read
+      - resource.manage
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
@@ -238,6 +242,8 @@ roles:
       - plan.read
       - plan.manage
       - plan_activity.complete
+      - resource.read
+      - resource.manage
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
@@ -273,6 +279,7 @@ roles:
       - alert_rule.read
       - plan.read
       - plan_activity.complete
+      - resource.read
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
@@ -303,6 +310,7 @@ roles:
       - alert.acknowledge
       - plan.read
       - plan_activity.complete
+      - resource.read
       - irrigation.schedule.read
       - recommendation.read
       - irrigation.record
@@ -326,6 +334,7 @@ roles:
       - signal.record
       - alert.read
       - plan.read
+      - resource.read
       - irrigation.schedule.read
       - recommendation.read
       - scouting.record
@@ -345,6 +354,7 @@ roles:
       - signal.read
       - alert.read
       - plan.read
+      - resource.read
       - irrigation.schedule.read
       - recommendation.read
       - analytics.read
