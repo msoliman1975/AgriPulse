@@ -28,8 +28,10 @@ export interface Plan {
 
 export interface PlanActivity {
   id: string;
-  plan_id: string;
+  plan_id: string | null;
+  farm_id: string;
   block_id: string;
+  recommendation_id: string | null;
   activity_type: ActivityType;
   scheduled_date: string;
   duration_days: number;

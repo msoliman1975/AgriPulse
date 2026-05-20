@@ -266,6 +266,7 @@ class PlansServiceImpl:
         activity = await self._repo.insert_activity(
             activity_id=activity_id,
             plan_id=plan_id,
+            farm_id=plan["farm_id"],
             block_id=block_id,
             activity_type=activity_type,
             scheduled_date=scheduled_date,
