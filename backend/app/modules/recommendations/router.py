@@ -18,6 +18,7 @@ RBAC:
 
 from __future__ import annotations
 
+from datetime import date as date_type
 from typing import Any
 from uuid import UUID
 
@@ -40,6 +41,7 @@ from app.modules.recommendations.schemas import (
     DecisionTreeVersionResponse,
     EvaluateBlockResponse,
     RecommendationResponse,
+    RecommendationScheduleRequest,
     RecommendationTransitionRequest,
     TreeParameterOverrideResponse,
     TreeParameterOverridesResponse,
@@ -189,6 +191,106 @@ async def transition_recommendation(
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
+
+
+# Map decision-tree action_type → board ActivityType. action_type comes
+# from the tree YAML (loader.py validates it as a free-form string), so
+# unknown values fall through to `observation` — a no-op default that
+# never misleads the field operator.
+_ACTION_TO_ACTIVITY: dict[str, str] = {
+    "irrigate": "irrigation",
+    "fertilize": "fertilizing",
+    "spray": "spraying",
+    "prune": "pruning",
+    "scout": "observation",
+    "inspect": "observation",
+    "harvest_window": "harvesting",
+}
+
+
+@router.post(
+    "/recommendations/{recommendation_id}/schedule",
+    response_model=dict,  # mirrors plans.ActivityResponse without forcing the import
+    status_code=status.HTTP_201_CREATED,
+    summary="Schedule a board activity from this recommendation and apply it.",
+)
+async def schedule_recommendation(
+    recommendation_id: UUID,
+    payload: RecommendationScheduleRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: RecommendationsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """One-shot drag-rec-to-cell flow (PR-5).
+
+    Creates a `plan_activities` row with `recommendation_id` set to the
+    source rec, then transitions the rec to `applied` in the same
+    tenant-session (single DB transaction). Defaults derived from the
+    rec — caller can override `block_id`, `activity_type`, `scheduled_date`.
+    """
+    schema = _ensure_tenant(context)
+    rec = await service.get_recommendation(recommendation_id=recommendation_id)
+    if rec is None:
+        raise RecommendationNotFoundError(recommendation_id)
+
+    farm_id = rec["farm_id"]
+    if not has_capability(context, "plan.manage", farm_id=farm_id):
+        raise RecommendationNotFoundError(recommendation_id)
+    if not has_capability(context, "recommendation.act", farm_id=farm_id):
+        raise RecommendationNotFoundError(recommendation_id)
+    if rec["state"] not in ("open", "deferred"):
+        from app.modules.recommendations.errors import (
+            InvalidRecommendationTransitionError,
+        )
+
+        raise InvalidRecommendationTransitionError(
+            current_state=rec["state"], action="schedule"
+        )
+
+    activity_type = payload.activity_type or _ACTION_TO_ACTIVITY.get(
+        rec["action_type"], "observation"
+    )
+    block_id = payload.block_id or rec["block_id"]
+    scheduled_date = (
+        payload.scheduled_date.date()
+        if payload.scheduled_date is not None
+        else date_type.today()
+    )
+
+    # Local import — plans.service depends on plans.models which references
+    # recommendations.models for FK registration. Importing at module top
+    # would form a circular registration risk during model finalize.
+    from app.modules.plans.service import get_plans_service
+
+    plans = get_plans_service(tenant_session=tenant_session)
+    activity = await plans.create_flat_activity(
+        farm_id=farm_id,
+        block_id=block_id,
+        activity_type=activity_type,
+        scheduled_date=scheduled_date,
+        duration_days=1,
+        start_time=None,
+        product_name=None,
+        dosage=None,
+        notes=payload.notes,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        recommendation_id=recommendation_id,
+    )
+
+    await service.transition_recommendation(
+        recommendation_id=recommendation_id,
+        action="apply",
+        dismissal_reason=None,
+        deferred_until=None,
+        outcome_notes=(
+            f"Scheduled as plan activity {activity['id']} for {scheduled_date.isoformat()}."
+        ),
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+    return activity
 
 
 # ---------- Decision-tree catalog -----------------------------------------

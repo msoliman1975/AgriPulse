@@ -36,8 +36,12 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0030"
-down_revision: str | None = "0029"
+# Renumbered to 0030a after the rules-session also shipped a 0030
+# (tree_parameter_overrides). The two migrations were authored in
+# parallel; sequencing this one *after* lets alembic pick a single
+# linear chain instead of fighting over revision-id "0030".
+revision: str = "0030a"
+down_revision: str | None = "0030"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

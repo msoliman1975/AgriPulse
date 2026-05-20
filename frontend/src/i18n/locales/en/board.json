@@ -62,6 +62,22 @@
     "skipExisting": "Skip cells that already have this activity",
     "create": "Create {{count}}"
   },
+  "rail": {
+    "title": "Suggested actions",
+    "empty": "No open recommendations.",
+    "loadFailed": "Couldn't load recommendations.",
+    "dragHint": "Drag onto a cell to schedule"
+  },
+  "recAction": {
+    "irrigate": "Irrigate",
+    "fertilize": "Fertilize",
+    "spray": "Spray",
+    "scout": "Scout",
+    "harvest_window": "Harvest window",
+    "prune": "Prune",
+    "no_action": "No action",
+    "other": "Other"
+  },
   "mobile": {
     "add": "+ Add",
     "noneScheduled": "Nothing scheduled."

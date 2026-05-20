@@ -14,9 +14,11 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
 import { useBoard } from "@/queries/board";
 
+import { useScheduleRecommendation } from "@/queries/recScheduling";
+
 import { ActivityChip } from "../components/ActivityChip";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog";
-import { BoardCell } from "../components/BoardCell";
+import { BoardCell, type RecDropPayload } from "../components/BoardCell";
 import { BoardFilters } from "../components/BoardFilters";
 import { BoardMobileList } from "../components/BoardMobileList";
 import {
@@ -24,6 +26,7 @@ import {
   type SelectedCell,
 } from "../components/BulkAddDialog";
 import { QuickAddDialog } from "../components/QuickAddDialog";
+import { RecommendationsRail } from "../components/RecommendationsRail";
 
 const DEFAULT_WEEKS = 8;
 
@@ -66,6 +69,8 @@ export function BoardPage(): ReactNode {
     weekStart: string;
   } | null>(null);
   const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
+
+  const scheduleRec = useScheduleRecommendation(farmId ?? null);
 
   const weekStarts = useMemo(
     () =>
@@ -237,27 +242,45 @@ export function BoardPage(): ReactNode {
           canManage={canManage}
         />
       ) : (
-        <BoardGrid
-          blocks={visibleBlocks}
-          weekStarts={weekStarts}
-          grouped={grouped}
-          canManage={canManage}
-          selection={bulkSelection}
-          onCellClick={(blockId, weekStart, modifiers) => {
-            if (!canManage) return;
-            if (modifiers.shift) {
-              toggleCellSelection(blockId, weekStart);
-            } else if (bulkSelection.size > 0) {
-              // Plain click while a bulk selection is active: clear it
-              // first, then treat as a new quick-add.
-              clearBulk();
-              setQuickAdd({ blockId, weekStart });
-            } else {
-              setQuickAdd({ blockId, weekStart });
-            }
-          }}
-          onChipClick={(activity) => setOpenActivity(activity)}
-        />
+        <div className="flex gap-4">
+          <div className="min-w-0 flex-1">
+            <BoardGrid
+              blocks={visibleBlocks}
+              weekStarts={weekStarts}
+              grouped={grouped}
+              canManage={canManage}
+              selection={bulkSelection}
+              onCellClick={(blockId, weekStart, modifiers) => {
+                if (!canManage) return;
+                if (modifiers.shift) {
+                  toggleCellSelection(blockId, weekStart);
+                } else if (bulkSelection.size > 0) {
+                  // Plain click while a bulk selection is active: clear it
+                  // first, then treat as a new quick-add.
+                  clearBulk();
+                  setQuickAdd({ blockId, weekStart });
+                } else {
+                  setQuickAdd({ blockId, weekStart });
+                }
+              }}
+              onChipClick={(activity) => setOpenActivity(activity)}
+              onRecDrop={(blockId, weekStart, payload) => {
+                if (!canManage) return;
+                // The cell carries the week's Monday; the schedule
+                // endpoint accepts a per-day scheduled_date so we land
+                // on Monday by default. Operators can drag the resulting
+                // chip later if they need a different day.
+                scheduleRec.mutate({
+                  recommendationId: payload.recommendationId,
+                  payload: { scheduled_date: weekStart, block_id: blockId },
+                });
+              }}
+            />
+          </div>
+          {canManage ? (
+            <RecommendationsRail farmId={farmId} draggable />
+          ) : null}
+        </div>
       )}
 
       {quickAdd ? (
@@ -344,6 +367,11 @@ interface BoardGridProps {
     modifiers: { shift: boolean },
   ) => void;
   onChipClick: (a: BoardActivity) => void;
+  onRecDrop?: (
+    blockId: string,
+    weekStart: string,
+    payload: RecDropPayload,
+  ) => void;
 }
 
 function BoardGrid({
@@ -354,6 +382,7 @@ function BoardGrid({
   selection,
   onCellClick,
   onChipClick,
+  onRecDrop,
 }: BoardGridProps): ReactNode {
   const { t } = useTranslation("board");
   if (blocks.length === 0) {
@@ -404,6 +433,11 @@ function BoardGrid({
                     selected={isSelected}
                     onClick={(modifiers) =>
                       onCellClick(block.id, ws, modifiers)
+                    }
+                    onRecDrop={
+                      onRecDrop
+                        ? (payload) => onRecDrop(block.id, ws, payload)
+                        : undefined
                     }
                   >
                     {cellActivities.map((a) => (

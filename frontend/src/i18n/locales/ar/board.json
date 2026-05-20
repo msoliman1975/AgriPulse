@@ -62,6 +62,22 @@
     "skipExisting": "تخطّي الخلايا التي بها بالفعل هذه المهمة",
     "create": "إنشاء {{count}}"
   },
+  "rail": {
+    "title": "إجراءات مقترحة",
+    "empty": "لا توجد توصيات مفتوحة.",
+    "loadFailed": "تعذّر تحميل التوصيات.",
+    "dragHint": "اسحب إلى خلية للجدولة"
+  },
+  "recAction": {
+    "irrigate": "ري",
+    "fertilize": "تسميد",
+    "spray": "رش",
+    "scout": "مراقبة",
+    "harvest_window": "نافذة الحصاد",
+    "prune": "تقليم",
+    "no_action": "لا إجراء",
+    "other": "أخرى"
+  },
   "mobile": {
     "add": "+ إضافة",
     "noneScheduled": "لا شيء مجدول."
