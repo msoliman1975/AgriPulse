@@ -109,5 +109,43 @@
       "alert": "Alert",
       "noop": "No action"
     }
+  },
+  "editor": {
+    "header": {
+      "unsaved": "unsaved edits",
+      "saveDraft": "Save as new draft",
+      "saving": "Saving…",
+      "saveFailed": "Save failed — the YAML editor has more detail.",
+      "discardAll": "Discard all"
+    },
+    "panel": {
+      "nodeId": "Node id",
+      "role": "Role",
+      "edit": "Edit",
+      "done": "Done",
+      "selectHint": "Click a node on the canvas to see its details. Hold the right capability to edit fields inline.",
+      "pendingNote": "Unsaved edits on this node.",
+      "discardNode": "Discard this node",
+      "labels": {
+        "heading": "Labels",
+        "en": "Label (EN)",
+        "ar": "Label (AR)"
+      },
+      "outcome": {
+        "heading": "Outcome",
+        "kind": "Kind",
+        "actionType": "Action type",
+        "severity": "Severity",
+        "confidence": "Confidence",
+        "textEn": "Text (EN)",
+        "textAr": "Text (AR)"
+      },
+      "condition": {
+        "heading": "Condition",
+        "deferredNote": "Condition-tree editing isn't surfaced visually yet — use the YAML editor for now.",
+        "onMatch": "on_match →",
+        "onMiss": "on_miss →"
+      }
+    }
   }
 }

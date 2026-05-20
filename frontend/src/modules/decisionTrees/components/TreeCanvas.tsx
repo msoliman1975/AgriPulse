@@ -19,9 +19,21 @@ const { NODE_WIDTH, NODE_HEIGHT } = LAYOUT_CONSTANTS;
 
 interface TreeCanvasProps {
   layout: LayoutResult;
+  // PR-D2: selection + click handler. Both optional so D1's read-only
+  // call sites keep working without changes.
+  selectedNodeId?: string | null;
+  onSelectNode?: (nodeId: string | null) => void;
+  // PR-D2: ids that have unsaved edits — rendered with a small dot
+  // overlay so the author sees what's pending.
+  dirtyNodeIds?: ReadonlySet<string>;
 }
 
-export function TreeCanvas({ layout }: TreeCanvasProps): JSX.Element {
+export function TreeCanvas({
+  layout,
+  selectedNodeId = null,
+  onSelectNode,
+  dirtyNodeIds,
+}: TreeCanvasProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
 
   if (layout.nodes.length === 0) {
@@ -41,13 +53,23 @@ export function TreeCanvas({ layout }: TreeCanvasProps): JSX.Element {
         height={layout.height}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         className="block"
+        // Click on empty canvas clears selection so the details panel
+        // collapses. Bubble guard inside NodeRect stops node clicks
+        // from reaching this handler.
+        onClick={onSelectNode ? () => onSelectNode(null) : undefined}
       >
         {/* Edges drawn first so nodes sit on top. */}
         {layout.edges.map((edge) => (
           <EdgePath key={`${edge.from}->${edge.to}-${edge.branch}`} edge={edge} t={t} />
         ))}
         {layout.nodes.map((node) => (
-          <NodeRect key={node.id} node={node} />
+          <NodeRect
+            key={node.id}
+            node={node}
+            selected={selectedNodeId === node.id}
+            dirty={dirtyNodeIds?.has(node.id) ?? false}
+            onClick={onSelectNode}
+          />
         ))}
       </svg>
     </div>
@@ -114,14 +136,43 @@ function EdgePath({ edge, t }: EdgePathProps): JSX.Element {
 
 interface NodeRectProps {
   node: PositionedNode;
+  selected: boolean;
+  dirty: boolean;
+  onClick?: (nodeId: string | null) => void;
 }
 
-function NodeRect({ node }: NodeRectProps): JSX.Element {
+function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Element {
   const { x, y, role, data } = node;
   const palette = paletteFor(role);
+  const isInteractive = onClick !== undefined;
 
   return (
-    <g>
+    <g
+      onClick={
+        onClick
+          ? (event) => {
+              event.stopPropagation();
+              onClick(node.id);
+            }
+          : undefined
+      }
+      style={{ cursor: isInteractive ? "pointer" : "default" }}
+    >
+      {/* Selection halo — drawn behind the node so it reads as a glow. */}
+      {selected ? (
+        <rect
+          x={x - 4}
+          y={y - 4}
+          width={NODE_WIDTH + 8}
+          height={NODE_HEIGHT + 8}
+          rx={12}
+          ry={12}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth={2.5}
+          strokeDasharray="6 3"
+        />
+      ) : null}
       <rect
         x={x}
         y={y}
@@ -152,6 +203,10 @@ function NodeRect({ node }: NodeRectProps): JSX.Element {
       ) : (
         <LeafBody x={x} y={y} role={role} data={data} />
       )}
+      {/* Dirty indicator — small blue dot, lower-right corner. */}
+      {dirty ? (
+        <circle cx={x + NODE_WIDTH - 12} cy={y + NODE_HEIGHT - 12} r={4} fill="#2563eb" />
+      ) : null}
     </g>
   );
 }
