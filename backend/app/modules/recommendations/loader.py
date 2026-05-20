@@ -255,6 +255,28 @@ def _validate_reachability(
                     path=source_path,
                     detail=f"leaf {nid!r} 'outcome.action_type' must be a string",
                 )
+            # Leaf kind discriminator (PR-E): defaults to recommendation
+            # for backward compat; "alert" requires a severity in the
+            # alerts module's vocabulary.
+            kind = outcome.get("kind", "recommendation")
+            if kind not in ("recommendation", "alert"):
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=(
+                        f"leaf {nid!r} 'outcome.kind' must be 'alert' "
+                        f"or 'recommendation', got {kind!r}"
+                    ),
+                )
+            if kind == "alert":
+                severity = outcome.get("severity")
+                if severity not in ("info", "warning", "critical"):
+                    raise DecisionTreeParseError(
+                        path=source_path,
+                        detail=(
+                            f"alert leaf {nid!r} requires 'severity' in "
+                            f"info/warning/critical, got {severity!r}"
+                        ),
+                    )
             continue
         # Decision node — both branches must point at known nodes.
         for branch in ("on_match", "on_miss"):

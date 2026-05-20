@@ -180,6 +180,24 @@ class RecommendationsServiceImpl:
                 # tomorrow when signals change.
                 continue
 
+            # PR-E: dispatch on leaf kind. "alert" leaves write to
+            # tenant.alerts via the alerts repo (rule_code synthesised
+            # from tree + leaf id so the existing partial-UNIQUE
+            # dedup keeps working); "recommendation" leaves take the
+            # existing path below.
+            if result.outcome.kind == "alert":
+                opened = await self._open_alert_from_tree(
+                    block_id=block_id,
+                    farm_id=farm_id,
+                    tree=tree,
+                    result=result,
+                    actor_user_id=actor_user_id,
+                    tenant_schema=tenant_schema,
+                )
+                if opened:
+                    recommendations_opened += 1  # counter is generic; rename in PR-F
+                continue
+
             recommendation_id = uuid7()
             valid_until: datetime | None = None
             if result.outcome.valid_for_hours is not None:
@@ -264,6 +282,91 @@ class RecommendationsServiceImpl:
             "trees_skipped_crop": trees_skipped_crop,
             "recommendations_opened": recommendations_opened,
         }
+
+    async def _open_alert_from_tree(
+        self,
+        *,
+        block_id: UUID,
+        farm_id: UUID,
+        tree: dict[str, Any],
+        result: Any,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> bool:
+        """Open an alert produced by a tree-leaf with ``kind: alert``.
+
+        PR-E: trees can now emit alerts as well as recommendations.
+        We synthesise a ``rule_code`` of the form
+        ``f"tree:{tree_code}:{leaf_node_id}"`` so the existing
+        ``alerts`` partial-UNIQUE on ``(block_id, rule_code)`` keeps
+        dedup semantics intact across re-evaluations. PR-F retires
+        rule-sourced alerts entirely, at which point all rows in
+        ``tenant.alerts`` carry tree-shaped rule_codes.
+
+        Returns True iff a row was newly inserted (the partial UNIQUE
+        blocked a duplicate while a prior alert is still
+        open/acknowledged/snoozed).
+        """
+        from app.modules.alerts.events import AlertOpenedV1
+        from app.modules.alerts.repository import AlertsRepository
+
+        outcome = result.outcome
+        leaf_node_id = outcome.leaf_node_id or "leaf"
+        rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
+        alert_id = uuid7()
+        alert_repo = AlertsRepository(
+            tenant_session=self._tenant, public_session=self._public
+        )
+        inserted = await alert_repo.insert_alert(
+            alert_id=alert_id,
+            block_id=block_id,
+            rule_code=rule_code,
+            severity=outcome.severity,
+            diagnosis_en=outcome.text_en,
+            diagnosis_ar=outcome.text_ar,
+            prescription_en=None,
+            prescription_ar=None,
+            prescription_activity_id=None,
+            signal_snapshot=result.evaluation_snapshot,
+            actor_user_id=actor_user_id,
+        )
+        if not inserted:
+            return False
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="alerts.alert_opened",
+            actor_user_id=actor_user_id,
+            actor_kind="system" if actor_user_id is None else "user",
+            subject_kind="alert",
+            subject_id=alert_id,
+            farm_id=farm_id,
+            details={
+                "block_id": str(block_id),
+                "rule_code": rule_code,
+                "severity": outcome.severity,
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "leaf_node_id": leaf_node_id,
+            },
+        )
+        self._bus.publish(
+            AlertOpenedV1(
+                alert_id=alert_id,
+                block_id=block_id,
+                rule_code=rule_code,
+                severity=outcome.severity,
+                created_at=datetime.now(UTC),
+                tenant_schema=tenant_schema,
+                farm_id=farm_id,
+                diagnosis_en=outcome.text_en,
+                diagnosis_ar=outcome.text_ar,
+                prescription_en=None,
+                prescription_ar=None,
+                signal_snapshot=result.evaluation_snapshot,
+            )
+        )
+        return True
 
     # ---- Reads --------------------------------------------------------
 
