@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,9 @@ from app.modules.recommendations.schemas import (
     EvaluateBlockResponse,
     RecommendationResponse,
     RecommendationTransitionRequest,
+    TreeParameterOverrideResponse,
+    TreeParameterOverridesResponse,
+    TreeParameterOverrideUpsertRequest,
 )
 
 # Importing the private authoring errors to map them at the route layer is
@@ -54,6 +57,8 @@ from app.modules.recommendations.service import (
     _DecisionTreeNoPublishedVersionError,
     _DecisionTreeNotFoundError,
     _DecisionTreeVersionNotFoundError,
+    _ParamNameUnknownError,
+    _ParamValueCoercionError,
     get_decision_trees_author_service,
     get_recommendations_service,
 )
@@ -474,3 +479,117 @@ async def dry_run_decision_tree(
         if mapped is not None:
             raise mapped from exc
         raise
+
+
+# =====================================================================
+# Tree parameter overrides (PR-C)
+# =====================================================================
+
+
+def _map_param_override_error(exc: Exception) -> Exception | None:
+    """Map PR-C override errors to APIError. Mirrors the authoring
+    error mapper pattern so both can be raised from one try/except."""
+    from app.core.errors import APIError
+
+    if isinstance(exc, _ParamNameUnknownError):
+        return APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Unknown tree parameter",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/recommendations/param-unknown",
+            extras={"code": exc.code, "param_name": exc.param_name},
+        )
+    if isinstance(exc, _ParamValueCoercionError):
+        return APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid parameter value",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/recommendations/param-bad-value",
+            extras={"param_name": exc.param_name, "type": exc.type_},
+        )
+    return None
+
+
+@router.get(
+    "/decision-trees/{code}/parameter-overrides",
+    response_model=TreeParameterOverridesResponse,
+    summary="Read declarations + current overrides for one tree.",
+)
+async def get_tree_parameter_overrides(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    assert context.tenant_id is not None
+    result = await service.list_tree_param_overrides(
+        code=code, tenant_id=context.tenant_id
+    )
+    if not result.get("found"):
+        mapped = _map_authoring_error(_DecisionTreeNotFoundError(code))
+        assert mapped is not None
+        raise mapped
+    return {
+        "code": result["code"],
+        "tree_id": result["tree_id"],
+        "declarations": result["declarations"],
+        "overrides": result["overrides"],
+    }
+
+
+@router.put(
+    "/decision-trees/{code}/parameter-overrides/{param_name}",
+    response_model=TreeParameterOverrideResponse,
+    summary="Set or replace one parameter override for the calling tenant.",
+)
+async def upsert_tree_parameter_override(
+    code: str,
+    param_name: str,
+    payload: TreeParameterOverrideUpsertRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    assert context.tenant_id is not None
+    try:
+        return await service.upsert_tree_param_override(
+            code=code,
+            tenant_id=context.tenant_id,
+            param_name=param_name,
+            value=payload.value,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_param_override_error(exc) or _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/decision-trees/{code}/parameter-overrides/{param_name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    summary="Remove one override so the tree falls back to its default.",
+)
+async def delete_tree_parameter_override(
+    code: str,
+    param_name: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> Response:
+    _ensure_tenant(context)
+    assert context.tenant_id is not None
+    try:
+        await service.delete_tree_param_override(
+            code=code,
+            tenant_id=context.tenant_id,
+            param_name=param_name,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

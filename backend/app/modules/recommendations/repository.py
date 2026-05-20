@@ -18,6 +18,7 @@ from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -449,6 +450,98 @@ class RecommendationsRepository:
             )
         ).first()
         return row.id if row is not None else None
+
+    # ---- Tree parameter overrides (tenant) ----------------------------
+
+    async def list_param_overrides_for_tree(self, *, tree_id: UUID) -> dict[str, Any]:
+        """Fetch every override row for one tree as a flat
+        ``{param_name: value}`` dict — the shape the engine consumes
+        via ``evaluate_tree(param_overrides=...)``.
+
+        Returns ``{}`` when no overrides exist (the engine falls back
+        to declared defaults entirely).
+        """
+        rows = (
+            await self._tenant.execute(
+                text(
+                    "SELECT param_name, value FROM tree_parameter_overrides "
+                    "WHERE tree_id = :tid"
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        ).all()
+        return {r.param_name: r.value for r in rows}
+
+    async def list_all_param_overrides_visible_to_tenant(
+        self, *, tree_ids: tuple[UUID, ...]
+    ) -> dict[UUID, dict[str, Any]]:
+        """Bulk variant of `list_param_overrides_for_tree` for the
+        sweep: one query for every tree the sweep is about to walk,
+        grouped by tree_id. Returns an empty dict per tree if the
+        tenant has no overrides.
+        """
+        if not tree_ids:
+            return {}
+        rows = (
+            await self._tenant.execute(
+                text(
+                    "SELECT tree_id, param_name, value "
+                    "FROM tree_parameter_overrides "
+                    "WHERE tree_id = ANY(:tids)"
+                ).bindparams(
+                    bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))
+                ),
+                {"tids": list(tree_ids)},
+            )
+        ).all()
+        grouped: dict[UUID, dict[str, Any]] = {tid: {} for tid in tree_ids}
+        for r in rows:
+            grouped.setdefault(r.tree_id, {})[r.param_name] = r.value
+        return grouped
+
+    async def upsert_param_override(
+        self,
+        *,
+        tree_id: UUID,
+        param_name: str,
+        value: Any,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Set or replace one override. ON CONFLICT updates value +
+        updated_by/_at; created_by/_at stay from the first insert."""
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO tree_parameter_overrides
+                    (tree_id, param_name, value, created_by, updated_by)
+                VALUES (:tid, :n, CAST(:v AS jsonb), :actor, :actor)
+                ON CONFLICT (tree_id, param_name) DO UPDATE
+                SET value = EXCLUDED.value,
+                    updated_by = EXCLUDED.updated_by,
+                    updated_at = now()
+                """
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "tid": tree_id,
+                "n": param_name,
+                "v": _serialize_jsonb(value),
+                "actor": actor_user_id,
+            },
+        )
+
+    async def delete_param_override(self, *, tree_id: UUID, param_name: str) -> bool:
+        """Remove one override. Returns True if a row was deleted."""
+        result = await self._tenant.execute(
+            text(
+                "DELETE FROM tree_parameter_overrides "
+                "WHERE tree_id = :tid AND param_name = :n"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": tree_id, "n": param_name},
+        )
+        return bool(getattr(result, "rowcount", 0) or 0)
 
     # ---- Recommendations (tenant) -------------------------------------
 
