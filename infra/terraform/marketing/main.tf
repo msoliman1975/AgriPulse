@@ -48,9 +48,9 @@ resource "aws_s3_bucket_versioning" "site" {
 # Bucket policy is wired after the distribution exists so we can scope on its ARN.
 data "aws_iam_policy_document" "site_bucket" {
   statement {
-    sid     = "AllowCloudFrontOAC"
-    effect  = "Allow"
-    actions = ["s3:GetObject"]
+    sid       = "AllowCloudFrontOAC"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.site.arn}/*"]
 
     principals {
@@ -76,10 +76,10 @@ resource "aws_s3_bucket_policy" "site" {
 # --------------------------------------------------------------------------
 
 resource "aws_acm_certificate" "site" {
-  provider          = aws.us_east_1
-  domain_name       = var.root_domain
+  provider                  = aws.us_east_1
+  domain_name               = var.root_domain
   subject_alternative_names = [for h in var.site_hostnames : h if h != var.root_domain]
-  validation_method = "DNS"
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
