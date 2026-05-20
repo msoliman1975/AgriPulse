@@ -105,6 +105,36 @@ export async function transitionRecommendation(
   return data;
 }
 
+// Board PR-5: drag-rec-to-cell. Spawns a plan_activity with
+// recommendation_id set and transitions the rec to applied in one
+// server-side transaction.
+export interface ScheduleRecommendationPayload {
+  scheduled_date?: string | null; // ISO; defaults to today
+  activity_type?:
+    | "planting"
+    | "fertilizing"
+    | "spraying"
+    | "pruning"
+    | "harvesting"
+    | "irrigation"
+    | "soil_prep"
+    | "observation"
+    | null;
+  block_id?: string | null;
+  notes?: string | null;
+}
+
+export async function scheduleRecommendation(
+  recommendationId: string,
+  payload: ScheduleRecommendationPayload = {},
+): Promise<import("./plans").PlanActivity> {
+  const { data } = await apiClient.post<import("./plans").PlanActivity>(
+    `/v1/recommendations/${recommendationId}/schedule`,
+    payload,
+  );
+  return data;
+}
+
 export async function listDecisionTrees(): Promise<DecisionTree[]> {
   const { data } = await apiClient.get<DecisionTree[]>("/v1/decision-trees");
   return data;

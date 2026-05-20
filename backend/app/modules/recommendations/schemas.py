@@ -70,6 +70,35 @@ class RecommendationTransitionRequest(BaseModel):
     outcome_notes: str | None = Field(default=None, max_length=2000)
 
 
+class RecommendationScheduleRequest(BaseModel):
+    """POST /api/v1/recommendations/{id}/schedule body.
+
+    Spawns a board activity from this recommendation and transitions
+    the rec to ``applied`` in one transaction. The rec's ``block_id``
+    and inferred activity type are defaults the caller can override.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scheduled_date: datetime | None = None
+    """If omitted, scheduled = today. Time component is ignored."""
+    activity_type: (
+        Literal[
+            "planting",
+            "fertilizing",
+            "spraying",
+            "pruning",
+            "harvesting",
+            "irrigation",
+            "soil_prep",
+            "observation",
+        ]
+        | None
+    ) = None
+    block_id: UUID | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+
+
 class DecisionTreeResponse(BaseModel):
     """One row from `public.decision_trees` plus the current version."""
 
