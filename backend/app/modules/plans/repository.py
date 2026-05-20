@@ -122,7 +122,8 @@ class PlansRepository:
         self,
         *,
         activity_id: UUID,
-        plan_id: UUID,
+        plan_id: UUID | None,
+        farm_id: UUID,
         block_id: UUID,
         activity_type: str,
         scheduled_date: date_type,
@@ -132,11 +133,14 @@ class PlansRepository:
         dosage: str | None,
         notes: str | None,
         actor_user_id: UUID | None,
+        recommendation_id: UUID | None = None,
     ) -> dict[str, Any]:
         activity = PlanActivity(
             id=activity_id,
             plan_id=plan_id,
+            farm_id=farm_id,
             block_id=block_id,
+            recommendation_id=recommendation_id,
             activity_type=activity_type,
             scheduled_date=scheduled_date,
             duration_days=duration_days,
@@ -199,15 +203,14 @@ class PlansRepository:
                 await self._session.execute(
                     text(
                         """
-                        SELECT a.id, a.plan_id, a.block_id, a.activity_type,
+                        SELECT a.id, a.plan_id, a.farm_id, a.block_id,
+                               a.recommendation_id, a.activity_type,
                                a.scheduled_date, a.duration_days, a.start_time,
                                a.product_name, a.dosage,
                                a.notes, a.status, a.completed_at, a.completed_by,
                                a.created_at, a.updated_at
                         FROM plan_activities a
-                        JOIN vegetation_plans p ON p.id = a.plan_id
-                        WHERE p.farm_id = :farm_id
-                          AND p.deleted_at IS NULL
+                        WHERE a.farm_id = :farm_id
                           AND a.deleted_at IS NULL
                           AND a.scheduled_date >= :from_date
                           AND a.scheduled_date < :to_date
@@ -241,7 +244,9 @@ def _activity_to_dict(row: PlanActivity) -> dict[str, Any]:
     return {
         "id": row.id,
         "plan_id": row.plan_id,
+        "farm_id": row.farm_id,
         "block_id": row.block_id,
+        "recommendation_id": row.recommendation_id,
         "activity_type": row.activity_type,
         "scheduled_date": row.scheduled_date,
         "duration_days": row.duration_days,

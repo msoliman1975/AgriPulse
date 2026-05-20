@@ -14,6 +14,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
+# Force-register the Recommendation model so SQLAlchemy can resolve the
+# `recommendation_id` FK at metadata-finalize time, regardless of which
+# routers a given app/test imports.
+from app.modules.recommendations import models as _recommendations_models  # noqa: F401
+
 
 class VegetationPlan(Base, TimestampedMixin):
     """`tenant_<id>.vegetation_plans` — one per farm per season."""
@@ -36,22 +41,40 @@ class VegetationPlan(Base, TimestampedMixin):
 
 
 class PlanActivity(Base, TimestampedMixin):
-    """`tenant_<id>.plan_activities` — scheduled activity items."""
+    """`tenant_<id>.plan_activities` — scheduled activity items.
+
+    The board flow (PR-1+) creates activities directly on a farm + block
+    without an enclosing `vegetation_plans` row, so `plan_id` is
+    nullable. `farm_id` is denormalized from `blocks.farm_id` so the
+    board query can range-scan on (farm_id, scheduled_date) without an
+    extra join. `recommendation_id` is set when an activity is spawned
+    from a recommendation via drag-to-cell (PR-5).
+    """
 
     __tablename__ = "plan_activities"
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
-    plan_id: Mapped[UUID] = mapped_column(
+    plan_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("vegetation_plans.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
         nullable=False,
     )
     block_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("blocks.id", ondelete="RESTRICT"),
         nullable=False,
+    )
+    recommendation_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("recommendations.id", ondelete="SET NULL"),
+        nullable=True,
     )
     activity_type: Mapped[str] = mapped_column(Text, nullable=False)
     scheduled_date: Mapped[date_type] = mapped_column(Date, nullable=False)

@@ -60,7 +60,9 @@ export function NewActivityModal({
     const candidates: PlanActivity[] = selectedBlockIds.map((bid, i) => ({
       id: `__candidate-${i}`,
       plan_id: plan?.id ?? "preview",
+      farm_id: plan?.farm_id ?? "preview",
       block_id: bid,
+      recommendation_id: null,
       activity_type: type,
       scheduled_date: scheduledDate,
       duration_days: durationDays,
