@@ -100,6 +100,31 @@ class PlansService(Protocol):
         self, *, activity_id: UUID
     ) -> dict[str, Any] | None: ...
 
+    async def create_flat_activity(
+        self,
+        *,
+        farm_id: UUID,
+        block_id: UUID,
+        activity_type: str,
+        scheduled_date: date_type,
+        duration_days: int,
+        start_time: time | None,
+        product_name: str | None,
+        dosage: str | None,
+        notes: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        recommendation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def get_board(
+        self,
+        *,
+        farm_id: UUID,
+        week_start: date_type,
+        weeks: int,
+    ) -> dict[str, Any]: ...
+
     async def update_activity(
         self,
         *,
@@ -311,6 +336,148 @@ class PlansServiceImpl:
         if await self._repo.get_plan(plan_id=plan_id) is None:
             raise PlanNotFoundError(plan_id)
         return await self._repo.list_activities(plan_id=plan_id)
+
+    async def create_flat_activity(
+        self,
+        *,
+        farm_id: UUID,
+        block_id: UUID,
+        activity_type: str,
+        scheduled_date: date_type,
+        duration_days: int,
+        start_time: time | None,
+        product_name: str | None,
+        dosage: str | None,
+        notes: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        recommendation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Board-flow activity creation — no enclosing vegetation_plan.
+
+        Used by `POST /api/v1/farms/{farm_id}/activities` and (via
+        recommendation_id) by the rec-drag schedule flow in PR-5.
+        """
+        activity_id = uuid7()
+        activity = await self._repo.insert_activity(
+            activity_id=activity_id,
+            plan_id=None,
+            farm_id=farm_id,
+            block_id=block_id,
+            activity_type=activity_type,
+            scheduled_date=scheduled_date,
+            duration_days=duration_days,
+            start_time=start_time,
+            product_name=product_name,
+            dosage=dosage,
+            notes=notes,
+            actor_user_id=actor_user_id,
+            recommendation_id=recommendation_id,
+        )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="plans.activity_scheduled",
+            actor_user_id=actor_user_id,
+            subject_kind="plan_activity",
+            subject_id=activity_id,
+            farm_id=farm_id,
+            details={
+                "block_id": str(block_id),
+                "activity_type": activity_type,
+                "scheduled_date": scheduled_date.isoformat(),
+                "via": "board",
+            },
+        )
+        self._bus.publish(
+            PlanActivityScheduledV1(
+                activity_id=activity_id,
+                plan_id=None,
+                block_id=block_id,
+                activity_type=activity_type,
+                scheduled_date=scheduled_date,
+                actor_user_id=actor_user_id,
+            )
+        )
+        return activity
+
+    async def bulk_create_flat_activities(
+        self,
+        *,
+        farm_id: UUID,
+        cells: tuple[tuple[UUID, date_type], ...],
+        activity_type: str,
+        duration_days: int,
+        start_time: time | None,
+        notes: str | None,
+        skip_existing: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        """Create one activity per (block_id, scheduled_date) pair.
+
+        Returns ``{created: [...activities], skipped: [...{block_id, date}]}``.
+        When ``skip_existing`` is True, any (block, date, activity_type)
+        triple that already exists (excluding deleted_at-not-null rows)
+        is skipped. Failures in the middle do not abort earlier
+        successes — each row is its own savepoint.
+        """
+        created: list[dict[str, Any]] = []
+        skipped: list[dict[str, str]] = []
+        for block_id, scheduled_date in cells:
+            if skip_existing and await self._repo.activity_exists_on(
+                block_id=block_id,
+                scheduled_date=scheduled_date,
+                activity_type=activity_type,
+            ):
+                skipped.append(
+                    {
+                        "block_id": str(block_id),
+                        "scheduled_date": scheduled_date.isoformat(),
+                        "reason": "duplicate",
+                    }
+                )
+                continue
+            row = await self.create_flat_activity(
+                farm_id=farm_id,
+                block_id=block_id,
+                activity_type=activity_type,
+                scheduled_date=scheduled_date,
+                duration_days=duration_days,
+                start_time=start_time,
+                product_name=None,
+                dosage=None,
+                notes=notes,
+                actor_user_id=actor_user_id,
+                tenant_schema=tenant_schema,
+            )
+            created.append(row)
+        return {"created": created, "skipped": skipped}
+
+    async def get_board(
+        self,
+        *,
+        farm_id: UUID,
+        week_start: date_type,
+        weeks: int,
+    ) -> dict[str, Any]:
+        """Return the board grid: blocks + activities (with resources)
+        for a date window of ``weeks`` 7-day weeks starting on
+        ``week_start``.
+        """
+        from datetime import timedelta
+
+        to_date = week_start + timedelta(days=7 * weeks)
+        blocks = await self._repo.list_active_blocks(farm_id=farm_id)
+        activities = await self._repo.list_board_activities(
+            farm_id=farm_id, from_date=week_start, to_date=to_date
+        )
+        return {
+            "farm_id": str(farm_id),
+            "week_start": week_start.isoformat(),
+            "weeks": weeks,
+            "blocks": blocks,
+            "activities": activities,
+        }
 
     async def get_activity(
         self, *, activity_id: UUID

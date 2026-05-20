@@ -22,7 +22,7 @@ class PlanActivityScheduledV1(Event):
     event_name: ClassVar[str] = "plans.activity_scheduled.v1"
 
     activity_id: UUID
-    plan_id: UUID
+    plan_id: UUID | None
     block_id: UUID
     activity_type: str
     scheduled_date: date_type
@@ -33,7 +33,7 @@ class PlanActivityCompletedV1(Event):
     event_name: ClassVar[str] = "plans.activity_completed.v1"
 
     activity_id: UUID
-    plan_id: UUID
+    plan_id: UUID | None
     block_id: UUID
     actor_user_id: UUID | None = None
 
@@ -42,6 +42,6 @@ class PlanActivitySkippedV1(Event):
     event_name: ClassVar[str] = "plans.activity_skipped.v1"
 
     activity_id: UUID
-    plan_id: UUID
+    plan_id: UUID | None
     block_id: UUID
     actor_user_id: UUID | None = None

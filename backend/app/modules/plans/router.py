@@ -32,7 +32,11 @@ from app.modules.plans.schemas import (
     ActivityCreateRequest,
     ActivityResponse,
     ActivityUpdateRequest,
+    BoardResponse,
+    BulkActivityCreateRequest,
+    BulkActivityCreateResponse,
     CalendarResponse,
+    FlatActivityCreateRequest,
     PlanCreateRequest,
     PlanResponse,
     PlanUpdateRequest,
@@ -261,11 +265,11 @@ async def update_activity(
     from app.modules.plans.errors import ActivityNotFoundError
 
     schema = _ensure_tenant(context)
-    # Fetch first so we know the activity's plan and through it the farm.
-    activity = await service._repo.get_activity(activity_id=activity_id)
+    # Fetch first so we know the activity's farm (denormalized on the row).
+    activity = await service.get_activity(activity_id=activity_id)
     if activity is None:
         raise ActivityNotFoundError(activity_id)
-    plan = await service.get_plan(plan_id=activity["plan_id"])
+    farm_id = activity["farm_id"]
 
     state_action = payload.state
     metadata_changes = payload.model_dump(exclude={"state"}, exclude_unset=True)
@@ -276,10 +280,10 @@ async def update_activity(
     #   * Editing scheduled_date / product / dosage / notes -> `plan.manage`
     #     so only managers reshuffle the schedule.
     if state_action is not None and not has_capability(
-        context, "plan_activity.complete", farm_id=plan["farm_id"]
+        context, "plan_activity.complete", farm_id=farm_id
     ):
         raise ActivityNotFoundError(activity_id)
-    if metadata_changes and not has_capability(context, "plan.manage", farm_id=plan["farm_id"]):
+    if metadata_changes and not has_capability(context, "plan.manage", farm_id=farm_id):
         raise ActivityNotFoundError(activity_id)
 
     return await service.update_activity(
@@ -288,4 +292,86 @@ async def update_activity(
         state_action=state_action,
         actor_user_id=context.user_id,
         tenant_schema=schema,
+    )
+
+
+# ---------- Board (PR-3) --------------------------------------------------
+
+
+@router.post(
+    "/farms/{farm_id}/activities",
+    response_model=ActivityResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Schedule a board activity (no enclosing vegetation plan).",
+)
+async def create_flat_activity(
+    farm_id: UUID,
+    payload: FlatActivityCreateRequest,
+    context: RequestContext = Depends(
+        requires_capability("plan.manage", farm_id_param="farm_id")
+    ),
+    service: PlansServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.create_flat_activity(
+        farm_id=farm_id,
+        block_id=payload.block_id,
+        activity_type=payload.activity_type,
+        scheduled_date=payload.scheduled_date,
+        duration_days=payload.duration_days,
+        start_time=payload.start_time,
+        product_name=payload.product_name,
+        dosage=payload.dosage,
+        notes=payload.notes,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.post(
+    "/farms/{farm_id}/activities/bulk",
+    response_model=BulkActivityCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk-create board activities — one row per (block, date) cell.",
+)
+async def bulk_create_activities(
+    farm_id: UUID,
+    payload: BulkActivityCreateRequest,
+    context: RequestContext = Depends(
+        requires_capability("plan.manage", farm_id_param="farm_id")
+    ),
+    service: PlansServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    cells = tuple((c.block_id, c.scheduled_date) for c in payload.cells)
+    return await service.bulk_create_flat_activities(
+        farm_id=farm_id,
+        cells=cells,
+        activity_type=payload.activity_type,
+        duration_days=payload.duration_days,
+        start_time=payload.start_time,
+        notes=payload.notes,
+        skip_existing=payload.skip_existing,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.get(
+    "/farms/{farm_id}/board",
+    response_model=BoardResponse,
+    summary="Board grid — blocks + activities (with resources) over a date window.",
+)
+async def get_board(
+    farm_id: UUID,
+    week_start: date_type = Query(),
+    weeks: int = Query(default=8, ge=1, le=26),
+    context: RequestContext = Depends(
+        requires_capability("plan.read", farm_id_param="farm_id")
+    ),
+    service: PlansServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.get_board(
+        farm_id=farm_id, week_start=week_start, weeks=weeks
     )
