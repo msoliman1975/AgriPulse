@@ -3,31 +3,45 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 
-import type { BoardActivity, BoardBlock } from "@/api/plans";
+import type {
+  ActivityType,
+  BoardActivity,
+  BoardBlock,
+  BoardResourceChip,
+} from "@/api/plans";
 import { Skeleton } from "@/components/Skeleton";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
 import { useBoard } from "@/queries/board";
 
-import { BoardCell } from "../components/BoardCell";
 import { ActivityChip } from "../components/ActivityChip";
-import { QuickAddDialog } from "../components/QuickAddDialog";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog";
+import { BoardCell } from "../components/BoardCell";
+import { BoardFilters } from "../components/BoardFilters";
+import { BoardMobileList } from "../components/BoardMobileList";
+import {
+  BulkAddDialog,
+  type SelectedCell,
+} from "../components/BulkAddDialog";
+import { QuickAddDialog } from "../components/QuickAddDialog";
 
 const DEFAULT_WEEKS = 8;
 
 /**
  * /board/:farmId — Weekly Operations Board.
- * Rows = active blocks. Columns = N weeks starting Monday-of-current-week
- * (or a user-picked start). Each cell shows activity chips for that
- * (block × week).
+ *
+ * - Desktop: rows=active blocks × cols=N weeks grid. Click a cell to
+ *   quick-add; shift-click 2+ cells to bulk-add.
+ * - Mobile: vertical timeline per block.
+ * - Filters (block, type, assignee) apply locally — the grid still
+ *   fetches the full window and we drop chips client-side.
  */
 export function BoardPage(): ReactNode {
   const { t } = useTranslation("board");
   const { farmId } = useParams<{ farmId: string }>();
   const canManage = useCapability("plan.manage");
+  const isMobile = useIsMobile();
 
-  // Anchor the window to Monday of the current week (locale-agnostic; we
-  // pin to Monday regardless of i18next's weekStartsOn).
   const [anchor, setAnchor] = useState<Date>(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 }),
   );
@@ -35,6 +49,23 @@ export function BoardPage(): ReactNode {
   const weeks = DEFAULT_WEEKS;
 
   const boardQ = useBoard(farmId ?? null, weekStartIso, weeks);
+
+  // Filters — empty Set means "all".
+  const [filterBlockIds, setFilterBlockIds] = useState<Set<string>>(new Set());
+  const [filterTypes, setFilterTypes] = useState<Set<ActivityType>>(new Set());
+  const [filterResourceIds, setFilterResourceIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Bulk selection — set of "${blockId}|${weekStart}" keys.
+  const [bulkSelection, setBulkSelection] = useState<Set<string>>(new Set());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+
+  const [quickAdd, setQuickAdd] = useState<{
+    blockId: string;
+    weekStart: string;
+  } | null>(null);
+  const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
 
   const weekStarts = useMemo(
     () =>
@@ -44,11 +75,36 @@ export function BoardPage(): ReactNode {
     [anchor, weeks],
   );
 
-  // Group activities by (block_id × week_start_iso) so the grid lookup
-  // is O(1) at render time.
+  // Apply client-side filters to the activity list.
+  const filteredActivities = useMemo(() => {
+    const all = boardQ.data?.activities ?? [];
+    return all.filter((a) => {
+      if (filterBlockIds.size > 0 && !filterBlockIds.has(a.block_id)) {
+        return false;
+      }
+      if (filterTypes.size > 0 && !filterTypes.has(a.activity_type)) {
+        return false;
+      }
+      if (filterResourceIds.size > 0) {
+        const hit = a.resources.some((r) => filterResourceIds.has(r.id));
+        if (!hit) return false;
+      }
+      return true;
+    });
+  }, [boardQ.data, filterBlockIds, filterTypes, filterResourceIds]);
+
+  // Visible blocks: if filterBlockIds is non-empty, show only those;
+  // otherwise all from the response.
+  const visibleBlocks = useMemo(() => {
+    const all = boardQ.data?.blocks ?? [];
+    if (filterBlockIds.size === 0) return all;
+    return all.filter((b) => filterBlockIds.has(b.id));
+  }, [boardQ.data, filterBlockIds]);
+
+  // Map (block × week-monday) → activities for O(1) cell lookup.
   const grouped = useMemo(() => {
     const map = new Map<string, BoardActivity[]>();
-    for (const a of boardQ.data?.activities ?? []) {
+    for (const a of filteredActivities) {
       const wkStart = format(
         startOfWeek(parseISO(a.scheduled_date), { weekStartsOn: 1 }),
         "yyyy-MM-dd",
@@ -59,13 +115,56 @@ export function BoardPage(): ReactNode {
       map.set(key, arr);
     }
     return map;
+  }, [filteredActivities]);
+
+  // Surface known resources to the filter UI by flattening once.
+  const knownResources = useMemo<BoardResourceChip[]>(() => {
+    const byId = new Map<string, BoardResourceChip>();
+    for (const a of boardQ.data?.activities ?? []) {
+      for (const r of a.resources) {
+        if (!byId.has(r.id)) byId.set(r.id, r);
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, [boardQ.data]);
 
-  const [quickAdd, setQuickAdd] = useState<{
-    blockId: string;
-    weekStart: string;
-  } | null>(null);
-  const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
+  function toggleCellSelection(blockId: string, weekStart: string) {
+    const key = `${blockId}|${weekStart}`;
+    setBulkSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setFilterBlockIds(new Set());
+    setFilterTypes(new Set());
+    setFilterResourceIds(new Set());
+  }
+
+  function clearBulk() {
+    setBulkSelection(new Set());
+  }
+
+  // Selected-cell tuples for BulkAddDialog — only include cells whose
+  // block is in visibleBlocks (filter narrowed the grid).
+  const selectedCells: SelectedCell[] = useMemo(() => {
+    const byBlock = new Map(
+      (boardQ.data?.blocks ?? []).map((b) => [b.id, b.code]),
+    );
+    return Array.from(bulkSelection)
+      .map((k): SelectedCell | null => {
+        const [blockId, weekStart] = k.split("|");
+        const code = byBlock.get(blockId);
+        if (!code) return null;
+        return { blockId, weekStart, blockCode: code };
+      })
+      .filter((x): x is SelectedCell => x !== null);
+  }, [bulkSelection, boardQ.data]);
 
   if (!farmId) return null;
 
@@ -88,18 +187,74 @@ export function BoardPage(): ReactNode {
         />
       </header>
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <BoardFilters
+          blocks={boardQ.data?.blocks ?? []}
+          knownResources={knownResources}
+          blockIds={filterBlockIds}
+          setBlockIds={setFilterBlockIds}
+          types={filterTypes}
+          setTypes={setFilterTypes}
+          resourceIds={filterResourceIds}
+          setResourceIds={setFilterResourceIds}
+          onClear={clearFilters}
+        />
+        {bulkSelection.size >= 2 && canManage ? (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-ap-muted">
+              {t("bulk.selected", { count: bulkSelection.size })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBulkDialogOpen(true)}
+              className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary-700"
+            >
+              {t("bulk.add")}
+            </button>
+            <button
+              type="button"
+              onClick={clearBulk}
+              className="text-xs text-ap-muted underline-offset-2 hover:underline"
+            >
+              {t("bulk.clear")}
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       {boardQ.isLoading ? (
         <Skeleton className="h-96 w-full" />
       ) : boardQ.isError ? (
         <p className="text-sm text-ap-crit">{t("loadFailed")}</p>
+      ) : isMobile ? (
+        <BoardMobileList
+          blocks={visibleBlocks}
+          activities={filteredActivities}
+          onChipClick={setOpenActivity}
+          onBlockAddClick={(blockId) =>
+            setQuickAdd({ blockId, weekStart: weekStartIso })
+          }
+          canManage={canManage}
+        />
       ) : (
         <BoardGrid
-          blocks={boardQ.data?.blocks ?? []}
+          blocks={visibleBlocks}
           weekStarts={weekStarts}
           grouped={grouped}
           canManage={canManage}
-          onCellClick={(blockId, weekStart) => {
-            if (canManage) setQuickAdd({ blockId, weekStart });
+          selection={bulkSelection}
+          onCellClick={(blockId, weekStart, modifiers) => {
+            if (!canManage) return;
+            if (modifiers.shift) {
+              toggleCellSelection(blockId, weekStart);
+            } else if (bulkSelection.size > 0) {
+              // Plain click while a bulk selection is active: clear it
+              // first, then treat as a new quick-add.
+              clearBulk();
+              setQuickAdd({ blockId, weekStart });
+            } else {
+              setQuickAdd({ blockId, weekStart });
+            }
           }}
           onChipClick={(activity) => setOpenActivity(activity)}
         />
@@ -111,6 +266,14 @@ export function BoardPage(): ReactNode {
           blockId={quickAdd.blockId}
           weekStart={quickAdd.weekStart}
           onClose={() => setQuickAdd(null)}
+        />
+      ) : null}
+      {bulkDialogOpen ? (
+        <BulkAddDialog
+          farmId={farmId}
+          cells={selectedCells}
+          onClose={() => setBulkDialogOpen(false)}
+          onSaved={clearBulk}
         />
       ) : null}
       {openActivity ? (
@@ -174,7 +337,12 @@ interface BoardGridProps {
   weekStarts: string[];
   grouped: Map<string, BoardActivity[]>;
   canManage: boolean;
-  onCellClick: (blockId: string, weekStart: string) => void;
+  selection: Set<string>;
+  onCellClick: (
+    blockId: string,
+    weekStart: string,
+    modifiers: { shift: boolean },
+  ) => void;
   onChipClick: (a: BoardActivity) => void;
 }
 
@@ -183,6 +351,7 @@ function BoardGrid({
   weekStarts,
   grouped,
   canManage,
+  selection,
   onCellClick,
   onChipClick,
 }: BoardGridProps): ReactNode {
@@ -227,11 +396,15 @@ function BoardGrid({
               {weekStarts.map((ws) => {
                 const key = `${block.id}|${ws}`;
                 const cellActivities = grouped.get(key) ?? [];
+                const isSelected = selection.has(key);
                 return (
                   <BoardCell
                     key={key}
                     canManage={canManage}
-                    onClick={() => onCellClick(block.id, ws)}
+                    selected={isSelected}
+                    onClick={(modifiers) =>
+                      onCellClick(block.id, ws, modifiers)
+                    }
                   >
                     {cellActivities.map((a) => (
                       <ActivityChip
