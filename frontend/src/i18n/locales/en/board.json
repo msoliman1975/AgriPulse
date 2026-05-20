@@ -1,0 +1,58 @@
+{
+  "title": "Operations board",
+  "subtitle": "Weekly plan across all blocks. Click a cell to schedule.",
+  "loadFailed": "Couldn't load the board — try again.",
+  "empty": "No active blocks on this farm yet.",
+  "nav": {
+    "prev": "Prev",
+    "next": "Next",
+    "today": "Today"
+  },
+  "col": {
+    "block": "Block"
+  },
+  "cell": {
+    "add": "Add"
+  },
+  "type": {
+    "planting": "Planting",
+    "fertilizing": "Fertilizing",
+    "spraying": "Spraying",
+    "pruning": "Pruning",
+    "harvesting": "Harvesting",
+    "irrigation": "Irrigation",
+    "soil_prep": "Soil prep",
+    "observation": "Observation"
+  },
+  "status": {
+    "scheduled": "Scheduled",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "skipped": "Skipped"
+  },
+  "quickAdd": {
+    "title": "New activity",
+    "scope": "Scheduled for {{date}}",
+    "type": "Type",
+    "day": "Day of week",
+    "assigned": "Assigned",
+    "workers": "Workers",
+    "equipment": "Equipment",
+    "noResources": "No workers or equipment on this farm yet — manage them under Settings.",
+    "note": "Note (optional)",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "failed": "Couldn't save — check the form."
+  },
+  "detail": {
+    "date": "Date",
+    "status": "Status",
+    "notes": "Notes",
+    "assigned": "Assigned",
+    "close": "Close",
+    "start": "Start",
+    "skip": "Skip",
+    "complete": "Complete"
+  }
+}
