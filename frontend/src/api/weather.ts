@@ -100,3 +100,31 @@ export async function getForecast(
   });
   return data;
 }
+
+// --- Daily derived (historical) ------------------------------------------
+
+export interface DerivedDailyRead {
+  date: string;
+  temp_min_c: string | null;
+  temp_max_c: string | null;
+  temp_mean_c: string | null;
+  precip_mm_daily: string | null;
+  precip_mm_7d: string | null;
+  precip_mm_30d: string | null;
+  et0_mm_daily: string | null;
+  gdd_base10: string | null;
+  gdd_base15: string | null;
+  gdd_cumulative_base10_season: string | null;
+  computed_at: string;
+}
+
+export async function getDerivedDaily(
+  blockId: string,
+  options: { since: string; until: string },
+): Promise<DerivedDailyRead[]> {
+  const { data } = await apiClient.get<DerivedDailyRead[]>(
+    `/v1/blocks/${blockId}/weather/derived`,
+    { params: { since: options.since, until: options.until } },
+  );
+  return data;
+}

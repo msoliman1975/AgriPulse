@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CartesianGrid,
@@ -21,9 +21,41 @@ import {
 } from "@/api/insights";
 import { Skeleton } from "@/components/Skeleton";
 
+import { IndexPicker, SUPPORTED_INDICES, type IndexCode } from "./IndexPicker";
+import { TimeSpanChips, timeSpanToSince, type TimeSpanKey } from "./TimeSpanChips";
+
 interface Props {
   farmId: string;
-  indexCode?: string;
+  /** Optional initial values; otherwise restored from localStorage. */
+  indexCode?: IndexCode;
+  timeSpan?: TimeSpanKey;
+}
+
+const LS_KEY = "insights.farmTrend.prefs";
+
+interface StoredPrefs {
+  index: IndexCode;
+  span: TimeSpanKey;
+}
+
+function _loadPrefs(farmId: string): StoredPrefs | null {
+  try {
+    const raw = window.localStorage.getItem(`${LS_KEY}.${farmId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredPrefs;
+    if (!SUPPORTED_INDICES.includes(parsed.index)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function _savePrefs(farmId: string, prefs: StoredPrefs): void {
+  try {
+    window.localStorage.setItem(`${LS_KEY}.${farmId}`, JSON.stringify(prefs));
+  } catch {
+    /* localStorage may be disabled; selection still applies for the session */
+  }
 }
 
 /**
@@ -36,11 +68,39 @@ interface Props {
  * conditions sit in [0.2, 0.9]; letting recharts pick keeps the lines
  * readable without forcing the viewer to stare at half-empty axis.
  */
-export function FarmTrendChart({ farmId, indexCode = "ndvi" }: Props): ReactNode {
+export function FarmTrendChart({
+  farmId,
+  indexCode: indexCodeProp,
+  timeSpan: timeSpanProp,
+}: Props): ReactNode {
   const { t } = useTranslation("insights");
+
+  const stored = useMemo(() => _loadPrefs(farmId), [farmId]);
+  const [indexCode, setIndexCode] = useState<IndexCode>(indexCodeProp ?? stored?.index ?? "ndvi");
+  const [timeSpan, setTimeSpan] = useState<TimeSpanKey>(timeSpanProp ?? stored?.span ?? "90d");
+
+  // Re-anchor state if the active farm changes (different localStorage scope).
+  useEffect(() => {
+    const fresh = _loadPrefs(farmId);
+    if (fresh) {
+      setIndexCode(fresh.index);
+      setTimeSpan(fresh.span);
+    }
+  }, [farmId]);
+
+  useEffect(() => {
+    _savePrefs(farmId, { index: indexCode, span: timeSpan });
+  }, [farmId, indexCode, timeSpan]);
+
+  const since = useMemo(() => timeSpanToSince(timeSpan), [timeSpan]);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["insights", "trend", farmId, indexCode] as const,
-    queryFn: () => getFarmIndexTimeseries(farmId, { index_code: indexCode }),
+    queryKey: ["insights", "trend", farmId, indexCode, timeSpan] as const,
+    queryFn: () =>
+      getFarmIndexTimeseries(farmId, {
+        index_code: indexCode,
+        ...(since ? { since } : {}),
+      }),
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });
@@ -70,16 +130,17 @@ export function FarmTrendChart({ farmId, indexCode = "ndvi" }: Props): ReactNode
       aria-labelledby="farm-trend-heading"
       className="rounded-xl border border-ap-line bg-ap-panel p-4"
     >
-      <header className="flex items-baseline justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="farm-trend-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
           {t("trend.title")}
         </h2>
-        <span className="text-[11px] text-ap-muted">
-          {t("trend.indexLabel", { code: indexCode.toUpperCase() })}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <IndexPicker value={indexCode} onChange={setIndexCode} />
+          <TimeSpanChips value={timeSpan} onChange={setTimeSpan} />
+        </div>
       </header>
 
       <div className="mt-3 min-h-[260px]">
