@@ -121,3 +121,90 @@ class CalendarResponse(BaseModel):
 
     farm_id: UUID
     activities: list[ActivityResponse]
+
+
+# ---------- Board (PR-3) ---------------------------------------------------
+
+
+class FlatActivityCreateRequest(BaseModel):
+    """POST /api/v1/farms/{farm_id}/activities body.
+
+    Board-flow creation — no enclosing vegetation_plan required.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    activity_type: ActivityType
+    scheduled_date: date_type
+    duration_days: int = Field(default=1, ge=1, le=60)
+    start_time: time | None = Field(default=None)
+    product_name: str | None = Field(default=None, max_length=255)
+    dosage: str | None = Field(default=None, max_length=128)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class BulkActivityCreateRequest(BaseModel):
+    """POST /api/v1/farms/{farm_id}/activities/bulk body.
+
+    ``cells`` is the list of (block_id, scheduled_date) pairs the
+    user shift-clicked. Each pair becomes one activity row.
+    ``skip_existing`` lets the server de-dupe against existing
+    (block, date, type) triples — useful when the user re-runs a
+    bulk-add and doesn't want duplicates.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cells: list["BulkCell"] = Field(min_length=1, max_length=200)
+    activity_type: ActivityType
+    duration_days: int = Field(default=1, ge=1, le=60)
+    start_time: time | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+    skip_existing: bool = True
+
+
+class BulkCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    block_id: UUID
+    scheduled_date: date_type
+
+
+class BulkActivityCreateResponse(BaseModel):
+    created: list[ActivityResponse]
+    skipped: list[dict[str, str]]
+
+
+class BoardBlockResponse(BaseModel):
+    id: UUID
+    code: str
+    name: str | None
+    unit_type: str
+
+
+class BoardResourceChip(BaseModel):
+    id: UUID
+    kind: Literal["worker", "equipment"]
+    name: str
+    role: str | None = None
+    equipment_type: str | None = None
+
+
+class BoardActivityResponse(ActivityResponse):
+    """Same as ActivityResponse but with attached resources rolled up."""
+
+    resources: list[BoardResourceChip] = Field(default_factory=list)
+
+
+class BoardResponse(BaseModel):
+    """GET /api/v1/farms/{farm_id}/board response."""
+
+    farm_id: UUID
+    week_start: date_type
+    weeks: int
+    blocks: list[BoardBlockResponse]
+    activities: list[BoardActivityResponse]
+
+
+# Resolve forward-ref between BulkActivityCreateRequest and BulkCell.
+BulkActivityCreateRequest.model_rebuild()

@@ -188,6 +188,107 @@ class PlansRepository:
         )
         return await self.get_activity(activity_id=activity_id)
 
+    async def activity_exists_on(
+        self,
+        *,
+        block_id: UUID,
+        scheduled_date: date_type,
+        activity_type: str,
+    ) -> bool:
+        """True if a non-deleted activity matching the triple exists."""
+        stmt = select(PlanActivity.id).where(
+            PlanActivity.block_id == block_id,
+            PlanActivity.scheduled_date == scheduled_date,
+            PlanActivity.activity_type == activity_type,
+            PlanActivity.deleted_at.is_(None),
+        )
+        return (
+            await self._session.execute(stmt)
+        ).scalars().first() is not None
+
+    async def list_active_blocks(
+        self, *, farm_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Active blocks (active_to NULL or future-dated)."""
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT id, code, name, unit_type
+                        FROM blocks
+                        WHERE farm_id = :farm_id
+                          AND deleted_at IS NULL
+                          AND (active_to IS NULL OR active_to > current_date)
+                        ORDER BY code
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def list_board_activities(
+        self,
+        *,
+        farm_id: UUID,
+        from_date: date_type,
+        to_date: date_type,
+    ) -> tuple[dict[str, Any], ...]:
+        """Board activities for a date window, each with its attached
+        resources rolled up as a JSONB array.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                          a.id, a.plan_id, a.farm_id, a.block_id,
+                          a.recommendation_id, a.activity_type,
+                          a.scheduled_date, a.duration_days, a.start_time,
+                          a.product_name, a.dosage,
+                          a.notes, a.status,
+                          a.completed_at, a.completed_by,
+                          a.created_at, a.updated_at,
+                          COALESCE(
+                            (
+                              SELECT json_agg(
+                                json_build_object(
+                                  'id', r.id,
+                                  'kind', r.kind,
+                                  'name', r.name,
+                                  'role', r.role,
+                                  'equipment_type', r.equipment_type
+                                )
+                                ORDER BY r.kind, r.name
+                              )
+                              FROM activity_resources ar
+                              JOIN resources r ON r.id = ar.resource_id
+                              WHERE ar.activity_id = a.id
+                                AND r.deleted_at IS NULL
+                            ),
+                            '[]'::json
+                          ) AS resources
+                        FROM plan_activities a
+                        WHERE a.farm_id = :farm_id
+                          AND a.deleted_at IS NULL
+                          AND a.scheduled_date >= :from_date
+                          AND a.scheduled_date < :to_date
+                        ORDER BY a.scheduled_date, a.id
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id, "from_date": from_date, "to_date": to_date},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def list_calendar(
         self,
         *,
