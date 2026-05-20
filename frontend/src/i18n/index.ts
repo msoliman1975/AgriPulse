@@ -21,6 +21,7 @@ import enSettings from "./locales/en/settings.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import enIntegrations from "./locales/en/integrations.json";
 import enResources from "./locales/en/resources.json";
+import enBoard from "./locales/en/board.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -40,6 +41,7 @@ import arSettings from "./locales/ar/settings.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 import arIntegrations from "./locales/ar/integrations.json";
 import arResources from "./locales/ar/resources.json";
+import arBoard from "./locales/ar/board.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -70,6 +72,7 @@ const resources = {
     integrationsHealth: enIntegrationsHealth,
     integrations: enIntegrations,
     resources: enResources,
+    board: enBoard,
   },
   ar: {
     common: arCommon,
@@ -91,6 +94,7 @@ const resources = {
     integrationsHealth: arIntegrationsHealth,
     integrations: arIntegrations,
     resources: arResources,
+    board: arBoard,
   },
 } as const;
 
@@ -122,6 +126,7 @@ void i18n
       "integrationsHealth",
       "integrations",
       "resources",
+      "board",
     ],
     interpolation: { escapeValue: false },
     detection: {

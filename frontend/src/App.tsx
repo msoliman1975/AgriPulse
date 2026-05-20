@@ -23,6 +23,7 @@ import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { PlanPage } from "@/modules/plan/pages/PlanPage";
+import { BoardPage } from "@/modules/board/pages/BoardPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
 import { RecommendationsPage } from "@/modules/recommendations/pages/RecommendationsPage";
 import { ReportsPage } from "@/modules/reports/pages/ReportsPage";
@@ -124,6 +125,7 @@ export function App(): ReactNode {
                 <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
                 <Route path="/plan/:farmId" element={<PlanPage />} />
+                <Route path="/board/:farmId" element={<BoardPage />} />
                 <Route path="/alerts/:farmId" element={<AlertsPage />} />
                 <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />
                 <Route path="/signals/:farmId" element={<SignalsLogPage />} />
