@@ -10,9 +10,9 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
-import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
+import { FarmWeatherChart } from "../components/FarmWeatherChart";
 import { KPICards } from "../components/KPICards";
 import { SeasonContextBar } from "../components/SeasonContextBar";
 
@@ -39,9 +39,9 @@ export function InsightsPage(): ReactNode {
   });
   const canReadWeather = useCapability("weather.read", { farmId });
 
-  // WeatherForecastPanel keys on block_id but resolves to the farm
+  // FarmWeatherChart keys on block_id but resolves to the farm
   // centroid internally; pulling the first block is the existing
-  // contract. When B.2's farm-level weather summary lands this can drop.
+  // contract. When a farm-level weather summary endpoint lands, drop this.
   const [firstBlock, setFirstBlock] = useState<Block | null>(null);
   useEffect(() => {
     if (!farmId) return;
@@ -97,15 +97,9 @@ export function InsightsPage(): ReactNode {
 
       <FarmTrendChart farmId={farmId} />
 
-      <BlockHealthScorecard farmId={farmId} />
+      {canReadWeather && firstBlock ? <FarmWeatherChart blockId={firstBlock.id} /> : null}
 
-      {canReadWeather && firstBlock ? (
-        <WeatherForecastPanel
-          blockId={firstBlock.id}
-          farmId={farmId}
-          farmName={farm?.name ?? null}
-        />
-      ) : null}
+      <BlockHealthScorecard farmId={farmId} />
     </div>
   );
 }

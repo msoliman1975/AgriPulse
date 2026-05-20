@@ -6,7 +6,39 @@
     "title": "اتجاه مؤشر الغطاء النباتي",
     "indexLabel": "{{code}}، جميع الحقول",
     "loadFailed": "تعذر تحميل الاتجاه.",
-    "empty": "لا توجد ملاحظات بعد. ستظهر النقاط هنا عند ابتلاع مشاهد Sentinel لأي حقل."
+    "empty": "لا توجد ملاحظات بعد. ستظهر النقاط هنا عند ابتلاع مشاهد Sentinel لأي حقل.",
+    "indexPicker": {
+      "label": "المؤشر",
+      "options": {
+        "ndvi": "NDVI",
+        "ndwi": "NDWI",
+        "evi": "EVI",
+        "savi": "SAVI",
+        "ndre": "NDRE",
+        "gndvi": "GNDVI"
+      }
+    },
+    "timespan": {
+      "ariaLabel": "الفترة الزمنية",
+      "7d": "٧ أيام",
+      "30d": "٣٠ يومًا",
+      "90d": "٩٠ يومًا",
+      "season": "الموسم",
+      "all": "الكل"
+    }
+  },
+  "weather": {
+    "title": "الطقس (سابق · توقع)",
+    "pastLabel": "السابق",
+    "pastAriaLabel": "نطاق الطقس السابق",
+    "loadFailed": "تعذر تحميل الطقس.",
+    "empty": "لا توجد بيانات طقس بعد.",
+    "axisPrecip": "الهطول (ملم)",
+    "axisTemp": "الحرارة (°م)",
+    "precip": "الهطول",
+    "tempHigh": "العليا",
+    "tempLow": "الدنيا",
+    "todayLabel": "اليوم"
   },
   "season": {
     "regionLabel": "سياق الموسم",

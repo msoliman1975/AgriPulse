@@ -6,7 +6,39 @@
     "title": "Vegetation index trend",
     "indexLabel": "{{code}}, all blocks",
     "loadFailed": "Failed to load trend.",
-    "empty": "No observations yet. Once Sentinel scenes are ingested for any block, points will appear here."
+    "empty": "No observations yet. Once Sentinel scenes are ingested for any block, points will appear here.",
+    "indexPicker": {
+      "label": "Index",
+      "options": {
+        "ndvi": "NDVI",
+        "ndwi": "NDWI",
+        "evi": "EVI",
+        "savi": "SAVI",
+        "ndre": "NDRE",
+        "gndvi": "GNDVI"
+      }
+    },
+    "timespan": {
+      "ariaLabel": "Time span",
+      "7d": "7d",
+      "30d": "30d",
+      "90d": "90d",
+      "season": "Season",
+      "all": "All"
+    }
+  },
+  "weather": {
+    "title": "Weather (past · forecast)",
+    "pastLabel": "Past",
+    "pastAriaLabel": "Weather past time span",
+    "loadFailed": "Failed to load weather.",
+    "empty": "No weather data yet.",
+    "axisPrecip": "Precip (mm)",
+    "axisTemp": "Temp (°C)",
+    "precip": "Precipitation",
+    "tempHigh": "High",
+    "tempLow": "Low",
+    "todayLabel": "Today"
   },
   "season": {
     "regionLabel": "Season context",
