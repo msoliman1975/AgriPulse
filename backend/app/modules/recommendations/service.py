@@ -59,6 +59,7 @@ class RecommendationsService(Protocol):
         block_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
     ) -> dict[str, int]: ...
 
     async def list_recommendations(
@@ -114,11 +115,18 @@ class RecommendationsServiceImpl:
         block_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
     ) -> dict[str, int]:
-        """Run every active tree against ``block_id``; insert new open
-        recommendations.
+        """Run every active tree visible to this tenant against
+        ``block_id``; insert new open recommendations.
+
+        ``tenant_id`` scopes the catalog lookup to platform trees +
+        this tenant's own authored trees. The Beat task resolves this
+        once per tenant before walking blocks (PR-A).
         """
-        trees = await self._repo.list_active_trees_with_current_version()
+        trees = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id
+        )
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
         block_crop_id, crop_id, crop_category = await self._repo.get_block_current_crop(
@@ -456,8 +464,17 @@ class DecisionTreesAuthorService:
         no-op if the on-disk YAML matches.
     """
 
-    def __init__(self, *, public_session: AsyncSession) -> None:
+    def __init__(self, *, public_session: AsyncSession, tenant_id: UUID) -> None:
+        """``tenant_id`` is the caller's tenant (from ``RequestContext``).
+
+        It scopes every read to platform PLUS this tenant, and stamps
+        every authoring write with this tenant's UUID, so tenant-A's
+        trees are never visible to or writable by tenant-B. The YAML
+        seed loader is the only writer that produces platform rows
+        (``tenant_id IS NULL``) — there is no API path to that.
+        """
         self._public = public_session
+        self._tenant_id = tenant_id
         self._repo = RecommendationsRepository(
             tenant_session=public_session,  # unused for authoring paths
             public_session=public_session,
@@ -468,12 +485,17 @@ class DecisionTreesAuthorService:
     # ---- Reads --------------------------------------------------------
 
     async def list_trees(self) -> tuple[dict[str, Any], ...]:
-        return await self._repo.list_all_trees()
+        return await self._repo.list_all_trees(visible_to_tenant_id=self._tenant_id)
 
     async def get_tree_detail(self, *, code: str) -> dict[str, Any] | None:
         from app.modules.recommendations.repository import _serialize_jsonb  # noqa: F401
 
-        tree = await self._repo.get_tree_by_code(code)
+        # Reads see platform + own; that's how a tenant viewing a
+        # platform tree's detail (e.g. to customize its parameters
+        # in PR-C) hits the right row.
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=self._tenant_id, include_platform=True
+        )
         if tree is None:
             return None
         versions = await self._repo.list_versions_for_tree(tree_id=tree["id"])
@@ -488,6 +510,7 @@ class DecisionTreesAuthorService:
         return {
             "id": tree["id"],
             "code": tree["code"],
+            "tenant_id": tree["tenant_id"],
             "name_en": tree["name_en"],
             "name_ar": tree["name_ar"],
             "description_en": tree["description_en"],
@@ -520,7 +543,16 @@ class DecisionTreesAuthorService:
             compile_tree,
         )
 
-        if await self._repo.get_tree_by_code(code) is not None:
+        # Reject collisions both within the tenant's own scope and
+        # against the platform catalog. Forbidding tenant codes that
+        # shadow a platform code keeps lookups by `code` unambiguous
+        # without needing an explicit "platform vs tenant" filter at
+        # every read site.
+        if (
+            await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
+            is not None
+            or await self._repo.get_tree_by_code(code, scope_tenant_id=None) is not None
+        ):
             raise _DecisionTreeCodeAlreadyExistsError(code)
 
         spec = _yaml.safe_load(tree_yaml)
@@ -534,6 +566,7 @@ class DecisionTreesAuthorService:
 
         tree_id = await self._repo.insert_tree(
             code=code,
+            tenant_id=self._tenant_id,
             name_en=compiled["name_en"],
             name_ar=compiled.get("name_ar"),
             description_en=compiled.get("description_en"),
@@ -591,7 +624,11 @@ class DecisionTreesAuthorService:
             compile_tree,
         )
 
-        tree = await self._repo.get_tree_by_code(code)
+        # Writes scope strictly to the caller's own tenant — a tenant
+        # cannot author a new version of a platform tree (those are
+        # YAML-managed). Platform-tree customization in PR-C goes
+        # through a separate override path, not version-append.
+        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
         spec = _yaml.safe_load(tree_yaml)
@@ -650,7 +687,11 @@ class DecisionTreesAuthorService:
         version: int,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
-        tree = await self._repo.get_tree_by_code(code)
+        # Writes scope strictly to the caller's own tenant — a tenant
+        # cannot author a new version of a platform tree (those are
+        # YAML-managed). Platform-tree customization in PR-C goes
+        # through a separate override path, not version-append.
+        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
         version_row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
@@ -723,7 +764,11 @@ class DecisionTreesAuthorService:
             spec = _yaml.safe_load(tree_yaml)
             compiled = compile_tree(spec, source_path=f"<dry-run:{code}>")
         else:
-            tree = await self._repo.get_tree_by_code(code)
+            # Dry-run is a read: a tenant can preview a platform tree
+            # against their block without writing.
+            tree = await self._repo.get_tree_by_code(
+                code, scope_tenant_id=self._tenant_id, include_platform=True
+            )
             if tree is None:
                 raise _DecisionTreeNotFoundError(code)
             target_version = version
@@ -839,6 +884,6 @@ class _DecisionTreeNoPublishedVersionError(_DecisionTreeAuthoringError):
 
 
 def get_decision_trees_author_service(
-    *, public_session: AsyncSession
+    *, public_session: AsyncSession, tenant_id: UUID
 ) -> DecisionTreesAuthorService:
-    return DecisionTreesAuthorService(public_session=public_session)
+    return DecisionTreesAuthorService(public_session=public_session, tenant_id=tenant_id)

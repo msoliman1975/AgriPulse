@@ -199,12 +199,16 @@ async def list_decision_trees(
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    # Scope to platform + own-tenant trees; tenant_id was added by
+    # migration 0024 (PR-A).
     rows = (
         (
             await public_session.execute(
                 text(
                     """
-                SELECT t.id, t.code, t.name_en, t.name_ar,
+                SELECT t.id, t.code, t.tenant_id,
+                       t.name_en, t.name_ar,
                        t.description_en, t.description_ar,
                        t.crop_id, t.applicable_regions, t.is_active,
                        v.version AS current_version
@@ -212,9 +216,11 @@ async def list_decision_trees(
                 LEFT JOIN public.decision_tree_versions v
                   ON v.id = t.current_version_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.code
+                  AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
+                ORDER BY t.tenant_id NULLS FIRST, t.code
                 """
-                )
+                ),
+                {"tid": context.tenant_id},
             )
         )
         .mappings()
@@ -237,10 +243,12 @@ async def evaluate_block(
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
     summary = await service.evaluate_block(
         block_id=block_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
+        tenant_id=context.tenant_id,
     )
     return {
         "block_id": str(block_id),
@@ -257,8 +265,16 @@ async def evaluate_block(
 
 def _author_service(
     public_session: AsyncSession = Depends(get_admin_db_session),
+    context: RequestContext = Depends(get_current_context),
 ) -> DecisionTreesAuthorService:
-    return get_decision_trees_author_service(public_session=public_session)
+    # All authoring routes require a tenant-scoped JWT; `_ensure_tenant`
+    # in each route handler also raises 403 if tenant_id is missing, so
+    # this `assert` is a belt-and-braces — the dependency wiring would
+    # have raised 401 long before this point with no tenant_id.
+    assert context.tenant_id is not None, "authoring requires a tenant context"
+    return get_decision_trees_author_service(
+        public_session=public_session, tenant_id=context.tenant_id
+    )
 
 
 def _map_authoring_error(exc: Exception) -> Exception | None:

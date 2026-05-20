@@ -852,14 +852,22 @@ def _on_alert_opened(event: AlertOpenedV1) -> None:
 # =====================================================================
 
 
-def _load_decision_tree(session: Session, tree_code: str) -> dict[str, Any] | None:
+def _load_decision_tree(
+    session: Session, tree_code: str, *, tenant_id: UUID
+) -> dict[str, Any] | None:
+    # After PR-A the catalog mixes platform + tenant trees; the same
+    # `code` can resolve to two different rows in different tenant
+    # scopes, so we must scope by tenant_id to find the same row that
+    # was evaluated. Platform trees (tenant_id IS NULL) are visible to
+    # every tenant.
     row = (
         session.execute(
             text(
                 "SELECT name_en, name_ar FROM public.decision_trees "
-                "WHERE code = :c AND deleted_at IS NULL"
+                "WHERE code = :c AND deleted_at IS NULL "
+                "  AND (tenant_id IS NULL OR tenant_id = :tid)"
             ),
-            {"c": tree_code},
+            {"c": tree_code, "tid": tenant_id},
         )
         .mappings()
         .first()
@@ -1271,7 +1279,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
             "farm_name": names.get("farm_name"),
         }
 
-        tree = _load_decision_tree(session, event.tree_code)
+        tree = _load_decision_tree(session, event.tree_code, tenant_id=tenant_id)
         tenant_channels = _load_tenant_channels(session, tenant_id)
         recipients = _load_recipients(session, farm_id=event.farm_id, tenant_id=tenant_id)
 

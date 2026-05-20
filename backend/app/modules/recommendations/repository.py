@@ -46,11 +46,16 @@ class RecommendationsRepository:
 
     # ---- Decision-tree catalog (public) -------------------------------
 
-    async def list_active_trees_with_current_version(self) -> tuple[dict[str, Any], ...]:
-        """Every active tree paired with its current published version.
+    async def list_active_trees_with_current_version(
+        self, *, visible_to_tenant_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Every active tree visible to the given tenant, paired with its
+        current published version.
 
-        Trees that have no published version yet are skipped — the
-        evaluator has nothing to run.
+        Visibility = platform catalog (tenant_id IS NULL) plus the
+        tenant's own authored trees (tenant_id = :tid). Other tenants'
+        trees are excluded. Trees without a published version yet are
+        skipped (PR-A).
         """
         rows = (
             (
@@ -59,6 +64,7 @@ class RecommendationsRepository:
                         """
                     SELECT t.id   AS tree_id,
                            t.code AS tree_code,
+                           t.tenant_id,
                            t.name_en, t.name_ar,
                            t.crop_id,
                            t.applicable_regions,
@@ -71,9 +77,11 @@ class RecommendationsRepository:
                     WHERE t.is_active = TRUE
                       AND t.deleted_at IS NULL
                       AND v.published_at IS NOT NULL
+                      AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                     ORDER BY t.code
                     """
-                    )
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": visible_to_tenant_id},
                 )
             )
             .mappings()
@@ -81,23 +89,45 @@ class RecommendationsRepository:
         )
         return tuple(dict(r) for r in rows)
 
-    async def get_tree_by_code(self, tree_code: str) -> dict[str, Any] | None:
-        row = (
-            (
-                await self._public.execute(
-                    select(DecisionTree).where(
-                        DecisionTree.code == tree_code, DecisionTree.deleted_at.is_(None)
-                    )
-                )
-            )
-            .scalars()
-            .one_or_none()
+    async def get_tree_by_code(
+        self,
+        tree_code: str,
+        *,
+        scope_tenant_id: UUID | None,
+        include_platform: bool = False,
+    ) -> dict[str, Any] | None:
+        """Look up one tree by code (PR-A).
+
+        ``scope_tenant_id``:
+          * UUID  — match trees authored by that tenant.
+          * None  — match platform trees only (tenant_id IS NULL).
+
+        ``include_platform`` (meaningful only when scope_tenant_id is a
+        UUID): when True, also include platform trees. Used by read
+        sites where a tenant should see "platform OR my own"; the
+        create_tree path rejects tenant codes that collide with
+        platform codes, so the result is unambiguous.
+        """
+        stmt = select(DecisionTree).where(
+            DecisionTree.code == tree_code,
+            DecisionTree.deleted_at.is_(None),
         )
+        if scope_tenant_id is None:
+            stmt = stmt.where(DecisionTree.tenant_id.is_(None))
+        elif include_platform:
+            stmt = stmt.where(
+                (DecisionTree.tenant_id.is_(None))
+                | (DecisionTree.tenant_id == scope_tenant_id)
+            )
+        else:
+            stmt = stmt.where(DecisionTree.tenant_id == scope_tenant_id)
+        row = (await self._public.execute(stmt)).scalars().one_or_none()
         if row is None:
             return None
         return {
             "id": row.id,
             "code": row.code,
+            "tenant_id": row.tenant_id,
             "name_en": row.name_en,
             "name_ar": row.name_ar,
             "description_en": row.description_en,
@@ -131,15 +161,24 @@ class RecommendationsRepository:
 
     # ---- Decision-tree authoring (PlatformAdmin) ----------------------
 
-    async def list_all_trees(self) -> tuple[dict[str, Any], ...]:
-        """Every non-deleted tree + the version number of its current
-        published version (if any). Drives the editor's tree list."""
+    async def list_all_trees(
+        self, *, visible_to_tenant_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Every non-deleted tree visible to the given tenant + the
+        version number of its current published version (if any).
+        Drives the authoring tree list.
+
+        Visibility mirrors `list_active_trees_with_current_version`:
+        platform trees plus the tenant's own. Platform trees sort first
+        so the authoring UI naturally groups them at the top (PR-A).
+        """
         rows = (
             (
                 await self._public.execute(
                     text(
                         """
-                    SELECT t.id, t.code, t.name_en, t.name_ar,
+                    SELECT t.id, t.code, t.tenant_id,
+                           t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
                            t.crop_id, t.applicable_regions, t.is_active,
                            v.version AS current_version
@@ -147,9 +186,11 @@ class RecommendationsRepository:
                     LEFT JOIN public.decision_tree_versions v
                       ON v.id = t.current_version_id
                     WHERE t.deleted_at IS NULL
-                    ORDER BY t.code
+                      AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
+                    ORDER BY t.tenant_id NULLS FIRST, t.code
                     """
-                    )
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": visible_to_tenant_id},
                 )
             )
             .mappings()
@@ -218,6 +259,7 @@ class RecommendationsRepository:
         self,
         *,
         code: str,
+        tenant_id: UUID | None,
         name_en: str,
         name_ar: str | None,
         description_en: str | None,
@@ -227,26 +269,34 @@ class RecommendationsRepository:
         actor_user_id: UUID | None,
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
-        version + current_version_id update in one transaction."""
+        version + current_version_id update in one transaction.
+
+        ``tenant_id`` is None for platform-shipped trees (the YAML seed
+        loader path) and a tenant UUID for API-authored trees (PR-A).
+        """
         row = (
             await self._public.execute(
                 text(
                     """
                     INSERT INTO public.decision_trees
-                        (code, name_en, name_ar, description_en, description_ar,
+                        (code, tenant_id, name_en, name_ar,
+                         description_en, description_ar,
                          crop_id, applicable_regions, is_active,
                          created_by, updated_by)
-                    VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
+                    VALUES (:code, :tenant_id, :name_en, :name_ar,
+                            :description_en, :description_ar,
                             :crop_id, :applicable_regions, TRUE,
                             :actor, :actor)
                     RETURNING id
                     """
                 ).bindparams(
+                    bindparam("tenant_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
                 ),
                 {
                     "code": code,
+                    "tenant_id": tenant_id,
                     "name_en": name_en,
                     "name_ar": name_ar,
                     "description_en": description_en,
@@ -367,6 +417,24 @@ class RecommendationsRepository:
                 "actor": actor_user_id,
             },
         )
+
+    async def get_tenant_id_by_schema(self, schema_name: str) -> UUID | None:
+        """Resolve a tenant's UUID via `public.tenants.schema_name`.
+
+        Used by the sweep loop to compute the scoping UUID once per
+        tenant before walking blocks. Returns None when the schema is
+        unknown / soft-deleted; the caller logs and skips.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT id FROM public.tenants "
+                    "WHERE schema_name = :s AND deleted_at IS NULL"
+                ),
+                {"s": schema_name},
+            )
+        ).first()
+        return cast(UUID, row.id) if row is not None else None
 
     async def resolve_crop_id(self, crop_code: str | None) -> UUID | None:
         """Lookup `crops.id` by code. Returns None when crop_code is

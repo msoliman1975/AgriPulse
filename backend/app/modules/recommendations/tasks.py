@@ -64,11 +64,19 @@ def evaluate_for_tenant(tenant_schema: str) -> dict[str, int]:
 async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     factory = AsyncSessionLocal()
     blocks: tuple[Any, ...] = ()
+    tenant_id = None
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         async with factory() as public_session:
             svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             blocks = await svc._repo.list_active_block_ids()
+            # Resolve once per sweep; the catalog scoping needs a UUID,
+            # not a schema name (PR-A).
+            tenant_id = await svc._repo.get_tenant_id_by_schema(tenant_schema)
+
+    if tenant_id is None:
+        _log.warning("recommendations_tenant_sweep_skip_unknown_schema", schema=tenant_schema)
+        return {"blocks_processed": 0, "recommendations_opened": 0}
 
     blocks_processed = 0
     recommendations_opened = 0
@@ -83,6 +91,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
                     block_id=block_id,
                     actor_user_id=None,
                     tenant_schema=tenant_schema,
+                    tenant_id=tenant_id,
                 )
         blocks_processed += 1
         recommendations_opened += summary.get("recommendations_opened", 0)
