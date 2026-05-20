@@ -14,10 +14,12 @@ export function SettingsIndexPage(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canRule = useCapability("alert_rule.read");
   const canUser = useCapability("user.read");
+  const canResources = useCapability("resource.read");
 
   if (canManageIntegrations) return <Navigate to="/settings/org" replace />;
   if (canReadHealth) return <Navigate to="/settings/integrations/health" replace />;
   if (canUser) return <Navigate to="/settings/users" replace />;
+  if (canResources) return <Navigate to="/settings/workers" replace />;
   if (canRule) return <Navigate to="/settings/rules" replace />;
   return (
     <div className="mx-auto max-w-3xl py-12 text-center">

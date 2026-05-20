@@ -33,6 +33,7 @@ export function SettingsLayout(): ReactNode {
   const canRule = useCapability("alert_rule.read");
   const canUser = useCapability("user.read");
   const canTree = useCapability("decision_tree.manage");
+  const canResources = useCapability("resource.read");
   // Org / notifications placeholder pages — gate on the same caps as the
   // V1 settings they will hold.
   const showOrg = canManageIntegrations;
@@ -53,6 +54,8 @@ export function SettingsLayout(): ReactNode {
       prefix: "/settings/integrations",
     },
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
+    { to: "/settings/workers", labelKey: "nav.workers", show: canResources },
+    { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
     { to: "/settings/rules", labelKey: "nav.rules", show: canRule },
     {
       to: "/settings/decision-trees",
