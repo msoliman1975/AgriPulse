@@ -98,8 +98,10 @@ class ActivityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    plan_id: UUID
+    plan_id: UUID | None
+    farm_id: UUID
     block_id: UUID
+    recommendation_id: UUID | None
     activity_type: ActivityType
     scheduled_date: date_type
     duration_days: int

@@ -82,7 +82,9 @@ export function PlanPage(): ReactNode {
       irrigationRows.map((s) => ({
         id: `irrig-${s.id}`,
         plan_id: activePlan?.id ?? "irrig",
+        farm_id: activePlan?.farm_id ?? farmId ?? "",
         block_id: s.block_id,
+        recommendation_id: null,
         activity_type: "irrigation",
         scheduled_date: s.scheduled_for,
         duration_days: 1,
