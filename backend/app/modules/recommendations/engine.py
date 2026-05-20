@@ -117,7 +117,21 @@ def _substitute_params_in_outcome_params(
 
 @dataclass(frozen=True, slots=True)
 class TreeOutcome:
-    """Resolved leaf outcome — what the service writes into recommendations."""
+    """Resolved leaf outcome — what the service writes downstream.
+
+    ``kind`` (PR-E) discriminates where the outcome lands:
+      * ``"recommendation"`` (default) — writes to ``tenant.recommendations``;
+        ``confidence`` is meaningful, ``severity`` defaults to ``"info"``.
+      * ``"alert"`` — writes to ``tenant.alerts`` via the alerts repo;
+        ``severity`` is the lifecycle-driving field (one of
+        info / warning / critical), ``confidence`` is fixed at 1.0
+        (alerts express certainty, not probability).
+
+    ``leaf_node_id`` is the id of the leaf node that produced the
+    outcome. For alert outcomes the service combines it with the tree
+    code to form a stable ``rule_code`` for the alerts dedup partial
+    UNIQUE: ``f"tree:{tree_code}:{leaf_node_id}"``.
+    """
 
     action_type: str
     severity: str
@@ -126,6 +140,8 @@ class TreeOutcome:
     text_en: str
     text_ar: str | None
     valid_for_hours: int | None
+    kind: str = "recommendation"
+    leaf_node_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +213,9 @@ def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
 
         if "outcome" in node:
             path.append(_step_for_leaf(current, node))
-            outcome = _parse_outcome(node["outcome"], params=params_resolved)
+            outcome = _parse_outcome(
+                node["outcome"], leaf_node_id=current, params=params_resolved
+            )
             return EvaluationResult(
                 outcome=outcome,
                 path=path,
@@ -265,7 +283,9 @@ def _step_for_leaf(node_id: str, node: Mapping[str, Any]) -> TreePathStep:
     )
 
 
-def _parse_outcome(raw: Any, *, params: Mapping[str, Any]) -> TreeOutcome | None:
+def _parse_outcome(
+    raw: Any, *, leaf_node_id: str, params: Mapping[str, Any]
+) -> TreeOutcome | None:
     if not isinstance(raw, dict):
         return None
     action_type = raw.get("action_type")
@@ -273,13 +293,27 @@ def _parse_outcome(raw: Any, *, params: Mapping[str, Any]) -> TreeOutcome | None
     if not isinstance(action_type, str) or not isinstance(text_en, str):
         return None
 
-    confidence_raw = raw.get("confidence", 0.5)
-    try:
-        confidence = Decimal(str(confidence_raw))
-    except (ArithmeticError, ValueError):
-        confidence = Decimal("0.5")
-    if confidence < 0 or confidence > 1:
-        confidence = max(Decimal("0"), min(Decimal("1"), confidence))
+    kind = str(raw.get("kind", "recommendation"))
+    if kind not in ("recommendation", "alert"):
+        # Malformed leaf — leave as recommendation, the loader's compile
+        # step already rejects unknown kinds at startup so reaching here
+        # means the compiled JSON was hand-tampered. Permissive fallback.
+        kind = "recommendation"
+
+    # Alert leaves carry severity and certainty (no probabilistic
+    # confidence); recommendation leaves keep the existing confidence
+    # semantic. We still populate both fields on TreeOutcome for shape
+    # uniformity — the service picks the right one based on kind.
+    if kind == "alert":
+        confidence = Decimal("1")
+    else:
+        confidence_raw = raw.get("confidence", 0.5)
+        try:
+            confidence = Decimal(str(confidence_raw))
+        except (ArithmeticError, ValueError):
+            confidence = Decimal("0.5")
+        if confidence < 0 or confidence > 1:
+            confidence = max(Decimal("0"), min(Decimal("1"), confidence))
 
     valid_for_hours_raw = raw.get("valid_for_hours")
     valid_for_hours: int | None = None
@@ -301,4 +335,6 @@ def _parse_outcome(raw: Any, *, params: Mapping[str, Any]) -> TreeOutcome | None
         text_en=text_en,
         text_ar=raw.get("text_ar"),
         valid_for_hours=valid_for_hours,
+        kind=kind,
+        leaf_node_id=leaf_node_id,
     )
