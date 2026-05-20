@@ -38,6 +38,9 @@ class DecisionTree(Base, TimestampedMixin):
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
+    # NULL = platform-shipped (YAML-seeded); non-NULL = tenant-authored.
+    # Uniqueness of `code` is partial-indexed per scope; see migration 0024.
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     name_en: Mapped[str] = mapped_column(Text, nullable=False)
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description_en: Mapped[str | None] = mapped_column(Text, nullable=True)

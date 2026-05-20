@@ -190,12 +190,18 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
         crop_code = compiled.get("crop_code")
         crop_id = await _resolve_crop_id(public_session, crop_code)
 
-        # Fetch existing tree by code.
+        # Fetch existing platform tree by code. After PR-A, code uniqueness
+        # is partitioned by tenant_id; here we only want the platform row
+        # (tenant_id IS NULL) — a tenant could theoretically have authored
+        # a tree with the same code (create_tree forbids it, but defending
+        # in depth is cheap).
         existing = (
             (
                 await public_session.execute(
                     select(DecisionTree).where(
-                        DecisionTree.code == compiled["code"], DecisionTree.deleted_at.is_(None)
+                        DecisionTree.code == compiled["code"],
+                        DecisionTree.tenant_id.is_(None),
+                        DecisionTree.deleted_at.is_(None),
                     )
                 )
             )

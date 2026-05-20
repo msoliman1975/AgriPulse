@@ -77,6 +77,9 @@ class DecisionTreeResponse(BaseModel):
 
     id: UUID
     code: str
+    # NULL = platform-shipped business knowledge; non-NULL = the
+    # caller's own tenant-authored tree (PR-A).
+    tenant_id: UUID | None = None
     name_en: str
     name_ar: str | None
     description_en: str | None
@@ -128,6 +131,8 @@ class DecisionTreeDetailResponse(BaseModel):
 
     id: UUID
     code: str
+    # NULL = platform-shipped; non-NULL = caller's own tenant (PR-A).
+    tenant_id: UUID | None = None
     name_en: str
     name_ar: str | None
     description_en: str | None
