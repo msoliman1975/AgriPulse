@@ -39,6 +39,7 @@ from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
     IndicesValueRef,
+    ParamsValueRef,
     SignalsValueRef,
     ValueRef,
     WeatherValueRef,
@@ -105,22 +106,51 @@ def _eval_comparison(
         right_raw = node.get("right")
         if right_raw is None:
             raise ConditionParseError(f"op '{op}' requires 'right'")
-        return _compare(op, left, right_raw)
+        right = _resolve_literal_or_ref(right_raw, ctx, snapshot)
+        # A right-side ref that doesn't resolve (e.g. a missing
+        # parameter) short-circuits to no-match, same as left-side.
+        if right is None:
+            return False
+        return _compare(op, left, right)
 
     if op == "between":
-        low = node.get("low")
-        high = node.get("high")
-        if low is None or high is None:
+        low_raw = node.get("low")
+        high_raw = node.get("high")
+        if low_raw is None or high_raw is None:
             raise ConditionParseError("op 'between' requires 'low' and 'high'")
+        low = _resolve_literal_or_ref(low_raw, ctx, snapshot)
+        high = _resolve_literal_or_ref(high_raw, ctx, snapshot)
+        if low is None or high is None:
+            return False
         return _compare("ge", left, low) and _compare("le", left, high)
 
     if op == "in":
         values = node.get("values")
         if not isinstance(values, list):
             raise ConditionParseError("op 'in' requires 'values' list")
-        return any(_compare("eq", left, v) for v in values)
+        resolved = [_resolve_literal_or_ref(v, ctx, snapshot) for v in values]
+        return any(_compare("eq", left, v) for v in resolved if v is not None)
 
     raise ConditionParseError(f"unknown op {op!r}")
+
+
+def _resolve_literal_or_ref(
+    value: Any, ctx: ConditionContext, snapshot: dict[str, Any]
+) -> Any:
+    """If ``value`` is a value-ref dict (has a ``source`` key), resolve
+    it against the context; otherwise return it as a literal.
+
+    Snapshot recording: ref-typed right/low/high values are recorded
+    under their dotted key the same way left-side refs are, so the
+    explainability trail shows the resolved parameter / weather value
+    that the comparison actually used.
+    """
+    if isinstance(value, dict) and "source" in value:
+        ref = parse_value_ref(value)
+        resolved = _resolve(ref, ctx)
+        snapshot["values"][_ref_key(ref)] = _stringify(resolved)
+        return resolved
+    return value
 
 
 def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
@@ -147,6 +177,8 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
         if sig_entry is None:
             return None
         return getattr(sig_entry, ref.key, None)
+    if isinstance(ref, ParamsValueRef):
+        return ctx.params.get(ref.name)
     return None
 
 
@@ -157,6 +189,8 @@ def _ref_key(ref: ValueRef) -> str:
         return f"weather.{ref.scope}.{ref.field}"
     if isinstance(ref, SignalsValueRef):
         return f"signals.{ref.code}.{ref.key}"
+    if isinstance(ref, ParamsValueRef):
+        return f"params.{ref.name}"
     return f"block.{ref.field}"
 
 

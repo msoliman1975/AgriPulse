@@ -69,10 +69,28 @@ class SignalsValueRef:
     key: str  # one of SIGNAL_KEYS
 
 
-ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef | SignalsValueRef
+@dataclass(frozen=True, slots=True)
+class ParamsValueRef:
+    """``{"source":"params","name":"ndvi_drop_threshold"}``
+
+    Resolves to a decision-tree parameter value (defaults from the
+    tree's ``parameters:`` declaration, layered with tenant overrides
+    in PR-C). Used in any literal slot of a comparison node:
+    ``right`` / ``low`` / ``high`` / inside ``values``. NOT valid on
+    a comparison ``left``, which always points at observed data.
+
+    Permissive resolution: unknown name → None → comparison fails
+    closed, matching every other ref kind.
+    """
+
+    source: Literal["params"]
+    name: str
 
 
-def parse_value_ref(raw: Any) -> ValueRef:
+ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef | SignalsValueRef | ParamsValueRef
+
+
+def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0912 - dispatch over ref sources
     """Strict parse of a leaf value-ref dict.
 
     Raises ``ConditionParseError`` on unknown source or missing/invalid
@@ -111,4 +129,9 @@ def parse_value_ref(raw: Any) -> ValueRef:
         if key not in SIGNAL_KEYS:
             raise ConditionParseError(f"signals ref 'key' must be one of {SIGNAL_KEYS}")
         return SignalsValueRef(source="signals", code=code, key=key)
+    if source == "params":
+        name = raw.get("name")
+        if not isinstance(name, str) or not name:
+            raise ConditionParseError("params ref missing 'name'")
+        return ParamsValueRef(source="params", name=name)
     raise ConditionParseError(f"unknown value-ref source {source!r}")
