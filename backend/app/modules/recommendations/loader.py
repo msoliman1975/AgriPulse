@@ -83,6 +83,13 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     # at sweep time when a tenant block hits the dead branch.
     _validate_reachability(nodes_raw, root, source_path)
 
+    # Validate the optional `parameters:` declaration block (PR-B) and
+    # walk the node tree to verify every `{source: params, name: x}`
+    # ref names a declared parameter. Trees that don't declare params
+    # skip this entirely and behave exactly like pre-PR-B trees.
+    parameters_decl = _validate_parameters_block(spec, source_path)
+    _validate_params_refs(nodes_raw, parameters_decl, source_path)
+
     compiled: dict[str, Any] = {
         "code": code,
         "name_en": name_en,
@@ -91,10 +98,126 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
         "description_ar": spec.get("description_ar"),
         "crop_code": spec.get("crop_code"),
         "applicable_regions": list(spec.get("applicable_regions") or []),
+        "parameters": parameters_decl,
         "root": root,
         "nodes": nodes_raw,
     }
     return compiled
+
+
+# Allowed `type:` values in a parameter declaration. Each maps to a
+# permissive coercion: the engine just stores values; the YAML loader
+# checks the *default* fits the declared type so a buggy YAML surfaces
+# at startup, not during evaluation.
+_PARAM_TYPES: frozenset[str] = frozenset(
+    {"number", "integer", "boolean", "string", "enum"}
+)
+
+
+def _validate_parameters_block(
+    spec: dict[str, Any], source_path: str
+) -> dict[str, dict[str, Any]]:
+    """Strict-parse the optional ``parameters:`` block.
+
+    Each entry must have a ``type`` and a ``default``. ``enum`` types
+    additionally require a non-empty ``values`` list and the default
+    must be one of the values. Returns a normalized mapping keyed by
+    parameter name; an empty dict when no ``parameters:`` block exists.
+    """
+    raw = spec.get("parameters")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise DecisionTreeParseError(
+            path=source_path, detail="'parameters' must be a mapping"
+        )
+
+    normalized: dict[str, dict[str, Any]] = {}
+    for name, decl in raw.items():
+        if not isinstance(name, str) or not name:
+            raise DecisionTreeParseError(
+                path=source_path, detail="parameter names must be non-empty strings"
+            )
+        if not isinstance(decl, dict):
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"parameter {name!r} declaration must be a mapping",
+            )
+        type_ = decl.get("type")
+        if type_ not in _PARAM_TYPES:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"parameter {name!r} 'type' must be one of {sorted(_PARAM_TYPES)}",
+            )
+        if "default" not in decl:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"parameter {name!r} missing 'default'",
+            )
+        default = decl["default"]
+        if type_ == "enum":
+            values = decl.get("values")
+            if not isinstance(values, list) or not values:
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=f"enum parameter {name!r} requires non-empty 'values'",
+                )
+            if default not in values:
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=f"enum parameter {name!r} default {default!r} not in values",
+                )
+
+        normalized[name] = {
+            "type": type_,
+            "default": default,
+            "description": decl.get("description"),
+            "min": decl.get("min"),
+            "max": decl.get("max"),
+            "values": list(decl.get("values") or []) if type_ == "enum" else None,
+        }
+    return normalized
+
+
+def _validate_params_refs(
+    nodes: dict[str, Any],
+    parameters_decl: dict[str, dict[str, Any]],
+    source_path: str,
+) -> None:
+    """Walk every node's condition tree and every leaf's outcome.parameters
+    looking for ``{source: params, name: x}`` refs. Each `x` must be a
+    declared parameter; missing declarations surface as a parse error
+    at startup so trees never ship referencing a typo'd parameter."""
+    declared = set(parameters_decl.keys())
+
+    def _walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if value.get("source") == "params":
+                ref_name = value.get("name")
+                if not isinstance(ref_name, str) or ref_name not in declared:
+                    raise DecisionTreeParseError(
+                        path=source_path,
+                        detail=(
+                            f"params ref {ref_name!r} is not declared in "
+                            "the tree's 'parameters' block"
+                        ),
+                    )
+                return
+            for child in value.values():
+                _walk(child)
+        elif isinstance(value, list):
+            for item in value:
+                _walk(item)
+
+    for node in nodes.values():
+        if not isinstance(node, dict):
+            continue
+        condition = node.get("condition")
+        if isinstance(condition, dict):
+            _walk(condition.get("tree"))
+        outcome = node.get("outcome")
+        if isinstance(outcome, dict):
+            _walk(outcome.get("parameters"))
 
 
 def _validate_reachability(

@@ -115,6 +115,12 @@ class ConditionContext:
     indices: dict[str, IndicesEntry] = field(default_factory=dict)
     weather: WeatherSnapshot | None = None
     signals: dict[str, SignalEntry] = field(default_factory=dict)
+    # Decision-tree parameter values (PR-B): {name: value} resolved
+    # from the tree's `parameters:` defaults, layered with tenant
+    # overrides in PR-C. The alerts engine leaves this empty.
+    # `{source: params, name: x}` resolves via this dict; missing keys
+    # return None (permissive).
+    params: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_block_signals(
@@ -126,6 +132,7 @@ class ConditionContext:
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
         signals: dict[str, SignalEntry] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
         engine already loads. ``weather`` and ``signals`` are optional —
@@ -147,6 +154,7 @@ class ConditionContext:
             indices=indices,
             weather=weather,
             signals=signals or {},
+            params=dict(params or {}),
         )
 
 

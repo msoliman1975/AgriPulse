@@ -57,7 +57,7 @@ error=...)`` for the caller to log.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
@@ -65,6 +65,54 @@ from app.shared.conditions import ConditionContext
 from app.shared.conditions import evaluate as _evaluate_condition_tree
 
 _MAX_STEPS = 64
+
+
+def _build_params(
+    compiled: Mapping[str, Any],
+    overrides: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Resolve parameter values for one tree evaluation (PR-B).
+
+    Starts with the defaults declared in ``compiled.parameters``, then
+    layers any ``overrides`` on top. PR-C plumbs tenant-level overrides
+    into this slot; for now most callers pass ``None`` and only
+    defaults apply. Overrides for parameters not declared in the tree
+    are silently dropped — they'd indicate either a stale override or
+    a typo, and we'd rather fail closed than apply a phantom value.
+    """
+    decl = compiled.get("parameters") or {}
+    resolved: dict[str, Any] = {}
+    if isinstance(decl, dict):
+        for name, decl_entry in decl.items():
+            if isinstance(decl_entry, dict) and "default" in decl_entry:
+                resolved[name] = decl_entry["default"]
+    if overrides:
+        for k, v in overrides.items():
+            if k in resolved:
+                resolved[k] = v
+    return resolved
+
+
+def _substitute_params_in_outcome_params(
+    raw: Any, params: Mapping[str, Any]
+) -> Any:
+    """Replace any ``{source: params, name: x}`` ref dict found inside
+    an outcome.parameters value with the resolved literal.
+
+    Recursive: handles nested dicts and lists so a parameter can be a
+    structured value containing nested refs. Refs to undeclared names
+    resolve to ``None`` — the engine writes that into the persisted
+    ``recommendations.parameters`` JSONB, which is the same shape
+    consumers already handle for missing optional fields.
+    """
+    if isinstance(raw, dict):
+        if raw.get("source") == "params":
+            name = raw.get("name")
+            return params.get(name) if isinstance(name, str) else None
+        return {k: _substitute_params_in_outcome_params(v, params) for k, v in raw.items()}
+    if isinstance(raw, list):
+        return [_substitute_params_in_outcome_params(v, params) for v in raw]
+    return raw
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +150,10 @@ class EvaluationResult:
 
 
 def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
-    compiled: Mapping[str, Any], ctx: ConditionContext
+    compiled: Mapping[str, Any],
+    ctx: ConditionContext,
+    *,
+    param_overrides: Mapping[str, Any] | None = None,
 ) -> EvaluationResult:
     """Walk ``compiled`` from its root with ``ctx`` and return the result.
 
@@ -110,7 +161,18 @@ def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
     a leaf with ``action_type == 'no_action'`` (the engine still records
     the path so debug callers can see which branch the block hit). The
     service treats outcome=None as "do not write a recommendation".
+
+    ``param_overrides`` (PR-B): values that override the tree's
+    declared parameter defaults. Resolved params land on ``ctx.params``
+    for the duration of this evaluation so any ``$params.x`` refs
+    inside conditions resolve to either the override or the default.
+    PR-C will populate this from ``tenant.tree_parameter_overrides``.
     """
+    params_resolved = _build_params(compiled, param_overrides)
+    # Don't mutate the caller's ctx — every block in a sweep shares the
+    # same data ctx but each tree builds its own params dict.
+    ctx = replace(ctx, params=params_resolved) if params_resolved else ctx
+
     nodes_raw = compiled.get("nodes")
     if not isinstance(nodes_raw, dict):
         return EvaluationResult(outcome=None, error="compiled.nodes missing or not a dict")
@@ -135,7 +197,7 @@ def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
 
         if "outcome" in node:
             path.append(_step_for_leaf(current, node))
-            outcome = _parse_outcome(node["outcome"])
+            outcome = _parse_outcome(node["outcome"], params=params_resolved)
             return EvaluationResult(
                 outcome=outcome,
                 path=path,
@@ -203,7 +265,7 @@ def _step_for_leaf(node_id: str, node: Mapping[str, Any]) -> TreePathStep:
     )
 
 
-def _parse_outcome(raw: Any) -> TreeOutcome | None:
+def _parse_outcome(raw: Any, *, params: Mapping[str, Any]) -> TreeOutcome | None:
     if not isinstance(raw, dict):
         return None
     action_type = raw.get("action_type")
@@ -224,11 +286,18 @@ def _parse_outcome(raw: Any) -> TreeOutcome | None:
     if isinstance(valid_for_hours_raw, int) and valid_for_hours_raw > 0:
         valid_for_hours = valid_for_hours_raw
 
+    # Outcome.parameters may contain `{source: params, name: x}` refs;
+    # substitute them to literals here so the persisted row in
+    # `recommendations.parameters` is a plain JSONB object the rest
+    # of the system can consume without knowing about refs (PR-B).
+    raw_parameters = dict(raw.get("parameters") or {})
+    parameters = _substitute_params_in_outcome_params(raw_parameters, params)
+
     return TreeOutcome(
         action_type=action_type,
         severity=str(raw.get("severity", "info")),
         confidence=confidence,
-        parameters=dict(raw.get("parameters") or {}),
+        parameters=parameters if isinstance(parameters, dict) else {},
         text_en=text_en,
         text_ar=raw.get("text_ar"),
         valid_for_hours=valid_for_hours,
