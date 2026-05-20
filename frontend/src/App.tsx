@@ -22,7 +22,6 @@ import { BlockAutoGridPage } from "@/modules/farms/pages/BlockAutoGridPage";
 import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
-import { PlanPage } from "@/modules/plan/pages/PlanPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
 import { RecommendationsPage } from "@/modules/recommendations/pages/RecommendationsPage";
@@ -65,6 +64,11 @@ function RedirectDecisionTreeDetail(): ReactNode {
 function RedirectLegacyAdminTenant(): ReactNode {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return <Navigate to={`/platform/tenants/${tenantId}`} replace />;
+}
+
+function RedirectPlanToBoard(): ReactNode {
+  const { farmId = "" } = useParams<{ farmId: string }>();
+  return <Navigate to={`/board/${farmId}`} replace />;
 }
 
 export function App(): ReactNode {
@@ -124,7 +128,11 @@ export function App(): ReactNode {
                 <Route path="/labs/map" element={<MapExperiencePage />} />
                 <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
-                <Route path="/plan/:farmId" element={<PlanPage />} />
+                {/* Board PR-7 cutover: /plan/:farmId redirects to /board/:farmId.
+                  The legacy PlanPage component stays in the codebase for the
+                  one-plan-at-a-time flow under /plans/:planId/activities; the
+                  farm-scoped Gantt is folded into the board grid. */}
+                <Route path="/plan/:farmId" element={<RedirectPlanToBoard />} />
                 <Route path="/board/:farmId" element={<BoardPage />} />
                 <Route path="/alerts/:farmId" element={<AlertsPage />} />
                 <Route path="/recommendations/:farmId" element={<RecommendationsPage />} />

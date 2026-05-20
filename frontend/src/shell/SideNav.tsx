@@ -187,11 +187,11 @@ export function SideNav(): ReactNode {
           activePathPrefix="/signals/"
         />
         <SideNavItem
-          to={hasFarm ? `/plan/${farmSegment}` : "#"}
+          to={hasFarm ? `/board/${farmSegment}` : "#"}
           label="Plan"
           icon={<PlanIcon className="h-4 w-4" />}
           disabled={!hasFarm}
-          activePathPrefix="/plan/"
+          activePathPrefix="/board/"
         />
         <SideNavItem
           to={hasFarm ? `/reports/${farmSegment}` : "#"}
