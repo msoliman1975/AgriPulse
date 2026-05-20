@@ -45,6 +45,27 @@
     "cancel": "Cancel",
     "failed": "Couldn't save — check the form."
   },
+  "filters": {
+    "blocks": "Blocks",
+    "types": "Activity",
+    "assignees": "Assigned",
+    "clear": "Clear filters"
+  },
+  "bulk": {
+    "selected": "{{count}} cells selected",
+    "add": "Bulk add",
+    "clear": "Clear selection"
+  },
+  "bulkAdd": {
+    "title": "Schedule across {{count}} cells",
+    "day": "Day of week (applied to each selected week)",
+    "skipExisting": "Skip cells that already have this activity",
+    "create": "Create {{count}}"
+  },
+  "mobile": {
+    "add": "+ Add",
+    "noneScheduled": "Nothing scheduled."
+  },
   "detail": {
     "date": "Date",
     "status": "Status",
