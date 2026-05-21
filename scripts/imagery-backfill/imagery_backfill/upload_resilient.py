@@ -28,6 +28,12 @@ import psycopg
 
 from imagery_backfill import upload_to_local as _impl
 
+# Capture the real `psycopg.connect` BEFORE we monkey-patch it, so the
+# wrapper below can still reach the unpatched function. Without this we
+# self-recurse the moment `_connect_once` tries to open the underlying
+# connection.
+_real_psycopg_connect = psycopg.connect
+
 _real_conn: psycopg.Connection | None = None
 
 
@@ -80,7 +86,7 @@ def _connect_once(*args, **kwargs) -> _PinnedConn:
         from psycopg.rows import dict_row
         kwargs.setdefault("row_factory", dict_row)
         kwargs["autocommit"] = False
-        _real_conn = psycopg.connect(*args, **kwargs)
+        _real_conn = _real_psycopg_connect(*args, **kwargs)
     return _PinnedConn(_real_conn)
 
 
