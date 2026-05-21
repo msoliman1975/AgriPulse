@@ -113,14 +113,18 @@ def _iso_utc_z(dt: datetime) -> str:
 @click.option("--farm-id", "farm_id", type=click.UUID, required=True,
               help="Target farm UUID. All active blocks under this farm will receive history.")
 @click.option("--pg-dsn", default=_DEFAULT_PG_DSN, show_default=True)
+@click.option("--s3-mode", type=click.Choice(["minio", "aws"]), default="minio",
+              show_default=True,
+              help='"minio" → use --s3-endpoint + --s3-key/--s3-secret (local). '
+                   '"aws"  → real AWS S3 with boto3 default credential chain.')
 @click.option("--s3-endpoint", default=_DEFAULT_S3_ENDPOINT, show_default=True,
-              help='Pass "" (empty) to use real AWS S3 instead of MinIO.')
+              help="Ignored in --s3-mode aws.")
 @click.option("--s3-key", default=_DEFAULT_S3_KEY, show_default=True,
-              help='Pass "" (empty) to fall back to the boto3 default credential chain.')
+              help="Ignored in --s3-mode aws.")
 @click.option("--s3-secret", default=_DEFAULT_S3_SECRET, show_default=True)
 @click.option("--s3-bucket", default=_DEFAULT_S3_BUCKET, show_default=True)
 @click.option("--aws-region", default=_DEFAULT_AWS_REGION, show_default=True,
-              help="AWS region for real-S3 mode. Use eu-south-1 for live.")
+              help="AWS region for --s3-mode aws. Use eu-south-1 for live.")
 @click.option("--dry-run", is_flag=True,
               help="Discover scenes + blocks + plan, but write nothing.")
 def main(
@@ -128,6 +132,7 @@ def main(
     tenant_id: UUID,
     farm_id: UUID,
     pg_dsn: str,
+    s3_mode: str,
     s3_endpoint: str,
     s3_key: str,
     s3_secret: str,
@@ -218,14 +223,13 @@ def main(
         return
 
     # ---- S3 client (MinIO local OR real AWS S3) ----
-    # An empty `--s3-endpoint` means "use real AWS"; otherwise we point
-    # at MinIO. An empty `--s3-key` falls back to the boto3 default
-    # credential chain (env vars / AWS profile / IRSA / instance role),
-    # so live runs from a laptop with `AWS_PROFILE=agripulse` just work.
+    # `--s3-mode aws` uses the boto3 default credential chain (env vars,
+    # AWS_PROFILE, IRSA, instance role) so a laptop with
+    # `AWS_PROFILE=agripulse` just works without echoing keys on the
+    # command line. `minio` keeps the local-compose path unchanged.
     s3_kwargs: dict[str, Any] = {"region_name": aws_region}
-    if s3_endpoint:
+    if s3_mode == "minio":
         s3_kwargs["endpoint_url"] = s3_endpoint
-    if s3_key:
         s3_kwargs["aws_access_key_id"] = s3_key
         s3_kwargs["aws_secret_access_key"] = s3_secret
     s3 = boto3.client("s3", **s3_kwargs)
