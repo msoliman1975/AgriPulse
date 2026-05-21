@@ -1,8 +1,22 @@
 {{- /*
-ArgoCD PreSync hook Job — runs `alembic upgrade head` against the
-public schema before any new ReplicaSet of the api Deployment goes
-live. Without this, fresh deployments (or schema changes) require an
-operator to kubectl-cp alembic.ini into a pod and run alembic by hand.
+ArgoCD PreSync hook Job — applies all DB migrations before any new
+ReplicaSet of the api Deployment goes live.
+
+Two phases chained in a single container:
+
+  1. `alembic -n public upgrade head` — schema migrations for the
+     shared public schema (tenants, users, audit log, etc.).
+  2. `python -m scripts.migrate_tenants` — walks every active tenant
+     row in public.tenants and applies the tenant-schema migrations
+     to its dedicated schema. Reruns are idempotent.
+
+Why both run here: before this change, only step 1 ran automatically.
+Tenant-schema migrations were a manual operator step (kubectl-exec
+into the api pod, run migrate_tenants). Skipping that step meant
+deploys that added a tenant migration would 500 on every request
+that touched a still-stale tenant schema — exactly the failure mode
+we hit on the 0030 board-columns migration. Chaining the two keeps
+deploy and schema state in lock-step.
 
 The Job uses the same image + envFrom (configmap + ExternalSecret) as
 the api Deployment, plus DATABASE_PASSWORD from the CNPG-managed
@@ -14,7 +28,8 @@ Notes
 -----
 - hook-delete-policy `before-hook-creation,hook-succeeded` keeps a
   failed job's Pod around for inspection (delete it manually after).
-- The Job mounts no PVC; pgstac is memory-hungry, so 1500Mi limit.
+- 1500Mi memory limit accommodates pgstac's appetite + a per-tenant
+  alembic context (peak ~200Mi during a multi-step tenant upgrade).
 - amd64 pin matches the api Deployment (image is amd64-only today).
 */ -}}
 {{- if .Values.migrationJob.enabled }}
@@ -45,14 +60,20 @@ spec:
         - name: alembic
           image: {{ include "agripulse-api.imageRef" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Chained via `sh -c` so the tenant pass only runs if the
+          # public pass succeeded — `set -euo pipefail` makes the
+          # container exit non-zero on the first failure so ArgoCD
+          # blocks the sync instead of rolling pods against a stale
+          # schema.
           command:
-            - /opt/venv/bin/alembic
+            - /bin/sh
             - -c
-            - /app/alembic.ini
-            - -n
-            - public
-            - upgrade
-            - head
+            - |
+              set -euo pipefail
+              echo ">> alembic upgrade head (public)"
+              /opt/venv/bin/alembic -c /app/alembic.ini -n public upgrade head
+              echo ">> migrate_tenants (all active tenants)"
+              /opt/venv/bin/python -m scripts.migrate_tenants
           workingDir: /app
           envFrom:
             - configMapRef:
