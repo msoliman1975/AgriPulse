@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 
+import { isApiError } from "@/api/errors";
 import {
   applyIrrigation,
   applyOrg,
@@ -108,7 +109,15 @@ export function FarmDefaultsTab({ farmId }: Props) {
         setWeatherProviders(wp);
       } catch (err) {
         if (cancelled) return;
-        const status = (err as { response?: { status?: number } })?.response?.status;
+        // The axios interceptor lifts every error into an `ApiError`
+        // with `.status` on it. The pre-interceptor shape
+        // (`err.response.status`) never matched here, so a 404 from
+        // the template endpoints used to slip through as a generic
+        // "Not found." load error instead of triggering the
+        // feature-off notice.
+        const status = isApiError(err)
+          ? err.status
+          : (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) {
           setFeatureOff(true);
         } else {

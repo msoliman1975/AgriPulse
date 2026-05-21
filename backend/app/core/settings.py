@@ -70,10 +70,11 @@ class Settings(BaseSettings):
 
     # --- Feature flags ---------------------------------------------------
     # Gates the /v1/farms/{id}/config/subscriptions/* endpoints + the
-    # Defaults tab in FarmDrawer. OFF by default until backfill of
-    # existing per-block subscriptions into farm templates is verified
-    # in each tenant. Flipped on per-environment; removed in PR-4.
-    farm_config_template_enabled: bool = False
+    # Defaults tab in FarmDrawer. ON by default — farm-level templates
+    # are the canonical config surface. Override per-env to `False`
+    # only if you need to stage the backfill of existing per-block
+    # subscriptions before exposing templates. Removed in PR-4.
+    farm_config_template_enabled: bool = True
     keycloak_base_url: str = "https://keycloak.dev.agripulse.local"
     keycloak_realm: str = "agripulse"
     keycloak_admin_client_id: str = "agripulse-tenancy"
