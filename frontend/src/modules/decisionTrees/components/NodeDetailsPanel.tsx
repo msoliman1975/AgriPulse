@@ -24,21 +24,39 @@ import { useTranslation } from "react-i18next";
 
 import type { PositionedNode } from "../layout/treeLayout";
 import type { LeafOutcomePatch, NodePatch } from "../lib/treeEdit";
+import { parseConditionTree } from "../lib/conditionEdit";
+import { ConditionBuilder } from "./ConditionBuilder";
 
 interface NodeDetailsPanelProps {
   node: PositionedNode;
   pendingPatch?: NodePatch;
   canEdit: boolean;
+  /** True when this node is the tree's root. Disables Delete because
+   *  the root has no parent to clean up after removal. */
+  isRoot?: boolean;
   onPatch: (nodeId: string, patch: NodePatch) => void;
   onClearPatch: (nodeId: string) => void;
+  /** PR-D4: delete this node + its subtree. Caller surfaces the
+   *  confirm dialog. */
+  onDelete?: (nodeId: string) => void;
+  /** PR-D4: add a child under one of this decision's empty branches.
+   *  Caller surfaces the kind-picker. */
+  onAddChild?: (parentId: string, branch: "match" | "miss") => void;
+  /** PR-D5: rewrite this decision's condition.tree. Caller commits the
+   *  change to the draft YAML and re-validates. */
+  onConditionChange?: (nodeId: string, nextTree: unknown) => void;
 }
 
 export function NodeDetailsPanel({
   node,
   pendingPatch,
   canEdit,
+  isRoot = false,
   onPatch,
   onClearPatch,
+  onDelete,
+  onAddChild,
+  onConditionChange,
 }: NodeDetailsPanelProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -46,6 +64,11 @@ export function NodeDetailsPanel({
   const isLeaf = node.data.outcome !== undefined;
   const hasPending =
     pendingPatch !== undefined && Object.keys(pendingPatch).length > 0;
+  // Add-child buttons surface for decision nodes with empty branches.
+  const canAddMatch =
+    !isLeaf && canEdit && onAddChild !== undefined && !(node.data as { on_match?: string }).on_match;
+  const canAddMiss =
+    !isLeaf && canEdit && onAddChild !== undefined && !(node.data as { on_miss?: string }).on_miss;
 
   return (
     <aside className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
@@ -86,7 +109,12 @@ export function NodeDetailsPanel({
           onPatch={onPatch}
         />
       ) : (
-        <DecisionConditionSection node={node} />
+        <DecisionConditionSection
+          node={node}
+          mode={mode}
+          canEdit={canEdit}
+          onConditionChange={onConditionChange}
+        />
       )}
 
       {hasPending ? (
@@ -99,6 +127,59 @@ export function NodeDetailsPanel({
           >
             {t("editor.panel.discardNode")}
           </button>
+        </div>
+      ) : null}
+
+      {/* PR-D4: structural actions. Always rendered (when canEdit) so
+       *  the author can see *where* add/delete live — even if a given
+       *  node has no applicable add target. We surface contextual
+       *  hints in place of buttons when an action isn't available.
+       */}
+      {canEdit ? (
+        <div className="flex flex-col gap-2 border-t border-ap-line pt-3 text-xs">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ap-muted">
+            {t("editor.panel.actions")}
+          </p>
+          {!isLeaf ? (
+            canAddMatch || canAddMiss ? (
+              <div className="flex flex-wrap gap-2">
+                {canAddMatch ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddChild!(node.id, "match")}
+                    className="rounded-md border border-ap-line bg-ap-bg/60 px-2 py-1 font-medium text-ap-ink hover:bg-ap-bg"
+                  >
+                    {t("editor.panel.addMatch")}
+                  </button>
+                ) : null}
+                {canAddMiss ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddChild!(node.id, "miss")}
+                    className="rounded-md border border-ap-line bg-ap-bg/60 px-2 py-1 font-medium text-ap-ink hover:bg-ap-bg"
+                  >
+                    {t("editor.panel.addMiss")}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-ap-muted">{t("editor.panel.branchesFilledHint")}</p>
+            )
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              disabled={isRoot}
+              onClick={() => onDelete(node.id)}
+              title={isRoot ? t("editor.panel.deleteRootBlocked") : undefined}
+              className="self-start rounded-md border border-ap-crit/40 px-2 py-1 font-medium text-ap-crit hover:bg-ap-crit/10 disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              {t("editor.panel.deleteNode")}
+            </button>
+          ) : null}
+          {isRoot ? (
+            <p className="text-ap-muted">{t("editor.panel.deleteRootBlocked")}</p>
+          ) : null}
         </div>
       ) : null}
     </aside>
@@ -147,22 +228,43 @@ function LabelsSection({
   );
 }
 
-function DecisionConditionSection({ node }: { node: PositionedNode }): ReactNode {
+function DecisionConditionSection({
+  node,
+  mode,
+  canEdit,
+  onConditionChange,
+}: {
+  node: PositionedNode;
+  mode: "view" | "edit";
+  canEdit: boolean;
+  onConditionChange?: (nodeId: string, nextTree: unknown) => void;
+}): ReactNode {
   const { t } = useTranslation("decisionTrees");
-  const condition = (node.data as { condition?: unknown }).condition;
+  const condition = (node.data as { condition?: { tree?: unknown } }).condition;
+  const tree = condition?.tree;
+  const editable = parseConditionTree(tree);
+  // Builder edits flow back through the host page's
+  // `applySetNodeCondition` helper; here we just adapt the prop.
+  const handleChange = (next: unknown): void => {
+    onConditionChange?.(node.id, next);
+  };
   return (
     <Section title={t("editor.panel.condition.heading")}>
-      <p className="text-xs text-ap-muted">
-        {t("editor.panel.condition.deferredNote")}
-      </p>
-      <pre className="max-h-64 overflow-auto rounded bg-ap-bg/60 p-2 text-[11px] leading-relaxed text-ap-ink">
-        {JSON.stringify(condition, null, 2)}
-      </pre>
+      {mode === "edit" && canEdit && onConditionChange ? (
+        <ConditionBuilder value={editable} onChange={handleChange} />
+      ) : (
+        <>
+          {editable.kind === "unsupported" ? (
+            <p className="text-xs text-ap-muted">
+              {t("editor.panel.condition.unsupportedNote")}
+            </p>
+          ) : null}
+          <ConditionBuilder value={editable} onChange={() => {}} readOnly />
+        </>
+      )}
       <KeyValue
         label={t("editor.panel.condition.onMatch")}
-        value={
-          (node.data as { on_match?: string }).on_match ?? "—"
-        }
+        value={(node.data as { on_match?: string }).on_match ?? "—"}
         mono
       />
       <KeyValue

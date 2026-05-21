@@ -1,31 +1,56 @@
-// Read-only SVG renderer for a compiled decision tree (PR-D1).
+// SVG renderer for a compiled decision tree.
 //
-// Takes a LayoutResult from `treeLayout.ts` and draws each node as a
-// rounded rect with role-colored chrome. Decision nodes show the
-// condition summary text; leaf nodes show kind chip + action_type +
-// the (truncated) leaf text. Edges are drawn as orthogonal Bezier
-// curves from parent bottom to child top, color-coded by branch
-// (green for `match`, slate for `miss`).
+// PR-D1 made it read-only. PR-D2 added click-to-select + dirty
+// indicators. PR-D4 added `+` ports for adding children to empty
+// branches. PR-D6 turns every branch port into a drag source so the
+// author can rewire connections by dragging from a port to a target
+// node.
 //
-// Pure presentational — accepts no state. PR-D2 will introduce
-// click-to-select / hover overlays; D1 stays read-only.
+// Drag UX:
+//   - pointerdown on a port enters "potential drag" — if the cursor
+//     moves more than DRAG_THRESHOLD before pointerup, it's a drag;
+//     otherwise the port's click handler fires (= add-child for empty
+//     ports, no-op for filled ports).
+//   - pointermove tracks the cursor in SVG coords and re-renders a
+//     dashed line from the source port to the cursor.
+//   - pointerup on a node calls `onRewire(parent, branch, target)`.
 
+import { useRef, useState, useEffect, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LayoutResult, PositionedNode } from "../layout/treeLayout";
 import { LAYOUT_CONSTANTS } from "../layout/treeLayout";
 
 const { NODE_WIDTH, NODE_HEIGHT } = LAYOUT_CONSTANTS;
+const DRAG_THRESHOLD_PX = 4;
 
 interface TreeCanvasProps {
   layout: LayoutResult;
-  // PR-D2: selection + click handler. Both optional so D1's read-only
-  // call sites keep working without changes.
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string | null) => void;
-  // PR-D2: ids that have unsaved edits — rendered with a small dot
-  // overlay so the author sees what's pending.
   dirtyNodeIds?: ReadonlySet<string>;
+  /** PR-D4: click on a `+` port → add a child. */
+  onAddChild?: (parentId: string, branch: "match" | "miss") => void;
+  /** PR-D6: drag from any port to a node → rewire the branch. */
+  onRewire?: (parentId: string, branch: "match" | "miss", targetId: string) => void;
+  /** PR-D7: dry-run path overlay. Visited nodes get a halo; edges
+   *  along the path render thicker. `terminalNodeId` is the leaf at
+   *  the end of the path — drawn with the strongest emphasis. */
+  pathNodeIds?: ReadonlySet<string>;
+  pathEdgeKeys?: ReadonlySet<string>;
+  terminalNodeId?: string | null;
+}
+
+interface DragState {
+  parentId: string;
+  branch: "match" | "miss";
+  /** Port origin in SVG coords (where the dashed line starts). */
+  originX: number;
+  originY: number;
+  cursorX: number;
+  cursorY: number;
+  hoverNodeId: string | null;
+  moved: boolean;
 }
 
 export function TreeCanvas({
@@ -33,8 +58,118 @@ export function TreeCanvas({
   selectedNodeId = null,
   onSelectNode,
   dirtyNodeIds,
+  onAddChild,
+  onRewire,
+  pathNodeIds,
+  pathEdgeKeys,
+  terminalNodeId,
 }: TreeCanvasProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+
+  // Convert a pointer event to SVG-local coords. Uses the SVG element's
+  // current CTM so it stays correct under scroll / scale.
+  function clientToSvg(evt: { clientX: number; clientY: number }): { x: number; y: number } | null {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const inv = ctm.inverse();
+    const local = pt.matrixTransform(inv);
+    return { x: local.x, y: local.y };
+  }
+
+  // Pointer-move on window during a drag — using window so the user
+  // can drag outside the SVG bounds without losing the drag.
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (evt: PointerEvent): void => {
+      const local = clientToSvg(evt);
+      if (!local) return;
+      const dx = Math.abs(local.x - drag.cursorX);
+      const dy = Math.abs(local.y - drag.cursorY);
+      setDrag((prev) =>
+        prev
+          ? {
+              ...prev,
+              cursorX: local.x,
+              cursorY: local.y,
+              moved: prev.moved || dx + dy > DRAG_THRESHOLD_PX,
+            }
+          : null,
+      );
+    };
+    const onUp = (): void => {
+      // pointerup is handled by the per-node handler below if dropped
+      // on a node; if not, just cancel. We need to delay-clear so the
+      // per-node handler runs first.
+      setTimeout(() => setDrag(null), 0);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [drag]);
+
+  const onPortPointerDown = (
+    parentId: string,
+    branch: "match" | "miss",
+    originX: number,
+    originY: number,
+    evt: ReactPointerEvent<SVGGElement>,
+  ): void => {
+    const local = clientToSvg(evt);
+    if (!local) return;
+    evt.stopPropagation();
+    setDrag({
+      parentId,
+      branch,
+      originX,
+      originY,
+      cursorX: local.x,
+      cursorY: local.y,
+      hoverNodeId: null,
+      moved: false,
+    });
+  };
+
+  const onPortClick = (parentId: string, branch: "match" | "miss"): void => {
+    onAddChild?.(parentId, branch);
+  };
+
+  // Per-node pointer handlers for highlight + drop.
+  const onNodePointerEnter = (nodeId: string): void => {
+    setDrag((prev) => (prev ? { ...prev, hoverNodeId: nodeId } : null));
+  };
+  const onNodePointerLeave = (nodeId: string): void => {
+    setDrag((prev) =>
+      prev && prev.hoverNodeId === nodeId ? { ...prev, hoverNodeId: null } : prev,
+    );
+  };
+  const onNodePointerUp = (nodeId: string): void => {
+    const d = drag;
+    if (!d || !d.moved) return;
+    if (d.parentId === nodeId) return;
+    onRewire?.(d.parentId, d.branch, nodeId);
+    setDrag(null);
+  };
+
+  // Precompute a Set of node ids that are valid drop targets so the
+  // visual can dim ineligible ones (e.g. the source parent itself).
+  const validDropTargets = useMemo(() => {
+    if (!drag) return null;
+    const set = new Set<string>();
+    for (const n of layout.nodes) {
+      if (n.id !== drag.parentId) set.add(n.id);
+    }
+    return set;
+  }, [drag, layout.nodes]);
 
   if (layout.nodes.length === 0) {
     return (
@@ -44,33 +179,107 @@ export function TreeCanvas({
     );
   }
 
+  const canShowPorts = onAddChild !== undefined || onRewire !== undefined;
+
   return (
     <div className="overflow-auto rounded-xl border border-ap-line bg-ap-panel">
       <svg
+        ref={svgRef}
         role="img"
         aria-label={t("viewer.svgAria")}
         width={layout.width}
         height={layout.height}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
-        className="block"
-        // Click on empty canvas clears selection so the details panel
-        // collapses. Bubble guard inside NodeRect stops node clicks
-        // from reaching this handler.
+        className="block touch-none"
         onClick={onSelectNode ? () => onSelectNode(null) : undefined}
       >
-        {/* Edges drawn first so nodes sit on top. */}
-        {layout.edges.map((edge) => (
-          <EdgePath key={`${edge.from}->${edge.to}-${edge.branch}`} edge={edge} t={t} />
-        ))}
+        {layout.edges.map((edge) => {
+          const key = `${edge.from}->${edge.to}-${edge.branch}`;
+          return (
+            <EdgePath
+              key={key}
+              edge={edge}
+              t={t}
+              onPath={pathEdgeKeys?.has(key) ?? false}
+            />
+          );
+        })}
         {layout.nodes.map((node) => (
           <NodeRect
             key={node.id}
             node={node}
             selected={selectedNodeId === node.id}
             dirty={dirtyNodeIds?.has(node.id) ?? false}
+            isDropTarget={
+              drag !== null &&
+              drag.moved &&
+              validDropTargets?.has(node.id) === true &&
+              drag.hoverNodeId === node.id
+            }
+            isDropEligible={
+              drag !== null && drag.moved && validDropTargets?.has(node.id) === true
+            }
+            onPath={pathNodeIds?.has(node.id) ?? false}
+            isTerminal={terminalNodeId === node.id}
             onClick={onSelectNode}
+            onPointerEnter={() => onNodePointerEnter(node.id)}
+            onPointerLeave={() => onNodePointerLeave(node.id)}
+            onPointerUp={() => onNodePointerUp(node.id)}
           />
         ))}
+        {canShowPorts
+          ? layout.nodes.flatMap((node) => {
+              if (node.role !== "decision") return [];
+              const data = node.data;
+              const ports: JSX.Element[] = [];
+              const matchFilled = Boolean(data.on_match);
+              const missFilled = Boolean(data.on_miss);
+              ports.push(
+                <BranchPort
+                  key={`${node.id}-port-match`}
+                  parentId={node.id}
+                  branch="match"
+                  filled={matchFilled}
+                  nodeX={node.x}
+                  nodeY={node.y}
+                  onClick={() => onPortClick(node.id, "match")}
+                  onPointerDown={(originX, originY, evt) =>
+                    onPortPointerDown(node.id, "match", originX, originY, evt)
+                  }
+                />,
+              );
+              ports.push(
+                <BranchPort
+                  key={`${node.id}-port-miss`}
+                  parentId={node.id}
+                  branch="miss"
+                  filled={missFilled}
+                  nodeX={node.x}
+                  nodeY={node.y}
+                  onClick={() => onPortClick(node.id, "miss")}
+                  onPointerDown={(originX, originY, evt) =>
+                    onPortPointerDown(node.id, "miss", originX, originY, evt)
+                  }
+                />,
+              );
+              return ports;
+            })
+          : null}
+        {/* PR-D6: live drag indicator — dashed line from port to cursor.
+            Only renders once the cursor has moved past the threshold so
+            a click doesn't briefly flash a line. */}
+        {drag && drag.moved ? (
+          <line
+            x1={drag.originX}
+            y1={drag.originY}
+            x2={drag.cursorX}
+            y2={drag.cursorY}
+            stroke={drag.branch === "match" ? "#16a34a" : "#94a3b8"}
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            pointerEvents="none"
+          />
+        ) : null}
       </svg>
     </div>
   );
@@ -81,13 +290,11 @@ export function TreeCanvas({
 interface EdgePathProps {
   edge: LayoutResult["edges"][number];
   t: ReturnType<typeof useTranslation>["t"];
+  /** PR-D7: edge is on the dry-run path → thicker stroke + saturated color. */
+  onPath?: boolean;
 }
 
-function EdgePath({ edge, t }: EdgePathProps): JSX.Element {
-  // Smooth S-curve between (fromX, fromY) and (toX, toY) via a cubic
-  // Bezier with vertical control handles. Match edges go solid green;
-  // miss edges go dashed slate so the user reads branch direction
-  // without needing to hit the label.
+function EdgePath({ edge, t, onPath = false }: EdgePathProps): JSX.Element {
   const dx = edge.toX - edge.fromX;
   const dy = edge.toY - edge.fromY;
   const c1x = edge.fromX;
@@ -97,13 +304,9 @@ function EdgePath({ edge, t }: EdgePathProps): JSX.Element {
   const d = `M ${edge.fromX} ${edge.fromY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${edge.toX} ${edge.toY}`;
 
   const isMatch = edge.branch === "match";
-  const stroke = isMatch ? "#16a34a" : "#94a3b8"; // green-600 / slate-400
+  const stroke = isMatch ? "#16a34a" : "#94a3b8";
   const label = isMatch ? t("viewer.edges.match") : t("viewer.edges.miss");
 
-  // Label sits at the midpoint of the curve. Anchored against the dx
-  // sign so left-going edges put their label to the right of the
-  // curve and vice-versa — keeps text from running across nearby
-  // nodes on dense layouts.
   const midX = (edge.fromX + edge.toX) / 2 + (dx >= 0 ? 8 : -8);
   const midY = (edge.fromY + edge.toY) / 2;
 
@@ -112,10 +315,10 @@ function EdgePath({ edge, t }: EdgePathProps): JSX.Element {
       <path
         d={d}
         stroke={stroke}
-        strokeWidth={2}
-        strokeDasharray={isMatch ? undefined : "5 4"}
+        strokeWidth={onPath ? 4 : 2}
+        strokeDasharray={isMatch ? undefined : onPath ? "8 3" : "5 4"}
         fill="none"
-        opacity={0.85}
+        opacity={onPath ? 1 : 0.85}
       />
       <text
         x={midX}
@@ -138,14 +341,38 @@ interface NodeRectProps {
   node: PositionedNode;
   selected: boolean;
   dirty: boolean;
+  isDropTarget: boolean;
+  isDropEligible: boolean;
+  /** PR-D7: node is on the dry-run path → subtle highlight halo. */
+  onPath: boolean;
+  /** PR-D7: terminal node (last on the path) → strong highlight. */
+  isTerminal: boolean;
   onClick?: (nodeId: string | null) => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+  onPointerUp: () => void;
 }
 
-function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Element {
+function NodeRect({
+  node,
+  selected,
+  dirty,
+  isDropTarget,
+  isDropEligible,
+  onPath,
+  isTerminal,
+  onClick,
+  onPointerEnter,
+  onPointerLeave,
+  onPointerUp,
+}: NodeRectProps): JSX.Element {
   const { x, y, role, data } = node;
   const palette = paletteFor(role);
   const isInteractive = onClick !== undefined;
-
+  // During a drag, dim nodes that aren't eligible drop targets to
+  // signal where the user can release. The drop target itself gets a
+  // bold highlight ring.
+  const opacity = isDropEligible || !isDropTargetMode(isDropTarget, isDropEligible) ? 1 : 0.4;
   return (
     <g
       onClick={
@@ -156,9 +383,11 @@ function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Elemen
             }
           : undefined
       }
-      style={{ cursor: isInteractive ? "pointer" : "default" }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onPointerUp={onPointerUp}
+      style={{ cursor: isInteractive ? "pointer" : "default", opacity }}
     >
-      {/* Selection halo — drawn behind the node so it reads as a glow. */}
       {selected ? (
         <rect
           x={x - 4}
@@ -173,6 +402,32 @@ function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Elemen
           strokeDasharray="6 3"
         />
       ) : null}
+      {isDropTarget ? (
+        <rect
+          x={x - 6}
+          y={y - 6}
+          width={NODE_WIDTH + 12}
+          height={NODE_HEIGHT + 12}
+          rx={14}
+          ry={14}
+          fill="#16a34a22"
+          stroke="#16a34a"
+          strokeWidth={3}
+        />
+      ) : null}
+      {onPath && !isDropTarget ? (
+        <rect
+          x={x - 3}
+          y={y - 3}
+          width={NODE_WIDTH + 6}
+          height={NODE_HEIGHT + 6}
+          rx={12}
+          ry={12}
+          fill={isTerminal ? "#facc1533" : "#fde04822"}
+          stroke={isTerminal ? "#ca8a04" : "#facc15"}
+          strokeWidth={isTerminal ? 3 : 2}
+        />
+      ) : null}
       <rect
         x={x}
         y={y}
@@ -184,8 +439,6 @@ function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Elemen
         stroke={palette.border}
         strokeWidth={1.5}
       />
-      {/* Node id strip — small monospace badge in top-left so the
-          editor reading the YAML can cross-reference. */}
       <text
         x={x + 12}
         y={y + 16}
@@ -195,21 +448,95 @@ function NodeRect({ node, selected, dirty, onClick }: NodeRectProps): JSX.Elemen
       >
         {node.id}
       </text>
-      {/* Role chip — top-right, color-coded. */}
       <RoleChip x={x + NODE_WIDTH - 90} y={y + 8} role={role} data={data} />
-      {/* Main content line. */}
       {role === "decision" ? (
         <DecisionBody x={x} y={y} data={data} />
       ) : (
         <LeafBody x={x} y={y} role={role} data={data} />
       )}
-      {/* Dirty indicator — small blue dot, lower-right corner. */}
       {dirty ? (
         <circle cx={x + NODE_WIDTH - 12} cy={y + NODE_HEIGHT - 12} r={4} fill="#2563eb" />
       ) : null}
     </g>
   );
 }
+
+function isDropTargetMode(isDropTarget: boolean, isDropEligible: boolean): boolean {
+  return isDropTarget || isDropEligible;
+}
+
+// ---- Branch port (PR-D4 + PR-D6) ----------------------------------
+
+interface BranchPortProps {
+  parentId: string;
+  branch: "match" | "miss";
+  /** Whether the branch already has a child. Filled ports show a
+   *  rewire glyph (·); empty ports show a `+`. Click only adds when
+   *  the branch is empty. */
+  filled: boolean;
+  nodeX: number;
+  nodeY: number;
+  onClick: () => void;
+  onPointerDown: (
+    originX: number,
+    originY: number,
+    evt: ReactPointerEvent<SVGGElement>,
+  ) => void;
+}
+
+function BranchPort({
+  parentId: _parentId,
+  branch,
+  filled,
+  nodeX,
+  nodeY,
+  onClick,
+  onPointerDown,
+}: BranchPortProps): JSX.Element {
+  const { t } = useTranslation("decisionTrees");
+  const isMatch = branch === "match";
+  const cx = isMatch ? nodeX + 60 : nodeX + NODE_WIDTH - 60;
+  const cy = nodeY + NODE_HEIGHT + 18;
+  const stroke = isMatch ? "#16a34a" : "#94a3b8";
+  const fill = filled ? stroke : "#ffffff";
+  const title = filled
+    ? isMatch
+      ? t("editor.canvas.dragMatch")
+      : t("editor.canvas.dragMiss")
+    : isMatch
+      ? t("editor.canvas.addMatch")
+      : t("editor.canvas.addMiss");
+  return (
+    <g
+      style={{ cursor: filled ? "grab" : "pointer" }}
+      onPointerDown={(evt) => onPointerDown(cx, cy, evt)}
+      onClick={(evt) => {
+        evt.stopPropagation();
+        if (!filled) onClick();
+      }}
+    >
+      <title>{title}</title>
+      <circle cx={cx} cy={cy} r={11} fill={fill} stroke={stroke} strokeWidth={1.5} />
+      {filled ? (
+        // "↻" rewire glyph — a small open arc that reads as "swap"
+        // without the rotation animation a real ↻ would imply.
+        <path
+          d={`M ${cx - 4} ${cy - 1} a 4 4 0 1 0 4 -4`}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth={1.5}
+        />
+      ) : (
+        <>
+          <line x1={cx - 5} y1={cy} x2={cx + 5} y2={cy} stroke={stroke} strokeWidth={1.75} />
+          <line x1={cx} y1={cy - 5} x2={cx} y2={cy + 5} stroke={stroke} strokeWidth={1.75} />
+        </>
+      )}
+    </g>
+  );
+}
+
+// ---- Decision / Leaf bodies (unchanged) ---------------------------
 
 function DecisionBody({
   x,
@@ -220,9 +547,6 @@ function DecisionBody({
   y: number;
   data: PositionedNode["data"];
 }): JSX.Element {
-  // For V1 the condition summary is "decision" plus the optional
-  // human label_en. The full condition tree is in the YAML editor;
-  // PR-D2 will surface a richer inline preview.
   const summary = data.label_en ?? "(unlabelled decision)";
   return (
     <>
@@ -295,7 +619,10 @@ function RoleChip({
     text = (data.outcome?.severity ?? "alert").toString();
   } else if (role === "leaf-recommendation") {
     const c = data.outcome?.confidence;
-    text = c !== undefined ? `${t("viewer.chips.recommendation")} · ${c}` : t("viewer.chips.recommendation");
+    text =
+      c !== undefined
+        ? `${t("viewer.chips.recommendation")} · ${c}`
+        : t("viewer.chips.recommendation");
   } else {
     text = t("viewer.chips.noop");
   }
@@ -341,7 +668,6 @@ interface Palette {
 function paletteFor(role: PositionedNode["role"]): Palette {
   switch (role) {
     case "leaf-alert":
-      // amber-tinted to read as "watch / action needed"
       return {
         bg: "#fffbeb",
         border: "#f59e0b",
@@ -351,7 +677,6 @@ function paletteFor(role: PositionedNode["role"]): Palette {
         chipText: "#7c2d12",
       };
     case "leaf-recommendation":
-      // emerald-tinted to read as "do this"
       return {
         bg: "#ecfdf5",
         border: "#10b981",

@@ -4,8 +4,13 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
+import { STARTER_TREE_YAML } from "../lib/treeStructure";
+import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 
-const STARTER_YAML = `code: my_tree_v1
+// Default for the YAML textarea when the page first loads. Authors who
+// want to start clean can pick "Empty" from the template picker and
+// click Start from scratch instead of touching this body at all.
+const DEFAULT_YAML = `code: my_tree_v1
 name_en: My new tree
 name_ar: شجرتي الجديدة
 description_en: One-paragraph what + why.
@@ -54,7 +59,11 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   const [code, setCode] = useState("");
   const [cropCode, setCropCode] = useState("");
-  const [yamlBody, setYamlBody] = useState(STARTER_YAML);
+  const [yamlBody, setYamlBody] = useState(DEFAULT_YAML);
+  // PR-D8: tracking the selected template id lets the dropdown stay
+  // in sync after a swap, and powers the "Start from scratch" button
+  // which jumps straight to the canvas.
+  const [templateId, setTemplateId] = useState<string>("custom");
 
   const create = useCreateDecisionTree();
 
@@ -62,13 +71,47 @@ export function DecisionTreeCreatePage(): ReactNode {
     return <Navigate to="/settings/decision-trees" replace />;
   }
 
-  const submit = (event: React.FormEvent): void => {
-    event.preventDefault();
+  // Swap the YAML body when the user picks a different template. We
+  // also reset the template id to "custom" if the author then edits
+  // the YAML by hand, so the dropdown reflects the divergence.
+  const onTemplateChange = (id: string): void => {
+    setTemplateId(id);
+    const tpl = getTemplate(id);
+    if (tpl) setYamlBody(tpl.yaml);
+  };
+  const onYamlEdit = (next: string): void => {
+    setYamlBody(next);
+    setTemplateId("custom");
+  };
+
+  const onStartFromScratch = (): void => {
+    if (!code.trim()) return;
+    const yaml = STARTER_TREE_YAML.replace("REPLACE_ME", code.trim());
     create.mutate(
       {
         code: code.trim(),
         crop_code: cropCode.trim() || null,
-        tree_yaml: yamlBody,
+        tree_yaml: yaml,
+      },
+      {
+        onSuccess: (tree) => {
+          navigate(`/settings/decision-trees/${tree.code}/view`);
+        },
+      },
+    );
+  };
+
+  const submit = (event: React.FormEvent): void => {
+    event.preventDefault();
+    // If a template is selected (other than "custom"), make sure the
+    // code in the YAML matches the form field — otherwise the
+    // backend stores the wrong code on the tree row.
+    const yaml = yamlBody.replace(/^code:\s*REPLACE_ME$/m, `code: ${code.trim()}`);
+    create.mutate(
+      {
+        code: code.trim(),
+        crop_code: cropCode.trim() || null,
+        tree_yaml: yaml,
       },
       {
         onSuccess: (tree) => {
@@ -107,13 +150,34 @@ export function DecisionTreeCreatePage(): ReactNode {
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
-        <div>
-          <h2 className="text-sm font-semibold text-ap-ink">{t("create.fields.yaml")}</h2>
-          <p className="text-xs text-ap-muted">{t("create.fields.yamlHint")}</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ap-ink">{t("create.fields.yaml")}</h2>
+            <p className="text-xs text-ap-muted">{t("create.fields.yamlHint")}</p>
+          </div>
+          <Field label={t("create.templates.heading")}>
+            <select
+              value={templateId}
+              onChange={(e) => onTemplateChange(e.target.value)}
+              className={inputCls}
+            >
+              <option value="custom">{t("create.templates.custom")}</option>
+              {TREE_TEMPLATES.map((tpl) => (
+                <option key={tpl.id} value={tpl.id}>
+                  {t(tpl.labelKey)}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
+        {templateId !== "custom" ? (
+          <p className="text-xs text-ap-muted">
+            {t(getTemplate(templateId)?.descKey ?? "create.templates.customDesc")}
+          </p>
+        ) : null}
         <textarea
           value={yamlBody}
-          onChange={(e) => setYamlBody(e.target.value)}
+          onChange={(e) => onYamlEdit(e.target.value)}
           rows={28}
           spellCheck={false}
           className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-3 py-2 font-mono text-xs text-ap-ink shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
@@ -132,6 +196,14 @@ export function DecisionTreeCreatePage(): ReactNode {
           className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
         >
           {t("create.cancel")}
+        </button>
+        <button
+          type="button"
+          onClick={onStartFromScratch}
+          disabled={create.isPending || !code.trim()}
+          className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/5 disabled:opacity-60"
+        >
+          {create.isPending ? t("create.saving") : t("create.startFromScratch")}
         </button>
         <button
           type="submit"

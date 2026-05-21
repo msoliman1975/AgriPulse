@@ -35,7 +35,21 @@
     "save": "Create tree",
     "saving": "Creating…",
     "cancel": "Cancel",
-    "saveFailed": "Create failed"
+    "saveFailed": "Create failed",
+    "startFromScratch": "Start from scratch",
+    "templates": {
+      "heading": "Start from template",
+      "custom": "(custom)",
+      "customDesc": "Author the YAML directly.",
+      "empty": "Empty tree",
+      "emptyDesc": "Single root + two placeholder leaves. Edit on the canvas.",
+      "scoutStress": "Scout for stress",
+      "scoutStressDesc": "Recommend a scouting visit when NDVI drops below baseline, severity-tiered by the size of the drop.",
+      "ndviAlert": "NDVI baseline alert",
+      "ndviAlertDesc": "Fire a severity-tagged alert when NDVI falls below its seasonal baseline.",
+      "irrigation": "Irrigation decision",
+      "irrigationDesc": "Skip irrigation when meaningful rain is in the 24h forecast."
+    }
   },
   "edit": {
     "loadFailed": "Failed to load tree.",
@@ -119,16 +133,112 @@
       "discardAll": "Discard all",
       "publish": "Publish v{{n}}",
       "publishing": "Publishing…",
-      "publishFailed": "Publish failed — the YAML editor has more detail."
+      "publishFailed": "Publish failed — the YAML editor has more detail.",
+      "invalidCount": "{{n}} issue(s)",
+      "fixErrorsHint": "Fix the listed issues before saving.",
+      "undo": "Undo",
+      "redo": "Redo",
+      "undoTitle": "Undo (Ctrl+Z)",
+      "redoTitle": "Redo (Ctrl+Shift+Z / Ctrl+Y)"
+    },
+    "canvas": {
+      "addMatch": "Add match child",
+      "addMiss": "Add miss child",
+      "dragMatch": "Drag to rewire match branch",
+      "dragMiss": "Drag to rewire miss branch",
+      "rewireFailed": "Couldn't rewire — see the structural error list."
+    },
+    "errors": {
+      "heading": "Structural issues — save is blocked"
+    },
+    "unreachable": {
+      "heading": "{{count}} node(s) unreachable from root",
+      "body": "These nodes still exist in the YAML but no on_match/on_miss pointer leads to them — usually the side-effect of a rewire. Clean them up or open the YAML editor to re-attach.",
+      "cleanup": "Clean up"
+    },
+    "dryRun": {
+      "heading": "Dry-run on a block",
+      "mode": "Test against",
+      "useDraft": "In-editor draft",
+      "useCurrent": "Published version",
+      "run": "Run",
+      "running": "Running…",
+      "clear": "Clear",
+      "outcome": "Outcome",
+      "matched": "matched",
+      "noMatch": "no match",
+      "snapshot": "Values resolved",
+      "error": "Error"
+    },
+    "addChild": {
+      "title": "Add child node",
+      "scope": "Under {{parent}} → {{branch}}",
+      "kind": "Kind",
+      "kindDecision": "Decision",
+      "kindDecisionDesc": "Branch the flow on a signal-driven condition.",
+      "kindRec": "Recommendation",
+      "kindRecDesc": "Leaf that surfaces a confidence-scored suggestion.",
+      "kindAlert": "Alert",
+      "kindAlertDesc": "Leaf that fires a severity-tagged notification.",
+      "kindNoop": "No action",
+      "kindNoopDesc": "Leaf that explicitly says nothing should happen.",
+      "nodeId": "Node id",
+      "nodeIdHint": "Stable identifier — letters, numbers, underscores. Used in YAML and audit logs.",
+      "create": "Add node",
+      "cancel": "Cancel",
+      "failed": "Couldn't add — try a different id."
+    },
+    "condition": {
+      "match": "Match",
+      "modeAll": "ALL of the following",
+      "modeAny": "ANY of the following",
+      "empty": "No condition set — add a term below.",
+      "addTerm": "+ Add condition",
+      "removeTerm": "Remove condition",
+      "left": "Source",
+      "right": "Threshold",
+      "operator": "Operator",
+      "indexCode": "Index code",
+      "weatherField": "Field",
+      "signalCode": "Signal code",
+      "paramName": "Parameter name",
+      "rightNumber": "Number",
+      "rightString": "Text",
+      "rightBoolean": "Boolean",
+      "rightRef": "Parameter ref",
+      "unsupportedHeading": "Visual editing not available",
+      "applyFailed": "Couldn't apply condition change.",
+      "source": {
+        "indices": "Index (NDVI, EVI, …)",
+        "block": "Block attribute",
+        "weather": "Weather",
+        "signals": "Custom signal",
+        "params": "Tree parameter"
+      }
+    },
+    "delete": {
+      "title": "Delete node?",
+      "singleBody": "Remove \"{{nodeId}}\" from the tree. The parent pointer that referenced it will be cleared.",
+      "cascadeBody": "Remove \"{{nodeId}}\" and {{count}} node(s) in its subtree. The parent pointer that referenced it will be cleared.",
+      "confirm": "Delete",
+      "cancel": "Cancel",
+      "failed": "Delete failed."
     },
     "panel": {
       "nodeId": "Node id",
       "role": "Role",
       "edit": "Edit",
       "done": "Done",
-      "selectHint": "Click a node on the canvas to see its details. Hold the right capability to edit fields inline.",
+      "selectHint": "Click a node on the canvas to see its details.",
+      "selectHintActions": "Edit, delete, and add-child controls live in this panel — they appear per-selected-node.",
+      "actions": "Actions",
+      "branchesFilledHint": "Both branches are already wired. Delete a child first, or drag a branch port onto a different node to rewire.",
       "pendingNote": "Unsaved edits on this node.",
       "discardNode": "Discard this node",
+      "addMatch": "Add match child",
+      "addMiss": "Add miss child",
+      "deleteNode": "Delete node",
+      "deleteRootBlocked": "Root can't be deleted.",
       "labels": {
         "heading": "Labels",
         "en": "Label (EN)",
@@ -146,6 +256,7 @@
       "condition": {
         "heading": "Condition",
         "deferredNote": "Condition-tree editing isn't surfaced visually yet — use the YAML editor for now.",
+        "unsupportedNote": "This condition uses a shape the visual editor doesn't model yet — open the YAML editor to change it.",
         "onMatch": "on_match →",
         "onMiss": "on_miss →"
       }
