@@ -36,15 +36,19 @@ export function ResourcesEquipmentPage(): ReactNode {
   const [farmId, setFarmId] = useState<string | null>(null);
   const [includeArchived, setIncludeArchived] = useState(false);
 
-  const itemsQ = useResources(farmId, {
-    kind: "equipment",
-    include_archived: includeArchived,
-  });
-
+  // Default to the first farm once farms load. Computed before
+  // useResources so the list query and the create button act on the
+  // same farm; otherwise create succeeds but invalidation misses the
+  // disabled `farmId=null` query and the row never appears.
   const effectiveFarmId = useMemo(
     () => farmId ?? farmsQ.data?.items[0]?.id ?? null,
     [farmId, farmsQ.data],
   );
+
+  const itemsQ = useResources(effectiveFarmId, {
+    kind: "equipment",
+    include_archived: includeArchived,
+  });
 
   return (
     <div className="flex flex-col gap-6">

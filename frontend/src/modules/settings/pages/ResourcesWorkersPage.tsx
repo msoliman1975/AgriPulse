@@ -36,16 +36,20 @@ export function ResourcesWorkersPage(): ReactNode {
   const [farmId, setFarmId] = useState<string | null>(null);
   const [includeArchived, setIncludeArchived] = useState(false);
 
-  const workersQ = useResources(farmId, {
-    kind: "worker",
-    include_archived: includeArchived,
-  });
-
-  // Default to the first farm once farms load.
+  // Default to the first farm once farms load. Must be computed before
+  // useResources so the list query targets the same farm the rest of
+  // the page (dropdown, create button) is acting on — otherwise creating
+  // a worker invalidates a query the page never opened, and the new
+  // row never appears.
   const effectiveFarmId = useMemo(
     () => farmId ?? farmsQ.data?.items[0]?.id ?? null,
     [farmId, farmsQ.data],
   );
+
+  const workersQ = useResources(effectiveFarmId, {
+    kind: "worker",
+    include_archived: includeArchived,
+  });
 
   return (
     <div className="flex flex-col gap-6">
