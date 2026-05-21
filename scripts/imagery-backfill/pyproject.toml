@@ -1,0 +1,31 @@
+[project]
+name = "imagery-backfill"
+version = "0.1.0"
+description = "One-shot historical Sentinel-2 L2A backfill for a single AgriPulse farm. Produces an upload-ready bundle (S3-mirror layout + manifest.jsonl) for later import."
+requires-python = ">=3.12"
+dependencies = [
+  "click>=8.1",
+  "httpx>=0.27",
+  "numpy>=1.26",
+  "rasterio>=1.3",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.34"]
+local-upload = [
+  "psycopg[binary]>=3.2",
+  "boto3>=1.34",
+]
+
+[project.scripts]
+imagery-backfill = "imagery_backfill.cli:main"
+imagery-upload-local = "imagery_backfill.upload_to_local:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["imagery_backfill"]
