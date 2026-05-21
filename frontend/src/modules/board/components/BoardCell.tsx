@@ -13,6 +13,9 @@ interface BoardCellProps {
   onClick: (modifiers: { shift: boolean }) => void;
   /** Optional drop handler — fires when a rec chip is dropped on the cell. */
   onRecDrop?: (payload: RecDropPayload) => void;
+  /** Compact cells (used for day-grid month view) get a smaller min-width
+   *  so 30 columns fit reasonably. Defaults to false. */
+  compact?: boolean;
   children: ReactNode;
 }
 
@@ -27,6 +30,7 @@ export function BoardCell({
   selected,
   onClick,
   onRecDrop,
+  compact = false,
   children,
 }: BoardCellProps): ReactNode {
   const { t } = useTranslation("board");
@@ -67,7 +71,8 @@ export function BoardCell({
   return (
     <td
       className={clsx(
-        "min-w-[140px] border-b border-r p-1.5 align-top",
+        compact ? "min-w-[56px] p-1" : "min-w-[140px] p-1.5",
+        "border-b border-r align-top",
         selected
           ? "border-ap-primary bg-ap-primary-soft/50"
           : dragOver

@@ -85,6 +85,7 @@ class ActivityUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    activity_type: ActivityType | None = None
     scheduled_date: date_type | None = None
     duration_days: int | None = Field(default=None, ge=1, le=60)
     start_time: time | None = None

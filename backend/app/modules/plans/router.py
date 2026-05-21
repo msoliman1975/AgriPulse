@@ -11,6 +11,7 @@ Mounted under /api/v1 by the app factory. Endpoints:
   POST   /plans/{plan_id}/activities
   GET    /plans/{plan_id}/activities
   PATCH  /activities/{activity_id}                         â€” metadata + state actions
+  DELETE /activities/{activity_id}                         â€” soft-delete
 
 RBAC:
   * Reads use ``plan.read``.
@@ -295,6 +296,31 @@ async def update_activity(
     )
 
 
+@router.delete(
+    "/activities/{activity_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Soft-delete an activity (removes it from the board).",
+)
+async def delete_activity(
+    activity_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlansServiceImpl = Depends(_service),
+) -> None:
+    from app.modules.plans.errors import ActivityNotFoundError
+
+    schema = _ensure_tenant(context)
+    activity = await service.get_activity(activity_id=activity_id)
+    if activity is None:
+        raise ActivityNotFoundError(activity_id)
+    if not has_capability(context, "plan.manage", farm_id=activity["farm_id"]):
+        raise ActivityNotFoundError(activity_id)
+    await service.delete_activity(
+        activity_id=activity_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
 # ---------- Board (PR-3) --------------------------------------------------
 
 
@@ -365,7 +391,7 @@ async def bulk_create_activities(
 async def get_board(
     farm_id: UUID,
     week_start: date_type = Query(),
-    weeks: int = Query(default=8, ge=1, le=26),
+    weeks: int = Query(default=8, ge=1, le=40),
     context: RequestContext = Depends(
         requires_capability("plan.read", farm_id_param="farm_id")
     ),

@@ -71,6 +71,7 @@ export interface ActivityCreatePayload {
 }
 
 export interface ActivityUpdatePayload {
+  activity_type?: ActivityType;
   scheduled_date?: string;
   duration_days?: number;
   start_time?: string | null;
@@ -130,6 +131,10 @@ export async function updateActivity(
 ): Promise<PlanActivity> {
   const { data } = await apiClient.patch<PlanActivity>(`/v1/activities/${activityId}`, payload);
   return data;
+}
+
+export async function deleteActivity(activityId: string): Promise<void> {
+  await apiClient.delete(`/v1/activities/${activityId}`);
 }
 
 // --- Board (PR-3 + PR-4) -------------------------------------------------

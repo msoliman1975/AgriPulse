@@ -9,6 +9,7 @@ import {
   archivePlan,
   createActivity,
   createPlan,
+  deleteActivity,
   getPlan,
   listActivities,
   listCalendar,
@@ -109,6 +110,24 @@ export function useUpdateActivity() {
       // Board-flow activities have plan_id = null; invalidate the board
       // grid for the activity's farm so completes/skips reflect immediately.
       void qc.invalidateQueries({ queryKey: ["board", activity.farm_id] });
+    },
+  });
+}
+
+export function useDeleteActivity() {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { activityId: string; farmId: string; planId: string | null }
+  >({
+    mutationFn: ({ activityId }) => deleteActivity(activityId),
+    onSuccess: (_, { farmId, planId }) => {
+      if (planId) {
+        void qc.invalidateQueries({ queryKey: ["plans", "activities", planId] });
+      }
+      void qc.invalidateQueries({ queryKey: ["plans", "calendar"] });
+      void qc.invalidateQueries({ queryKey: ["board", farmId] });
     },
   });
 }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date as date_type
+from datetime import UTC, date as date_type
 from datetime import datetime, time
 from typing import Any
 from uuid import UUID
@@ -187,6 +187,24 @@ class PlansRepository:
             .values(**changes, updated_by=actor_user_id)
         )
         return await self.get_activity(activity_id=activity_id)
+
+    async def soft_delete_activity(
+        self,
+        *,
+        activity_id: UUID,
+        actor_user_id: UUID | None,
+    ) -> bool:
+        """Soft-delete an activity by stamping `deleted_at`. Returns True
+        if a row was actually deleted (not already gone)."""
+        result = await self._session.execute(
+            update(PlanActivity)
+            .where(
+                PlanActivity.id == activity_id,
+                PlanActivity.deleted_at.is_(None),
+            )
+            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+        )
+        return (result.rowcount or 0) > 0
 
     async def activity_exists_on(
         self,

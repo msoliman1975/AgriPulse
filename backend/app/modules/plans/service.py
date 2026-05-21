@@ -135,6 +135,14 @@ class PlansService(Protocol):
         tenant_schema: str,
     ) -> dict[str, Any]: ...
 
+    async def delete_activity(
+        self,
+        *,
+        activity_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None: ...
+
     async def list_calendar(
         self,
         *,
@@ -571,6 +579,46 @@ class PlansServiceImpl:
                 )
             )
         return after
+
+    async def delete_activity(
+        self,
+        *,
+        activity_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None:
+        """Soft-delete an activity. Idempotent on already-deleted rows
+        (caller sees a 404 in that case via `get_activity` returning None).
+        Audit trail records the actor + the prior status."""
+        before = await self._repo.get_activity(activity_id=activity_id)
+        if before is None:
+            raise ActivityNotFoundError(activity_id)
+        deleted = await self._repo.soft_delete_activity(
+            activity_id=activity_id, actor_user_id=actor_user_id
+        )
+        if not deleted:
+            # Lost the race — another caller deleted it between get + update.
+            raise ActivityNotFoundError(activity_id)
+        plan = (
+            await self._repo.get_plan(plan_id=before["plan_id"])
+            if before["plan_id"] is not None
+            else None
+        )
+        farm_id = plan["farm_id"] if plan is not None else before.get("farm_id")
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="plans.activity_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="plan_activity",
+            subject_id=activity_id,
+            farm_id=farm_id,
+            details={
+                "plan_id": str(before["plan_id"]) if before["plan_id"] else None,
+                "block_id": str(before["block_id"]),
+                "previous_status": before["status"],
+                "activity_type": before["activity_type"],
+            },
+        )
 
     async def list_calendar(
         self,

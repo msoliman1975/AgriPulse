@@ -1,4 +1,10 @@
-import { addDays, format, parseISO, startOfWeek } from "date-fns";
+import {
+  endOfMonth,
+  format,
+  isWithinInterval,
+  parseISO,
+  startOfMonth,
+} from "date-fns";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,15 +28,22 @@ const ACTIVITY_TYPES: ActivityType[] = [
 interface QuickAddDialogProps {
   farmId: string;
   blockId: string;
-  /** ISO date of the Monday-anchored week the user clicked. */
-  weekStart: string;
+  /** ISO date the cell represents: the day itself (day-unit columns)
+   *  or the 1st of the month (month-unit columns, i.e. season view). */
+  columnStart: string;
+  /** Cell unit. "day" means the scheduled date IS columnStart — the
+   *  dialog shows a read-only label with no date editor. "month"
+   *  shows a date input bounded to that calendar month so the author
+   *  can pick which day in the month. */
+  columnUnit: "day" | "month";
   onClose: () => void;
 }
 
 /**
- * Quick-add popover for one (block × week) cell. Per the design spec:
- *   - type (required, defaults to last-used or "irrigation")
- *   - day picker (7 dots, defaults Monday or today-if-in-week)
+ * Quick-add popover for one (block × column) cell. Per the design spec:
+ *   - type (required, defaults to "irrigation")
+ *   - day picker — 7 dots in week mode, free date input bounded to the
+ *     month in month/season mode
  *   - assigned resources picker (multi-select from master file)
  *   - optional note
  * Submit creates the activity then attaches resources in sequence.
@@ -38,21 +51,44 @@ interface QuickAddDialogProps {
 export function QuickAddDialog({
   farmId,
   blockId,
-  weekStart,
+  columnStart,
+  columnUnit,
   onClose,
 }: QuickAddDialogProps): ReactNode {
   const { t } = useTranslation("board");
-  const monday = parseISO(weekStart);
-  const today = startOfWeek(new Date(), { weekStartsOn: 1 });
-  // Default day: today if today is within this week, otherwise Monday.
-  const initialDayOffset =
-    monday.toDateString() === today.toDateString() ? new Date().getDay() === 0 ? 6 : new Date().getDay() - 1 : 0;
-  const [dayOffset, setDayOffset] = useState(initialDayOffset);
+  const colStartDate = parseISO(columnStart);
+
+  // Default scheduled date.
+  //  - "day": the clicked day itself. No editor.
+  //  - "month": today-if-in-month, else first-of-month. User can pick.
+  const initialScheduledIso = useMemo(() => {
+    if (columnUnit === "day") return columnStart;
+    const monthStart = startOfMonth(colStartDate);
+    const monthEnd = endOfMonth(colStartDate);
+    const today = new Date();
+    if (isWithinInterval(today, { start: monthStart, end: monthEnd })) {
+      return format(today, "yyyy-MM-dd");
+    }
+    return columnStart;
+  }, [columnUnit, columnStart, colStartDate]);
+
+  const [scheduledIso, setScheduledIso] = useState(initialScheduledIso);
   const [activityType, setActivityType] = useState<ActivityType>("irrigation");
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(
     new Set(),
   );
   const [notes, setNotes] = useState("");
+
+  // Month-mode date bounds: lock to this column's month so the user
+  // can't accidentally schedule into the next column.
+  const monthInputMin =
+    columnUnit === "month"
+      ? format(startOfMonth(colStartDate), "yyyy-MM-dd")
+      : undefined;
+  const monthInputMax =
+    columnUnit === "month"
+      ? format(endOfMonth(colStartDate), "yyyy-MM-dd")
+      : undefined;
 
   const resourcesQ = useResources(farmId, { include_archived: false });
   const workers = useMemo(
@@ -67,7 +103,7 @@ export function QuickAddDialog({
   const create = useCreateFlatActivity(farmId);
   const attach = useAttachResource(farmId);
 
-  const scheduledDate = format(addDays(monday, dayOffset), "yyyy-MM-dd");
+  const scheduledDate = columnUnit === "day" ? columnStart : scheduledIso;
 
   async function submit() {
     const activity = await create.mutateAsync({
@@ -87,7 +123,6 @@ export function QuickAddDialog({
   }
 
   const isSubmitting = create.isPending || attach.isPending;
-  const days = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
     <Modal open onClose={onClose} labelledBy="quickadd-title" className="max-w-md">
@@ -96,7 +131,7 @@ export function QuickAddDialog({
       </h2>
       <p className="mt-1 text-xs text-ap-muted">
         {t("quickAdd.scope", {
-          date: format(addDays(monday, dayOffset), "EEE, MMM d"),
+          date: format(parseISO(scheduledDate), "EEE, MMM d"),
         })}
       </p>
 
@@ -123,28 +158,19 @@ export function QuickAddDialog({
           </select>
         </label>
 
-        <div className="flex flex-col gap-1 text-sm">
-          <span className="text-ap-muted">{t("quickAdd.day")}</span>
-          <div className="flex gap-1">
-            {days.map((label, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setDayOffset(idx)}
-                className={
-                  "flex h-9 w-9 items-center justify-center rounded-md border text-xs " +
-                  (idx === dayOffset
-                    ? "border-ap-primary bg-ap-primary text-white"
-                    : "border-ap-line bg-white text-ap-ink hover:bg-ap-bg/40")
-                }
-                aria-pressed={idx === dayOffset}
-                aria-label={format(addDays(monday, idx), "EEE")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {columnUnit === "month" ? (
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ap-muted">{t("quickAdd.date")}</span>
+            <input
+              type="date"
+              className="rounded-md border border-ap-line bg-white px-2 py-1.5"
+              value={scheduledIso}
+              min={monthInputMin}
+              max={monthInputMax}
+              onChange={(e) => setScheduledIso(e.target.value)}
+            />
+          </label>
+        ) : null}
 
         <div className="flex flex-col gap-1 text-sm">
           <span className="text-ap-muted">{t("quickAdd.assigned")}</span>

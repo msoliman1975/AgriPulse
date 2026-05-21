@@ -1,6 +1,6 @@
 {
   "title": "Operations board",
-  "subtitle": "Weekly plan across all blocks. Click a cell to schedule.",
+  "subtitle": "Plan across all blocks. Click a cell to schedule.",
   "loadFailed": "Couldn't load the board — try again.",
   "empty": "No active blocks on this farm yet.",
   "nav": {
@@ -8,11 +8,18 @@
     "next": "Next",
     "today": "Today"
   },
+  "view": {
+    "label": "View",
+    "week": "Week",
+    "month": "Month",
+    "season": "Season"
+  },
   "col": {
     "block": "Block"
   },
   "cell": {
-    "add": "Add"
+    "add": "Add",
+    "more": "+{{count}} more"
   },
   "type": {
     "planting": "Planting",
@@ -35,6 +42,7 @@
     "scope": "Scheduled for {{date}}",
     "type": "Type",
     "day": "Day of week",
+    "date": "Date",
     "assigned": "Assigned",
     "workers": "Workers",
     "equipment": "Equipment",
@@ -86,8 +94,21 @@
     "date": "Date",
     "status": "Status",
     "notes": "Notes",
+    "product": "Product",
+    "dosage": "Dosage",
     "assigned": "Assigned",
     "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "edit": "Edit",
+    "editFailed": "Couldn't save edits — try again.",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "deleteConfirm": "Delete",
+    "deleteFailed": "Couldn't delete — try again.",
+    "deleteHeading": "Delete this activity?",
+    "deleteBody": "{{type}} on {{date}} will be removed from the board. This can't be undone from the UI.",
     "start": "Start",
     "skip": "Skip",
     "complete": "Complete"

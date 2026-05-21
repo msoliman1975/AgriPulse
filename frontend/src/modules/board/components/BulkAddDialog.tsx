@@ -1,4 +1,3 @@
-import { addDays, format, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,7 +19,7 @@ const ACTIVITY_TYPES: ActivityType[] = [
 export interface SelectedCell {
   /** block id */
   blockId: string;
-  /** ISO Monday of the week */
+  /** ISO date the cell represents — the specific day for the activity. */
   weekStart: string;
   /** Human-readable block code, for the summary list */
   blockCode: string;
@@ -49,18 +48,16 @@ export function BulkAddDialog({
   const [activityType, setActivityType] = useState<ActivityType>("irrigation");
   const [notes, setNotes] = useState("");
   const [skipExisting, setSkipExisting] = useState(true);
-  const [dayOffset, setDayOffset] = useState(0); // Monday by default
 
   const mutation = useBulkCreateActivities(farmId);
 
   async function submit() {
+    // Each selected cell already encodes the exact day — the dialog
+    // no longer needs a dayOffset since the grid is day-granular.
     const result = await mutation.mutateAsync({
       cells: cells.map((c) => ({
         block_id: c.blockId,
-        scheduled_date: format(
-          addDays(parseISO(c.weekStart), dayOffset),
-          "yyyy-MM-dd",
-        ),
+        scheduled_date: c.weekStart,
       })),
       activity_type: activityType,
       notes: notes.trim() || null,
@@ -110,27 +107,6 @@ export function BulkAddDialog({
             ))}
           </select>
         </label>
-
-        <div className="flex flex-col gap-1 text-sm">
-          <span className="text-ap-muted">{t("bulkAdd.day")}</span>
-          <div className="flex gap-1">
-            {["M", "T", "W", "T", "F", "S", "S"].map((label, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setDayOffset(idx)}
-                className={
-                  "flex h-9 w-9 items-center justify-center rounded-md border text-xs " +
-                  (idx === dayOffset
-                    ? "border-ap-primary bg-ap-primary text-white"
-                    : "border-ap-line bg-white text-ap-ink hover:bg-ap-bg/40")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ap-muted">{t("quickAdd.note")}</span>
