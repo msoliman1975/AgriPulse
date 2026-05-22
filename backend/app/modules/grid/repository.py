@@ -208,6 +208,99 @@ class GridRepository:
         await self._session.flush()
         return len(cells)
 
+    async def list_active_cells_for_block_product(
+        self, *, block_id: UUID, product_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Return (cell_id, geom_wkt) for every cell of the active
+        grid_config for this (block, product), or empty tuple if no
+        active config exists.
+
+        Geometry is returned in the config's UTM SRID — same SRID the
+        raw COGs are written in, so the caller can run zonal stats
+        without re-projecting.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT gc.id AS cell_id,
+                               ST_AsText(gc.geom) AS geom_wkt,
+                               cfg.utm_srid       AS utm_srid
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        WHERE cfg.block_id = :block_id
+                          AND cfg.product_id = :product_id
+                          AND cfg.retired_at IS NULL
+                        """
+                    ).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_id", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"block_id": block_id, "product_id": product_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def bulk_upsert_aggregates(
+        self,
+        *,
+        rows: list[dict[str, Any]],
+    ) -> int:
+        """Upsert grid-cell aggregates. ``rows`` keys must include:
+        time, cell_id, block_id, index_code, product_id, stac_item_id,
+        mean, min_val, max_val, std_dev, valid_pixel_count,
+        total_pixel_count, cloud_cover_pct.
+
+        Re-running computation for the same scene is idempotent — the
+        UNIQUE on (time, cell_id, index_code, product_id) collides and
+        we DO NOTHING. Returns the number of rows in the input batch
+        (not the number actually inserted; conflict rows are silently
+        dropped).
+        """
+        if not rows:
+            return 0
+        values_sql = ", ".join(
+            f"(:t{i}, :cell{i}, :block{i}, :code{i}, :prod{i}, "
+            f":mean{i}, :min{i}, :max{i}, :std{i}, "
+            f":vp{i}, :tp{i}, :cc{i}, :stac{i})"
+            for i in range(len(rows))
+        )
+        params: dict[str, Any] = {}
+        for i, r in enumerate(rows):
+            params[f"t{i}"] = r["time"]
+            params[f"cell{i}"] = r["cell_id"]
+            params[f"block{i}"] = r["block_id"]
+            params[f"code{i}"] = r["index_code"]
+            params[f"prod{i}"] = r["product_id"]
+            params[f"mean{i}"] = r["mean"]
+            params[f"min{i}"] = r["min_val"]
+            params[f"max{i}"] = r["max_val"]
+            params[f"std{i}"] = r["std_dev"]
+            params[f"vp{i}"] = r["valid_pixel_count"]
+            params[f"tp{i}"] = r["total_pixel_count"]
+            params[f"cc{i}"] = r["cloud_cover_pct"]
+            params[f"stac{i}"] = r["stac_item_id"]
+        await self._session.execute(
+            text(
+                f"""
+                INSERT INTO block_grid_aggregates (
+                    time, cell_id, block_id, index_code, product_id,
+                    mean, "min", "max", std_dev,
+                    valid_pixel_count, total_pixel_count, cloud_cover_pct,
+                    stac_item_id
+                ) VALUES {values_sql}
+                ON CONFLICT (time, cell_id, index_code, product_id) DO NOTHING
+                """
+            ),
+            params,
+        )
+        await self._session.flush()
+        return len(rows)
+
     async def count_cells(self, *, grid_config_id: UUID) -> int:
         row = (
             await self._session.execute(

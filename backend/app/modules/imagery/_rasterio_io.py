@@ -143,22 +143,32 @@ def compute_and_write_indices(
     product_code: str,
     scene_id: str,
     aoi_hash: str,
-) -> tuple[dict[str, IndexAggregates], dict[str, str]]:
-    """Compute six indices, upload each as a COG, return aggregates + keys.
+) -> tuple[
+    dict[str, IndexAggregates],
+    dict[str, str],
+    dict[str, NDArray[np.float32]],
+]:
+    """Compute six indices, upload each as a COG, return aggregates + keys
+    + the AOI-masked rasters themselves.
 
-    The returned ``index_aggregates`` map preserves insertion order
-    (the catalog order: ndvi → gndvi); the matching ``index_keys`` map
-    holds the S3 key each per-index COG was written to.
+    The third return value (``index_rasters``) is the AOI-masked
+    per-index arrays kept in memory so the caller can run additional
+    zonal stats (sub-block grid cells, custom AOIs) without re-reading
+    from S3. Outside the AOI is NaN — matches what was written to the
+    COG. Order matches the catalog (ndvi → gndvi).
     """
     indices = compute_all_indices(bands_arrays)
     aggregates: dict[str, IndexAggregates] = {}
     written_keys: dict[str, str] = {}
+    masked_rasters: dict[str, NDArray[np.float32]] = {}
 
     for index_code, raster in indices.items():
         aggregates[index_code] = compute_aggregates(raster, aoi_mask)
         # Apply the AOI mask to the raster before writing. NaN outside
-        # the AOI keeps tile-server rendering clean.
+        # the AOI keeps tile-server rendering clean and lets downstream
+        # zonal stats ignore the off-AOI region without re-masking.
         out_array = np.where(aoi_mask, raster, np.float32("nan"))
+        masked_rasters[index_code] = out_array
 
         # Write to an in-memory GeoTIFF (COG profile) and upload.
         with MemoryFile() as memfile:
@@ -180,7 +190,7 @@ def compute_and_write_indices(
         )
         written_keys[index_code] = key
 
-    return aggregates, written_keys
+    return aggregates, written_keys, masked_rasters
 
 
 # Suppress unused-import warning when only re-exported.
