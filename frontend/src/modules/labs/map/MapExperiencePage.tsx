@@ -28,9 +28,14 @@ import {
   type FarmUpdatePayload,
 } from "@/api/farms";
 import { loadMapSummary, loadUnitDetail } from "./api";
-import { MapCanvas, type DrawProgress, type DrawTarget } from "./MapCanvas";
+import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
 import { SignalOverlayControl } from "./SignalOverlayControl";
+import { getGridCells } from "@/api/grid";
+import { listSubscriptions } from "@/api/imagery";
+import type { IndexCode } from "@/api/indices";
+import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
+import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { DetailPanel } from "./DetailPanel";
@@ -557,6 +562,45 @@ function MapForFarm({ farmId }: { farmId: string }) {
     };
   }, [signalOverlayDefId, signalObservationsQ.data, blockCentroids, selectedSignalDefinition]);
 
+  // Sub-block grid overlay (PR-grid). Off by default. Product is
+  // sourced from the selected block's first active imagery
+  // subscription — V1 doesn't yet expose a product picker, the
+  // assumption being a block typically has at most one ingest source.
+  const [showGrid, setShowGrid] = useState<boolean>(false);
+  const [gridIndex] = useState<IndexCode>("ndvi");
+  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+
+  const subscriptionsQ = useQuery({
+    queryKey: ["labs/map/subscriptions", selectedId],
+    queryFn: () => listSubscriptions(selectedId!, { include_inactive: false }),
+    enabled: Boolean(selectedId),
+    staleTime: 60_000,
+  });
+  const gridProductId = subscriptionsQ.data?.[0]?.product_id ?? null;
+
+  const gridCellsQ = useQuery({
+    queryKey: ["labs/map/gridCells", selectedId, gridProductId, gridIndex],
+    queryFn: () =>
+      getGridCells(selectedId!, gridProductId!, gridIndex),
+    enabled: Boolean(showGrid && selectedId && gridProductId),
+    staleTime: 30_000,
+  });
+
+  const gridCellsFc: FeatureCollection<GeoPolygon, GridCellProps> | null = useMemo(() => {
+    if (!showGrid || !gridCellsQ.data) return null;
+    return {
+      type: "FeatureCollection",
+      features: gridCellsQ.data.cells.map((c) => ({
+        type: "Feature" as const,
+        geometry: c.geometry,
+        properties: {
+          cell_id: c.cell_id,
+          value: c.mean === null ? null : Number(c.mean),
+        },
+      })),
+    };
+  }, [showGrid, gridCellsQ.data]);
+
   // CS-8 popup: URL ?signal_obs=<id> drives a side panel that
   // hydrates from the same observations the overlay already loaded
   // — no extra round-trip. When the picker is off or the id no
@@ -727,6 +771,8 @@ function MapForFarm({ farmId }: { farmId: string }) {
             showBlockLabels={layerPrefs.labels}
             borderOpacity={layerPrefs.borderOpacity}
             blockFillOpacity={layerPrefs.blockFillOpacity}
+            gridCells={gridCellsFc}
+            onGridCellClick={(cellId) => setSelectedCellId(cellId)}
             signalOverlay={signalOverlay.fc}
             onSignalClick={(observationId) => {
               // The URL `?signal_obs=` drives the SignalObservationPanel
@@ -757,6 +803,33 @@ function MapForFarm({ farmId }: { farmId: string }) {
           isLoading={signalObservationsQ.isLoading}
           isError={signalObservationsQ.isError}
           onChange={setSignalOverlayDefId}
+        />
+
+        {selectedId && gridProductId ? (
+          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow">
+            <label className="flex items-center gap-2 text-slate-700">
+              <input
+                type="checkbox"
+                checked={showGrid}
+                onChange={(e) => setShowGrid(e.target.checked)}
+                aria-label="Show sub-block grid"
+              />
+              <span className="font-medium">Sub-block grid</span>
+              {showGrid && gridCellsQ.data ? (
+                <span className="text-slate-500">
+                  {gridCellsQ.data.cells.length} cells · {gridIndex.toUpperCase()}
+                </span>
+              ) : null}
+            </label>
+          </div>
+        ) : null}
+
+        <GridCellDrawer
+          open={selectedCellId !== null}
+          cellId={selectedCellId}
+          productId={gridProductId}
+          indexCode={gridIndex}
+          onClose={() => setSelectedCellId(null)}
         />
 
         {selectedObservationId ? (

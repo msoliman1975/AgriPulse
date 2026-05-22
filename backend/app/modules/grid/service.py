@@ -36,6 +36,10 @@ from app.modules.grid.geometry import (
 from app.modules.grid.repository import GridRepository
 from app.modules.grid.schemas import (
     CellSizePreviewResponse,
+    GridCellHistoryPoint,
+    GridCellHistoryResponse,
+    GridCellsResponse,
+    GridCellWithValue,
     GridConfigResponse,
 )
 from app.modules.grid.zonal import CellAggregates
@@ -85,6 +89,29 @@ class GridService(Protocol):
         cloud_cover_pct: Decimal | None,
         per_cell_per_index: dict[UUID, dict[str, CellAggregates]],
     ) -> int: ...
+
+    async def get_cells_with_values(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        at: datetime | None,
+    ) -> GridCellsResponse: ...
+
+    async def get_cell_history(
+        self,
+        *,
+        cell_id: UUID,
+        product_id: UUID,
+        index_code: str,
+    ) -> GridCellHistoryResponse: ...
+
+    async def resolve_cell_context(
+        self,
+        *,
+        cell_id: UUID,
+    ) -> dict[str, Any] | None: ...
 
 
 class GridServiceImpl:
@@ -268,6 +295,89 @@ class GridServiceImpl:
                     }
                 )
         return await self._repo.bulk_upsert_aggregates(rows=rows)
+
+
+    async def get_cells_with_values(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        at: datetime | None,
+    ) -> GridCellsResponse:
+        # Resolve "latest" lazily so a stale `at` from the client is
+        # never silently extrapolated — either we use what they sent
+        # or we use whatever the most-recent observation says.
+        import json
+
+        resolved_at = at
+        if resolved_at is None:
+            resolved_at = await self._repo.get_latest_scene_time(
+                block_id=block_id, product_id=product_id, index_code=index_code
+            )
+        rows = await self._repo.list_cells_with_values(
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            at=resolved_at,
+        )
+        cells = tuple(
+            GridCellWithValue(
+                cell_id=r["cell_id"],
+                row_idx=r["row_idx"],
+                col_idx=r["col_idx"],
+                area_m2=r["area_m2"],
+                centroid_lon=float(r["centroid_lon"]),
+                centroid_lat=float(r["centroid_lat"]),
+                geometry=json.loads(r["geometry_json"]),
+                mean=r["mean"],
+                valid_pixel_pct=r["valid_pixel_pct"],
+                time=r["time"],
+            )
+            for r in rows
+        )
+        return GridCellsResponse(
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            cells=cells,
+            at=resolved_at,
+        )
+
+    async def get_cell_history(
+        self,
+        *,
+        cell_id: UUID,
+        product_id: UUID,
+        index_code: str,
+    ) -> GridCellHistoryResponse:
+        rows = await self._repo.get_cell_history(
+            cell_id=cell_id, index_code=index_code, product_id=product_id
+        )
+        points = tuple(
+            GridCellHistoryPoint(
+                time=r["time"],
+                mean=r["mean"],
+                min=r["min"],
+                max=r["max"],
+                std_dev=r["std_dev"],
+                valid_pixel_pct=r["valid_pixel_pct"],
+            )
+            for r in rows
+        )
+        return GridCellHistoryResponse(
+            cell_id=cell_id,
+            index_code=index_code,
+            product_id=product_id,
+            points=points,
+        )
+
+    async def resolve_cell_context(
+        self,
+        *,
+        cell_id: UUID,
+    ) -> dict[str, Any] | None:
+        return await self._repo.resolve_cell_context(cell_id=cell_id)
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:

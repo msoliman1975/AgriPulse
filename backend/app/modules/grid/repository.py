@@ -301,6 +301,144 @@ class GridRepository:
         await self._session.flush()
         return len(rows)
 
+    async def get_latest_scene_time(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+    ) -> datetime | None:
+        """Most recent scene time with any cell observation for (block, product, index)."""
+        row = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT MAX(time) AS t
+                    FROM block_grid_aggregates
+                    WHERE block_id   = :block
+                      AND product_id = :product
+                      AND index_code = :code
+                    """
+                ).bindparams(
+                    bindparam("block", type_=PG_UUID(as_uuid=True)),
+                    bindparam("product", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"block": block_id, "product": product_id, "code": index_code},
+            )
+        ).scalar_one_or_none()
+        return row
+
+    async def list_cells_with_values(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        at: datetime | None,
+    ) -> tuple[dict[str, Any], ...]:
+        """Per-cell GeoJSON + value at a given scene time (or NULL if no
+        observations at that time). Cells without any observation still
+        appear so the heatmap can render them as "no data" tiles.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                            gc.id              AS cell_id,
+                            gc.row_idx,
+                            gc.col_idx,
+                            gc.area_m2,
+                            ST_X(gc.centroid) AS centroid_lon,
+                            ST_Y(gc.centroid) AS centroid_lat,
+                            ST_AsGeoJSON(ST_Transform(gc.geom, 4326)) AS geometry_json,
+                            obs.mean,
+                            obs.valid_pixel_pct,
+                            obs.time
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        LEFT JOIN block_grid_aggregates obs
+                          ON obs.cell_id    = gc.id
+                         AND obs.product_id = cfg.product_id
+                         AND obs.index_code = :code
+                         AND (:at IS NULL OR obs.time = :at)
+                        WHERE cfg.block_id   = :block
+                          AND cfg.product_id = :product
+                          AND cfg.retired_at IS NULL
+                        ORDER BY gc.row_idx, gc.col_idx
+                        """
+                    ).bindparams(
+                        bindparam("block", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {
+                        "block": block_id,
+                        "product": product_id,
+                        "code": index_code,
+                        "at": at,
+                    },
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def get_cell_history(
+        self,
+        *,
+        cell_id: UUID,
+        index_code: str,
+        product_id: UUID,
+    ) -> tuple[dict[str, Any], ...]:
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT time, mean, "min", "max", std_dev, valid_pixel_pct
+                        FROM block_grid_aggregates
+                        WHERE cell_id    = :cell
+                          AND index_code = :code
+                          AND product_id = :product
+                        ORDER BY time ASC
+                        """
+                    ).bindparams(
+                        bindparam("cell", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"cell": cell_id, "code": index_code, "product": product_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def resolve_cell_context(
+        self, *, cell_id: UUID
+    ) -> dict[str, Any] | None:
+        """Look up block_id + product_id for a cell — used by RBAC checks."""
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT cfg.block_id, cfg.product_id
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        WHERE gc.id = :cell
+                        """
+                    ).bindparams(bindparam("cell", type_=PG_UUID(as_uuid=True))),
+                    {"cell": cell_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
     async def count_cells(self, *, grid_config_id: UUID) -> int:
         row = (
             await self._session.execute(

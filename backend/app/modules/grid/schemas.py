@@ -54,3 +54,52 @@ class CellSizePreviewResponse(BaseModel):
         default=None,
         description="Human-readable guardrail violation, or null if valid.",
     )
+
+
+class GridCellWithValue(BaseModel):
+    """One cell + its latest (or scene-specific) index value.
+
+    Geometry is the cell polygon as a GeoJSON dict in WGS84 (4326) so
+    the frontend can drop it directly into a MapLibre GeoJSON source.
+    """
+
+    cell_id: UUID
+    row_idx: int
+    col_idx: int
+    area_m2: Decimal
+    centroid_lon: float
+    centroid_lat: float
+    geometry: dict[str, object] = Field(description="GeoJSON Polygon in WGS84.")
+    mean: Decimal | None
+    valid_pixel_pct: Decimal | None
+    time: datetime | None = Field(description="Scene time of the value, null if no observations.")
+
+
+class GridCellsResponse(BaseModel):
+    """GET /api/v1/blocks/{block_id}/grid-cells response."""
+
+    block_id: UUID
+    product_id: UUID
+    index_code: str
+    cells: tuple[GridCellWithValue, ...]
+    at: datetime | None = Field(
+        description="The scene time the values are pulled from (latest by default)."
+    )
+
+
+class GridCellHistoryPoint(BaseModel):
+    time: datetime
+    mean: Decimal | None
+    min: Decimal | None
+    max: Decimal | None
+    std_dev: Decimal | None
+    valid_pixel_pct: Decimal | None
+
+
+class GridCellHistoryResponse(BaseModel):
+    """GET /api/v1/grid-cells/{cell_id}/history response."""
+
+    cell_id: UUID
+    index_code: str
+    product_id: UUID
+    points: tuple[GridCellHistoryPoint, ...]

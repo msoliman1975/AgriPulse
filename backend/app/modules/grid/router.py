@@ -13,15 +13,18 @@ farm_id from the block, gate on ``index.read`` (preview / GET) or
 ``imagery.manage`` (PUT), surface denial as a 404.
 """
 
+from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.grid.errors import GridConfigNotFoundError
 from app.modules.grid.schemas import (
     CellSizePreviewRequest,
     CellSizePreviewResponse,
+    GridCellHistoryResponse,
+    GridCellsResponse,
     GridConfigBody,
     GridConfigResponse,
 )
@@ -134,4 +137,59 @@ async def preview_cell_size(
         block_id=block_id,
         product_id=product_id,
         cell_size_m=body.cell_size_m,
+    )
+
+
+@router.get(
+    "/blocks/{block_id}/grid-cells",
+    response_model=GridCellsResponse,
+    summary="Cells + values for a block at a specific (or latest) scene time.",
+)
+async def get_grid_cells(
+    block_id: UUID,
+    product_id: UUID = Query(..., description="Imagery product UUID."),
+    index_code: str = Query(..., alias="index"),
+    at: datetime | None = Query(default=None, description="Scene time; latest if omitted."),
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    service: GridService = Depends(_service),
+) -> GridCellsResponse:
+    _ensure_tenant(context)
+    farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
+    if not has_capability(context, "index.read", farm_id=farm_id):
+        raise BlockNotVisibleError(str(block_id))
+    return await service.get_cells_with_values(
+        block_id=block_id,
+        product_id=product_id,
+        index_code=index_code,
+        at=at,
+    )
+
+
+@router.get(
+    "/grid-cells/{cell_id}/history",
+    response_model=GridCellHistoryResponse,
+    summary="Time series for one cell + index.",
+)
+async def get_grid_cell_history(
+    cell_id: UUID,
+    product_id: UUID = Query(...),
+    index_code: str = Query(..., alias="index"),
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    service: GridService = Depends(_service),
+) -> GridCellHistoryResponse:
+    _ensure_tenant(context)
+    # Resolve cell → block to apply the same per-farm RBAC the rest of
+    # the grid module uses. Missing cell = 404 via shared helper.
+    ctx = await service.resolve_cell_context(cell_id=cell_id)
+    if ctx is None:
+        raise BlockNotVisibleError(str(cell_id))
+    farm_id = await _resolve_farm_id(block_id=ctx["block_id"], tenant_session=tenant_session)
+    if not has_capability(context, "index.read", farm_id=farm_id):
+        raise BlockNotVisibleError(str(cell_id))
+    return await service.get_cell_history(
+        cell_id=cell_id,
+        product_id=product_id,
+        index_code=index_code,
     )
