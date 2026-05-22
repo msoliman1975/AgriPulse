@@ -73,6 +73,20 @@ interface Props {
   // with the underlying observation id.
   signalOverlay?: FeatureCollection<Point, SignalOverlayProps> | null;
   onSignalClick?: (observationId: string) => void;
+  // Sub-block grid overlay (PR-grid). `null` hides; an FC shows.
+  // Each feature must carry { cell_id: string, value: number | null }
+  // in its properties; the heatmap color ramp reads `value`, the click
+  // handler reads `cell_id`.
+  gridCells?: FeatureCollection<Polygon, GridCellProps> | null;
+  onGridCellClick?: (cellId: string) => void;
+}
+
+export interface GridCellProps {
+  cell_id: string;
+  // -1 is the no-data sentinel — see GRID_FILL_LAYER's fill-color
+  // expression. Callers should encode null observations as -1 when
+  // building the FeatureCollection.
+  value: number;
 }
 
 const SOURCE_ID = "units";
@@ -91,6 +105,10 @@ const AOI_LINE_LAYER = "farm-aoi-line";
 const SIGNAL_SOURCE_ID = "signal-overlay";
 const SIGNAL_CIRCLE_LAYER = "signal-overlay-circle";
 const SIGNAL_HALO_LAYER = "signal-overlay-halo";
+// Sub-block grid overlay layers.
+const GRID_SOURCE_ID = "subblock-grid";
+const GRID_FILL_LAYER = "subblock-grid-fill";
+const GRID_LINE_LAYER = "subblock-grid-line";
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -153,6 +171,8 @@ export function MapCanvas({
   blockFillOpacity = 1,
   signalOverlay = null,
   onSignalClick,
+  gridCells = null,
+  onGridCellClick,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -171,6 +191,8 @@ export function MapCanvas({
   onReshapeRef.current = onReshape;
   const onSignalClickRef = useRef(onSignalClick);
   onSignalClickRef.current = onSignalClick;
+  const onGridCellClickRef = useRef(onGridCellClick);
+  onGridCellClickRef.current = onGridCellClick;
 
   // Initial mount.
   useEffect(() => {
@@ -379,11 +401,68 @@ export function MapCanvas({
         map.getCanvas().style.cursor = "";
       });
 
+      // Sub-block grid overlay (PR-grid). Heatmap colour ramp uses a
+      // simple linear interpolation on the `value` property — null
+      // values render as a neutral grey so "no data" cells are still
+      // visible against the satellite base.
+      map.addSource(GRID_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: GRID_FILL_LAYER,
+        type: "fill",
+        source: GRID_SOURCE_ID,
+        paint: {
+          // Null values are encoded as -1 on the FC-build side so this
+          // expression never has to compare against null (MapLibre's
+          // TS typing rejects `null` as an ExpressionInputType).
+          "fill-color": [
+            "interpolate",
+            ["linear"],
+            ["to-number", ["get", "value"]],
+            -1,
+            "#9ca3af", // slate-400 — "no data" sentinel
+            0.0,
+            "#dc2626", // red-600 — very low (bare/water)
+            0.3,
+            "#f59e0b", // amber-500 — stressed
+            0.6,
+            "#84cc16", // lime-500 — moderate
+            0.85,
+            "#16a34a", // green-600 — healthy
+          ],
+          "fill-opacity": 0.6,
+        },
+      });
+      map.addLayer({
+        id: GRID_LINE_LAYER,
+        type: "line",
+        source: GRID_SOURCE_ID,
+        paint: {
+          "line-color": "#1f2937",
+          "line-width": 0.3,
+          "line-opacity": 0.4,
+        },
+      });
+      map.on("mousemove", GRID_FILL_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", GRID_FILL_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
+
       map.on("click", FILL_LAYER, (ev) => {
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as Pick<UnitFeatureProps, "id">;
         onSelectRef.current(props.id);
+      });
+      map.on("click", GRID_FILL_LAYER, (ev) => {
+        const f = ev.features?.[0];
+        if (!f) return;
+        const props = f.properties as { cell_id?: string };
+        if (props.cell_id) onGridCellClickRef.current?.(props.cell_id);
       });
       map.on("click", SIGNAL_CIRCLE_LAYER, (ev) => {
         const f = ev.features?.[0];
@@ -476,6 +555,28 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [signalOverlay]);
+
+  // Sub-block grid overlay. Same null = hide / FC = show pattern as
+  // signal overlay; data goes straight into the existing GeoJSON
+  // source.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const src = map.getSource(GRID_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+      const visible = gridCells !== null;
+      const fc = gridCells ?? { type: "FeatureCollection", features: [] };
+      src.setData(fc);
+      for (const layerId of [GRID_FILL_LAYER, GRID_LINE_LAYER]) {
+        if (!map.getLayer(layerId)) continue;
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [gridCells]);
 
   // Visibility + opacity toggles. Each prop maps to one or two MapLibre
   // layers; if a layer hasn't been added yet (style still loading) we

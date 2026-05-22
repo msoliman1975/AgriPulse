@@ -669,7 +669,7 @@ async def _compute_indices_async(
             band_names=tuple(product["bands"]),
             aoi_geojson_utm36n=block["boundary_utm_geojson"],
         )
-        index_aggregates, index_keys = compute_and_write_indices(
+        index_aggregates, index_keys, index_rasters = compute_and_write_indices(
             bands_arrays=bands_arrays,
             aoi_mask=aoi_mask,
             profile=profile,
@@ -679,6 +679,7 @@ async def _compute_indices_async(
             scene_id=job["scene_id"],
             aoi_hash=block["aoi_hash"],
         )
+        raster_transform = profile["transform"]
     except Exception as exc:
         bus.publish(IngestionFailedV1(job_id=job_id, error=f"compute_indices_failed: {exc}"))
         await _record_audit(
@@ -691,7 +692,11 @@ async def _compute_indices_async(
         return {"job_id": str(job_id), "status": "compute_failed"}
 
     # Step 3: insert one block_index_aggregates row per index; refresh
-    # the pgstac item with merged assets.
+    # the pgstac item with merged assets. Also (if this block+product
+    # has an active grid_config) populate block_grid_aggregates from
+    # the in-memory index rasters via the grid module's zonal helper.
+    from app.modules.grid.service import get_grid_service
+    from app.modules.grid.zonal import compute_cell_aggregates
     from app.modules.indices.service import get_indices_service
 
     async with factory() as session, session.begin():
@@ -714,6 +719,33 @@ async def _compute_indices_async(
                 valid_pixel_count=agg.valid_pixel_count,
                 total_pixel_count=agg.total_pixel_count,
                 cloud_cover_pct=job["cloud_cover_pct"],
+            )
+
+        # Per-cell aggregates — only if a grid_config exists for this
+        # (block, product). Skipped silently otherwise; blocks without
+        # cells keep working exactly as before.
+        grid_service = get_grid_service(tenant_session=session)
+        cells = await grid_service.list_active_cells(
+            block_id=job["block_id"], product_id=job["product_id"]
+        )
+        if cells:
+            per_cell_per_index: dict[Any, dict[str, Any]] = {}
+            for cell in cells:
+                per_index: dict[str, Any] = {}
+                for index_code, raster in index_rasters.items():
+                    per_index[index_code] = compute_cell_aggregates(
+                        raster=raster,
+                        transform=raster_transform,
+                        cell_polygon_wkt=cell["geom_wkt"],
+                    )
+                per_cell_per_index[cell["cell_id"]] = per_index
+            await grid_service.record_grid_aggregates(
+                scene_time=job["scene_datetime"],
+                block_id=job["block_id"],
+                product_id=job["product_id"],
+                stac_item_id=job["stac_item_id"],
+                cloud_cover_pct=job["cloud_cover_pct"],
+                per_cell_per_index=per_cell_per_index,
             )
 
         # Refresh pgstac.items with the merged asset map.
