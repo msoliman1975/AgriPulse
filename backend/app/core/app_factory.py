@@ -130,6 +130,7 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.imagery.subscribers import (
         register_subscribers as register_imagery_subscribers,
     )
+    from app.modules.grid.router import router as grid_router
     from app.modules.indices.router import router as indices_router
     from app.modules.integrations.router import router as integrations_router
     from app.modules.integrations_health.router import (
@@ -174,6 +175,7 @@ def _register_module_routers(app: FastAPI) -> None:
     app.include_router(farms_config_router)
     app.include_router(imagery_router)
     app.include_router(indices_router)
+    app.include_router(grid_router)
     app.include_router(weather_router)
     app.include_router(alerts_router)
     app.include_router(plans_router)

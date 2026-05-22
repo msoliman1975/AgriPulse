@@ -15,6 +15,7 @@ from sqlalchemy import engine_from_config, pool
 # `--autogenerate` runs see them. Hand-written migrations do not need
 # this, but it is cheap to keep the registry warm.
 import app.modules.farms.models
+import app.modules.grid.models
 import app.modules.iam.models
 import app.modules.imagery.models
 import app.modules.indices.models
