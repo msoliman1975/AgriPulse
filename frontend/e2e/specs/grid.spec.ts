@@ -154,13 +154,7 @@ const cellsResponse = {
   ],
 };
 
-// TODO(grid-zones-V1): the page-level wiring renders the block and the
-// signal-overlay control, but `subscriptionsQ` does not appear to fire
-// inside Playwright (no request hits the mock). Spec is preserved as
-// scaffold + contract documentation; debug why the useQuery never
-// dispatches in this test environment and re-enable. The route mocks +
-// expected payloads are correct against the contract.
-test.fixme("sub-block grid: configure cell size, enable overlay, fetch cells", async ({
+test("sub-block grid: configure cell size, enable overlay, fetch cells", async ({
   authedPage,
 }) => {
   let putBody: unknown = null;
