@@ -596,7 +596,9 @@ function MapForFarm({ farmId }: { farmId: string }) {
         geometry: c.geometry,
         properties: {
           cell_id: c.cell_id,
-          value: c.mean === null ? null : Number(c.mean),
+          // -1 is the no-data sentinel that MapCanvas's fill-color
+          // expression maps to grey — see GridCellProps comment.
+          value: c.mean === null ? -1 : Number(c.mean),
         },
       })),
     };

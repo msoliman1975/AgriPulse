@@ -83,7 +83,10 @@ interface Props {
 
 export interface GridCellProps {
   cell_id: string;
-  value: number | null;
+  // -1 is the no-data sentinel — see GRID_FILL_LAYER's fill-color
+  // expression. Callers should encode null observations as -1 when
+  // building the FeatureCollection.
+  value: number;
 }
 
 const SOURCE_ID = "units";
@@ -411,23 +414,23 @@ export function MapCanvas({
         type: "fill",
         source: GRID_SOURCE_ID,
         paint: {
+          // Null values are encoded as -1 on the FC-build side so this
+          // expression never has to compare against null (MapLibre's
+          // TS typing rejects `null` as an ExpressionInputType).
           "fill-color": [
-            "case",
-            ["==", ["get", "value"], null],
-            "#9ca3af", // slate-400 for "no data"
-            [
-              "interpolate",
-              ["linear"],
-              ["to-number", ["get", "value"]],
-              0.0,
-              "#dc2626", // red-600 — very low (bare/water)
-              0.3,
-              "#f59e0b", // amber-500 — stressed
-              0.6,
-              "#84cc16", // lime-500 — moderate
-              0.85,
-              "#16a34a", // green-600 — healthy
-            ],
+            "interpolate",
+            ["linear"],
+            ["to-number", ["get", "value"]],
+            -1,
+            "#9ca3af", // slate-400 — "no data" sentinel
+            0.0,
+            "#dc2626", // red-600 — very low (bare/water)
+            0.3,
+            "#f59e0b", // amber-500 — stressed
+            0.6,
+            "#84cc16", // lime-500 — moderate
+            0.85,
+            "#16a34a", // green-600 — healthy
           ],
           "fill-opacity": 0.6,
         },
