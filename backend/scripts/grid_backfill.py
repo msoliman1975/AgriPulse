@@ -92,18 +92,27 @@ def _list_jobs(
             rows = conn.execute(stmt, params).mappings().all()
             out: list[dict[str, str]] = []
             for r in rows:
-                assets = r["assets_written"] or {}
+                assets = r["assets_written"]
                 raw_key = None
+                # Two shapes coexist in the wild:
+                #   * dict {"raw_bands": {"href": "s3://bucket/...", ...}, ...}
+                #     written by the production compute_indices task path.
+                #   * list ["sentinel_hub/.../raw_bands.tif", ...]
+                #     written by scripts/imagery-backfill/upload_to_local.
                 if isinstance(assets, dict):
                     raw_bands = assets.get("raw_bands") or {}
                     if isinstance(raw_bands, dict):
                         href = raw_bands.get("href")
                         if isinstance(href, str) and href.startswith("s3://"):
-                            # Strip s3://<bucket>/ to get the key.
                             raw_key = href.split("/", 3)[-1]
+                elif isinstance(assets, list):
+                    for entry in assets:
+                        if isinstance(entry, str) and entry.endswith("raw_bands.tif"):
+                            raw_key = entry
+                            break
                 if raw_key is None:
                     logger.warning(
-                        "skip job=%s — no raw_bands href in assets_written",
+                        "skip job=%s — no raw_bands key in assets_written",
                         r["job_id"],
                     )
                     continue

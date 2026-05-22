@@ -102,10 +102,11 @@ class BlockGridAggregate(Base):
     __table_args__: tuple[UniqueConstraint | CheckConstraint | dict[str, object], ...] = (
         UniqueConstraint(
             "time",
+            "block_id",
             "cell_id",
             "index_code",
             "product_id",
-            name="uq_block_grid_aggregates_time_cell_index_product",
+            name="uq_block_grid_aggregates_time_block_cell_index_product",
         ),
         CheckConstraint(
             "total_pixel_count >= 0 AND valid_pixel_count >= 0 "
@@ -115,11 +116,14 @@ class BlockGridAggregate(Base):
         {},
     )
 
+    # block_id is part of the composite primary key because TimescaleDB
+    # requires the space-partitioning column in every UNIQUE/PK on a
+    # hypertable.
     time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, primary_key=True
     )
+    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, primary_key=True)
     cell_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, primary_key=True)
-    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     index_code: Mapped[str] = mapped_column(Text, nullable=False, primary_key=True)
     product_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), nullable=False, primary_key=True
