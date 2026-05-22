@@ -170,8 +170,13 @@ def main(
             }
     click.echo(f"bundle: {len(scenes)} unique scene(s)")
 
-    # ---- DB: resolve tenant schema + farm + blocks + product/provider ----
-    with psycopg.connect(pg_dsn, row_factory=dict_row) as conn:
+    # ---- DB: one connection for the whole run ---------------------------
+    # We used to open a fresh psycopg.connect() for each phase (resolve,
+    # subscriptions, per-scene writes — 65+ opens total). That thrashed
+    # `kubectl port-forward` over the SSM tunnel — the tunnel often
+    # drops after a TCP socket closes, so the second `connect()` would
+    # time out. One long-lived connection sidesteps the issue entirely.
+    with psycopg.connect(pg_dsn, row_factory=dict_row, autocommit=False) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT schema_name FROM public.tenants "
@@ -261,7 +266,11 @@ def main(
                 )
                 row = cur.fetchone()
                 if row:
-                    sub_id = row[0]
+                    # `row` is a dict when the conn was opened with
+                    # row_factory=dict_row (upload_resilient pins it
+                    # that way for the read phase). Use named access so
+                    # both row factories work.
+                    sub_id = row["id"] if isinstance(row, dict) else row[0]
                 else:
                     sub_id = uuid.uuid4()
                     cur.execute(
@@ -280,6 +289,35 @@ def main(
                         ),
                     )
                 sub_ids_by_block[block["id"]] = sub_id
+
+            # 1b. Ensure the pgstac collection (+ its partition on
+            # pgstac.items) exists before any upsert_item calls. The
+            # live ingestion path normally creates this lazily on first
+            # scene; for the backfill we have to bootstrap it ourselves.
+            collection_doc = {
+                "type": "Collection",
+                "id": collection_id,
+                "stac_version": "1.0.0",
+                "description": f"Sentinel-2 L2A imagery for tenant schema {schema}",
+                "license": "proprietary",
+                "extent": {
+                    "spatial": {"bbox": [[-180.0, -90.0, 180.0, 90.0]]},
+                    "temporal": {"interval": [["2015-06-23T00:00:00Z", None]]},
+                },
+                "links": [],
+            }
+            cur.execute(
+                "SELECT 1 FROM pgstac.collections WHERE id = %s",
+                (collection_id,),
+            )
+            if cur.fetchone() is None:
+                cur.execute(
+                    "SELECT pgstac.create_collection(%s::jsonb)",
+                    (json.dumps(collection_doc),),
+                )
+                click.echo(f"created pgstac collection: {collection_id}")
+            else:
+                click.echo(f"pgstac collection already present: {collection_id}")
         conn.commit()
     click.echo(f"subscriptions ready: {len(sub_ids_by_block)}")
 
@@ -306,7 +344,10 @@ def main(
                     "WHERE scene_id=%s AND status='succeeded' AND block_id = ANY(%s)",
                     (scene_id, [b["id"] for b in blocks]),
                 )
-                already_count = cur.fetchone()[0]
+                already_row = cur.fetchone()
+                already_count = (
+                    already_row["count"] if isinstance(already_row, dict) else already_row[0]
+                )
                 if already_count >= len(blocks):
                     if (scene_idx + 1) % progress_every == 0 or scene_idx + 1 == len(scenes):
                         click.echo(f"  [{scene_idx + 1}/{len(scenes)}] (already imported)")
