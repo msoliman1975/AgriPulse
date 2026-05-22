@@ -34,6 +34,7 @@ import { SignalOverlayControl } from "./SignalOverlayControl";
 import { getGridCells } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
+import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
 import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
 import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
@@ -806,21 +807,31 @@ function MapForFarm({ farmId }: { farmId: string }) {
         />
 
         {selectedId && gridProductId ? (
-          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow">
-            <label className="flex items-center gap-2 text-slate-700">
-              <input
-                type="checkbox"
-                checked={showGrid}
-                onChange={(e) => setShowGrid(e.target.checked)}
-                aria-label="Show sub-block grid"
-              />
-              <span className="font-medium">Sub-block grid</span>
-              {showGrid && gridCellsQ.data ? (
-                <span className="text-slate-500">
-                  {gridCellsQ.data.cells.length} cells · {gridIndex.toUpperCase()}
-                </span>
-              ) : null}
-            </label>
+          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-w-sm flex-col gap-2">
+            <div className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow">
+              <label className="flex items-center gap-2 text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={(e) => setShowGrid(e.target.checked)}
+                  aria-label="Show sub-block grid"
+                />
+                <span className="font-medium">Sub-block grid</span>
+                {showGrid && gridCellsQ.data ? (
+                  <span className="text-slate-500">
+                    {gridCellsQ.data.cells.length} cells · {gridIndex.toUpperCase()}
+                  </span>
+                ) : null}
+              </label>
+            </div>
+            <details className="rounded-md border border-slate-200 bg-white/95 shadow">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">
+                Grid configuration
+              </summary>
+              <div className="px-1 pb-2">
+                <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+              </div>
+            </details>
           </div>
         ) : null}
 
