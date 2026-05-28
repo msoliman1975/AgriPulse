@@ -256,48 +256,59 @@ class GridRepository:
         total_pixel_count, cloud_cover_pct.
 
         Re-running computation for the same scene is idempotent — the
-        UNIQUE on (time, cell_id, index_code, product_id) collides and
-        we DO NOTHING. Returns the number of rows in the input batch
-        (not the number actually inserted; conflict rows are silently
-        dropped).
+        UNIQUE on (time, block_id, cell_id, index_code, product_id)
+        collides and we DO NOTHING. Returns the number of rows in the
+        input batch (not the number actually inserted; conflict rows
+        are silently dropped).
+
+        Chunked because asyncpg (and the underlying Postgres protocol)
+        cap a single statement at 32_767 parameters. With 13 params
+        per row, a busy scene (a few thousand cells × six indices)
+        easily blows past that; chunk to a safe row count to keep each
+        execute under the limit.
         """
         if not rows:
             return 0
-        values_sql = ", ".join(
-            f"(:t{i}, :cell{i}, :block{i}, :code{i}, :prod{i}, "
-            f":mean{i}, :min{i}, :max{i}, :std{i}, "
-            f":vp{i}, :tp{i}, :cc{i}, :stac{i})"
-            for i in range(len(rows))
-        )
-        params: dict[str, Any] = {}
-        for i, r in enumerate(rows):
-            params[f"t{i}"] = r["time"]
-            params[f"cell{i}"] = r["cell_id"]
-            params[f"block{i}"] = r["block_id"]
-            params[f"code{i}"] = r["index_code"]
-            params[f"prod{i}"] = r["product_id"]
-            params[f"mean{i}"] = r["mean"]
-            params[f"min{i}"] = r["min_val"]
-            params[f"max{i}"] = r["max_val"]
-            params[f"std{i}"] = r["std_dev"]
-            params[f"vp{i}"] = r["valid_pixel_count"]
-            params[f"tp{i}"] = r["total_pixel_count"]
-            params[f"cc{i}"] = r["cloud_cover_pct"]
-            params[f"stac{i}"] = r["stac_item_id"]
-        await self._session.execute(
-            text(
-                f"""
-                INSERT INTO block_grid_aggregates (
-                    time, cell_id, block_id, index_code, product_id,
-                    mean, "min", "max", std_dev,
-                    valid_pixel_count, total_pixel_count, cloud_cover_pct,
-                    stac_item_id
-                ) VALUES {values_sql}
-                ON CONFLICT (time, cell_id, index_code, product_id) DO NOTHING
-                """
-            ),
-            params,
-        )
+        # 13 params/row, asyncpg cap 32_767 → 2520 rows max per chunk.
+        # Round down to 2000 for headroom against future column adds.
+        chunk_size = 2000
+        for start in range(0, len(rows), chunk_size):
+            chunk = rows[start : start + chunk_size]
+            values_sql = ", ".join(
+                f"(:t{i}, :cell{i}, :block{i}, :code{i}, :prod{i}, "
+                f":mean{i}, :min{i}, :max{i}, :std{i}, "
+                f":vp{i}, :tp{i}, :cc{i}, :stac{i})"
+                for i in range(len(chunk))
+            )
+            params: dict[str, Any] = {}
+            for i, r in enumerate(chunk):
+                params[f"t{i}"] = r["time"]
+                params[f"cell{i}"] = r["cell_id"]
+                params[f"block{i}"] = r["block_id"]
+                params[f"code{i}"] = r["index_code"]
+                params[f"prod{i}"] = r["product_id"]
+                params[f"mean{i}"] = r["mean"]
+                params[f"min{i}"] = r["min_val"]
+                params[f"max{i}"] = r["max_val"]
+                params[f"std{i}"] = r["std_dev"]
+                params[f"vp{i}"] = r["valid_pixel_count"]
+                params[f"tp{i}"] = r["total_pixel_count"]
+                params[f"cc{i}"] = r["cloud_cover_pct"]
+                params[f"stac{i}"] = r["stac_item_id"]
+            await self._session.execute(
+                text(
+                    f"""
+                    INSERT INTO block_grid_aggregates (
+                        time, cell_id, block_id, index_code, product_id,
+                        mean, "min", "max", std_dev,
+                        valid_pixel_count, total_pixel_count, cloud_cover_pct,
+                        stac_item_id
+                    ) VALUES {values_sql}
+                    ON CONFLICT (time, block_id, cell_id, index_code, product_id) DO NOTHING
+                    """
+                ),
+                params,
+            )
         await self._session.flush()
         return len(rows)
 

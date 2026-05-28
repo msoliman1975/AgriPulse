@@ -156,9 +156,12 @@ def upgrade() -> None:
 
     # ---- block_grid_aggregates (hypertable) ----------------------------
     # No PK column: hypertables need the time column in any unique
-    # constraint. The UNIQUE on (time, cell_id, index_code, product_id)
-    # is the idempotency key. block_id is denormalised so we can space-
-    # partition on it and filter without joining grid_cells.
+    # constraint, AND the space-partitioning column (block_id) must be
+    # part of every UNIQUE/PK on the table. The UNIQUE on
+    # (time, block_id, cell_id, index_code, product_id) is the
+    # idempotency key — adding block_id is redundant for logical
+    # uniqueness (cell_id is globally unique) but mandatory for the
+    # hypertable to be created.
     op.create_table(
         "block_grid_aggregates",
         sa.Column("time", sa.DateTime(timezone=True), nullable=False),
@@ -191,10 +194,11 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint(
             "time",
+            "block_id",
             "cell_id",
             "index_code",
             "product_id",
-            name="uq_block_grid_aggregates_time_cell_index_product",
+            name="uq_block_grid_aggregates_time_block_cell_index_product",
         ),
         sa.CheckConstraint(
             "total_pixel_count >= 0 AND valid_pixel_count >= 0 "

@@ -156,7 +156,10 @@ def generate_cells(
             if not cell.intersects(poly):
                 continue
             clipped = cell.intersection(poly)
-            if clipped.is_empty or clipped.area <= 0:
+            # Filter sub-meter slivers: anything below 1 m² rounds to 0.00
+            # under NUMERIC(10,2) and trips ck_grid_cells_area_positive,
+            # and a sub-meter cell has no analytic value anyway.
+            if clipped.is_empty or clipped.area < 1.0:
                 continue
             # Force to a single Polygon (some intersections produce a
             # MultiPolygon at concave edges; keep the largest piece).
