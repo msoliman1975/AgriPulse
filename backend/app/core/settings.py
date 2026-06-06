@@ -180,6 +180,13 @@ class Settings(BaseSettings):
     # WHERE state='open' keeps re-runs idempotent.
     recommendations_evaluate_sweep_seconds: int = 3600
 
+    # Cadence for `grid.detect_anomalies_sweep` — per-tenant spatial
+    # anomaly detection over each active sub-block grid. Hourly by default
+    # (same grain as the recommendations sweep); a fresh scene's per-cell
+    # aggregates turn into a worst-cells alert within one Beat cycle.
+    # Idempotent on the alerts partial UNIQUE (block_id, rule_code).
+    grid_anomaly_detect_sweep_seconds: int = 3600
+
     # Cadence for `integrations_health.probe_providers` (PR-IH5). 5 min
     # is the proposal default for Open-Meteo; if Sentinel Hub probe
     # costs need throttling, raise it. Each probe is a single HTTP

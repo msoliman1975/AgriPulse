@@ -34,6 +34,8 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.irrigation.tasks",
     "app.modules.integrations_health.probes",
     "app.modules.integrations_health.streak_watcher",
+    # Sub-block grid spatial-anomaly alerting sweep.
+    "app.modules.grid.tasks",
 )
 
 

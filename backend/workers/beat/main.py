@@ -85,6 +85,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.recommendations_evaluate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Sub-block grid spatial-anomaly alerting: per tenant, scan each
+    # active grid's latest scene for cells doing markedly worse than the
+    # field average and open a block-level alert naming the worst cells.
+    # Idempotent on the alerts partial UNIQUE (block_id, rule_code).
+    "grid.detect_anomalies_sweep": {
+        "task": "grid.detect_anomalies_sweep",
+        "schedule": float(_settings.grid_anomaly_detect_sweep_seconds),
+        "options": {"queue": "light"},
+    },
     # Provider liveness probes (PR-IH5). Pings each active weather +
     # imagery provider on a tight cadence so the Providers tab can show
     # red/green status without waiting for a real tenant fetch to fail.
