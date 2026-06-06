@@ -27,6 +27,7 @@ from app.modules.grid.schemas import (
     GridCellsResponse,
     GridConfigBody,
     GridConfigResponse,
+    GridWorstCellsResponse,
 )
 from app.modules.grid.service import GridService, get_grid_service
 from app.modules.imagery.errors import BlockNotVisibleError
@@ -162,6 +163,34 @@ async def get_grid_cells(
         block_id=block_id,
         product_id=product_id,
         index_code=index_code,
+        at=at,
+    )
+
+
+@router.get(
+    "/blocks/{block_id}/grid-cells/worst",
+    response_model=GridWorstCellsResponse,
+    summary="The N lowest-mean cells for a block at the latest (or given) scene.",
+)
+async def get_worst_grid_cells(
+    block_id: UUID,
+    product_id: UUID = Query(..., description="Imagery product UUID."),
+    index_code: str = Query(..., alias="index"),
+    limit: int = Query(default=10, ge=1, le=50, description="How many cells to return."),
+    at: datetime | None = Query(default=None, description="Scene time; latest if omitted."),
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    service: GridService = Depends(_service),
+) -> GridWorstCellsResponse:
+    _ensure_tenant(context)
+    farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
+    if not has_capability(context, "index.read", farm_id=farm_id):
+        raise BlockNotVisibleError(str(block_id))
+    return await service.get_worst_cells(
+        block_id=block_id,
+        product_id=product_id,
+        index_code=index_code,
+        limit=limit,
         at=at,
     )
 

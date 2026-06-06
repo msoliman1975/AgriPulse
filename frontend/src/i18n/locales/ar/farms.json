@@ -229,5 +229,33 @@
       "fileRequired": "اختر ملفًا للرفع.",
       "kindRequired": "اختر النوع."
     }
+  },
+  "common": {
+    "saving": "جارٍ الحفظ…",
+    "loading": "جارٍ التحميل…"
+  },
+  "subblockGrid": {
+    "cardTitle": "شبكة الكتل الفرعية",
+    "cardSubtitle": "قسّم هذه الكتلة إلى خلايا أصغر حتى تحدد متوسطات المؤشر لكل مشهد مكان ظهور المشكلات بدقة.",
+    "cellSizeLabel": "حجم الخلية (بالمتر)",
+    "previewOk": "عند {{size}} متر، ستحتوي هذه الكتلة على {{count}} خلية ({{ppc}} بكسل لكل خلية).",
+    "currentConfig": "نشط: {{size}} متر، {{count}} خلية.",
+    "create": "إنشاء الشبكة",
+    "replace": "استبدال الشبكة",
+    "saveError": "تعذّر حفظ إعداد الشبكة.",
+    "toggleLabel": "شبكة الكتل الفرعية",
+    "toggleAria": "إظهار شبكة الكتل الفرعية",
+    "cellCount": "{{count}} خلية",
+    "indexLabel": "المؤشر",
+    "worstHeading": "أدنى خلايا {{index}}",
+    "worstEmpty": "لا توجد ملاحظات بعد.",
+    "worstRank": "#{{rank}}",
+    "cellDrawerTitle": "سجل الخلية",
+    "historyError": "تعذّر تحميل سجل الخلية.",
+    "notEnoughObs": "لا توجد ملاحظات كافية بعد لرسم اتجاه.",
+    "statMean": "المتوسط",
+    "statMin": "الأدنى",
+    "statMax": "الأعلى",
+    "latestScene": "أحدث مشهد: {{date}}"
   }
 }

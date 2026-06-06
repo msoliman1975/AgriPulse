@@ -31,11 +31,12 @@ import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
 import { SignalOverlayControl } from "./SignalOverlayControl";
-import { getGridCells } from "@/api/grid";
+import { getGridCells, getWorstGridCells } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
 import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
+import { GridOverlayPanel } from "@/modules/grid/GridOverlayPanel";
 import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
@@ -568,8 +569,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
   // subscription — V1 doesn't yet expose a product picker, the
   // assumption being a block typically has at most one ingest source.
   const [showGrid, setShowGrid] = useState<boolean>(false);
-  const [gridIndex] = useState<IndexCode>("ndvi");
+  const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+
+  // Indices offered in the grid picker. Mirror the block detail panel's
+  // trio (the health-relevant ones); the backend stores all six per cell.
+  const GRID_INDEX_OPTIONS: IndexCode[] = ["ndvi", "ndre", "ndwi"];
 
   const subscriptionsQ = useQuery({
     queryKey: ["labs/map/subscriptions", selectedId],
@@ -583,6 +588,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
     queryKey: ["labs/map/gridCells", selectedId, gridProductId, gridIndex],
     queryFn: () =>
       getGridCells(selectedId!, gridProductId!, gridIndex),
+    enabled: Boolean(showGrid && selectedId && gridProductId),
+    staleTime: 30_000,
+  });
+
+  // Worst-N under-performing cells for the current index, so a scout can
+  // be dispatched to the exact spot. Only fetched while the overlay is on.
+  const worstCellsQ = useQuery({
+    queryKey: ["labs/map/worstCells", selectedId, gridProductId, gridIndex],
+    queryFn: () => getWorstGridCells(selectedId!, gridProductId!, gridIndex, 5),
     enabled: Boolean(showGrid && selectedId && gridProductId),
     staleTime: 30_000,
   });
@@ -809,31 +823,19 @@ function MapForFarm({ farmId }: { farmId: string }) {
         />
 
         {selectedId && gridProductId ? (
-          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-w-sm flex-col gap-2">
-            <div className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow">
-              <label className="flex items-center gap-2 text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={showGrid}
-                  onChange={(e) => setShowGrid(e.target.checked)}
-                  aria-label="Show sub-block grid"
-                />
-                <span className="font-medium">Sub-block grid</span>
-                {showGrid && gridCellsQ.data ? (
-                  <span className="text-slate-500">
-                    {gridCellsQ.data.cells.length} cells · {gridIndex.toUpperCase()}
-                  </span>
-                ) : null}
-              </label>
-            </div>
-            <details className="rounded-md border border-slate-200 bg-white/95 shadow">
-              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">
-                Grid configuration
-              </summary>
-              <div className="px-1 pb-2">
-                <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
-              </div>
-            </details>
+          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-h-[70vh] max-w-sm flex-col gap-2 overflow-y-auto">
+            <GridOverlayPanel
+              showGrid={showGrid}
+              onToggleGrid={setShowGrid}
+              indexCode={gridIndex}
+              indexOptions={GRID_INDEX_OPTIONS}
+              onIndexChange={setGridIndex}
+              cellCount={showGrid ? (gridCellsQ.data?.cells.length ?? null) : null}
+              worstCells={worstCellsQ.data?.cells}
+              worstLoading={worstCellsQ.isLoading}
+              onSelectCell={setSelectedCellId}
+            />
+            <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
           </div>
         ) : null}
 

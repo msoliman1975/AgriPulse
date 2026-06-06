@@ -47,6 +47,25 @@ export interface GridCellsResponse {
   at: string | null;
 }
 
+export interface GridWorstCell {
+  cell_id: string;
+  row_idx: number;
+  col_idx: number;
+  centroid_lon: number;
+  centroid_lat: number;
+  mean: string | null;
+  valid_pixel_pct: string | null;
+  time: string | null;
+}
+
+export interface GridWorstCellsResponse {
+  block_id: string;
+  product_id: string;
+  index_code: string;
+  cells: GridWorstCell[];
+  at: string | null;
+}
+
 export interface GridCellHistoryPoint {
   time: string;
   mean: string | null;
@@ -119,6 +138,27 @@ export async function getGridCells(
       params: {
         product_id: productId,
         index: indexCode,
+        at: at ?? undefined,
+      },
+    },
+  );
+  return data;
+}
+
+export async function getWorstGridCells(
+  blockId: string,
+  productId: string,
+  indexCode: IndexCode,
+  limit = 10,
+  at?: string,
+): Promise<GridWorstCellsResponse> {
+  const { data } = await apiClient.get<GridWorstCellsResponse>(
+    `/v1/blocks/${blockId}/grid-cells/worst`,
+    {
+      params: {
+        product_id: productId,
+        index: indexCode,
+        limit,
         at: at ?? undefined,
       },
     },
