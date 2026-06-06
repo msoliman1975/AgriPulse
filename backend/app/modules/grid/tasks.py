@@ -32,6 +32,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.modules.grid.anomaly import AnomalyResult
+from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.service import get_grid_service
 from app.shared.db.blocks import read_block_context
 from app.shared.db.ids import uuid7
@@ -69,24 +70,59 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
 
 
 def _build_diagnosis(
-    *, index_code: str, result: AnomalyResult
+    *, index_code: str, result: AnomalyResult, worst_label: str | None = None
 ) -> tuple[str, str]:
-    """(en, ar) diagnosis text naming the worst flagged cell + counts."""
+    """(en, ar) diagnosis text naming the worst flagged cell + counts.
+
+    ``worst_label`` is the pivot-relative location ("ring 3, NE sector")
+    when the unit is a center pivot; for square blocks it's None and we
+    fall back to the row/col index.
+    """
     worst = result.flagged[0]
     idx = index_code.upper()
     n = len(result.flagged)
+    where_en = worst_label or f"row {worst.row_idx}, col {worst.col_idx}"
+    where_ar = worst_label or f"الصف {worst.row_idx}، العمود {worst.col_idx}"
     en = (
         f"{n} sub-block cell(s) show {idx} well below the field average "
-        f"({result.block_mean:.2f}). Worst: row {worst.row_idx}, col "
-        f"{worst.col_idx} at {worst.mean:.2f} "
+        f"({result.block_mean:.2f}). Worst: {where_en} at {worst.mean:.2f} "
         f"({worst.z:.1f} SD below). Scout these areas."
     )
     ar = (
         f"تُظهر {n} خلية فرعية قيمة {idx} أقل بكثير من متوسط الحقل "
-        f"({result.block_mean:.2f}). الأسوأ: الصف {worst.row_idx}، العمود "
-        f"{worst.col_idx} عند {worst.mean:.2f}. يُنصح بمعاينة هذه المناطق."
+        f"({result.block_mean:.2f}). الأسوأ: {where_ar} عند "
+        f"{worst.mean:.2f}. يُنصح بمعاينة هذه المناطق."
     )
     return en, ar
+
+
+async def _pivot_worst_label(
+    *,
+    svc: Any,
+    block_id: UUID,
+    product_id: UUID,
+    result: AnomalyResult,
+) -> str | None:
+    """"ring N, <sector> sector" for the worst flagged cell on a pivot.
+
+    Returns None for square (non-pivot) blocks so the diagnosis falls
+    back to the row/col index.
+    """
+    pivot = await svc._repo.get_pivot_geometry(block_id=block_id)
+    if pivot is None:
+        return None
+    cfg = await svc._repo.get_active_config(block_id=block_id, product_id=product_id)
+    ring_width = float(cfg["cell_size_m"]) if cfg else 0.0
+    worst = result.flagged[0]
+    rs = ring_sector(
+        centroid_lon=worst.centroid_lon,
+        centroid_lat=worst.centroid_lat,
+        center_lon=pivot["center_lon"],
+        center_lat=pivot["center_lat"],
+        ring_width_m=ring_width,
+        sector_count=pivot["sector_count"],
+    )
+    return f"ring {rs.ring}, {rs.sector_label} sector"
 
 
 def _build_snapshot(
@@ -123,6 +159,7 @@ async def _open_anomaly_alert(
     index_code: str,
     scene_time: datetime,
     result: AnomalyResult,
+    worst_label: str | None = None,
 ) -> bool:
     """Insert a block-level alert + audit + event. Returns True if new.
 
@@ -141,7 +178,9 @@ async def _open_anomaly_alert(
     farm_id = block_ctx["farm_id"]
 
     rule_code = f"grid:{index_code}_spatial_anomaly"
-    diag_en, diag_ar = _build_diagnosis(index_code=index_code, result=result)
+    diag_en, diag_ar = _build_diagnosis(
+        index_code=index_code, result=result, worst_label=worst_label
+    )
     snapshot = _build_snapshot(
         index_code=index_code, scene_time=scene_time, result=result
     )
@@ -231,6 +270,14 @@ async def _detect_for_tenant_async(tenant_schema: str) -> dict[str, int]:
             if verdict is None:
                 continue
             result, scene_time = verdict
+            # For a center pivot, translate the worst cell into the
+            # machine's own language ("ring 3, NE sector").
+            worst_label = await _pivot_worst_label(
+                svc=svc,
+                block_id=block_id,
+                product_id=product_id,
+                result=result,
+            )
             async with factory() as public_session:
                 opened = await _open_anomaly_alert(
                     session=session,
@@ -240,6 +287,7 @@ async def _detect_for_tenant_async(tenant_schema: str) -> dict[str, int]:
                     index_code=_INDEX_CODE,
                     scene_time=scene_time,
                     result=result,
+                    worst_label=worst_label,
                 )
             if opened:
                 alerts_opened += 1

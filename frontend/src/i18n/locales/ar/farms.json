@@ -250,6 +250,7 @@
     "worstHeading": "أدنى خلايا {{index}}",
     "worstEmpty": "لا توجد ملاحظات بعد.",
     "worstRank": "#{{rank}}",
+    "ringSector": "حلقة {{ring}}، {{sector}}",
     "cellDrawerTitle": "سجل الخلية",
     "historyError": "تعذّر تحميل سجل الخلية.",
     "notEnoughObs": "لا توجد ملاحظات كافية بعد لرسم اتجاه.",

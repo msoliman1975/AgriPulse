@@ -10,7 +10,14 @@ from app.modules.grid.anomaly import CellMean, detect_low_outliers
 
 def _cells(values: list[float]) -> list[CellMean]:
     return [
-        CellMean(cell_id=uuid4(), row_idx=i // 10, col_idx=i % 10, mean=Decimal(str(v)))
+        CellMean(
+            cell_id=uuid4(),
+            row_idx=i // 10,
+            col_idx=i % 10,
+            mean=Decimal(str(v)),
+            centroid_lon=0.0,
+            centroid_lat=0.0,
+        )
         for i, v in enumerate(values)
     ]
 
