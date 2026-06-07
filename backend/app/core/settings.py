@@ -180,6 +180,14 @@ class Settings(BaseSettings):
     # WHERE state='open' keeps re-runs idempotent.
     recommendations_evaluate_sweep_seconds: int = 3600
 
+    # Per-cell grid observation retention (block_grid_aggregates). None =
+    # compress-only, keep everything (the current deliberate policy — see
+    # docs/proposals/grid-aggregates-retention.md). Set to a day count
+    # (e.g. 730 for ~24 months) and run scripts/apply_grid_retention to
+    # add a TimescaleDB retention policy that drops older chunks. Disabled
+    # by default so no data is ever dropped without an explicit opt-in.
+    grid_aggregates_retention_days: int | None = None
+
     # Cadence for `grid.detect_anomalies_sweep` — per-tenant spatial
     # anomaly detection over each active sub-block grid. Hourly by default
     # (same grain as the recommendations sweep); a fresh scene's per-cell
