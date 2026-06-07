@@ -14,11 +14,12 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, String, bindparam, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.signals.errors import (
     SignalCodeAlreadyExistsError,
+    SignalLocationOutsideBlockError,
     SignalTemplateCodeAlreadyExistsError,
 )
 from app.modules.signals.models import (
@@ -485,9 +486,8 @@ class SignalsRepository:
         location_mode: str = "entity",
         location_point_wkt: str | None = None,
     ) -> None:
-        await self._session.execute(
-            text(
-                """
+        stmt = text(
+            """
                 INSERT INTO signal_observations (
                     time, id, signal_definition_id, farm_id, block_id,
                     value_numeric, value_categorical, value_event, value_boolean,
@@ -504,40 +504,50 @@ class SignalsRepository:
                          ELSE ST_GeomFromText(:location_point, 4326) END
                 )
                 """
-            ).bindparams(
-                bindparam("id", type_=PG_UUID(as_uuid=True)),
-                bindparam("def_id", type_=PG_UUID(as_uuid=True)),
-                bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
-                bindparam("recorded_by", type_=PG_UUID(as_uuid=True)),
-                bindparam("template_observation_id", type_=PG_UUID(as_uuid=True)),
-                # asyncpg can't infer the type of a bare NULL used only in
-                # "CASE WHEN :geopoint IS NULL ... ST_GeomFromText(:geopoint)"
-                # (the PostGIS overload leaves it ambiguous). Pin both WKT
-                # params to text so the prepared statement type-checks when
-                # the observation has no point (the common numeric case).
-                bindparam("geopoint", type_=String()),
-                bindparam("location_point", type_=String()),
-            ),
-            {
-                "time": time,
-                "id": observation_id,
-                "def_id": signal_definition_id,
-                "farm_id": farm_id,
-                "block_id": block_id,
-                "value_numeric": value_numeric,
-                "value_categorical": value_categorical,
-                "value_event": value_event,
-                "value_boolean": value_boolean,
-                "geopoint": value_geopoint_wkt,
-                "attachment_s3_key": attachment_s3_key,
-                "notes": notes,
-                "recorded_by": recorded_by,
-                "template_observation_id": template_observation_id,
-                "location_mode": location_mode,
-                "location_point": location_point_wkt,
-            },
+        ).bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+            bindparam("def_id", type_=PG_UUID(as_uuid=True)),
+            bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+            bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+            bindparam("recorded_by", type_=PG_UUID(as_uuid=True)),
+            bindparam("template_observation_id", type_=PG_UUID(as_uuid=True)),
+            # asyncpg can't infer the type of a bare NULL used only in
+            # "CASE WHEN :geopoint IS NULL ... ST_GeomFromText(:geopoint)"
+            # (the PostGIS overload leaves it ambiguous). Pin both WKT
+            # params to text so the prepared statement type-checks when
+            # the observation has no point (the common numeric case).
+            bindparam("geopoint", type_=String()),
+            bindparam("location_point", type_=String()),
         )
+        params = {
+            "time": time,
+            "id": observation_id,
+            "def_id": signal_definition_id,
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "value_numeric": value_numeric,
+            "value_categorical": value_categorical,
+            "value_event": value_event,
+            "value_boolean": value_boolean,
+            "geopoint": value_geopoint_wkt,
+            "attachment_s3_key": attachment_s3_key,
+            "notes": notes,
+            "recorded_by": recorded_by,
+            "template_observation_id": template_observation_id,
+            "location_mode": location_mode,
+            "location_point": location_point_wkt,
+        }
+        try:
+            await self._session.execute(stmt, params)
+        except DBAPIError as exc:
+            # The ST_Within trigger (migration 0029) RAISEs when a
+            # `point_in_entity` point falls outside the block boundary.
+            # Translate that into a clean 422 instead of a generic 500.
+            if "is not within block" in str(getattr(exc, "orig", exc) or exc):
+                raise SignalLocationOutsideBlockError(
+                    block_id=str(block_id) if block_id else None
+                ) from exc
+            raise
 
     async def list_observations(
         self,

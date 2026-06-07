@@ -57,6 +57,28 @@ class InvalidSignalValueError(APIError):
         )
 
 
+class SignalLocationOutsideBlockError(APIError):
+    """`location_mode=point_in_entity` but the point falls outside the
+    block boundary — the ST_Within trigger (migration 0029) rejected it.
+
+    Surfaced as 422 so the operator gets a clear "point is outside the
+    block" message instead of a generic 500.
+    """
+
+    def __init__(self, *, block_id: str | None = None) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Location outside block",
+            detail=(
+                "The captured point is outside the selected block's boundary. "
+                "Move the point inside the block, or use 'Free point' to record "
+                "a location anywhere."
+            ),
+            type_=f"{_TYPE_BASE}/location-outside-block",
+            extras={"block_id": block_id} if block_id else None,
+        )
+
+
 class AttachmentNotPermittedError(APIError):
     def __init__(self, *, code: str) -> None:
         super().__init__(
