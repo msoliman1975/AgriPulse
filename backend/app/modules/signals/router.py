@@ -187,14 +187,39 @@ async def update_definition(
 )
 async def delete_definition(
     definition_id: UUID,
+    force: bool = Query(
+        default=False,
+        description="Archive even if live trees/templates reference it (CS-13 escape hatch).",
+    ),
     context: RequestContext = Depends(requires_capability("signal.define")),
     service: SignalsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> None:
     schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
     await service.delete_definition(
         definition_id=definition_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
+        tenant_id=tenant_id,
+        force=force,
+    )
+
+
+@router.get(
+    "/signals/definitions/{definition_id}/references",
+    summary="Decision trees + templates referencing this definition (CS-13).",
+)
+async def get_definition_references(
+    definition_id: UUID,
+    context: RequestContext = Depends(requires_capability("signal.read")),
+    service: SignalsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, list[dict[str, str]]]:
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
+    return await service.get_definition_references(
+        definition_id=definition_id, tenant_id=tenant_id
     )
 
 
@@ -366,14 +391,39 @@ async def update_template(
 )
 async def delete_template(
     template_id: UUID,
+    force: bool = Query(
+        default=False,
+        description="Archive even if live trees reference its signals (CS-13 escape hatch).",
+    ),
     context: RequestContext = Depends(requires_capability("signal.define")),
     service: SignalsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> None:
     schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
     await service.delete_template(
         template_id=template_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
+        tenant_id=tenant_id,
+        force=force,
+    )
+
+
+@router.get(
+    "/signals/templates/{template_id}/references",
+    summary="Decision trees referencing this template's signals (CS-13).",
+)
+async def get_template_references(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("signal.read")),
+    service: SignalsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, list[dict[str, str]]]:
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
+    return await service.get_template_references(
+        template_id=template_id, tenant_id=tenant_id
     )
 
 

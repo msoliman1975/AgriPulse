@@ -305,6 +305,70 @@ class SignalsRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return tuple(_template_member_to_dict(r) for r in rows)
 
+    # ---- CS-13 references -------------------------------------------------
+
+    async def list_active_tree_versions(
+        self, *, tenant_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Active decision trees visible to this tenant (its own + global)
+        with the compiled body of their current version. decision_trees
+        lives in the PUBLIC schema, so it's qualified explicitly."""
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT dt.id AS id, dt.code AS code, dt.name_en AS name,
+                           v.tree_compiled AS compiled
+                    FROM public.decision_trees dt
+                    JOIN public.decision_tree_versions v
+                      ON v.id = dt.current_version_id
+                    WHERE dt.is_active
+                      AND (dt.tenant_id = :tid OR dt.tenant_id IS NULL)
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tenant_id},
+            )
+        ).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def list_templates_for_definition(
+        self, *, definition_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Live templates that include this definition as a member."""
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT t.id AS id, t.code AS code, t.name AS name
+                    FROM signal_template_definitions td
+                    JOIN signal_templates t ON t.id = td.template_id
+                    WHERE td.signal_definition_id = :did
+                      AND t.deleted_at IS NULL
+                    ORDER BY t.name
+                    """
+                ).bindparams(bindparam("did", type_=PG_UUID(as_uuid=True))),
+                {"did": definition_id},
+            )
+        ).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def get_template_member_codes(self, *, template_id: UUID) -> tuple[str, ...]:
+        """Definition codes of a template's members (for tree-ref scans)."""
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT d.code AS code
+                    FROM signal_template_definitions td
+                    JOIN signal_definitions d ON d.id = td.signal_definition_id
+                    WHERE td.template_id = :tid
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": template_id},
+            )
+        ).mappings().all()
+        return tuple(r["code"] for r in rows)
+
     async def insert_template(
         self,
         *,

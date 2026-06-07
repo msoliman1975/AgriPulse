@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from uuid import UUID
 
 from fastapi import status
@@ -52,6 +53,34 @@ class SignalObservationNotFoundError(APIError):
             detail=f"No signal observation matching {ref!r} in this tenant.",
             type_=f"{_TYPE_BASE}/observation-not-found",
             extras={"ref": str(ref)},
+        )
+
+
+class SignalDefinitionInUseError(APIError):
+    def __init__(self, *, definition_id: UUID, references: Mapping[str, object]) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Signal definition is in use",
+            detail=(
+                "This definition is referenced by live decision trees or "
+                "templates. Archive those first, or re-run with force=true."
+            ),
+            type_=f"{_TYPE_BASE}/definition-in-use",
+            extras={"definition_id": str(definition_id), **references},
+        )
+
+
+class SignalTemplateInUseError(APIError):
+    def __init__(self, *, template_id: UUID, references: Mapping[str, object]) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Signal template is in use",
+            detail=(
+                "This template's signals are referenced by live decision "
+                "trees. Archive those first, or re-run with force=true."
+            ),
+            type_=f"{_TYPE_BASE}/template-in-use",
+            extras={"template_id": str(template_id), **references},
         )
 
 

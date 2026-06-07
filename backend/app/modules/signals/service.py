@@ -19,6 +19,7 @@ Three responsibilities:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
@@ -54,8 +55,10 @@ from app.modules.signals.errors import (
     CsvImportTooLargeError,
     InvalidSignalValueError,
     SignalAssignmentNotFoundError,
+    SignalDefinitionInUseError,
     SignalDefinitionNotFoundError,
     SignalObservationNotFoundError,
+    SignalTemplateInUseError,
     SignalTemplateMembersInvalidError,
     SignalTemplateNotFoundError,
 )
@@ -146,6 +149,8 @@ class SignalsService(Protocol):
         template_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
+        force: bool = False,
     ) -> None: ...
 
     async def delete_definition(
@@ -154,6 +159,8 @@ class SignalsService(Protocol):
         definition_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
+        force: bool = False,
     ) -> None: ...
 
     async def list_assignments(self, *, definition_id: UUID) -> tuple[dict[str, Any], ...]: ...
@@ -375,10 +382,22 @@ class SignalsServiceImpl:
         definition_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
+        force: bool = False,
     ) -> None:
         existing = await self._repo.get_definition(definition_id=definition_id)
         if existing is None:
             raise SignalDefinitionNotFoundError(definition_id)
+        # CS-13: refuse to archive a definition a live tree/template still
+        # references — unless the admin forces it (logged louder).
+        if not force:
+            refs = await self.get_definition_references(
+                definition_id=definition_id, tenant_id=tenant_id
+            )
+            if refs["decision_trees"] or refs["templates"]:
+                raise SignalDefinitionInUseError(
+                    definition_id=definition_id, references=refs
+                )
         deleted = await self._repo.soft_delete_definition(
             definition_id=definition_id, actor_user_id=actor_user_id
         )
@@ -386,13 +405,46 @@ class SignalsServiceImpl:
             return
         await self._audit.record(
             tenant_schema=tenant_schema,
-            event_type="signals.definition_deleted",
+            event_type=(
+                "signals.definition_force_deleted" if force else "signals.definition_deleted"
+            ),
             actor_user_id=actor_user_id,
             subject_kind="signal_definition",
             subject_id=definition_id,
             farm_id=None,
-            details={"code": existing["code"]},
+            details={"code": existing["code"], "forced": force},
         )
+
+    async def get_definition_references(
+        self, *, definition_id: UUID, tenant_id: UUID
+    ) -> dict[str, list[dict[str, str]]]:
+        """Live decision trees + templates that reference this definition.
+        Each item carries id/code/name/kind so the FE deep-links without a
+        second round-trip (CS-13)."""
+        defn = await self._repo.get_definition(definition_id=definition_id)
+        if defn is None:
+            raise SignalDefinitionNotFoundError(definition_id)
+        code = defn["code"]
+        trees = [
+            {
+                "id": str(tv["id"]),
+                "code": tv["code"],
+                "name": tv["name"],
+                "kind": "decision_tree",
+            }
+            for tv in await self._repo.list_active_tree_versions(tenant_id=tenant_id)
+            if code in _tree_signal_codes(tv["compiled"])
+        ]
+        templates = [
+            {
+                "id": str(t["id"]),
+                "code": t["code"],
+                "name": t["name"],
+                "kind": "signal_template",
+            }
+            for t in await self._repo.list_templates_for_definition(definition_id=definition_id)
+        ]
+        return {"decision_trees": trees, "templates": templates}
 
     # ---- Assignments --------------------------------------------------
 
@@ -836,10 +888,18 @@ class SignalsServiceImpl:
         template_id: UUID,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        tenant_id: UUID,
+        force: bool = False,
     ) -> None:
         existing = await self._repo.get_template(template_id=template_id)
         if existing is None:
             raise SignalTemplateNotFoundError(template_id)
+        if not force:
+            refs = await self.get_template_references(
+                template_id=template_id, tenant_id=tenant_id
+            )
+            if refs["decision_trees"]:
+                raise SignalTemplateInUseError(template_id=template_id, references=refs)
         deleted = await self._repo.soft_delete_template(
             template_id=template_id, actor_user_id=actor_user_id
         )
@@ -847,13 +907,38 @@ class SignalsServiceImpl:
             return
         await self._audit.record(
             tenant_schema=tenant_schema,
-            event_type="signals.template_deleted",
+            event_type=(
+                "signals.template_force_deleted" if force else "signals.template_deleted"
+            ),
             actor_user_id=actor_user_id,
             subject_kind="signal_template",
             subject_id=template_id,
             farm_id=None,
-            details={"code": existing["code"]},
+            details={"code": existing["code"], "forced": force},
         )
+
+    async def get_template_references(
+        self, *, template_id: UUID, tenant_id: UUID
+    ) -> dict[str, list[dict[str, str]]]:
+        """Decision trees referencing any of this template's member signals
+        (the engine sees flat signals, not templates — D1)."""
+        tpl = await self._repo.get_template(template_id=template_id)
+        if tpl is None:
+            raise SignalTemplateNotFoundError(template_id)
+        codes = set(await self._repo.get_template_member_codes(template_id=template_id))
+        trees: list[dict[str, str]] = []
+        if codes:
+            trees = [
+                {
+                    "id": str(tv["id"]),
+                    "code": tv["code"],
+                    "name": tv["name"],
+                    "kind": "decision_tree",
+                }
+                for tv in await self._repo.list_active_tree_versions(tenant_id=tenant_id)
+                if _tree_signal_codes(tv["compiled"]) & codes
+            ]
+        return {"decision_trees": trees, "templates": []}
 
     @staticmethod
     def _validate_template_members(
@@ -1366,6 +1451,32 @@ def _csv_point_wkt(lat: float | None, lon: float | None) -> str | None:
     if lat is None or lon is None:
         return None
     return f"POINT({lon} {lat})"
+
+
+def _walk_signal_codes(node: Any, found: set[str]) -> None:
+    """Collect every signal code referenced anywhere in a compiled tree.
+    A leaf ref is `{source: signals, code: <code>, key: ...}` (CS-7 D6)."""
+    if isinstance(node, dict):
+        if node.get("source") == "signals" and isinstance(node.get("code"), str):
+            found.add(node["code"])
+        for value in node.values():
+            _walk_signal_codes(value, found)
+    elif isinstance(node, list):
+        for item in node:
+            _walk_signal_codes(item, found)
+
+
+def _tree_signal_codes(compiled: Any) -> set[str]:
+    """Signal codes referenced by a compiled tree. Tolerates the body
+    arriving as a JSON string (raw-SQL JSONB) or an already-parsed dict."""
+    if isinstance(compiled, str):
+        try:
+            compiled = json.loads(compiled)
+        except (ValueError, TypeError):
+            return set()
+    found: set[str] = set()
+    _walk_signal_codes(compiled, found)
+    return found
 
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:
