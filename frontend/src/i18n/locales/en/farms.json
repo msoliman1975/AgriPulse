@@ -229,5 +229,33 @@
       "fileRequired": "Choose a file to upload.",
       "kindRequired": "Pick a kind."
     }
+  },
+  "common": {
+    "saving": "Saving…",
+    "loading": "Loading…"
+  },
+  "subblockGrid": {
+    "cardTitle": "Sub-block grid",
+    "cardSubtitle": "Divide this block into smaller cells so per-scene index aggregates pinpoint where issues appear.",
+    "cellSizeLabel": "Cell size (metres)",
+    "previewOk": "At {{size}}m, this block will have {{count}} cells ({{ppc}} pixels per cell).",
+    "currentConfig": "Active: {{size}}m, {{count}} cells.",
+    "create": "Create grid",
+    "replace": "Replace grid",
+    "saveError": "Could not save grid config.",
+    "toggleLabel": "Sub-block grid",
+    "toggleAria": "Show sub-block grid",
+    "cellCount": "{{count}} cells",
+    "indexLabel": "Index",
+    "worstHeading": "Lowest {{index}} cells",
+    "worstEmpty": "No observations yet.",
+    "worstRank": "#{{rank}}",
+    "cellDrawerTitle": "Cell history",
+    "historyError": "Could not load cell history.",
+    "notEnoughObs": "Not enough observations yet to draw a trend.",
+    "statMean": "Mean",
+    "statMin": "Min",
+    "statMax": "Max",
+    "latestScene": "Latest scene: {{date}}"
   }
 }

@@ -159,6 +159,7 @@ test("sub-block grid: configure cell size, enable overlay, fetch cells", async (
 }) => {
   let putBody: unknown = null;
   let cellsFetched = false;
+  let worstFetched = false;
 
   // Map-page data fan-out — getFarm, listBlocks, getBlock, getBlocksSummary,
   // and the (optional) plans + health endpoints. The fixture catch-all
@@ -275,6 +276,38 @@ test("sub-block grid: configure cell size, enable overlay, fetch cells", async (
     });
   });
 
+  // Worst-N endpoint — registered after the broad grid-cells route so it
+  // takes priority for the /worst path (Playwright matches newest first).
+  await authedPage.route(
+    `**/api/v1/blocks/${BLOCK_ID}/grid-cells/worst**`,
+    async (route) => {
+      worstFetched = true;
+      const url = new URL(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          block_id: BLOCK_ID,
+          product_id: PRODUCT_ID,
+          index_code: url.searchParams.get("index") ?? "ndvi",
+          at: "2026-05-20T10:00:00Z",
+          cells: [
+            {
+              cell_id: "88888888-8888-7888-8888-888888888888",
+              row_idx: 0,
+              col_idx: 0,
+              centroid_lon: 31.0005,
+              centroid_lat: 30.5005,
+              mean: "0.1500",
+              valid_pixel_pct: "100.00",
+              time: "2026-05-20T10:00:00Z",
+            },
+          ],
+        }),
+      });
+    },
+  );
+
   // Wider viewport — the grid-config control lives in the bottom-left
   // corner and gets clipped at the default 1280×720 with a sidebar.
   await authedPage.setViewportSize({ width: 1600, height: 900 });
@@ -282,13 +315,10 @@ test("sub-block grid: configure cell size, enable overlay, fetch cells", async (
   await authedPage.goto(`/labs/map/${FARM_ID}?unit=${BLOCK_ID}`);
   await authedPage.waitForLoadState("networkidle");
 
-  // The grid-config disclosure renders once the subscriptions query
-  // returns a product_id.
-  const gridDisclosure = authedPage.getByText("Grid configuration", { exact: false });
-  await expect(gridDisclosure).toBeVisible({ timeout: 15_000 });
-  await gridDisclosure.click();
-
+  // The grid-config card lives in the block detail panel (right side),
+  // rendered once the block detail + subscription (product_id) load.
   const cellSizeInput = authedPage.getByLabel(/cell size/i);
+  await expect(cellSizeInput).toBeVisible({ timeout: 15_000 });
   await cellSizeInput.fill("20");
 
   await expect(
@@ -298,7 +328,16 @@ test("sub-block grid: configure cell size, enable overlay, fetch cells", async (
   await authedPage.getByRole("button", { name: /create grid/i }).click();
   await expect.poll(() => putBody).toEqual({ cell_size_m: 20 });
 
+  // Toggle the overlay on (bottom-left control) → cells GET fires.
   const toggle = authedPage.getByRole("checkbox", { name: /show sub-block grid/i });
   await toggle.check();
   await expect.poll(() => cellsFetched).toBe(true);
+
+  // Index picker appears once the overlay is on; switching it re-queries.
+  const indexPicker = authedPage.getByLabel("Index", { exact: true });
+  await expect(indexPicker).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => worstFetched).toBe(true);
+  worstFetched = false;
+  await indexPicker.selectOption("ndre");
+  await expect.poll(() => worstFetched).toBe(true);
 });

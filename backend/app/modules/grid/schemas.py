@@ -87,6 +87,38 @@ class GridCellsResponse(BaseModel):
     )
 
 
+class GridWorstCell(BaseModel):
+    """A single under-performing cell, for the worst-N list.
+
+    Lean by design — no polygon geometry (the list only needs to label
+    the cell and fly the map to its centroid on click).
+    """
+
+    cell_id: UUID
+    row_idx: int
+    col_idx: int
+    centroid_lon: float
+    centroid_lat: float
+    mean: Decimal | None
+    valid_pixel_pct: Decimal | None
+    time: datetime | None
+
+
+class GridWorstCellsResponse(BaseModel):
+    """GET /api/v1/blocks/{block_id}/grid-cells/worst response.
+
+    Cells with the lowest index mean at the latest (or given) scene,
+    ascending — the unhealthiest first. Cells without an observation are
+    excluded (no signal to rank on).
+    """
+
+    block_id: UUID
+    product_id: UUID
+    index_code: str
+    cells: tuple[GridWorstCell, ...]
+    at: datetime | None
+
+
 class GridCellHistoryPoint(BaseModel):
     time: datetime
     mean: Decimal | None

@@ -68,6 +68,7 @@ function CellSparkline({
 }: {
   points: { time: string; mean: string | null }[];
 }): ReactNode {
+  const { t } = useTranslation("farms");
   const values = points
     .map((p) => (p.mean === null ? null : Number(p.mean)))
     .filter((v): v is number => v != null);
@@ -75,7 +76,9 @@ function CellSparkline({
   if (values.length < 2) {
     return (
       <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-500">
-        Not enough observations yet to draw a trend.
+        {t("subblockGrid.notEnoughObs", {
+          defaultValue: "Not enough observations yet to draw a trend.",
+        })}
       </div>
     );
   }
@@ -129,16 +132,20 @@ function CellSummary({
 }: {
   points: { time: string; mean: string | null; min: string | null; max: string | null }[];
 }): ReactNode {
+  const { t } = useTranslation("farms");
   const last = [...points].reverse().find((p) => p.mean !== null);
   if (!last) return null;
   const dt = new Date(last.time);
   return (
     <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-      <Stat label="Mean" value={last.mean} />
-      <Stat label="Min" value={last.min} />
-      <Stat label="Max" value={last.max} />
+      <Stat label={t("subblockGrid.statMean", { defaultValue: "Mean" })} value={last.mean} />
+      <Stat label={t("subblockGrid.statMin", { defaultValue: "Min" })} value={last.min} />
+      <Stat label={t("subblockGrid.statMax", { defaultValue: "Max" })} value={last.max} />
       <p className="col-span-3 mt-1 text-[11px] text-slate-500">
-        Latest scene: {dt.toLocaleString()}
+        {t("subblockGrid.latestScene", {
+          defaultValue: "Latest scene: {{date}}",
+          date: dt.toLocaleString(),
+        })}
       </p>
     </dl>
   );

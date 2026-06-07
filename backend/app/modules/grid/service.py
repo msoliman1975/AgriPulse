@@ -41,6 +41,8 @@ from app.modules.grid.schemas import (
     GridCellsResponse,
     GridCellWithValue,
     GridConfigResponse,
+    GridWorstCell,
+    GridWorstCellsResponse,
 )
 from app.modules.grid.zonal import CellAggregates
 
@@ -98,6 +100,16 @@ class GridService(Protocol):
         index_code: str,
         at: datetime | None,
     ) -> GridCellsResponse: ...
+
+    async def get_worst_cells(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        limit: int,
+        at: datetime | None,
+    ) -> GridWorstCellsResponse: ...
 
     async def get_cell_history(
         self,
@@ -342,6 +354,53 @@ class GridServiceImpl:
             index_code=index_code,
             cells=cells,
             at=resolved_at,
+        )
+
+    async def get_worst_cells(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        limit: int,
+        at: datetime | None,
+    ) -> GridWorstCellsResponse:
+        """The N lowest-mean cells at the latest (or given) scene.
+
+        Reuses :meth:`get_cells_with_values` rather than a bespoke
+        query — cells are capped at 5000 per grid, so ranking in Python
+        is cheap and keeps a single source of truth for the cell/value
+        join. Cells without an observation are dropped (nothing to rank).
+        """
+        full = await self.get_cells_with_values(
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            at=at,
+        )
+        ranked = sorted(
+            (c for c in full.cells if c.mean is not None),
+            key=lambda c: c.mean,  # type: ignore[arg-type,return-value]
+        )[:limit]
+        cells = tuple(
+            GridWorstCell(
+                cell_id=c.cell_id,
+                row_idx=c.row_idx,
+                col_idx=c.col_idx,
+                centroid_lon=c.centroid_lon,
+                centroid_lat=c.centroid_lat,
+                mean=c.mean,
+                valid_pixel_pct=c.valid_pixel_pct,
+                time=c.time,
+            )
+            for c in ranked
+        )
+        return GridWorstCellsResponse(
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            cells=cells,
+            at=full.at,
         )
 
     async def get_cell_history(
