@@ -23,6 +23,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.modules.grid.anomaly import AnomalyResult, CellMean, detect_low_outliers
 from app.modules.grid.errors import (
     CellSizeInvalidError,
     GridConfigNotFoundError,
@@ -124,6 +125,16 @@ class GridService(Protocol):
         *,
         cell_id: UUID,
     ) -> dict[str, Any] | None: ...
+
+    async def list_active_configs(self) -> tuple[dict[str, Any], ...]: ...
+
+    async def detect_block_anomalies(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+    ) -> tuple[AnomalyResult, datetime] | None: ...
 
 
 class GridServiceImpl:
@@ -437,6 +448,45 @@ class GridServiceImpl:
         cell_id: UUID,
     ) -> dict[str, Any] | None:
         return await self._repo.resolve_cell_context(cell_id=cell_id)
+
+    async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_active_configs()
+
+    async def detect_block_anomalies(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+    ) -> tuple[AnomalyResult, datetime] | None:
+        """Run spatial-anomaly detection on the latest scene for a grid.
+
+        Returns the verdict + the scene time it was computed from, or
+        ``None`` when there's no scene yet or nothing crosses the
+        threshold. See :mod:`app.modules.grid.anomaly` for the rules.
+        """
+        at = await self._repo.get_latest_scene_time(
+            block_id=block_id, product_id=product_id, index_code=index_code
+        )
+        if at is None:
+            return None
+        rows = await self._repo.list_cell_means(
+            block_id=block_id, product_id=product_id, index_code=index_code, at=at
+        )
+        cells = [
+            CellMean(
+                cell_id=r["cell_id"],
+                row_idx=r["row_idx"],
+                col_idx=r["col_idx"],
+                mean=r["mean"],
+            )
+            for r in rows
+            if r["mean"] is not None
+        ]
+        result = detect_low_outliers(cells)
+        if result is None:
+            return None
+        return result, at
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:

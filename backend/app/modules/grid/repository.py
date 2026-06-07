@@ -339,6 +339,81 @@ class GridRepository:
         ).scalar_one_or_none()
         return row
 
+    async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
+        """Every non-retired grid config in the tenant: (block_id, product_id).
+
+        Drives the anomaly sweep — one detection pass per active grid.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT block_id, product_id
+                        FROM grid_configs
+                        WHERE retired_at IS NULL
+                          AND deleted_at IS NULL
+                        ORDER BY created_at
+                        """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def list_cell_means(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        at: datetime,
+    ) -> tuple[dict[str, Any], ...]:
+        """Per-cell means for one scene — lean input for anomaly detection.
+
+        Unlike :meth:`list_cells_with_values` this skips geometry/centroid
+        work (no ST_AsGeoJSON / transforms): the detector only needs
+        (cell_id, row_idx, col_idx, mean), and the sweep runs this across
+        every block in the tenant.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx, obs.mean
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        JOIN block_grid_aggregates obs
+                          ON obs.cell_id    = gc.id
+                         AND obs.block_id   = cfg.block_id
+                         AND obs.product_id = cfg.product_id
+                         AND obs.index_code = :code
+                         AND obs.time       = :at
+                        WHERE cfg.block_id   = :block
+                          AND cfg.product_id = :product
+                          AND cfg.retired_at IS NULL
+                        """
+                    ).bindparams(
+                        bindparam("block", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product", type_=PG_UUID(as_uuid=True)),
+                        bindparam("at", type_=DateTime(timezone=True)),
+                    ),
+                    {
+                        "block": block_id,
+                        "product": product_id,
+                        "code": index_code,
+                        "at": at,
+                    },
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def list_cells_with_values(
         self,
         *,
