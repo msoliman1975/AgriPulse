@@ -223,3 +223,60 @@ class TestSnapshotImportSmoke:
         assert "PERCENTILE_CONT" in _AGGREGATE_SQL
         assert "MAX(o.value_numeric)" in _AGGREGATE_SQL
         assert "MIN(o.value_numeric)" in _AGGREGATE_SQL
+
+
+class TestCountAndSum:
+    """CS-14 — count (any value_kind) + sum (numeric)."""
+
+    def test_sum_numeric(self) -> None:
+        out = aggregate_observations(
+            [_obs(1), _obs(2), _obs(3)],
+            value_kind="numeric",
+            aggregation="sum",
+            window_days=None,
+            now=NOW,
+        )
+        assert out == AggregatedValue(time=NOW, value_numeric=Decimal("6"))
+
+    def test_count_numeric_counts_rows(self) -> None:
+        out = aggregate_observations(
+            [_obs(10), _obs(20), _obs(30)],
+            value_kind="numeric",
+            aggregation="count",
+            window_days=None,
+            now=NOW,
+        )
+        assert out is not None
+        assert out.value_numeric == Decimal("3")
+
+    def test_count_respects_window(self) -> None:
+        out = aggregate_observations(
+            [_obs(1, days_ago=1), _obs(2, days_ago=5), _obs(3, days_ago=40)],
+            value_kind="numeric",
+            aggregation="count",
+            window_days=14,
+            now=NOW,
+        )
+        assert out is not None
+        assert out.value_numeric == Decimal("2")  # the 40-day-old row is excluded
+
+    def test_count_works_for_non_numeric_kind(self) -> None:
+        # Pest-sighting events have no value_numeric, but count still works
+        # by counting the rows (mirrors SQL COUNT(*)). CS-14 edge case.
+        rows = [
+            ObservationRow(time=NOW - timedelta(days=1), value_event="aphids"),
+            ObservationRow(time=NOW - timedelta(days=2), value_event="aphids"),
+            ObservationRow(time=NOW - timedelta(days=3), value_event="mites"),
+        ]
+        out = aggregate_observations(
+            rows, value_kind="event", aggregation="count", window_days=14, now=NOW
+        )
+        assert out is not None
+        assert out.value_numeric == Decimal("3")
+
+    def test_count_non_numeric_empty_window_returns_none(self) -> None:
+        rows = [ObservationRow(time=NOW - timedelta(days=40), value_event="aphids")]
+        out = aggregate_observations(
+            rows, value_kind="event", aggregation="count", window_days=14, now=NOW
+        )
+        assert out is None

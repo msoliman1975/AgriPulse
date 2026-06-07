@@ -5,7 +5,7 @@ import { apiClient } from "./client";
 export type ValueKind = "numeric" | "categorical" | "event" | "boolean" | "geopoint";
 
 // CS-1 D3 / CS-9. Non-numeric kinds are coerced to `latest` server-side.
-export type Aggregation = "latest" | "mean" | "median" | "max" | "min";
+export type Aggregation = "latest" | "mean" | "median" | "max" | "min" | "count" | "sum";
 
 export interface SignalDefinition {
   id: string;

@@ -151,7 +151,9 @@
           "mean": "mean",
           "median": "median",
           "max": "max",
-          "min": "min"
+          "min": "min",
+          "count": "count",
+          "sum": "sum"
         }
       }
     },
