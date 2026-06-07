@@ -16,7 +16,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import DateTime, bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -382,6 +382,10 @@ class GridRepository:
                     ).bindparams(
                         bindparam("block", type_=PG_UUID(as_uuid=True)),
                         bindparam("product", type_=PG_UUID(as_uuid=True)),
+                        # asyncpg can't infer the type of a bare NULL used in
+                        # ":at IS NULL"; pin it to timestamptz so the prepared
+                        # statement type-checks when no scene time is given.
+                        bindparam("at", type_=DateTime(timezone=True)),
                     ),
                     {
                         "block": block_id,
