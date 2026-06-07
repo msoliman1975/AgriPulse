@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 
@@ -26,21 +26,33 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
   const { t } = useTranslation("farms");
   const queryClient = useQueryClient();
   const [cellSize, setCellSize] = useState<string>("");
+  // Per-block anomaly threshold override. Empty string = inherit the
+  // tenant/platform default (sent as null).
+  const [threshold, setThreshold] = useState<string>("");
 
   const configQuery = useQuery({
     queryKey: ["grid-config", blockId, productId],
     queryFn: () => getGridConfig(blockId, productId),
   });
 
-  // Seed the input from the active config on first load.
+  // Seed the inputs from the active config once, when it first loads.
+  // A ref (not `cellSize === ""`) because an empty threshold is a valid
+  // "inherited" state we must not keep re-seeding over.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (configQuery.data && cellSize === "") {
+    if (configQuery.data && !seededRef.current) {
       setCellSize(configQuery.data.cell_size_m);
+      setThreshold(configQuery.data.anomaly_z_threshold ?? "");
+      seededRef.current = true;
     }
-  }, [configQuery.data, cellSize]);
+  }, [configQuery.data]);
 
   const parsed = Number(cellSize);
   const isValid = !Number.isNaN(parsed) && parsed > 0;
+  const thresholdTrimmed = threshold.trim();
+  const thresholdParsed = thresholdTrimmed === "" ? null : Number(thresholdTrimmed);
+  const thresholdValid =
+    thresholdParsed === null || (!Number.isNaN(thresholdParsed) && thresholdParsed > 0);
 
   const previewQuery = useQuery({
     queryKey: ["grid-config-preview", blockId, productId, parsed],
@@ -49,7 +61,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => putGridConfig(blockId, productId, parsed),
+    mutationFn: () => putGridConfig(blockId, productId, parsed, thresholdParsed),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["grid-config", blockId, productId] });
       queryClient.invalidateQueries({ queryKey: ["grid-cells", blockId] });
@@ -106,6 +118,35 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
         </div>
       )}
 
+      <label className="mt-3 block text-sm font-medium text-slate-700">
+        {t("subblockGrid.thresholdLabel", { defaultValue: "Anomaly sensitivity (z-score)" })}
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          value={threshold}
+          onChange={(e) => setThreshold(e.target.value)}
+          placeholder={t("subblockGrid.thresholdInherit", { defaultValue: "Inherited" })}
+          className="mt-1 block w-32 rounded border border-slate-300 px-2 py-1 text-sm"
+          aria-label={t("subblockGrid.thresholdLabel", {
+            defaultValue: "Anomaly sensitivity (z-score)",
+          })}
+        />
+      </label>
+      <p className="mt-1 text-xs text-slate-500">
+        {t("subblockGrid.thresholdHelp", {
+          defaultValue:
+            "Std-devs below the field average before a cell is flagged. Lower = more sensitive. Leave blank to inherit the tenant default.",
+        })}
+      </p>
+      {!thresholdValid && (
+        <p className="mt-1 text-xs text-amber-600">
+          {t("subblockGrid.thresholdInvalid", {
+            defaultValue: "Enter a positive number, or leave blank to inherit.",
+          })}
+        </p>
+      )}
+
       {configQuery.data && (
         <p className="mt-3 text-xs text-slate-500">
           {t("subblockGrid.currentConfig", {
@@ -118,7 +159,9 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
 
       <button
         type="button"
-        disabled={!isValid || !previewQuery.data?.valid || saveMutation.isPending}
+        disabled={
+          !isValid || !thresholdValid || !previewQuery.data?.valid || saveMutation.isPending
+        }
         onClick={() => saveMutation.mutate()}
         className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300"
       >

@@ -4,7 +4,7 @@ import { integrationsApi } from "@/api/integrations";
 
 const STALE = 30_000;
 
-export function useTenantIntegration(category: "weather" | "imagery" | "email" | "webhook") {
+export function useTenantIntegration(category: "weather" | "imagery" | "email" | "webhook" | "detection") {
   return useQuery({
     queryKey: ["integrations", category, "tenant"] as const,
     queryFn: () => integrationsApi[category].getTenant(),
@@ -12,7 +12,7 @@ export function useTenantIntegration(category: "weather" | "imagery" | "email" |
   });
 }
 
-export function usePutTenantIntegration(category: "weather" | "imagery" | "email" | "webhook") {
+export function usePutTenantIntegration(category: "weather" | "imagery" | "email" | "webhook" | "detection") {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>

@@ -5,7 +5,12 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import uuid4
 
-from app.modules.grid.anomaly import CellMean, detect_low_outliers
+from app.modules.grid.anomaly import (
+    DEFAULT_K,
+    CellMean,
+    detect_low_outliers,
+    effective_k,
+)
 
 
 def _cells(values: list[float]) -> list[CellMean]:
@@ -52,6 +57,30 @@ def test_returns_none_when_no_cell_crosses_threshold() -> None:
     # nothing is flagged even though the field isn't uniform.
     values = [0.60] * 20 + [0.70] * 20
     assert detect_low_outliers(_cells(values)) is None
+
+
+def test_k_threshold_changes_flagged_count() -> None:
+    # Same field: mean 0.65, std 0.05. The 0.60 cohort sits 1.0 SD below.
+    # At the default k=1.5 nothing is flagged; loosen to k=0.5 and the
+    # whole low cohort crosses the threshold. Locks the G-3 contract that
+    # a smaller k = more sensitive detection.
+    values = [0.60] * 20 + [0.70] * 20
+    assert detect_low_outliers(_cells(values), k=DEFAULT_K) is None
+    loosened = detect_low_outliers(_cells(values), k=0.5)
+    assert loosened is not None
+    assert len(loosened.flagged) == 20
+    assert all(f.mean == 0.60 for f in loosened.flagged)
+
+
+def test_effective_k_prefers_block_override() -> None:
+    # Per-block override wins over the tenant default...
+    assert effective_k(block_override=Decimal("2.5"), tenant_default=1.5) == 2.5
+    # ...and a NULL override falls through to the tenant/platform default.
+    assert effective_k(block_override=None, tenant_default=1.5) == 1.5
+    # Decimal overrides are coerced to float for the detector.
+    assert isinstance(
+        effective_k(block_override=Decimal("1.50"), tenant_default=1.5), float
+    )
 
 
 def test_severity_critical_when_many_flagged() -> None:

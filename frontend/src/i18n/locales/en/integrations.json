@@ -21,6 +21,10 @@
     "title": "Webhook",
     "subtitle": "Outbound webhook signing and timeout. Falls back to platform defaults when not set."
   },
+  "detection": {
+    "title": "Detection",
+    "subtitle": "Sub-block grid anomaly sensitivity. Lower z-score = more sensitive. Falls back to the platform default; individual blocks can override on their grid config card."
+  },
   "section": {
     "tenant": "Tenant defaults",
     "farm": "Farm overrides",

@@ -23,7 +23,12 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.modules.grid.anomaly import AnomalyResult, CellMean, detect_low_outliers
+from app.modules.grid.anomaly import (
+    DEFAULT_K,
+    AnomalyResult,
+    CellMean,
+    detect_low_outliers,
+)
 from app.modules.grid.errors import (
     CellSizeInvalidError,
     GridConfigNotFoundError,
@@ -74,6 +79,7 @@ class GridService(Protocol):
         product_id: UUID,
         cell_size_m: Decimal,
         created_by: UUID | None,
+        anomaly_z_threshold: Decimal | None = None,
     ) -> GridConfigResponse: ...
 
     async def list_active_cells(
@@ -129,12 +135,20 @@ class GridService(Protocol):
 
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]: ...
 
+    async def list_observed_indices(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+    ) -> tuple[str, ...]: ...
+
     async def detect_block_anomalies(
         self,
         *,
         block_id: UUID,
         product_id: UUID,
         index_code: str,
+        k: float = DEFAULT_K,
     ) -> tuple[AnomalyResult, datetime] | None: ...
 
 
@@ -204,6 +218,7 @@ class GridServiceImpl:
         product_id: UUID,
         cell_size_m: Decimal,
         created_by: UUID | None,
+        anomaly_z_threshold: Decimal | None = None,
     ) -> GridConfigResponse:
         # 1. Validate inputs against the product + block bounds.
         block = await self._repo.get_block_geometry(block_id=block_id)
@@ -227,8 +242,23 @@ class GridServiceImpl:
         )
         now = datetime.now(tz=UTC)
         if prior is not None:
-            # Same cell size = no-op (idempotent re-PUT).
+            # Same cell size = no geometry change. Apply a threshold-only
+            # update in place (no retire + regenerate) so tuning the
+            # detector doesn't throw away the cell grid + its observations.
             if prior["cell_size_m"] == cell_size_m:
+                if prior["anomaly_z_threshold"] != anomaly_z_threshold:
+                    await self._repo.update_config_threshold(
+                        config_id=prior["id"],
+                        anomaly_z_threshold=anomaly_z_threshold,
+                    )
+                    refreshed = await self._repo.get_active_config(
+                        block_id=block_id, product_id=product_id
+                    )
+                    assert refreshed is not None
+                    count = await self._repo.count_cells(
+                        grid_config_id=refreshed["id"]
+                    )
+                    return GridConfigResponse(cell_count=count, **refreshed)
                 count = await self._repo.count_cells(grid_config_id=prior["id"])
                 return GridConfigResponse(cell_count=count, **prior)
             await self._repo.retire_config(config_id=prior["id"], retired_at=now)
@@ -241,6 +271,7 @@ class GridServiceImpl:
             cell_size_m=cell_size_m,
             utm_srid=utm_srid,
             created_by=created_by,
+            anomaly_z_threshold=anomaly_z_threshold,
         )
 
         cells = list(
@@ -480,18 +511,33 @@ class GridServiceImpl:
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_active_configs()
 
+    async def list_observed_indices(
+        self, *, block_id: UUID, product_id: UUID
+    ) -> tuple[str, ...]:
+        """Index codes the imagery pipeline has written for this grid.
+
+        Drives the multi-index sweep (G-1) — see the repository method.
+        """
+        return await self._repo.list_observed_indices(
+            block_id=block_id, product_id=product_id
+        )
+
     async def detect_block_anomalies(
         self,
         *,
         block_id: UUID,
         product_id: UUID,
         index_code: str,
+        k: float = DEFAULT_K,
     ) -> tuple[AnomalyResult, datetime] | None:
         """Run spatial-anomaly detection on the latest scene for a grid.
 
-        Returns the verdict + the scene time it was computed from, or
-        ``None`` when there's no scene yet or nothing crosses the
-        threshold. See :mod:`app.modules.grid.anomaly` for the rules.
+        ``k`` is the z-score threshold (std-devs below the block mean) and
+        is resolved per (block, tenant, platform) by the caller; it
+        defaults to the module constant when unset. Returns the verdict +
+        the scene time it was computed from, or ``None`` when there's no
+        scene yet or nothing crosses the threshold. See
+        :mod:`app.modules.grid.anomaly` for the rules.
         """
         at = await self._repo.get_latest_scene_time(
             block_id=block_id, product_id=product_id, index_code=index_code
@@ -513,7 +559,7 @@ class GridServiceImpl:
             for r in rows
             if r["mean"] is not None
         ]
-        result = detect_low_outliers(cells)
+        result = detect_low_outliers(cells, k=k)
         if result is None:
             return None
         return result, at

@@ -21,7 +21,8 @@
     "weather": "Weather",
     "imagery": "Imagery",
     "email": "Email",
-    "webhook": "Webhook"
+    "webhook": "Webhook",
+    "detection": "Detection"
   },
   "placeholder": {
     "org": {

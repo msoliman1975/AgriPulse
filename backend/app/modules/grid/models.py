@@ -48,6 +48,11 @@ class GridConfig(Base, TimestampedMixin):
     cell_size_m: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     utm_srid: Mapped[int] = mapped_column(Integer, nullable=False)
     retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Per-block override for the spatial-anomaly z-score threshold (G-3).
+    # NULL = inherit the tenant override / platform default.
+    anomaly_z_threshold: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 2), nullable=True
+    )
 
 
 class GridCell(Base):

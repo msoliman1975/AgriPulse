@@ -50,6 +50,11 @@ export function IntegrationsLayout(): ReactNode {
       labelKey: "integrationsTabs.webhook",
       show: canManage,
     },
+    {
+      to: "/settings/integrations/detection",
+      labelKey: "integrationsTabs.detection",
+      show: canManage,
+    },
   ].filter((e) => e.show);
 
   if (entries.length === 0) {

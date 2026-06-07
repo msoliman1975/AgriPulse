@@ -44,6 +44,7 @@ from app.modules.integrations.schemas import (
     TenantSettingUpsertRequest,
 )
 from app.modules.integrations.service import (
+    DETECTION_KEYS,
     EMAIL_KEYS,
     IMAGERY_KEYS,
     WEATHER_KEYS,
@@ -388,6 +389,50 @@ async def put_webhook_tenant(
             status_code=status.HTTP_400_BAD_REQUEST,
             title="Invalid key",
             detail=f"{key!r} is not a webhook-category key.",
+            type_="https://agripulse.cloud/problems/integrations/invalid-key",
+        )
+    return await service.upsert_tenant_value(
+        tenant_id=tid,
+        key=key,
+        value=payload.value,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+# ---- Detection (alerting thresholds) --------------------------------------
+
+
+@router.get(
+    "/integrations/detection/tenant",
+    response_model=TenantIntegrationSettingsResponse,
+)
+async def get_detection_tenant(
+    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
+    service: IntegrationsService = Depends(_service),
+) -> dict[str, Any]:
+    tid, _ = _ensure_tenant(context)
+    return {"settings": await service.list_tenant(tenant_id=tid, keys=DETECTION_KEYS)}
+
+
+@router.put(
+    "/integrations/detection/tenant",
+    response_model=ResolvedIntegrationSetting,
+)
+async def put_detection_tenant(
+    payload: TenantSettingUpsertRequest,
+    key: str = Query(...),
+    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
+    service: IntegrationsService = Depends(_service),
+) -> dict[str, Any]:
+    tid, schema = _ensure_tenant(context)
+    if key not in DETECTION_KEYS:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Invalid key",
+            detail=f"{key!r} is not a detection-category key.",
             type_="https://agripulse.cloud/problems/integrations/invalid-key",
         )
     return await service.upsert_tenant_value(

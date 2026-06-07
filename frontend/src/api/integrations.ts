@@ -106,4 +106,8 @@ export const integrationsApi = {
     getTenant: () => getTenant("webhook"),
     putTenant: (key: string, value: unknown) => putTenant("webhook", key, value),
   },
+  detection: {
+    getTenant: () => getTenant("detection"),
+    putTenant: (key: string, value: unknown) => putTenant("detection", key, value),
+  },
 };

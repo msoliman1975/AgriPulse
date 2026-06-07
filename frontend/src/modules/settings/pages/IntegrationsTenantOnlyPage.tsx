@@ -7,14 +7,15 @@ import { SourcePill } from "@/modules/settings/components/SourcePill";
 import { usePutTenantIntegration, useTenantIntegration } from "@/queries/integrations";
 
 interface Props {
-  category: "email" | "webhook";
+  category: "email" | "webhook" | "detection";
   i18nTitleKey: string;
   i18nSubtitleKey: string;
 }
 
 /**
- * Email + webhook are tenant-tier-only per the proposal V1. One page
- * lists the resolved keys with editable values.
+ * Email, webhook + detection are tenant-tier-only. One page lists the
+ * resolved keys with editable values; per-block detection overrides live
+ * on the block grid config card.
  */
 export function IntegrationsTenantOnlyPage({
   category,

@@ -52,6 +52,9 @@ WEBHOOK_KEYS = (
     "webhook.signing_alg",
     "webhook.timeout_seconds",
 )
+# Detection / alerting thresholds (G-3). Tenant-tier override of the
+# platform default; per-block overrides live on grid_configs.
+DETECTION_KEYS = ("grid.anomaly_z_threshold",)
 
 
 def _resolved_dict(key: str, resolved: ResolvedSetting) -> dict[str, Any]:

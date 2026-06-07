@@ -13,10 +13,17 @@ class GridConfigBody(BaseModel):
     """Request body for PUT /blocks/{b}/grid-configs/{product_id}.
 
     A bare cell_size_m suffices — utm_srid is inferred server-side from
-    ``blocks.boundary_utm``.
+    ``blocks.boundary_utm``. ``anomaly_z_threshold`` is an optional
+    per-block detection override; null/omitted means "inherit" the tenant
+    override / platform default.
     """
 
     cell_size_m: Decimal = Field(gt=0, description="Cell edge in metres.")
+    anomaly_z_threshold: Decimal | None = Field(
+        default=None,
+        gt=0,
+        description="Per-block z-score threshold override; null inherits.",
+    )
 
 
 class GridConfigResponse(BaseModel):
@@ -29,6 +36,10 @@ class GridConfigResponse(BaseModel):
     product_id: UUID
     cell_size_m: Decimal
     utm_srid: int
+    anomaly_z_threshold: Decimal | None = Field(
+        default=None,
+        description="Per-block z-score override; null means inherited.",
+    )
     retired_at: datetime | None
     created_at: datetime
     updated_at: datetime

@@ -114,6 +114,7 @@ async def put_grid_config(
         product_id=product_id,
         cell_size_m=body.cell_size_m,
         created_by=context.user_id,
+        anomaly_z_threshold=body.anomaly_z_threshold,
     )
 
 
