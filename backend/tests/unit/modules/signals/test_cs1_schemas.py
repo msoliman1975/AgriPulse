@@ -52,6 +52,19 @@ class TestCoerceAggregationForValueKind:
     def test_numeric_with_none_defaults_to_latest(self) -> None:
         assert _coerce_aggregation_for_value_kind("numeric", None) == "latest"
 
+    @pytest.mark.parametrize("value_kind", ["categorical", "event", "boolean", "geopoint"])
+    def test_count_survives_non_numeric(self, value_kind: str) -> None:
+        # CS-14: count is value-kind-agnostic; it must not clamp to latest.
+        assert _coerce_aggregation_for_value_kind(value_kind, "count") == "count"
+
+    def test_sum_clamps_to_latest_for_non_numeric(self) -> None:
+        # sum needs a numeric value column → coerce away on non-numeric.
+        assert _coerce_aggregation_for_value_kind("event", "sum") == "latest"
+
+    def test_numeric_passes_count_and_sum(self) -> None:
+        assert _coerce_aggregation_for_value_kind("numeric", "count") == "count"
+        assert _coerce_aggregation_for_value_kind("numeric", "sum") == "sum"
+
     def test_known_numeric_kinds_set(self) -> None:
         # Defensive: catches additions to NUMERIC_VALUE_KINDS that would
         # change the coercion behavior for existing definitions.

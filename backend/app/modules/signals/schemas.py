@@ -14,18 +14,25 @@ ValueKind = Literal["numeric", "categorical", "event", "boolean", "geopoint"]
 # CS-1 D3. Non-numeric value_kinds must always use `latest` — enforced
 # in the request validators, not in DB (legacy rows + clean-data
 # trade-off).
-Aggregation = Literal["latest", "mean", "median", "max", "min"]
+Aggregation = Literal["latest", "mean", "median", "max", "min", "count", "sum"]
 NUMERIC_VALUE_KINDS: frozenset[str] = frozenset({"numeric"})
+# CS-14: count works on any value_kind (it counts observations, not values);
+# every other non-`latest` aggregate needs a numeric value column.
+_VALUE_KIND_AGNOSTIC_AGGREGATIONS: frozenset[str] = frozenset({"latest", "count"})
 
 # CS-1 D2. See models.SignalObservation.location_mode docstring.
 LocationMode = Literal["entity", "point_in_entity", "free_point"]
 
 
 def _coerce_aggregation_for_value_kind(value_kind: str, aggregation: str | None) -> str:
-    """Non-numeric kinds always use `latest`, regardless of input."""
-    if value_kind not in NUMERIC_VALUE_KINDS:
+    """Numeric kinds keep any aggregation. Non-numeric kinds may only use
+    the value-kind-agnostic ones (`latest`, `count`); anything else (mean,
+    median, max, min, sum) needs a numeric value column → coerce to
+    `latest`. CS-14."""
+    agg = aggregation or "latest"
+    if value_kind not in NUMERIC_VALUE_KINDS and agg not in _VALUE_KIND_AGNOSTIC_AGGREGATIONS:
         return "latest"
-    return aggregation or "latest"
+    return agg
 
 
 class SignalDefinitionResponse(BaseModel):

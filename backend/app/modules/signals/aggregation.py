@@ -16,14 +16,17 @@ hot per-evaluation path. This module exists for three reasons:
 
 Behaviour MUST match the SQL in snapshot.py:
 
-  * Non-numeric value_kinds always resolve to the most recent
-    observation's value, regardless of the configured aggregation rule.
+  * aggregation='count' (CS-14) works for EVERY value_kind: it counts
+    the in-window observations themselves (mirrors SQL COUNT(*)), not
+    their values, so it bypasses numeric value extraction.
+  * Non-numeric value_kinds with any other rule resolve to the most
+    recent observation's value, regardless of the configured rule.
   * Numeric value_kinds with aggregation='latest' resolve to the most
     recent value_numeric.
-  * Numeric value_kinds with aggregation ∈ {mean, median, max, min}
-    aggregate over observations whose time falls inside
-    [now - window_days, now], or all observations if window_days is
-    None.
+  * Numeric value_kinds with aggregation ∈ {mean, median, max, min, sum}
+    (CS-14 adds sum) aggregate value_numeric over observations whose time
+    falls inside [now - window_days, now], or all observations if
+    window_days is None.
   * The reported ``time`` for an aggregated value is the max time
     across the observations that contributed (matches MAX(o.time) in
     the SQL).
@@ -40,7 +43,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
-Aggregation = Literal["latest", "mean", "median", "max", "min"]
+Aggregation = Literal["latest", "mean", "median", "max", "min", "count", "sum"]
 NUMERIC_VALUE_KINDS: frozenset[str] = frozenset({"numeric"})
 
 
@@ -69,7 +72,7 @@ class AggregatedValue:
     value_boolean: bool | None = None
 
 
-def aggregate_observations(
+def aggregate_observations(  # noqa: PLR0911  # one branch per aggregation rule reads clearer flat
     observations: Sequence[ObservationRow],
     *,
     value_kind: str,
@@ -84,6 +87,18 @@ def aggregate_observations(
     """
     if not observations:
         return None
+
+    # CS-14: `count` works for every value_kind — it counts the in-window
+    # observations themselves, not their values, so it bypasses the numeric
+    # value-extraction path below (mirrors SQL COUNT(*)).
+    if aggregation == "count":
+        rows = _in_window(observations, window_days=window_days, now=now)
+        if not rows:
+            return None
+        return AggregatedValue(
+            time=max(r.time for r in rows),
+            value_numeric=Decimal(len(rows)),
+        )
 
     # Non-numeric kinds always use latest, regardless of aggregation
     # config — belt-and-brace against a misconfigured definition.
@@ -138,4 +153,10 @@ def _apply_aggregate(values: Sequence[Decimal], rule: Aggregation) -> Decimal:
         return max(values)
     if rule == "min":
         return min(values)
+    if rule == "sum":
+        return sum(values, Decimal(0))
+    if rule == "count":
+        # Reachable only if a caller invokes _apply_aggregate directly;
+        # aggregate_observations handles count before value extraction.
+        return Decimal(len(values))
     raise ValueError(f"Unsupported aggregation rule for non-latest path: {rule!r}")

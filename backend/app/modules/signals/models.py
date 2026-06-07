@@ -62,12 +62,13 @@ class SignalDefinition(Base, TimestampedMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
-    # CS-1 D3: per-definition aggregation rule. The recommendations
-    # engine uses `aggregation` + `aggregation_window_days` to collapse
-    # multiple observations to a single block-level value. Non-numeric
-    # value_kinds (categorical, event, boolean, geopoint) must always
-    # use `latest` — validated at the schema layer, not in DB, so legacy
-    # rows with NULL aggregation_window_days continue to work.
+    # CS-1 D3 / CS-14: per-definition aggregation rule ∈ {latest, mean,
+    # median, max, min, sum, count}. The recommendations engine uses
+    # `aggregation` + `aggregation_window_days` to collapse multiple
+    # observations to a single block-level value. `count` works for any
+    # value_kind (counts observations); every other non-`latest` rule is
+    # numeric-only and non-numeric kinds coerce to `latest` — validated at
+    # the schema layer (CHECK only pins the allowed string values).
     aggregation: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'latest'"))
     aggregation_window_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

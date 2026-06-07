@@ -40,7 +40,15 @@ import {
 import { filterDefinitions } from "../components/catalogFilter";
 
 const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
-const AGGREGATIONS: Aggregation[] = ["latest", "mean", "median", "max", "min"];
+const AGGREGATIONS: Aggregation[] = [
+  "latest",
+  "mean",
+  "median",
+  "max",
+  "min",
+  "count",
+  "sum",
+];
 
 interface FormState {
   code: string;

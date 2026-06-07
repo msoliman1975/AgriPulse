@@ -22,13 +22,15 @@ CS-6 aggregation:
   observations to a single block-level value per signal using the
   rule:
 
-  * ``aggregation = 'latest'`` OR ``value_kind != 'numeric'`` →
-    take the most recent observation's value (legacy behaviour).
-  * ``aggregation ∈ {mean, median, max, min}`` on a numeric def →
-    GROUP BY signal_definition_id over the window (or all history
-    when ``aggregation_window_days IS NULL``), apply the SQL
-    aggregate, and report the window-max ``time`` so consumers can
-    still answer "how recent is this".
+  * ``aggregation = 'count'`` (CS-14) on ANY value_kind → COUNT(*)
+    of in-window observations, returned in ``value_numeric``.
+  * ``aggregation = 'latest'``, OR a non-numeric def with any rule
+    other than count → take the most recent observation's value.
+  * ``aggregation ∈ {mean, median, max, min, sum}`` (CS-14 adds sum)
+    on a numeric def → GROUP BY signal_definition_id over the window
+    (or all history when ``aggregation_window_days IS NULL``), apply
+    the SQL aggregate, and report the window-max ``time`` so consumers
+    can still answer "how recent is this".
 
   Non-numeric kinds are forced to ``latest`` by the service-layer
   ``_coerce_aggregation_for_value_kind`` at write time, but we
@@ -49,10 +51,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.conditions.context import SignalEntry
 
-# All five SQL aggregates collapsed into one CASE so the query stays
+# All SQL aggregates collapsed into one CASE so the query stays
 # single-pass. PERCENTILE_CONT requires a float ordering expression,
 # hence the double-cast; the outer cast back to numeric keeps the
 # returned column type uniform with MAX/MIN/AVG (which preserve numeric).
+# CS-14: `count` is COUNT(*) (works for any value_kind — it counts rows,
+# not values) and `sum` is SUM(value_numeric) (numeric-only).
 _AGGREGATE_SQL = """
     CASE a.aggregation
         WHEN 'mean'   THEN AVG(o.value_numeric)
@@ -62,6 +66,8 @@ _AGGREGATE_SQL = """
         )::numeric
         WHEN 'max'    THEN MAX(o.value_numeric)
         WHEN 'min'    THEN MIN(o.value_numeric)
+        WHEN 'sum'    THEN SUM(o.value_numeric)
+        WHEN 'count'  THEN COUNT(*)::numeric
     END
 """
 
@@ -111,7 +117,12 @@ async def load_snapshot(
                            o.value_event, o.value_boolean
                     FROM signal_observations o
                     JOIN applicable a ON a.id = o.signal_definition_id
-                    WHERE (a.aggregation = 'latest' OR a.value_kind != 'numeric')
+                    -- latest if explicitly configured, or a non-numeric def
+                    -- whose rule coerces to latest (everything except count).
+                    WHERE (
+                            a.aggregation = 'latest'
+                         OR (a.value_kind != 'numeric' AND a.aggregation != 'count')
+                      )
                       AND (o.block_id = :block_id OR o.block_id IS NULL)
                       AND o.farm_id = :farm_id
                     ORDER BY o.signal_definition_id, o.time DESC
@@ -130,8 +141,10 @@ async def load_snapshot(
                            NULL::boolean  AS value_boolean
                     FROM signal_observations o
                     JOIN applicable a ON a.id = o.signal_definition_id
+                    -- numeric non-latest rules, plus `count` on ANY
+                    -- value_kind (CS-14 — counts rows via COUNT(*)).
                     WHERE a.aggregation != 'latest'
-                      AND a.value_kind = 'numeric'
+                      AND (a.value_kind = 'numeric' OR a.aggregation = 'count')
                       AND (o.block_id = :block_id OR o.block_id IS NULL)
                       AND o.farm_id = :farm_id
                       AND (
