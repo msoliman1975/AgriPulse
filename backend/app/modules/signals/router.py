@@ -563,3 +563,61 @@ async def list_observations(
             limit=limit,
         )
     )
+
+
+@router.delete(
+    "/signals/observations",
+    status_code=status.HTTP_200_OK,
+    summary="Delete all observations in a templated group (CS-11).",
+)
+async def delete_template_observation(
+    template_observation_id: UUID = Query(
+        ..., description="Delete every sibling row sharing this id."
+    ),
+    context: RequestContext = Depends(get_current_context),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, int]:
+    schema = _ensure_tenant(context)
+    farm_id = await service.get_template_observation_farm(
+        template_observation_id=template_observation_id
+    )
+    if farm_id is None:
+        from app.modules.signals.errors import SignalObservationNotFoundError
+
+        raise SignalObservationNotFoundError(template_observation_id)
+    _ensure_farm_capability(context, "signal.delete_observation", farm_id)
+    deleted = await service.delete_template_observation(
+        template_observation_id=template_observation_id,
+        farm_id=farm_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    return {"deleted": deleted}
+
+
+@router.delete(
+    "/signals/observations/{observation_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a single signal observation (CS-11).",
+)
+async def delete_observation(
+    observation_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, int]:
+    schema = _ensure_tenant(context)
+    obs = await service.get_observation(observation_id=observation_id)
+    if obs is None:
+        from app.modules.signals.errors import SignalObservationNotFoundError
+
+        raise SignalObservationNotFoundError(observation_id)
+    # Farm-scoped capability — resolve farm_id from the row first (it's
+    # not in the request), same body-then-check pattern as create.
+    _ensure_farm_capability(context, "signal.delete_observation", obs["farm_id"])
+    await service.delete_observation(
+        observation_id=observation_id,
+        farm_id=obs["farm_id"],
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    return {"deleted": 1}
