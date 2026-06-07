@@ -502,18 +502,28 @@ async def create_observation(
     "/signals/csv-import",
     status_code=status.HTTP_200_OK,
     response_model=None,
-    summary="Strict CSV import for signal observations (CS-7).",
+    summary="Strict CSV import for signal observations (CS-7 / CS-12).",
 )
 async def import_observations_csv(
     farm_id: UUID = Query(..., description="Target farm; all rows are recorded against it."),
+    bulk_mode: bool = Query(
+        default=False,
+        description="Raise the row cap to 50,000 (and size to 50 MB) for backfills. "
+        "Requires signal.define + signal.record.",
+    ),
     file: UploadFile = File(..., description="UTF-8 CSV file. See module docstring for schema."),
     context: RequestContext = Depends(get_current_context),
     service: SignalsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, int]:
     schema = _ensure_tenant(context)
     # signal.record on the target farm; per-row farm_id is fixed by
-    # the query param so we authorize once instead of N times.
+    # the query param so we authorize once instead of N times. Bulk mode
+    # is a tenant-admin-level backfill action — additionally gate on
+    # signal.define so an everyday operator can't trigger 50k-row imports.
     _ensure_farm_capability(context, "signal.record", farm_id)
+    if bulk_mode:
+        _ensure_farm_capability(context, "signal.define", farm_id)
     if context.user_id is None:
         from app.core.errors import APIError
 
@@ -523,12 +533,15 @@ async def import_observations_csv(
             detail="CSV import requires an authenticated user.",
             type_="https://agripulse.cloud/problems/user-required",
         )
+    tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
     csv_bytes = await file.read()
     return await service.import_observations_csv(
         farm_id=farm_id,
         csv_bytes=csv_bytes,
         recorded_by=context.user_id,
         tenant_schema=schema,
+        tenant_id=tenant_id,
+        bulk_mode=bulk_mode,
     )
 
 

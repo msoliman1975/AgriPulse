@@ -8,10 +8,31 @@ import {
   type CsvImportRowError,
   type CsvImportSuccess,
 } from "@/api/signals";
+import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
   farmId: string;
 }
+
+// Columns the importer understands. signal_code + observed_at are
+// required; the rest are optional (CS-12 added the location / attachment /
+// template ones). Descriptions are i18n keys under csvImport.schema.col.*.
+const CSV_COLUMNS: { name: string; required: boolean }[] = [
+  { name: "signal_code", required: true },
+  { name: "observed_at", required: true },
+  { name: "block_id", required: false },
+  { name: "value_numeric", required: false },
+  { name: "value_categorical", required: false },
+  { name: "value_event", required: false },
+  { name: "value_boolean", required: false },
+  { name: "notes", required: false },
+  { name: "location_mode", required: false },
+  { name: "location_point_lat", required: false },
+  { name: "location_point_lon", required: false },
+  { name: "attachment_s3_key", required: false },
+  { name: "template_code", required: false },
+  { name: "template_member_position", required: false },
+];
 
 /**
  * CSV-import widget for the Signals Configuration page. Wraps the
@@ -36,9 +57,14 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
   const [rowErrors, setRowErrors] = useState<CsvImportRowError[]>([]);
   const [topLevelError, setTopLevelError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CsvImportSuccess | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [showSchema, setShowSchema] = useState(false);
+  // Bulk mode is a backfill action — gated on signal.define (the route
+  // additionally requires it server-side).
+  const canBulk = useCapability("signal.define", { farmId });
 
   const mutation = useMutation({
-    mutationFn: (file: File) => importSignalObservationsCsv(farmId, file),
+    mutationFn: (file: File) => importSignalObservationsCsv(farmId, file, bulkMode && canBulk),
     onMutate: () => {
       setRowErrors([]);
       setTopLevelError(null);
@@ -85,13 +111,22 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ap-muted">
           {t("csvImport.title")}
         </h2>
-        <a
-          href={SAMPLE_CSV_URL}
-          download="signal-observations-sample.csv"
-          className="text-[11px] text-ap-primary hover:underline"
-        >
-          {t("csvImport.sampleLink")}
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowSchema(true)}
+            className="text-[11px] text-ap-primary hover:underline"
+          >
+            {t("csvImport.schema.link")}
+          </button>
+          <a
+            href={SAMPLE_CSV_URL}
+            download="signal-observations-sample.csv"
+            className="text-[11px] text-ap-primary hover:underline"
+          >
+            {t("csvImport.sampleLink")}
+          </a>
+        </div>
       </header>
       <p className="mt-1 text-xs text-ap-muted">{t("csvImport.subtitle")}</p>
 
@@ -122,8 +157,26 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
         </label>
-        <p className="text-[10px] text-ap-muted">{t("csvImport.limits")}</p>
+        <p className="text-[10px] text-ap-muted">
+          {bulkMode && canBulk ? t("csvImport.limitsBulk") : t("csvImport.limits")}
+        </p>
       </div>
+
+      <label
+        className={
+          "mt-2 flex items-center gap-2 text-xs " +
+          (canBulk ? "text-ap-ink" : "text-ap-muted")
+        }
+        title={canBulk ? t("csvImport.bulkMode.tooltip") : t("csvImport.bulkMode.needsCap")}
+      >
+        <input
+          type="checkbox"
+          checked={bulkMode && canBulk}
+          disabled={!canBulk || mutation.isPending}
+          onChange={(e) => setBulkMode(e.target.checked)}
+        />
+        {t("csvImport.bulkMode.label")}
+      </label>
 
       {mutation.isPending ? (
         <p className="mt-3 text-xs text-ap-muted">{t("csvImport.uploading")}</p>
@@ -177,6 +230,42 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
             </tbody>
           </table>
           <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.failureHint")}</p>
+        </div>
+      ) : null}
+
+      {showSchema ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-ap-line bg-white p-4 shadow-xl">
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-sm font-semibold text-ap-ink">{t("csvImport.schema.title")}</h3>
+              <button
+                type="button"
+                onClick={() => setShowSchema(false)}
+                className="text-xs text-ap-muted hover:text-ap-ink"
+              >
+                {t("csvImport.schema.close")}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-ap-muted">{t("csvImport.schema.intro")}</p>
+            <table className="mt-3 min-w-full text-xs">
+              <tbody>
+                {CSV_COLUMNS.map((c) => (
+                  <tr key={c.name} className="border-t border-ap-line align-top">
+                    <td className="px-2 py-1 font-mono text-ap-ink">
+                      {c.name}
+                      {c.required ? <span className="text-ap-crit"> *</span> : null}
+                    </td>
+                    <td className="px-2 py-1 text-ap-muted">{t(`csvImport.schema.col.${c.name}`)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.schema.requiredNote")}</p>
+          </div>
         </div>
       ) : null}
     </section>

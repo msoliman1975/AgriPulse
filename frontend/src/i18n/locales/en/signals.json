@@ -16,6 +16,35 @@
       "row": "Row",
       "field": "Field",
       "message": "Message"
+    },
+    "limitsBulk": "Bulk mode: max 50 MB / 50,000 rows · UTF-8 encoded",
+    "bulkMode": {
+      "label": "Bulk mode",
+      "tooltip": "Allows up to 50,000 rows (50 MB). For backfills — requires admin privileges.",
+      "needsCap": "Requires admin (signal.define) privileges."
+    },
+    "schema": {
+      "link": "Columns",
+      "title": "CSV columns",
+      "intro": "One observation per row. Templated rows (set template_code + template_member_position) sharing the same template + observed_at + block + location are inserted as one grouped submission.",
+      "close": "Close",
+      "requiredNote": "* required column.",
+      "col": {
+        "signal_code": "Definition code (or, for templated rows, the member's definition code).",
+        "observed_at": "ISO-8601 timestamp the observation was taken.",
+        "block_id": "Block UUID; omit for a farm-level observation.",
+        "value_numeric": "Numeric value (numeric definitions).",
+        "value_categorical": "Category value (categorical definitions).",
+        "value_event": "Event text (event definitions).",
+        "value_boolean": "true/false (boolean definitions).",
+        "notes": "Free-text note.",
+        "location_mode": "entity (default), point_in_entity, or free_point.",
+        "location_point_lat": "Latitude for point modes (−90..90).",
+        "location_point_lon": "Longitude for point modes (−180..180).",
+        "attachment_s3_key": "Existing S3 key under this tenant's prefix (migration use).",
+        "template_code": "Template code — set to record this row as part of a template submission.",
+        "template_member_position": "0-based member position within the template (required with template_code)."
+      }
     }
   },
   "observationPanel": {
