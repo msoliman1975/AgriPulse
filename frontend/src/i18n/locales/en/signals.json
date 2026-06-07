@@ -166,6 +166,22 @@
         "label": "Observed at",
         "nowButton": "Now",
         "hint": "Defaults to now if left blank — pick a past time for backdated entries."
+      },
+      "location": {
+        "label": "Location",
+        "mode": {
+          "entity": "Whole block",
+          "point_in_entity": "Point in block",
+          "free_point": "Free point"
+        },
+        "lat": "Latitude",
+        "lon": "Longitude",
+        "gpsButton": "📍 Use current location",
+        "gpsLocating": "Locating…",
+        "geoDenied": "Couldn't get your location. Check the browser's location permission.",
+        "geoUnavailable": "Geolocation isn't available in this browser.",
+        "needsBlock": "Select a block first to pin a point inside it.",
+        "invalidLatLon": "Enter a valid latitude (−90 to 90) and longitude (−180 to 180)."
       }
     },
     "template": {
