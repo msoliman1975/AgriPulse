@@ -79,6 +79,9 @@ interface Props {
   // handler reads `cell_id`.
   gridCells?: FeatureCollection<Polygon, GridCellProps> | null;
   onGridCellClick?: (cellId: string) => void;
+  // G-2: cell ids to outline on the heatmap (the worst-N / alert-cited
+  // cells), so a scout can see exactly where to go. Empty = none.
+  highlightedCellIds?: string[];
 }
 
 export interface GridCellProps {
@@ -109,6 +112,7 @@ const SIGNAL_HALO_LAYER = "signal-overlay-halo";
 const GRID_SOURCE_ID = "subblock-grid";
 const GRID_FILL_LAYER = "subblock-grid-fill";
 const GRID_LINE_LAYER = "subblock-grid-line";
+const GRID_HIGHLIGHT_LAYER = "subblock-grid-highlight";
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -173,6 +177,7 @@ export function MapCanvas({
   onSignalClick,
   gridCells = null,
   onGridCellClick,
+  highlightedCellIds = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -445,6 +450,19 @@ export function MapCanvas({
           "line-opacity": 0.4,
         },
       });
+      // G-2: bright outline over the worst-N / alert-cited cells. Starts
+      // matching nothing; the highlightedCellIds effect swaps the filter.
+      map.addLayer({
+        id: GRID_HIGHLIGHT_LAYER,
+        type: "line",
+        source: GRID_SOURCE_ID,
+        filter: ["in", ["get", "cell_id"], ["literal", []]],
+        paint: {
+          "line-color": "#db2777", // pink-600 — pops against the heatmap ramp
+          "line-width": 2.5,
+          "line-opacity": 0.95,
+        },
+      });
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -569,7 +587,7 @@ export function MapCanvas({
       const visible = gridCells !== null;
       const fc = gridCells ?? { type: "FeatureCollection", features: [] };
       src.setData(fc);
-      for (const layerId of [GRID_FILL_LAYER, GRID_LINE_LAYER]) {
+      for (const layerId of [GRID_FILL_LAYER, GRID_LINE_LAYER, GRID_HIGHLIGHT_LAYER]) {
         if (!map.getLayer(layerId)) continue;
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
@@ -577,6 +595,24 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [gridCells]);
+
+  // G-2: outline the cited cells (worst-N / alert) via a filter swap on
+  // the highlight layer — same lightweight pattern as the block selection
+  // highlight. An empty list matches nothing.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(GRID_HIGHLIGHT_LAYER)) return;
+      map.setFilter(GRID_HIGHLIGHT_LAYER, [
+        "in",
+        ["get", "cell_id"],
+        ["literal", highlightedCellIds],
+      ]);
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [highlightedCellIds]);
 
   // Visibility + opacity toggles. Each prop maps to one or two MapLibre
   // layers; if a layer hasn't been added yet (style still loading) we

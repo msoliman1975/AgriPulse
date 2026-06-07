@@ -601,6 +601,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
     staleTime: 30_000,
   });
 
+  // G-2: outline the worst-N cells on the heatmap so the alert/worst list
+  // and the map agree on *where* to scout. Persisted while the overlay is
+  // on; empty when hidden so the highlight layer matches nothing.
+  const highlightedCellIds = useMemo<string[]>(
+    () =>
+      showGrid && worstCellsQ.data ? worstCellsQ.data.cells.map((c) => c.cell_id) : [],
+    [showGrid, worstCellsQ.data],
+  );
+
   const gridCellsFc: FeatureCollection<GeoPolygon, GridCellProps> | null = useMemo(() => {
     if (!showGrid || !gridCellsQ.data) return null;
     return {
@@ -789,6 +798,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
             borderOpacity={layerPrefs.borderOpacity}
             blockFillOpacity={layerPrefs.blockFillOpacity}
             gridCells={gridCellsFc}
+            highlightedCellIds={highlightedCellIds}
             onGridCellClick={(cellId) => setSelectedCellId(cellId)}
             signalOverlay={signalOverlay.fc}
             onSignalClick={(observationId) => {
