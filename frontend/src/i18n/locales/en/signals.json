@@ -100,6 +100,30 @@
     "cancel": "Cancel",
     "loadFailed": "Failed to load definitions.",
     "empty": "No signals defined yet — start with one for the data your team already records.",
+    "noMatches": "No definitions match these filters.",
+    "toolbar": {
+      "search": "Search definitions",
+      "searchPlaceholder": "Search name, code, description…",
+      "showArchived": "Show archived"
+    },
+    "references": {
+      "badge": "Used by {{count}}",
+      "badgeTitle": "Show what references this signal",
+      "titleFor": "References — {{name}}",
+      "decisionTrees": "Decision trees",
+      "templates": "Templates",
+      "none": "Nothing references this yet.",
+      "close": "Close",
+      "conflictTitle": "Still in use",
+      "conflictBody": "These live references will keep pointing at this signal after it's archived:",
+      "archiveAnyway": "Archive anyway",
+      "archiving": "Archiving…",
+      "cancel": "Cancel",
+      "kind": {
+        "decision_tree": "decision tree",
+        "signal_template": "template"
+      }
+    },
     "form": {
       "code": "Code (stable identifier)",
       "codePlaceholder": "soil_moisture",
@@ -178,6 +202,7 @@
     "form": {
       "value": "Value",
       "valueWithUnit": "Value ({{unit}})",
+      "outOfRange": "Outside the expected range ({{bounds}}) — saved anyway.",
       "description": "Description",
       "pickOne": "Pick one…",
       "lat": "Latitude",
