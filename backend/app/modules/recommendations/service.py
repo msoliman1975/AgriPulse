@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
+from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.engine import (
     TreePathStep,
     evaluate_tree,
@@ -146,12 +147,22 @@ class RecommendationsServiceImpl:
         # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
         signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
+        # Sub-block grid spatial-anomaly verdicts (G-4). Empty for blocks
+        # with no grid / no current anomaly, so `{source: grid}` predicates
+        # fail closed just like every other source.
+        grid = await load_grid_snapshot(
+            self._tenant,
+            self._public,
+            block_id=block_id,
+            tenant_id=tenant_id,
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
             latest_index_aggregates=latest,
             weather=weather,
             signals=signals,
+            grid=grid,
         )
 
         # PR-C: bulk-load tenant parameter overrides for every tree the
@@ -1025,6 +1036,7 @@ class DecisionTreesAuthorService:
         # Uses tenant_session so we read the right tenant's signals/
         # weather/indices.
         repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
         from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
@@ -1041,12 +1053,23 @@ class DecisionTreesAuthorService:
             if farm_id is not None
             else None
         )
+        # Same grid anomaly snapshot the production evaluator sees, so an
+        # author can dry-run a `{source: grid}` predicate against a real
+        # block.
+        grid = (
+            await load_grid_snapshot(
+                tenant_session, self._public, block_id=block_id, tenant_id=self._tenant_id
+            )
+            if farm_id is not None
+            else None
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
             latest_index_aggregates=latest_indices,
             weather=weather,
             signals=signals,
+            grid=grid,
         )
         result = evaluate_tree(compiled, ctx)
         outcome_dict: dict[str, Any] | None = None

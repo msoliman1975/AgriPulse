@@ -434,6 +434,36 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def list_active_configs_for_block(
+        self, *, block_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Active grid configs for one block: (product_id, anomaly_z_threshold).
+
+        Drives the per-block anomaly snapshot the recommendations engine
+        reads (G-4) — a block usually has a single active grid, but the
+        schema allows one per imagery product.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT product_id, anomaly_z_threshold
+                        FROM grid_configs
+                        WHERE block_id = :block
+                          AND retired_at IS NULL
+                          AND deleted_at IS NULL
+                        ORDER BY created_at
+                        """
+                    ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                    {"block": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def list_observed_indices(
         self, *, block_id: UUID, product_id: UUID
     ) -> tuple[str, ...]:

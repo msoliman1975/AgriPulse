@@ -14,6 +14,7 @@ import { type ReactNode } from "react";
 
 import {
   COMPARISON_OPS,
+  GRID_FIELDS,
   INDICES_KEYS,
   SIGNAL_KEYS,
   WEATHER_SCOPES,
@@ -204,8 +205,8 @@ function ValueRefEditor({
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const sources: ValueRefSource[] = disallowParams
-    ? ["indices", "block", "weather", "signals"]
-    : ["indices", "block", "weather", "signals", "params"];
+    ? ["indices", "block", "weather", "signals", "grid"]
+    : ["indices", "block", "weather", "signals", "grid", "params"];
 
   const onSourceChange = (next: ValueRefSource): void => {
     if (next === value.source) return;
@@ -329,6 +330,36 @@ function SourceSpecificFields({
           {SIGNAL_KEYS.map((k) => (
             <option key={k} value={k}>
               {k}
+            </option>
+          ))}
+        </select>
+      </>
+    );
+  }
+  if (value.source === "grid") {
+    return (
+      <>
+        <input
+          type="text"
+          disabled={readOnly}
+          placeholder="ndvi"
+          value={value.index_code}
+          onChange={(e) => onChange({ ...value, index_code: e.target.value })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.indexCode")}
+        />
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) =>
+            onChange({ ...value, field: e.target.value as (typeof GRID_FIELDS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.gridField")}
+        >
+          {GRID_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
             </option>
           ))}
         </select>

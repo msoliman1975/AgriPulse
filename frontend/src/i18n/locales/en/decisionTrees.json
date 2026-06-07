@@ -201,6 +201,7 @@
       "indexCode": "Index code",
       "weatherField": "Field",
       "signalCode": "Signal code",
+      "gridField": "Grid field",
       "paramName": "Parameter name",
       "rightNumber": "Number",
       "rightString": "Text",
@@ -213,6 +214,7 @@
         "block": "Block attribute",
         "weather": "Weather",
         "signals": "Custom signal",
+        "grid": "Grid anomaly",
         "params": "Tree parameter"
       }
     },

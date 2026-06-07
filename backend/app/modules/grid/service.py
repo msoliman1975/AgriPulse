@@ -28,6 +28,7 @@ from app.modules.grid.anomaly import (
     AnomalyResult,
     CellMean,
     detect_low_outliers,
+    effective_k,
 )
 from app.modules.grid.errors import (
     CellSizeInvalidError,
@@ -150,6 +151,13 @@ class GridService(Protocol):
         index_code: str,
         k: float = DEFAULT_K,
     ) -> tuple[AnomalyResult, datetime] | None: ...
+
+    async def snapshot_block_anomalies(
+        self,
+        *,
+        block_id: UUID,
+        default_k: float = DEFAULT_K,
+    ) -> dict[str, dict[str, Any]]: ...
 
 
 class GridServiceImpl:
@@ -563,6 +571,55 @@ class GridServiceImpl:
         if result is None:
             return None
         return result, at
+
+    async def snapshot_block_anomalies(
+        self, *, block_id: UUID, default_k: float = DEFAULT_K
+    ) -> dict[str, dict[str, Any]]:
+        """Latest spatial-anomaly verdict per index for one block (G-4).
+
+        Returns ``{index_code: {worst_z, flagged_count, worst_row,
+        worst_col, severity}}`` for every index whose latest scene
+        crossed the threshold; indices with no current anomaly are
+        omitted (the tree predicate fails closed). ``default_k`` is the
+        already-resolved tenant/platform threshold; per-block overrides
+        layer on top via :func:`effective_k`.
+
+        Cheap for the common case: a block with no active grid returns
+        ``{}`` after a single config lookup, doing no detection work.
+        """
+        configs = await self._repo.list_active_configs_for_block(block_id=block_id)
+        out: dict[str, dict[str, Any]] = {}
+        for cfg in configs:
+            product_id = cfg["product_id"]
+            k = effective_k(
+                block_override=cfg.get("anomaly_z_threshold"),
+                tenant_default=default_k,
+            )
+            for index_code in await self._repo.list_observed_indices(
+                block_id=block_id, product_id=product_id
+            ):
+                # First active grid carrying this index wins (a block with
+                # two products + the same index is a non-case in practice).
+                if index_code in out:
+                    continue
+                verdict = await self.detect_block_anomalies(
+                    block_id=block_id,
+                    product_id=product_id,
+                    index_code=index_code,
+                    k=k,
+                )
+                if verdict is None:
+                    continue
+                result, _scene_time = verdict
+                worst = result.flagged[0]
+                out[index_code] = {
+                    "worst_z": round(worst.z, 4),
+                    "flagged_count": len(result.flagged),
+                    "worst_row": worst.row_idx,
+                    "worst_col": worst.col_idx,
+                    "severity": result.severity,
+                }
+        return out
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:

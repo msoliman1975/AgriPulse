@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from app.shared.conditions.context import SIGNAL_KEYS, WEATHER_SCOPES
+from app.shared.conditions.context import GRID_FIELDS, SIGNAL_KEYS, WEATHER_SCOPES
 from app.shared.conditions.errors import ConditionParseError
 
 INDICES_KEYS: tuple[str, ...] = ("mean", "baseline_deviation")
@@ -70,6 +70,22 @@ class SignalsValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class GridValueRef:
+    """``{"source":"grid","index_code":"ndvi","field":"flagged_count"}``
+
+    Reads the latest sub-block grid spatial-anomaly verdict for ``index_code``
+    (G-4). ``field`` is one of ``GRID_FIELDS`` (worst_z / flagged_count /
+    worst_row / worst_col / severity). Resolves to ``None`` — fail-closed —
+    when the block has no current anomaly for that index, matching every
+    other source. Only valid on a comparison ``left`` (observed data).
+    """
+
+    source: Literal["grid"]
+    index_code: str
+    field: str  # one of GRID_FIELDS
+
+
+@dataclass(frozen=True, slots=True)
 class ParamsValueRef:
     """``{"source":"params","name":"ndvi_drop_threshold"}``
 
@@ -87,7 +103,14 @@ class ParamsValueRef:
     name: str
 
 
-ValueRef = IndicesValueRef | BlockValueRef | WeatherValueRef | SignalsValueRef | ParamsValueRef
+ValueRef = (
+    IndicesValueRef
+    | BlockValueRef
+    | WeatherValueRef
+    | SignalsValueRef
+    | GridValueRef
+    | ParamsValueRef
+)
 
 
 def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0912 - dispatch over ref sources
@@ -129,6 +152,14 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0912 - dispatch over ref 
         if key not in SIGNAL_KEYS:
             raise ConditionParseError(f"signals ref 'key' must be one of {SIGNAL_KEYS}")
         return SignalsValueRef(source="signals", code=code, key=key)
+    if source == "grid":
+        index_code = raw.get("index_code")
+        if not isinstance(index_code, str) or not index_code:
+            raise ConditionParseError("grid ref missing 'index_code'")
+        field_ = raw.get("field")
+        if field_ not in GRID_FIELDS:
+            raise ConditionParseError(f"grid ref 'field' must be one of {GRID_FIELDS}")
+        return GridValueRef(source="grid", index_code=index_code, field=field_)
     if source == "params":
         name = raw.get("name")
         if not isinstance(name, str) or not name:

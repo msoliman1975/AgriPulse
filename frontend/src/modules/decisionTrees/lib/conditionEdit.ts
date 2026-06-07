@@ -34,6 +34,15 @@ export const WEATHER_SCOPES = [
   "derived_today",
   "derived_yesterday",
 ] as const;
+// Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
+// backend/app/shared/conditions/context.py.
+export const GRID_FIELDS = [
+  "worst_z",
+  "flagged_count",
+  "worst_row",
+  "worst_col",
+  "severity",
+] as const;
 
 // Comparison ops the V1 builder surfaces in the operator dropdown.
 // `between` and `in` exist in the engine but are deferred to YAML —
@@ -43,13 +52,20 @@ export type ComparisonOp = (typeof COMPARISON_OPS)[number];
 
 // ---- AST types -----------------------------------------------------
 
-export type ValueRefSource = "indices" | "block" | "weather" | "signals" | "params";
+export type ValueRefSource =
+  | "indices"
+  | "block"
+  | "weather"
+  | "signals"
+  | "grid"
+  | "params";
 
 export type ValueRef =
   | { source: "indices"; index_code: string; key: (typeof INDICES_KEYS)[number] }
   | { source: "block"; field: (typeof BLOCK_FIELDS)[number] }
   | { source: "weather"; scope: (typeof WEATHER_SCOPES)[number]; field: string }
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
+  | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
   | { source: "params"; name: string };
 
 // The right-hand side of a binary comparison can be a literal (number,
@@ -185,6 +201,16 @@ function parseValueRef(raw: unknown): ValueRef | null {
       key: key as (typeof SIGNAL_KEYS)[number],
     };
   }
+  if (source === "grid") {
+    const index_code = typeof raw.index_code === "string" ? raw.index_code : "";
+    const field = raw.field as string;
+    if (!(GRID_FIELDS as readonly string[]).includes(field)) return null;
+    return {
+      source: "grid",
+      index_code,
+      field: field as (typeof GRID_FIELDS)[number],
+    };
+  }
   if (source === "params") {
     const name = typeof raw.name === "string" ? raw.name : "";
     return { source: "params", name };
@@ -248,6 +274,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "weather", scope: ref.scope, field: ref.field };
     case "signals":
       return { source: "signals", code: ref.code, key: ref.key };
+    case "grid":
+      return { source: "grid", index_code: ref.index_code, field: ref.field };
     case "params":
       return { source: "params", name: ref.name };
   }
@@ -286,6 +314,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" };
     case "signals":
       return { source: "signals", code: "", key: "value_numeric" };
+    case "grid":
+      return { source: "grid", index_code: "ndvi", field: "flagged_count" };
     case "params":
       return { source: "params", name: "" };
   }

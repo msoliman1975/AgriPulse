@@ -97,6 +97,31 @@ describe("parseConditionTree", () => {
     expect(parseConditionTree(undefined).kind).toBe("empty");
   });
 
+  it("parses a grid anomaly ref (G-4)", () => {
+    const raw = {
+      op: "ge",
+      left: { source: "grid", index_code: "ndvi", field: "flagged_count" },
+      right: 5,
+    };
+    const result = parseConditionTree(raw);
+    expect(result.kind).toBe("single");
+    if (result.kind !== "single") return;
+    expect(result.term.left).toEqual({
+      source: "grid",
+      index_code: "ndvi",
+      field: "flagged_count",
+    });
+  });
+
+  it("rejects an unknown grid field (falls to unsupported)", () => {
+    const raw = {
+      op: "ge",
+      left: { source: "grid", index_code: "ndvi", field: "bogus" },
+      right: 5,
+    };
+    expect(parseConditionTree(raw).kind).toBe("unsupported");
+  });
+
   it("parses a params ref on the right operand", () => {
     const raw = {
       op: "lt",
@@ -128,6 +153,17 @@ describe("round-trip", () => {
   it("preserves the unsupported AST untouched", () => {
     const original = {
       not: { op: "lt", left: { source: "indices", index_code: "ndvi", key: "mean" }, right: 0 },
+    };
+    const parsed = parseConditionTree(original);
+    const back = serializeCondition(parsed);
+    expect(back).toEqual(original);
+  });
+
+  it("preserves a grid anomaly comparison (G-4)", () => {
+    const original = {
+      op: "ge",
+      left: { source: "grid", index_code: "ndvi", field: "flagged_count" },
+      right: 5,
     };
     const parsed = parseConditionTree(original);
     const back = serializeCondition(parsed);
