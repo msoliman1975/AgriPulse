@@ -6,6 +6,7 @@ import type {
   Aggregation,
   SignalDefinition,
   SignalDefinitionCreatePayload,
+  SignalReferences,
   SignalTemplate,
   SignalTemplateCreatePayload,
   SignalTemplateMember,
@@ -21,12 +22,22 @@ import {
   useCreateSignalTemplate,
   useDeleteSignalDefinition,
   useDeleteSignalTemplate,
+  useSignalDefinitionReferences,
   useSignalDefinitions,
   useSignalTemplate,
+  useSignalTemplateReferences,
   useSignalTemplates,
   useUpdateSignalDefinition,
   useUpdateSignalTemplate,
 } from "@/queries/signals";
+import {
+  ArchiveConflictModal,
+  ReferencesDrawer,
+  UsedByBadge,
+  refCount,
+  referencesFromError,
+} from "../components/ReferenceWidgets";
+import { filterDefinitions } from "../components/catalogFilter";
 
 const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
 const AGGREGATIONS: Aggregation[] = ["latest", "mean", "median", "max", "min"];
@@ -69,6 +80,49 @@ export function SignalsConfigPage(): ReactNode {
   const updateMut = useUpdateSignalDefinition();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [showForm, setShowForm] = useState(false);
+
+  // CS-13 catalog toolbar + references/conflict UI.
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<Set<ValueKind>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
+  const [drawer, setDrawer] = useState<{ title: string; references: SignalReferences } | null>(
+    null,
+  );
+  const [conflict, setConflict] = useState<{ defn: SignalDefinition; references: SignalReferences } | null>(
+    null,
+  );
+
+  const filtered = useMemo(
+    () => filterDefinitions(data ?? [], { search, kinds: kindFilter, showArchived }),
+    [data, search, kindFilter, showArchived],
+  );
+
+  const toggleKind = (k: ValueKind) =>
+    setKindFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+
+  const archiveDefinition = (defn: SignalDefinition) =>
+    deleteMut.mutate(
+      { id: defn.id },
+      {
+        onError: (err) => {
+          const references = referencesFromError(err);
+          if (references) setConflict({ defn, references });
+        },
+      },
+    );
+
+  const forceArchive = () => {
+    if (!conflict) return;
+    deleteMut.mutate(
+      { id: conflict.defn.id, force: true },
+      { onSuccess: () => setConflict(null) },
+    );
+  };
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -267,6 +321,44 @@ export function SignalsConfigPage(): ReactNode {
         </form>
       ) : null}
 
+      {/* CS-13 toolbar */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("config.toolbar.searchPlaceholder")}
+          aria-label={t("config.toolbar.search")}
+          className={`${inputCls} max-w-xs flex-1`}
+        />
+        <div className="flex flex-wrap gap-1">
+          {VALUE_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => toggleKind(k)}
+              aria-pressed={kindFilter.has(k)}
+              className={
+                "rounded-full border px-2 py-0.5 font-medium " +
+                (kindFilter.has(k)
+                  ? "border-ap-primary bg-ap-primary-soft text-ap-primary"
+                  : "border-ap-line bg-ap-panel text-ap-muted hover:bg-ap-line/40")
+              }
+            >
+              {t(`valueKind.${k}`)}
+            </button>
+          ))}
+        </div>
+        <label className="ms-auto flex items-center gap-1.5 text-ap-ink">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
+          {t("config.toolbar.showArchived")}
+        </label>
+      </div>
+
       <div className="rounded-xl border border-ap-line bg-ap-panel">
         {isLoading ? (
           <div className="flex flex-col gap-2 p-4">
@@ -277,14 +369,19 @@ export function SignalsConfigPage(): ReactNode {
           <p className="p-4 text-sm text-ap-crit">{t("config.loadFailed")}</p>
         ) : !data || data.length === 0 ? (
           <p className="p-12 text-center text-sm text-ap-muted">{t("config.empty")}</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-12 text-center text-sm text-ap-muted">{t("config.noMatches")}</p>
         ) : (
           <ul className="divide-y divide-ap-line">
-            {data.map((d) => (
+            {filtered.map((d) => (
               <DefinitionRow
                 key={d.id}
                 defn={d}
                 canEdit={canDefine}
-                onArchive={() => deleteMut.mutate(d.id)}
+                onArchive={() => archiveDefinition(d)}
+                onShowReferences={(references) =>
+                  setDrawer({ title: t("config.references.titleFor", { name: d.name }), references })
+                }
                 onToggleActive={() =>
                   updateMut.mutate({ id: d.id, payload: { is_active: !d.is_active } })
                 }
@@ -295,6 +392,22 @@ export function SignalsConfigPage(): ReactNode {
       </div>
 
       <TemplatesCard canDefine={canDefine} definitions={data ?? []} />
+
+      {drawer ? (
+        <ReferencesDrawer
+          title={drawer.title}
+          references={drawer.references}
+          onClose={() => setDrawer(null)}
+        />
+      ) : null}
+      {conflict ? (
+        <ArchiveConflictModal
+          references={conflict.references}
+          pending={deleteMut.isPending}
+          onCancel={() => setConflict(null)}
+          onForce={forceArchive}
+        />
+      ) : null}
     </div>
   );
 }
@@ -303,14 +416,17 @@ function DefinitionRow({
   defn,
   canEdit,
   onArchive,
+  onShowReferences,
   onToggleActive,
 }: {
   defn: SignalDefinition;
   canEdit: boolean;
   onArchive: () => void;
+  onShowReferences: (references: SignalReferences) => void;
   onToggleActive: () => void;
 }): ReactNode {
   const { t } = useTranslation("signals");
+  const { data: references } = useSignalDefinitionReferences(defn.id);
   const valueRange = useMemo(() => {
     if (defn.value_kind !== "numeric") return null;
     if (defn.value_min === null && defn.value_max === null) return null;
@@ -336,6 +452,10 @@ function DefinitionRow({
           <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
           {aggLabel ? <Pill kind="neutral">{aggLabel}</Pill> : null}
           {defn.attachment_allowed ? <Pill kind="neutral">{t("config.row.photos")}</Pill> : null}
+          <UsedByBadge
+            count={refCount(references)}
+            onClick={() => references && onShowReferences(references)}
+          />
         </div>
         {defn.description ? <p className="mt-1 text-sm text-ap-muted">{defn.description}</p> : null}
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ap-muted">
@@ -400,6 +520,27 @@ function TemplatesCard({
   const deleteMut = useDeleteSignalTemplate();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [drawer, setDrawer] = useState<{ title: string; references: SignalReferences } | null>(
+    null,
+  );
+  const [conflict, setConflict] = useState<{ tpl: SignalTemplate; references: SignalReferences } | null>(
+    null,
+  );
+
+  const archiveTemplate = (tpl: SignalTemplate) =>
+    deleteMut.mutate(
+      { id: tpl.id },
+      {
+        onError: (err) => {
+          const references = referencesFromError(err);
+          if (references) setConflict({ tpl, references });
+        },
+      },
+    );
+  const forceArchiveTemplate = () => {
+    if (!conflict) return;
+    deleteMut.mutate({ id: conflict.tpl.id, force: true }, { onSuccess: () => setConflict(null) });
+  };
 
   const startNew = () => {
     setEditingId(null);
@@ -499,12 +640,34 @@ function TemplatesCard({
                   setShowNew(false);
                   setEditingId(tpl.id);
                 }}
-                onArchive={() => deleteMut.mutate(tpl.id)}
+                onArchive={() => archiveTemplate(tpl)}
+                onShowReferences={(references) =>
+                  setDrawer({
+                    title: t("config.references.titleFor", { name: tpl.name }),
+                    references,
+                  })
+                }
               />
             ),
           )}
         </ul>
       )}
+
+      {drawer ? (
+        <ReferencesDrawer
+          title={drawer.title}
+          references={drawer.references}
+          onClose={() => setDrawer(null)}
+        />
+      ) : null}
+      {conflict ? (
+        <ArchiveConflictModal
+          references={conflict.references}
+          pending={deleteMut.isPending}
+          onCancel={() => setConflict(null)}
+          onForce={forceArchiveTemplate}
+        />
+      ) : null}
     </section>
   );
 }
@@ -514,14 +677,17 @@ function TemplateRow({
   canEdit,
   onEdit,
   onArchive,
+  onShowReferences,
 }: {
   template: SignalTemplate;
   canEdit: boolean;
   onEdit: () => void;
   onArchive: () => void;
+  onShowReferences: (references: SignalReferences) => void;
 }): ReactNode {
   const { t } = useTranslation("signals");
   const { data: detail } = useSignalTemplate(template.id);
+  const { data: references } = useSignalTemplateReferences(template.id);
   const memberCount = detail?.members.length ?? null;
   return (
     <li className="flex items-start gap-3 p-4">
@@ -537,6 +703,10 @@ function TemplateRow({
               {t("config.templates.memberCount", { count: memberCount })}
             </Pill>
           ) : null}
+          <UsedByBadge
+            count={refCount(references)}
+            onClick={() => references && onShowReferences(references)}
+          />
         </div>
         {template.description ? (
           <p className="mt-1 text-sm text-ap-muted">{template.description}</p>

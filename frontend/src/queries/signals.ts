@@ -24,7 +24,9 @@ import {
   deleteSignalObservation,
   deleteSignalTemplate,
   deleteSignalTemplateObservationGroup,
+  getSignalDefinitionReferences,
   getSignalTemplate,
+  getSignalTemplateReferences,
   listSignalAssignments,
   listSignalDefinitions,
   listSignalObservations,
@@ -67,11 +69,29 @@ export function useUpdateSignalDefinition() {
 
 export function useDeleteSignalDefinition() {
   const qc = useQueryClient();
-  return useMutation<void, Error, string>({
-    mutationFn: deleteSignalDefinition,
+  return useMutation<void, Error, { id: string; force?: boolean }>({
+    mutationFn: ({ id, force }) => deleteSignalDefinition(id, force ?? false),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["signal_definitions"] });
     },
+  });
+}
+
+export function useSignalDefinitionReferences(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["signal_definition_references", id] as const,
+    queryFn: () => getSignalDefinitionReferences(id!),
+    enabled: Boolean(id) && enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useSignalTemplateReferences(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["signal_template_references", id] as const,
+    queryFn: () => getSignalTemplateReferences(id!),
+    enabled: Boolean(id) && enabled,
+    staleTime: 60_000,
   });
 }
 
@@ -199,8 +219,8 @@ export function useUpdateSignalTemplate() {
 
 export function useDeleteSignalTemplate() {
   const qc = useQueryClient();
-  return useMutation<void, Error, string>({
-    mutationFn: deleteSignalTemplate,
+  return useMutation<void, Error, { id: string; force?: boolean }>({
+    mutationFn: ({ id, force }) => deleteSignalTemplate(id, force ?? false),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["signal_templates"] });
     },

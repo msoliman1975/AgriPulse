@@ -100,6 +100,30 @@
     "cancel": "إلغاء",
     "loadFailed": "فشل تحميل التعريفات.",
     "empty": "لا تعريفات بعد — ابدأ بتعريف لما يسجّله فريقك بالفعل.",
+    "noMatches": "لا توجد تعريفات مطابقة لعوامل التصفية.",
+    "toolbar": {
+      "search": "بحث في التعريفات",
+      "searchPlaceholder": "ابحث بالاسم أو الرمز أو الوصف…",
+      "showArchived": "عرض المؤرشفة"
+    },
+    "references": {
+      "badge": "مُستخدَم في {{count}}",
+      "badgeTitle": "اعرض ما يشير إلى هذه الإشارة",
+      "titleFor": "المراجع — {{name}}",
+      "decisionTrees": "أشجار القرار",
+      "templates": "النماذج",
+      "none": "لا شيء يشير إليها بعد.",
+      "close": "إغلاق",
+      "conflictTitle": "ما زالت مستخدمة",
+      "conflictBody": "ستظل هذه المراجع الحيّة تشير إلى هذه الإشارة بعد أرشفتها:",
+      "archiveAnyway": "أرشفة على أي حال",
+      "archiving": "جارٍ الأرشفة…",
+      "cancel": "إلغاء",
+      "kind": {
+        "decision_tree": "شجرة قرار",
+        "signal_template": "نموذج"
+      }
+    },
     "form": {
       "code": "الرمز (مُعرِّف ثابت)",
       "codePlaceholder": "soil_moisture",
@@ -178,6 +202,7 @@
     "form": {
       "value": "القيمة",
       "valueWithUnit": "القيمة ({{unit}})",
+      "outOfRange": "خارج النطاق المتوقع ({{bounds}}) — تم الحفظ على أي حال.",
       "description": "الوصف",
       "pickOne": "اختر واحدًا…",
       "lat": "خط العرض",

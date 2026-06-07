@@ -44,6 +44,18 @@ export function ValueInput({
   const { t } = useTranslation("signals");
   const req = !optional;
   if (defn.value_kind === "numeric") {
+    // CS-13: non-blocking out-of-expected-range hint. The server is still
+    // authoritative and a genuine out-of-range reading is allowed — this
+    // only warns. No chip when both bounds are null.
+    const hasBounds = defn.value_min !== null || defn.value_max !== null;
+    const parsed = valueText.trim() === "" ? null : Number(valueText);
+    const outOfRange =
+      hasBounds &&
+      parsed !== null &&
+      Number.isFinite(parsed) &&
+      ((defn.value_min !== null && parsed < Number(defn.value_min)) ||
+        (defn.value_max !== null && parsed > Number(defn.value_max)));
+    const bounds = `${defn.value_min ?? "−∞"} … ${defn.value_max ?? "∞"}`;
     return (
       <Field
         label={defn.unit ? t("log.form.valueWithUnit", { unit: defn.unit }) : t("log.form.value")}
@@ -53,8 +65,14 @@ export function ValueInput({
           inputMode="decimal"
           value={valueText}
           onChange={(e) => setValueText(e.target.value)}
+          aria-invalid={outOfRange || undefined}
           className={inputCls}
         />
+        {outOfRange ? (
+          <span className="text-[11px] text-amber-700">
+            {t("log.form.outOfRange", { bounds })}
+          </span>
+        ) : null}
       </Field>
     );
   }

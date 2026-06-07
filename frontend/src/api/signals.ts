@@ -164,8 +164,35 @@ export async function updateSignalDefinition(
   return data;
 }
 
-export async function deleteSignalDefinition(id: string): Promise<void> {
-  await apiClient.delete(`/v1/signals/definitions/${id}`);
+export async function deleteSignalDefinition(id: string, force = false): Promise<void> {
+  await apiClient.delete(`/v1/signals/definitions/${id}`, { params: { force } });
+}
+
+// CS-13 references + conflict-aware archive.
+export interface SignalReference {
+  id: string;
+  code: string;
+  name: string;
+  kind: "decision_tree" | "signal_template";
+}
+
+export interface SignalReferences {
+  decision_trees: SignalReference[];
+  templates: SignalReference[];
+}
+
+export async function getSignalDefinitionReferences(id: string): Promise<SignalReferences> {
+  const { data } = await apiClient.get<SignalReferences>(
+    `/v1/signals/definitions/${id}/references`,
+  );
+  return data;
+}
+
+export async function getSignalTemplateReferences(id: string): Promise<SignalReferences> {
+  const { data } = await apiClient.get<SignalReferences>(
+    `/v1/signals/templates/${id}/references`,
+  );
+  return data;
 }
 
 export async function listSignalAssignments(definitionId: string): Promise<SignalAssignment[]> {
@@ -383,8 +410,8 @@ export async function updateSignalTemplate(
   return data;
 }
 
-export async function deleteSignalTemplate(id: string): Promise<void> {
-  await apiClient.delete(`/v1/signals/templates/${id}`);
+export async function deleteSignalTemplate(id: string, force = false): Promise<void> {
+  await apiClient.delete(`/v1/signals/templates/${id}`, { params: { force } });
 }
 
 export async function createSignalTemplateObservation(
