@@ -56,6 +56,9 @@ export interface GridWorstCell {
   mean: string | null;
   valid_pixel_pct: string | null;
   time: string | null;
+  // Pivot-relative location — null for square (non-pivot) blocks.
+  ring: number | null;
+  sector_label: string | null;
 }
 
 export interface GridWorstCellsResponse {

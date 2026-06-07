@@ -250,6 +250,7 @@
     "worstHeading": "Lowest {{index}} cells",
     "worstEmpty": "No observations yet.",
     "worstRank": "#{{rank}}",
+    "ringSector": "ring {{ring}}, {{sector}}",
     "cellDrawerTitle": "Cell history",
     "historyError": "Could not load cell history.",
     "notEnoughObs": "Not enough observations yet to draw a trend.",

@@ -47,6 +47,14 @@ def _service_with_cells(cells: list[GridCellWithValue]) -> GridServiceImpl:
         )
 
     svc.get_cells_with_values = _fake_get_cells_with_values  # type: ignore[method-assign]
+
+    # get_worst_cells consults the repo for pivot geometry to add ring/
+    # sector labels; these tests use square blocks, so stub it to None.
+    class _FakeRepo:
+        async def get_pivot_geometry(self, *, block_id: object) -> None:
+            return None
+
+    svc._repo = _FakeRepo()  # type: ignore[assignment]
     return svc
 
 

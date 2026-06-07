@@ -102,6 +102,10 @@ class GridWorstCell(BaseModel):
     mean: Decimal | None
     valid_pixel_pct: Decimal | None
     time: datetime | None
+    # Pivot-relative location, populated only when the unit is a center
+    # pivot (else null — square blocks have no ring/sector meaning).
+    ring: int | None = None
+    sector_label: str | None = None
 
 
 class GridWorstCellsResponse(BaseModel):

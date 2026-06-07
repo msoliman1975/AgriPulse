@@ -11,6 +11,7 @@ Operations are organised by domain object:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -78,6 +79,44 @@ class GridRepository:
             )
         ).scalar_one_or_none()
         return Decimal(row) if row is not None else None
+
+    async def get_pivot_geometry(self, *, block_id: UUID) -> dict[str, Any] | None:
+        """Center/radius/sector_count for a pivot unit, else None.
+
+        Returns None for non-pivot blocks or pivots missing the geometry,
+        so callers can fall back to plain row/col labels. The shape mirrors
+        ``blocks.irrigation_geometry``:
+        ``{"center": {"lat", "lon"}, "radius_m", "sector_count"}``.
+        """
+        row = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT unit_type, irrigation_geometry
+                    FROM blocks
+                    WHERE id = :block AND deleted_at IS NULL
+                    """
+                ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                {"block": block_id},
+            )
+        ).mappings().one_or_none()
+        if row is None or row["unit_type"] != "pivot":
+            return None
+        geom = row["irrigation_geometry"]
+        if isinstance(geom, str):
+            geom = json.loads(geom)
+        if not isinstance(geom, dict):
+            return None
+        center = geom.get("center") or {}
+        try:
+            return {
+                "center_lon": float(center["lon"]),
+                "center_lat": float(center["lat"]),
+                "radius_m": float(geom["radius_m"]),
+                "sector_count": int(geom.get("sector_count") or 4),
+            }
+        except (KeyError, TypeError, ValueError):
+            return None
 
     # ---- grid_configs -------------------------------------------------
 
@@ -383,7 +422,10 @@ class GridRepository:
                 await self._session.execute(
                     text(
                         """
-                        SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx, obs.mean
+                        SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx,
+                               ST_X(gc.centroid) AS centroid_lon,
+                               ST_Y(gc.centroid) AS centroid_lat,
+                               obs.mean
                         FROM grid_cells gc
                         JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
                         JOIN block_grid_aggregates obs

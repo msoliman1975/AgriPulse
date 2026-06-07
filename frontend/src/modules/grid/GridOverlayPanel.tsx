@@ -110,6 +110,15 @@ export function GridOverlayPanel({
                         rank: i + 1,
                       })}
                     </span>
+                    {cell.ring != null && cell.sector_label ? (
+                      <span className="flex-1 truncate text-slate-600">
+                        {t("subblockGrid.ringSector", {
+                          defaultValue: "ring {{ring}}, {{sector}}",
+                          ring: cell.ring,
+                          sector: cell.sector_label,
+                        })}
+                      </span>
+                    ) : null}
                     <span className="font-mono font-medium text-slate-800">
                       {cell.mean === null ? "—" : Number(cell.mean).toFixed(3)}
                     </span>

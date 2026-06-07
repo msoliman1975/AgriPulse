@@ -46,6 +46,8 @@ class CellMean:
     row_idx: int
     col_idx: int
     mean: Decimal
+    centroid_lon: float
+    centroid_lat: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +57,8 @@ class FlaggedCell:
     col_idx: int
     mean: float
     z: float  # std-devs below the block mean (positive = below)
+    centroid_lon: float
+    centroid_lat: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +105,8 @@ def detect_low_outliers(
             col_idx=c.col_idx,
             mean=float(c.mean),
             z=(mu - float(c.mean)) / sigma,
+            centroid_lon=c.centroid_lon,
+            centroid_lat=c.centroid_lat,
         )
         for c in cells
         if float(c.mean) < threshold

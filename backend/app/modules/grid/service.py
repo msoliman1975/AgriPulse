@@ -34,6 +34,7 @@ from app.modules.grid.geometry import (
     generate_cells,
     validate_cell_size,
 )
+from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.repository import GridRepository
 from app.modules.grid.schemas import (
     CellSizePreviewResponse,
@@ -393,19 +394,46 @@ class GridServiceImpl:
             (c for c in full.cells if c.mean is not None),
             key=lambda c: c.mean,  # type: ignore[arg-type,return-value]
         )[:limit]
-        cells = tuple(
-            GridWorstCell(
-                cell_id=c.cell_id,
-                row_idx=c.row_idx,
-                col_idx=c.col_idx,
-                centroid_lon=c.centroid_lon,
-                centroid_lat=c.centroid_lat,
-                mean=c.mean,
-                valid_pixel_pct=c.valid_pixel_pct,
-                time=c.time,
+
+        # For a center pivot, label each worst cell with its ring + sector
+        # so the list reads "ring 3, NE" instead of an opaque row/col.
+        pivot = await self._repo.get_pivot_geometry(block_id=block_id)
+        ring_width = 0.0
+        if pivot is not None:
+            cfg = await self._repo.get_active_config(
+                block_id=block_id, product_id=product_id
             )
-            for c in ranked
-        )
+            ring_width = float(cfg["cell_size_m"]) if cfg else 0.0
+
+        cells_list: list[GridWorstCell] = []
+        for c in ranked:
+            ring: int | None = None
+            sector_label: str | None = None
+            if pivot is not None:
+                rs = ring_sector(
+                    centroid_lon=c.centroid_lon,
+                    centroid_lat=c.centroid_lat,
+                    center_lon=pivot["center_lon"],
+                    center_lat=pivot["center_lat"],
+                    ring_width_m=ring_width,
+                    sector_count=pivot["sector_count"],
+                )
+                ring, sector_label = rs.ring, rs.sector_label
+            cells_list.append(
+                GridWorstCell(
+                    cell_id=c.cell_id,
+                    row_idx=c.row_idx,
+                    col_idx=c.col_idx,
+                    centroid_lon=c.centroid_lon,
+                    centroid_lat=c.centroid_lat,
+                    mean=c.mean,
+                    valid_pixel_pct=c.valid_pixel_pct,
+                    time=c.time,
+                    ring=ring,
+                    sector_label=sector_label,
+                )
+            )
+        cells = tuple(cells_list)
         return GridWorstCellsResponse(
             block_id=block_id,
             product_id=product_id,
@@ -479,6 +507,8 @@ class GridServiceImpl:
                 row_idx=r["row_idx"],
                 col_idx=r["col_idx"],
                 mean=r["mean"],
+                centroid_lon=float(r["centroid_lon"]),
+                centroid_lat=float(r["centroid_lat"]),
             )
             for r in rows
             if r["mean"] is not None
