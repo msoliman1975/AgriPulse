@@ -195,8 +195,35 @@
     },
     "list": {
       "heading": "أحدث الملاحظات",
-      "empty": "لا ملاحظات بعد لهذه الإشارة.",
-      "photo": "صورة ↗"
+      "empty": "لا توجد ملاحظات مطابقة لعوامل التصفية.",
+      "photo": "صورة ↗",
+      "loadedCount": "{{count}} محمّلة",
+      "loadMore": "تحميل المزيد",
+      "allLoaded": "تم تحميل كل الملاحظات المطابقة.",
+      "capReached": "يتم عرض أحدث {{max}}. ضيّق عوامل التصفية لرؤية الأقدم.",
+      "filters": {
+        "definition": "الإشارة",
+        "allDefinitions": "كل الإشارات",
+        "block": "الحقل",
+        "anyBlock": "أي حقل",
+        "since": "من",
+        "until": "إلى",
+        "templatedOnly": "النماذج فقط"
+      },
+      "grouped": {
+        "header": "إرسال نموذج",
+        "memberCount": "{{count}} قراءة",
+        "memberCount_other": "{{count}} قراءات"
+      },
+      "delete": {
+        "button": "حذف",
+        "confirmTitle": "حذف الملاحظة؟",
+        "confirmBody": "سيؤدي هذا إلى حذف {{count}} ملاحظة نهائيًا. لا يمكن التراجع.",
+        "confirmBody_other": "سيؤدي هذا إلى حذف {{count}} ملاحظات نهائيًا. لا يمكن التراجع.",
+        "cancel": "إلغاء",
+        "confirm": "حذف",
+        "deleting": "جارٍ الحذف…"
+      }
     }
   },
   "valueKind": {

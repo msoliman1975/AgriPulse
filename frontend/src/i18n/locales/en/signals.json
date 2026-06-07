@@ -195,8 +195,35 @@
     },
     "list": {
       "heading": "Recent observations",
-      "empty": "No observations yet for this signal.",
-      "photo": "photo ↗"
+      "empty": "No observations match these filters.",
+      "photo": "photo ↗",
+      "loadedCount": "{{count}} loaded",
+      "loadMore": "Load more",
+      "allLoaded": "All matching observations loaded.",
+      "capReached": "Showing the most recent {{max}}. Narrow the filters to see older entries.",
+      "filters": {
+        "definition": "Signal",
+        "allDefinitions": "All signals",
+        "block": "Block",
+        "anyBlock": "Any block",
+        "since": "From",
+        "until": "To",
+        "templatedOnly": "Templated only"
+      },
+      "grouped": {
+        "header": "Template submission",
+        "memberCount": "{{count}} reading",
+        "memberCount_other": "{{count}} readings"
+      },
+      "delete": {
+        "button": "Delete",
+        "confirmTitle": "Delete observation?",
+        "confirmBody": "This permanently removes {{count}} observation. This cannot be undone.",
+        "confirmBody_other": "This permanently removes {{count}} observations. This cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete",
+        "deleting": "Deleting…"
+      }
     }
   },
   "valueKind": {

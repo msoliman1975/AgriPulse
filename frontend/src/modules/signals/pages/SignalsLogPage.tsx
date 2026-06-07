@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow, parseISO } from "date-fns";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
@@ -17,9 +16,9 @@ import {
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
-import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { SignalsCsvImport } from "../components/SignalsCsvImport";
+import { ObservationList } from "../components/ObservationList";
 import { LocationCapture, type LocationValue } from "../components/LocationCapture";
 import { ObservedAtPicker } from "../components/ObservedAtPicker";
 import { ValueInput } from "../components/ValueInput";
@@ -27,7 +26,6 @@ import {
   useCreateSignalObservation,
   useCreateTemplateObservation,
   useSignalDefinitions,
-  useSignalObservations,
   useSignalTemplate,
   useSignalTemplates,
 } from "@/queries/signals";
@@ -38,6 +36,7 @@ export function SignalsLogPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("signals");
   const canRecord = useCapability("signal.record", { farmId });
+  const canDeleteObs = useCapability("signal.delete_observation", { farmId });
   const { data: defs, isLoading: defsLoading } = useSignalDefinitions();
   const { data: templates, isLoading: tplsLoading } = useSignalTemplates();
   const [mode, setMode] = useState<Mode>("single");
@@ -69,11 +68,6 @@ export function SignalsLogPage(): ReactNode {
     () => activeTemplates.find((t) => t.id === selectedTplId) ?? null,
     [activeTemplates, selectedTplId],
   );
-
-  const { data: observations, isLoading: obsLoading } = useSignalObservations({
-    farm_id: farmId,
-    limit: 50,
-  });
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -145,9 +139,9 @@ export function SignalsLogPage(): ReactNode {
                 )
               ) : null}
               <ObservationList
-                isLoading={obsLoading}
-                observations={observations ?? []}
-                definitionFilter={selectedDef?.id}
+                farmId={farmId}
+                definitions={defs ?? []}
+                canDelete={canDeleteObs}
               />
             </section>
           </div>
@@ -197,9 +191,9 @@ export function SignalsLogPage(): ReactNode {
               )
             ) : null}
             <ObservationList
-              isLoading={obsLoading}
-              observations={observations ?? []}
-              definitionFilter={undefined}
+              farmId={farmId}
+              definitions={defs ?? []}
+              canDelete={canDeleteObs}
             />
           </section>
         </div>
@@ -649,99 +643,6 @@ export function TemplateRecordForm({
       </div>
     </form>
   );
-}
-
-function ObservationList({
-  isLoading,
-  observations,
-  definitionFilter,
-}: {
-  isLoading: boolean;
-  observations: ReturnType<typeof useSignalObservations>["data"] extends infer T
-    ? T extends Array<infer R>
-      ? R[]
-      : never
-    : never;
-  definitionFilter: string | undefined;
-}): ReactNode {
-  const { t } = useTranslation("signals");
-  const dateLocale = useDateLocale();
-  const filtered = definitionFilter
-    ? observations.filter((o) => o.signal_definition_id === definitionFilter)
-    : observations;
-  return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel">
-      <div className="flex items-center justify-between border-b border-ap-line px-4 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ap-muted">
-          {t("log.list.heading")}
-        </span>
-        <span className="text-xs text-ap-muted">{filtered.length}</span>
-      </div>
-      {isLoading ? (
-        <div className="flex flex-col gap-2 p-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <p className="p-6 text-center text-xs text-ap-muted">{t("log.list.empty")}</p>
-      ) : (
-        <ul className="divide-y divide-ap-line">
-          {filtered.map((o) => (
-            <li key={o.id} className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
-              <span className="font-mono text-xs text-ap-muted">{o.signal_code}</span>
-              <span className="font-medium text-ap-ink">{formatValue(o)}</span>
-              {o.notes ? <span className="text-xs text-ap-muted">— {o.notes}</span> : null}
-              {o.location_mode && o.location_mode !== "entity" ? (
-                <span
-                  className="text-[11px] text-ap-muted"
-                  title={
-                    t(`log.form.location.mode.${o.location_mode}`) +
-                    (o.location_point
-                      ? ` · ${o.location_point.latitude.toFixed(5)}, ${o.location_point.longitude.toFixed(5)}`
-                      : "")
-                  }
-                  aria-label={t(`log.form.location.mode.${o.location_mode}`)}
-                >
-                  📍
-                </span>
-              ) : null}
-              <span className="ms-auto text-[11px] text-ap-muted">
-                {formatDistanceToNow(parseISO(o.time), {
-                  addSuffix: true,
-                  locale: dateLocale,
-                })}
-              </span>
-              {o.attachment_download_url ? (
-                <a
-                  href={o.attachment_download_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] font-medium text-ap-primary hover:underline"
-                >
-                  {t("log.list.photo")}
-                </a>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function formatValue(o: {
-  value_numeric: string | null;
-  value_categorical: string | null;
-  value_event: string | null;
-  value_boolean: boolean | null;
-  value_geopoint: { latitude: number; longitude: number } | null;
-}): string {
-  if (o.value_numeric !== null) return o.value_numeric;
-  if (o.value_categorical !== null) return o.value_categorical;
-  if (o.value_event !== null) return o.value_event;
-  if (o.value_boolean !== null) return String(o.value_boolean);
-  if (o.value_geopoint) return `${o.value_geopoint.latitude}, ${o.value_geopoint.longitude}`;
-  return "—";
 }
 
 const inputCls =

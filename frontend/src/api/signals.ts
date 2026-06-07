@@ -234,6 +234,26 @@ export async function listSignalObservations(
   return data;
 }
 
+// CS-11 delete (capability: signal.delete_observation). Hard-delete; the
+// audit log preserves the row. Both return { deleted: <rows removed> }.
+export async function deleteSignalObservation(
+  observationId: string,
+): Promise<{ deleted: number }> {
+  const { data } = await apiClient.delete<{ deleted: number }>(
+    `/v1/signals/observations/${observationId}`,
+  );
+  return data;
+}
+
+export async function deleteSignalTemplateObservationGroup(
+  templateObservationId: string,
+): Promise<{ deleted: number }> {
+  const { data } = await apiClient.delete<{ deleted: number }>("/v1/signals/observations", {
+    params: { template_observation_id: templateObservationId },
+  });
+  return data;
+}
+
 // CS-7 CSV import. Multipart upload — the backend's UploadFile reads
 // the whole body, so we pass a real File via FormData (axios sets the
 // boundary). Errors come back as a 422 with extras.errors = [...] or
