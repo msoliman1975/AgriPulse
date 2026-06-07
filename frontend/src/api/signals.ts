@@ -4,6 +4,9 @@ import { apiClient } from "./client";
 
 export type ValueKind = "numeric" | "categorical" | "event" | "boolean" | "geopoint";
 
+// CS-1 D3 / CS-9. Non-numeric kinds are coerced to `latest` server-side.
+export type Aggregation = "latest" | "mean" | "median" | "max" | "min";
+
 export interface SignalDefinition {
   id: string;
   code: string;
@@ -19,6 +22,8 @@ export interface SignalDefinition {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  aggregation: Aggregation;
+  aggregation_window_days: number | null;
 }
 
 export interface SignalDefinitionCreatePayload {
@@ -31,6 +36,8 @@ export interface SignalDefinitionCreatePayload {
   value_min?: string | null;
   value_max?: string | null;
   attachment_allowed?: boolean;
+  aggregation?: Aggregation;
+  aggregation_window_days?: number | null;
 }
 
 export interface SignalDefinitionUpdatePayload {
@@ -42,6 +49,8 @@ export interface SignalDefinitionUpdatePayload {
   value_max?: string | null;
   attachment_allowed?: boolean;
   is_active?: boolean;
+  aggregation?: Aggregation;
+  aggregation_window_days?: number | null;
 }
 
 export interface SignalAssignment {
@@ -245,5 +254,120 @@ export async function importSignalObservationsCsv(
     params: { farm_id: farmId },
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return data;
+}
+
+// ---- CS-9: signal templates -----------------------------------------------
+// The backend has shipped templates since CS-1 D1; this PR adds the FE client.
+
+export interface SignalTemplate {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SignalTemplateMember {
+  signal_definition_id: string;
+  position: number;
+  is_required: boolean;
+}
+
+export interface SignalTemplateWithMembers {
+  template: SignalTemplate;
+  members: SignalTemplateMember[];
+}
+
+export interface SignalTemplateCreatePayload {
+  code: string;
+  name: string;
+  description?: string | null;
+  members: SignalTemplateMember[];
+}
+
+export interface SignalTemplateUpdatePayload {
+  name?: string;
+  description?: string | null;
+  is_active?: boolean;
+  members?: SignalTemplateMember[];
+}
+
+export interface SignalTemplateObservationMemberSubmission {
+  signal_definition_id: string;
+  value_numeric?: string | null;
+  value_categorical?: string | null;
+  value_event?: string | null;
+  value_boolean?: boolean | null;
+  value_geopoint?: Geopoint | null;
+  attachment_s3_key?: string | null;
+  notes?: string | null;
+}
+
+export interface SignalTemplateObservationCreatePayload {
+  farm_id: string;
+  block_id?: string | null;
+  observed_at?: string | null;
+  location_mode?: LocationMode;
+  location_point?: Geopoint | null;
+  members: SignalTemplateObservationMemberSubmission[];
+}
+
+export interface SignalTemplateObservationCreateResponse {
+  template_observation_id: string;
+  template_id: string;
+  farm_id: string;
+  block_id: string | null;
+  observed_at: string;
+  observation_count: number;
+}
+
+export async function listSignalTemplates(includeInactive = false): Promise<SignalTemplate[]> {
+  const { data } = await apiClient.get<SignalTemplate[]>("/v1/signals/templates", {
+    params: { include_inactive: includeInactive },
+  });
+  return data;
+}
+
+export async function getSignalTemplate(id: string): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.get<SignalTemplateWithMembers>(`/v1/signals/templates/${id}`);
+  return data;
+}
+
+export async function createSignalTemplate(
+  payload: SignalTemplateCreatePayload,
+): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.post<SignalTemplateWithMembers>(
+    "/v1/signals/templates",
+    payload,
+  );
+  return data;
+}
+
+export async function updateSignalTemplate(
+  id: string,
+  payload: SignalTemplateUpdatePayload,
+): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.patch<SignalTemplateWithMembers>(
+    `/v1/signals/templates/${id}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteSignalTemplate(id: string): Promise<void> {
+  await apiClient.delete(`/v1/signals/templates/${id}`);
+}
+
+export async function createSignalTemplateObservation(
+  templateId: string,
+  payload: SignalTemplateObservationCreatePayload,
+): Promise<SignalTemplateObservationCreateResponse> {
+  const { data } = await apiClient.post<SignalTemplateObservationCreateResponse>(
+    `/v1/signals/templates/${templateId}/observations`,
+    payload,
+  );
   return data;
 }

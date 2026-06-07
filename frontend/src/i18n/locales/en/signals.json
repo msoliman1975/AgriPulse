@@ -88,7 +88,41 @@
       "attachmentHint": "Field operators can attach a photo when recording",
       "save": "Save",
       "saving": "Saving…",
-      "saveFailed": "Save failed"
+      "saveFailed": "Save failed",
+      "aggregation": {
+        "label": "Aggregation",
+        "windowLabel": "Window (days)",
+        "windowHint": "e.g. 14",
+        "options": {
+          "latest": "latest",
+          "mean": "mean",
+          "median": "median",
+          "max": "max",
+          "min": "min"
+        }
+      }
+    },
+    "templates": {
+      "heading": "Templates",
+      "subtitle": "Group several definitions to record them together (e.g. a soil-test panel).",
+      "new": "New template",
+      "edit": "Edit",
+      "archive": "Archive",
+      "empty": "No templates yet — create one to capture multi-value field forms.",
+      "memberCount": "{{count}} member",
+      "memberCount_other": "{{count}} members",
+      "memberPicker": {
+        "label": "Members (drag to reorder)",
+        "emptyHint": "Add at least one definition.",
+        "required": "required",
+        "required_min": "Add at least one member.",
+        "searchPlaceholder": "Search definitions to add…",
+        "noMatches": "No matching definitions.",
+        "noMore": "All active definitions are already in this template.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove"
+      }
     },
     "row": {
       "active": "active",
@@ -107,6 +141,11 @@
     "subtitle": "Record observations one at a time, or import many at once via CSV. They feed alerts, recommendations, and the dashboard.",
     "noDefinitions": "No signal definitions yet. Ask a tenant admin to define one in Configuration → Signals.",
     "missingCapability": "You need the {{capability}} capability on this farm to log observations.",
+    "mode": {
+      "label": "Entry mode",
+      "single": "Single signal",
+      "template": "Template"
+    },
     "form": {
       "value": "Value",
       "valueWithUnit": "Value ({{unit}})",
@@ -120,7 +159,23 @@
       "recording": "Recording…",
       "record": "Record",
       "errorLatLon": "Latitude and longitude must be numeric.",
-      "errorGeneric": "Failed to record observation."
+      "errorGeneric": "Failed to record observation.",
+      "block": "Block (optional)",
+      "blockOptional": "— farm-level —",
+      "observedAt": {
+        "label": "Observed at",
+        "nowButton": "Now",
+        "hint": "Defaults to now if left blank — pick a past time for backdated entries."
+      }
+    },
+    "template": {
+      "title": "Template entry",
+      "subtitle": "Record several signals at once.",
+      "empty": "No active templates yet. A tenant admin can author one in Configuration → Signals.",
+      "noMembers": "This template has no member definitions.",
+      "submit": "Record observations",
+      "requiredMissing": "{{name}} is required.",
+      "emptySubmission": "Fill at least one member before submitting."
     },
     "list": {
       "heading": "Recent observations",
