@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, bindparam, select, text
+from sqlalchemy import ColumnElement, String, bindparam, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -511,6 +511,13 @@ class SignalsRepository:
                 bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("recorded_by", type_=PG_UUID(as_uuid=True)),
                 bindparam("template_observation_id", type_=PG_UUID(as_uuid=True)),
+                # asyncpg can't infer the type of a bare NULL used only in
+                # "CASE WHEN :geopoint IS NULL ... ST_GeomFromText(:geopoint)"
+                # (the PostGIS overload leaves it ambiguous). Pin both WKT
+                # params to text so the prepared statement type-checks when
+                # the observation has no point (the common numeric case).
+                bindparam("geopoint", type_=String()),
+                bindparam("location_point", type_=String()),
             ),
             {
                 "time": time,
