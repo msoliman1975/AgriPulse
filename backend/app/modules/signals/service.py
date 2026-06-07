@@ -32,7 +32,19 @@ from app.modules.signals.csv_import import (
     MAX_BYTES as CSV_MAX_BYTES,
 )
 from app.modules.signals.csv_import import (
+    MAX_BYTES_BULK as CSV_MAX_BYTES_BULK,
+)
+from app.modules.signals.csv_import import (
+    MAX_ROWS as CSV_MAX_ROWS,
+)
+from app.modules.signals.csv_import import (
+    MAX_ROWS_BULK as CSV_MAX_ROWS_BULK,
+)
+from app.modules.signals.csv_import import (
     CsvRowError,
+    ParsedCsvRow,
+    TemplatedGroup,
+    group_rows,
     parse_csv,
 )
 from app.modules.signals.errors import (
@@ -1078,27 +1090,21 @@ class SignalsServiceImpl:
         csv_bytes: bytes,
         recorded_by: UUID,
         tenant_schema: str,
+        tenant_id: UUID,
+        bulk_mode: bool = False,
     ) -> dict[str, int]:
-        """Strict-mode CSV import. Either every row is inserted in one
-        transaction, or none are and we raise CsvImportFailedError with
-        the per-row diagnostics (D4).
+        """Strict-mode CSV import (D4) — flat rows + templated groups (CS-12).
 
-        Validation runs in two passes:
-
-          1. csv_import.parse_csv — shape errors (missing required
-             columns, unparseable timestamps, multiple value columns
-             set, etc.).
-          2. Service-level business-rule validation — each row's
-             signal_code resolves to an active definition, the value
-             column matches its value_kind, numeric bounds hold,
-             categorical-membership holds.
-
-        The two passes accumulate into one error list; the caller
-        either sees `rows_imported` on success or the combined
-        error report on failure.
+        ``bulk_mode`` raises the row/byte ceilings (the route gates it on
+        signal.define + signal.record). Either every row inserts in one
+        transaction, or none do and we raise CsvImportFailedError with the
+        per-row report. Templated rows (carrying ``template_code``) are
+        grouped and inserted as one template-observation each.
         """
-        if len(csv_bytes) > CSV_MAX_BYTES:
-            raise CsvImportTooLargeError(size_bytes=len(csv_bytes), limit_bytes=CSV_MAX_BYTES)
+        max_bytes = CSV_MAX_BYTES_BULK if bulk_mode else CSV_MAX_BYTES
+        max_rows = CSV_MAX_ROWS_BULK if bulk_mode else CSV_MAX_ROWS
+        if len(csv_bytes) > max_bytes:
+            raise CsvImportTooLargeError(size_bytes=len(csv_bytes), limit_bytes=max_bytes)
 
         try:
             text_body = csv_bytes.decode("utf-8-sig")
@@ -1116,58 +1122,20 @@ class SignalsServiceImpl:
                 ]
             ) from exc
 
-        parsed = parse_csv(text_body)
+        parsed = parse_csv(text_body, max_rows=max_rows)
+        flat_rows, groups, group_errors = group_rows(parsed.rows)
 
-        # Resolve unique signal_codes referenced in the file → load
-        # each definition once. Codes missing from the catalog produce
-        # a row-level error.
-        codes_referenced = {r.signal_code for r in parsed.rows}
-        defs_by_code: dict[str, dict[str, Any]] = {}
-        for code in sorted(codes_referenced):
-            defn = await self._repo.get_definition(code=code)
-            if defn is not None:
-                defs_by_code[code] = defn
+        defs_by_code = await self._resolve_csv_defs({r.signal_code for r in parsed.rows})
+        templates_by_code, template_member_defs = await self._resolve_csv_templates(
+            {g.template_code for g in groups}
+        )
 
-        # Second-pass: business-rule validation.
-        business_errors: list[CsvRowError] = []
-        for row in parsed.rows:
-            defn = defs_by_code.get(row.signal_code)
-            if defn is None:
-                business_errors.append(
-                    CsvRowError(
-                        row_number=row.row_number,
-                        field="signal_code",
-                        message=(
-                            f"No active signal definition with code "
-                            f"{row.signal_code!r} in this tenant."
-                        ),
-                    )
-                )
-                continue
-            try:
-                self._validate_value(
-                    defn=defn,
-                    request_values={
-                        "value_numeric": row.value_numeric,
-                        "value_categorical": row.value_categorical,
-                        "value_event": row.value_event,
-                        "value_boolean": row.value_boolean,
-                        "value_geopoint": None,
-                    },
-                )
-            except InvalidSignalValueError as exc:
-                # exc.detail is typed `str | None` on the base APIError
-                # but InvalidSignalValueError always passes a detail; the
-                # fallback is defensive only.
-                business_errors.append(
-                    CsvRowError(
-                        row_number=row.row_number,
-                        field=None,
-                        message=exc.detail or "Invalid signal value.",
-                    )
-                )
+        business_errors = self._validate_csv_flat_rows(flat_rows, defs_by_code, tenant_id)
+        business_errors += self._validate_csv_groups(
+            groups, defs_by_code, templates_by_code, template_member_defs, tenant_id
+        )
 
-        all_errors = parsed.errors + business_errors
+        all_errors = list(parsed.errors) + list(group_errors) + business_errors
         if all_errors:
             raise CsvImportFailedError(
                 errors=[
@@ -1176,10 +1144,9 @@ class SignalsServiceImpl:
                 ]
             )
 
-        # All-or-nothing insert. Caller's session wraps the whole
-        # batch in a single transaction so a mid-loop DB error rolls
-        # back the partial insertion.
-        for row in parsed.rows:
+        # All-or-nothing insert: the caller's session wraps the whole batch
+        # in one transaction, so a mid-loop DB error rolls back everything.
+        for row in flat_rows:
             defn = defs_by_code[row.signal_code]
             await self._repo.insert_observation(
                 observation_id=uuid7(),
@@ -1192,10 +1159,46 @@ class SignalsServiceImpl:
                 value_event=row.value_event,
                 value_boolean=row.value_boolean,
                 value_geopoint_wkt=None,
-                attachment_s3_key=None,
+                attachment_s3_key=row.attachment_s3_key,
                 notes=row.notes,
                 recorded_by=recorded_by,
+                location_mode=row.location_mode,
+                location_point_wkt=_csv_point_wkt(row.location_point_lat, row.location_point_lon),
             )
+
+        inserted = len(flat_rows)
+        for group in groups:
+            tpl = templates_by_code[group.template_code]
+            members = tuple(
+                SignalTemplateObservationMemberSubmission(
+                    signal_definition_id=defs_by_code[r.signal_code]["id"],
+                    value_numeric=r.value_numeric,
+                    value_categorical=r.value_categorical,
+                    value_event=r.value_event,
+                    value_boolean=r.value_boolean,
+                    notes=r.notes,
+                )
+                for r in group.rows
+            )
+            point = (
+                GeopointModel(
+                    latitude=group.location_point_lat, longitude=group.location_point_lon
+                )
+                if group.location_point_lat is not None and group.location_point_lon is not None
+                else None
+            )
+            await self.create_template_observation(
+                template_id=tpl["id"],
+                farm_id=farm_id,
+                block_id=group.block_id,
+                observed_at=group.observed_at,
+                location_mode=group.location_mode,
+                location_point=point,
+                members=members,
+                recorded_by=recorded_by,
+                tenant_schema=tenant_schema,
+            )
+            inserted += len(group.rows)
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -1205,11 +1208,164 @@ class SignalsServiceImpl:
             subject_id=None,
             farm_id=farm_id,
             details={
-                "rows_imported": len(parsed.rows),
-                "signal_codes": sorted(codes_referenced),
+                "rows_imported": inserted,
+                "flat_rows": len(flat_rows),
+                "template_groups": len(groups),
+                "bulk_mode": bulk_mode,
+                "signal_codes": sorted({r.signal_code for r in parsed.rows}),
             },
         )
-        return {"rows_imported": len(parsed.rows)}
+        return {"rows_imported": inserted}
+
+    async def _resolve_csv_defs(self, codes: set[str]) -> dict[str, dict[str, Any]]:
+        """Load each referenced signal definition once, keyed by code."""
+        defs: dict[str, dict[str, Any]] = {}
+        for code in sorted(codes):
+            defn = await self._repo.get_definition(code=code)
+            if defn is not None:
+                defs[code] = defn
+        return defs
+
+    async def _resolve_csv_templates(
+        self, codes: set[str]
+    ) -> tuple[dict[str, dict[str, Any]], dict[UUID, set[UUID]]]:
+        """Resolve templated-group codes → (template_by_code, member def-ids)."""
+        by_code: dict[str, dict[str, Any]] = {}
+        member_defs: dict[UUID, set[UUID]] = {}
+        if not codes:
+            return by_code, member_defs
+        catalog = {t["code"]: t for t in await self._repo.list_templates(include_inactive=False)}
+        for code in codes:
+            tpl = catalog.get(code)
+            if tpl is None:
+                continue
+            by_code[code] = tpl
+            members = await self._repo.get_template_members(template_id=tpl["id"])
+            member_defs[tpl["id"]] = {m["signal_definition_id"] for m in members}
+        return by_code, member_defs
+
+    def _csv_attachment_error(
+        self, *, row_number: int, key: str | None, tenant_id: UUID
+    ) -> CsvRowError | None:
+        """Attachment keys are taken on trust for migrations, but must live
+        under this tenant's prefix (defensive, matches the upload layout)."""
+        if key is None:
+            return None
+        prefix = f"tenants/{tenant_id}/"
+        if not key.startswith(prefix):
+            return CsvRowError(
+                row_number=row_number,
+                field="attachment_s3_key",
+                message=f"Attachment key must start with {prefix!r}.",
+            )
+        return None
+
+    def _validate_csv_value(
+        self, *, defn: dict[str, Any], row: ParsedCsvRow
+    ) -> CsvRowError | None:
+        try:
+            self._validate_value(
+                defn=defn,
+                request_values={
+                    "value_numeric": row.value_numeric,
+                    "value_categorical": row.value_categorical,
+                    "value_event": row.value_event,
+                    "value_boolean": row.value_boolean,
+                    "value_geopoint": None,
+                },
+            )
+        except InvalidSignalValueError as exc:
+            return CsvRowError(
+                row_number=row.row_number,
+                field=None,
+                message=exc.detail or "Invalid signal value.",
+            )
+        return None
+
+    def _validate_csv_flat_rows(
+        self,
+        rows: list[ParsedCsvRow],
+        defs_by_code: dict[str, dict[str, Any]],
+        tenant_id: UUID,
+    ) -> list[CsvRowError]:
+        errors: list[CsvRowError] = []
+        for row in rows:
+            defn = defs_by_code.get(row.signal_code)
+            if defn is None:
+                errors.append(
+                    CsvRowError(
+                        row_number=row.row_number,
+                        field="signal_code",
+                        message=f"No active signal definition with code {row.signal_code!r}.",
+                    )
+                )
+                continue
+            if (verr := self._validate_csv_value(defn=defn, row=row)) is not None:
+                errors.append(verr)
+            if (aerr := self._csv_attachment_error(
+                row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
+            )) is not None:
+                errors.append(aerr)
+        return errors
+
+    def _validate_csv_groups(
+        self,
+        groups: list[TemplatedGroup],
+        defs_by_code: dict[str, dict[str, Any]],
+        templates_by_code: dict[str, dict[str, Any]],
+        template_member_defs: dict[UUID, set[UUID]],
+        tenant_id: UUID,
+    ) -> list[CsvRowError]:
+        errors: list[CsvRowError] = []
+        for group in groups:
+            tpl = templates_by_code.get(group.template_code)
+            if tpl is None:
+                errors.append(
+                    CsvRowError(
+                        row_number=group.rows[0].row_number,
+                        field="template_code",
+                        message=f"No active template with code {group.template_code!r}.",
+                    )
+                )
+                continue
+            member_defs = template_member_defs.get(tpl["id"], set())
+            for row in group.rows:
+                defn = defs_by_code.get(row.signal_code)
+                if defn is None:
+                    errors.append(
+                        CsvRowError(
+                            row_number=row.row_number,
+                            field="signal_code",
+                            message=f"No active signal definition with code {row.signal_code!r}.",
+                        )
+                    )
+                    continue
+                if defn["id"] not in member_defs:
+                    errors.append(
+                        CsvRowError(
+                            row_number=row.row_number,
+                            field="signal_code",
+                            message=(
+                                f"{row.signal_code!r} is not a member of template "
+                                f"{group.template_code!r}."
+                            ),
+                        )
+                    )
+                    continue
+                if (verr := self._validate_csv_value(defn=defn, row=row)) is not None:
+                    errors.append(verr)
+                if (aerr := self._csv_attachment_error(
+                    row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
+                )) is not None:
+                    errors.append(aerr)
+        return errors
+
+
+def _csv_point_wkt(lat: float | None, lon: float | None) -> str | None:
+    """WGS84 POINT WKT for a CSV row's location, or None when absent."""
+    if lat is None or lon is None:
+        return None
+    return f"POINT({lon} {lat})"
 
 
 def _enrich_observation(row: dict[str, Any], *, storage: StorageClient) -> dict[str, Any]:

@@ -170,6 +170,7 @@ class TestImportObservationsCsv:
                 csv_bytes=b"X" * (5 * 1024 * 1024 + 1),
                 recorded_by=uuid4(),
                 tenant_schema="t_x",
+                tenant_id=uuid4(),
             )
         repo.insert_observation.assert_not_called()
 
@@ -183,6 +184,7 @@ class TestImportObservationsCsv:
                 csv_bytes=b"signal_code,observed_at\nsoil\xff_ph,2026-01-01\n",
                 recorded_by=uuid4(),
                 tenant_schema="t_x",
+                tenant_id=uuid4(),
             )
         errors = exc_info.value.extras["errors"]
         assert any("UTF-8" in e["message"] for e in errors)
@@ -198,6 +200,7 @@ class TestImportObservationsCsv:
                 csv_bytes=body,
                 recorded_by=uuid4(),
                 tenant_schema="t_x",
+                tenant_id=uuid4(),
             )
         errors = exc_info.value.extras["errors"]
         assert any(e["field"] == "signal_code" for e in errors)
@@ -220,6 +223,7 @@ class TestImportObservationsCsv:
                 csv_bytes=body,
                 recorded_by=uuid4(),
                 tenant_schema="t_x",
+                tenant_id=uuid4(),
             )
         repo.insert_observation.assert_not_called()
 
@@ -243,6 +247,7 @@ class TestImportObservationsCsv:
             csv_bytes=body,
             recorded_by=uuid4(),
             tenant_schema="t_x",
+            tenant_id=uuid4(),
         )
         assert out == {"rows_imported": 2}
         assert repo.insert_observation.await_count == 2
@@ -269,6 +274,7 @@ class TestImportObservationsCsv:
                 csv_bytes=body,
                 recorded_by=uuid4(),
                 tenant_schema="t_x",
+                tenant_id=uuid4(),
             )
         errors = exc_info.value.extras["errors"]
         # Shape error (row 2) + business error (row 3).

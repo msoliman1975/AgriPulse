@@ -272,11 +272,12 @@ export interface CsvImportRowError {
 export async function importSignalObservationsCsv(
   farmId: string,
   file: File,
+  bulkMode = false,
 ): Promise<CsvImportSuccess> {
   const fd = new FormData();
   fd.append("file", file);
   const { data } = await apiClient.post<CsvImportSuccess>("/v1/signals/csv-import", fd, {
-    params: { farm_id: farmId },
+    params: { farm_id: farmId, bulk_mode: bulkMode },
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;

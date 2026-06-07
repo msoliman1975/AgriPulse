@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -43,6 +44,9 @@ from uuid import UUID
 
 MAX_BYTES: Final[int] = 5 * 1024 * 1024
 MAX_ROWS: Final[int] = 5_000
+# CS-12: ?bulk_mode=true backfill ceilings (tenant-admin gated).
+MAX_BYTES_BULK: Final[int] = 50 * 1024 * 1024
+MAX_ROWS_BULK: Final[int] = 50_000
 
 REQUIRED_COLUMNS: Final[tuple[str, ...]] = ("signal_code", "observed_at")
 VALUE_COLUMNS: Final[tuple[str, ...]] = (
@@ -55,8 +59,19 @@ OPTIONAL_COLUMNS: Final[tuple[str, ...]] = (
     "block_id",
     "notes",
     *VALUE_COLUMNS,
+    # CS-12: location capture + attachment + templated-row columns.
+    "location_mode",
+    "location_point_lat",
+    "location_point_lon",
+    "attachment_s3_key",
+    "template_code",
+    "template_member_position",
 )
 KNOWN_COLUMNS: Final[frozenset[str]] = frozenset(REQUIRED_COLUMNS + OPTIONAL_COLUMNS)
+
+_LOCATION_MODES: Final[frozenset[str]] = frozenset(
+    {"entity", "point_in_entity", "free_point"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +100,14 @@ class ParsedCsvRow:
     value_event: str | None = None
     value_boolean: bool | None = None
     notes: str | None = None
+    # CS-12 additive columns. location_point_* are floats here; the
+    # service renders them as WKT. template_* drive group assembly.
+    location_mode: str = "entity"
+    location_point_lat: float | None = None
+    location_point_lon: float | None = None
+    attachment_s3_key: str | None = None
+    template_code: str | None = None
+    template_member_position: int | None = None
 
 
 @dataclass
@@ -96,12 +119,13 @@ class CsvParseResult:
     errors: list[CsvRowError] = field(default_factory=list)
 
 
-def parse_csv(text: str) -> CsvParseResult:
+def parse_csv(text: str, *, max_rows: int = MAX_ROWS) -> CsvParseResult:
     """Parse the CSV body + shape-validate every row.
 
     Caller decides what to do with non-empty ``errors``; in the strict
     flow the service layer rejects the batch as soon as any error is
-    present.
+    present. ``max_rows`` defaults to 5,000; the ``bulk_mode`` import path
+    raises it to support backfills.
     """
     result = CsvParseResult()
 
@@ -129,13 +153,13 @@ def parse_csv(text: str) -> CsvParseResult:
         return result
 
     for index, raw in enumerate(reader, start=2):
-        if index - 1 > MAX_ROWS:
+        if index - 1 > max_rows:
             result.errors.append(
                 CsvRowError(
                     row_number=index,
                     field=None,
                     message=(
-                        f"File exceeds the {MAX_ROWS}-row limit. Split into "
+                        f"File exceeds the {max_rows}-row limit. Split into "
                         f"smaller files and re-upload."
                     ),
                 )
@@ -146,7 +170,7 @@ def parse_csv(text: str) -> CsvParseResult:
     return result
 
 
-def _parse_one_row(  # noqa: PLR0912  # one row, one validator — splitting just adds ceremony
+def _parse_one_row(  # noqa: PLR0912, PLR0915  # one row, one validator — splitting just adds ceremony
     raw: dict[str, str | None], *, row_number: int, into: CsvParseResult
 ) -> None:
     """Coerce a single CSV row. Errors accumulate in ``into.errors``;
@@ -203,6 +227,12 @@ def _parse_one_row(  # noqa: PLR0912  # one row, one validator — splitting jus
     value_event = cleaned.get("value_event")
     notes = cleaned.get("notes")
 
+    # CS-12: location / attachment / template columns (extracted to keep
+    # this validator a manageable length).
+    location_mode, lat, lon = _parse_location(cleaned, _add_error)
+    attachment_s3_key = cleaned.get("attachment_s3_key")
+    template_code, template_member_position = _parse_template_ref(cleaned, _add_error)
+
     # Exactly-one-value check (matches the DB-row CHECK constraint).
     # Boolean False / numeric 0 are legitimate values; check None-ness,
     # not truthiness.
@@ -234,6 +264,12 @@ def _parse_one_row(  # noqa: PLR0912  # one row, one validator — splitting jus
                 value_event=value_event,
                 value_boolean=value_boolean,
                 notes=notes,
+                location_mode=location_mode,
+                location_point_lat=lat,
+                location_point_lon=lon,
+                attachment_s3_key=attachment_s3_key,
+                template_code=template_code,
+                template_member_position=template_member_position,
             )
         )
 
@@ -243,3 +279,155 @@ def _clean(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _parse_coord(
+    raw: str | None,
+    field_name: str,
+    limit: float,
+    add_error: Callable[[str | None, str], None],
+) -> float | None:
+    if raw is None:
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        add_error(field_name, f"Could not parse {raw!r} as a number.")
+        return None
+    if v < -limit or v > limit:
+        add_error(field_name, f"Must be between -{limit:g} and {limit:g}.")
+        return None
+    return v
+
+
+def _parse_location(
+    cleaned: dict[str, str | None],
+    add_error: Callable[[str | None, str], None],
+) -> tuple[str, float | None, float | None]:
+    """(location_mode, lat, lon) with CS-10 coherence rules enforced."""
+    location_mode = cleaned.get("location_mode") or "entity"
+    if location_mode not in _LOCATION_MODES:
+        add_error("location_mode", "Must be one of entity, point_in_entity, free_point.")
+        location_mode = "entity"
+
+    lat = _parse_coord(cleaned.get("location_point_lat"), "location_point_lat", 90.0, add_error)
+    lon = _parse_coord(cleaned.get("location_point_lon"), "location_point_lon", 180.0, add_error)
+    if (lat is None) != (lon is None):
+        add_error(
+            "location_point_lat",
+            "Provide both location_point_lat and location_point_lon, or neither.",
+        )
+    if location_mode in {"point_in_entity", "free_point"} and (lat is None or lon is None):
+        add_error(
+            "location_mode",
+            f"location_mode={location_mode!r} requires location_point_lat + location_point_lon.",
+        )
+    if location_mode == "entity" and (lat is not None or lon is not None):
+        add_error("location_mode", "location_mode=entity must not carry a location point.")
+    return location_mode, lat, lon
+
+
+def _parse_template_ref(
+    cleaned: dict[str, str | None],
+    add_error: Callable[[str | None, str], None],
+) -> tuple[str | None, int | None]:
+    """(template_code, template_member_position) — both-or-neither."""
+    template_code = cleaned.get("template_code")
+    member_pos_raw = cleaned.get("template_member_position")
+    position: int | None = None
+    if member_pos_raw is not None:
+        try:
+            position = int(member_pos_raw)
+            if position < 0:
+                add_error("template_member_position", "Must be >= 0.")
+                position = None
+        except ValueError:
+            add_error(
+                "template_member_position",
+                f"Could not parse {member_pos_raw!r} as an integer.",
+            )
+    if template_code and position is None and member_pos_raw is None:
+        add_error("template_member_position", "Required when template_code is set.")
+    if member_pos_raw is not None and not template_code:
+        add_error("template_code", "Required when template_member_position is set.")
+    return template_code, position
+
+
+@dataclass(frozen=True, slots=True)
+class TemplatedGroup:
+    """A set of CSV rows that together form one template observation —
+    same template + observed_at + block + location, one row per member."""
+
+    template_code: str
+    observed_at: datetime
+    block_id: UUID | None
+    location_mode: str
+    location_point_lat: float | None
+    location_point_lon: float | None
+    rows: tuple[ParsedCsvRow, ...]
+
+
+def group_rows(
+    rows: list[ParsedCsvRow],
+) -> tuple[list[ParsedCsvRow], list[TemplatedGroup], list[CsvRowError]]:
+    """Split shape-valid rows into flat rows + templated groups (CS-12).
+
+    Rows carrying a ``template_code`` are grouped by
+    (template_code, observed_at, block_id, location_mode, lat, lon) — so a
+    file may freely mix flat rows and several template submissions. The
+    only intra-group rule enforced here is that member positions are
+    unique; membership-in-template + value-kind checks are the service's
+    job (they need the catalog). Errors are returned, not raised.
+    """
+    flat: list[ParsedCsvRow] = []
+    grouped: dict[
+        tuple[str, datetime, UUID | None, str, float | None, float | None],
+        list[ParsedCsvRow],
+    ] = {}
+    for row in rows:
+        if not row.template_code:
+            flat.append(row)
+            continue
+        key = (
+            row.template_code,
+            row.observed_at,
+            row.block_id,
+            row.location_mode,
+            row.location_point_lat,
+            row.location_point_lon,
+        )
+        grouped.setdefault(key, []).append(row)
+
+    groups: list[TemplatedGroup] = []
+    errors: list[CsvRowError] = []
+    for key, member_rows in grouped.items():
+        seen_positions: dict[int, int] = {}
+        for r in member_rows:
+            pos = r.template_member_position
+            if pos is None:
+                continue  # already flagged in _parse_one_row
+            if pos in seen_positions:
+                errors.append(
+                    CsvRowError(
+                        row_number=r.row_number,
+                        field="template_member_position",
+                        message=(
+                            f"Duplicate member position {pos} in template "
+                            f"{key[0]!r} group (also row {seen_positions[pos]})."
+                        ),
+                    )
+                )
+            else:
+                seen_positions[pos] = r.row_number
+        groups.append(
+            TemplatedGroup(
+                template_code=key[0],
+                observed_at=key[1],
+                block_id=key[2],
+                location_mode=key[3],
+                location_point_lat=key[4],
+                location_point_lon=key[5],
+                rows=tuple(member_rows),
+            )
+        )
+    return flat, groups, errors
