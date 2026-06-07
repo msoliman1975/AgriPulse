@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 
 import {
+  backfillGrid,
   getGridConfig,
   previewCellSize,
   putGridConfig,
@@ -67,6 +68,21 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
       queryClient.invalidateQueries({ queryKey: ["grid-cells", blockId] });
     },
   });
+
+  const backfillMutation = useMutation({
+    mutationFn: () => backfillGrid(blockId, productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["grid-cells", blockId] });
+    },
+  });
+
+  // A rezone (changing the cell size on an existing grid) retires the old
+  // cells and generates new ones — the new grid has no history until the
+  // next scene, so warn + point at backfill.
+  const isRezone =
+    configQuery.data != null &&
+    isValid &&
+    Number(configQuery.data.cell_size_m) !== parsed;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -157,6 +173,18 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
         </p>
       )}
 
+      {isRezone && (
+        <p
+          className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800"
+          role="status"
+        >
+          {t("subblockGrid.rezoneWarning", {
+            defaultValue:
+              "Changing the cell size retires the current grid and builds new cells. The new grid has no history until the next scene — use “Backfill” below to repopulate it from past scenes.",
+          })}
+        </p>
+      )}
+
       <button
         type="button"
         disabled={
@@ -176,6 +204,43 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
         <p className="mt-2 text-xs text-red-600">
           {t("subblockGrid.saveError", { defaultValue: "Could not save grid config." })}
         </p>
+      )}
+
+      {configQuery.data && (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <p className="text-xs font-medium text-slate-600">
+            {t("subblockGrid.backfillHeading", { defaultValue: "Backfill history" })}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("subblockGrid.backfillHelp", {
+              defaultValue:
+                "Re-process past scenes onto the current cells. Useful after a rezone. This re-reads imagery and can take a while.",
+            })}
+          </p>
+          <button
+            type="button"
+            disabled={backfillMutation.isPending}
+            onClick={() => backfillMutation.mutate()}
+            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {backfillMutation.isPending
+              ? t("subblockGrid.backfillPending", { defaultValue: "Queuing…" })
+              : t("subblockGrid.backfillButton", { defaultValue: "Backfill historical scenes" })}
+          </button>
+          {backfillMutation.isSuccess && (
+            <p className="mt-2 text-xs text-emerald-700">
+              {t("subblockGrid.backfillQueued", {
+                defaultValue: "Queued {{count}} scene(s). Cells repopulate as they finish.",
+                count: backfillMutation.data.scenes_queued,
+              })}
+            </p>
+          )}
+          {backfillMutation.isError && (
+            <p className="mt-2 text-xs text-red-600">
+              {t("subblockGrid.backfillError", { defaultValue: "Could not start backfill." })}
+            </p>
+          )}
+        </div>
       )}
     </section>
   );

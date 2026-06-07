@@ -134,6 +134,25 @@ class GridWorstCellsResponse(BaseModel):
     at: datetime | None
 
 
+class GridBackfillRequest(BaseModel):
+    """POST /blocks/{b}/grid-configs/{product_id}/backfill body (G-5).
+
+    Re-processes past scenes onto the current grid. Opt-in because each
+    scene re-reads its raw bands; capped by ``limit``.
+    """
+
+    limit: int = Field(default=200, ge=1, le=500, description="Max scenes to re-process.")
+    since: datetime | None = Field(
+        default=None, description="Only scenes at/after this time; all if null."
+    )
+
+
+class GridBackfillResponse(BaseModel):
+    scenes_queued: int = Field(
+        description="Scenes matched + queued for re-processing onto the grid."
+    )
+
+
 class GridCellHistoryPoint(BaseModel):
     time: datetime
     mean: Decimal | None

@@ -120,6 +120,23 @@ export async function putGridConfig(
   return data;
 }
 
+export interface GridBackfillResponse {
+  scenes_queued: number;
+}
+
+export async function backfillGrid(
+  blockId: string,
+  productId: string,
+  limit = 200,
+  since?: string,
+): Promise<GridBackfillResponse> {
+  const { data } = await apiClient.post<GridBackfillResponse>(
+    `/v1/blocks/${blockId}/grid-configs/${productId}/backfill`,
+    { limit, since: since ?? null },
+  );
+  return data;
+}
+
 export async function previewCellSize(
   blockId: string,
   productId: string,

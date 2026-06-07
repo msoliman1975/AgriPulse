@@ -30,6 +30,7 @@ from app.modules.grid.anomaly import (
     detect_low_outliers,
     effective_k,
 )
+from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.errors import (
     CellSizeInvalidError,
     GridConfigNotFoundError,
@@ -158,6 +159,15 @@ class GridService(Protocol):
         block_id: UUID,
         default_k: float = DEFAULT_K,
     ) -> dict[str, dict[str, Any]]: ...
+
+    async def count_backfill_scenes(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        since: datetime | None,
+        limit: int,
+    ) -> int: ...
 
 
 class GridServiceImpl:
@@ -620,6 +630,28 @@ class GridServiceImpl:
                     "severity": result.severity,
                 }
         return out
+
+    async def count_backfill_scenes(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        since: datetime | None,
+        limit: int,
+    ) -> int:
+        """How many past scenes a backfill would re-process (G-5).
+
+        Lets the UI show "Backfill N scenes" before the user commits. The
+        actual fan-out runs in the ``grid.backfill_block`` task.
+        """
+        jobs = await list_backfill_jobs(
+            self._session,
+            block_id=block_id,
+            product_id=product_id,
+            since=since,
+            limit=limit,
+        )
+        return len(jobs)
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:

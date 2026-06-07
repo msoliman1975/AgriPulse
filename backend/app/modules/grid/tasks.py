@@ -32,6 +32,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.modules.grid.anomaly import DEFAULT_K, AnomalyResult, effective_k
+from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.service import get_grid_service
 from app.shared.db.blocks import read_block_context
@@ -396,3 +397,61 @@ async def _detect_sweep_async() -> dict[str, int]:
         detect_anomalies_for_tenant.delay(schema)
         enqueued += 1
     return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.backfill_block",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_block(
+    tenant_schema: str,
+    block_id: str,
+    product_id: str,
+    limit: int = 200,
+    since_iso: str | None = None,
+) -> dict[str, int]:
+    """Opt-in backfill of past scenes onto a block's current grid (G-5).
+
+    Walks succeeded ingestion jobs and re-enqueues ``compute_indices`` for
+    each, which repopulates ``block_grid_aggregates`` on the freshly
+    regenerated cells. Idempotent: scenes already computed on the new grid
+    collide on the UNIQUE and DO NOTHING.
+    """
+    return _run_task(
+        _backfill_block_async(tenant_schema, block_id, product_id, limit, since_iso)
+    )
+
+
+async def _backfill_block_async(
+    tenant_schema: str,
+    block_id: str,
+    product_id: str,
+    limit: int,
+    since_iso: str | None,
+) -> dict[str, int]:
+    from app.modules.imagery.tasks import compute_indices
+
+    since = datetime.fromisoformat(since_iso) if since_iso else None
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        jobs = await list_backfill_jobs(
+            session,
+            block_id=UUID(block_id),
+            product_id=UUID(product_id),
+            since=since,
+            limit=limit,
+        )
+
+    for j in jobs:
+        compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
+
+    _log.info(
+        "grid_backfill_queued",
+        tenant_schema=tenant_schema,
+        block_id=block_id,
+        product_id=product_id,
+        scenes_queued=len(jobs),
+    )
+    return {"scenes_queued": len(jobs)}

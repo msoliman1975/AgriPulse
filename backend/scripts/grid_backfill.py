@@ -29,6 +29,7 @@ from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.settings import get_settings
+from app.modules.grid.backfill import extract_raw_bands_key
 
 logger = logging.getLogger("grid_backfill")
 
@@ -92,24 +93,9 @@ def _list_jobs(
             rows = conn.execute(stmt, params).mappings().all()
             out: list[dict[str, str]] = []
             for r in rows:
-                assets = r["assets_written"]
-                raw_key = None
-                # Two shapes coexist in the wild:
-                #   * dict {"raw_bands": {"href": "s3://bucket/...", ...}, ...}
-                #     written by the production compute_indices task path.
-                #   * list ["sentinel_hub/.../raw_bands.tif", ...]
-                #     written by scripts/imagery-backfill/upload_to_local.
-                if isinstance(assets, dict):
-                    raw_bands = assets.get("raw_bands") or {}
-                    if isinstance(raw_bands, dict):
-                        href = raw_bands.get("href")
-                        if isinstance(href, str) and href.startswith("s3://"):
-                            raw_key = href.split("/", 3)[-1]
-                elif isinstance(assets, list):
-                    for entry in assets:
-                        if isinstance(entry, str) and entry.endswith("raw_bands.tif"):
-                            raw_key = entry
-                            break
+                # Shared with the grid.backfill_block task so both decode
+                # the two asset-manifest shapes identically.
+                raw_key = extract_raw_bands_key(r["assets_written"])
                 if raw_key is None:
                     logger.warning(
                         "skip job=%s — no raw_bands key in assets_written",
