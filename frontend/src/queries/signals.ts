@@ -21,7 +21,9 @@ import {
   createSignalTemplateObservation,
   deleteSignalAssignment,
   deleteSignalDefinition,
+  deleteSignalObservation,
   deleteSignalTemplate,
+  deleteSignalTemplateObservationGroup,
   getSignalTemplate,
   listSignalAssignments,
   listSignalDefinitions,
@@ -121,6 +123,29 @@ export function useCreateSignalObservation() {
     { definitionId: string; payload: SignalObservationCreatePayload }
   >({
     mutationFn: ({ definitionId, payload }) => createSignalObservation(definitionId, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["signal_observations"] });
+      void qc.invalidateQueries({ queryKey: ["labs", "map"] });
+    },
+  });
+}
+
+export function useDeleteSignalObservation() {
+  const qc = useQueryClient();
+  return useMutation<{ deleted: number }, Error, { observationId: string }>({
+    mutationFn: ({ observationId }) => deleteSignalObservation(observationId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["signal_observations"] });
+      void qc.invalidateQueries({ queryKey: ["labs", "map"] });
+    },
+  });
+}
+
+export function useDeleteSignalTemplateObservationGroup() {
+  const qc = useQueryClient();
+  return useMutation<{ deleted: number }, Error, { templateObservationId: string }>({
+    mutationFn: ({ templateObservationId }) =>
+      deleteSignalTemplateObservationGroup(templateObservationId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["signal_observations"] });
       void qc.invalidateQueries({ queryKey: ["labs", "map"] });

@@ -51,6 +51,7 @@ export type Capability =
   | "signal.read"
   | "signal.define"
   | "signal.record"
+  | "signal.delete_observation"
   | "user.read"
   | "user.invite"
   | "user.update"
@@ -261,6 +262,7 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "signal.read",
     "signal.define",
     "signal.record",
+    "signal.delete_observation",
     "user.read",
     "user.invite",
     "user.update",
