@@ -11,6 +11,12 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
+  # Keep EKS control-plane logging OFF — vended logs to CloudWatch cost ~$31/mo
+  # at our traffic level and we don't need them for dev. The module's default
+  # is to leave whatever is currently on the cluster untouched, which is how
+  # this drifted on once before; explicit empty list pins it off.
+  cluster_enabled_log_types = []
+
   # Encrypt secrets at rest with our KMS key.
   cluster_encryption_config = {
     provider_key_arn = aws_kms_key.agripulse.arn
