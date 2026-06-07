@@ -105,6 +105,11 @@ export interface SignalObservationCreatePayload {
   value_geopoint?: Geopoint | null;
   attachment_s3_key?: string | null;
   notes?: string | null;
+  // CS-10. Defaults to `entity` server-side when omitted, preserving the
+  // pre-CS-10 single-shot behavior. `location_point` is required by the
+  // backend for non-`entity` modes (point_in_entity is ST_Within-validated).
+  location_mode?: LocationMode;
+  location_point?: Geopoint | null;
 }
 
 export interface SignalAttachmentInitPayload {

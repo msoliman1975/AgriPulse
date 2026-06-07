@@ -20,6 +20,7 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { SignalsCsvImport } from "../components/SignalsCsvImport";
+import { LocationCapture, type LocationValue } from "../components/LocationCapture";
 import { ObservedAtPicker } from "../components/ObservedAtPicker";
 import { ValueInput } from "../components/ValueInput";
 import {
@@ -283,6 +284,11 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [observedAt, setObservedAt] = useState<string | null>(null);
+  const [location, setLocation] = useState<LocationValue>({
+    location_mode: "entity",
+    location_point: null,
+  });
+  const [locationReset, setLocationReset] = useState(0);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -305,6 +311,16 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
     // Backwards-compat: untouched picker submits no `time`; server falls
     // back to now(), preserving CS-1..CS-8 client behavior.
     if (observedAt) payload.time = observedAt;
+    // CS-10: only send location when the operator picked a non-default mode,
+    // so untouched submits stay identical to pre-CS-10 behavior.
+    if (location.location_mode !== "entity") {
+      if (!location.location_point) {
+        setError(t("log.form.location.invalidLatLon"));
+        return;
+      }
+      payload.location_mode = location.location_mode;
+      payload.location_point = location.location_point;
+    }
 
     try {
       if (defn.attachment_allowed && file) {
@@ -328,6 +344,8 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
       setNotes("");
       setFile(null);
       setObservedAt(null);
+      setLocation({ location_mode: "entity", location_point: null });
+      setLocationReset((k) => k + 1);
     } catch (err) {
       setUploading(false);
       const message = err instanceof Error ? err.message : t("log.form.errorGeneric");
@@ -359,6 +377,7 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
         setLon={setLon}
       />
       <ObservedAtPicker value={observedAt} onChange={setObservedAt} />
+      <LocationCapture blockId={null} onChange={setLocation} resetKey={locationReset} />
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-ap-muted">{t("log.form.notes")}</span>
         <textarea
@@ -467,6 +486,11 @@ export function TemplateRecordForm({
   const [notes, setNotes] = useState("");
   const [observedAt, setObservedAt] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
+  const [location, setLocation] = useState<LocationValue>({
+    location_mode: "entity",
+    location_point: null,
+  });
+  const [locationReset, setLocationReset] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const orderedMembers = useMemo(() => {
@@ -492,6 +516,8 @@ export function TemplateRecordForm({
     setNotes("");
     setObservedAt(null);
     setBlockId(null);
+    setLocation({ location_mode: "entity", location_point: null });
+    setLocationReset((k) => k + 1);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -513,12 +539,20 @@ export function TemplateRecordForm({
       setError(t("log.template.emptySubmission"));
       return;
     }
+    if (location.location_mode !== "entity" && !location.location_point) {
+      setError(t("log.form.location.invalidLatLon"));
+      return;
+    }
     const payload: SignalTemplateObservationCreatePayload = {
       farm_id: farmId,
       block_id: blockId,
       observed_at: observedAt,
       members: memberSubs,
     };
+    if (location.location_mode !== "entity") {
+      payload.location_mode = location.location_mode;
+      payload.location_point = location.location_point;
+    }
     try {
       await create.mutateAsync({ templateId: template.id, payload });
       reset();
@@ -592,6 +626,7 @@ export function TemplateRecordForm({
 
       <ObservedAtPicker value={observedAt} onChange={setObservedAt} />
       <BlockSelect farmId={farmId} value={blockId} onChange={setBlockId} />
+      <LocationCapture blockId={blockId} onChange={setLocation} resetKey={locationReset} />
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-ap-muted">{t("log.form.notes")}</span>
         <textarea
@@ -656,6 +691,20 @@ function ObservationList({
               <span className="font-mono text-xs text-ap-muted">{o.signal_code}</span>
               <span className="font-medium text-ap-ink">{formatValue(o)}</span>
               {o.notes ? <span className="text-xs text-ap-muted">— {o.notes}</span> : null}
+              {o.location_mode && o.location_mode !== "entity" ? (
+                <span
+                  className="text-[11px] text-ap-muted"
+                  title={
+                    t(`log.form.location.mode.${o.location_mode}`) +
+                    (o.location_point
+                      ? ` · ${o.location_point.latitude.toFixed(5)}, ${o.location_point.longitude.toFixed(5)}`
+                      : "")
+                  }
+                  aria-label={t(`log.form.location.mode.${o.location_mode}`)}
+                >
+                  📍
+                </span>
+              ) : null}
               <span className="ms-auto text-[11px] text-ap-muted">
                 {formatDistanceToNow(parseISO(o.time), {
                   addSuffix: true,
