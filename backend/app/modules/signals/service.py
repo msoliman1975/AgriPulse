@@ -43,6 +43,7 @@ from app.modules.signals.errors import (
     InvalidSignalValueError,
     SignalAssignmentNotFoundError,
     SignalDefinitionNotFoundError,
+    SignalObservationNotFoundError,
     SignalTemplateMembersInvalidError,
     SignalTemplateNotFoundError,
 )
@@ -442,6 +443,66 @@ class SignalsServiceImpl:
             farm_id=None,
             details={},
         )
+
+    # ---- Observation delete (CS-11) -----------------------------------
+
+    async def get_observation(self, *, observation_id: UUID) -> dict[str, Any] | None:
+        """Lookup used by the delete route to resolve farm_id (for the
+        farm-scoped capability check) before deleting."""
+        return await self._repo.get_observation(observation_id=observation_id)
+
+    async def get_template_observation_farm(
+        self, *, template_observation_id: UUID
+    ) -> UUID | None:
+        return await self._repo.get_template_observation_farm(
+            template_observation_id=template_observation_id
+        )
+
+    async def delete_observation(
+        self,
+        *,
+        observation_id: UUID,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> None:
+        deleted = await self._repo.delete_observation(observation_id=observation_id)
+        if deleted == 0:
+            raise SignalObservationNotFoundError(observation_id)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.observation_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_observation",
+            subject_id=observation_id,
+            farm_id=farm_id,
+            details={"deleted_count": deleted},
+        )
+
+    async def delete_template_observation(
+        self,
+        *,
+        template_observation_id: UUID,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> int:
+        """Delete every sibling in a templated group. Returns count deleted."""
+        deleted = await self._repo.delete_observations_by_template(
+            template_observation_id=template_observation_id
+        )
+        if deleted == 0:
+            raise SignalObservationNotFoundError(template_observation_id)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.template_observation_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_observation",
+            subject_id=template_observation_id,
+            farm_id=farm_id,
+            details={"deleted_count": deleted},
+        )
+        return deleted
 
     # ---- Attachment upload --------------------------------------------
 

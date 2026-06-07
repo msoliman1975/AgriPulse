@@ -44,6 +44,17 @@ class SignalAssignmentNotFoundError(APIError):
         )
 
 
+class SignalObservationNotFoundError(APIError):
+    def __init__(self, ref: str | UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Signal observation not found",
+            detail=f"No signal observation matching {ref!r} in this tenant.",
+            type_=f"{_TYPE_BASE}/observation-not-found",
+            extras={"ref": str(ref)},
+        )
+
+
 class InvalidSignalValueError(APIError):
     """An observation's value violates the definition's constraints
     (wrong kind, out of range, not in categorical_values, etc.)."""

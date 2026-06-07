@@ -549,6 +549,76 @@ class SignalsRepository:
                 ) from exc
             raise
 
+    async def get_observation(self, *, observation_id: UUID) -> dict[str, Any] | None:
+        """Minimal lookup for the delete path: farm_id (for the farm-scoped
+        capability check) + template_observation_id. None if absent."""
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT id, farm_id, template_observation_id
+                        FROM signal_observations
+                        WHERE id = :id
+                        """
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": observation_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def get_template_observation_farm(
+        self, *, template_observation_id: UUID
+    ) -> UUID | None:
+        """farm_id of any row in a templated group (all siblings carry the
+        same template_observation_id, CS-4 D8). None if the group is empty."""
+        return (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT farm_id
+                    FROM signal_observations
+                    WHERE template_observation_id = :tid
+                    LIMIT 1
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": template_observation_id},
+            )
+        ).scalar_one_or_none()
+
+    async def delete_observation(self, *, observation_id: UUID) -> int:
+        """Hard-delete one observation row. Returns rows affected (0 if gone).
+
+        signal_observations is an append-only hypertable with no soft-delete
+        column; corrections are delete + re-record (the audit log preserves
+        the deletion). CS-11.
+        """
+        result = await self._session.execute(
+            text(
+                "DELETE FROM signal_observations WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {"id": observation_id},
+        )
+        await self._session.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    async def delete_observations_by_template(
+        self, *, template_observation_id: UUID
+    ) -> int:
+        """Hard-delete every row in a templated group (lead + siblings all
+        share template_observation_id). Returns the number deleted."""
+        result = await self._session.execute(
+            text(
+                "DELETE FROM signal_observations WHERE template_observation_id = :tid"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": template_observation_id},
+        )
+        await self._session.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
+
     async def list_observations(
         self,
         *,
