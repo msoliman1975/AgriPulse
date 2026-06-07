@@ -8,6 +8,7 @@ import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
 import enWeather from "./locales/en/weather.json";
 import enAdmin from "./locales/en/admin.json";
+import enSignals from "./locales/en/signals.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -15,6 +16,7 @@ import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
 import arWeather from "./locales/ar/weather.json";
 import arAdmin from "./locales/ar/admin.json";
+import arSignals from "./locales/ar/signals.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -35,6 +37,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           indices: enIndices,
           weather: enWeather,
           admin: enAdmin,
+          signals: enSignals,
         },
         ar: {
           common: arCommon,
@@ -44,12 +47,13 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           indices: arIndices,
           weather: arWeather,
           admin: arAdmin,
+          signals: arSignals,
         },
       },
       lng: language,
       fallbackLng: "en",
       defaultNS: "common",
-      ns: ["common", "auth", "farms", "imagery", "indices", "weather", "admin"],
+      ns: ["common", "auth", "farms", "imagery", "indices", "weather", "admin", "signals"],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },
     });
