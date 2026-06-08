@@ -145,7 +145,6 @@ export function QuickAddDialog({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ap-muted">{t("quickAdd.type")}</span>
           <select
-            autoFocus
             className="rounded-md border border-ap-line bg-white px-2 py-1.5"
             value={activityType}
             onChange={(e) => setActivityType(e.target.value as ActivityType)}

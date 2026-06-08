@@ -52,9 +52,7 @@ def _minimal_tree_yaml(code: str) -> str:
     )
 
 
-async def _insert_platform_tree_via_sql(
-    admin_session: AsyncSession, *, code: str
-) -> None:
+async def _insert_platform_tree_via_sql(admin_session: AsyncSession, *, code: str) -> None:
     """Insert a platform tree (tenant_id NULL) directly via SQL — bypasses
     the authoring service which would stamp tenant_id from its caller."""
     await admin_session.execute(
@@ -84,9 +82,7 @@ async def test_tenant_a_tree_not_visible_to_tenant_b(
         contact_email="ops@pra-b.test",
     )
 
-    svc_a = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant_a.tenant_id
-    )
+    svc_a = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_a.tenant_id)
     code = "pra_tenant_a_only"
     await svc_a.create_tree(
         code=code,
@@ -97,20 +93,14 @@ async def test_tenant_a_tree_not_visible_to_tenant_b(
 
     # Tenant A sees their own tree in the authoring list.
     a_trees = await svc_a.list_trees()
-    assert any(t["code"] == code for t in a_trees), (
-        "tenant A should see their own tree"
-    )
+    assert any(t["code"] == code for t in a_trees), "tenant A should see their own tree"
     a_row = next(t for t in a_trees if t["code"] == code)
     assert a_row["tenant_id"] == tenant_a.tenant_id
 
     # Tenant B does not see it in their authoring list, nor by lookup.
-    svc_b = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant_b.tenant_id
-    )
+    svc_b = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_b.tenant_id)
     b_trees = await svc_b.list_trees()
-    assert all(t["code"] != code for t in b_trees), (
-        "tenant B must not see tenant A's tree"
-    )
+    assert all(t["code"] != code for t in b_trees), "tenant B must not see tenant A's tree"
     assert await svc_b.get_tree_detail(code=code) is None
 
 
@@ -132,12 +122,8 @@ async def test_platform_tree_visible_to_every_tenant(
     platform_code = f"pra_platform_{uuid4().hex[:8]}"
     await _insert_platform_tree_via_sql(admin_session, code=platform_code)
 
-    svc_a = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant_a.tenant_id
-    )
-    svc_b = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant_b.tenant_id
-    )
+    svc_a = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_a.tenant_id)
+    svc_b = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_b.tenant_id)
     a_listing = await svc_a.list_trees()
     b_listing = await svc_b.list_trees()
     assert any(t["code"] == platform_code and t["tenant_id"] is None for t in a_listing)
@@ -161,9 +147,7 @@ async def test_tenant_cannot_shadow_platform_code(
     platform_code = f"pra_shadowed_{uuid4().hex[:8]}"
     await _insert_platform_tree_via_sql(admin_session, code=platform_code)
 
-    svc = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant.tenant_id
-    )
+    svc = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant.tenant_id)
     with pytest.raises(_DecisionTreeCodeAlreadyExistsError):
         await svc.create_tree(
             code=platform_code,
@@ -193,9 +177,7 @@ async def test_evaluator_listing_includes_platform_and_own_only(
     )
 
     # Tenant A authors a tree and publishes v1.
-    svc_a = DecisionTreesAuthorService(
-        public_session=admin_session, tenant_id=tenant_a.tenant_id
-    )
+    svc_a = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_a.tenant_id)
     a_code = f"pra_eval_a_{uuid4().hex[:8]}"
     await svc_a.create_tree(
         code=a_code,
@@ -237,14 +219,10 @@ async def test_evaluator_listing_includes_platform_and_own_only(
     )
     await admin_session.commit()
 
-    repo = RecommendationsRepository(
-        tenant_session=admin_session, public_session=admin_session
-    )
+    repo = RecommendationsRepository(tenant_session=admin_session, public_session=admin_session)
     visible_to_b = await repo.list_active_trees_with_current_version(
         visible_to_tenant_id=tenant_b.tenant_id
     )
     codes = {t["tree_code"] for t in visible_to_b}
     assert platform_code in codes, "tenant B must see platform trees"
-    assert a_code not in codes, (
-        "tenant B must NOT see tenant A's trees in the evaluator listing"
-    )
+    assert a_code not in codes, "tenant B must NOT see tenant A's trees in the evaluator listing"

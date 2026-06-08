@@ -243,18 +243,14 @@ async def schedule_recommendation(
             InvalidRecommendationTransitionError,
         )
 
-        raise InvalidRecommendationTransitionError(
-            current_state=rec["state"], action="schedule"
-        )
+        raise InvalidRecommendationTransitionError(current_state=rec["state"], action="schedule")
 
     activity_type = payload.activity_type or _ACTION_TO_ACTIVITY.get(
         rec["action_type"], "observation"
     )
     block_id = payload.block_id or rec["block_id"]
     scheduled_date = (
-        payload.scheduled_date.date()
-        if payload.scheduled_date is not None
-        else date_type.today()
+        payload.scheduled_date.date() if payload.scheduled_date is not None else date_type.today()
     )
 
     # Local import — plans.service depends on plans.models which references
@@ -624,9 +620,7 @@ async def get_tree_parameter_overrides(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     assert context.tenant_id is not None
-    result = await service.list_tree_param_overrides(
-        code=code, tenant_id=context.tenant_id
-    )
+    result = await service.list_tree_param_overrides(code=code, tenant_id=context.tenant_id)
     if not result.get("found"):
         mapped = _map_authoring_error(_DecisionTreeNotFoundError(code))
         assert mapped is not None

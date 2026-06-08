@@ -116,9 +116,7 @@ async def _run_recommendations_sweep_one_block(
     async with factory() as session, session.begin():
         await session.execute(text(f'SET LOCAL search_path TO "{schema_name}", public'))
         async with factory() as public_session:
-            svc = get_recommendations_service(
-                tenant_session=session, public_session=public_session
-            )
+            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             await svc.evaluate_block(
                 block_id=block_id,
                 actor_user_id=None,
@@ -142,28 +140,26 @@ async def test_severe_ndvi_drop_opens_critical_alert_via_tree(
         admin_session, tenant.schema_name, deviation=Decimal("-2.0")
     )
 
-    await _run_recommendations_sweep_one_block(
-        tenant.schema_name, tenant.tenant_id, block_id
-    )
+    await _run_recommendations_sweep_one_block(tenant.schema_name, tenant.tenant_id, block_id)
 
     # Tree-sourced alert lands in tenant.alerts with a synthesised
     # rule_code per PR-E's convention.
     rows = (
-        await admin_session.execute(
-            text(
-                f'SELECT rule_code, severity, status FROM "{tenant.schema_name}".alerts '
-                "WHERE block_id = :bid ORDER BY created_at DESC"
-            ),
-            {"bid": block_id},
+        (
+            await admin_session.execute(
+                text(
+                    f'SELECT rule_code, severity, status FROM "{tenant.schema_name}".alerts '
+                    "WHERE block_id = :bid ORDER BY created_at DESC"
+                ),
+                {"bid": block_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     assert len(rows) >= 1, "expected the tree to open one alert for the block"
     critical = next(
-        (
-            r
-            for r in rows
-            if r["rule_code"].startswith("tree:ndvi_baseline_alert_v1:")
-        ),
+        (r for r in rows if r["rule_code"].startswith("tree:ndvi_baseline_alert_v1:")),
         None,
     )
     assert critical is not None, f"no tree-sourced alert; got: {[dict(r) for r in rows]}"
@@ -187,25 +183,23 @@ async def test_moderate_ndvi_drop_opens_warning_alert_via_tree(
         admin_session, tenant.schema_name, deviation=Decimal("-1.0")
     )
 
-    await _run_recommendations_sweep_one_block(
-        tenant.schema_name, tenant.tenant_id, block_id
-    )
+    await _run_recommendations_sweep_one_block(tenant.schema_name, tenant.tenant_id, block_id)
 
     rows = (
-        await admin_session.execute(
-            text(
-                f'SELECT rule_code, severity FROM "{tenant.schema_name}".alerts '
-                "WHERE block_id = :bid ORDER BY created_at DESC"
-            ),
-            {"bid": block_id},
-        )
-    ).mappings().all()
-    warning = next(
         (
-            r
-            for r in rows
-            if r["rule_code"].endswith(":leaf_alert_warning")
-        ),
+            await admin_session.execute(
+                text(
+                    f'SELECT rule_code, severity FROM "{tenant.schema_name}".alerts '
+                    "WHERE block_id = :bid ORDER BY created_at DESC"
+                ),
+                {"bid": block_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    warning = next(
+        (r for r in rows if r["rule_code"].endswith(":leaf_alert_warning")),
         None,
     )
     assert warning is not None, f"no warning alert; got: {[dict(r) for r in rows]}"
@@ -253,23 +247,23 @@ async def test_tenant_param_override_changes_threshold(
     )
     await admin_session.commit()
 
-    await _run_recommendations_sweep_one_block(
-        tenant.schema_name, tenant.tenant_id, block_id
-    )
+    await _run_recommendations_sweep_one_block(tenant.schema_name, tenant.tenant_id, block_id)
 
     rows = (
-        await admin_session.execute(
-            text(
-                f'SELECT rule_code, severity FROM "{tenant.schema_name}".alerts '
-                "WHERE block_id = :bid"
-            ),
-            {"bid": block_id},
+        (
+            await admin_session.execute(
+                text(
+                    f'SELECT rule_code, severity FROM "{tenant.schema_name}".alerts '
+                    "WHERE block_id = :bid"
+                ),
+                {"bid": block_id},
+            )
         )
-    ).mappings().all()
-    critical = next(
-        (r for r in rows if r["rule_code"].endswith(":leaf_alert_critical")), None
+        .mappings()
+        .all()
     )
-    assert critical is not None, (
-        f"override should have triggered a critical alert; got: {[dict(r) for r in rows]}"
-    )
+    critical = next((r for r in rows if r["rule_code"].endswith(":leaf_alert_critical")), None)
+    assert (
+        critical is not None
+    ), f"override should have triggered a critical alert; got: {[dict(r) for r in rows]}"
     assert critical["severity"] == "critical"

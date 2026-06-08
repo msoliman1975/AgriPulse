@@ -200,14 +200,17 @@ class ConditionContext:
         indices: dict[str, IndicesEntry] = {}
         for code, row in latest_index_aggregates.items():
             indices[code] = IndicesEntry(
-                time=row.get("time"),  # type: ignore[arg-type]
+                # ``time`` is always present on an aggregate row (required on
+                # IndicesEntry); index access keeps the type as Any rather than
+                # Optional, so it satisfies the datetime field.
+                time=row["time"],
                 mean=_to_decimal(row.get("mean")),
                 baseline_deviation=_to_decimal(row.get("baseline_deviation")),
                 # Trend features (KB P2) — the service merges these into the
                 # row from the recent aggregate history; absent → None.
                 slope=_to_decimal(row.get("slope")),
                 delta=_to_decimal(row.get("delta")),
-                trend_direction=row.get("trend_direction"),  # type: ignore[arg-type]
+                trend_direction=row.get("trend_direction"),
             )
         return cls(
             block_id=block_id,

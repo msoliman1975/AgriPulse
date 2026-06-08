@@ -105,9 +105,7 @@ async def _create_user(session: AsyncSession, *, tenant_id: UUID, user_id: UUID)
 
 async def _bootstrap(admin_session: AsyncSession, slug: str):
     tenancy = get_tenant_service(admin_session)
-    tenant = await tenancy.create_tenant(
-        slug=slug, name=slug, contact_email=f"ops@{slug}.test"
-    )
+    tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"ops@{slug}.test")
     user_id = uuid4()
     await _create_user(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
     context = make_context(
@@ -139,16 +137,12 @@ async def test_feature_flag_off_returns_404(
 
     _, context = await _bootstrap(admin_session, "cfg-off")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
         )
-        resp = await c.get(
-            f"/api/v1/farms/{farm.json()['id']}/config/subscriptions/template"
-        )
+        resp = await c.get(f"/api/v1/farms/{farm.json()['id']}/config/subscriptions/template")
     assert resp.status_code == 404
 
 
@@ -156,9 +150,7 @@ async def test_feature_flag_off_returns_404(
 async def test_template_crud_round_trip(admin_session: AsyncSession) -> None:
     _, context = await _bootstrap(admin_session, "cfg-crud")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -166,9 +158,7 @@ async def test_template_crud_round_trip(admin_session: AsyncSession) -> None:
         farm_id = farm.json()["id"]
 
         # Initially empty.
-        initial = await c.get(
-            f"/api/v1/farms/{farm_id}/config/subscriptions/template"
-        )
+        initial = await c.get(f"/api/v1/farms/{farm_id}/config/subscriptions/template")
         assert initial.status_code == 200
         assert initial.json() == {"imagery": [], "weather": []}
 
@@ -215,9 +205,7 @@ async def test_replace_rejects_duplicate_keys(
 ) -> None:
     _, context = await _bootstrap(admin_session, "cfg-dup")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -257,9 +245,7 @@ async def test_apply_preview_three_diff_shapes(
     product_a = str(uuid4())
     product_b = str(uuid4())
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -310,8 +296,7 @@ async def test_apply_preview_three_diff_shapes(
         )
         await admin_session.execute(
             text(
-                "UPDATE imagery_aoi_subscriptions "
-                "SET cadence_hours = 6 WHERE block_id = :bid"
+                "UPDATE imagery_aoi_subscriptions " "SET cadence_hours = 6 WHERE block_id = :bid"
             ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
             {"bid": UUID(ids[0])},
         )
@@ -356,9 +341,7 @@ async def test_selective_apply_only_touches_passed_ids(
     app = build_app(context, with_config=True)
     product_a = str(uuid4())
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -407,8 +390,7 @@ async def test_selective_apply_only_touches_passed_ids(
         rows = (
             await admin_session.execute(
                 text(
-                    "SELECT COUNT(*) AS n FROM imagery_aoi_subscriptions "
-                    "WHERE block_id = :bid"
+                    "SELECT COUNT(*) AS n FROM imagery_aoi_subscriptions " "WHERE block_id = :bid"
                 ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
                 {"bid": UUID(ids[1])},
             )
@@ -425,9 +407,7 @@ async def test_apply_is_idempotent_when_block_already_matches(
     app = build_app(context, with_config=True)
     product_a = str(uuid4())
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},

@@ -45,9 +45,7 @@ def _ctx(deviation: Decimal) -> ConditionContext:
     )
 
 
-def _yaml_with_kind(
-    *, kind: str, severity: str | None = None, leaf_id: str = "fired"
-) -> dict:
+def _yaml_with_kind(*, kind: str, severity: str | None = None, leaf_id: str = "fired") -> dict:
     outcome: dict = {
         "kind": kind,
         "action_type": "scout" if kind == "recommendation" else "inspect",

@@ -12,7 +12,6 @@ Drives the drag-rec-to-cell flow end-to-end:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -124,7 +123,7 @@ async def _seed_open_recommendation(
 
 
 # Late import to avoid circular import at module load.
-from app.shared.db.session import AsyncSessionLocal  # noqa: E402  # pragma: no cover
+from app.shared.db.session import AsyncSessionLocal  # pragma: no cover
 
 
 @pytest.mark.asyncio
@@ -189,11 +188,7 @@ async def test_schedule_rejects_already_applied(
     )
     app = _build_app(context)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        first = await client.post(
-            f"/api/v1/recommendations/{rec_id}/schedule", json={}
-        )
+        first = await client.post(f"/api/v1/recommendations/{rec_id}/schedule", json={})
         assert first.status_code == 201
-        second = await client.post(
-            f"/api/v1/recommendations/{rec_id}/schedule", json={}
-        )
+        second = await client.post(f"/api/v1/recommendations/{rec_id}/schedule", json={})
         assert second.status_code == 409, second.text

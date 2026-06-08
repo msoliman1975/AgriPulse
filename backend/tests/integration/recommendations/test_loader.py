@@ -42,13 +42,7 @@ def _minimal_leaf_spec(**extra: object) -> dict[str, object]:
 
 
 def _seeds_dir() -> Path:
-    return (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "modules"
-        / "recommendations"
-        / "seeds"
-    )
+    return Path(__file__).resolve().parents[3] / "app" / "modules" / "recommendations" / "seeds"
 
 
 def test_seed_yaml_compiles() -> None:

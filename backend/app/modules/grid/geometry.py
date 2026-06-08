@@ -174,5 +174,3 @@ def generate_cells(
                 geom_wkt=clipped.wkt,
                 area_m2=float(clipped.area),
             )
-
-

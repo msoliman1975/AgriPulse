@@ -105,7 +105,7 @@ export function parseConditionTree(raw: unknown): EditableCondition {
   // Boolean group?
   if ("all_of" in raw || "any_of" in raw) {
     const mode: GroupMode = "all_of" in raw ? "all" : "any";
-    const children = (mode === "all" ? raw.all_of : raw.any_of) as unknown;
+    const children = (mode === "all" ? raw.all_of : raw.any_of);
     if (!Array.isArray(children)) {
       return {
         kind: "unsupported",

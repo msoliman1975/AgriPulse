@@ -120,14 +120,10 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
 # permissive coercion: the engine just stores values; the YAML loader
 # checks the *default* fits the declared type so a buggy YAML surfaces
 # at startup, not during evaluation.
-_PARAM_TYPES: frozenset[str] = frozenset(
-    {"number", "integer", "boolean", "string", "enum"}
-)
+_PARAM_TYPES: frozenset[str] = frozenset({"number", "integer", "boolean", "string", "enum"})
 
 
-def _validate_parameters_block(
-    spec: dict[str, Any], source_path: str
-) -> dict[str, dict[str, Any]]:
+def _validate_parameters_block(spec: dict[str, Any], source_path: str) -> dict[str, dict[str, Any]]:
     """Strict-parse the optional ``parameters:`` block.
 
     Each entry must have a ``type`` and a ``default``. ``enum`` types
@@ -139,9 +135,7 @@ def _validate_parameters_block(
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise DecisionTreeParseError(
-            path=source_path, detail="'parameters' must be a mapping"
-        )
+        raise DecisionTreeParseError(path=source_path, detail="'parameters' must be a mapping")
 
     normalized: dict[str, dict[str, Any]] = {}
     for name, decl in raw.items():
@@ -203,9 +197,7 @@ def _validate_parameters_block(
 
 # Evidence-quality grade — how strong the *science* is (distinct from a
 # leaf's result `confidence`, which is firing probability).
-_EVIDENCE_CONFIDENCE: frozenset[str] = frozenset(
-    {"very_high", "high", "medium", "low"}
-)
+_EVIDENCE_CONFIDENCE: frozenset[str] = frozenset({"very_high", "high", "medium", "low"})
 
 # Authoritative source categories the research task accepts.
 _CITATION_SOURCE_TYPES: frozenset[str] = frozenset(
@@ -226,14 +218,10 @@ _TRANSFERABILITY_GRADES: frozenset[str] = frozenset(
     {"very_high", "high", "medium", "low", "not_applicable"}
 )
 # The three regions the research task scores every finding against.
-_TRANSFERABILITY_REGIONS: frozenset[str] = frozenset(
-    {"egypt", "middle_east", "global"}
-)
+_TRANSFERABILITY_REGIONS: frozenset[str] = frozenset({"egypt", "middle_east", "global"})
 
 
-def _validate_evidence_block(
-    spec: dict[str, Any], source_path: str
-) -> dict[str, Any] | None:
+def _validate_evidence_block(spec: dict[str, Any], source_path: str) -> dict[str, Any] | None:
     """Strict-parse the optional ``evidence:`` block.
 
     Shape::
@@ -254,9 +242,7 @@ def _validate_evidence_block(
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        raise DecisionTreeParseError(
-            path=source_path, detail="'evidence' must be a mapping"
-        )
+        raise DecisionTreeParseError(path=source_path, detail="'evidence' must be a mapping")
 
     confidence = raw.get("confidence")
     if confidence not in _EVIDENCE_CONFIDENCE:
@@ -270,9 +256,7 @@ def _validate_evidence_block(
 
     notes = raw.get("notes")
     if notes is not None and not isinstance(notes, str):
-        raise DecisionTreeParseError(
-            path=source_path, detail="evidence 'notes' must be a string"
-        )
+        raise DecisionTreeParseError(path=source_path, detail="evidence 'notes' must be a string")
 
     citations_raw = raw.get("citations")
     citations: list[dict[str, Any]] = []
@@ -348,9 +332,7 @@ def _validate_transferability_block(
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        raise DecisionTreeParseError(
-            path=source_path, detail="'transferability' must be a mapping"
-        )
+        raise DecisionTreeParseError(path=source_path, detail="'transferability' must be a mapping")
 
     normalized: dict[str, Any] = {region: None for region in sorted(_TRANSFERABILITY_REGIONS)}
     for region, grade in raw.items():
@@ -490,14 +472,10 @@ def _validate_reachability(
 # its guidance into these time horizons; each holds an ordered list of
 # localized action items. Optional — leaves without it keep their single
 # ``text_en`` summary as the only guidance.
-_ACTION_HORIZONS: frozenset[str] = frozenset(
-    {"immediate", "short_term", "long_term", "monitoring"}
-)
+_ACTION_HORIZONS: frozenset[str] = frozenset({"immediate", "short_term", "long_term", "monitoring"})
 
 
-def _validate_outcome_actions(
-    outcome: dict[str, Any], nid: str, source_path: str
-) -> None:
+def _validate_outcome_actions(outcome: dict[str, Any], nid: str, source_path: str) -> None:
     """Strict-parse a leaf outcome's optional ``actions:`` block.
 
     Shape::
@@ -545,18 +523,14 @@ def _validate_outcome_actions(
                 raise DecisionTreeParseError(
                     path=source_path,
                     detail=(
-                        f"leaf {nid!r} actions[{horizon}][{i}] requires a "
-                        "non-empty 'text_en'"
+                        f"leaf {nid!r} actions[{horizon}][{i}] requires a " "non-empty 'text_en'"
                     ),
                 )
             text_ar = item.get("text_ar")
             if text_ar is not None and not isinstance(text_ar, str):
                 raise DecisionTreeParseError(
                     path=source_path,
-                    detail=(
-                        f"leaf {nid!r} actions[{horizon}][{i}] 'text_ar' must "
-                        "be a string"
-                    ),
+                    detail=(f"leaf {nid!r} actions[{horizon}][{i}] 'text_ar' must " "be a string"),
                 )
 
 

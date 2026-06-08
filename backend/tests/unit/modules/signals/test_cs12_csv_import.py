@@ -54,7 +54,14 @@ def test_parses_free_point_location() -> None:
 
 def test_invalid_location_mode_errors() -> None:
     res = parse_csv(
-        _csv(_row(signal_code="x", observed_at="2026-06-01T10:00:00+00:00", value_numeric="1", location_mode="bogus"))
+        _csv(
+            _row(
+                signal_code="x",
+                observed_at="2026-06-01T10:00:00+00:00",
+                value_numeric="1",
+                location_mode="bogus",
+            )
+        )
     )
     assert any(e.field == "location_mode" for e in res.errors)
 
@@ -92,21 +99,42 @@ def test_lat_without_lon_errors() -> None:
 
 def test_point_in_entity_requires_coords() -> None:
     res = parse_csv(
-        _csv(_row(signal_code="x", observed_at="2026-06-01T10:00:00+00:00", value_numeric="1", location_mode="point_in_entity"))
+        _csv(
+            _row(
+                signal_code="x",
+                observed_at="2026-06-01T10:00:00+00:00",
+                value_numeric="1",
+                location_mode="point_in_entity",
+            )
+        )
     )
     assert any(e.field == "location_mode" for e in res.errors)
 
 
 def test_template_code_requires_position() -> None:
     res = parse_csv(
-        _csv(_row(signal_code="x", observed_at="2026-06-01T10:00:00+00:00", value_numeric="1", template_code="soiltest"))
+        _csv(
+            _row(
+                signal_code="x",
+                observed_at="2026-06-01T10:00:00+00:00",
+                value_numeric="1",
+                template_code="soiltest",
+            )
+        )
     )
     assert any(e.field == "template_member_position" for e in res.errors)
 
 
 def test_position_requires_template_code() -> None:
     res = parse_csv(
-        _csv(_row(signal_code="x", observed_at="2026-06-01T10:00:00+00:00", value_numeric="1", template_member_position="0"))
+        _csv(
+            _row(
+                signal_code="x",
+                observed_at="2026-06-01T10:00:00+00:00",
+                value_numeric="1",
+                template_member_position="0",
+            )
+        )
     )
     assert any(e.field == "template_code" for e in res.errors)
 
@@ -123,7 +151,9 @@ def test_max_rows_param_enforced() -> None:
 def test_group_rows_splits_flat_and_templated() -> None:
     res = parse_csv(
         _csv(
-            _row(signal_code="standalone", observed_at="2026-06-01T10:00:00+00:00", value_numeric="9"),
+            _row(
+                signal_code="standalone", observed_at="2026-06-01T10:00:00+00:00", value_numeric="9"
+            ),
             _row(
                 signal_code="ph",
                 observed_at="2026-06-02T08:00:00+00:00",
@@ -153,8 +183,20 @@ def test_group_rows_splits_flat_and_templated() -> None:
 def test_group_rows_flags_duplicate_member_position() -> None:
     res = parse_csv(
         _csv(
-            _row(signal_code="a", observed_at="2026-06-02T08:00:00+00:00", value_numeric="1", template_code="t", template_member_position="0"),
-            _row(signal_code="b", observed_at="2026-06-02T08:00:00+00:00", value_numeric="2", template_code="t", template_member_position="0"),
+            _row(
+                signal_code="a",
+                observed_at="2026-06-02T08:00:00+00:00",
+                value_numeric="1",
+                template_code="t",
+                template_member_position="0",
+            ),
+            _row(
+                signal_code="b",
+                observed_at="2026-06-02T08:00:00+00:00",
+                value_numeric="2",
+                template_code="t",
+                template_member_position="0",
+            ),
         )
     )
     _flat, _groups, errors = group_rows(res.rows)
@@ -164,8 +206,20 @@ def test_group_rows_flags_duplicate_member_position() -> None:
 def test_group_rows_distinct_observed_at_are_separate_groups() -> None:
     res = parse_csv(
         _csv(
-            _row(signal_code="a", observed_at="2026-06-02T08:00:00+00:00", value_numeric="1", template_code="t", template_member_position="0"),
-            _row(signal_code="a", observed_at="2026-06-03T08:00:00+00:00", value_numeric="2", template_code="t", template_member_position="0"),
+            _row(
+                signal_code="a",
+                observed_at="2026-06-02T08:00:00+00:00",
+                value_numeric="1",
+                template_code="t",
+                template_member_position="0",
+            ),
+            _row(
+                signal_code="a",
+                observed_at="2026-06-03T08:00:00+00:00",
+                value_numeric="2",
+                template_code="t",
+                template_member_position="0",
+            ),
         )
     )
     _flat, groups, _errors = group_rows(res.rows)
@@ -222,10 +276,20 @@ def _impl_with_repo() -> SignalsServiceImpl:
 async def test_templated_csv_routes_group_to_template_observation() -> None:
     impl = _impl_with_repo()
     body = _csv(
-        _row(signal_code="ph", observed_at="2026-06-02T08:00:00+00:00", value_numeric="6.5",
-             template_code="soiltest", template_member_position="0"),
-        _row(signal_code="moisture", observed_at="2026-06-02T08:00:00+00:00", value_numeric="40",
-             template_code="soiltest", template_member_position="1"),
+        _row(
+            signal_code="ph",
+            observed_at="2026-06-02T08:00:00+00:00",
+            value_numeric="6.5",
+            template_code="soiltest",
+            template_member_position="0",
+        ),
+        _row(
+            signal_code="moisture",
+            observed_at="2026-06-02T08:00:00+00:00",
+            value_numeric="40",
+            template_code="soiltest",
+            template_member_position="1",
+        ),
     )
     out = await impl.import_observations_csv(
         farm_id=uuid4(),
@@ -248,14 +312,22 @@ async def test_templated_csv_rejects_non_member_signal() -> None:
 
     impl = _impl_with_repo()
     # 'moisture' resolves but is dropped from the template's member set.
-    impl._repo.get_template_members = AsyncMock(
-        return_value=({"signal_definition_id": _PH_ID},)
-    )
+    impl._repo.get_template_members = AsyncMock(return_value=({"signal_definition_id": _PH_ID},))
     body = _csv(
-        _row(signal_code="ph", observed_at="2026-06-02T08:00:00+00:00", value_numeric="6.5",
-             template_code="soiltest", template_member_position="0"),
-        _row(signal_code="moisture", observed_at="2026-06-02T08:00:00+00:00", value_numeric="40",
-             template_code="soiltest", template_member_position="1"),
+        _row(
+            signal_code="ph",
+            observed_at="2026-06-02T08:00:00+00:00",
+            value_numeric="6.5",
+            template_code="soiltest",
+            template_member_position="0",
+        ),
+        _row(
+            signal_code="moisture",
+            observed_at="2026-06-02T08:00:00+00:00",
+            value_numeric="40",
+            template_code="soiltest",
+            template_member_position="1",
+        ),
     )
     with pytest.raises(CsvImportFailedError) as exc:
         await impl.import_observations_csv(

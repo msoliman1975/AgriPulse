@@ -118,8 +118,7 @@ class RecommendationsRepository:
             stmt = stmt.where(DecisionTree.tenant_id.is_(None))
         elif include_platform:
             stmt = stmt.where(
-                (DecisionTree.tenant_id.is_(None))
-                | (DecisionTree.tenant_id == scope_tenant_id)
+                (DecisionTree.tenant_id.is_(None)) | (DecisionTree.tenant_id == scope_tenant_id)
             )
         else:
             stmt = stmt.where(DecisionTree.tenant_id == scope_tenant_id)
@@ -163,9 +162,7 @@ class RecommendationsRepository:
 
     # ---- Decision-tree authoring (PlatformAdmin) ----------------------
 
-    async def list_all_trees(
-        self, *, visible_to_tenant_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_all_trees(self, *, visible_to_tenant_id: UUID) -> tuple[dict[str, Any], ...]:
         """Every non-deleted tree visible to the given tenant + the
         version number of its current published version (if any).
         Drives the authoring tree list.
@@ -430,8 +427,7 @@ class RecommendationsRepository:
         row = (
             await self._public.execute(
                 text(
-                    "SELECT id FROM public.tenants "
-                    "WHERE schema_name = :s AND deleted_at IS NULL"
+                    "SELECT id FROM public.tenants " "WHERE schema_name = :s AND deleted_at IS NULL"
                 ),
                 {"s": schema_name},
             )
@@ -465,8 +461,7 @@ class RecommendationsRepository:
         rows = (
             await self._tenant.execute(
                 text(
-                    "SELECT param_name, value FROM tree_parameter_overrides "
-                    "WHERE tree_id = :tid"
+                    "SELECT param_name, value FROM tree_parameter_overrides " "WHERE tree_id = :tid"
                 ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
                 {"tid": tree_id},
             )
@@ -489,9 +484,7 @@ class RecommendationsRepository:
                     "SELECT tree_id, param_name, value "
                     "FROM tree_parameter_overrides "
                     "WHERE tree_id = ANY(:tids)"
-                ).bindparams(
-                    bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))
-                ),
+                ).bindparams(bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))),
                 {"tids": list(tree_ids)},
             )
         ).all()
@@ -537,8 +530,7 @@ class RecommendationsRepository:
         """Remove one override. Returns True if a row was deleted."""
         result = await self._tenant.execute(
             text(
-                "DELETE FROM tree_parameter_overrides "
-                "WHERE tree_id = :tid AND param_name = :n"
+                "DELETE FROM tree_parameter_overrides " "WHERE tree_id = :tid AND param_name = :n"
             ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
             {"tid": tree_id, "n": param_name},
         )

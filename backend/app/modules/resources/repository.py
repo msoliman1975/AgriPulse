@@ -149,9 +149,7 @@ class ResourcesRepository:
         await self._session.flush()
         return True
 
-    async def list_for_activity(
-        self, *, activity_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_for_activity(self, *, activity_id: UUID) -> tuple[dict[str, Any], ...]:
         stmt = (
             select(Resource)
             .join(ActivityResource, ActivityResource.resource_id == Resource.id)

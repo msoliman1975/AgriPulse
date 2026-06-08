@@ -43,9 +43,7 @@ def _build_app(context) -> FastAPI:  # type: ignore[no-untyped-def]
     return app
 
 
-async def _bootstrap(
-    admin_session: AsyncSession, slug: str
-) -> tuple[object, object, str, str]:
+async def _bootstrap(admin_session: AsyncSession, slug: str) -> tuple[object, object, str, str]:
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
         slug=slug,
@@ -117,9 +115,7 @@ async def test_worker_crud_round_trip(admin_session: AsyncSession) -> None:
         assert single.json()["name"] == "Ahmed Hassan"
 
         # List filters by kind
-        workers = await client.get(
-            f"/api/v1/farms/{farm_id}/resources", params={"kind": "worker"}
-        )
+        workers = await client.get(f"/api/v1/farms/{farm_id}/resources", params={"kind": "worker"})
         assert workers.status_code == 200
         assert len(workers.json()) == 1
         equipment = await client.get(
@@ -246,16 +242,12 @@ async def test_archive_restore_round_trip(admin_session: AsyncSession) -> None:
         ).json()
         resource_id = created["id"]
 
-        archived = await client.patch(
-            f"/api/v1/resources/{resource_id}", json={"archive": True}
-        )
+        archived = await client.patch(f"/api/v1/resources/{resource_id}", json={"archive": True})
         assert archived.status_code == 200, archived.text
         assert archived.json()["archived_at"] is not None
 
         # Default list hides archived
-        active = (
-            await client.get(f"/api/v1/farms/{farm_id}/resources")
-        ).json()
+        active = (await client.get(f"/api/v1/farms/{farm_id}/resources")).json()
         assert active == []
 
         # include_archived brings it back
@@ -268,9 +260,7 @@ async def test_archive_restore_round_trip(admin_session: AsyncSession) -> None:
         assert any(r["id"] == resource_id for r in with_archived)
 
         # Restore
-        restored = await client.patch(
-            f"/api/v1/resources/{resource_id}", json={"archive": False}
-        )
+        restored = await client.patch(f"/api/v1/resources/{resource_id}", json={"archive": False})
         assert restored.status_code == 200
         assert restored.json()["archived_at"] is None
 
@@ -324,25 +314,17 @@ async def test_attach_and_detach_resource_to_activity(
         ).json()
 
         # Attach both
-        a1 = await client.post(
-            f"/api/v1/activities/{activity_id}/resources/{worker['id']}"
-        )
+        a1 = await client.post(f"/api/v1/activities/{activity_id}/resources/{worker['id']}")
         assert a1.status_code == 201, a1.text
-        a2 = await client.post(
-            f"/api/v1/activities/{activity_id}/resources/{tractor['id']}"
-        )
+        a2 = await client.post(f"/api/v1/activities/{activity_id}/resources/{tractor['id']}")
         assert a2.status_code == 201, a2.text
 
         # Re-attach is idempotent (no 409)
-        a3 = await client.post(
-            f"/api/v1/activities/{activity_id}/resources/{worker['id']}"
-        )
+        a3 = await client.post(f"/api/v1/activities/{activity_id}/resources/{worker['id']}")
         assert a3.status_code == 201
 
         # Detach one
-        d1 = await client.delete(
-            f"/api/v1/activities/{activity_id}/resources/{worker['id']}"
-        )
+        d1 = await client.delete(f"/api/v1/activities/{activity_id}/resources/{worker['id']}")
         assert d1.status_code == 204
 
 
@@ -376,10 +358,6 @@ async def test_attach_archived_resource_rejected(
                 json={"kind": "worker", "name": "Mona", "role": "scout"},
             )
         ).json()
-        await client.patch(
-            f"/api/v1/resources/{worker['id']}", json={"archive": True}
-        )
-        bad = await client.post(
-            f"/api/v1/activities/{activity['id']}/resources/{worker['id']}"
-        )
+        await client.patch(f"/api/v1/resources/{worker['id']}", json={"archive": True})
+        bad = await client.post(f"/api/v1/activities/{activity['id']}/resources/{worker['id']}")
         assert bad.status_code == 422, bad.text

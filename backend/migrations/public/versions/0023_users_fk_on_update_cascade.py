@@ -42,7 +42,12 @@ depends_on: str | Sequence[str] | None = None
 _FKS: tuple[tuple[str, str, str, str], ...] = (
     ("tenant_memberships", "user_id", "tenant_memberships_user_id_fkey", "CASCADE"),
     ("tenant_memberships", "invited_by", "tenant_memberships_invited_by_fkey", "SET NULL"),
-    ("tenant_role_assignments", "granted_by", "tenant_role_assignments_granted_by_fkey", "SET NULL"),
+    (
+        "tenant_role_assignments",
+        "granted_by",
+        "tenant_role_assignments_granted_by_fkey",
+        "SET NULL",
+    ),
     ("platform_role_assignments", "user_id", "platform_role_assignments_user_id_fkey", "CASCADE"),
     (
         "platform_role_assignments",
@@ -59,7 +64,7 @@ def upgrade() -> None:
     for table, column, name, on_delete in _FKS:
         op.execute(f'ALTER TABLE public.{table} DROP CONSTRAINT IF EXISTS "{name}"')
         op.execute(
-            f'ALTER TABLE public.{table} '
+            f"ALTER TABLE public.{table} "
             f'ADD CONSTRAINT "{name}" FOREIGN KEY ({column}) '
             f"REFERENCES public.users(id) "
             f"ON UPDATE CASCADE ON DELETE {on_delete}"
@@ -70,7 +75,7 @@ def downgrade() -> None:
     for table, column, name, on_delete in _FKS:
         op.execute(f'ALTER TABLE public.{table} DROP CONSTRAINT IF EXISTS "{name}"')
         op.execute(
-            f'ALTER TABLE public.{table} '
+            f"ALTER TABLE public.{table} "
             f'ADD CONSTRAINT "{name}" FOREIGN KEY ({column}) '
             f"REFERENCES public.users(id) "
             f"ON DELETE {on_delete}"

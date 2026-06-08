@@ -157,7 +157,7 @@ class BulkActivityCreateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    cells: list["BulkCell"] = Field(min_length=1, max_length=200)
+    cells: list[BulkCell] = Field(min_length=1, max_length=200)
     activity_type: ActivityType
     duration_days: int = Field(default=1, ge=1, le=60)
     start_time: time | None = None

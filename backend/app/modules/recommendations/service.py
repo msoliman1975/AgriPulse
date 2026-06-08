@@ -135,9 +135,12 @@ class RecommendationsServiceImpl:
         # trend fields → trend predicates fail closed.
         _merge_index_trends(latest, await self._repo.get_index_trends(block_id=block_id))
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
-        block_crop_id, crop_id, crop_category, growth_stage = (
-            await self._repo.get_block_current_crop(block_id=block_id)
-        )
+        (
+            block_crop_id,
+            crop_id,
+            crop_category,
+            growth_stage,
+        ) = await self._repo.get_block_current_crop(block_id=block_id)
 
         if farm_id is None:
             self._log.info("recommendations_skip_no_farm", block_id=str(block_id))
@@ -1055,9 +1058,7 @@ class DecisionTreesAuthorService:
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
-        _, _, crop_category, growth_stage = await repo.get_block_current_crop(
-            block_id=block_id
-        )
+        _, _, crop_category, growth_stage = await repo.get_block_current_crop(block_id=block_id)
         weather = (
             await load_weather_snapshot(tenant_session, farm_id=farm_id)
             if farm_id is not None
@@ -1184,7 +1185,9 @@ class _ParamValueCoercionError(_DecisionTreeAuthoringError):
         self.detail = detail
 
 
-def _coerce_override_value(value: Any, *, declared: dict[str, Any]) -> Any:  # noqa: PLR0911, PLR0912 - dispatch over declared types
+def _coerce_override_value(  # noqa: PLR0911, PLR0912
+    value: Any, *, declared: dict[str, Any]
+) -> Any:
     """Coerce ``value`` (typically from JSON over HTTP) into the
     parameter's declared type. Throws ``_ParamValueCoercionError``
     when the coercion fails or violates min/max/enum constraints.

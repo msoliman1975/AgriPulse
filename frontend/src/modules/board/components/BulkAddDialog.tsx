@@ -68,7 +68,7 @@ export function BulkAddDialog({
     // Hand the skip-summary to a toast — for V1 we just close; PR-7
     // can wire a toast bus.
     if (result.skipped.length > 0) {
-      // eslint-disable-next-line no-console
+
       console.info(
         `[board] bulk-add skipped ${result.skipped.length}/${cells.length} cells`,
       );
@@ -95,7 +95,6 @@ export function BulkAddDialog({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ap-muted">{t("quickAdd.type")}</span>
           <select
-            autoFocus
             className="rounded-md border border-ap-line bg-white px-2 py-1.5"
             value={activityType}
             onChange={(e) => setActivityType(e.target.value as ActivityType)}

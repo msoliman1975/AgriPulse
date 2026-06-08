@@ -199,10 +199,7 @@ def upgrade() -> None:
     )
     # PostGIS geometry — emitted via raw SQL to match the
     # value_geopoint pattern from migration 0017.
-    op.execute(
-        "ALTER TABLE signal_observations "
-        "ADD COLUMN location_point geometry(Point, 4326)"
-    )
+    op.execute("ALTER TABLE signal_observations " "ADD COLUMN location_point geometry(Point, 4326)")
     op.create_check_constraint(
         "ck_signal_observations_location_mode",
         "signal_observations",

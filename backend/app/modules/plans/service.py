@@ -96,9 +96,7 @@ class PlansService(Protocol):
 
     async def list_activities(self, *, plan_id: UUID) -> tuple[dict[str, Any], ...]: ...
 
-    async def get_activity(
-        self, *, activity_id: UUID
-    ) -> dict[str, Any] | None: ...
+    async def get_activity(self, *, activity_id: UUID) -> dict[str, Any] | None: ...
 
     async def create_flat_activity(
         self,
@@ -487,9 +485,7 @@ class PlansServiceImpl:
             "activities": activities,
         }
 
-    async def get_activity(
-        self, *, activity_id: UUID
-    ) -> dict[str, Any] | None:
+    async def get_activity(self, *, activity_id: UUID) -> dict[str, Any] | None:
         """Fetch a single activity row by id, or None if missing.
 
         Used by adjacent modules (resources, recommendations) to gate

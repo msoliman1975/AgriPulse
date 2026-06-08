@@ -138,9 +138,7 @@ async def _evaluate_via_tree(schema_name: str, tenant_id: UUID, block_id: UUID) 
     async with factory() as session, session.begin():
         await session.execute(text(f'SET LOCAL search_path TO "{schema_name}", public'))
         async with factory() as public_session:
-            svc = get_recommendations_service(
-                tenant_session=session, public_session=public_session
-            )
+            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             await svc.evaluate_block(
                 block_id=block_id,
                 actor_user_id=None,

@@ -8,10 +8,10 @@ painful.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ---------- Template rows ---------------------------------------------------
 
@@ -66,9 +66,9 @@ class ApplyPreviewRequest(BaseModel):
 
 class BlockDiffSchema(BaseModel):
     block_id: UUID
-    will_add: list[dict] = Field(default_factory=list)
-    will_update: list[dict] = Field(default_factory=list)
-    will_deactivate: list[dict] = Field(default_factory=list)
+    will_add: list[dict[str, Any]] = Field(default_factory=list)
+    will_update: list[dict[str, Any]] = Field(default_factory=list)
+    will_deactivate: list[dict[str, Any]] = Field(default_factory=list)
     matches: bool
 
 
@@ -122,8 +122,8 @@ class IrrigationTemplateSchema(BaseModel):
 
 class SimpleBlockDiffSchema(BaseModel):
     block_id: str
-    before: dict
-    after: dict
+    before: dict[str, Any]
+    after: dict[str, Any]
     matches: bool
 
 

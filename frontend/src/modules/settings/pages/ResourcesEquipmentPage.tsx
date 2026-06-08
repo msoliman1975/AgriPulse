@@ -285,7 +285,6 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
     <tr className="border-t border-ap-line bg-ap-bg/30">
       <td className="px-3 py-2">
         <input
-          autoFocus
           className="w-full rounded border border-ap-line px-2 py-1"
           placeholder={t("equipment.namePlaceholder")}
           value={name}

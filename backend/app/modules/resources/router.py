@@ -109,9 +109,7 @@ async def list_resources(
     service: ResourcesServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
-    rows = await service.list(
-        farm_id=farm_id, kind=kind, include_archived=include_archived
-    )
+    rows = await service.list(farm_id=farm_id, kind=kind, include_archived=include_archived)
     return list(rows)
 
 

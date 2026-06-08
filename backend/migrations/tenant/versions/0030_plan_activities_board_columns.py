@@ -105,9 +105,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_plan_activities_recommendation_id", table_name="plan_activities"
-    )
+    op.drop_index("ix_plan_activities_recommendation_id", table_name="plan_activities")
     op.drop_constraint(
         "fk_plan_activities_recommendation_id_recommendations",
         "plan_activities",
@@ -129,9 +127,7 @@ def downgrade() -> None:
     )
     op.alter_column("plan_activities", "plan_id", nullable=False)
 
-    op.drop_index(
-        "ix_plan_activities_farm_id_scheduled_date", table_name="plan_activities"
-    )
+    op.drop_index("ix_plan_activities_farm_id_scheduled_date", table_name="plan_activities")
     op.drop_constraint(
         "fk_plan_activities_farm_id_farms",
         "plan_activities",

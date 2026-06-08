@@ -88,9 +88,7 @@ async def _bootstrap_two_blocks(
 
 @pytest.mark.asyncio
 async def test_flat_activity_create_no_plan(admin_session: AsyncSession) -> None:
-    context, farm_id, b1_id, _b2 = await _bootstrap_two_blocks(
-        admin_session, "bd3-flat"
-    )
+    context, farm_id, b1_id, _b2 = await _bootstrap_two_blocks(admin_session, "bd3-flat")
     app = _build_app(context)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         sd = (date.today() + timedelta(days=3)).isoformat()
@@ -112,9 +110,7 @@ async def test_flat_activity_create_no_plan(admin_session: AsyncSession) -> None
 
 @pytest.mark.asyncio
 async def test_bulk_create_skips_duplicates(admin_session: AsyncSession) -> None:
-    context, farm_id, b1, b2 = await _bootstrap_two_blocks(
-        admin_session, "bd3-bulk"
-    )
+    context, farm_id, b1, b2 = await _bootstrap_two_blocks(admin_session, "bd3-bulk")
     app = _build_app(context)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         sd = (date.today() + timedelta(days=4)).isoformat()
@@ -147,9 +143,7 @@ async def test_bulk_create_skips_duplicates(admin_session: AsyncSession) -> None
 async def test_bulk_skip_false_creates_duplicates(
     admin_session: AsyncSession,
 ) -> None:
-    context, farm_id, b1, _ = await _bootstrap_two_blocks(
-        admin_session, "bd3-bulk-nodedupe"
-    )
+    context, farm_id, b1, _ = await _bootstrap_two_blocks(admin_session, "bd3-bulk-nodedupe")
     app = _build_app(context)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         sd = (date.today() + timedelta(days=2)).isoformat()
@@ -174,9 +168,7 @@ async def test_bulk_skip_false_creates_duplicates(
 async def test_board_includes_blocks_and_activities_with_resources(
     admin_session: AsyncSession,
 ) -> None:
-    context, farm_id, b1, b2 = await _bootstrap_two_blocks(
-        admin_session, "bd3-board"
-    )
+    context, farm_id, b1, b2 = await _bootstrap_two_blocks(admin_session, "bd3-board")
     app = _build_app(context)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         sd = date.today() + timedelta(days=1)
@@ -197,9 +189,7 @@ async def test_board_includes_blocks_and_activities_with_resources(
                 json={"kind": "worker", "name": "Ahmed", "role": "operator"},
             )
         ).json()
-        attach = await client.post(
-            f"/api/v1/activities/{activity['id']}/resources/{worker['id']}"
-        )
+        attach = await client.post(f"/api/v1/activities/{activity['id']}/resources/{worker['id']}")
         assert attach.status_code == 201
 
         # Activity outside the window — should be excluded

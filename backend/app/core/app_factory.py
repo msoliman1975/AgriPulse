@@ -116,7 +116,7 @@ def create_app() -> FastAPI:
     return app
 
 
-def _register_module_routers(app: FastAPI) -> None:
+def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     """Mount each domain module's router. Imports are local to keep the
     factory's import graph thin in environments that do not need the
     full app (e.g., a Celery worker importing only `app.core.settings`).
@@ -125,13 +125,14 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
+    from app.modules.grid.router import router as grid_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
     from app.modules.imagery.subscribers import (
         register_subscribers as register_imagery_subscribers,
     )
-    from app.modules.grid.router import router as grid_router
     from app.modules.indices.router import router as indices_router
+    from app.modules.insights.router import router as insights_router
     from app.modules.integrations.router import router as integrations_router
     from app.modules.integrations_health.router import (
         router as integrations_health_router,
@@ -142,7 +143,6 @@ def _register_module_routers(app: FastAPI) -> None:
         register_subscribers as register_notifications_subscribers,
     )
     from app.modules.plans.router import router as plans_router
-    from app.modules.resources.router import router as resources_router
     from app.modules.platform_admins.admins_router import (
         router as platform_admins_self_router,
     )
@@ -161,8 +161,8 @@ def _register_module_routers(app: FastAPI) -> None:
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
-    from app.modules.insights.router import router as insights_router
     from app.modules.recommendations.router import router as recommendations_router
+    from app.modules.resources.router import router as resources_router
     from app.modules.signals.router import router as signals_router
     from app.modules.tenancy.router import router as tenancy_router
     from app.modules.weather.router import router as weather_router

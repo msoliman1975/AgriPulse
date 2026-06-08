@@ -26,9 +26,8 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.weather.errors import BlockNotVisibleError
 from app.modules.weather.models import WeatherProvider
@@ -92,9 +91,7 @@ async def _resolve_farm_id(*, block_id: UUID, tenant_session: AsyncSession) -> U
     return block["farm_id"]
 
 
-async def _guard_subscriptions_lock(
-    *, tenant_session: AsyncSession, farm_id: UUID
-) -> None:
+async def _guard_subscriptions_lock(*, tenant_session: AsyncSession, farm_id: UUID) -> None:
     """Reject writes when the farm's subscriptions category is locked.
 
     Gated by the farm-config feature flag. PR-3 of farm-block-config-model.

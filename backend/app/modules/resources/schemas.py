@@ -15,12 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 ResourceKind = Literal["worker", "equipment"]
-WorkerRole = Literal[
-    "agronomist", "operator", "scout", "field_worker", "manager"
-]
-EquipmentType = Literal[
-    "tractor", "sprayer", "irrigation_pump", "harvester", "other"
-]
+WorkerRole = Literal["agronomist", "operator", "scout", "field_worker", "manager"]
+EquipmentType = Literal["tractor", "sprayer", "irrigation_pump", "harvester", "other"]
 
 
 class ResourceCreateRequest(BaseModel):
@@ -33,12 +29,10 @@ class ResourceCreateRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
 
     @model_validator(mode="after")
-    def _shape(self) -> "ResourceCreateRequest":
+    def _shape(self) -> ResourceCreateRequest:
         if self.kind == "worker":
             if self.role is None:
-                raise PydanticCustomError(
-                    "resource_worker_requires_role", "worker requires a role"
-                )
+                raise PydanticCustomError("resource_worker_requires_role", "worker requires a role")
             if self.equipment_type is not None:
                 raise PydanticCustomError(
                     "resource_worker_no_equipment_type",
