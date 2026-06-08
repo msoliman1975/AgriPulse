@@ -122,6 +122,34 @@
       "recommendation": "توصية",
       "alert": "تنبيه",
       "noop": "لا إجراء"
+    },
+    "provenance": {
+      "title": "الأساس العلمي",
+      "confidence": "قوة الأدلة",
+      "sources": "المصادر",
+      "transferability": "قابلية التطبيق",
+      "region": {
+        "egypt": "مصر",
+        "middle_east": "الشرق الأوسط",
+        "global": "عالمي"
+      },
+      "grade": {
+        "very_high": "عالية جدًا",
+        "high": "عالية",
+        "medium": "متوسطة",
+        "low": "منخفضة",
+        "not_applicable": "غير منطبق"
+      },
+      "sourceType": {
+        "peer_reviewed": "محكّمة",
+        "fao": "الفاو",
+        "usda": "وزارة الزراعة الأمريكية",
+        "extension": "الإرشاد الزراعي",
+        "university": "جامعي",
+        "research_institution": "مؤسسة بحثية",
+        "remote_sensing": "الاستشعار عن بُعد",
+        "government": "حكومي"
+      }
     }
   },
   "editor": {

@@ -26,7 +26,7 @@ import { Link, useParams } from "react-router-dom";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
-import type { DryRunResponse } from "@/api/decisionTrees";
+import { readTreeProvenance, type DryRunResponse } from "@/api/decisionTrees";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
@@ -39,6 +39,7 @@ import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
 import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
 import { ParametersPanel } from "../components/ParametersPanel";
+import { ProvenancePanel } from "../components/ProvenancePanel";
 import { TreeCanvas } from "../components/TreeCanvas";
 import { layoutTree, type CompiledTree } from "../layout/treeLayout";
 import {
@@ -257,6 +258,10 @@ export function DecisionTreeViewerPage(): ReactNode {
     (latestVersion.published_at == null ||
       tree.current_version !== latestVersion.version);
   const rootId = draftCompiled?.root ?? null;
+  // Provenance reads from the published/current compiled version (the
+  // authoritative normalized shape), not the in-editor draft — it's
+  // authored in raw YAML, not via the canvas.
+  const provenance = readTreeProvenance(sourceVersion?.tree_compiled);
 
   const onPatch = (nodeId: string, patch: NodePatch): void => {
     setEditBuffer((buf) => patchBuffer(buf, nodeId, patch));
@@ -553,6 +558,11 @@ export function DecisionTreeViewerPage(): ReactNode {
       ) : null}
 
       <Legend />
+
+      <ProvenancePanel
+        evidence={provenance.evidence}
+        transferability={provenance.transferability}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <div className="flex flex-col gap-4">

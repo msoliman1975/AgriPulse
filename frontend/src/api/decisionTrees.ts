@@ -15,6 +15,65 @@ export interface DecisionTree {
   current_version: number | null;
 }
 
+// Scientific-provenance metadata (KB P1-A). Lives inside `tree_compiled`
+// (the backend folds it in at compile time); these mirror the shapes
+// produced by recommendations/loader.py. Optional — absent on trees that
+// don't declare an `evidence:` / `transferability:` block.
+export type EvidenceConfidence = "very_high" | "high" | "medium" | "low";
+
+export type CitationSourceType =
+  | "peer_reviewed"
+  | "fao"
+  | "usda"
+  | "extension"
+  | "university"
+  | "research_institution"
+  | "remote_sensing"
+  | "government";
+
+export interface TreeCitation {
+  source_type: CitationSourceType;
+  title: string;
+  doi: string | null;
+  url: string | null;
+  year: number | null;
+}
+
+export interface TreeEvidence {
+  confidence: EvidenceConfidence;
+  notes: string | null;
+  citations: TreeCitation[];
+}
+
+export type TransferabilityGrade =
+  | "very_high"
+  | "high"
+  | "medium"
+  | "low"
+  | "not_applicable";
+
+export interface TreeTransferability {
+  egypt: TransferabilityGrade | null;
+  middle_east: TransferabilityGrade | null;
+  global: TransferabilityGrade | null;
+}
+
+// Pull the provenance blocks out of an untyped compiled tree. Tolerant
+// of the legacy shape (keys absent) — returns nulls so callers render
+// nothing rather than crashing on an older version's compiled JSON.
+export function readTreeProvenance(
+  compiled: Record<string, unknown> | null | undefined,
+): { evidence: TreeEvidence | null; transferability: TreeTransferability | null } {
+  const ev = compiled?.evidence;
+  const tr = compiled?.transferability;
+  return {
+    evidence:
+      ev && typeof ev === "object" ? (ev as TreeEvidence) : null,
+    transferability:
+      tr && typeof tr === "object" ? (tr as TreeTransferability) : null,
+  };
+}
+
 export interface DecisionTreeVersion {
   id: string;
   tree_id: string;

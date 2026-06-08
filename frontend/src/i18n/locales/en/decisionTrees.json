@@ -122,6 +122,34 @@
       "recommendation": "Recommendation",
       "alert": "Alert",
       "noop": "No action"
+    },
+    "provenance": {
+      "title": "Scientific basis",
+      "confidence": "Evidence confidence",
+      "sources": "Sources",
+      "transferability": "Transferability",
+      "region": {
+        "egypt": "Egypt",
+        "middle_east": "Middle East",
+        "global": "Global"
+      },
+      "grade": {
+        "very_high": "Very high",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "not_applicable": "N/A"
+      },
+      "sourceType": {
+        "peer_reviewed": "Peer-reviewed",
+        "fao": "FAO",
+        "usda": "USDA",
+        "extension": "Extension",
+        "university": "University",
+        "research_institution": "Research institution",
+        "remote_sensing": "Remote sensing",
+        "government": "Government"
+      }
     }
   },
   "editor": {
