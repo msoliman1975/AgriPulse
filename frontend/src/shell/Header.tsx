@@ -7,12 +7,12 @@ import { getUnreadCount } from "@/api/inbox";
 import { openInboxStream } from "@/realtime/inboxStream";
 import { ActiveFarmContext } from "./ActiveFarmContext";
 import { AlertsDrawer } from "./AlertsDrawer";
+import { ConfigsMenu } from "./ConfigsMenu";
 import { FarmSwitcher } from "./FarmSwitcher";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { TenantBadge } from "./TenantBadge";
-import { TenantTreeDrawer } from "./TenantTreeDrawer";
 import { UserMenu } from "./UserMenu";
-import { BellIcon, GearIcon, TenantIcon } from "./icons";
+import { BellIcon, UserIcon } from "./icons";
 
 interface HeaderProps {
   /** Optional view-specific toolbar slot (Insights date-range, Plan zoom). */
@@ -23,7 +23,6 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
   const { t } = useTranslation("common");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [tenantTreeOpen, setTenantTreeOpen] = useState(false);
 
   // Bell badge: unread inbox count.
   //   * Push: SSE on /v1/inbox/stream invalidates the count + list on
@@ -92,28 +91,20 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
               </span>
             ) : null}
           </button>
+          <ConfigsMenu />
           <button
             type="button"
-            aria-label="Tenant tree"
-            title="Tenant overview"
-            onClick={() => setTenantTreeOpen(true)}
-            className="rounded-md p-2 text-ap-muted hover:bg-ap-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
-          >
-            <TenantIcon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label={t("shell.settingsTitle")}
+            aria-label={t("shell.userProfileTitle")}
+            title={t("shell.userProfileTitle")}
             onClick={() => setSettingsOpen(true)}
             className="rounded-md p-2 text-ap-muted hover:bg-ap-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
           >
-            <GearIcon className="h-5 w-5" />
+            <UserIcon className="h-5 w-5" />
           </button>
         </div>
       </div>
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <AlertsDrawer open={alertsOpen} onClose={() => setAlertsOpen(false)} />
-      <TenantTreeDrawer open={tenantTreeOpen} onClose={() => setTenantTreeOpen(false)} />
     </header>
   );
 }
