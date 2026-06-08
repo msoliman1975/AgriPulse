@@ -242,7 +242,7 @@ export function DetailPanel({
           {detail.alerts.map((a) => (
             <div
               key={a.id}
-              className="mt-1 rounded border-l-4 px-2 py-1 text-[11px]"
+              className="mt-1 rounded border-s-4 px-2 py-1 text-[11px]"
               style={{
                 borderColor: a.severity === "critical" ? "#A32D2D" : "#854F0B",
                 background: a.severity === "critical" ? "#fcebeb" : "#faeeda",
@@ -265,7 +265,7 @@ export function DetailPanel({
                 key={code}
                 type="button"
                 onClick={() => setActiveIndex(isActive ? null : code)}
-                className={`rounded-md border px-2 py-1.5 text-left transition ${
+                className={`rounded-md border px-2 py-1.5 text-start transition ${
                   isActive
                     ? "border-slate-300 bg-slate-50"
                     : "border-slate-200 hover:border-slate-300"
@@ -695,7 +695,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <div className="mt-1 flex justify-between gap-2 text-[11px]">
       <span className="text-slate-500">{label}:</span>
-      <span className="text-right text-slate-800">{children}</span>
+      <span className="text-end text-slate-800">{children}</span>
     </div>
   );
 }

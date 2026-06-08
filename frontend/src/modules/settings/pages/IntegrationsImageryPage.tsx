@@ -178,8 +178,8 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
         <tbody className="divide-y divide-ap-line">
           {(farmQ.data?.settings ?? []).map((s) => (
             <tr key={s.key}>
-              <td className="py-2 pr-4 font-mono text-xs">{s.key}</td>
-              <td className="py-2 pr-4 text-ap-ink">{formatValue(s.value)}</td>
+              <td className="py-2 pe-4 font-mono text-xs">{s.key}</td>
+              <td className="py-2 pe-4 text-ap-ink">{formatValue(s.value)}</td>
               <td className="py-2">
                 <SourcePill source={s.source} />
               </td>

@@ -5,6 +5,9 @@ import { useTranslation } from "react-i18next";
 import { archiveFarm, getFarm, type FarmDetail } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
+import { Card } from "@/components/Card";
+import { ErrorState } from "@/components/ErrorState";
+import { PageHeader } from "@/components/PageHeader";
 import { useCapability } from "@/rbac/useCapability";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { AreaDisplay } from "../components/AreaDisplay";
@@ -57,48 +60,58 @@ export function FarmDetailPage(): JSX.Element {
   };
 
   if (error) {
-    return (
-      <p role="alert" className="text-sm text-red-700">
-        {error}
-      </p>
-    );
+    return <ErrorState message={error} />;
   }
   if (!farm) {
-    return <p role="status">{t("detail.loading")}</p>;
+    return (
+      <p role="status" className="text-sm text-ap-muted">
+        {t("detail.loading")}
+      </p>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-brand-800">{farm.name}</h1>
-          <p className="text-sm text-slate-600">
+      <PageHeader
+        above={
+          <Link
+            to="/farms"
+            className="text-sm font-medium text-ap-primary hover:underline"
+          >
+            ← {t("detail.back")}
+          </Link>
+        }
+        title={farm.name}
+        subtitle={
+          <>
             {farm.code} · {farm.governorate ?? "—"} · <AreaDisplay areaM2={Number(farm.area_m2)} />
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canEdit ? (
-            <Link to={`/farms/${farm.id}/edit`} className="btn btn-ghost">
-              {t("detail.edit")}
-            </Link>
-          ) : null}
-          {canArchive ? (
-            <ArchiveButton label={t("detail.archive")} busy={busy} onConfirm={handleArchive} />
-          ) : null}
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {canEdit ? (
+              <Link to={`/farms/${farm.id}/edit`} className="btn btn-ghost">
+                {t("detail.edit")}
+              </Link>
+            ) : null}
+            {canArchive ? (
+              <ArchiveButton label={t("detail.archive")} busy={busy} onConfirm={handleArchive} />
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="card">
+      <Card>
         <MapPreview geometry={farm.boundary} />
-      </div>
+      </Card>
 
       {canReadWeather && blocks.length > 0 ? (
         <WeatherForecastPanel blockId={blocks[0].id} farmId={farm.id} farmName={farm.name} />
       ) : null}
 
-      <div className="card">
+      <Card>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-800">{t("detail.blocksTab")}</h2>
+          <h2 className="text-lg font-semibold text-ap-ink">{t("detail.blocksTab")}</h2>
           {canCreateBlock ? (
             <span className="flex gap-2">
               <Link to={`/farms/${farm.id}/blocks/new`} className="btn btn-primary">
@@ -111,12 +124,12 @@ export function FarmDetailPage(): JSX.Element {
           ) : null}
         </div>
         {blocks.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">{t("detail.noBlocks")}</p>
+          <p className="mt-3 text-sm text-ap-muted">{t("detail.noBlocks")}</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {blocks.map((b) => (
               <li key={b.id} className="flex items-center justify-between text-sm">
-                <Link to={`/farms/${farm.id}/blocks/${b.id}`} className="text-brand-700 underline">
+                <Link to={`/farms/${farm.id}/blocks/${b.id}`} className="text-ap-primary underline">
                   {b.code} {b.name ? `— ${b.name}` : null}
                 </Link>
                 <AreaDisplay areaM2={Number(b.area_m2)} />
@@ -124,15 +137,15 @@ export function FarmDetailPage(): JSX.Element {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
       <AttachmentsTab ownerKind="farm" ownerId={farm.id} farmId={farm.id} />
 
-      <div className="card">
-        <Link to={`/farms/${farm.id}/members`} className="text-brand-700 underline">
+      <Card>
+        <Link to={`/farms/${farm.id}/members`} className="text-ap-primary underline">
           {t("detail.membersTab")}
         </Link>
-      </div>
+      </Card>
     </div>
   );
 }

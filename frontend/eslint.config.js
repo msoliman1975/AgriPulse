@@ -68,6 +68,26 @@ export default tseslint.config(
       // add ceremony without surfacing real bugs. Demoted to warn so the
       // signal stays but CI doesn't fail.
       "@typescript-eslint/no-floating-promises": "warn",
+      // Design-system guard (F-6/F-11): flag the pre-rename Tailwind palette
+      // (slate/gray/zinc/neutral/stone/brand/emerald/rose/red) so new code
+      // reaches for the `ap-*` tokens instead. `warn`, not `error`: the
+      // codebase still has ~400 legacy usages to migrate incrementally, so a
+      // hard failure would block every build. The signal arrests new drift.
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "Literal[value=/(?:text|bg|border|ring|divide|from|via|to|fill|stroke|outline|placeholder|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|brand|emerald|rose|red)-\\d/]",
+          message:
+            "Use the ap-* design tokens (text-ap-ink, bg-ap-panel, border-ap-line, text-ap-crit, …) instead of the pre-rename palette.",
+        },
+        {
+          selector:
+            "TemplateElement[value.raw=/(?:text|bg|border|ring|divide|from|via|to|fill|stroke|outline|placeholder|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|brand|emerald|rose|red)-\\d/]",
+          message:
+            "Use the ap-* design tokens (text-ap-ink, bg-ap-panel, border-ap-line, text-ap-crit, …) instead of the pre-rename palette.",
+        },
+      ],
     },
   },
   {
@@ -83,6 +103,9 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
+      // Map layers legitimately pass raw color strings to mapbox paint specs,
+      // and the surface is WiP — exempt it from the palette guard for now.
+      "no-restricted-syntax": "off",
     },
   },
   {
