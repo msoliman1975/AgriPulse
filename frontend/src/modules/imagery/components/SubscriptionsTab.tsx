@@ -99,11 +99,11 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
   return (
     <section className="card space-y-3" aria-label={t("subscriptions.heading")}>
       <header>
-        <h2 className="text-lg font-semibold text-slate-800">{t("subscriptions.heading")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("subscriptions.heading")}</h2>
       </header>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {error}
         </p>
       ) : null}
@@ -111,19 +111,19 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
       {loading ? (
         <p role="status">{t("panel.loading")}</p>
       ) : subscriptions.length === 0 ? (
-        <p className="text-sm text-slate-600">{t("subscriptions.empty")}</p>
+        <p className="text-sm text-ap-muted">{t("subscriptions.empty")}</p>
       ) : (
-        <ul className="divide-y divide-slate-200">
+        <ul className="divide-y divide-ap-line">
           {subscriptions.map((sub) => (
             <li key={sub.id} className="flex items-center justify-between py-2">
               <div className="text-sm">
-                <p className="font-medium text-slate-800">
+                <p className="font-medium text-ap-ink">
                   {t("subscriptions.productLabel")}: {productLabel(sub.product_id, products)}
                 </p>
-                <p className="text-slate-600">
+                <p className="text-ap-muted">
                   {t("subscriptions.createdAt", { date: dateFmt.format(new Date(sub.created_at)) })}
                 </p>
-                <p className="text-slate-600">
+                <p className="text-ap-muted">
                   {sub.last_successful_ingest_at
                     ? t("subscriptions.lastIngest", {
                         date: dateFmt.format(new Date(sub.last_successful_ingest_at)),

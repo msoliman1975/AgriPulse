@@ -72,7 +72,7 @@ export function FarmMembersPage(): JSX.Element {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-brand-800">{t("members.heading")}</h1>
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("members.heading")}</h1>
         <Link to={`/farms/${farmId}`} className="btn btn-ghost">
           {t("block.back")}
         </Link>

@@ -265,7 +265,7 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
       {/* Pagination */}
       <div className="flex items-center justify-center gap-3 border-t border-ap-line px-4 py-2 text-xs">
         {atCap ? (
-          <span className="text-amber-700">{t("log.list.capReached", { max: MAX_LOADED })}</span>
+          <span className="text-ap-warn">{t("log.list.capReached", { max: MAX_LOADED })}</span>
         ) : obsQuery.hasNextPage ? (
           <button
             type="button"

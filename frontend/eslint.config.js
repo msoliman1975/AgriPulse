@@ -68,13 +68,13 @@ export default tseslint.config(
       // add ceremony without surfacing real bugs. Demoted to warn so the
       // signal stays but CI doesn't fail.
       "@typescript-eslint/no-floating-promises": "warn",
-      // Design-system guard (F-6/F-11): flag the pre-rename Tailwind palette
-      // (slate/gray/zinc/neutral/stone/brand/emerald/rose/red) so new code
-      // reaches for the `ap-*` tokens instead. `warn`, not `error`: the
-      // codebase still has ~400 legacy usages to migrate incrementally, so a
-      // hard failure would block every build. The signal arrests new drift.
+      // Design-system guard (F-6/F-11): forbid the pre-rename Tailwind palette
+      // (slate/gray/zinc/neutral/stone/brand/emerald/rose/red) — new code must
+      // use the `ap-*` tokens. Promoted to `error` once the codebase reached
+      // zero legacy usages (the full migration is complete); labs/map is
+      // exempt below while it's WiP.
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector:
             "Literal[value=/(?:text|bg|border|ring|divide|from|via|to|fill|stroke|outline|placeholder|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|brand|emerald|rose|red)-\\d/]",

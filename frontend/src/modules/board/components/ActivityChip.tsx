@@ -5,16 +5,19 @@ import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardActivity } from "@/api/plans";
 
-/** Color hint per activity type. Keep keys aligned with backend ActivityType. */
+/** Color hint per activity type, using the design system's ap activity tokens
+ *  (soft wash + token text + soft border). Keep keys aligned with backend
+ *  ActivityType. soil_prep / observation have no dedicated token, so they use
+ *  the neutral surface and the accent respectively. */
 const TYPE_TINT: Record<ActivityType, string> = {
-  planting: "bg-emerald-50 text-emerald-900 border-emerald-200",
-  fertilizing: "bg-amber-50 text-amber-900 border-amber-200",
-  spraying: "bg-rose-50 text-rose-900 border-rose-200",
-  pruning: "bg-purple-50 text-purple-900 border-purple-200",
-  harvesting: "bg-orange-50 text-orange-900 border-orange-200",
-  irrigation: "bg-sky-50 text-sky-900 border-sky-200",
-  soil_prep: "bg-stone-50 text-stone-900 border-stone-200",
-  observation: "bg-slate-50 text-slate-900 border-slate-200",
+  planting: "bg-ap-plant/10 text-ap-plant border-ap-plant/30",
+  fertilizing: "bg-ap-fert/10 text-ap-fert border-ap-fert/30",
+  spraying: "bg-ap-spray/10 text-ap-spray border-ap-spray/30",
+  pruning: "bg-ap-prune/10 text-ap-prune border-ap-prune/30",
+  harvesting: "bg-ap-harv/10 text-ap-harv border-ap-harv/30",
+  irrigation: "bg-ap-irrig/10 text-ap-irrig border-ap-irrig/30",
+  soil_prep: "bg-ap-bg text-ap-ink border-ap-line",
+  observation: "bg-ap-accent/10 text-ap-accent border-ap-accent/30",
 };
 
 const TYPE_ICON: Record<ActivityType, string> = {

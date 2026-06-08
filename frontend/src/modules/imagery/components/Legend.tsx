@@ -26,7 +26,7 @@ export function Legend({
 
   return (
     <div
-      className="rounded border border-slate-200 bg-white p-3 text-xs text-slate-700"
+      className="rounded border border-ap-line bg-white p-3 text-xs text-ap-ink"
       role="figure"
       aria-label={t("legend.title")}
     >
@@ -40,15 +40,15 @@ export function Legend({
       <div className="mt-1 flex justify-between">
         <span>
           <span className="block">{fmt.format(min)}</span>
-          <span className="block text-slate-500">{t("legend.low")}</span>
+          <span className="block text-ap-muted">{t("legend.low")}</span>
         </span>
         <span className="text-center">
           <span className="block">{fmt.format((min + max) / 2)}</span>
-          <span className="block text-slate-500">{t("legend.mid")}</span>
+          <span className="block text-ap-muted">{t("legend.mid")}</span>
         </span>
         <span className="text-right">
           <span className="block">{fmt.format(max)}</span>
-          <span className="block text-slate-500">{t("legend.high")}</span>
+          <span className="block text-ap-muted">{t("legend.high")}</span>
         </span>
       </div>
     </div>

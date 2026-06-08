@@ -36,7 +36,7 @@ export function AuthCallback(): JSX.Element {
 
   if (auth.error) {
     return (
-      <p role="alert" className="p-6 text-sm text-red-700">
+      <p role="alert" className="p-6 text-sm text-ap-crit">
         {auth.error.message}
       </p>
     );
@@ -48,7 +48,7 @@ export function AuthCallback(): JSX.Element {
   }
 
   return (
-    <p role="status" className="p-6 text-slate-600">
+    <p role="status" className="p-6 text-ap-muted">
       {t("actions.loading")}
     </p>
   );

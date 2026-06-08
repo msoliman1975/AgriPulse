@@ -28,7 +28,7 @@ export function BlockCreatePage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-brand-800">{t("detail.addBlock")}</h1>
+      <h1 className="text-2xl font-semibold text-ap-ink">{t("detail.addBlock")}</h1>
       <BlockForm
         submitLabel={t("form.submitBlockCreate")}
         onSubmit={handleSubmit}

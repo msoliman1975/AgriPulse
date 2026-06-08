@@ -214,7 +214,7 @@ function Row({
             type="button"
             onClick={onRemove}
             disabled={removing}
-            className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-crit hover:bg-rose-50 disabled:opacity-60"
+            className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-crit hover:bg-ap-crit-soft disabled:opacity-60"
           >
             {t("platformAdmins.removeButton")}
           </button>

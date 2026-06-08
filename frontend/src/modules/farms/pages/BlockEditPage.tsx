@@ -50,7 +50,7 @@ export function BlockEditPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-brand-800">{t("block.edit")}</h1>
+      <h1 className="text-2xl font-semibold text-ap-ink">{t("block.edit")}</h1>
       <BlockForm
         initial={{
           code: block.code,

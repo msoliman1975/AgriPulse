@@ -48,7 +48,7 @@ export function TenantAdminDetailPage(): ReactNode {
     return (
       <div
         role="alert"
-        className="mx-auto max-w-lg rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
+        className="mx-auto max-w-lg rounded-md border border-ap-crit/30 bg-ap-crit-soft p-4 text-sm text-ap-crit"
       >
         {t("tenants.detail.errorTitle")}
       </div>
@@ -180,11 +180,11 @@ function StatusBanner({ tenant, formatter }: { tenant: AdminTenant } & Formatter
   return (
     <div
       role="status"
-      className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+      className="rounded-md border border-ap-warn/30 bg-ap-warn-soft p-3 text-sm text-ap-warn"
     >
       {t(key, { when })}
       {tenant.last_status_reason ? (
-        <p className="mt-1 text-xs text-amber-800/80">{tenant.last_status_reason}</p>
+        <p className="mt-1 text-xs text-ap-warn/80">{tenant.last_status_reason}</p>
       ) : null}
     </div>
   );

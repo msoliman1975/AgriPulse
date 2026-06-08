@@ -45,16 +45,16 @@ export function GridCellDrawer({
       title={t("subblockGrid.cellDrawerTitle", { defaultValue: "Cell history" })}
     >
       {isLoading && (
-        <p className="text-sm text-slate-500">{t("common.loading", { defaultValue: "Loading…" })}</p>
+        <p className="text-sm text-ap-muted">{t("common.loading", { defaultValue: "Loading…" })}</p>
       )}
       {isError && (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-ap-crit">
           {t("subblockGrid.historyError", { defaultValue: "Could not load cell history." })}
         </p>
       )}
       {data && (
         <>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">{indexCode}</p>
+          <p className="mb-2 text-xs uppercase tracking-wide text-ap-muted">{indexCode}</p>
           <CellSparkline points={data.points} />
           <CellSummary points={data.points} />
         </>
@@ -75,7 +75,7 @@ function CellSparkline({
 
   if (values.length < 2) {
     return (
-      <div className="rounded-md border border-slate-200 p-3 text-xs text-slate-500">
+      <div className="rounded-md border border-ap-line p-3 text-xs text-ap-muted">
         {t("subblockGrid.notEnoughObs", {
           defaultValue: "Not enough observations yet to draw a trend.",
         })}
@@ -106,10 +106,10 @@ function CellSparkline({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" aria-label="Cell index history">
-      <text x={4} y={12} className="fill-slate-500" fontSize={10}>
+      <text x={4} y={12} className="fill-ap-muted" fontSize={10}>
         {yMax.toFixed(2)}
       </text>
-      <text x={4} y={H - 4} className="fill-slate-500" fontSize={10}>
+      <text x={4} y={H - 4} className="fill-ap-muted" fontSize={10}>
         {yMin.toFixed(2)}
       </text>
       <path d={path} fill="none" stroke="#10b981" strokeWidth={2} />
@@ -141,7 +141,7 @@ function CellSummary({
       <Stat label={t("subblockGrid.statMean", { defaultValue: "Mean" })} value={last.mean} />
       <Stat label={t("subblockGrid.statMin", { defaultValue: "Min" })} value={last.min} />
       <Stat label={t("subblockGrid.statMax", { defaultValue: "Max" })} value={last.max} />
-      <p className="col-span-3 mt-1 text-[11px] text-slate-500">
+      <p className="col-span-3 mt-1 text-[11px] text-ap-muted">
         {t("subblockGrid.latestScene", {
           defaultValue: "Latest scene: {{date}}",
           date: dt.toLocaleString(),
@@ -153,9 +153,9 @@ function CellSummary({
 
 function Stat({ label, value }: { label: string; value: string | null }): ReactNode {
   return (
-    <div className="rounded border border-slate-200 px-2 py-1">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="text-sm font-medium text-slate-800">
+    <div className="rounded border border-ap-line px-2 py-1">
+      <dt className="text-ap-muted">{label}</dt>
+      <dd className="text-sm font-medium text-ap-ink">
         {value === null ? "—" : Number(value).toFixed(3)}
       </dd>
     </div>

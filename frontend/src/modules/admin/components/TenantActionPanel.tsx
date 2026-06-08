@@ -110,7 +110,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
       {anyError ? (
         <p
           role="alert"
-          className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"
+          className="mt-3 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-xs text-ap-crit"
         >
           <span className="font-semibold">{t("tenants.detail.errorTitleAction")}</span>
           {": "}
@@ -170,8 +170,8 @@ interface ActionButtonProps {
 function ActionButton({ tone, label, pending, onClick }: ActionButtonProps): ReactNode {
   const tones: Record<ActionButtonProps["tone"], string> = {
     primary: "bg-ap-primary text-white hover:bg-ap-primary/90",
-    warning: "bg-amber-600 text-white hover:bg-amber-700",
-    danger: "bg-rose-600 text-white hover:bg-rose-700",
+    warning: "bg-ap-warn text-white hover:bg-ap-warn/90",
+    danger: "bg-ap-crit text-white hover:bg-ap-crit/90",
   };
   return (
     <button
@@ -224,7 +224,7 @@ function SuspendModal({ open, pending, onClose, onSubmit }: SuspendModalProps): 
           type="button"
           onClick={() => onSubmit(reason.trim() || null)}
           disabled={pending}
-          className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+          className="rounded-md bg-ap-warn px-3 py-2 text-sm font-medium text-white hover:bg-ap-warn/90 disabled:opacity-60"
         >
           {pending ? t("tenants.detail.actionPending") : t("tenants.detail.modals.suspend.confirm")}
         </button>
@@ -281,7 +281,7 @@ function RequestDeleteModal({
           type="button"
           onClick={() => onSubmit(reason.trim() || null)}
           disabled={pending}
-          className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+          className="rounded-md bg-ap-crit px-3 py-2 text-sm font-medium text-white hover:bg-ap-crit/90 disabled:opacity-60"
         >
           {pending
             ? t("tenants.detail.actionPending")
@@ -322,7 +322,7 @@ function PurgeModal({
 
   return (
     <Modal open={open} onClose={onClose} labelledBy="purge-modal-title">
-      <h2 id="purge-modal-title" className="text-lg font-semibold text-rose-700">
+      <h2 id="purge-modal-title" className="text-lg font-semibold text-ap-crit">
         {t("tenants.detail.modals.purge.title")}
       </h2>
       <p className="mt-2 text-sm text-ap-ink">{t("tenants.detail.modals.purge.body")}</p>
@@ -347,7 +347,7 @@ function PurgeModal({
         // eslint-disable-next-line jsx-a11y/label-has-associated-control
         <label
           htmlFor="purge-force-checkbox"
-          className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm"
+          className="mt-4 flex items-start gap-2 rounded-md border border-ap-warn/30 bg-ap-warn-soft p-3 text-sm"
         >
           <input
             id="purge-force-checkbox"
@@ -357,10 +357,10 @@ function PurgeModal({
             className="mt-0.5"
           />
           <span>
-            <span className="block font-semibold text-amber-900">
+            <span className="block font-semibold text-ap-warn">
               {t("tenants.detail.modals.purge.forceLabel")}
             </span>
-            <span className="block text-xs text-amber-800/80">
+            <span className="block text-xs text-ap-warn/80">
               {t("tenants.detail.modals.purge.forceWarning", { days: graceDays })}
             </span>
           </span>
@@ -378,7 +378,7 @@ function PurgeModal({
           type="button"
           onClick={() => onSubmit(confirmation, force)}
           disabled={pending || !canSubmit}
-          className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+          className="rounded-md bg-ap-crit px-3 py-2 text-sm font-medium text-white hover:bg-ap-crit/90 disabled:opacity-60"
         >
           {pending ? t("tenants.detail.actionPending") : t("tenants.detail.modals.purge.confirm")}
         </button>

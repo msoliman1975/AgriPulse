@@ -39,11 +39,11 @@ export function ActiveFarmContext(): ReactNode {
       {farm.governorate ? <span className="truncate">{farm.governorate}</span> : null}
       <span className="truncate">{farm.farm_type}</span>
       {farm.is_active ? (
-        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+        <span className="rounded bg-ap-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-ap-primary">
           Active
         </span>
       ) : (
-        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900">
+        <span className="rounded bg-ap-warn-soft px-1.5 py-0.5 text-[10px] font-medium text-ap-warn">
           Inactive
         </span>
       )}

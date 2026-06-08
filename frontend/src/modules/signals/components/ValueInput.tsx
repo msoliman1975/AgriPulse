@@ -69,7 +69,7 @@ export function ValueInput({
           className={inputCls}
         />
         {outOfRange ? (
-          <span className="text-[11px] text-amber-700">
+          <span className="text-[11px] text-ap-warn">
             {t("log.form.outOfRange", { bounds })}
           </span>
         ) : null}

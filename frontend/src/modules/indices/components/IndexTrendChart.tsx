@@ -83,7 +83,7 @@ export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.
   return (
     <section className="card space-y-3" aria-label={t("trend.heading")}>
       <header>
-        <h2 className="text-lg font-semibold text-slate-800">{t("trend.heading")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("trend.heading")}</h2>
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -121,13 +121,13 @@ export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {t("trend.error", { message: error })}
         </p>
       ) : loading ? (
         <p role="status">{t("trend.loading")}</p>
       ) : chartData.length === 0 ? (
-        <p className="text-sm text-slate-600">{t("trend.empty")}</p>
+        <p className="text-sm text-ap-muted">{t("trend.empty")}</p>
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">

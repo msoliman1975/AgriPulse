@@ -50,7 +50,7 @@ export function FarmEditPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-brand-800">{t("detail.edit")}</h1>
+      <h1 className="text-2xl font-semibold text-ap-ink">{t("detail.edit")}</h1>
       <FarmForm
         initial={{
           code: farm.code,

@@ -100,7 +100,7 @@ export function AlertsDrawer({ open, onClose }: Props): ReactNode {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-600">{t("shell.alertsEmpty")}</p>
+        <p className="text-sm text-ap-muted">{t("shell.alertsEmpty")}</p>
       )}
     </Drawer>
   );

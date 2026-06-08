@@ -12,18 +12,18 @@ export function MembersList({ members, canRevoke, onRevoke }: Props): JSX.Elemen
   const { t, i18n } = useTranslation("farms");
   const active = members.filter((m) => m.revoked_at === null);
   if (active.length === 0) {
-    return <p className="text-sm text-slate-600">{t("members.empty")}</p>;
+    return <p className="text-sm text-ap-muted">{t("members.empty")}</p>;
   }
   return (
-    <ul className="divide-y divide-slate-200">
+    <ul className="divide-y divide-ap-line">
       {active.map((m) => (
         <li key={m.id} className="flex items-center justify-between py-2 text-sm">
           <span>
-            <span className="font-medium text-slate-800">{t(`roles.${m.role}`)}</span>
-            <span className="ms-2 text-xs text-slate-500">{m.membership_id.slice(0, 8)}…</span>
+            <span className="font-medium text-ap-ink">{t(`roles.${m.role}`)}</span>
+            <span className="ms-2 text-xs text-ap-muted">{m.membership_id.slice(0, 8)}…</span>
           </span>
           <span className="flex items-center gap-3">
-            <time className="text-xs text-slate-500">
+            <time className="text-xs text-ap-muted">
               {new Date(m.granted_at).toLocaleDateString(i18n.language)}
             </time>
             {canRevoke && onRevoke ? (

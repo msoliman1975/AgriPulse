@@ -93,7 +93,7 @@ export function MapDraw({
     <div
       ref={containerRef}
       data-testid="map-draw"
-      className={className ?? "h-96 w-full overflow-hidden rounded-md border border-slate-200"}
+      className={className ?? "h-96 w-full overflow-hidden rounded-md border border-ap-line"}
     />
   );
 }

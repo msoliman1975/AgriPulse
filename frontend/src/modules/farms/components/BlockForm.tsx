@@ -250,7 +250,7 @@ export function BlockForm({
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("form.blockBoundary")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("form.blockBoundary")}</h2>
         <div className="mt-4">
           <MapDraw initial={drawnPolygon ?? null} onChange={setDrawnPolygon} />
         </div>

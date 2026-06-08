@@ -60,9 +60,9 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
   const { t } = useTranslation("board");
   const severityColor =
     rec.severity === "critical"
-      ? "border-rose-300 bg-rose-50 text-rose-900"
+      ? "border-ap-crit/30 bg-ap-crit-soft text-ap-crit"
       : rec.severity === "warning"
-        ? "border-amber-300 bg-amber-50 text-amber-900"
+        ? "border-ap-warn/30 bg-ap-warn-soft text-ap-warn"
         : "border-sky-300 bg-sky-50 text-sky-900";
   return (
     <div
