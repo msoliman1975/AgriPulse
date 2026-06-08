@@ -98,7 +98,7 @@ resource "aws_iam_policy" "tempo_s3" {
 
 module "iam_role_tempo" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-${var.environment}-tempo"
 

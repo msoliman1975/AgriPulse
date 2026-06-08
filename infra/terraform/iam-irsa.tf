@@ -16,7 +16,7 @@
 # CREATING until the 20-min Terraform timeout fires.
 module "iam_role_ebs_csi" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-${var.environment}-ebs-csi"
 
@@ -72,7 +72,7 @@ resource "aws_iam_policy" "external_dns" {
 
 module "iam_role_external_dns" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-${var.environment}-external-dns"
 
@@ -127,7 +127,7 @@ resource "aws_iam_policy" "cert_manager_dns01" {
 
 module "iam_role_cert_manager" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-${var.environment}-cert-manager"
 
@@ -189,7 +189,7 @@ module "iam_role_agripulse_api" {
   for_each = toset(var.environments)
 
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-api-irsa-${each.value}"
 
@@ -245,7 +245,7 @@ module "iam_role_agripulse_cnpg" {
   for_each = toset(var.environments)
 
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.50"
+  version = "~> 6.6"
 
   role_name = "agripulse-cnpg-irsa-${each.value}"
 
