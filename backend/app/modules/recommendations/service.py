@@ -135,8 +135,8 @@ class RecommendationsServiceImpl:
         # trend fields → trend predicates fail closed.
         _merge_index_trends(latest, await self._repo.get_index_trends(block_id=block_id))
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
-        block_crop_id, crop_id, crop_category = await self._repo.get_block_current_crop(
-            block_id=block_id
+        block_crop_id, crop_id, crop_category, growth_stage = (
+            await self._repo.get_block_current_crop(block_id=block_id)
         )
 
         if farm_id is None:
@@ -164,6 +164,7 @@ class RecommendationsServiceImpl:
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
+            block_attributes={"growth_stage": growth_stage},
             latest_index_aggregates=latest,
             weather=weather,
             signals=signals,
@@ -1054,7 +1055,9 @@ class DecisionTreesAuthorService:
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
-        _, _, crop_category = await repo.get_block_current_crop(block_id=block_id)
+        _, _, crop_category, growth_stage = await repo.get_block_current_crop(
+            block_id=block_id
+        )
         weather = (
             await load_weather_snapshot(tenant_session, farm_id=farm_id)
             if farm_id is not None
@@ -1078,6 +1081,7 @@ class DecisionTreesAuthorService:
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
+            block_attributes={"growth_stage": growth_stage},
             latest_index_aggregates=latest_indices,
             weather=weather,
             signals=signals,

@@ -28,7 +28,11 @@ INDICES_KEYS: tuple[str, ...] = (
     "delta",
     "trend_direction",
 )
-BLOCK_FIELDS: tuple[str, ...] = ("crop_category",)
+# ``growth_stage`` (KB P3) is the stored phenological stage on the block's
+# current block_crops row (categorical, e.g. tuber_bulking). Compare with
+# eq/ne/in. Resolves via ``block_attributes`` and is None until a stage is
+# set, so stage-gated rules fail closed.
+BLOCK_FIELDS: tuple[str, ...] = ("crop_category", "growth_stage")
 
 
 @dataclass(frozen=True, slots=True)
