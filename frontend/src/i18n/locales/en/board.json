@@ -1,7 +1,7 @@
 {
-  "title": "Operations board",
+  "title": "Plan",
   "subtitle": "Plan across all blocks. Click a cell to schedule.",
-  "loadFailed": "Couldn't load the board — try again.",
+  "loadFailed": "Couldn't load the plan — try again.",
   "empty": "No active blocks on this farm yet.",
   "nav": {
     "prev": "Prev",
@@ -108,7 +108,7 @@
     "deleteConfirm": "Delete",
     "deleteFailed": "Couldn't delete — try again.",
     "deleteHeading": "Delete this activity?",
-    "deleteBody": "{{type}} on {{date}} will be removed from the board. This can't be undone from the UI.",
+    "deleteBody": "{{type}} on {{date}} will be removed from the plan. This can't be undone from the UI.",
     "start": "Start",
     "skip": "Skip",
     "complete": "Complete"
