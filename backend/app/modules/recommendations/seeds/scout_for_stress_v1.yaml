@@ -22,6 +22,44 @@ description_ar: >-
 crop_code: null
 applicable_regions: []
 
+# Scientific provenance (KB P1-A). Evaluator-invisible metadata: it
+# documents *why* this rule exists and how far it travels. NDVI anomaly
+# vs a per-field seasonal baseline is a long-established stress indicator;
+# what it cannot do is attribute the cause — hence this rule recommends a
+# scouting visit rather than a specific intervention. That limitation is
+# stated explicitly in evidence.notes per the "state uncertainty" rule.
+evidence:
+  confidence: high
+  notes: >-
+    NDVI depression relative to a field's own seasonal baseline is a
+    well-established indicator of vegetation stress, but it is
+    non-specific: water, nutrient, pest, disease and senescence stress
+    all depress NDVI. The rule therefore triggers ground scouting to
+    attribute cause rather than prescribing treatment. Baseline-relative
+    (z-score) framing makes the signal field- and crop-agnostic.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Red and photographic infrared linear combinations for monitoring
+        vegetation
+      doi: 10.1016/0034-4257(79)90013-0
+      year: 1979
+    - source_type: peer_reviewed
+      title: >-
+        Monitoring vegetation systems in the Great Plains with ERTS
+      url: https://ntrs.nasa.gov/citations/19740022614
+      year: 1974
+    - source_type: fao
+      title: >-
+        FAO GIEWS — Earth Observation: NDVI anomaly for agricultural
+        drought and crop-condition monitoring
+      url: https://www.fao.org/giews/earthobservation/
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: high
+
 root: root
 nodes:
   root:

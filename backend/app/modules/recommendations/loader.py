@@ -90,6 +90,15 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     parameters_decl = _validate_parameters_block(spec, source_path)
     _validate_params_refs(nodes_raw, parameters_decl, source_path)
 
+    # Validate the optional scientific-provenance blocks (KB P1-A).
+    # These are display/governance metadata only — the evaluator never
+    # reads them. They ride inside `tree_compiled` so they version
+    # immutably with the tree and surface through the existing
+    # DecisionTreeVersionResponse without a schema migration. Trees that
+    # omit them get `null` and behave exactly as before.
+    evidence = _validate_evidence_block(spec, source_path)
+    transferability = _validate_transferability_block(spec, source_path)
+
     compiled: dict[str, Any] = {
         "code": code,
         "name_en": name_en,
@@ -99,6 +108,8 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
         "crop_code": spec.get("crop_code"),
         "applicable_regions": list(spec.get("applicable_regions") or []),
         "parameters": parameters_decl,
+        "evidence": evidence,
+        "transferability": transferability,
         "root": root,
         "nodes": nodes_raw,
     }
@@ -176,6 +187,190 @@ def _validate_parameters_block(
             "max": decl.get("max"),
             "values": list(decl.get("values") or []) if type_ == "enum" else None,
         }
+    return normalized
+
+
+# ---------------------------------------------------------------------
+# Scientific-provenance blocks (KB P1-A) — `evidence:` + `transferability:`
+#
+# Optional, evaluator-invisible metadata that lets a seeded knowledge-base
+# condition carry its provenance (peer-reviewed / FAO / USDA / extension
+# citations + an evidence-quality grade) and per-region applicability. The
+# research task that drives the KB demands "do not fabricate; state
+# uncertainty explicitly" — `evidence.confidence` + `evidence.notes` are
+# where that uncertainty is recorded.
+# ---------------------------------------------------------------------
+
+# Evidence-quality grade — how strong the *science* is (distinct from a
+# leaf's result `confidence`, which is firing probability).
+_EVIDENCE_CONFIDENCE: frozenset[str] = frozenset(
+    {"very_high", "high", "medium", "low"}
+)
+
+# Authoritative source categories the research task accepts.
+_CITATION_SOURCE_TYPES: frozenset[str] = frozenset(
+    {
+        "peer_reviewed",
+        "fao",
+        "usda",
+        "extension",
+        "university",
+        "research_institution",
+        "remote_sensing",
+        "government",
+    }
+)
+
+# Per-region transferability suitability grades.
+_TRANSFERABILITY_GRADES: frozenset[str] = frozenset(
+    {"very_high", "high", "medium", "low", "not_applicable"}
+)
+# The three regions the research task scores every finding against.
+_TRANSFERABILITY_REGIONS: frozenset[str] = frozenset(
+    {"egypt", "middle_east", "global"}
+)
+
+
+def _validate_evidence_block(
+    spec: dict[str, Any], source_path: str
+) -> dict[str, Any] | None:
+    """Strict-parse the optional ``evidence:`` block.
+
+    Shape::
+
+        evidence:
+          confidence: high            # required: very_high|high|medium|low
+          notes: "..."                # optional free-text (uncertainty)
+          citations:                  # optional
+            - source_type: peer_reviewed
+              title: "..."            # required
+              doi: "10.xxxx/yyyy"     # optional
+              url: "https://..."      # optional
+              year: 2019              # optional int
+
+    Returns a normalized dict, or ``None`` when no block is present.
+    """
+    raw = spec.get("evidence")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise DecisionTreeParseError(
+            path=source_path, detail="'evidence' must be a mapping"
+        )
+
+    confidence = raw.get("confidence")
+    if confidence not in _EVIDENCE_CONFIDENCE:
+        raise DecisionTreeParseError(
+            path=source_path,
+            detail=(
+                f"evidence 'confidence' must be one of "
+                f"{sorted(_EVIDENCE_CONFIDENCE)}, got {confidence!r}"
+            ),
+        )
+
+    notes = raw.get("notes")
+    if notes is not None and not isinstance(notes, str):
+        raise DecisionTreeParseError(
+            path=source_path, detail="evidence 'notes' must be a string"
+        )
+
+    citations_raw = raw.get("citations")
+    citations: list[dict[str, Any]] = []
+    if citations_raw is not None:
+        if not isinstance(citations_raw, list):
+            raise DecisionTreeParseError(
+                path=source_path, detail="evidence 'citations' must be a list"
+            )
+        for i, cite in enumerate(citations_raw):
+            citations.append(_validate_citation(cite, i, source_path))
+
+    return {"confidence": confidence, "notes": notes, "citations": citations}
+
+
+def _validate_citation(cite: Any, index: int, source_path: str) -> dict[str, Any]:
+    if not isinstance(cite, dict):
+        raise DecisionTreeParseError(
+            path=source_path, detail=f"evidence citation #{index} must be a mapping"
+        )
+    source_type = cite.get("source_type")
+    if source_type not in _CITATION_SOURCE_TYPES:
+        raise DecisionTreeParseError(
+            path=source_path,
+            detail=(
+                f"citation #{index} 'source_type' must be one of "
+                f"{sorted(_CITATION_SOURCE_TYPES)}, got {source_type!r}"
+            ),
+        )
+    title = cite.get("title")
+    if not isinstance(title, str) or not title:
+        raise DecisionTreeParseError(
+            path=source_path,
+            detail=f"citation #{index} requires a non-empty 'title'",
+        )
+    year = cite.get("year")
+    if year is not None and not isinstance(year, int):
+        raise DecisionTreeParseError(
+            path=source_path, detail=f"citation #{index} 'year' must be an integer"
+        )
+    for opt in ("doi", "url"):
+        val = cite.get(opt)
+        if val is not None and not isinstance(val, str):
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"citation #{index} {opt!r} must be a string",
+            )
+    return {
+        "source_type": source_type,
+        "title": title,
+        "doi": cite.get("doi"),
+        "url": cite.get("url"),
+        "year": year,
+    }
+
+
+def _validate_transferability_block(
+    spec: dict[str, Any], source_path: str
+) -> dict[str, Any] | None:
+    """Strict-parse the optional ``transferability:`` block.
+
+    Shape::
+
+        transferability:
+          egypt: high
+          middle_east: high
+          global: medium
+
+    Keys are restricted to the three research regions; each value is a
+    suitability grade. Missing regions normalize to ``None``. Returns
+    ``None`` when no block is present.
+    """
+    raw = spec.get("transferability")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise DecisionTreeParseError(
+            path=source_path, detail="'transferability' must be a mapping"
+        )
+
+    normalized: dict[str, Any] = {region: None for region in sorted(_TRANSFERABILITY_REGIONS)}
+    for region, grade in raw.items():
+        if region not in _TRANSFERABILITY_REGIONS:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=(
+                    f"transferability region {region!r} must be one of "
+                    f"{sorted(_TRANSFERABILITY_REGIONS)}"
+                ),
+            )
+        if grade not in _TRANSFERABILITY_GRADES:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=(
+                    f"transferability[{region}] must be one of "
+                    f"{sorted(_TRANSFERABILITY_GRADES)}, got {grade!r}"
+                ),
+            )
+        normalized[region] = grade
     return normalized
 
 
