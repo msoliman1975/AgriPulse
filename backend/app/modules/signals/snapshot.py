@@ -40,6 +40,7 @@ CS-6 aggregation:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -49,7 +50,13 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.indices.trends import compute_trend
 from app.shared.conditions.context import SignalEntry
+
+# Window over which numeric-signal trends (value_slope / value_delta /
+# value_trend_direction) are computed (KB P2). Independent of a signal's
+# aggregation window — it's a fixed look-back for direction-of-change.
+_TREND_WINDOW_DAYS = 30
 
 # All SQL aggregates collapsed into one CASE so the query stays
 # single-pass. PERCENTILE_CONT requires a float ordering expression,
@@ -174,7 +181,7 @@ async def load_snapshot(
         .mappings()
         .all()
     )
-    return {
+    entries = {
         row["code"]: SignalEntry(
             time=row["time"],
             value_numeric=_to_decimal(row["value_numeric"]),
@@ -184,6 +191,85 @@ async def load_snapshot(
         )
         for row in rows
     }
+    # KB P2: fold in numeric-signal trends so a rule can say e.g.
+    # "soil_salinity rising". Only touches signals already in the snapshot.
+    trends = await _load_numeric_trends(session, block_id=block_id, farm_id=farm_id)
+    for code, (slope, delta, direction) in trends.items():
+        if code in entries:
+            entries[code] = replace(
+                entries[code],
+                value_slope=slope,
+                value_delta=delta,
+                value_trend_direction=direction,
+            )
+    return entries
+
+
+async def _load_numeric_trends(
+    session: AsyncSession,
+    *,
+    block_id: UUID,
+    farm_id: UUID,
+) -> dict[str, tuple[Decimal | None, Decimal | None, str | None]]:
+    """Trend (slope, delta, direction) over the numeric observation history
+    of each applicable numeric signal, within ``_TREND_WINDOW_DAYS``.
+
+    Same applicability rule as the main snapshot. Signals with fewer than
+    two numeric observations in the window are omitted (their trend fields
+    stay ``None`` → trend predicates fail closed)."""
+    rows = (
+        (
+            await session.execute(
+                text(
+                    """
+                    WITH applicable AS (
+                        SELECT DISTINCT d.id, d.code
+                        FROM signal_definitions d
+                        JOIN signal_assignments a ON a.signal_definition_id = d.id
+                        WHERE d.deleted_at IS NULL
+                          AND d.is_active = TRUE
+                          AND d.value_kind = 'numeric'
+                          AND a.deleted_at IS NULL
+                          AND a.is_active = TRUE
+                          AND (
+                                (a.farm_id IS NULL AND a.block_id IS NULL)
+                             OR (a.block_id = :block_id)
+                             OR (a.farm_id = :farm_id AND a.block_id IS NULL)
+                          )
+                    )
+                    SELECT a.code, o.time, o.value_numeric
+                    FROM applicable a
+                    JOIN signal_observations o ON o.signal_definition_id = a.id
+                    WHERE o.value_numeric IS NOT NULL
+                      AND (o.block_id = :block_id OR o.block_id IS NULL)
+                      AND o.farm_id = :farm_id
+                      AND o.time >= now() - make_interval(days => :window_days)
+                    ORDER BY a.code, o.time
+                    """
+                ).bindparams(
+                    bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                ),
+                {
+                    "block_id": block_id,
+                    "farm_id": farm_id,
+                    "window_days": _TREND_WINDOW_DAYS,
+                },
+            )
+        )
+        .mappings()
+        .all()
+    )
+    series: dict[str, list[tuple[Any, Any]]] = {}
+    for row in rows:
+        series.setdefault(row["code"], []).append((row["time"], row["value_numeric"]))
+
+    out: dict[str, tuple[Decimal | None, Decimal | None, str | None]] = {}
+    for code, points in series.items():
+        trend = compute_trend(points)
+        if trend.direction is not None:
+            out[code] = (trend.slope, trend.delta, trend.direction)
+    return out
 
 
 def _to_decimal(value: Any) -> Decimal | None:
