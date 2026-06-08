@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import { listBlocks } from "@/api/blocks";
 import {
@@ -102,9 +102,7 @@ export function SignalsLogPage(): ReactNode {
         defsLoading ? (
           <Skeleton className="h-64 w-full rounded-xl" />
         ) : !defs || defs.length === 0 ? (
-          <div className="rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
-            {t("log.noDefinitions")}
-          </div>
+          <EmptyWithCta message={t("log.noDefinitions")} farmId={farmId} />
         ) : (
           <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
             <aside className="rounded-xl border border-ap-line bg-ap-panel p-2">
@@ -149,9 +147,7 @@ export function SignalsLogPage(): ReactNode {
       ) : tplsLoading ? (
         <Skeleton className="h-64 w-full rounded-xl" />
       ) : activeTemplates.length === 0 ? (
-        <div className="rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
-          {t("log.template.empty")}
-        </div>
+        <EmptyWithCta message={t("log.template.empty")} farmId={farmId} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
           <aside className="rounded-xl border border-ap-line bg-ap-panel p-2">
@@ -198,6 +194,27 @@ export function SignalsLogPage(): ReactNode {
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function EmptyWithCta({
+  message,
+  farmId,
+}: {
+  message: string;
+  farmId: string;
+}): ReactNode {
+  const { t } = useTranslation("signals");
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
+      <p>{message}</p>
+      <Link
+        to={`/config/signals/${farmId}`}
+        className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
+      >
+        {t("log.configureCta")}
+      </Link>
     </div>
   );
 }

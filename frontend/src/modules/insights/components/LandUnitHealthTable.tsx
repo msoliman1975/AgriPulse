@@ -98,7 +98,7 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
       <td className="px-4 py-2 text-end">
         <button
           type="button"
-          onClick={() => navigate(`/plan/${farmId}?lane=${b.id}`)}
+          onClick={() => navigate(`/board/${farmId}?lane=${b.id}`)}
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
         >
           Plan

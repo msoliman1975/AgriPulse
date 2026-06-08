@@ -1,6 +1,13 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 
 import { AuthCallback } from "@/auth/AuthCallback";
 import { AuthProvider } from "@/auth/AuthProvider";
@@ -69,7 +76,11 @@ function RedirectLegacyAdminTenant(): ReactNode {
 
 function RedirectPlanToBoard(): ReactNode {
   const { farmId = "" } = useParams<{ farmId: string }>();
-  return <Navigate to={`/board/${farmId}`} replace />;
+  // Preserve the query string (?activity=&lane=) so deep-links from Alerts and
+  // the Insights "Upcoming activities" card keep focusing the right activity
+  // after the /plan -> /board cutover redirect.
+  const { search } = useLocation();
+  return <Navigate to={`/board/${farmId}${search}`} replace />;
 }
 
 export function App(): ReactNode {

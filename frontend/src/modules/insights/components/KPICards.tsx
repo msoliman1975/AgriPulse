@@ -111,7 +111,7 @@ export function KPICards({ farmId }: Props): ReactNode {
             ? t("kpi.irrigation.hintTotal", { mm: totalMm.toFixed(1) })
             : t("kpi.irrigation.hintEmpty")
         }
-        onClick={() => navigate(`/plan/${farmId}`)}
+        onClick={() => navigate(`/board/${farmId}`)}
       />
       <KPICard
         title={t("kpi.latestSignal.title")}

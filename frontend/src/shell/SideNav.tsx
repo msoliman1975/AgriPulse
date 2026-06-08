@@ -13,7 +13,6 @@ import {
   LandUnitsIcon,
   PlanIcon,
   RecommendationsIcon,
-  ReportsIcon,
   SignalsIcon,
   TenantIcon,
   UsersIcon,
@@ -37,11 +36,12 @@ function SideNavItem({
   badge,
 }: SideNavItemProps): ReactNode {
   const location = useLocation();
+  const { t } = useTranslation("common");
   if (disabled) {
     return (
       <span
         aria-disabled="true"
-        title="Pick a farm to continue"
+        title={t("workspaceNav.pickFarm")}
         className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ap-muted/60"
       >
         {icon}
@@ -92,7 +92,7 @@ export function SideNav(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const hasFarm = Boolean(farmId);
   const isPlatformAdmin = useCapability("platform.manage_tenants");
-  const { t } = useTranslation("admin");
+  const { t } = useTranslation(["admin", "common"]);
   const farmSegment = farmId ?? "";
 
   // Persona separation (portal-restructure Q8): PlatformAdmin sees
@@ -143,86 +143,82 @@ export function SideNav(): ReactNode {
       aria-label="Primary"
       className="hidden w-56 flex-shrink-0 overflow-y-auto border-e border-ap-line bg-ap-panel py-3 md:block"
     >
-      <GroupHeader>Workspace</GroupHeader>
+      <GroupHeader>{t("common:workspaceNav.workspace")}</GroupHeader>
       <div className="flex flex-col gap-0.5 px-2">
         <SideNavItem
           to={hasFarm ? `/insights/${farmSegment}` : "#"}
-          label="Insights"
+          label={t("common:workspaceNav.insights")}
           icon={<InsightsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/insights/"
         />
         <SideNavItem
           to={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
-          label="Farm management"
+          label={t("common:workspaceNav.farmManagement")}
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
         {/* Legacy form-based view kept as a fallback while we iterate. */}
         <SideNavItem
           to={hasFarm ? `/farms/${farmSegment}` : "/farms"}
-          label="Farm management (legacy)"
+          label={t("common:workspaceNav.farmManagementLegacy")}
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/farms/${farmSegment}` : "/farms"}
         />
         <SideNavItem
           to={hasFarm ? `/alerts/${farmSegment}` : "#"}
-          label="Alerts"
+          label={t("common:workspaceNav.alerts")}
           icon={<AlertsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/alerts/"
         />
         <SideNavItem
           to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
-          label="Recommendations"
+          label={t("common:workspaceNav.recommendations")}
           icon={<RecommendationsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/recommendations/"
         />
         <SideNavItem
           to={hasFarm ? `/signals/${farmSegment}` : "#"}
-          label="Signals"
+          label={t("common:workspaceNav.signals")}
           icon={<SignalsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/signals/"
         />
         <SideNavItem
           to={hasFarm ? `/board/${farmSegment}` : "#"}
-          label="Plan"
+          label={t("common:workspaceNav.plan")}
           icon={<PlanIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/board/"
         />
-        <SideNavItem
-          to={hasFarm ? `/reports/${farmSegment}` : "#"}
-          label="Reports"
-          icon={<ReportsIcon className="h-4 w-4" />}
-          disabled={!hasFarm}
-          activePathPrefix="/reports/"
-        />
+        {/* Reports (F-2): the page is a "coming soon" dead-end, so the nav
+            entry is withheld until it ships. The /reports/:farmId route still
+            resolves for any existing deep links. */}
       </div>
       {/* Per-farm configuration that genuinely needs a farm context. The
           tenant-wide config (rules, users, decision trees) lives under
           the Settings hub so a farm doesn't have to be active. */}
-      <GroupHeader>Configuration</GroupHeader>
+      <GroupHeader>{t("common:workspaceNav.configuration")}</GroupHeader>
       <div className="flex flex-col gap-0.5 px-2">
         <SideNavItem
           to={hasFarm ? `/config/imagery/${farmSegment}` : "#"}
-          label="Imagery & weather"
+          label={t("common:workspaceNav.imageryWeather")}
           icon={<ImageryIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/config/imagery/"
         />
         <SideNavItem
           to={hasFarm ? `/config/signals/${farmSegment}` : "#"}
-          label="Custom signals"
+          label={t("common:workspaceNav.customSignals")}
           icon={<SignalsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
           activePathPrefix="/config/signals/"
         />
         <SideNavItem
           to="/settings"
-          label="Settings"
+          label={t("common:workspaceNav.settings")}
           icon={<GearIcon className="h-4 w-4" />}
           activePathPrefix="/settings"
         />

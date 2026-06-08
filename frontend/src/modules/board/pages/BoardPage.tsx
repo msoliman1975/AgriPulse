@@ -8,9 +8,9 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import type {
   ActivityType,
@@ -139,8 +139,18 @@ export function BoardPage(): ReactNode {
   const range = useMemo(() => computeWindow(viewMode, anchor), [viewMode, anchor]);
   const boardQ = useBoard(farmId ?? null, range.fetchStart, range.fetchWeeks);
 
-  // Filters — empty Set means "all".
-  const [filterBlockIds, setFilterBlockIds] = useState<Set<string>>(new Set());
+  // Deep-link context preserved through the /plan -> /board redirect: callers
+  // (Alerts, Insights "Upcoming activities") pass ?activity=&lane= to focus a
+  // specific activity in a specific block lane.
+  const [searchParams] = useSearchParams();
+  const focusActivityId = searchParams.get("activity");
+  const focusLane = searchParams.get("lane");
+
+  // Filters — empty Set means "all". Seed the block filter from ?lane= so the
+  // deep-linked block is focused on first paint, before the board data lands.
+  const [filterBlockIds, setFilterBlockIds] = useState<Set<string>>(() =>
+    focusLane ? new Set([focusLane]) : new Set(),
+  );
   const [filterTypes, setFilterTypes] = useState<Set<ActivityType>>(new Set());
   const [filterResourceIds, setFilterResourceIds] = useState<Set<string>>(
     new Set(),
@@ -156,6 +166,23 @@ export function BoardPage(): ReactNode {
     columnUnit: "day" | "month";
   } | null>(null);
   const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
+
+  // Open the deep-linked activity once the board data is available, re-anchoring
+  // the window so it is actually visible. Runs once: the guard ref stops it from
+  // re-opening the dialog after the user closes it. If the activity falls outside
+  // the fetched window it is silently skipped — the ?lane= focus still applies.
+  const deepLinkConsumed = useRef(false);
+  useEffect(() => {
+    if (deepLinkConsumed.current || !focusActivityId) return;
+    const activities = boardQ.data?.activities;
+    if (!activities) return;
+    const match = activities.find((a) => a.id === focusActivityId);
+    if (match) {
+      setAnchor(startOfWeek(parseISO(match.scheduled_date), { weekStartsOn: 1 }));
+      setOpenActivity(match);
+    }
+    deepLinkConsumed.current = true;
+  }, [focusActivityId, boardQ.data]);
 
   const scheduleRec = useScheduleRecommendation(farmId ?? null);
 
@@ -519,7 +546,7 @@ function RangeNavigator({
       </button>
       <button
         type="button"
-        className="ml-2 rounded-md border border-ap-line bg-white px-2 py-1"
+        className="ms-2 rounded-md border border-ap-line bg-white px-2 py-1"
         onClick={onToday}
       >
         {t("nav.today")}
@@ -588,7 +615,7 @@ function BoardGrid({
       <table className="min-w-full table-fixed border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-ap-bg/80">
           <tr>
-            <th className="w-32 border-b border-r border-ap-line p-2 text-left text-xs font-semibold uppercase tracking-wider text-ap-muted">
+            <th className="w-32 border-b border-e border-ap-line p-2 text-start text-xs font-semibold uppercase tracking-wider text-ap-muted">
               {t("col.block")}
             </th>
             {columns.map((col) => (
@@ -596,7 +623,7 @@ function BoardGrid({
                 key={col.start}
                 className={
                   (compactCells ? "min-w-[56px] p-1 " : "min-w-[120px] p-2 ") +
-                  "border-b border-r border-ap-line text-left text-xs font-semibold uppercase tracking-wider text-ap-muted"
+                  "border-b border-e border-ap-line text-start text-xs font-semibold uppercase tracking-wider text-ap-muted"
                 }
               >
                 {columnLabel(col)}
@@ -609,7 +636,7 @@ function BoardGrid({
             <tr key={block.id}>
               <th
                 scope="row"
-                className="w-32 border-b border-r border-ap-line bg-ap-bg/30 p-2 text-left align-top font-medium text-ap-ink"
+                className="w-32 border-b border-e border-ap-line bg-ap-bg/30 p-2 text-start align-top font-medium text-ap-ink"
               >
                 <div>{block.code}</div>
                 {block.name ? (

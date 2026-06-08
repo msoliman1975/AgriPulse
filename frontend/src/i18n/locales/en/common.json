@@ -8,6 +8,21 @@
     "skipToContent": "Skip to main content",
     "noTenants": "No tenants yet."
   },
+  "workspaceNav": {
+    "workspace": "Workspace",
+    "configuration": "Configuration",
+    "insights": "Insights",
+    "farmManagement": "Farm management",
+    "farmManagementLegacy": "Farm management (legacy)",
+    "alerts": "Alerts",
+    "recommendations": "Recommendations",
+    "signals": "Signals",
+    "plan": "Plan",
+    "imageryWeather": "Imagery & weather",
+    "customSignals": "Custom signals",
+    "settings": "Settings",
+    "pickFarm": "Pick a farm to continue"
+  },
   "shell": {
     "languageToggle": "Language",
     "languageEnglish": "English",
