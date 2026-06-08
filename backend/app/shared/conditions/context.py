@@ -43,11 +43,18 @@ class IndicesEntry:
 # definition picks which one is non-null; the parser doesn't know the
 # kind, so it accepts any of these and the resolver returns ``None`` for
 # the wrong one.
+# ``value_slope`` / ``value_delta`` / ``value_trend_direction`` (KB P2) are
+# precomputed from the numeric observation history of the signal, so a rule
+# can say "soil_salinity rising" the same way indices express trends. Only
+# meaningful for numeric signals; non-numeric signals leave them None.
 SIGNAL_KEYS: tuple[str, ...] = (
     "value_numeric",
     "value_categorical",
     "value_event",
     "value_boolean",
+    "value_slope",
+    "value_delta",
+    "value_trend_direction",
 )
 
 
@@ -65,6 +72,11 @@ class SignalEntry:
     value_categorical: str | None = None
     value_event: str | None = None
     value_boolean: bool | None = None
+    # Trend over the numeric observation history (KB P2); None for
+    # non-numeric signals or too-short history.
+    value_slope: Decimal | None = None
+    value_delta: Decimal | None = None
+    value_trend_direction: str | None = None
 
 
 # Allowed fields for a grid value-ref (G-4). Each maps 1:1 to a
