@@ -32,7 +32,8 @@
     "addBlock": "Add block",
     "autoGrid": "Auto-grid blocks",
     "noBlocks": "This farm has no blocks yet.",
-    "loading": "Loading farm…"
+    "loading": "Loading farm…",
+    "back": "Back to farms"
   },
   "form": {
     "code": "Code",

@@ -1,7 +1,7 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import type {
   ActionHorizon,
@@ -54,12 +54,22 @@ export function RecommendationsPage(): ReactNode {
           <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
           <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
         </div>
-        <SegmentedControl
-          ariaLabel={t("tabsLabel")}
-          items={STATE_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
-          value={tab}
-          onChange={(v) => setTab(v)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            ariaLabel={t("tabsLabel")}
+            items={STATE_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
+            value={tab}
+            onChange={(v) => setTab(v)}
+          />
+          {/* F-8: give applied/acted-on recommendations a direct path to the
+              board instead of stranding the user after "Apply". */}
+          <Link
+            to={`/board/${farmId}`}
+            className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
+          >
+            {t("actions.openInPlan")}
+          </Link>
+        </div>
       </header>
 
       <div className="rounded-xl border border-ap-line bg-ap-panel">
@@ -81,6 +91,7 @@ export function RecommendationsPage(): ReactNode {
               <Row
                 key={r.id}
                 rec={r}
+                farmId={farmId}
                 canAct={canAct}
                 onApply={() =>
                   transition.mutate({
@@ -111,13 +122,14 @@ export function RecommendationsPage(): ReactNode {
 
 interface RowProps {
   rec: Recommendation;
+  farmId: string;
   canAct: boolean;
   onApply: () => void;
   onDismiss: () => void;
   onDefer: (until: string) => void;
 }
 
-function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode {
+function Row({ rec, farmId, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode {
   const { t, i18n } = useTranslation("recommendations");
   const dateLocale = useDateLocale();
   const [expanded, setExpanded] = useState(false);
@@ -226,6 +238,14 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
               {t("actions.apply")}
             </button>
           </div>
+        ) : null}
+        {rec.state === "applied" ? (
+          <Link
+            to={`/board/${farmId}`}
+            className="text-[11px] font-medium text-ap-primary hover:underline"
+          >
+            {t("actions.openInPlan")}
+          </Link>
         ) : null}
       </div>
     </li>

@@ -8,6 +8,21 @@
     "skipToContent": "تخطّي إلى المحتوى الرئيسي",
     "noTenants": "لا توجد مؤسسات بعد."
   },
+  "workspaceNav": {
+    "workspace": "مساحة العمل",
+    "configuration": "التهيئة",
+    "insights": "الرؤى",
+    "farmManagement": "إدارة المزرعة",
+    "farmManagementLegacy": "إدارة المزرعة (القديمة)",
+    "alerts": "التنبيهات",
+    "recommendations": "التوصيات",
+    "signals": "الإشارات",
+    "plan": "الخطة",
+    "imageryWeather": "الصور والطقس",
+    "customSignals": "الإشارات المخصصة",
+    "settings": "الإعدادات",
+    "pickFarm": "اختر مزرعة للمتابعة"
+  },
   "shell": {
     "languageToggle": "اللغة",
     "languageEnglish": "English",

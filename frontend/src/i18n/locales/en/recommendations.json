@@ -25,7 +25,8 @@
     "apply": "Apply",
     "dismiss": "Dismiss",
     "defer24": "Defer 24h",
-    "defer24Title": "Defer for 24 hours"
+    "defer24Title": "Defer for 24 hours",
+    "openInPlan": "Open in Plan"
   },
   "path": {
     "match": "match",

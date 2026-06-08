@@ -67,9 +67,9 @@ function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): React
   const navigate = useNavigate();
   const goResolve = () => {
     if (a.prescription_activity_id) {
-      navigate(`/plan/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
+      navigate(`/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
     } else {
-      navigate(`/plan/${farmId}?lane=${a.block_id}`);
+      navigate(`/board/${farmId}?lane=${a.block_id}`);
     }
   };
   return (

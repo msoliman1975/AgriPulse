@@ -40,7 +40,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
         </h2>
         <button
           type="button"
-          onClick={() => navigate(`/plan/${farmId}`)}
+          onClick={() => navigate(`/board/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
           Plan →
@@ -61,7 +61,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
               <button
                 type="button"
                 key={a.id}
-                onClick={() => navigate(`/plan/${farmId}?activity=${a.id}&lane=${a.block_id}`)}
+                onClick={() => navigate(`/board/${farmId}?activity=${a.id}&lane=${a.block_id}`)}
                 className="flex items-center gap-3 rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-start hover:bg-ap-line/30"
               >
                 <div className="flex w-12 flex-none flex-col items-center text-ap-muted">

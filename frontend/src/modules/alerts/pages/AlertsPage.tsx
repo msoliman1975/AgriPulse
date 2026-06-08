@@ -167,9 +167,9 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
           type="button"
           onClick={() => {
             if (a.prescription_activity_id) {
-              navigate(`/plan/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
+              navigate(`/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
             } else {
-              navigate(`/plan/${farmId}?lane=${a.block_id}`);
+              navigate(`/board/${farmId}?lane=${a.block_id}`);
             }
           }}
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"

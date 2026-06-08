@@ -195,6 +195,7 @@
     "title": "Signals — entry & log",
     "subtitle": "Record observations one at a time, or import many at once via CSV. They feed alerts, recommendations, and the dashboard.",
     "noDefinitions": "No signal definitions yet. Ask a tenant admin to define one in Configuration → Signals.",
+    "configureCta": "Configure signals",
     "missingCapability": "You need the {{capability}} capability on this farm to log observations.",
     "mode": {
       "label": "Entry mode",
