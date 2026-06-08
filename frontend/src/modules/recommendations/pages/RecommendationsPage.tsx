@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import type {
+  ActionHorizon,
   Recommendation,
+  RecommendationActions,
   RecommendationSeverity,
   RecommendationState,
   TreePathStepDTO,
@@ -189,7 +191,12 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
         >
           {expanded ? t("row.explainHide") : t("row.explainShow")}
         </button>
-        {expanded ? <TreePath path={rec.tree_path} /> : null}
+        {expanded ? (
+          <>
+            <ActionsList actions={rec.actions} />
+            <TreePath path={rec.tree_path} />
+          </>
+        ) : null}
       </div>
       <div className="flex flex-none flex-col items-end gap-1.5">
         {!isTerminal && canAct ? (
@@ -222,6 +229,41 @@ function Row({ rec, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode 
         ) : null}
       </div>
     </li>
+  );
+}
+
+// 4-horizon structured guidance (KB P1-B). Rendered above the
+// explainability path when a recommendation carries an `actions` block;
+// renders nothing for recommendations whose leaf had only a summary.
+const ACTION_HORIZONS: readonly ActionHorizon[] = [
+  "immediate",
+  "short_term",
+  "long_term",
+  "monitoring",
+];
+
+function ActionsList({ actions }: { actions: RecommendationActions }): ReactNode {
+  const { t, i18n } = useTranslation("recommendations");
+  const isAr = i18n.language === "ar";
+  const present = ACTION_HORIZONS.filter((h) => (actions[h]?.length ?? 0) > 0);
+  if (present.length === 0) return null;
+  return (
+    <dl className="mt-2 flex flex-col gap-2 rounded-md border border-ap-line bg-ap-bg/40 p-3 text-[11px]">
+      {present.map((horizon) => (
+        <div key={horizon}>
+          <dt className="font-semibold text-ap-ink">
+            {t(`actionHorizon.${horizon}`)}
+          </dt>
+          <dd>
+            <ul className="ml-3 list-disc text-ap-muted">
+              {(actions[horizon] ?? []).map((item, i) => (
+                <li key={i}>{isAr ? (item.text_ar ?? item.text_en) : item.text_en}</li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

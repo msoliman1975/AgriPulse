@@ -23,6 +23,16 @@ RecommendationState = Literal["open", "applied", "dismissed", "deferred", "expir
 Severity = Literal["info", "warning", "critical"]
 
 
+ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
+
+
+class RecommendationActionItem(BaseModel):
+    """One localized action item within a time horizon (KB P1-B)."""
+
+    text_en: str
+    text_ar: str | None = None
+
+
 class RecommendationResponse(BaseModel):
     """One row from `recommendations`."""
 
@@ -38,6 +48,12 @@ class RecommendationResponse(BaseModel):
     action_type: ActionType
     severity: Severity
     parameters: dict[str, Any]
+    # 4-horizon structured guidance (KB P1-B). Keyed by ActionHorizon;
+    # absent horizons are simply omitted. Empty for trees whose leaf
+    # carries only the single `text_en` summary.
+    actions: dict[ActionHorizon, list[RecommendationActionItem]] = Field(
+        default_factory=dict
+    )
     confidence: Decimal
     tree_path: list[dict[str, Any]]
     text_en: str

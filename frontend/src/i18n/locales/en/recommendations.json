@@ -43,5 +43,11 @@
     "dismissed": "dismissed",
     "deferred": "deferred",
     "expired": "expired"
+  },
+  "actionHorizon": {
+    "immediate": "Immediate",
+    "short_term": "Short-term",
+    "long_term": "Long-term",
+    "monitoring": "Monitoring"
   }
 }
