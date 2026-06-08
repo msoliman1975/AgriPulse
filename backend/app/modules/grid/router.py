@@ -23,6 +23,8 @@ from app.modules.grid.errors import GridConfigNotFoundError
 from app.modules.grid.schemas import (
     CellSizePreviewRequest,
     CellSizePreviewResponse,
+    GridBackfillRequest,
+    GridBackfillResponse,
     GridCellHistoryResponse,
     GridCellsResponse,
     GridConfigBody,
@@ -114,7 +116,44 @@ async def put_grid_config(
         product_id=product_id,
         cell_size_m=body.cell_size_m,
         created_by=context.user_id,
+        anomaly_z_threshold=body.anomaly_z_threshold,
     )
+
+
+@router.post(
+    "/blocks/{block_id}/grid-configs/{product_id}/backfill",
+    response_model=GridBackfillResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-process past scenes onto the current grid (opt-in).",
+)
+async def backfill_grid(
+    block_id: UUID,
+    product_id: UUID,
+    body: GridBackfillRequest,
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    service: GridService = Depends(_service),
+) -> GridBackfillResponse:
+    schema = _ensure_tenant(context)
+    farm_id = await _resolve_farm_id(block_id=block_id, tenant_session=tenant_session)
+    # Same write scope as reshaping the grid — backfill spends compute.
+    if not has_capability(context, "imagery.subscription.manage", farm_id=farm_id):
+        raise BlockNotVisibleError(str(block_id))
+    count = await service.count_backfill_scenes(
+        block_id=block_id, product_id=product_id, since=body.since, limit=body.limit
+    )
+    # Fan-out runs off-request: one task lists + enqueues compute_indices
+    # per scene so the response returns immediately.
+    from app.modules.grid.tasks import backfill_block
+
+    backfill_block.delay(
+        schema,
+        str(block_id),
+        str(product_id),
+        body.limit,
+        body.since.isoformat() if body.since else None,
+    )
+    return GridBackfillResponse(scenes_queued=count)
 
 
 @router.post(

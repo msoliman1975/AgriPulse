@@ -38,6 +38,18 @@ CRITICAL_FLAGGED_FRACTION = 0.10
 CRITICAL_WORST_Z = 3.0
 
 
+def effective_k(*, block_override: float | Decimal | None, tenant_default: float) -> float:
+    """Resolve the detection threshold for one block (G-3).
+
+    Per-block override (``grid_configs.anomaly_z_threshold``) wins; a NULL
+    override falls through to the already-resolved tenant/platform default.
+    Pure so the resolution order is unit-testable without a DB.
+    """
+    if block_override is not None:
+        return float(block_override)
+    return tenant_default
+
+
 @dataclass(frozen=True, slots=True)
 class CellMean:
     """One cell's index mean at a single scene."""

@@ -58,6 +58,37 @@ class SignalEntry:
     value_boolean: bool | None = None
 
 
+# Allowed fields for a grid value-ref (G-4). Each maps 1:1 to a
+# ``GridAnomalyEntry`` attribute; ``parse_value_ref`` validates against
+# this tuple and the evaluator reads via ``getattr``.
+GRID_FIELDS: tuple[str, ...] = (
+    "worst_z",  # std-devs the worst flagged cell sits below the field mean
+    "flagged_count",  # how many cells crossed the threshold
+    "worst_row",  # grid row of the worst cell
+    "worst_col",  # grid col of the worst cell
+    "severity",  # "warning" | "critical"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class GridAnomalyEntry:
+    """Latest sub-block grid spatial-anomaly verdict for one index (G-4).
+
+    Present in ``ConditionContext.grid`` only when the latest scene for
+    that (block, index) crossed the detection threshold — a tree
+    predicate against an index with no current anomaly resolves to
+    ``None`` and fails closed, matching every other source. Lets a
+    decision tree branch on *where/how-bad* a spatial anomaly is, e.g.
+    ``{source: grid, index_code: ndvi, field: flagged_count} >= 5``.
+    """
+
+    worst_z: Decimal | None = None
+    flagged_count: int | None = None
+    worst_row: int | None = None
+    worst_col: int | None = None
+    severity: str | None = None
+
+
 # Allowed scope keys for a weather value-ref. Keep in lock-step with
 # ``WeatherSnapshot`` field names below — ``parse_value_ref`` validates
 # against this tuple.
@@ -115,6 +146,10 @@ class ConditionContext:
     indices: dict[str, IndicesEntry] = field(default_factory=dict)
     weather: WeatherSnapshot | None = None
     signals: dict[str, SignalEntry] = field(default_factory=dict)
+    # Sub-block grid spatial-anomaly verdicts keyed by index_code (G-4).
+    # Populated by the recommendations driver only when the block has an
+    # active grid with a current anomaly; empty otherwise.
+    grid: dict[str, GridAnomalyEntry] = field(default_factory=dict)
     # Decision-tree parameter values (PR-B): {name: value} resolved
     # from the tree's `parameters:` defaults, layered with tenant
     # overrides in PR-C. The alerts engine leaves this empty.
@@ -132,6 +167,7 @@ class ConditionContext:
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
         signals: dict[str, SignalEntry] | None = None,
+        grid: dict[str, GridAnomalyEntry] | None = None,
         params: dict[str, Any] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
@@ -154,6 +190,7 @@ class ConditionContext:
             indices=indices,
             weather=weather,
             signals=signals or {},
+            grid=grid or {},
             params=dict(params or {}),
         )
 

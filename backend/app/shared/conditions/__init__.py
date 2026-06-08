@@ -24,6 +24,7 @@ Design choices worth knowing:
 
 from app.shared.conditions.context import (
     ConditionContext,
+    GridAnomalyEntry,
     SignalEntry,
     WeatherSnapshot,
 )
@@ -33,6 +34,7 @@ from app.shared.conditions.evaluator import evaluate
 __all__ = [
     "ConditionContext",
     "ConditionParseError",
+    "GridAnomalyEntry",
     "SignalEntry",
     "WeatherSnapshot",
     "evaluate",

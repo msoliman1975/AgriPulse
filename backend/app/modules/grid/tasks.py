@@ -31,7 +31,8 @@ from celery import shared_task
 from sqlalchemy import text
 
 from app.core.logging import get_logger
-from app.modules.grid.anomaly import AnomalyResult
+from app.modules.grid.anomaly import DEFAULT_K, AnomalyResult, effective_k
+from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.service import get_grid_service
 from app.shared.db.blocks import read_block_context
@@ -44,10 +45,10 @@ from app.shared.db.session import (
 
 _log = get_logger(__name__)
 
-# V1 hardcodes NDVI, matching the rest of the grid V1 surface (the
-# overlay/worst-N default). A future pass can sweep each grid's
-# subscribed indices.
-_INDEX_CODE = "ndvi"
+# Platform-default key for the detection threshold. Resolves
+# per-block (grid_configs.anomaly_z_threshold) -> tenant override ->
+# platform default. See migration 0026 (public) / 0036 (tenant).
+_ANOMALY_K_KEY = "grid.anomaly_z_threshold"
 
 
 def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -67,6 +68,37 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
         text("SELECT set_config('app.current_tenant_id', :v, TRUE)"),
         {"v": safe},
     )
+
+
+async def _resolve_tenant_default_k(public_session: Any, tenant_schema: str) -> float:
+    """Tenant-tier detection threshold: tenant override -> platform default.
+
+    Per-block overrides (``grid_configs.anomaly_z_threshold``) layer on
+    top of this in the sweep loop. Falls back to the module
+    :data:`DEFAULT_K` if the tenant or the seed key can't be resolved, so
+    a missing setting never wedges the sweep.
+    """
+    from app.shared.settings.errors import SettingNotFoundError
+    from app.shared.settings.resolver import SettingsResolver
+
+    tenant_id = (
+        await public_session.execute(
+            text("SELECT id FROM public.tenants WHERE schema_name = :s"),
+            {"s": tenant_schema},
+        )
+    ).scalar_one_or_none()
+    if tenant_id is None:
+        return DEFAULT_K
+    try:
+        resolved = await SettingsResolver(public_session=public_session).get_tenant(
+            UUID(str(tenant_id)), _ANOMALY_K_KEY
+        )
+    except SettingNotFoundError:
+        return DEFAULT_K
+    try:
+        return float(resolved.value)
+    except (TypeError, ValueError):
+        return DEFAULT_K
 
 
 def _build_diagnosis(
@@ -103,7 +135,7 @@ async def _pivot_worst_label(
     product_id: UUID,
     result: AnomalyResult,
 ) -> str | None:
-    """"ring N, <sector> sector" for the worst flagged cell on a pivot.
+    """ "ring N, <sector> sector" for the worst flagged cell on a pivot.
 
     Returns None for square (non-pivot) blocks so the diagnosis falls
     back to the row/col index.
@@ -181,9 +213,7 @@ async def _open_anomaly_alert(
     diag_en, diag_ar = _build_diagnosis(
         index_code=index_code, result=result, worst_label=worst_label
     )
-    snapshot = _build_snapshot(
-        index_code=index_code, scene_time=scene_time, result=result
-    )
+    snapshot = _build_snapshot(index_code=index_code, scene_time=scene_time, result=result)
     alert_id = uuid7()
 
     repo = AlertsRepository(tenant_session=session, public_session=public_session)
@@ -255,50 +285,79 @@ async def _detect_for_tenant_async(tenant_schema: str) -> dict[str, int]:
         svc = get_grid_service(tenant_session=session)
         configs = await svc.list_active_configs()
 
+    # Resolve the tenant/platform detection threshold once; per-block
+    # overrides layer on top inside the loop.
+    async with factory() as public_session:
+        tenant_default_k = await _resolve_tenant_default_k(public_session, tenant_schema)
+
     grids_checked = 0
+    indices_checked = 0
     alerts_opened = 0
     for cfg in configs:
         block_id = cfg["block_id"]
         product_id = cfg["product_id"]
+        k = effective_k(
+            block_override=cfg.get("anomaly_z_threshold"),
+            tenant_default=tenant_default_k,
+        )
+
+        # G-1: sweep every index the pipeline has written for this grid,
+        # not just NDVI. One alert per (block, index) — rule_code carries
+        # the index so per-index alerts coexist on the same block.
         async with factory() as session, session.begin():
             await _set_tenant_context(session, tenant_schema)
             svc = get_grid_service(tenant_session=session)
-            verdict = await svc.detect_block_anomalies(
-                block_id=block_id, product_id=product_id, index_code=_INDEX_CODE
-            )
-            grids_checked += 1
-            if verdict is None:
-                continue
-            result, scene_time = verdict
-            # For a center pivot, translate the worst cell into the
-            # machine's own language ("ring 3, NE sector").
-            worst_label = await _pivot_worst_label(
-                svc=svc,
-                block_id=block_id,
-                product_id=product_id,
-                result=result,
-            )
-            async with factory() as public_session:
-                opened = await _open_anomaly_alert(
-                    session=session,
-                    public_session=public_session,
-                    tenant_schema=tenant_schema,
+            index_codes = await svc.list_observed_indices(block_id=block_id, product_id=product_id)
+        grids_checked += 1
+
+        for index_code in index_codes:
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, tenant_schema)
+                svc = get_grid_service(tenant_session=session)
+                verdict = await svc.detect_block_anomalies(
                     block_id=block_id,
-                    index_code=_INDEX_CODE,
-                    scene_time=scene_time,
-                    result=result,
-                    worst_label=worst_label,
+                    product_id=product_id,
+                    index_code=index_code,
+                    k=k,
                 )
-            if opened:
-                alerts_opened += 1
+                indices_checked += 1
+                if verdict is None:
+                    continue
+                result, scene_time = verdict
+                # For a center pivot, translate the worst cell into the
+                # machine's own language ("ring 3, NE sector").
+                worst_label = await _pivot_worst_label(
+                    svc=svc,
+                    block_id=block_id,
+                    product_id=product_id,
+                    result=result,
+                )
+                async with factory() as public_session:
+                    opened = await _open_anomaly_alert(
+                        session=session,
+                        public_session=public_session,
+                        tenant_schema=tenant_schema,
+                        block_id=block_id,
+                        index_code=index_code,
+                        scene_time=scene_time,
+                        result=result,
+                        worst_label=worst_label,
+                    )
+                if opened:
+                    alerts_opened += 1
 
     _log.info(
         "grid_anomaly_tenant_sweep_done",
         tenant_schema=tenant_schema,
         grids_checked=grids_checked,
+        indices_checked=indices_checked,
         alerts_opened=alerts_opened,
     )
-    return {"grids_checked": grids_checked, "alerts_opened": alerts_opened}
+    return {
+        "grids_checked": grids_checked,
+        "indices_checked": indices_checked,
+        "alerts_opened": alerts_opened,
+    }
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -332,3 +391,59 @@ async def _detect_sweep_async() -> dict[str, int]:
         detect_anomalies_for_tenant.delay(schema)
         enqueued += 1
     return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.backfill_block",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_block(
+    tenant_schema: str,
+    block_id: str,
+    product_id: str,
+    limit: int = 200,
+    since_iso: str | None = None,
+) -> dict[str, int]:
+    """Opt-in backfill of past scenes onto a block's current grid (G-5).
+
+    Walks succeeded ingestion jobs and re-enqueues ``compute_indices`` for
+    each, which repopulates ``block_grid_aggregates`` on the freshly
+    regenerated cells. Idempotent: scenes already computed on the new grid
+    collide on the UNIQUE and DO NOTHING.
+    """
+    return _run_task(_backfill_block_async(tenant_schema, block_id, product_id, limit, since_iso))
+
+
+async def _backfill_block_async(
+    tenant_schema: str,
+    block_id: str,
+    product_id: str,
+    limit: int,
+    since_iso: str | None,
+) -> dict[str, int]:
+    from app.modules.imagery.tasks import compute_indices
+
+    since = datetime.fromisoformat(since_iso) if since_iso else None
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        jobs = await list_backfill_jobs(
+            session,
+            block_id=UUID(block_id),
+            product_id=UUID(product_id),
+            since=since,
+            limit=limit,
+        )
+
+    for j in jobs:
+        compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
+
+    _log.info(
+        "grid_backfill_queued",
+        tenant_schema=tenant_schema,
+        block_id=block_id,
+        product_id=product_id,
+        scenes_queued=len(jobs),
+    )
+    return {"scenes_queued": len(jobs)}

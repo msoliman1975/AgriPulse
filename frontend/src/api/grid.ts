@@ -10,6 +10,8 @@ export interface GridConfigResponse {
   product_id: string;
   cell_size_m: string;
   utm_srid: number;
+  // Per-block z-score override; null means inherited (tenant/platform).
+  anomaly_z_threshold: string | null;
   retired_at: string | null;
   created_at: string;
   updated_at: string;
@@ -109,10 +111,28 @@ export async function putGridConfig(
   blockId: string,
   productId: string,
   cellSizeM: number,
+  anomalyZThreshold?: number | null,
 ): Promise<GridConfigResponse> {
   const { data } = await apiClient.put<GridConfigResponse>(
     `/v1/blocks/${blockId}/grid-configs/${productId}`,
-    { cell_size_m: cellSizeM },
+    { cell_size_m: cellSizeM, anomaly_z_threshold: anomalyZThreshold ?? null },
+  );
+  return data;
+}
+
+export interface GridBackfillResponse {
+  scenes_queued: number;
+}
+
+export async function backfillGrid(
+  blockId: string,
+  productId: string,
+  limit = 200,
+  since?: string,
+): Promise<GridBackfillResponse> {
+  const { data } = await apiClient.post<GridBackfillResponse>(
+    `/v1/blocks/${blockId}/grid-configs/${productId}/backfill`,
+    { limit, since: since ?? null },
   );
   return data;
 }

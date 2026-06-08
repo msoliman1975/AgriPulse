@@ -212,6 +212,16 @@ export function App(): ReactNode {
                         />
                       }
                     />
+                    <Route
+                      path="detection"
+                      element={
+                        <IntegrationsTenantOnlyPage
+                          category="detection"
+                          i18nTitleKey="detection.title"
+                          i18nSubtitleKey="detection.subtitle"
+                        />
+                      }
+                    />
                   </Route>
                   <Route path="users" element={<UsersConfigPage />} />
                   <Route path="workers" element={<ResourcesWorkersPage />} />

@@ -201,6 +201,7 @@
       "indexCode": "رمز المؤشر",
       "weatherField": "الحقل",
       "signalCode": "رمز الإشارة",
+      "gridField": "حقل الشبكة",
       "paramName": "اسم المعامل",
       "rightNumber": "رقم",
       "rightString": "نص",
@@ -213,6 +214,7 @@
         "block": "خاصية الحقل",
         "weather": "الطقس",
         "signals": "إشارة مخصصة",
+        "grid": "شذوذ الشبكة",
         "params": "معامل الشجرة"
       }
     },

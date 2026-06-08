@@ -21,7 +21,8 @@
     "weather": "الطقس",
     "imagery": "الصور",
     "email": "البريد",
-    "webhook": "Webhook"
+    "webhook": "Webhook",
+    "detection": "الكشف"
   },
   "placeholder": {
     "org": {

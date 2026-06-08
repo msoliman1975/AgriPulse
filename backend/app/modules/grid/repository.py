@@ -32,9 +32,7 @@ class GridRepository:
 
     # ---- block context ------------------------------------------------
 
-    async def get_block_geometry(
-        self, *, block_id: UUID
-    ) -> dict[str, Any] | None:
+    async def get_block_geometry(self, *, block_id: UUID) -> dict[str, Any] | None:
         """Return ``boundary_utm`` (WKT), ``area_m2``, ``utm_srid`` for a block.
 
         Returns ``None`` if the block doesn't exist in the tenant schema.
@@ -89,17 +87,21 @@ class GridRepository:
         ``{"center": {"lat", "lon"}, "radius_m", "sector_count"}``.
         """
         row = (
-            await self._session.execute(
-                text(
-                    """
+            (
+                await self._session.execute(
+                    text(
+                        """
                     SELECT unit_type, irrigation_geometry
                     FROM blocks
                     WHERE id = :block AND deleted_at IS NULL
                     """
-                ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
-                {"block": block_id},
+                    ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                    {"block": block_id},
+                )
             )
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if row is None or row["unit_type"] != "pivot":
             return None
         geom = row["irrigation_geometry"]
@@ -120,15 +122,14 @@ class GridRepository:
 
     # ---- grid_configs -------------------------------------------------
 
-    async def get_active_config(
-        self, *, block_id: UUID, product_id: UUID
-    ) -> dict[str, Any] | None:
+    async def get_active_config(self, *, block_id: UUID, product_id: UUID) -> dict[str, Any] | None:
         row = (
             (
                 await self._session.execute(
                     text(
                         """
                         SELECT id, block_id, product_id, cell_size_m, utm_srid,
+                               anomaly_z_threshold,
                                retired_at, created_at, updated_at
                         FROM grid_configs
                         WHERE block_id = :block_id
@@ -155,9 +156,14 @@ class GridRepository:
         cell_size_m: Decimal,
         utm_srid: int,
         created_by: UUID | None,
+        anomaly_z_threshold: Decimal | None = None,
     ) -> UUID:
         """Insert a new active grid_config row. Caller must have retired
         any previous active config for the same (block, product) first.
+
+        ``anomaly_z_threshold`` carries forward a per-block detection
+        override across a rezone so the operator's tuning survives a
+        cell-size change.
         """
         row = (
             await self._session.execute(
@@ -165,10 +171,10 @@ class GridRepository:
                     """
                     INSERT INTO grid_configs (
                         block_id, product_id, cell_size_m, utm_srid,
-                        created_by, updated_by
+                        anomaly_z_threshold, created_by, updated_by
                     ) VALUES (
                         :block_id, :product_id, :cell_size_m, :utm_srid,
-                        :created_by, :created_by
+                        :anomaly_z_threshold, :created_by, :created_by
                     )
                     RETURNING id
                     """
@@ -182,12 +188,36 @@ class GridRepository:
                     "product_id": product_id,
                     "cell_size_m": cell_size_m,
                     "utm_srid": utm_srid,
+                    "anomaly_z_threshold": anomaly_z_threshold,
                     "created_by": created_by,
                 },
             )
         ).scalar_one()
         await self._session.flush()
         return row
+
+    async def update_config_threshold(
+        self, *, config_id: UUID, anomaly_z_threshold: Decimal | None
+    ) -> None:
+        """Update only the per-block anomaly threshold on an active config.
+
+        Used when the operator tunes the threshold without changing the
+        cell size — avoids retiring + regenerating the whole cell grid for
+        a knob that doesn't touch geometry.
+        """
+        await self._session.execute(
+            text(
+                """
+                UPDATE grid_configs
+                SET anomaly_z_threshold = :v,
+                    updated_at = now()
+                WHERE id = :config_id
+                  AND retired_at IS NULL
+                """
+            ).bindparams(bindparam("config_id", type_=PG_UUID(as_uuid=True))),
+            {"config_id": config_id, "v": anomaly_z_threshold},
+        )
+        await self._session.flush()
 
     async def retire_config(self, *, config_id: UUID, retired_at: datetime) -> None:
         await self._session.execute(
@@ -382,13 +412,15 @@ class GridRepository:
         """Every non-retired grid config in the tenant: (block_id, product_id).
 
         Drives the anomaly sweep — one detection pass per active grid.
+        Also carries ``anomaly_z_threshold`` (nullable per-block override)
+        so the sweep can resolve the detection k without a second query.
         """
         rows = (
             (
                 await self._session.execute(
                     text(
                         """
-                        SELECT block_id, product_id
+                        SELECT block_id, product_id, anomaly_z_threshold
                         FROM grid_configs
                         WHERE retired_at IS NULL
                           AND deleted_at IS NULL
@@ -401,6 +433,62 @@ class GridRepository:
             .all()
         )
         return tuple(dict(r) for r in rows)
+
+    async def list_active_configs_for_block(self, *, block_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Active grid configs for one block: (product_id, anomaly_z_threshold).
+
+        Drives the per-block anomaly snapshot the recommendations engine
+        reads (G-4) — a block usually has a single active grid, but the
+        schema allows one per imagery product.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT product_id, anomaly_z_threshold
+                        FROM grid_configs
+                        WHERE block_id = :block
+                          AND retired_at IS NULL
+                          AND deleted_at IS NULL
+                        ORDER BY created_at
+                        """
+                    ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                    {"block": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def list_observed_indices(self, *, block_id: UUID, product_id: UUID) -> tuple[str, ...]:
+        """Distinct index codes that have any cell observation for a grid.
+
+        Drives the multi-index sweep (G-1): rather than hardcoding NDVI we
+        run detection over exactly the indices the imagery pipeline has
+        actually written for this (block, product). Indices with too few
+        observed cells are filtered out downstream by the detector's
+        ``min_cells`` guard, so listing all present codes is safe.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT DISTINCT index_code
+                    FROM block_grid_aggregates
+                    WHERE block_id   = :block
+                      AND product_id = :product
+                    ORDER BY index_code
+                    """
+                ).bindparams(
+                    bindparam("block", type_=PG_UUID(as_uuid=True)),
+                    bindparam("product", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"block": block_id, "product": product_id},
+            )
+        ).all()
+        return tuple(str(r[0]) for r in rows)
 
     async def list_cell_means(
         self,
@@ -548,9 +636,7 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
-    async def resolve_cell_context(
-        self, *, cell_id: UUID
-    ) -> dict[str, Any] | None:
+    async def resolve_cell_context(self, *, cell_id: UUID) -> dict[str, Any] | None:
         """Look up block_id + product_id for a cell — used by RBAC checks."""
         row = (
             (
@@ -574,9 +660,9 @@ class GridRepository:
     async def count_cells(self, *, grid_config_id: UUID) -> int:
         row = (
             await self._session.execute(
-                text(
-                    "SELECT count(*) FROM grid_cells WHERE grid_config_id = :gc"
-                ).bindparams(bindparam("gc", type_=PG_UUID(as_uuid=True))),
+                text("SELECT count(*) FROM grid_cells WHERE grid_config_id = :gc").bindparams(
+                    bindparam("gc", type_=PG_UUID(as_uuid=True))
+                ),
                 {"gc": grid_config_id},
             )
         ).scalar_one()

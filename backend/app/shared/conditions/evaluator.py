@@ -38,6 +38,7 @@ from app.shared.conditions.context import ConditionContext
 from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
+    GridValueRef,
     IndicesValueRef,
     ParamsValueRef,
     SignalsValueRef,
@@ -134,9 +135,7 @@ def _eval_comparison(
     raise ConditionParseError(f"unknown op {op!r}")
 
 
-def _resolve_literal_or_ref(
-    value: Any, ctx: ConditionContext, snapshot: dict[str, Any]
-) -> Any:
+def _resolve_literal_or_ref(value: Any, ctx: ConditionContext, snapshot: dict[str, Any]) -> Any:
     """If ``value`` is a value-ref dict (has a ``source`` key), resolve
     it against the context; otherwise return it as a literal.
 
@@ -177,6 +176,11 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
         if sig_entry is None:
             return None
         return getattr(sig_entry, ref.key, None)
+    if isinstance(ref, GridValueRef):
+        grid_entry = ctx.grid.get(ref.index_code)
+        if grid_entry is None:
+            return None
+        return getattr(grid_entry, ref.field, None)
     if isinstance(ref, ParamsValueRef):
         return ctx.params.get(ref.name)
     return None
@@ -189,6 +193,8 @@ def _ref_key(ref: ValueRef) -> str:
         return f"weather.{ref.scope}.{ref.field}"
     if isinstance(ref, SignalsValueRef):
         return f"signals.{ref.code}.{ref.key}"
+    if isinstance(ref, GridValueRef):
+        return f"grid.{ref.index_code}.{ref.field}"
     if isinstance(ref, ParamsValueRef):
         return f"params.{ref.name}"
     return f"block.{ref.field}"

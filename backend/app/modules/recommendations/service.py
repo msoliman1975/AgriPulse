@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
+from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.engine import (
     TreePathStep,
     evaluate_tree,
@@ -146,12 +147,22 @@ class RecommendationsServiceImpl:
         # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
         signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
+        # Sub-block grid spatial-anomaly verdicts (G-4). Empty for blocks
+        # with no grid / no current anomaly, so `{source: grid}` predicates
+        # fail closed just like every other source.
+        grid = await load_grid_snapshot(
+            self._tenant,
+            self._public,
+            block_id=block_id,
+            tenant_id=tenant_id,
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
             latest_index_aggregates=latest,
             weather=weather,
             signals=signals,
+            grid=grid,
         )
 
         # PR-C: bulk-load tenant parameter overrides for every tree the
@@ -173,9 +184,7 @@ class RecommendationsServiceImpl:
             trees_evaluated += 1
 
             overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            result = evaluate_tree(
-                tree["tree_compiled"], ctx, param_overrides=overrides
-            )
+            result = evaluate_tree(tree["tree_compiled"], ctx, param_overrides=overrides)
             if result.error is not None:
                 self._log.warning(
                     "decision_tree_walk_error",
@@ -324,9 +333,7 @@ class RecommendationsServiceImpl:
         leaf_node_id = outcome.leaf_node_id or "leaf"
         rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
         alert_id = uuid7()
-        alert_repo = AlertsRepository(
-            tenant_session=self._tenant, public_session=self._public
-        )
+        alert_repo = AlertsRepository(tenant_session=self._tenant, public_session=self._public)
         inserted = await alert_repo.insert_alert(
             alert_id=alert_id,
             block_id=block_id,
@@ -380,9 +387,7 @@ class RecommendationsServiceImpl:
 
     # ---- Tree parameter overrides (tenant) ----------------------------
 
-    async def list_tree_param_overrides(
-        self, *, code: str, tenant_id: UUID
-    ) -> dict[str, Any]:
+    async def list_tree_param_overrides(self, *, code: str, tenant_id: UUID) -> dict[str, Any]:
         """Return ``{declarations: [...], overrides: {name: value}}`` for
         the named tree, so the UI can render every declared parameter
         with its default + current override side by side. The tree
@@ -467,9 +472,7 @@ class RecommendationsServiceImpl:
         )
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
-        deleted = await self._repo.delete_param_override(
-            tree_id=tree["id"], param_name=param_name
-        )
+        deleted = await self._repo.delete_param_override(tree_id=tree["id"], param_name=param_name)
         if deleted:
             await self._audit.record(
                 tenant_schema=None,
@@ -785,8 +788,7 @@ class DecisionTreesAuthorService:
         # without needing an explicit "platform vs tenant" filter at
         # every read site.
         if (
-            await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-            is not None
+            await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id) is not None
             or await self._repo.get_tree_by_code(code, scope_tenant_id=None) is not None
         ):
             raise _DecisionTreeCodeAlreadyExistsError(code)
@@ -1025,6 +1027,7 @@ class DecisionTreesAuthorService:
         # Uses tenant_session so we read the right tenant's signals/
         # weather/indices.
         repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
         from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
@@ -1041,12 +1044,23 @@ class DecisionTreesAuthorService:
             if farm_id is not None
             else None
         )
+        # Same grid anomaly snapshot the production evaluator sees, so an
+        # author can dry-run a `{source: grid}` predicate against a real
+        # block.
+        grid = (
+            await load_grid_snapshot(
+                tenant_session, self._public, block_id=block_id, tenant_id=self._tenant_id
+            )
+            if farm_id is not None
+            else None
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
             latest_index_aggregates=latest_indices,
             weather=weather,
             signals=signals,
+            grid=grid,
         )
         result = evaluate_tree(compiled, ctx)
         outcome_dict: dict[str, Any] | None = None
@@ -1138,9 +1152,7 @@ class _ParamValueCoercionError(_DecisionTreeAuthoringError):
     Router maps to 400."""
 
     def __init__(self, *, param_name: str, type_: str, detail: str) -> None:
-        super().__init__(
-            f"Override value for {param_name!r} ({type_}) is invalid: {detail}"
-        )
+        super().__init__(f"Override value for {param_name!r} ({type_}) is invalid: {detail}")
         self.param_name = param_name
         self.type_ = type_
         self.detail = detail

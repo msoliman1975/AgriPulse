@@ -13,10 +13,17 @@ class GridConfigBody(BaseModel):
     """Request body for PUT /blocks/{b}/grid-configs/{product_id}.
 
     A bare cell_size_m suffices — utm_srid is inferred server-side from
-    ``blocks.boundary_utm``.
+    ``blocks.boundary_utm``. ``anomaly_z_threshold`` is an optional
+    per-block detection override; null/omitted means "inherit" the tenant
+    override / platform default.
     """
 
     cell_size_m: Decimal = Field(gt=0, description="Cell edge in metres.")
+    anomaly_z_threshold: Decimal | None = Field(
+        default=None,
+        gt=0,
+        description="Per-block z-score threshold override; null inherits.",
+    )
 
 
 class GridConfigResponse(BaseModel):
@@ -29,6 +36,10 @@ class GridConfigResponse(BaseModel):
     product_id: UUID
     cell_size_m: Decimal
     utm_srid: int
+    anomaly_z_threshold: Decimal | None = Field(
+        default=None,
+        description="Per-block z-score override; null means inherited.",
+    )
     retired_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -121,6 +132,25 @@ class GridWorstCellsResponse(BaseModel):
     index_code: str
     cells: tuple[GridWorstCell, ...]
     at: datetime | None
+
+
+class GridBackfillRequest(BaseModel):
+    """POST /blocks/{b}/grid-configs/{product_id}/backfill body (G-5).
+
+    Re-processes past scenes onto the current grid. Opt-in because each
+    scene re-reads its raw bands; capped by ``limit``.
+    """
+
+    limit: int = Field(default=200, ge=1, le=500, description="Max scenes to re-process.")
+    since: datetime | None = Field(
+        default=None, description="Only scenes at/after this time; all if null."
+    )
+
+
+class GridBackfillResponse(BaseModel):
+    scenes_queued: int = Field(
+        description="Scenes matched + queued for re-processing onto the grid."
+    )
 
 
 class GridCellHistoryPoint(BaseModel):

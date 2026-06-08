@@ -23,7 +23,14 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
-from app.modules.grid.anomaly import AnomalyResult, CellMean, detect_low_outliers
+from app.modules.grid.anomaly import (
+    DEFAULT_K,
+    AnomalyResult,
+    CellMean,
+    detect_low_outliers,
+    effective_k,
+)
+from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.errors import (
     CellSizeInvalidError,
     GridConfigNotFoundError,
@@ -74,6 +81,7 @@ class GridService(Protocol):
         product_id: UUID,
         cell_size_m: Decimal,
         created_by: UUID | None,
+        anomaly_z_threshold: Decimal | None = None,
     ) -> GridConfigResponse: ...
 
     async def list_active_cells(
@@ -129,13 +137,37 @@ class GridService(Protocol):
 
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]: ...
 
+    async def list_observed_indices(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+    ) -> tuple[str, ...]: ...
+
     async def detect_block_anomalies(
         self,
         *,
         block_id: UUID,
         product_id: UUID,
         index_code: str,
+        k: float = DEFAULT_K,
     ) -> tuple[AnomalyResult, datetime] | None: ...
+
+    async def snapshot_block_anomalies(
+        self,
+        *,
+        block_id: UUID,
+        default_k: float = DEFAULT_K,
+    ) -> dict[str, dict[str, Any]]: ...
+
+    async def count_backfill_scenes(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        since: datetime | None,
+        limit: int,
+    ) -> int: ...
 
 
 class GridServiceImpl:
@@ -189,9 +221,7 @@ class GridServiceImpl:
         block_id: UUID,
         product_id: UUID,
     ) -> GridConfigResponse | None:
-        row = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        row = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         if row is None:
             return None
         count = await self._repo.count_cells(grid_config_id=row["id"])
@@ -204,6 +234,7 @@ class GridServiceImpl:
         product_id: UUID,
         cell_size_m: Decimal,
         created_by: UUID | None,
+        anomaly_z_threshold: Decimal | None = None,
     ) -> GridConfigResponse:
         # 1. Validate inputs against the product + block bounds.
         block = await self._repo.get_block_geometry(block_id=block_id)
@@ -222,13 +253,24 @@ class GridServiceImpl:
 
         # 2. Soft-retire any prior active config so the partial unique
         # index doesn't collide on insert.
-        prior = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        prior = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         now = datetime.now(tz=UTC)
         if prior is not None:
-            # Same cell size = no-op (idempotent re-PUT).
+            # Same cell size = no geometry change. Apply a threshold-only
+            # update in place (no retire + regenerate) so tuning the
+            # detector doesn't throw away the cell grid + its observations.
             if prior["cell_size_m"] == cell_size_m:
+                if prior["anomaly_z_threshold"] != anomaly_z_threshold:
+                    await self._repo.update_config_threshold(
+                        config_id=prior["id"],
+                        anomaly_z_threshold=anomaly_z_threshold,
+                    )
+                    refreshed = await self._repo.get_active_config(
+                        block_id=block_id, product_id=product_id
+                    )
+                    assert refreshed is not None
+                    count = await self._repo.count_cells(grid_config_id=refreshed["id"])
+                    return GridConfigResponse(cell_count=count, **refreshed)
                 count = await self._repo.count_cells(grid_config_id=prior["id"])
                 return GridConfigResponse(cell_count=count, **prior)
             await self._repo.retire_config(config_id=prior["id"], retired_at=now)
@@ -241,6 +283,7 @@ class GridServiceImpl:
             cell_size_m=cell_size_m,
             utm_srid=utm_srid,
             created_by=created_by,
+            anomaly_z_threshold=anomaly_z_threshold,
         )
 
         cells = list(
@@ -262,14 +305,11 @@ class GridServiceImpl:
             cells_generated=inserted,
         )
 
-        fresh = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        fresh = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         # By construction the new config is the active one; the None
         # branch is unreachable but keeps mypy honest.
         assert fresh is not None
         return GridConfigResponse(cell_count=inserted, **fresh)
-
 
     async def list_active_cells(
         self,
@@ -319,7 +359,6 @@ class GridServiceImpl:
                     }
                 )
         return await self._repo.bulk_upsert_aggregates(rows=rows)
-
 
     async def get_cells_with_values(
         self,
@@ -400,9 +439,7 @@ class GridServiceImpl:
         pivot = await self._repo.get_pivot_geometry(block_id=block_id)
         ring_width = 0.0
         if pivot is not None:
-            cfg = await self._repo.get_active_config(
-                block_id=block_id, product_id=product_id
-            )
+            cfg = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
             ring_width = float(cfg["cell_size_m"]) if cfg else 0.0
 
         cells_list: list[GridWorstCell] = []
@@ -480,18 +517,29 @@ class GridServiceImpl:
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_active_configs()
 
+    async def list_observed_indices(self, *, block_id: UUID, product_id: UUID) -> tuple[str, ...]:
+        """Index codes the imagery pipeline has written for this grid.
+
+        Drives the multi-index sweep (G-1) — see the repository method.
+        """
+        return await self._repo.list_observed_indices(block_id=block_id, product_id=product_id)
+
     async def detect_block_anomalies(
         self,
         *,
         block_id: UUID,
         product_id: UUID,
         index_code: str,
+        k: float = DEFAULT_K,
     ) -> tuple[AnomalyResult, datetime] | None:
         """Run spatial-anomaly detection on the latest scene for a grid.
 
-        Returns the verdict + the scene time it was computed from, or
-        ``None`` when there's no scene yet or nothing crosses the
-        threshold. See :mod:`app.modules.grid.anomaly` for the rules.
+        ``k`` is the z-score threshold (std-devs below the block mean) and
+        is resolved per (block, tenant, platform) by the caller; it
+        defaults to the module constant when unset. Returns the verdict +
+        the scene time it was computed from, or ``None`` when there's no
+        scene yet or nothing crosses the threshold. See
+        :mod:`app.modules.grid.anomaly` for the rules.
         """
         at = await self._repo.get_latest_scene_time(
             block_id=block_id, product_id=product_id, index_code=index_code
@@ -513,10 +561,81 @@ class GridServiceImpl:
             for r in rows
             if r["mean"] is not None
         ]
-        result = detect_low_outliers(cells)
+        result = detect_low_outliers(cells, k=k)
         if result is None:
             return None
         return result, at
+
+    async def snapshot_block_anomalies(
+        self, *, block_id: UUID, default_k: float = DEFAULT_K
+    ) -> dict[str, dict[str, Any]]:
+        """Latest spatial-anomaly verdict per index for one block (G-4).
+
+        Returns ``{index_code: {worst_z, flagged_count, worst_row,
+        worst_col, severity}}`` for every index whose latest scene
+        crossed the threshold; indices with no current anomaly are
+        omitted (the tree predicate fails closed). ``default_k`` is the
+        already-resolved tenant/platform threshold; per-block overrides
+        layer on top via :func:`effective_k`.
+
+        Cheap for the common case: a block with no active grid returns
+        ``{}`` after a single config lookup, doing no detection work.
+        """
+        configs = await self._repo.list_active_configs_for_block(block_id=block_id)
+        out: dict[str, dict[str, Any]] = {}
+        for cfg in configs:
+            product_id = cfg["product_id"]
+            k = effective_k(
+                block_override=cfg.get("anomaly_z_threshold"),
+                tenant_default=default_k,
+            )
+            for index_code in await self._repo.list_observed_indices(
+                block_id=block_id, product_id=product_id
+            ):
+                # First active grid carrying this index wins (a block with
+                # two products + the same index is a non-case in practice).
+                if index_code in out:
+                    continue
+                verdict = await self.detect_block_anomalies(
+                    block_id=block_id,
+                    product_id=product_id,
+                    index_code=index_code,
+                    k=k,
+                )
+                if verdict is None:
+                    continue
+                result, _scene_time = verdict
+                worst = result.flagged[0]
+                out[index_code] = {
+                    "worst_z": round(worst.z, 4),
+                    "flagged_count": len(result.flagged),
+                    "worst_row": worst.row_idx,
+                    "worst_col": worst.col_idx,
+                    "severity": result.severity,
+                }
+        return out
+
+    async def count_backfill_scenes(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        since: datetime | None,
+        limit: int,
+    ) -> int:
+        """How many past scenes a backfill would re-process (G-5).
+
+        Lets the UI show "Backfill N scenes" before the user commits. The
+        actual fan-out runs in the ``grid.backfill_block`` task.
+        """
+        jobs = await list_backfill_jobs(
+            self._session,
+            block_id=block_id,
+            product_id=product_id,
+            since=since,
+            limit=limit,
+        )
+        return len(jobs)
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:
