@@ -30,7 +30,7 @@ export function RecommendationsRail({
   });
 
   return (
-    <aside className="w-64 flex-shrink-0">
+    <aside className="min-w-0 flex-[1]">
       <h2 className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-ap-muted">
         {t("rail.title")}
       </h2>

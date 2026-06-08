@@ -332,7 +332,7 @@ export function BoardPage(): ReactNode {
   })();
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6">
+    <div className="flex w-full flex-col gap-4 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("title")}</h1>
@@ -403,7 +403,7 @@ export function BoardPage(): ReactNode {
         />
       ) : (
         <div className="flex gap-4">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-[4]">
             <BoardGrid
               blocks={visibleBlocks}
               columns={range.columns}
@@ -610,6 +610,13 @@ function BoardGrid({
   const maxVisibleChips =
     viewMode === "week" ? Infinity : viewMode === "month" ? 2 : 3;
   const compactCells = viewMode === "month";
+  // The column representing "today" — day-grid matches the exact day,
+  // season-grid (month columns) matches the current month.
+  const now = new Date();
+  const todayDay = format(now, "yyyy-MM-dd");
+  const todayMonth = format(startOfMonth(now), "yyyy-MM-dd");
+  const isTodayColumn = (col: ColumnDef): boolean =>
+    col.unit === "day" ? col.start === todayDay : col.start === todayMonth;
   return (
     <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
       <table className="min-w-full table-fixed border-collapse text-sm">
@@ -621,9 +628,13 @@ function BoardGrid({
             {columns.map((col) => (
               <th
                 key={col.start}
+                aria-current={isTodayColumn(col) ? "date" : undefined}
                 className={
                   (compactCells ? "min-w-[56px] p-1 " : "min-w-[120px] p-2 ") +
-                  "border-b border-e border-ap-line text-start text-xs font-semibold uppercase tracking-wider text-ap-muted"
+                  "border-b border-e text-start text-xs font-semibold uppercase tracking-wider " +
+                  (isTodayColumn(col)
+                    ? "border-ap-accent bg-ap-accent/[0.07] text-ap-accent"
+                    : "border-ap-line text-ap-muted")
                 }
               >
                 {columnLabel(col)}
@@ -638,10 +649,12 @@ function BoardGrid({
                 scope="row"
                 className="w-32 border-b border-e border-ap-line bg-ap-bg/30 p-2 text-start align-top font-medium text-ap-ink"
               >
-                <div>{block.code}</div>
-                {block.name ? (
-                  <div className="text-xs text-ap-muted">{block.name}</div>
-                ) : null}
+                <div
+                  className="truncate"
+                  title={block.name ? `${block.name} (${block.code})` : block.code}
+                >
+                  {block.name ?? block.code}
+                </div>
               </th>
               {columns.map((col) => {
                 const key = `${block.id}|${col.start}`;
@@ -661,6 +674,7 @@ function BoardGrid({
                     canManage={canManage}
                     selected={isSelected}
                     compact={compactCells}
+                    today={isTodayColumn(col)}
                     onClick={(modifiers) =>
                       onCellClick(block.id, col.start, col.unit, modifiers)
                     }

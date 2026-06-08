@@ -16,6 +16,8 @@ interface BoardCellProps {
   /** Compact cells (used for day-grid month view) get a smaller min-width
    *  so 30 columns fit reasonably. Defaults to false. */
   compact?: boolean;
+  /** Cell sits in the column representing today — gets a persistent tint. */
+  today?: boolean;
   children: ReactNode;
 }
 
@@ -31,6 +33,7 @@ export function BoardCell({
   onClick,
   onRecDrop,
   compact = false,
+  today = false,
   children,
 }: BoardCellProps): ReactNode {
   const { t } = useTranslation("board");
@@ -77,7 +80,9 @@ export function BoardCell({
           ? "border-ap-primary bg-ap-primary-soft/50"
           : dragOver
             ? "border-ap-primary bg-ap-primary-soft/40"
-            : "border-ap-line",
+            : today
+              ? "border-ap-line bg-ap-accent/[0.07]"
+              : "border-ap-line",
         canManage && "cursor-pointer hover:bg-ap-primary-soft/30",
       )}
       onClick={handleClick}

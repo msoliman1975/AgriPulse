@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardBlock, BoardResourceChip } from "@/api/plans";
@@ -92,46 +92,71 @@ function MultiSelect({
   selected,
   onChange,
 }: MultiSelectProps): ReactNode {
-  const summary =
-    selected.size === 0
-      ? label
-      : `${label} (${selected.size})`;
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const summary = selected.size === 0 ? label : `${label} (${selected.size})`;
+
+  // Close on click outside (and Escape). Native <details> only closed on a
+  // second click of the summary — an anti-pattern; this makes the dropdown
+  // dismiss when the user interacts with anything else.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent): void => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <details className="relative">
-      <summary
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
         className={
-          "cursor-pointer list-none rounded-md border px-2 py-1 text-sm " +
+          "cursor-pointer rounded-md border px-2 py-1 text-sm " +
           (selected.size > 0
             ? "border-ap-primary bg-ap-primary-soft text-ap-primary"
             : "border-ap-line bg-white text-ap-ink")
         }
       >
         {summary}
-      </summary>
-      <div className="absolute z-20 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-ap-line bg-white shadow-lg">
-        {all.length === 0 ? (
-          <p className="p-2 text-xs text-ap-muted">—</p>
-        ) : (
-          all.map((opt) => (
-            <label
-              key={opt.id}
-              className="flex cursor-pointer items-center gap-2 px-2 py-1 hover:bg-ap-bg/50"
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(opt.id)}
-                onChange={() => {
-                  const next = new Set(selected);
-                  if (next.has(opt.id)) next.delete(opt.id);
-                  else next.add(opt.id);
-                  onChange(next);
-                }}
-              />
-              <span className="text-sm">{opt.label}</span>
-            </label>
-          ))
-        )}
-      </div>
-    </details>
+      </button>
+      {open ? (
+        <div className="absolute z-20 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-ap-line bg-white shadow-lg">
+          {all.length === 0 ? (
+            <p className="p-2 text-xs text-ap-muted">—</p>
+          ) : (
+            all.map((opt) => (
+              <label
+                key={opt.id}
+                className="flex cursor-pointer items-center gap-2 px-2 py-1 hover:bg-ap-bg/50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(opt.id)}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (next.has(opt.id)) next.delete(opt.id);
+                    else next.add(opt.id);
+                    onChange(next);
+                  }}
+                />
+                <span className="text-sm">{opt.label}</span>
+              </label>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
