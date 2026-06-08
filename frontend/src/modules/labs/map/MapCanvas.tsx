@@ -599,6 +599,13 @@ export function MapCanvas({
   // G-2: outline the cited cells (worst-N / alert) via a filter swap on
   // the highlight layer — same lightweight pattern as the block selection
   // highlight. An empty list matches nothing.
+  //
+  // Gate on the layer EXISTING, not on `isStyleLoaded()`: `setFilter` works
+  // the moment the layer is present, even while the style transiently
+  // reports not-loaded mid-`setData`. The worst-cells query resolves around
+  // the same time as the grid-cells data, so an `isStyleLoaded()` guard
+  // here would fall through to `once("load")` — which never fires again
+  // post-load — and the highlight would be silently dropped.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -610,7 +617,7 @@ export function MapCanvas({
         ["literal", highlightedCellIds],
       ]);
     };
-    if (map.isStyleLoaded()) apply();
+    if (map.getLayer(GRID_HIGHLIGHT_LAYER)) apply();
     else map.once("load", apply);
   }, [highlightedCellIds]);
 
