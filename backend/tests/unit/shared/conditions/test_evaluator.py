@@ -63,6 +63,57 @@ def test_parse_block_value_ref_crop_category() -> None:
     assert ref.field == "crop_category"
 
 
+# ---- growth_stage block field (KB P3) -------------------------------------
+
+
+def _stage_ctx(stage: str | None) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        block_attributes={"growth_stage": stage},
+    )
+
+
+def test_parse_block_value_ref_growth_stage() -> None:
+    ref = parse_value_ref({"source": "block", "field": "growth_stage"})
+    assert isinstance(ref, BlockValueRef)
+    assert ref.field == "growth_stage"
+
+
+def test_parse_block_value_ref_unknown_field_raises() -> None:
+    with pytest.raises(ConditionParseError):
+        parse_value_ref({"source": "block", "field": "bogus"})
+
+
+def test_growth_stage_eq_matches_when_set() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "block", "field": "growth_stage"},
+        "right": "tuber_bulking",
+    }
+    assert evaluate(tree, _stage_ctx("tuber_bulking"))[0] is True
+    assert evaluate(tree, _stage_ctx("maturation"))[0] is False
+
+
+def test_growth_stage_unset_fails_closed() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "block", "field": "growth_stage"},
+        "right": "tuber_bulking",
+    }
+    # No stage set -> None -> predicate is False (fail-closed).
+    assert evaluate(tree, _stage_ctx(None))[0] is False
+
+
+def test_growth_stage_in_operator() -> None:
+    tree = {
+        "op": "in",
+        "left": {"source": "block", "field": "growth_stage"},
+        "values": ["tuber_initiation", "tuber_bulking"],
+    }
+    assert evaluate(tree, _stage_ctx("tuber_bulking"))[0] is True
+    assert evaluate(tree, _stage_ctx("emergence"))[0] is False
+
+
 def test_parse_value_ref_unknown_source_raises() -> None:
     with pytest.raises(ConditionParseError):
         parse_value_ref({"source": "weather", "field": "temp_c"})
