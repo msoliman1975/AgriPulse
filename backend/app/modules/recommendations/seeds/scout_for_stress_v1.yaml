@@ -108,6 +108,20 @@ nodes:
       text_ar: >-
         تراجع حاد في NDVI على هذا الحقل. حدّد زيارة فحص حقلية خلال 24
         ساعة لتحديد السبب (ري، آفات، أمراض، تغذية).
+      actions:
+        immediate:
+          - text_en: Scout the block on foot within 24 hours.
+            text_ar: افحص الحقل ميدانيًا خلال 24 ساعة.
+        short_term:
+          - text_en: >-
+              Confirm the cause (water, pest, disease, nutrition) and
+              act on the matching diagnosis.
+            text_ar: >-
+              أكّد السبب (ري، آفات، أمراض، تغذية) وتصرّف وفق التشخيص
+              المطابق.
+        monitoring:
+          - text_en: Re-check NDVI on the next satellite pass.
+            text_ar: أعد فحص NDVI في المرور القادم للقمر الصناعي.
 
   leaf_scout_warning:
     label_en: Moderate stress — scout within 72h

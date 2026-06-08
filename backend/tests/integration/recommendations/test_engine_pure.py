@@ -242,3 +242,62 @@ def test_path_records_match_state_per_node() -> None:
         ("severity_check", True),
         ("leaf_critical", None),
     ]
+
+
+# --- 4-horizon recommendation actions (KB P1-B) -----------------------
+
+
+def _leaf_tree_with_outcome(outcome: dict[str, object]) -> dict[str, object]:
+    return {
+        "code": "x",
+        "name_en": "x",
+        "root": "leaf",
+        "nodes": {"leaf": {"outcome": outcome}},
+    }
+
+
+def test_outcome_parses_action_horizons() -> None:
+    tree = _leaf_tree_with_outcome(
+        {
+            "action_type": "scout",
+            "text_en": "x",
+            "actions": {
+                "immediate": [{"text_en": "Scout now", "text_ar": "افحص الآن"}],
+                "monitoring": [{"text_en": "Recheck NDVI"}],
+            },
+        }
+    )
+    result = evaluate_tree(tree, _ctx_with_deviation(None))
+    assert result.outcome is not None
+    assert result.outcome.actions["immediate"][0]["text_en"] == "Scout now"
+    assert result.outcome.actions["immediate"][0]["text_ar"] == "افحص الآن"
+    # text_ar defaults to None when omitted.
+    assert result.outcome.actions["monitoring"][0]["text_ar"] is None
+    # Horizons not supplied are simply absent.
+    assert "long_term" not in result.outcome.actions
+
+
+def test_outcome_actions_default_empty() -> None:
+    tree = _leaf_tree_with_outcome({"action_type": "scout", "text_en": "x"})
+    result = evaluate_tree(tree, _ctx_with_deviation(None))
+    assert result.outcome is not None
+    assert result.outcome.actions == {}
+
+
+def test_outcome_drops_malformed_action_items() -> None:
+    # Engine is tolerant of hand-tampered compiled JSON: items missing
+    # text_en are dropped, and a horizon left empty is omitted.
+    tree = _leaf_tree_with_outcome(
+        {
+            "action_type": "scout",
+            "text_en": "x",
+            "actions": {
+                "immediate": [{"text_ar": "no english"}, {"text_en": "kept"}],
+                "short_term": [{"text_ar": "all dropped"}],
+            },
+        }
+    )
+    result = evaluate_tree(tree, _ctx_with_deviation(None))
+    assert result.outcome is not None
+    assert [i["text_en"] for i in result.outcome.actions["immediate"]] == ["kept"]
+    assert "short_term" not in result.outcome.actions

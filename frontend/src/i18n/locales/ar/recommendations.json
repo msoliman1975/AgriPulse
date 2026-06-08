@@ -43,5 +43,11 @@
     "dismissed": "مرفوضة",
     "deferred": "مؤجَّلة",
     "expired": "منتهية"
+  },
+  "actionHorizon": {
+    "immediate": "فوري",
+    "short_term": "قصير المدى",
+    "long_term": "طويل المدى",
+    "monitoring": "متابعة"
   }
 }

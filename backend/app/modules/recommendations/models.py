@@ -111,6 +111,11 @@ class Recommendation(Base, TimestampedMixin):
     parameters: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
+    # 4-horizon structured guidance (KB P1-B): {horizon: [{text_en,text_ar}]}.
+    # Empty {} when the source leaf declares no `actions:` block.
+    actions: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
     confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
     tree_path: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
     text_en: Mapped[str] = mapped_column(Text, nullable=False)

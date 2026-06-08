@@ -472,6 +472,8 @@ def _validate_reachability(
                             f"info/warning/critical, got {severity!r}"
                         ),
                     )
+            # Optional 4-horizon `actions:` block (KB P1-B).
+            _validate_outcome_actions(outcome, nid, source_path)
             continue
         # Decision node — both branches must point at known nodes.
         for branch in ("on_match", "on_miss"):
@@ -482,6 +484,80 @@ def _validate_reachability(
                     detail=f"node {nid!r} {branch!r} → {target!r} is not a known node",
                 )
             stack.append(target)
+
+
+# 4-horizon recommendation actions (KB P1-B). A leaf outcome may split
+# its guidance into these time horizons; each holds an ordered list of
+# localized action items. Optional — leaves without it keep their single
+# ``text_en`` summary as the only guidance.
+_ACTION_HORIZONS: frozenset[str] = frozenset(
+    {"immediate", "short_term", "long_term", "monitoring"}
+)
+
+
+def _validate_outcome_actions(
+    outcome: dict[str, Any], nid: str, source_path: str
+) -> None:
+    """Strict-parse a leaf outcome's optional ``actions:`` block.
+
+    Shape::
+
+        actions:
+          immediate:
+            - text_en: "..."
+              text_ar: "..."   # optional
+          short_term: [...]
+          long_term: [...]
+          monitoring: [...]
+
+    Unknown horizon keys and items missing ``text_en`` are hard errors
+    so a typo surfaces at startup sync, not silently at render time.
+    """
+    raw = outcome.get("actions")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise DecisionTreeParseError(
+            path=source_path, detail=f"leaf {nid!r} 'outcome.actions' must be a mapping"
+        )
+    for horizon, items in raw.items():
+        if horizon not in _ACTION_HORIZONS:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=(
+                    f"leaf {nid!r} actions horizon {horizon!r} must be one of "
+                    f"{sorted(_ACTION_HORIZONS)}"
+                ),
+            )
+        if not isinstance(items, list):
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"leaf {nid!r} actions[{horizon}] must be a list",
+            )
+        for i, item in enumerate(items):
+            if not isinstance(item, dict):
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=f"leaf {nid!r} actions[{horizon}][{i}] must be a mapping",
+                )
+            text_en = item.get("text_en")
+            if not isinstance(text_en, str) or not text_en:
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=(
+                        f"leaf {nid!r} actions[{horizon}][{i}] requires a "
+                        "non-empty 'text_en'"
+                    ),
+                )
+            text_ar = item.get("text_ar")
+            if text_ar is not None and not isinstance(text_ar, str):
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=(
+                        f"leaf {nid!r} actions[{horizon}][{i}] 'text_ar' must "
+                        "be a string"
+                    ),
+                )
 
 
 def _hash_compiled(compiled: dict[str, Any]) -> str:

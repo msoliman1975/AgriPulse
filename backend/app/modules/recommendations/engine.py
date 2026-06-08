@@ -66,6 +66,17 @@ from app.shared.conditions import evaluate as _evaluate_condition_tree
 
 _MAX_STEPS = 64
 
+# Recommendation action horizons (KB P1-B). A leaf outcome may carry an
+# optional `actions:` block splitting its guidance into these four time
+# horizons; the loader validates the shape at compile time, so by the
+# time the engine parses a compiled tree the keys are already known-good.
+_ACTION_HORIZONS: tuple[str, ...] = (
+    "immediate",
+    "short_term",
+    "long_term",
+    "monitoring",
+)
+
 
 def _build_params(
     compiled: Mapping[str, Any],
@@ -142,6 +153,11 @@ class TreeOutcome:
     valid_for_hours: int | None
     kind: str = "recommendation"
     leaf_node_id: str | None = None
+    # Structured guidance split by time horizon (KB P1-B). Maps a horizon
+    # in ``_ACTION_HORIZONS`` to an ordered list of ``{text_en, text_ar}``
+    # items. Empty when the leaf declares no ``actions:`` block — the
+    # ``text_en`` summary is then the only guidance, exactly as before.
+    actions: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,4 +353,41 @@ def _parse_outcome(
         valid_for_hours=valid_for_hours,
         kind=kind,
         leaf_node_id=leaf_node_id,
+        actions=_parse_actions(raw.get("actions")),
     )
+
+
+def _parse_actions(raw: Any) -> dict[str, list[dict[str, Any]]]:
+    """Normalize a leaf's optional ``actions:`` block into
+    ``{horizon: [{text_en, text_ar}]}``.
+
+    Tolerant by design — the loader already rejected malformed action
+    blocks at compile time, so reaching a bad shape here means the
+    compiled JSON was hand-tampered; we drop unknown horizons and
+    items missing ``text_en`` rather than raise inside a sweep. Only
+    non-empty horizons are kept so the persisted JSONB stays compact.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[dict[str, Any]]] = {}
+    for horizon in _ACTION_HORIZONS:
+        items_raw = raw.get(horizon)
+        if not isinstance(items_raw, list):
+            continue
+        items: list[dict[str, Any]] = []
+        for item in items_raw:
+            if not isinstance(item, dict):
+                continue
+            text_en = item.get("text_en")
+            if not isinstance(text_en, str) or not text_en:
+                continue
+            text_ar = item.get("text_ar")
+            items.append(
+                {
+                    "text_en": text_en,
+                    "text_ar": text_ar if isinstance(text_ar, str) else None,
+                }
+            )
+        if items:
+            out[horizon] = items
+    return out

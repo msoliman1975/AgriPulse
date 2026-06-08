@@ -233,6 +233,7 @@ class RecommendationsServiceImpl:
                 action_type=result.outcome.action_type,
                 severity=result.outcome.severity,
                 parameters=result.outcome.parameters,
+                actions=result.outcome.actions,
                 confidence=result.outcome.confidence,
                 tree_path=_serialize_path(result.path),
                 text_en=result.outcome.text_en,
@@ -1073,6 +1074,7 @@ class DecisionTreesAuthorService:
                 "text_en": result.outcome.text_en,
                 "text_ar": result.outcome.text_ar,
                 "valid_for_hours": result.outcome.valid_for_hours,
+                "actions": result.outcome.actions,
             }
         return {
             "matched": result.outcome is not None and result.outcome.action_type != "no_action",

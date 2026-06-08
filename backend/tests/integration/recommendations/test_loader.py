@@ -143,6 +143,69 @@ def test_transferability_missing_region_normalizes_to_none() -> None:
     assert compiled["transferability"]["global"] is None
 
 
+# --- 4-horizon outcome actions (KB P1-B) ------------------------------
+
+
+def _leaf_with_actions(actions: object) -> dict[str, object]:
+    return {
+        "code": "x",
+        "name_en": "x",
+        "root": "leaf",
+        "nodes": {
+            "leaf": {
+                "outcome": {
+                    "action_type": "scout",
+                    "text_en": "x",
+                    "actions": actions,
+                }
+            }
+        },
+    }
+
+
+def test_seed_actions_compile() -> None:
+    # The scout seed demonstrates the actions block on its critical leaf.
+    compiled = compile_tree(_load_seed(), source_path="seed")
+    crit = compiled["nodes"]["leaf_scout_critical"]["outcome"]["actions"]
+    assert crit["immediate"][0]["text_en"]
+
+
+def test_actions_valid_block_compiles() -> None:
+    compile_tree(
+        _leaf_with_actions(
+            {
+                "immediate": [{"text_en": "now", "text_ar": "الآن"}],
+                "long_term": [{"text_en": "later"}],
+            }
+        ),
+        source_path="x",
+    )
+
+
+def test_actions_rejects_unknown_horizon() -> None:
+    with pytest.raises(DecisionTreeParseError, match="horizon"):
+        compile_tree(
+            _leaf_with_actions({"someday": [{"text_en": "x"}]}),
+            source_path="x",
+        )
+
+
+def test_actions_rejects_item_without_text_en() -> None:
+    with pytest.raises(DecisionTreeParseError, match="text_en"):
+        compile_tree(
+            _leaf_with_actions({"immediate": [{"text_ar": "only ar"}]}),
+            source_path="x",
+        )
+
+
+def test_actions_rejects_non_list_horizon() -> None:
+    with pytest.raises(DecisionTreeParseError, match="must be a list"):
+        compile_tree(
+            _leaf_with_actions({"immediate": {"text_en": "x"}}),
+            source_path="x",
+        )
+
+
 def test_compile_rejects_missing_code() -> None:
     with pytest.raises(DecisionTreeParseError, match="missing 'code'"):
         compile_tree(

@@ -24,6 +24,19 @@ export interface TreePathStepDTO {
   values: Record<string, unknown>;
 }
 
+// 4-horizon structured guidance (KB P1-B).
+export type ActionHorizon = "immediate" | "short_term" | "long_term" | "monitoring";
+
+export interface RecommendationActionItem {
+  text_en: string;
+  text_ar: string | null;
+}
+
+// Horizons with no items are omitted by the server, so every key is optional.
+export type RecommendationActions = Partial<
+  Record<ActionHorizon, RecommendationActionItem[]>
+>;
+
 export interface Recommendation {
   id: string;
   block_id: string;
@@ -35,6 +48,7 @@ export interface Recommendation {
   action_type: RecommendationActionType;
   severity: RecommendationSeverity;
   parameters: Record<string, unknown>;
+  actions: RecommendationActions;
   // confidence is serialised as a string by Pydantic's Decimal handling.
   confidence: string;
   tree_path: TreePathStepDTO[];

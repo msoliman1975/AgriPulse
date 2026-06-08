@@ -558,6 +558,7 @@ class RecommendationsRepository:
         action_type: str,
         severity: str,
         parameters: dict[str, Any],
+        actions: dict[str, Any],
         confidence: Decimal,
         tree_path: list[Any],
         text_en: str,
@@ -575,14 +576,14 @@ class RecommendationsRepository:
                     """
                     INSERT INTO recommendations (
                         id, block_id, farm_id, tree_id, tree_code, tree_version,
-                        block_crop_id, action_type, severity, parameters,
+                        block_crop_id, action_type, severity, parameters, actions,
                         confidence, tree_path, text_en, text_ar,
                         valid_until, evaluation_snapshot, state,
                         created_by, updated_by
                     ) VALUES (
                         :id, :block_id, :farm_id, :tree_id, :tree_code, :tree_version,
                         :block_crop_id, :action_type, :severity,
-                        CAST(:parameters AS jsonb),
+                        CAST(:parameters AS jsonb), CAST(:actions AS jsonb),
                         :confidence,
                         CAST(:tree_path AS jsonb), :text_en, :text_ar,
                         :valid_until, CAST(:snapshot AS jsonb), 'open',
@@ -608,6 +609,7 @@ class RecommendationsRepository:
                     "action_type": action_type,
                     "severity": severity,
                     "parameters": _serialize_jsonb(parameters),
+                    "actions": _serialize_jsonb(actions),
                     "confidence": confidence,
                     "tree_path": _serialize_jsonb(tree_path),
                     "text_en": text_en,
