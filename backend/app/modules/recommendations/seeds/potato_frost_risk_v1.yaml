@@ -1,0 +1,184 @@
+# potato_frost_risk_v1 — warn of impending frost damage to potato foliage
+# from the 72h temperature forecast.
+#
+# Point-in-time threshold rule over the 72h weather forecast (KB content
+# track, post-P1). The 3-day window gives lead time to set up frost
+# protection. Cultivated potato cannot cold-harden: foliar injury begins
+# near -2 °C and foliage is killed near -3 °C. The kill point is
+# nucleation-dependent (unnucleated leaves can supercool to -6/-8 °C), so
+# treat the warning as a risk flag, not a certainty.
+
+code: potato_frost_risk_v1
+name_en: Potato — frost risk
+name_ar: البطاطس — خطر الصقيع
+description_en: >-
+  Warns when the 72h forecast minimum air temperature approaches frost
+  damage thresholds for potato foliage: injury risk at/below -2 °C
+  (default), escalating to critical (foliage-kill risk) at/below -3 °C.
+  The 3-day window allows time to arrange frost protection.
+description_ar: >-
+  يُحذّر عند اقتراب أدنى درجة حرارة متوقعة خلال 72 ساعة من عتبات ضرر الصقيع
+  لمجموع البطاطس الخضري: خطر إصابة عند ≤ -2 °م (افتراضيًا)، ويتصاعد إلى حرج
+  (خطر موت المجموع الخضري) عند ≤ -3 °م. نافذة الثلاثة أيام تتيح وقتًا لترتيب
+  الحماية من الصقيع.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    Cultivated potato (S. tuberosum) cannot cold-acclimate; foliar injury
+    begins near -2 °C and foliage is killed near -3 °C. The kill point is
+    ice-nucleation dependent — unnucleated leaves can supercool to
+    -6/-8 °C — so this is a risk flag, not a certainty. Frost is less
+    frequent in core Egyptian production but occurs in winter plantings
+    and inland/desert sites, hence medium Egypt applicability.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Stegner et al. — Frost tolerance and supercooling in potato
+        (Crops, 2022)
+      doi: 10.3390/crops2040026
+      year: 2022
+    - source_type: peer_reviewed
+      title: >-
+        Chen & Li — Cold acclimation and freezing injury in Solanum
+        species (Plant Physiology, 1980; foliage kill ~ -3 °C)
+      url: https://pmc.ncbi.nlm.nih.gov/articles/PMC440645/
+      year: 1980
+
+transferability:
+  egypt: medium
+  middle_east: medium
+  global: high
+
+parameters:
+  frost_injury_c:
+    type: number
+    default: -2.0
+    min: -10.0
+    max: 5.0
+    description: Forecast min air temp (°C) at/below which foliar frost injury risk begins.
+  frost_kill_c:
+    type: number
+    default: -3.0
+    min: -12.0
+    max: 5.0
+    description: Forecast min air temp (°C) at/below which foliage-kill risk is high.
+
+root: root
+nodes:
+  root:
+    label_en: Will the 72h minimum reach frost-injury territory?
+    label_ar: هل ستبلغ الصغرى خلال 72 ساعة مدى إصابة الصقيع؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: weather
+          scope: forecast_72h
+          field: air_temp_c_min
+        right:
+          source: params
+          name: frost_injury_c
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is foliage-kill territory forecast (≤ kill threshold)?
+    label_ar: هل يُتوقّع مدى موت المجموع الخضري (≤ عتبة الموت)؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: weather
+          scope: forecast_72h
+          field: air_temp_c_min
+        right:
+          source: params
+          name: frost_kill_c
+    on_match: leaf_critical
+    on_miss: leaf_warning
+
+  leaf_critical:
+    label_en: Hard frost forecast — protect the crop
+    label_ar: صقيع شديد متوقّع — احمِ المحصول
+    outcome:
+      action_type: other
+      severity: critical
+      confidence: 0.8
+      valid_for_hours: 72
+      parameters:
+        priority: high
+      text_en: >-
+        Forecast minimum reaches potato foliage-kill territory. Arrange
+        frost protection now; unprotected foliage may be lost.
+      text_ar: >-
+        تبلغ الصغرى المتوقعة مدى موت مجموع البطاطس الخضري. رتّب الحماية من
+        الصقيع الآن؛ فقد يُفقد المجموع غير المحمي.
+      actions:
+        immediate:
+          - text_en: >-
+              Run sprinkler frost protection overnight where available, or
+              cover seedbeds.
+            text_ar: >-
+              شغّل الرشّ للحماية من الصقيع ليلًا حيثما توفّر، أو غطِّ المصاطب.
+          - text_en: >-
+              Pre-irrigate soil before the frost night — moist soil
+              releases heat and buffers the canopy.
+            text_ar: >-
+              اروِ التربة قبل ليلة الصقيع — فالتربة الرطبة تطلق حرارة وتخفّف
+              عن المجموع الخضري.
+        short_term:
+          - text_en: After the event, assess foliar damage and regrowth before any inputs.
+            text_ar: بعد الحدث، قيّم ضرر المجموع الخضري والنموّ الجديد قبل أي مدخلات.
+        long_term:
+          - text_en: >-
+              Avoid frost-pocket fields and adjust planting dates to keep
+              emergence clear of the frost window.
+            text_ar: >-
+              تجنّب الحقول المعرّضة لتجمّع الصقيع وعدّل مواعيد الزراعة ليكون
+              الإنبات خارج نافذة الصقيع.
+        monitoring:
+          - text_en: Track overnight minimum forecasts through the cold spell.
+            text_ar: تابع توقّعات الصغرى الليلية طوال موجة البرد.
+
+  leaf_warning:
+    label_en: Light frost risk — watch and prepare
+    label_ar: خطر صقيع خفيف — راقب واستعد
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 72
+      parameters:
+        priority: medium
+      text_en: >-
+        Forecast minimum is at/below the foliar frost-injury threshold for
+        potato. Be ready to protect the crop if temperatures drop further.
+      text_ar: >-
+        الصغرى المتوقعة عند/دون عتبة إصابة الصقيع لمجموع البطاطس الخضري. كن
+        مستعدًا لحماية المحصول إذا انخفضت الحرارة أكثر.
+      actions:
+        immediate:
+          - text_en: Confirm the overnight low and have frost protection on standby.
+            text_ar: أكّد الصغرى الليلية وأبقِ وسائل الحماية من الصقيع جاهزة.
+        short_term:
+          - text_en: Pre-irrigate if a frost night becomes likely.
+            text_ar: اروِ التربة مسبقًا إذا رجّحت ليلة صقيع.
+        long_term: []
+        monitoring:
+          - text_en: Re-check the forecast each evening during the cold spell.
+            text_ar: أعد فحص التوقّع كل مساء خلال موجة البرد.
+
+  leaf_no_action:
+    label_en: No action — no frost in the forecast
+    label_ar: لا إجراء — لا صقيع في التوقّع
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Forecast minimums stay above frost-injury thresholds; no action needed.
+      text_ar: تبقى الصغرى المتوقعة فوق عتبات إصابة الصقيع؛ لا حاجة لإجراء.

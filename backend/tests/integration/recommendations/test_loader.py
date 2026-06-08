@@ -41,12 +41,33 @@ def _minimal_leaf_spec(**extra: object) -> dict[str, object]:
     }
 
 
+def _seeds_dir() -> Path:
+    return (
+        Path(__file__).resolve().parents[3]
+        / "app"
+        / "modules"
+        / "recommendations"
+        / "seeds"
+    )
+
+
 def test_seed_yaml_compiles() -> None:
     spec = _load_seed()
     compiled = compile_tree(spec, source_path="seed")
     assert compiled["code"] == "scout_for_stress_v1"
     assert compiled["root"] == "root"
     assert set(compiled["nodes"]) >= {"root", "severity_check", "leaf_no_action"}
+
+
+def test_all_seed_files_compile() -> None:
+    """Every shipped seed YAML must compile — guards new catalog entries
+    (e.g. the potato static-threshold trees) from shipping malformed."""
+    seeds = sorted(_seeds_dir().glob("*.yaml"))
+    assert seeds, "no seed YAML files found"
+    for path in seeds:
+        spec = yaml.safe_load(path.read_text(encoding="utf-8"))
+        compiled = compile_tree(spec, source_path=str(path))
+        assert compiled["code"], f"{path.name} compiled without a code"
 
 
 # --- evidence / transferability provenance blocks (KB P1-A) -----------

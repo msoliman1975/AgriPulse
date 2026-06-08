@@ -1,0 +1,184 @@
+# potato_heat_stress_v1 — warn when forecast air temperature threatens
+# potato tuberization / tuber bulking.
+#
+# Point-in-time threshold rule over the 24h weather forecast (KB content
+# track, post-P1). Potato tuber growth is optimal at 14–22 °C and is
+# impaired above ~22 °C, with tuber yield falling at/above ~25 °C as
+# assimilate is diverted to shoots. WARM NIGHTS (min > 18 °C) are the
+# more sensitive axis, so a hot day combined with a warm night escalates
+# to critical.
+
+code: potato_heat_stress_v1
+name_en: Potato — heat stress
+name_ar: البطاطس — الإجهاد الحراري
+description_en: >-
+  Warns when the 24h forecast maximum air temperature reaches the potato
+  heat-stress threshold (default 25 °C), impairing tuberization. Escalates
+  to critical when the forecast night minimum also stays warm (default
+  > 18 °C), the temperature axis most damaging to tuber set.
+description_ar: >-
+  يُحذّر عند بلوغ أعلى درجة حرارة متوقعة خلال 24 ساعة عتبة الإجهاد الحراري
+  للبطاطس (افتراضيًا 25 °م)، ما يعيق تكوّن الدرنات. ويتصاعد إلى حرج عند بقاء
+  الصغرى الليلية المتوقعة مرتفعة أيضًا (افتراضيًا > 18 °م)، وهي الأكثر ضررًا
+  لعقد الدرنات.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    Optimal tuber growth 14–22 °C; impairment above ~22 °C; tuber yield
+    falls at/above ~25 °C. Night temperature above ~18 °C is the more
+    sensitive axis — a single daytime cutoff cannot fully capture heat
+    stress, hence the day+night escalation here. A 30 °C tuber-bulking
+    cutoff sometimes cited was checked and rejected. Highly relevant to
+    Egyptian/arid production; no Egypt-specific primary cutoff was found.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        High-temperature effects on potato tuberization and assimilate
+        partitioning (Plant Physiology, 2024)
+      url: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11683837/
+      year: 2024
+    - source_type: peer_reviewed
+      title: >-
+        Heat stress at tuber initiation reduces tuber number and yield
+        in potato
+      url: https://pmc.ncbi.nlm.nih.gov/articles/PMC8146319/
+      year: 2021
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: high
+
+parameters:
+  heat_threshold_c:
+    type: number
+    default: 25.0
+    min: 15.0
+    max: 45.0
+    description: Forecast max air temp (°C) at/above which tuberization is impaired.
+  night_threshold_c:
+    type: number
+    default: 18.0
+    min: 10.0
+    max: 35.0
+    description: Forecast night-min air temp (°C) above which heat stress escalates.
+
+root: root
+nodes:
+  root:
+    label_en: Will the 24h max temperature reach the heat threshold?
+    label_ar: هل ستبلغ الحرارة العظمى خلال 24 ساعة عتبة الإجهاد؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather
+          scope: forecast_24h
+          field: air_temp_c_max
+        right:
+          source: params
+          name: heat_threshold_c
+    on_match: night_check
+    on_miss: leaf_no_action
+
+  night_check:
+    label_en: Will the night minimum also stay warm?
+    label_ar: هل ستبقى الصغرى الليلية مرتفعة أيضًا؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: weather
+          scope: forecast_24h
+          field: air_temp_c_min
+        right:
+          source: params
+          name: night_threshold_c
+    on_match: leaf_critical
+    on_miss: leaf_warning
+
+  leaf_critical:
+    label_en: Severe heat — hot day and warm night
+    label_ar: حرارة حادة — نهار حار وليل دافئ
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.8
+      valid_for_hours: 48
+      parameters:
+        priority: high
+      text_en: >-
+        Forecast combines a hot day with a warm night — strongly
+        suppressing tuber set. Cool the crop and protect tuberization.
+      text_ar: >-
+        يجمع التوقّع بين نهار حار وليل دافئ، ما يثبّط عقد الدرنات بشدّة.
+        برّد المحصول واحمِ تكوّن الدرنات.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate to cool the canopy and soil; schedule water for the
+              hottest part of the day.
+            text_ar: >-
+              اروِ لتبريد المجموع الخضري والتربة، وحدّد الريّ في أحرّ أوقات
+              اليوم.
+        short_term:
+          - text_en: >-
+              Maintain full soil moisture through the heat spell; avoid
+              water stress stacking on heat stress.
+            text_ar: >-
+              حافظ على رطوبة تربة كاملة طوال موجة الحر؛ وتجنّب تراكم الإجهاد
+              المائي فوق الحراري.
+        long_term:
+          - text_en: >-
+              For future seasons, shift planting so bulking avoids peak
+              heat and consider more heat-tolerant cultivars.
+            text_ar: >-
+              في المواسم القادمة، انقل موعد الزراعة لتفادي ذروة الحر أثناء
+              امتلاء الدرنات وفكّر في أصناف أكثر تحمّلًا للحرارة.
+        monitoring:
+          - text_en: Track daily max and night-min forecasts through the heat event.
+            text_ar: تابع توقّعات العظمى اليومية والصغرى الليلية طوال موجة الحر.
+
+  leaf_warning:
+    label_en: Daytime heat — protect tuberization
+    label_ar: حرارة نهارية — احمِ تكوّن الدرنات
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 48
+      parameters:
+        priority: medium
+      text_en: >-
+        Forecast daytime temperatures reach the heat-stress threshold for
+        potato. Keep the crop well-watered to limit canopy and tuber heat
+        stress.
+      text_ar: >-
+        تبلغ الحرارة النهارية المتوقعة عتبة الإجهاد الحراري للبطاطس. أبقِ
+        المحصول جيّد الريّ للحدّ من إجهاد المجموع الخضري والدرنات.
+      actions:
+        immediate:
+          - text_en: Ensure soil moisture is full ahead of the hot day.
+            text_ar: تأكّد من اكتمال رطوبة التربة قبل اليوم الحار.
+        short_term:
+          - text_en: Hold frequent irrigation while daytime highs persist.
+            text_ar: حافظ على ريّ متكرّر طالما استمرّت العظمى النهارية.
+        long_term: []
+        monitoring:
+          - text_en: Watch whether night minimums begin to stay above 18 °C.
+            text_ar: راقب ما إذا بدأت الصغرى الليلية تبقى فوق 18 °م.
+
+  leaf_no_action:
+    label_en: No action — temperatures within range
+    label_ar: لا إجراء — الحرارة ضمن المدى
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Forecast temperatures are within potato's tolerance; no action needed.
+      text_ar: الحرارة المتوقعة ضمن تحمّل البطاطس؛ لا حاجة لإجراء.
