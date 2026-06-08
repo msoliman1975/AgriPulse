@@ -158,13 +158,11 @@ export function SideNav(): ReactNode {
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
-        {/* Legacy form-based view kept as a fallback while we iterate. */}
-        <SideNavItem
-          to={hasFarm ? `/farms/${farmSegment}` : "/farms"}
-          label={t("common:workspaceNav.farmManagementLegacy")}
-          icon={<LandUnitsIcon className="h-4 w-4" />}
-          activePathPrefix={hasFarm ? `/farms/${farmSegment}` : "/farms"}
-        />
+        {/* F-4: the map-first surface (/labs/map) is now the single Farm
+            management page. The legacy form view at /farms is hidden from the
+            nav but its routes still resolve as a fallback.
+            TODO(nuke-legacy-farms): once /labs/map has full parity, delete the
+            /farms routes + pages and the workspaceNav.farmManagementLegacy key. */}
         <SideNavItem
           to={hasFarm ? `/alerts/${farmSegment}` : "#"}
           label={t("common:workspaceNav.alerts")}

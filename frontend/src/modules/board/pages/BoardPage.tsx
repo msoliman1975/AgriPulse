@@ -335,7 +335,7 @@ export function BoardPage(): ReactNode {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ap-ink">{t("title")}</h1>
+          <h1 className="text-2xl font-semibold text-ap-ink">{t("title")}</h1>
           <p className="mt-1 text-sm text-ap-muted">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
