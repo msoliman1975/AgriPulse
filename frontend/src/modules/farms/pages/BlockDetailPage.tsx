@@ -4,7 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { archiveBlock, getBlock, type BlockDetail } from "@/api/blocks";
 import { assignBlockCrop, listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
+import { getFarm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { ErrorState } from "@/components/ErrorState";
+import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/Skeleton";
 import { ImageryPanel } from "@/modules/imagery/components/ImageryPanel";
 import { SubscriptionsTab } from "@/modules/imagery/components/SubscriptionsTab";
 import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
@@ -29,6 +34,7 @@ export function BlockDetailPage(): JSX.Element {
   const canReadWeather = useCapability("weather.read", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
+  const [farmName, setFarmName] = useState<string | null>(null);
   const [history, setHistory] = useState<BlockCropAssignment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,11 +48,12 @@ export function BlockDetailPage(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    Promise.all([getBlock(blockId), listBlockCrops(blockId)])
-      .then(([b, h]) => {
+    Promise.all([getBlock(blockId), listBlockCrops(blockId), getFarm(farmId)])
+      .then(([b, h, f]) => {
         if (cancelled) return;
         setBlock(b);
         setHistory(h);
+        setFarmName(f.name);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -55,7 +62,7 @@ export function BlockDetailPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [blockId]);
+  }, [blockId, farmId]);
 
   const handleArchive = async (): Promise<void> => {
     setBusy(true);
@@ -93,65 +100,69 @@ export function BlockDetailPage(): JSX.Element {
   };
 
   if (error && !block) {
-    return (
-      <p role="alert" className="text-sm text-red-700">
-        {error}
-      </p>
-    );
+    return <ErrorState message={error} />;
   }
   if (!block) {
-    return <p role="status">{t("detail.loading")}</p>;
+    return <Skeleton className="h-64 w-full rounded-xl" />;
   }
 
   const current = history.find((h) => h.is_current);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-brand-800">
-              {t("block.detailHeading")} {block.code}
-            </h1>
+      <PageHeader
+        above={
+          <Breadcrumb
+            items={[
+              { label: t("list.heading"), to: "/farms" },
+              { label: farmName ?? "…", to: `/farms/${farmId}` },
+              { label: `${t("block.detailHeading")} ${block.code}` },
+            ]}
+          />
+        }
+        title={
+          <span className="flex items-center gap-2">
+            {t("block.detailHeading")} {block.code}
             {block.unit_type !== "block" ? (
-              <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+              <span className="inline-flex items-center rounded-full bg-ap-primary-soft px-2 py-0.5 text-xs font-medium text-ap-primary">
                 {t(`block.unitType.${block.unit_type}`)}
               </span>
             ) : null}
-          </div>
-          <p className="text-sm text-slate-600">
+          </span>
+        }
+        subtitle={
+          <>
             <AreaDisplay areaM2={Number(block.area_m2)} /> ·{" "}
             {block.irrigation_system ? t(`irrigationSystem.${block.irrigation_system}`) : "—"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link to={`/farms/${farmId}`} className="btn btn-ghost">
-            {t("block.back")}
-          </Link>
-          {canEdit ? (
-            <Link to={`/farms/${farmId}/blocks/${block.id}/edit`} className="btn btn-ghost">
-              {t("block.edit")}
-            </Link>
-          ) : null}
-          {canArchive ? (
-            <ArchiveButton label={t("block.archive")} busy={busy} onConfirm={handleArchive} />
-          ) : null}
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {canEdit ? (
+              <Link to={`/farms/${farmId}/blocks/${block.id}/edit`} className="btn btn-ghost">
+                {t("block.edit")}
+              </Link>
+            ) : null}
+            {canArchive ? (
+              <ArchiveButton label={t("block.archive")} busy={busy} onConfirm={handleArchive} />
+            ) : null}
+          </>
+        }
+      />
 
       <div className="card">
         <MapPreview geometry={block.boundary} />
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("block.currentCrop")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("block.currentCrop")}</h2>
         {current ? (
-          <p className="mt-2 text-sm text-slate-700">
+          <p className="mt-2 text-sm text-ap-ink">
             {current.season_label} ·{" "}
             {t(`status.${current.status === "growing" ? "active" : "active"}`)}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-slate-600">{t("block.noCrop")}</p>
+          <p className="mt-2 text-sm text-ap-muted">{t("block.noCrop")}</p>
         )}
 
         {canAssignCrop ? (
@@ -204,9 +215,9 @@ export function BlockDetailPage(): JSX.Element {
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("block.history")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("block.history")}</h2>
         {history.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">{t("block.noCrop")}</p>
+          <p className="mt-2 text-sm text-ap-muted">{t("block.noCrop")}</p>
         ) : (
           <ul className="mt-3 space-y-1 text-sm">
             {history.map((h) => (

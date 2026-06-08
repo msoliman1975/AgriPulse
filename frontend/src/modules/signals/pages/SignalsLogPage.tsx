@@ -13,6 +13,8 @@ import {
   initSignalAttachment,
   uploadAttachmentToS3,
 } from "@/api/signals";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -207,15 +209,19 @@ function EmptyWithCta({
 }): ReactNode {
   const { t } = useTranslation("signals");
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
-      <p>{message}</p>
-      <Link
-        to={`/config/signals/${farmId}`}
-        className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
-      >
-        {t("log.configureCta")}
-      </Link>
-    </div>
+    <Card noPadding>
+      <EmptyState
+        message={message}
+        action={
+          <Link
+            to={`/config/signals/${farmId}`}
+            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
+          >
+            {t("log.configureCta")}
+          </Link>
+        }
+      />
+    </Card>
   );
 }
 

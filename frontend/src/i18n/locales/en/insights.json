@@ -1,6 +1,7 @@
 {
   "page": {
-    "title": "Farm health overview"
+    "title": "Farm health overview",
+    "loadFailed": "Couldn't load this farm's overview — try again."
   },
   "trend": {
     "title": "Vegetation index trend",

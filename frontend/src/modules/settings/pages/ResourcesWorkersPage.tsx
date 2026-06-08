@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listFarms } from "@/api/farms";
 import type { WorkerRole } from "@/api/resources";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -53,10 +54,7 @@ export function ResourcesWorkersPage(): ReactNode {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold text-ap-ink">{t("workers.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("workers.subtitle")}</p>
-      </header>
+      <PageHeader title={t("workers.title")} subtitle={t("workers.subtitle")} />
 
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-2 text-sm">

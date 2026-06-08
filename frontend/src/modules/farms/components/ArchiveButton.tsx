@@ -15,7 +15,7 @@ export function ArchiveButton({ label, busy, onConfirm }: Props): JSX.Element {
     return (
       <button
         type="button"
-        className="btn btn-ghost text-red-700"
+        className="btn btn-ghost text-ap-crit"
         onClick={() => setConfirming(true)}
         disabled={busy}
       >

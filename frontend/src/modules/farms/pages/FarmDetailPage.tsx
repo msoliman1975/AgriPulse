@@ -5,8 +5,10 @@ import { useTranslation } from "react-i18next";
 import { archiveFarm, getFarm, type FarmDetail } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { Skeleton } from "@/components/Skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { useCapability } from "@/rbac/useCapability";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
@@ -63,23 +65,19 @@ export function FarmDetailPage(): JSX.Element {
     return <ErrorState message={error} />;
   }
   if (!farm) {
-    return (
-      <p role="status" className="text-sm text-ap-muted">
-        {t("detail.loading")}
-      </p>
-    );
+    return <Skeleton className="h-64 w-full rounded-xl" />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         above={
-          <Link
-            to="/farms"
-            className="text-sm font-medium text-ap-primary hover:underline"
-          >
-            ← {t("detail.back")}
-          </Link>
+          <Breadcrumb
+            items={[
+              { label: t("list.heading"), to: "/farms" },
+              { label: farm.name },
+            ]}
+          />
         }
         title={farm.name}
         subtitle={

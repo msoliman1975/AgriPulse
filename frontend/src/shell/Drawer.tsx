@@ -33,18 +33,18 @@ export function Drawer({ open, onClose, title, children, side = "end" }: Props):
         type="button"
         aria-label={t("actions.close")}
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 bg-ap-ink/40"
       />
       <aside
         className={`absolute top-0 ${sideClass} h-full w-full max-w-md overflow-y-auto bg-white shadow-xl`}
       >
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
+        <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
+          <h2 className="text-lg font-semibold text-ap-ink">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t("actions.close")}
-            className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-md p-1 text-ap-muted hover:bg-ap-line"
           >
             <svg viewBox="0 0 20 20" className="h-5 w-5" aria-hidden="true">
               <path
