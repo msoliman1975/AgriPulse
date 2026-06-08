@@ -6,6 +6,7 @@ import { Navigate } from "react-router-dom";
 
 import { getFarm } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
+import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -32,7 +33,7 @@ export function InsightsPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("insights");
   const dateLocale = useDateLocale();
-  const { data: farm, isLoading } = useQuery({
+  const { data: farm, isLoading, isError } = useQuery({
     queryKey: ["farms", "detail", farmId] as const,
     queryFn: () => getFarm(farmId!),
     enabled: Boolean(farmId),
@@ -59,6 +60,16 @@ export function InsightsPage(): ReactNode {
 
   if (!farmId) {
     return <Navigate to="/" replace />;
+  }
+
+  // If the farm itself can't load, the whole overview is meaningless — show a
+  // single error instead of a broken header over empty widgets.
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <ErrorState message={t("page.loadFailed")} />
+      </div>
+    );
   }
 
   return (

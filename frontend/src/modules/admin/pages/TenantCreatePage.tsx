@@ -169,7 +169,7 @@ export function TenantCreatePage(): ReactNode {
       {submitError ? (
         <p
           role="alert"
-          className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+          className="mt-4 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-sm text-ap-crit"
         >
           {submitError}
         </p>
@@ -441,7 +441,7 @@ function ReviewStep({ form }: { form: FormState }): ReactNode {
       <ReviewRow label={t("tenants.create.fields.tier")} value={form.initial_tier} />
       <ReviewRow label={t("tenants.create.fields.ownerEmail")} value={form.owner_email} />
       <ReviewRow label={t("tenants.create.fields.ownerFullName")} value={form.owner_full_name} />
-      <p className="rounded-md bg-emerald-50 p-2 text-xs text-emerald-800">
+      <p className="rounded-md bg-ap-primary-soft p-2 text-xs text-ap-primary">
         {t("tenants.create.review.ownerNote", { email: form.owner_email })}
       </p>
     </div>
@@ -461,16 +461,16 @@ function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => vo
   return (
     <section
       role="status"
-      className="mx-auto max-w-lg rounded-md border border-emerald-200 bg-emerald-50 p-6 shadow-card"
+      className="mx-auto max-w-lg rounded-md border border-ap-primary/30 bg-ap-primary-soft p-6 shadow-card"
     >
-      <h1 className="text-base font-semibold text-emerald-900">
+      <h1 className="text-base font-semibold text-ap-primary">
         {t("tenants.create.success.title")}
       </h1>
-      <p className="mt-2 text-sm text-emerald-800">{body}</p>
+      <p className="mt-2 text-sm text-ap-primary">{body}</p>
       <button
         type="button"
         onClick={onDone}
-        className="mt-4 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        className="mt-4 rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
       >
         {t("tenants.detail.title")}
       </button>
@@ -497,7 +497,7 @@ function Field({ label, help, error, children }: FieldProps): ReactNode {
       </label>
       <div className="mt-1">{children(id)}</div>
       {help && !error ? <p className="mt-1 text-xs text-ap-muted">{help}</p> : null}
-      {error ? <p className="mt-1 text-xs text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-ap-crit">{error}</p> : null}
     </div>
   );
 }

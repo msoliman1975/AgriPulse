@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ResolvedSetting } from "@/api/integrations";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { listFarms } from "@/api/farms";
 import { useQuery } from "@tanstack/react-query";
@@ -32,10 +34,7 @@ export function IntegrationsWeatherPage(): ReactNode {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold text-ap-ink">{t("weather.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("weather.subtitle")}</p>
-      </header>
+      <PageHeader title={t("weather.title")} subtitle={t("weather.subtitle")} />
 
       {/* Tenant tier */}
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
@@ -90,14 +89,14 @@ function SettingTable({
   isPending: boolean;
 }): ReactNode {
   const { t } = useTranslation("integrations");
+  if (settings.length === 0) {
+    return <EmptyState message={t("noSettings")} className="p-6" />;
+  }
   return (
     <div className="mt-3 divide-y divide-ap-line">
       {settings.map((s) => (
         <SettingRow key={s.key} setting={s} onSave={onSave} isPending={isPending} />
       ))}
-      {settings.length === 0 ? (
-        <p className="py-2 text-sm text-ap-muted">{t("noSettings")}</p>
-      ) : null}
     </div>
   );
 }

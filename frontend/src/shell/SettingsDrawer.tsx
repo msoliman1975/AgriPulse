@@ -44,33 +44,33 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
   return (
     <Drawer open={open} onClose={onClose} title={tc("shell.settingsTitle")}>
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ap-muted">
           {tc("shell.preferences")}
         </h3>
         <div className="flex flex-col gap-3">
           <div>
-            <span className="mb-1 block text-xs text-slate-500">{tc("shell.languageToggle")}</span>
+            <span className="mb-1 block text-xs text-ap-muted">{tc("shell.languageToggle")}</span>
             <LanguageToggle />
           </div>
           <div>
-            <span className="mb-1 block text-xs text-slate-500">{tc("shell.unitToggle")}</span>
+            <span className="mb-1 block text-xs text-ap-muted">{tc("shell.unitToggle")}</span>
             <UnitToggle />
           </div>
         </div>
       </section>
 
-      <hr className="my-5 border-slate-200" />
+      <hr className="my-5 border-ap-line" />
 
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ap-muted">
           {t("me.heading")}
         </h3>
         {error ? (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-ap-crit">
             {error}
           </p>
         ) : !me ? (
-          <p role="status" className="text-sm text-slate-600">
+          <p role="status" className="text-sm text-ap-muted">
             {tc("actions.loading")}
           </p>
         ) : (
@@ -98,7 +98,7 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
       </dl>
 
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ap-muted">
           {t("me.preferences")}
         </h4>
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -109,13 +109,13 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
       </div>
 
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ap-muted">
           {t("me.platformRoles")}
         </h4>
         {me.platform_roles.length === 0 ? (
-          <p className="text-slate-600">—</p>
+          <p className="text-ap-muted">—</p>
         ) : (
-          <ul className="list-inside list-disc text-slate-700">
+          <ul className="list-inside list-disc text-ap-ink">
             {me.platform_roles.map((r) => (
               <li key={r.role}>{r.role}</li>
             ))}
@@ -124,23 +124,23 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
       </div>
 
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ap-muted">
           {t("me.tenantMemberships")}
         </h4>
         {me.tenant_memberships.length === 0 ? (
-          <p className="text-slate-600">{t("me.noMemberships")}</p>
+          <p className="text-ap-muted">{t("me.noMemberships")}</p>
         ) : (
           <ul className="space-y-2">
             {me.tenant_memberships.map((m) => (
-              <li key={m.tenant_id} className="rounded-md border border-slate-200 p-2">
-                <p className="font-medium text-slate-800">
-                  {m.tenant_name} <span className="text-xs text-slate-500">({m.tenant_slug})</span>
+              <li key={m.tenant_id} className="rounded-md border border-ap-line p-2">
+                <p className="font-medium text-ap-ink">
+                  {m.tenant_name} <span className="text-xs text-ap-muted">({m.tenant_slug})</span>
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ap-muted">
                   {t("me.status")}: {m.status}
                 </p>
                 {m.tenant_roles.length > 0 ? (
-                  <p className="text-xs text-slate-700">
+                  <p className="text-xs text-ap-ink">
                     {t("me.tenantRoleHeader")}: {m.tenant_roles.map((r) => r.role).join(", ")}
                   </p>
                 ) : null}
@@ -151,13 +151,13 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
       </div>
 
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ap-muted">
           {t("me.farmScopes")}
         </h4>
         {me.farm_scopes.length === 0 ? (
-          <p className="text-slate-600">{t("me.noFarmScopes")}</p>
+          <p className="text-ap-muted">{t("me.noFarmScopes")}</p>
         ) : (
-          <ul className="list-inside list-disc text-slate-700">
+          <ul className="list-inside list-disc text-ap-ink">
             {me.farm_scopes.map((s) => (
               <li key={s.farm_id}>
                 {s.farm_id} — {s.role}
@@ -173,8 +173,8 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
 function Row({ label, value }: { label: string; value: string }): ReactNode {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="text-slate-800">{value}</dd>
+      <dt className="text-xs uppercase tracking-wide text-ap-muted">{label}</dt>
+      <dd className="text-ap-ink">{value}</dd>
     </div>
   );
 }

@@ -146,7 +146,7 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
       <h2 className="text-lg font-semibold text-slate-800">{t("attachments.heading")}</h2>
 
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-red-700">
+        <p role="alert" className="mt-2 text-sm text-ap-crit">
           {error}
         </p>
       ) : null}

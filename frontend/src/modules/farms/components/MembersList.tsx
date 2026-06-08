@@ -29,7 +29,7 @@ export function MembersList({ members, canRevoke, onRevoke }: Props): JSX.Elemen
             {canRevoke && onRevoke ? (
               <button
                 type="button"
-                className="btn btn-ghost text-red-700"
+                className="btn btn-ghost text-ap-crit"
                 onClick={() => onRevoke(m.id)}
               >
                 {t("members.revoke")}

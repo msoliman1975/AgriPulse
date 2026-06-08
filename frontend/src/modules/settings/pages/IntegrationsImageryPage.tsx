@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { ResolvedSetting } from "@/api/integrations";
 import { listFarms } from "@/api/farms";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
 import {
@@ -28,10 +30,7 @@ export function IntegrationsImageryPage(): ReactNode {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold text-ap-ink">{t("imagery.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("imagery.subtitle")}</p>
-      </header>
+      <PageHeader title={t("imagery.title")} subtitle={t("imagery.subtitle")} />
 
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
         <h2 className="text-sm font-semibold text-ap-ink">{t("section.tenant")}</h2>
@@ -83,6 +82,10 @@ function SettingsList({
   onSave: (key: string, value: unknown) => void;
   isPending: boolean;
 }): ReactNode {
+  const { t } = useTranslation("integrations");
+  if (settings.length === 0) {
+    return <EmptyState message={t("noSettings")} className="p-6" />;
+  }
   return (
     <div className="mt-3 divide-y divide-ap-line">
       {settings.map((s) => (

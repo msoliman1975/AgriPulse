@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ResolvedSetting } from "@/api/integrations";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
 import { usePutTenantIntegration, useTenantIntegration } from "@/queries/integrations";
@@ -28,10 +29,7 @@ export function IntegrationsTenantOnlyPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-semibold text-ap-ink">{t(i18nTitleKey)}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t(i18nSubtitleKey)}</p>
-      </header>
+      <PageHeader title={t(i18nTitleKey)} subtitle={t(i18nSubtitleKey)} />
 
       <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
         {tenantQ.isLoading ? (

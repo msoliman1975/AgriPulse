@@ -7,6 +7,8 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { PageHeader } from "@/components/PageHeader";
+import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useCapability } from "@/rbac/useCapability";
 import { isApiError } from "@/api/errors";
 import { AreaDisplay } from "../components/AreaDisplay";
@@ -65,44 +67,38 @@ export function FarmListPage(): JSX.Element {
       {error ? <ErrorState message={error} /> : null}
 
       {farms === null ? (
-        <p role="status" className="text-sm text-ap-muted">
-          {t("detail.loading")}
-        </p>
+        <Skeleton className="h-40 w-full rounded-xl" />
       ) : farms.length === 0 ? (
         <EmptyState message={t("list.empty")} />
       ) : (
-        <Card noPadding className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-start text-xs uppercase text-ap-muted">
-                <th className="px-4 py-2 text-start">{t("list.columns.code")}</th>
-                <th className="px-4 py-2 text-start">{t("list.columns.name")}</th>
-                <th className="px-4 py-2 text-start">{t("list.columns.governorate")}</th>
-                <th className="px-4 py-2 text-start">{t("list.columns.area")}</th>
-                <th className="px-4 py-2 text-start">{t("list.columns.status")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {farms.map((f) => (
-                <tr key={f.id} className="border-t border-ap-line">
-                  <td className="px-4 py-2">
-                    <Link to={`/farms/${f.id}`} className="text-ap-primary underline">
-                      {f.code}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2">{f.name}</td>
-                  <td className="px-4 py-2">{f.governorate ?? "—"}</td>
-                  <td className="px-4 py-2">
-                    <AreaDisplay areaM2={Number(f.area_m2)} />
-                  </td>
-                  <td className="px-4 py-2">
-                    {f.is_active ? t("status.active") : t("status.archived")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <Table>
+          <Thead>
+            <tr>
+              <Th>{t("list.columns.code")}</Th>
+              <Th>{t("list.columns.name")}</Th>
+              <Th>{t("list.columns.governorate")}</Th>
+              <Th>{t("list.columns.area")}</Th>
+              <Th>{t("list.columns.status")}</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {farms.map((f) => (
+              <Tr key={f.id}>
+                <Td>
+                  <Link to={`/farms/${f.id}`} className="text-ap-primary underline">
+                    {f.code}
+                  </Link>
+                </Td>
+                <Td>{f.name}</Td>
+                <Td>{f.governorate ?? "—"}</Td>
+                <Td>
+                  <AreaDisplay areaM2={Number(f.area_m2)} />
+                </Td>
+                <Td>{f.is_active ? t("status.active") : t("status.archived")}</Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
       )}
     </div>
   );

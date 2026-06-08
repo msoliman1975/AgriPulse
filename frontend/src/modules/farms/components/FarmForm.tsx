@@ -132,7 +132,7 @@ export function FarmForm({
             required
             disabled={!!initial?.code}
           />
-          <p className="mt-1 text-xs text-slate-500">{t("form.codeHelp")}</p>
+          <p className="mt-1 text-xs text-ap-muted">{t("form.codeHelp")}</p>
         </div>
         <div>
           <label className="label" htmlFor="farm-name">
@@ -277,13 +277,13 @@ export function FarmForm({
             value={tags}
             onChange={(e) => setTags(e.target.value)}
           />
-          <p className="mt-1 text-xs text-slate-500">{t("form.tagsHelp")}</p>
+          <p className="mt-1 text-xs text-ap-muted">{t("form.tagsHelp")}</p>
         </div>
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("form.boundary")}</h2>
-        <p className="mt-1 text-sm text-slate-600">{t("form.boundaryHelp")}</p>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("form.boundary")}</h2>
+        <p className="mt-1 text-sm text-ap-muted">{t("form.boundaryHelp")}</p>
         <div className="mt-4">
           <MapDraw onChange={setDrawnPolygon} />
         </div>
@@ -295,12 +295,12 @@ export function FarmForm({
       </div>
 
       {boundaryError ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {boundaryError}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {error}
         </p>
       ) : null}

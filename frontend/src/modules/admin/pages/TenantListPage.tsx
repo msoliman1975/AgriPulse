@@ -3,8 +3,11 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { ErrorState } from "@/components/ErrorState";
 import { FilterChip } from "@/components/FilterChip";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import type { TenantStatus } from "@/api/adminTenants";
 import { useAdminTenantList, useAdminTenantMeta } from "@/queries/admin/tenants";
 
@@ -56,18 +59,19 @@ export function TenantListPage(): ReactNode {
 
   return (
     <section className="mx-auto max-w-5xl">
-      <header className="flex flex-col gap-3 border-b border-ap-line pb-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-ap-ink">{t("tenants.list.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("tenants.list.subtitle")}</p>
-        </div>
-        <Link
-          to="/platform/tenants/new"
-          className="inline-flex items-center justify-center rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
-        >
-          {t("tenants.list.newButton")}
-        </Link>
-      </header>
+      <PageHeader
+        className="border-b border-ap-line pb-4"
+        title={t("tenants.list.title")}
+        subtitle={t("tenants.list.subtitle")}
+        actions={
+          <Link
+            to="/platform/tenants/new"
+            className="inline-flex items-center justify-center rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
+          >
+            {t("tenants.list.newButton")}
+          </Link>
+        }
+      />
 
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <input
@@ -97,69 +101,54 @@ export function TenantListPage(): ReactNode {
       </div>
 
       {list.isError ? (
-        <p
-          role="alert"
-          className="mt-6 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
-        >
-          {t("tenants.list.errorTitle")}
-        </p>
+        <ErrorState className="mt-6" message={t("tenants.list.errorTitle")} />
       ) : null}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-ap-line bg-ap-panel shadow-card">
-        <table className="min-w-full divide-y divide-ap-line text-sm">
-          <thead className="bg-ap-line/30 text-[11px] uppercase tracking-wider text-ap-muted">
+      <div className="mt-4">
+        <Table>
+          <Thead>
             <tr>
-              <th scope="col" className="px-3 py-2 text-start font-semibold">
-                {t("tenants.list.headers.slug")}
-              </th>
-              <th scope="col" className="px-3 py-2 text-start font-semibold">
-                {t("tenants.list.headers.name")}
-              </th>
-              <th scope="col" className="px-3 py-2 text-start font-semibold">
-                {t("tenants.list.headers.status")}
-              </th>
-              <th scope="col" className="px-3 py-2 text-start font-semibold">
-                {t("tenants.list.headers.contact")}
-              </th>
-              <th scope="col" className="px-3 py-2 text-start font-semibold">
-                {t("tenants.list.headers.created")}
-              </th>
+              <Th>{t("tenants.list.headers.slug")}</Th>
+              <Th>{t("tenants.list.headers.name")}</Th>
+              <Th>{t("tenants.list.headers.status")}</Th>
+              <Th>{t("tenants.list.headers.contact")}</Th>
+              <Th>{t("tenants.list.headers.created")}</Th>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-ap-line">
+          </Thead>
+          <Tbody>
             {list.isLoading || (list.isFetching && items.length === 0) ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center">
+                <Td colSpan={5} className="py-6 text-center">
                   <Skeleton className="mx-auto h-4 w-1/2" />
-                </td>
+                </Td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-10 text-center text-sm text-ap-muted">
+                <Td colSpan={5} className="py-10 text-center text-ap-muted">
                   {t("tenants.list.empty")}
-                </td>
+                </Td>
               </tr>
             ) : (
               items.map((tenant) => (
-                <tr
+                <Tr
                   key={tenant.id}
+                  interactive
                   onClick={() => navigate(`/platform/tenants/${tenant.id}`)}
-                  className="cursor-pointer transition-colors hover:bg-ap-line/30"
                 >
-                  <td className="px-3 py-2 font-mono text-xs text-ap-ink">{tenant.slug}</td>
-                  <td className="px-3 py-2 text-ap-ink">{tenant.name}</td>
-                  <td className="px-3 py-2">
+                  <Td className="font-mono text-xs text-ap-ink">{tenant.slug}</Td>
+                  <Td className="text-ap-ink">{tenant.name}</Td>
+                  <Td>
                     <TenantStatusBadge status={tenant.status} />
-                  </td>
-                  <td className="px-3 py-2 text-ap-muted">{tenant.contact_email}</td>
-                  <td className="px-3 py-2 text-ap-muted">
+                  </Td>
+                  <Td className="text-ap-muted">{tenant.contact_email}</Td>
+                  <Td className="text-ap-muted">
                     {dateFormatter.format(new Date(tenant.created_at))}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))
             )}
-          </tbody>
-        </table>
+          </Tbody>
+        </Table>
       </div>
 
       {total > 0 ? (
