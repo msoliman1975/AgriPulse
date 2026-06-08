@@ -38,9 +38,7 @@ CRITICAL_FLAGGED_FRACTION = 0.10
 CRITICAL_WORST_Z = 3.0
 
 
-def effective_k(
-    *, block_override: float | Decimal | None, tenant_default: float
-) -> float:
+def effective_k(*, block_override: float | Decimal | None, tenant_default: float) -> float:
     """Resolve the detection threshold for one block (G-3).
 
     Per-block override (``grid_configs.anomaly_z_threshold``) wins; a NULL

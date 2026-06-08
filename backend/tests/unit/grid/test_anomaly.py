@@ -78,9 +78,7 @@ def test_effective_k_prefers_block_override() -> None:
     # ...and a NULL override falls through to the tenant/platform default.
     assert effective_k(block_override=None, tenant_default=1.5) == 1.5
     # Decimal overrides are coerced to float for the detector.
-    assert isinstance(
-        effective_k(block_override=Decimal("1.50"), tenant_default=1.5), float
-    )
+    assert isinstance(effective_k(block_override=Decimal("1.50"), tenant_default=1.5), float)
 
 
 def test_severity_critical_when_many_flagged() -> None:

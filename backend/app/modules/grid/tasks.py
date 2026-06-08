@@ -135,7 +135,7 @@ async def _pivot_worst_label(
     product_id: UUID,
     result: AnomalyResult,
 ) -> str | None:
-    """"ring N, <sector> sector" for the worst flagged cell on a pivot.
+    """ "ring N, <sector> sector" for the worst flagged cell on a pivot.
 
     Returns None for square (non-pivot) blocks so the diagnosis falls
     back to the row/col index.
@@ -213,9 +213,7 @@ async def _open_anomaly_alert(
     diag_en, diag_ar = _build_diagnosis(
         index_code=index_code, result=result, worst_label=worst_label
     )
-    snapshot = _build_snapshot(
-        index_code=index_code, scene_time=scene_time, result=result
-    )
+    snapshot = _build_snapshot(index_code=index_code, scene_time=scene_time, result=result)
     alert_id = uuid7()
 
     repo = AlertsRepository(tenant_session=session, public_session=public_session)
@@ -290,9 +288,7 @@ async def _detect_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     # Resolve the tenant/platform detection threshold once; per-block
     # overrides layer on top inside the loop.
     async with factory() as public_session:
-        tenant_default_k = await _resolve_tenant_default_k(
-            public_session, tenant_schema
-        )
+        tenant_default_k = await _resolve_tenant_default_k(public_session, tenant_schema)
 
     grids_checked = 0
     indices_checked = 0
@@ -311,9 +307,7 @@ async def _detect_for_tenant_async(tenant_schema: str) -> dict[str, int]:
         async with factory() as session, session.begin():
             await _set_tenant_context(session, tenant_schema)
             svc = get_grid_service(tenant_session=session)
-            index_codes = await svc.list_observed_indices(
-                block_id=block_id, product_id=product_id
-            )
+            index_codes = await svc.list_observed_indices(block_id=block_id, product_id=product_id)
         grids_checked += 1
 
         for index_code in index_codes:
@@ -418,9 +412,7 @@ def backfill_block(
     regenerated cells. Idempotent: scenes already computed on the new grid
     collide on the UNIQUE and DO NOTHING.
     """
-    return _run_task(
-        _backfill_block_async(tenant_schema, block_id, product_id, limit, since_iso)
-    )
+    return _run_task(_backfill_block_async(tenant_schema, block_id, product_id, limit, since_iso))
 
 
 async def _backfill_block_async(

@@ -32,9 +32,7 @@ class GridRepository:
 
     # ---- block context ------------------------------------------------
 
-    async def get_block_geometry(
-        self, *, block_id: UUID
-    ) -> dict[str, Any] | None:
+    async def get_block_geometry(self, *, block_id: UUID) -> dict[str, Any] | None:
         """Return ``boundary_utm`` (WKT), ``area_m2``, ``utm_srid`` for a block.
 
         Returns ``None`` if the block doesn't exist in the tenant schema.
@@ -89,17 +87,21 @@ class GridRepository:
         ``{"center": {"lat", "lon"}, "radius_m", "sector_count"}``.
         """
         row = (
-            await self._session.execute(
-                text(
-                    """
+            (
+                await self._session.execute(
+                    text(
+                        """
                     SELECT unit_type, irrigation_geometry
                     FROM blocks
                     WHERE id = :block AND deleted_at IS NULL
                     """
-                ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
-                {"block": block_id},
+                    ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                    {"block": block_id},
+                )
             )
-        ).mappings().one_or_none()
+            .mappings()
+            .one_or_none()
+        )
         if row is None or row["unit_type"] != "pivot":
             return None
         geom = row["irrigation_geometry"]
@@ -120,9 +122,7 @@ class GridRepository:
 
     # ---- grid_configs -------------------------------------------------
 
-    async def get_active_config(
-        self, *, block_id: UUID, product_id: UUID
-    ) -> dict[str, Any] | None:
+    async def get_active_config(self, *, block_id: UUID, product_id: UUID) -> dict[str, Any] | None:
         row = (
             (
                 await self._session.execute(
@@ -434,9 +434,7 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
-    async def list_active_configs_for_block(
-        self, *, block_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_active_configs_for_block(self, *, block_id: UUID) -> tuple[dict[str, Any], ...]:
         """Active grid configs for one block: (product_id, anomaly_z_threshold).
 
         Drives the per-block anomaly snapshot the recommendations engine
@@ -464,9 +462,7 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
-    async def list_observed_indices(
-        self, *, block_id: UUID, product_id: UUID
-    ) -> tuple[str, ...]:
+    async def list_observed_indices(self, *, block_id: UUID, product_id: UUID) -> tuple[str, ...]:
         """Distinct index codes that have any cell observation for a grid.
 
         Drives the multi-index sweep (G-1): rather than hardcoding NDVI we
@@ -640,9 +636,7 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
-    async def resolve_cell_context(
-        self, *, cell_id: UUID
-    ) -> dict[str, Any] | None:
+    async def resolve_cell_context(self, *, cell_id: UUID) -> dict[str, Any] | None:
         """Look up block_id + product_id for a cell — used by RBAC checks."""
         row = (
             (
@@ -666,9 +660,9 @@ class GridRepository:
     async def count_cells(self, *, grid_config_id: UUID) -> int:
         row = (
             await self._session.execute(
-                text(
-                    "SELECT count(*) FROM grid_cells WHERE grid_config_id = :gc"
-                ).bindparams(bindparam("gc", type_=PG_UUID(as_uuid=True))),
+                text("SELECT count(*) FROM grid_cells WHERE grid_config_id = :gc").bindparams(
+                    bindparam("gc", type_=PG_UUID(as_uuid=True))
+                ),
                 {"gc": grid_config_id},
             )
         ).scalar_one()

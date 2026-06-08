@@ -221,9 +221,7 @@ class GridServiceImpl:
         block_id: UUID,
         product_id: UUID,
     ) -> GridConfigResponse | None:
-        row = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        row = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         if row is None:
             return None
         count = await self._repo.count_cells(grid_config_id=row["id"])
@@ -255,9 +253,7 @@ class GridServiceImpl:
 
         # 2. Soft-retire any prior active config so the partial unique
         # index doesn't collide on insert.
-        prior = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        prior = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         now = datetime.now(tz=UTC)
         if prior is not None:
             # Same cell size = no geometry change. Apply a threshold-only
@@ -273,9 +269,7 @@ class GridServiceImpl:
                         block_id=block_id, product_id=product_id
                     )
                     assert refreshed is not None
-                    count = await self._repo.count_cells(
-                        grid_config_id=refreshed["id"]
-                    )
+                    count = await self._repo.count_cells(grid_config_id=refreshed["id"])
                     return GridConfigResponse(cell_count=count, **refreshed)
                 count = await self._repo.count_cells(grid_config_id=prior["id"])
                 return GridConfigResponse(cell_count=count, **prior)
@@ -311,14 +305,11 @@ class GridServiceImpl:
             cells_generated=inserted,
         )
 
-        fresh = await self._repo.get_active_config(
-            block_id=block_id, product_id=product_id
-        )
+        fresh = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
         # By construction the new config is the active one; the None
         # branch is unreachable but keeps mypy honest.
         assert fresh is not None
         return GridConfigResponse(cell_count=inserted, **fresh)
-
 
     async def list_active_cells(
         self,
@@ -368,7 +359,6 @@ class GridServiceImpl:
                     }
                 )
         return await self._repo.bulk_upsert_aggregates(rows=rows)
-
 
     async def get_cells_with_values(
         self,
@@ -449,9 +439,7 @@ class GridServiceImpl:
         pivot = await self._repo.get_pivot_geometry(block_id=block_id)
         ring_width = 0.0
         if pivot is not None:
-            cfg = await self._repo.get_active_config(
-                block_id=block_id, product_id=product_id
-            )
+            cfg = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
             ring_width = float(cfg["cell_size_m"]) if cfg else 0.0
 
         cells_list: list[GridWorstCell] = []
@@ -529,16 +517,12 @@ class GridServiceImpl:
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_active_configs()
 
-    async def list_observed_indices(
-        self, *, block_id: UUID, product_id: UUID
-    ) -> tuple[str, ...]:
+    async def list_observed_indices(self, *, block_id: UUID, product_id: UUID) -> tuple[str, ...]:
         """Index codes the imagery pipeline has written for this grid.
 
         Drives the multi-index sweep (G-1) — see the repository method.
         """
-        return await self._repo.list_observed_indices(
-            block_id=block_id, product_id=product_id
-        )
+        return await self._repo.list_observed_indices(block_id=block_id, product_id=product_id)
 
     async def detect_block_anomalies(
         self,

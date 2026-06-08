@@ -19,9 +19,7 @@ def _ctx(grid: dict[str, GridAnomalyEntry] | None = None) -> ConditionContext:
 
 
 def test_parse_grid_value_ref() -> None:
-    ref = parse_value_ref(
-        {"source": "grid", "index_code": "ndvi", "field": "flagged_count"}
-    )
+    ref = parse_value_ref({"source": "grid", "index_code": "ndvi", "field": "flagged_count"})
     assert isinstance(ref, GridValueRef)
     assert ref.index_code == "ndvi"
     assert ref.field == "flagged_count"
@@ -95,9 +93,7 @@ def test_predicate_misses_other_index_anomaly() -> None:
         "left": {"source": "grid", "index_code": "ndvi", "field": "flagged_count"},
         "right": 1,
     }
-    matched, _ = evaluate(
-        tree, _ctx({"ndre": GridAnomalyEntry(flagged_count=9)})
-    )
+    matched, _ = evaluate(tree, _ctx({"ndre": GridAnomalyEntry(flagged_count=9)}))
     assert matched is False
 
 

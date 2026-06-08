@@ -43,7 +43,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "ck_grid_configs_anomaly_z_positive", "grid_configs", type_="check"
-    )
+    op.drop_constraint("ck_grid_configs_anomaly_z_positive", "grid_configs", type_="check")
     op.drop_column("grid_configs", "anomaly_z_threshold")

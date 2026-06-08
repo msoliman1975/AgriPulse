@@ -135,9 +135,7 @@ def _eval_comparison(
     raise ConditionParseError(f"unknown op {op!r}")
 
 
-def _resolve_literal_or_ref(
-    value: Any, ctx: ConditionContext, snapshot: dict[str, Any]
-) -> Any:
+def _resolve_literal_or_ref(value: Any, ctx: ConditionContext, snapshot: dict[str, Any]) -> Any:
     """If ``value`` is a value-ref dict (has a ``source`` key), resolve
     it against the context; otherwise return it as a literal.
 

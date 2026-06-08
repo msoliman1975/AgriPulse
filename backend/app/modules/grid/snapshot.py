@@ -61,9 +61,7 @@ async def load_snapshot(
     """``{index_code: GridAnomalyEntry}`` for the block's current anomalies."""
     default_k = await _resolve_default_k(public_session, tenant_session, tenant_id)
     svc = get_grid_service(tenant_session=tenant_session)
-    summaries = await svc.snapshot_block_anomalies(
-        block_id=block_id, default_k=default_k
-    )
+    summaries = await svc.snapshot_block_anomalies(block_id=block_id, default_k=default_k)
     out: dict[str, GridAnomalyEntry] = {}
     for index_code, s in summaries.items():
         out[index_code] = GridAnomalyEntry(

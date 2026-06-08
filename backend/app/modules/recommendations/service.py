@@ -184,9 +184,7 @@ class RecommendationsServiceImpl:
             trees_evaluated += 1
 
             overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            result = evaluate_tree(
-                tree["tree_compiled"], ctx, param_overrides=overrides
-            )
+            result = evaluate_tree(tree["tree_compiled"], ctx, param_overrides=overrides)
             if result.error is not None:
                 self._log.warning(
                     "decision_tree_walk_error",
@@ -335,9 +333,7 @@ class RecommendationsServiceImpl:
         leaf_node_id = outcome.leaf_node_id or "leaf"
         rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
         alert_id = uuid7()
-        alert_repo = AlertsRepository(
-            tenant_session=self._tenant, public_session=self._public
-        )
+        alert_repo = AlertsRepository(tenant_session=self._tenant, public_session=self._public)
         inserted = await alert_repo.insert_alert(
             alert_id=alert_id,
             block_id=block_id,
@@ -391,9 +387,7 @@ class RecommendationsServiceImpl:
 
     # ---- Tree parameter overrides (tenant) ----------------------------
 
-    async def list_tree_param_overrides(
-        self, *, code: str, tenant_id: UUID
-    ) -> dict[str, Any]:
+    async def list_tree_param_overrides(self, *, code: str, tenant_id: UUID) -> dict[str, Any]:
         """Return ``{declarations: [...], overrides: {name: value}}`` for
         the named tree, so the UI can render every declared parameter
         with its default + current override side by side. The tree
@@ -478,9 +472,7 @@ class RecommendationsServiceImpl:
         )
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
-        deleted = await self._repo.delete_param_override(
-            tree_id=tree["id"], param_name=param_name
-        )
+        deleted = await self._repo.delete_param_override(tree_id=tree["id"], param_name=param_name)
         if deleted:
             await self._audit.record(
                 tenant_schema=None,
@@ -796,8 +788,7 @@ class DecisionTreesAuthorService:
         # without needing an explicit "platform vs tenant" filter at
         # every read site.
         if (
-            await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-            is not None
+            await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id) is not None
             or await self._repo.get_tree_by_code(code, scope_tenant_id=None) is not None
         ):
             raise _DecisionTreeCodeAlreadyExistsError(code)
@@ -1161,9 +1152,7 @@ class _ParamValueCoercionError(_DecisionTreeAuthoringError):
     Router maps to 400."""
 
     def __init__(self, *, param_name: str, type_: str, detail: str) -> None:
-        super().__init__(
-            f"Override value for {param_name!r} ({type_}) is invalid: {detail}"
-        )
+        super().__init__(f"Override value for {param_name!r} ({type_}) is invalid: {detail}")
         self.param_name = param_name
         self.type_ = type_
         self.detail = detail
