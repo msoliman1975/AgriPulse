@@ -8,6 +8,7 @@ import {
   type CsvImportRowError,
   type CsvImportSuccess,
 } from "@/api/signals";
+import { Modal } from "@/components/Modal";
 import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
@@ -234,39 +235,40 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
       ) : null}
 
       {showSchema ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-          role="dialog"
-          aria-modal="true"
+        <Modal
+          open
+          onClose={() => setShowSchema(false)}
+          labelledBy="csv-schema-title"
+          className="max-w-lg p-4"
         >
-          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-ap-line bg-white p-4 shadow-xl">
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-sm font-semibold text-ap-ink">{t("csvImport.schema.title")}</h3>
-              <button
-                type="button"
-                onClick={() => setShowSchema(false)}
-                className="text-xs text-ap-muted hover:text-ap-ink"
-              >
-                {t("csvImport.schema.close")}
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-ap-muted">{t("csvImport.schema.intro")}</p>
-            <table className="mt-3 min-w-full text-xs">
-              <tbody>
-                {CSV_COLUMNS.map((c) => (
-                  <tr key={c.name} className="border-t border-ap-line align-top">
-                    <td className="px-2 py-1 font-mono text-ap-ink">
-                      {c.name}
-                      {c.required ? <span className="text-ap-crit"> *</span> : null}
-                    </td>
-                    <td className="px-2 py-1 text-ap-muted">{t(`csvImport.schema.col.${c.name}`)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.schema.requiredNote")}</p>
+          <div className="flex items-baseline justify-between">
+            <h3 id="csv-schema-title" className="text-sm font-semibold text-ap-ink">
+              {t("csvImport.schema.title")}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowSchema(false)}
+              className="text-xs text-ap-muted hover:text-ap-ink"
+            >
+              {t("csvImport.schema.close")}
+            </button>
           </div>
-        </div>
+          <p className="mt-1 text-xs text-ap-muted">{t("csvImport.schema.intro")}</p>
+          <table className="mt-3 min-w-full text-xs">
+            <tbody>
+              {CSV_COLUMNS.map((c) => (
+                <tr key={c.name} className="border-t border-ap-line align-top">
+                  <td className="px-2 py-1 font-mono text-ap-ink">
+                    {c.name}
+                    {c.required ? <span className="text-ap-crit"> *</span> : null}
+                  </td>
+                  <td className="px-2 py-1 text-ap-muted">{t(`csvImport.schema.col.${c.name}`)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.schema.requiredNote")}</p>
+        </Modal>
       ) : null}
     </section>
   );

@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
+import { Modal } from "@/components/Modal";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -708,45 +709,33 @@ function DeleteConfirmDialog({
   onConfirm,
 }: DeleteConfirmDialogProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
-  // Minimal modal — no resource-pool fetches needed; keep it inline
-  // to avoid widening the Modal component's surface.
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-md rounded-xl bg-ap-panel p-4 shadow-card"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-base font-semibold text-ap-ink">
-          {t("editor.delete.title")}
-        </h2>
-        <p className="mt-2 text-sm text-ap-ink">
-          {subtreeSize > 1
-            ? t("editor.delete.cascadeBody", { nodeId, count: subtreeSize })
-            : t("editor.delete.singleBody", { nodeId })}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm text-ap-muted"
-          >
-            {t("editor.delete.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-md bg-ap-crit px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-crit/90"
-          >
-            {t("editor.delete.confirm")}
-          </button>
-        </div>
+    <Modal open onClose={onCancel} labelledBy="delete-confirm-title" className="max-w-md">
+      <h2 id="delete-confirm-title" className="text-base font-semibold text-ap-ink">
+        {t("editor.delete.title")}
+      </h2>
+      <p className="mt-2 text-sm text-ap-ink">
+        {subtreeSize > 1
+          ? t("editor.delete.cascadeBody", { nodeId, count: subtreeSize })
+          : t("editor.delete.singleBody", { nodeId })}
+      </p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md px-3 py-1.5 text-sm text-ap-muted"
+        >
+          {t("editor.delete.cancel")}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="rounded-md bg-ap-crit px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-crit/90"
+        >
+          {t("editor.delete.confirm")}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
