@@ -29,7 +29,7 @@ export function UnitToggle(): ReactNode {
           aria-label={t("shell.unitToggle")}
           value={unit}
           onChange={onAreaChange}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ap-primary"
         >
           {SUPPORTED_AREA_UNITS.map((u) => (
             <option key={u} value={u}>
@@ -44,7 +44,7 @@ export function UnitToggle(): ReactNode {
           aria-label={t("shell.weatherUnitToggle")}
           value={weatherUnit}
           onChange={onWeatherChange}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ap-primary"
         >
           {SUPPORTED_WEATHER_UNIT_SYSTEMS.map((u) => (
             <option key={u} value={u}>

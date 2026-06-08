@@ -129,10 +129,10 @@ const HEALTH_CHIP: Record<Health, { bg: string; fg: string }> = {
   // labs/map/health.ts). Tailwind classes used here so we don't
   // import that module (no need to couple Insights to the Labs
   // surface).
-  healthy: { bg: "bg-emerald-100", fg: "text-emerald-800" },
-  watch: { bg: "bg-amber-100", fg: "text-amber-800" },
-  critical: { bg: "bg-rose-100", fg: "text-rose-800" },
-  unknown: { bg: "bg-slate-100", fg: "text-slate-700" },
+  healthy: { bg: "bg-ap-primary-soft", fg: "text-ap-primary" },
+  watch: { bg: "bg-ap-warn-soft", fg: "text-ap-warn" },
+  critical: { bg: "bg-ap-crit-soft", fg: "text-ap-crit" },
+  unknown: { bg: "bg-ap-bg", fg: "text-ap-ink" },
 };
 
 function HealthBadge({
@@ -156,7 +156,7 @@ function TrendPct({ value }: { value: string | null }): ReactNode {
   if (value === null) return <span className="text-ap-muted">—</span>;
   const num = Number(value);
   const sign = num > 0 ? "+" : "";
-  const cls = num > 0 ? "text-emerald-700" : num < 0 ? "text-rose-700" : "text-ap-muted";
+  const cls = num > 0 ? "text-ap-primary" : num < 0 ? "text-ap-crit" : "text-ap-muted";
   return (
     <span className={cls}>
       {sign}

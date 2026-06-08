@@ -26,8 +26,8 @@ const KIND_CLASS: Record<BadgeKind, string> = {
   "type-prune": "bg-ap-prune/15 text-ap-prune",
   "type-harv": "bg-ap-harv/15 text-ap-harv",
   "type-irrig": "bg-ap-irrig/15 text-ap-irrig",
-  "type-soil_prep": "bg-amber-100 text-amber-800",
-  "type-observation": "bg-slate-100 text-slate-700",
+  "type-soil_prep": "bg-ap-line/70 text-ap-ink",
+  "type-observation": "bg-ap-accent/15 text-ap-accent",
 };
 
 export function Badge({ kind = "neutral", className, children }: BadgeProps): ReactNode {

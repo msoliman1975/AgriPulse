@@ -143,7 +143,7 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
 
   return (
     <div className="card">
-      <h2 className="text-lg font-semibold text-slate-800">{t("attachments.heading")}</h2>
+      <h2 className="text-lg font-semibold text-ap-ink">{t("attachments.heading")}</h2>
 
       {error ? (
         <p role="alert" className="mt-2 text-sm text-ap-crit">
@@ -152,17 +152,17 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
       ) : null}
 
       {items === null ? (
-        <p role="status" className="mt-2 text-sm text-slate-600">
+        <p role="status" className="mt-2 text-sm text-ap-muted">
           {t("detail.loading")}
         </p>
       ) : items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-600">{t("attachments.empty")}</p>
+        <p className="mt-2 text-sm text-ap-muted">{t("attachments.empty")}</p>
       ) : (
         <ul className="mt-3 space-y-3">
           {items.map((a) => (
             <li
               key={a.id}
-              className="flex items-start justify-between gap-3 border-t border-slate-100 pt-3 first:border-0 first:pt-0"
+              className="flex items-start justify-between gap-3 border-t border-ap-line pt-3 first:border-0 first:pt-0"
             >
               <div className="flex items-start gap-3">
                 {a.content_type.startsWith("image/") ? (
@@ -177,15 +177,15 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
                     href={a.download_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-brand-700 underline"
+                    className="font-medium text-ap-primary underline"
                   >
                     {a.original_filename}
                   </a>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ap-muted">
                     {t(`attachments.kind.${a.kind}`)} · {formatSize(a.size_bytes, t)}
                   </p>
-                  {a.caption ? <p className="mt-1 text-xs text-slate-700">{a.caption}</p> : null}
-                  <p className="text-xs text-slate-400">
+                  {a.caption ? <p className="mt-1 text-xs text-ap-ink">{a.caption}</p> : null}
+                  <p className="text-xs text-ap-muted">
                     {new Date(a.created_at).toLocaleString(i18n.language)}
                   </p>
                 </div>
@@ -203,8 +203,8 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
       )}
 
       {canWrite ? (
-        <form onSubmit={handleSubmit} className="mt-6 space-y-3 border-t border-slate-100 pt-4">
-          <h3 className="text-sm font-semibold text-slate-700">{t("attachments.uploadHeading")}</h3>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-3 border-t border-ap-line pt-4">
+          <h3 className="text-sm font-semibold text-ap-ink">{t("attachments.uploadHeading")}</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="attachment-file-input">

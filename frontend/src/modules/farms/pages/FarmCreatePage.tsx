@@ -27,7 +27,7 @@ export function FarmCreatePage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-brand-800">{t("list.createButton")}</h1>
+      <h1 className="text-2xl font-semibold text-ap-ink">{t("list.createButton")}</h1>
       <FarmForm
         submitLabel={t("form.submitCreate")}
         onSubmit={handleSubmit}

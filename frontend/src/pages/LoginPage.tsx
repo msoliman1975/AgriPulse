@@ -49,9 +49,9 @@ export function LoginPage(): ReactNode {
   return (
     <div className="flex min-h-screen items-center justify-center bg-sand-50 px-4">
       <div className="card w-full max-w-md">
-        <h1 className="text-2xl font-semibold text-brand-800">{t("login.heading")}</h1>
-        <p className="mt-2 text-sm text-slate-600">{t("login.subheading")}</p>
-        <p className="mt-4 text-sm text-slate-500" aria-live="polite">
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("login.heading")}</h1>
+        <p className="mt-2 text-sm text-ap-muted">{t("login.subheading")}</p>
+        <p className="mt-4 text-sm text-ap-muted" aria-live="polite">
           {auth.activeNavigator ? t("login.redirecting") : null}
         </p>
         <button type="button" onClick={onClick} className="btn-primary mt-6 w-full">

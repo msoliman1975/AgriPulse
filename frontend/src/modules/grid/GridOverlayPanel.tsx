@@ -36,8 +36,8 @@ export function GridOverlayPanel({
   const { t } = useTranslation("farms");
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow">
-      <label className="flex items-center gap-2 text-slate-700">
+    <div className="rounded-md border border-ap-line bg-white/95 px-3 py-2 text-xs shadow">
+      <label className="flex items-center gap-2 text-ap-ink">
         <input
           type="checkbox"
           checked={showGrid}
@@ -48,7 +48,7 @@ export function GridOverlayPanel({
           {t("subblockGrid.toggleLabel", { defaultValue: "Sub-block grid" })}
         </span>
         {showGrid && cellCount != null ? (
-          <span className="text-slate-500">
+          <span className="text-ap-muted">
             {t("subblockGrid.cellCount", {
               defaultValue: "{{count}} cells",
               count: cellCount,
@@ -59,13 +59,13 @@ export function GridOverlayPanel({
 
       {showGrid ? (
         <div className="mt-2 flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-slate-600">
+          <label className="flex items-center gap-1.5 text-ap-muted">
             <span>{t("subblockGrid.indexLabel", { defaultValue: "Index" })}</span>
             <select
               value={indexCode}
               onChange={(e) => onIndexChange(e.target.value as IndexCode)}
               aria-label={t("subblockGrid.indexLabel", { defaultValue: "Index" })}
-              className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs"
+              className="rounded border border-ap-line bg-white px-1.5 py-0.5 text-xs"
             >
               {indexOptions.map((code) => (
                 <option key={code} value={code}>
@@ -78,19 +78,19 @@ export function GridOverlayPanel({
       ) : null}
 
       {showGrid ? (
-        <div className="mt-2 border-t border-slate-100 pt-2">
-          <p className="mb-1 font-medium text-slate-600">
+        <div className="mt-2 border-t border-ap-line pt-2">
+          <p className="mb-1 font-medium text-ap-muted">
             {t("subblockGrid.worstHeading", {
               defaultValue: "Lowest {{index}} cells",
               index: indexCode.toUpperCase(),
             })}
           </p>
           {worstLoading ? (
-            <p className="text-slate-400">
+            <p className="text-ap-muted">
               {t("common.loading", { defaultValue: "Loading…" })}
             </p>
           ) : !worstCells || worstCells.length === 0 ? (
-            <p className="text-slate-400">
+            <p className="text-ap-muted">
               {t("subblockGrid.worstEmpty", {
                 defaultValue: "No observations yet.",
               })}
@@ -102,16 +102,16 @@ export function GridOverlayPanel({
                   <button
                     type="button"
                     onClick={() => onSelectCell(cell.cell_id)}
-                    className="flex w-full items-center justify-between gap-3 rounded px-1.5 py-1 text-left hover:bg-slate-100"
+                    className="flex w-full items-center justify-between gap-3 rounded px-1.5 py-1 text-left hover:bg-ap-line/50"
                   >
-                    <span className="text-slate-500">
+                    <span className="text-ap-muted">
                       {t("subblockGrid.worstRank", {
                         defaultValue: "#{{rank}}",
                         rank: i + 1,
                       })}
                     </span>
                     {cell.ring != null && cell.sector_label ? (
-                      <span className="flex-1 truncate text-slate-600">
+                      <span className="flex-1 truncate text-ap-muted">
                         {t("subblockGrid.ringSector", {
                           defaultValue: "ring {{ring}}, {{sector}}",
                           ring: cell.ring,
@@ -119,7 +119,7 @@ export function GridOverlayPanel({
                         })}
                       </span>
                     ) : null}
-                    <span className="font-mono font-medium text-slate-800">
+                    <span className="font-mono font-medium text-ap-ink">
                       {cell.mean === null ? "—" : Number(cell.mean).toFixed(3)}
                     </span>
                   </button>

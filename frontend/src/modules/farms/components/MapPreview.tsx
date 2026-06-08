@@ -61,7 +61,7 @@ export function MapPreview({ geometry, className }: Props): JSX.Element {
     <div
       ref={ref}
       data-testid="map-preview"
-      className={className ?? "h-64 w-full overflow-hidden rounded-md border border-slate-200"}
+      className={className ?? "h-64 w-full overflow-hidden rounded-md border border-ap-line"}
     />
   );
 }

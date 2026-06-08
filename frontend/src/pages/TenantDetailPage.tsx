@@ -49,14 +49,14 @@ export function TenantDetailPage(): ReactNode {
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-700">
+      <p role="alert" className="text-sm text-ap-crit">
         {error}
       </p>
     );
   }
   if (!me) {
     return (
-      <p role="status" className="text-sm text-slate-600">
+      <p role="status" className="text-sm text-ap-muted">
         {t("actions.loading")}
       </p>
     );
@@ -68,7 +68,7 @@ export function TenantDetailPage(): ReactNode {
 
   if (!membership) {
     return (
-      <p role="alert" className="text-sm text-red-700">
+      <p role="alert" className="text-sm text-ap-crit">
         {t("errors.notFound")}
       </p>
     );
@@ -77,15 +77,15 @@ export function TenantDetailPage(): ReactNode {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-brand-800">{membership.tenant_name}</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-semibold text-ap-ink">{membership.tenant_name}</h1>
+        <p className="text-sm text-ap-muted">
           {membership.tenant_slug} ·{" "}
           {t(`shell.tenantStatus.${membership.status}`, membership.status)}
         </p>
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("tenant.metadata")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("tenant.metadata")}</h2>
         <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Row label={t("tenant.id")} value={membership.tenant_id} />
           <Row label={t("tenant.slug")} value={membership.tenant_slug} />
@@ -106,20 +106,20 @@ export function TenantDetailPage(): ReactNode {
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{tFarms("nav.farms")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{tFarms("nav.farms")}</h2>
         {!isActiveTenant ? (
-          <p className="mt-2 text-sm text-slate-600">{t("tenant.switchToView")}</p>
+          <p className="mt-2 text-sm text-ap-muted">{t("tenant.switchToView")}</p>
         ) : farms === null ? (
-          <p role="status" className="mt-2 text-sm text-slate-600">
+          <p role="status" className="mt-2 text-sm text-ap-muted">
             {t("actions.loading")}
           </p>
         ) : farms.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">{tFarms("list.empty")}</p>
+          <p className="mt-2 text-sm text-ap-muted">{tFarms("list.empty")}</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-start text-xs uppercase text-slate-500">
+                <tr className="text-start text-xs uppercase text-ap-muted">
                   <th className="py-2 text-start">{tFarms("list.columns.code")}</th>
                   <th className="py-2 text-start">{tFarms("list.columns.name")}</th>
                   <th className="py-2 text-start">{tFarms("list.columns.governorate")}</th>
@@ -129,9 +129,9 @@ export function TenantDetailPage(): ReactNode {
               </thead>
               <tbody>
                 {farms.map((f) => (
-                  <tr key={f.id} className="border-t border-slate-100">
+                  <tr key={f.id} className="border-t border-ap-line">
                     <td className="py-2">
-                      <Link to={`/farms/${f.id}`} className="text-brand-700 underline">
+                      <Link to={`/farms/${f.id}`} className="text-ap-primary underline">
                         {f.code}
                       </Link>
                     </td>
@@ -157,8 +157,8 @@ export function TenantDetailPage(): ReactNode {
 function Row({ label, value }: { label: string; value: string }): ReactNode {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="text-sm text-slate-800">{value}</dd>
+      <dt className="text-xs uppercase tracking-wide text-ap-muted">{label}</dt>
+      <dd className="text-sm text-ap-ink">{value}</dd>
     </div>
   );
 }

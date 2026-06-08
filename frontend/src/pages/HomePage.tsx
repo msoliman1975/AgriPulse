@@ -21,7 +21,7 @@ export function HomePage(): ReactNode {
   if (isLoading) {
     return (
       <div className="card max-w-2xl" role="status">
-        <p className="text-slate-600">{t("actions.loading")}</p>
+        <p className="text-ap-muted">{t("actions.loading")}</p>
       </div>
     );
   }

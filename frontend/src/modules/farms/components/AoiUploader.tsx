@@ -46,7 +46,7 @@ export function AoiUploader({ onFeaturesParsed }: Props): JSX.Element {
       <label className="label">{t("aoi.uploadLabel")}</label>
       <label
         htmlFor="aoi-file"
-        className="block cursor-pointer rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-600 hover:border-brand-500 hover:bg-brand-50"
+        className="block cursor-pointer rounded-md border border-dashed border-ap-line p-4 text-center text-sm text-ap-muted hover:border-ap-primary hover:bg-ap-primary-soft"
       >
         {pending ? t("actions.saving") : t("aoi.drop")}
       </label>
@@ -66,7 +66,7 @@ export function AoiUploader({ onFeaturesParsed }: Props): JSX.Element {
         </p>
       ) : null}
       {features.length > 0 ? (
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-ap-muted">
           {t("aoi.pickFeature")} {features.length}
         </p>
       ) : null}

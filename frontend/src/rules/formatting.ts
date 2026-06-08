@@ -42,10 +42,10 @@ const TYPE_BG: Record<ActivityType, string> = {
   pruning: "bg-ap-prune",
   harvesting: "bg-ap-harv",
   irrigation: "bg-ap-irrig",
-  soil_prep: "bg-amber-500",
-  observation: "bg-slate-400",
+  soil_prep: "bg-ap-warn",
+  observation: "bg-ap-muted",
 };
 
 export function activityTypeBgClass(t: ActivityType): string {
-  return TYPE_BG[t] ?? "bg-slate-400";
+  return TYPE_BG[t] ?? "bg-ap-muted";
 }

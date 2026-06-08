@@ -23,7 +23,7 @@ export function LanguageToggle(): ReactNode {
         aria-label={t("shell.languageToggle")}
         value={current}
         onChange={onChange}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ap-primary"
       >
         <option value="en">{t("shell.languageEnglish")}</option>
         <option value="ar">{t("shell.languageArabic")}</option>

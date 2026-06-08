@@ -186,7 +186,7 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
       {success ? (
         <p
           role="status"
-          className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-800"
+          className="mt-3 rounded-md border border-ap-primary/30 bg-ap-primary-soft p-2 text-xs text-ap-primary"
         >
           {t("csvImport.success", { count: success.rows_imported })}
         </p>
@@ -195,7 +195,7 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
       {topLevelError && rowErrors.length === 0 ? (
         <p
           role="alert"
-          className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800"
+          className="mt-3 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-2 text-xs text-ap-crit"
         >
           {topLevelError}
         </p>
@@ -203,11 +203,11 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
 
       {rowErrors.length > 0 ? (
         <div className="mt-3">
-          <p role="alert" className="text-xs font-semibold text-rose-800">
+          <p role="alert" className="text-xs font-semibold text-ap-crit">
             {t("csvImport.failureBanner", { count: rowErrors.length })}
           </p>
-          <table className="mt-2 min-w-full border border-rose-200 text-xs">
-            <thead className="bg-rose-50 text-rose-800">
+          <table className="mt-2 min-w-full border border-ap-crit/30 text-xs">
+            <thead className="bg-ap-crit-soft text-ap-crit">
               <tr>
                 <th scope="col" className="px-2 py-1 text-start font-semibold">
                   {t("csvImport.errorTable.row")}
@@ -222,10 +222,10 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
             </thead>
             <tbody>
               {rowErrors.map((e, i) => (
-                <tr key={`${e.row_number}-${i}`} className="border-t border-rose-100">
-                  <td className="px-2 py-1 tabular-nums text-rose-700">{e.row_number}</td>
-                  <td className="px-2 py-1 text-rose-700">{e.field ?? "—"}</td>
-                  <td className="px-2 py-1 text-rose-700">{e.message}</td>
+                <tr key={`${e.row_number}-${i}`} className="border-t border-ap-crit/20">
+                  <td className="px-2 py-1 tabular-nums text-ap-crit">{e.row_number}</td>
+                  <td className="px-2 py-1 text-ap-crit">{e.field ?? "—"}</td>
+                  <td className="px-2 py-1 text-ap-crit">{e.message}</td>
                 </tr>
               ))}
             </tbody>

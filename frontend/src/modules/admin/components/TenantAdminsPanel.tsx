@@ -203,7 +203,7 @@ function AssignFirstOwnerForm({
   }
 
   return (
-    <div className="mt-3 rounded-md border border-ap-warn/40 bg-amber-50/50 p-3">
+    <div className="mt-3 rounded-md border border-ap-warn/40 bg-ap-warn-soft/50 p-3">
       <p className="text-sm text-ap-warn">{t("owner.none")}</p>
       <p className="mt-1 text-xs text-ap-muted">{t("owner.assignIntro")}</p>
 

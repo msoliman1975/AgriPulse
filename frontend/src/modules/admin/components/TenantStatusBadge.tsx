@@ -5,11 +5,11 @@ import { useTranslation } from "react-i18next";
 import type { TenantStatus } from "@/api/adminTenants";
 
 const STATUS_CLASS: Record<TenantStatus, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  suspended: "bg-amber-100 text-amber-800",
-  pending_delete: "bg-rose-100 text-rose-800",
+  active: "bg-ap-primary-soft text-ap-primary",
+  suspended: "bg-ap-warn-soft text-ap-warn",
+  pending_delete: "bg-ap-crit-soft text-ap-crit",
   pending_provision: "bg-sky-100 text-sky-800",
-  archived: "bg-slate-200 text-slate-700",
+  archived: "bg-ap-line text-ap-ink",
 };
 
 interface Props {

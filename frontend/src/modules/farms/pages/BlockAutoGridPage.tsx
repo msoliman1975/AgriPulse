@@ -63,7 +63,7 @@ export function BlockAutoGridPage(): JSX.Element {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-brand-800">{t("autoGrid.heading")}</h1>
+        <h1 className="text-2xl font-semibold text-ap-ink">{t("autoGrid.heading")}</h1>
         <Link to={`/farms/${farmId}`} className="btn btn-ghost">
           {t("autoGrid.back")}
         </Link>
@@ -97,9 +97,9 @@ export function BlockAutoGridPage(): JSX.Element {
       ) : null}
 
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-800">{t("autoGrid.candidates")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("autoGrid.candidates")}</h2>
         {candidates.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">{t("autoGrid.empty")}</p>
+          <p className="mt-2 text-sm text-ap-muted">{t("autoGrid.empty")}</p>
         ) : (
           <ul className="mt-3 space-y-1">
             {candidates.map((c) => (

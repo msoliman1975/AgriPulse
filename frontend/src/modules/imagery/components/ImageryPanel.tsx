@@ -115,15 +115,15 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
   if (config === null) {
     return (
       <section className="card space-y-3" aria-label={t("panel.heading")}>
-        <h2 className="text-lg font-semibold text-slate-800">{t("panel.heading")}</h2>
+        <h2 className="text-lg font-semibold text-ap-ink">{t("panel.heading")}</h2>
         {configError ? (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-ap-crit">
             {t("panel.error", { message: configError })}
           </p>
         ) : configLoading ? (
           <p role="status">{t("panel.loading")}</p>
         ) : (
-          <p className="text-sm text-slate-600">{t("panel.noConfig")}</p>
+          <p className="text-sm text-ap-muted">{t("panel.noConfig")}</p>
         )}
       </section>
     );
@@ -133,8 +133,8 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
     <section className="card space-y-3" aria-label={t("panel.heading")}>
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">{t("panel.heading")}</h2>
-          <p className="text-sm text-slate-600">{t("panel.description")}</p>
+          <h2 className="text-lg font-semibold text-ap-ink">{t("panel.heading")}</h2>
+          <p className="text-sm text-ap-muted">{t("panel.description")}</p>
         </div>
         {canRefresh ? (
           <button
@@ -149,12 +149,12 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
       </header>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {t("panel.error", { message: error })}
         </p>
       ) : null}
       {refreshMessage ? (
-        <p role="status" className="text-sm text-slate-600">
+        <p role="status" className="text-sm text-ap-muted">
           {refreshMessage}
         </p>
       ) : null}
@@ -162,7 +162,7 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
       {loading ? (
         <p role="status">{t("panel.loading")}</p>
       ) : scenes.length === 0 ? (
-        <p className="text-sm text-slate-600">{t("panel.empty")}</p>
+        <p className="text-sm text-ap-muted">{t("panel.empty")}</p>
       ) : (
         <>
           <div>

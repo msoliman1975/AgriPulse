@@ -99,9 +99,9 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
     <section className="card space-y-3" aria-label={t("panel.heading")}>
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">{t("panel.heading")}</h2>
-          {description ? <p className="text-sm text-slate-600">{description}</p> : null}
-          <p className="mt-1 text-xs text-slate-500">{t("panel.farmCaption")}</p>
+          <h2 className="text-lg font-semibold text-ap-ink">{t("panel.heading")}</h2>
+          {description ? <p className="text-sm text-ap-muted">{description}</p> : null}
+          <p className="mt-1 text-xs text-ap-muted">{t("panel.farmCaption")}</p>
         </div>
         {canRefresh ? (
           <button
@@ -116,12 +116,12 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
       </header>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-ap-crit">
           {t("panel.error", { message: error })}
         </p>
       ) : null}
       {refreshMessage ? (
-        <p role="status" className="text-sm text-slate-600">
+        <p role="status" className="text-sm text-ap-muted">
           {refreshMessage}
         </p>
       ) : null}
@@ -129,10 +129,10 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
       {loading ? (
         <p role="status">{t("panel.loading")}</p>
       ) : forecast === null || forecast.days.length === 0 ? (
-        <p className="text-sm text-slate-600">{t("panel.empty")}</p>
+        <p className="text-sm text-ap-muted">{t("panel.empty")}</p>
       ) : (
         <>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ap-muted">
             {forecast.forecast_issued_at
               ? t("panel.issuedAt", {
                   date: issuedAtFmt.format(new Date(forecast.forecast_issued_at)),
@@ -146,25 +146,25 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
               return (
                 <li
                   key={day.date}
-                  className="rounded-md border border-slate-200 bg-white p-3 text-sm"
+                  className="rounded-md border border-ap-line bg-white p-3 text-sm"
                 >
-                  <p className="font-medium text-slate-800">
+                  <p className="font-medium text-ap-ink">
                     {idx === 0
                       ? t("day.today")
                       : idx === 1
                         ? t("day.tomorrow")
                         : dateFmt.format(parseLocalDate(day.date))}
                   </p>
-                  <p className="mt-1 text-slate-700">
+                  <p className="mt-1 text-ap-ink">
                     <span className="font-semibold">{high.display}</span>
                     {" / "}
-                    <span className="text-slate-500">{low.display}</span>{" "}
-                    <span className="text-xs text-slate-400">{high.unit}</span>
+                    <span className="text-ap-muted">{low.display}</span>{" "}
+                    <span className="text-xs text-ap-muted">{high.unit}</span>
                   </p>
-                  <p className="mt-1 text-slate-600">
+                  <p className="mt-1 text-ap-muted">
                     {t("day.precip")}: {formatPrecip(day.precip_mm_total, weatherUnit)}
                   </p>
-                  <p className="text-slate-600">
+                  <p className="text-ap-muted">
                     {t("day.precipChance")}: {formatProbability(day.precip_probability_max_pct)}
                   </p>
                 </li>

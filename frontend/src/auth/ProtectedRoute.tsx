@@ -29,7 +29,7 @@ export function ProtectedRoute({ children }: Props): ReactNode {
 
   if (auth.isLoading) {
     return (
-      <p role="status" className="p-6 text-slate-600">
+      <p role="status" className="p-6 text-ap-muted">
         {t("actions.loading")}
       </p>
     );

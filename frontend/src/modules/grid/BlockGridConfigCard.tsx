@@ -85,18 +85,18 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
     Number(configQuery.data.cell_size_m) !== parsed;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="text-base font-semibold text-slate-800">
+    <section className="rounded-lg border border-ap-line bg-white p-4">
+      <h3 className="text-base font-semibold text-ap-ink">
         {t("subblockGrid.cardTitle", { defaultValue: "Sub-block grid" })}
       </h3>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-ap-muted">
         {t("subblockGrid.cardSubtitle", {
           defaultValue:
             "Divide this block into smaller cells so per-scene index aggregates pinpoint where issues appear.",
         })}
       </p>
 
-      <label className="mt-3 block text-sm font-medium text-slate-700">
+      <label className="mt-3 block text-sm font-medium text-ap-ink">
         {t("subblockGrid.cellSizeLabel", { defaultValue: "Cell size (metres)" })}
         <input
           type="number"
@@ -104,7 +104,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
           step={1}
           value={cellSize}
           onChange={(e) => setCellSize(e.target.value)}
-          className="mt-1 block w-32 rounded border border-slate-300 px-2 py-1 text-sm"
+          className="mt-1 block w-32 rounded border border-ap-line px-2 py-1 text-sm"
           aria-label={t("subblockGrid.cellSizeLabel", { defaultValue: "Cell size (metres)" })}
         />
       </label>
@@ -113,8 +113,8 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
         <div
           className={`mt-3 rounded-md p-3 text-sm ${
             previewQuery.data.valid
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border border-amber-200 bg-amber-50 text-amber-800"
+              ? "border border-ap-primary/30 bg-ap-primary-soft text-ap-primary"
+              : "border border-ap-warn/30 bg-ap-warn-soft text-ap-warn"
           }`}
           role="status"
         >
@@ -134,7 +134,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
         </div>
       )}
 
-      <label className="mt-3 block text-sm font-medium text-slate-700">
+      <label className="mt-3 block text-sm font-medium text-ap-ink">
         {t("subblockGrid.thresholdLabel", { defaultValue: "Anomaly sensitivity (z-score)" })}
         <input
           type="number"
@@ -143,20 +143,20 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
           value={threshold}
           onChange={(e) => setThreshold(e.target.value)}
           placeholder={t("subblockGrid.thresholdInherit", { defaultValue: "Inherited" })}
-          className="mt-1 block w-32 rounded border border-slate-300 px-2 py-1 text-sm"
+          className="mt-1 block w-32 rounded border border-ap-line px-2 py-1 text-sm"
           aria-label={t("subblockGrid.thresholdLabel", {
             defaultValue: "Anomaly sensitivity (z-score)",
           })}
         />
       </label>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-ap-muted">
         {t("subblockGrid.thresholdHelp", {
           defaultValue:
             "Std-devs below the field average before a cell is flagged. Lower = more sensitive. Leave blank to inherit the tenant default.",
         })}
       </p>
       {!thresholdValid && (
-        <p className="mt-1 text-xs text-amber-600">
+        <p className="mt-1 text-xs text-ap-warn">
           {t("subblockGrid.thresholdInvalid", {
             defaultValue: "Enter a positive number, or leave blank to inherit.",
           })}
@@ -164,7 +164,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
       )}
 
       {configQuery.data && (
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-ap-muted">
           {t("subblockGrid.currentConfig", {
             defaultValue: "Active: {{size}}m, {{count}} cells.",
             size: configQuery.data.cell_size_m,
@@ -175,7 +175,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
 
       {isRezone && (
         <p
-          className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800"
+          className="mt-2 rounded-md border border-ap-warn/30 bg-ap-warn-soft p-2 text-xs text-ap-warn"
           role="status"
         >
           {t("subblockGrid.rezoneWarning", {
@@ -191,7 +191,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
           !isValid || !thresholdValid || !previewQuery.data?.valid || saveMutation.isPending
         }
         onClick={() => saveMutation.mutate()}
-        className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300"
+        className="mt-3 rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white disabled:bg-ap-line"
       >
         {saveMutation.isPending
           ? t("common.saving", { defaultValue: "Saving…" })
@@ -201,17 +201,17 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
       </button>
 
       {saveMutation.isError && (
-        <p className="mt-2 text-xs text-red-600">
+        <p className="mt-2 text-xs text-ap-crit">
           {t("subblockGrid.saveError", { defaultValue: "Could not save grid config." })}
         </p>
       )}
 
       {configQuery.data && (
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <p className="text-xs font-medium text-slate-600">
+        <div className="mt-4 border-t border-ap-line pt-3">
+          <p className="text-xs font-medium text-ap-muted">
             {t("subblockGrid.backfillHeading", { defaultValue: "Backfill history" })}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ap-muted">
             {t("subblockGrid.backfillHelp", {
               defaultValue:
                 "Re-process past scenes onto the current cells. Useful after a rezone. This re-reads imagery and can take a while.",
@@ -221,14 +221,14 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
             type="button"
             disabled={backfillMutation.isPending}
             onClick={() => backfillMutation.mutate()}
-            className="mt-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="mt-2 rounded-md border border-ap-line px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
           >
             {backfillMutation.isPending
               ? t("subblockGrid.backfillPending", { defaultValue: "Queuing…" })
               : t("subblockGrid.backfillButton", { defaultValue: "Backfill historical scenes" })}
           </button>
           {backfillMutation.isSuccess && (
-            <p className="mt-2 text-xs text-emerald-700">
+            <p className="mt-2 text-xs text-ap-primary">
               {t("subblockGrid.backfillQueued", {
                 defaultValue: "Queued {{count}} scene(s). Cells repopulate as they finish.",
                 count: backfillMutation.data.scenes_queued,
@@ -236,7 +236,7 @@ export function BlockGridConfigCard({ blockId, productId }: Props): ReactNode {
             </p>
           )}
           {backfillMutation.isError && (
-            <p className="mt-2 text-xs text-red-600">
+            <p className="mt-2 text-xs text-ap-crit">
               {t("subblockGrid.backfillError", { defaultValue: "Could not start backfill." })}
             </p>
           )}
