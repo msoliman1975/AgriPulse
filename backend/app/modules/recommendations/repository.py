@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
 
 
@@ -811,6 +812,54 @@ class RecommendationsRepository:
             }
             for row in rows
         }
+
+    async def get_index_trends(
+        self, *, block_id: UUID, window_days: int = 30
+    ) -> dict[str, dict[str, Any]]:
+        """Trend features per index_code over the last ``window_days`` of
+        ``block_index_aggregates`` means (KB P2).
+
+        Returns ``{index_code: {slope, delta, trend_direction}}`` computed
+        by the pure ``indices.trends.compute_trend``. Indices with fewer
+        than two valid means in the window are omitted (the merge then
+        leaves their trend fields ``None``, so trend predicates fail
+        closed). 30 days ≈ up to ~6 Sentinel-2 revisits, usually enough
+        for a 2-4-point fit after cloud masking.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT index_code, time, mean
+                        FROM block_index_aggregates
+                        WHERE block_id = :block_id
+                          AND mean IS NOT NULL
+                          AND time >= now() - make_interval(days => :window_days)
+                        ORDER BY index_code, time
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id, "window_days": window_days},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        series: dict[str, list[tuple[Any, Any]]] = {}
+        for row in rows:
+            series.setdefault(row["index_code"], []).append((row["time"], row["mean"]))
+
+        out: dict[str, dict[str, Any]] = {}
+        for code, points in series.items():
+            trend = compute_trend(points)
+            if trend.direction is None:
+                continue
+            out[code] = {
+                "slope": trend.slope,
+                "delta": trend.delta,
+                "trend_direction": trend.direction,
+            }
+        return out
 
     async def get_block_farm_id(self, *, block_id: UUID) -> UUID | None:
         row = (

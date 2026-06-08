@@ -16,7 +16,18 @@ from typing import Any, Literal
 from app.shared.conditions.context import GRID_FIELDS, SIGNAL_KEYS, WEATHER_SCOPES
 from app.shared.conditions.errors import ConditionParseError
 
-INDICES_KEYS: tuple[str, ...] = ("mean", "baseline_deviation")
+# ``slope`` / ``delta`` / ``trend_direction`` (KB P2) are precomputed by
+# the context-builder from the recent aggregate history (indices/trends.py).
+# ``trend_direction`` is categorical (rising/falling/stable) — compare with
+# eq/ne/in; ``slope``/``delta`` are numeric. They let a rule express
+# "NDMI decreasing" without any temporal operator in the evaluator.
+INDICES_KEYS: tuple[str, ...] = (
+    "mean",
+    "baseline_deviation",
+    "slope",
+    "delta",
+    "trend_direction",
+)
 BLOCK_FIELDS: tuple[str, ...] = ("crop_category",)
 
 

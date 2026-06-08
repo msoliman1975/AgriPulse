@@ -129,6 +129,11 @@ class RecommendationsServiceImpl:
             visible_to_tenant_id=tenant_id
         )
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
+        # Merge precomputed trend features (slope/delta/trend_direction)
+        # into each index row so conditions can express "NDMI decreasing"
+        # (KB P2). Indices without enough history are simply left without
+        # trend fields → trend predicates fail closed.
+        _merge_index_trends(latest, await self._repo.get_index_trends(block_id=block_id))
         farm_id = await self._repo.get_block_farm_id(block_id=block_id)
         block_crop_id, crop_id, crop_category = await self._repo.get_block_current_crop(
             block_id=block_id
@@ -665,6 +670,20 @@ def _serialize_path(steps: list[TreePathStep]) -> list[dict[str, Any]]:
     return out
 
 
+def _merge_index_trends(
+    latest: dict[str, dict[str, Any]],
+    trends: dict[str, dict[str, Any]],
+) -> None:
+    """Fold trend features into the latest-aggregate rows in place (KB P2).
+
+    Only indices that already have a latest aggregate are touched; a trend
+    for an index with no current row is ignored (can't happen in practice
+    — trends are a subset of the same hypertable)."""
+    for code, trend in trends.items():
+        if code in latest:
+            latest[code].update(trend)
+
+
 def get_recommendations_service(
     *, tenant_session: AsyncSession, public_session: AsyncSession
 ) -> RecommendationsServiceImpl:
@@ -1033,6 +1052,7 @@ class DecisionTreesAuthorService:
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
+        _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
         _, _, crop_category = await repo.get_block_current_crop(block_id=block_id)
         weather = (
