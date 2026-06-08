@@ -23,11 +23,20 @@ from typing import Any
 
 @dataclass(frozen=True, slots=True)
 class IndicesEntry:
-    """One row pulled from ``block_index_aggregates`` (latest per index)."""
+    """One row pulled from ``block_index_aggregates`` (latest per index),
+    plus precomputed trend features over the recent history (KB P2).
+
+    ``slope`` / ``delta`` are index-units(/day); ``trend_direction`` is
+    one of rising/falling/stable. All three are ``None`` when there is too
+    little history — the evaluator then fails closed on trend predicates.
+    """
 
     time: datetime
     mean: Decimal | None
     baseline_deviation: Decimal | None
+    slope: Decimal | None = None
+    delta: Decimal | None = None
+    trend_direction: str | None = None
 
 
 # Allowed keys for a signals value-ref. ``value_kind`` on the underlying
@@ -182,6 +191,11 @@ class ConditionContext:
                 time=row.get("time"),  # type: ignore[arg-type]
                 mean=_to_decimal(row.get("mean")),
                 baseline_deviation=_to_decimal(row.get("baseline_deviation")),
+                # Trend features (KB P2) — the service merges these into the
+                # row from the recent aggregate history; absent → None.
+                slope=_to_decimal(row.get("slope")),
+                delta=_to_decimal(row.get("delta")),
+                trend_direction=row.get("trend_direction"),  # type: ignore[arg-type]
             )
         return cls(
             block_id=block_id,
