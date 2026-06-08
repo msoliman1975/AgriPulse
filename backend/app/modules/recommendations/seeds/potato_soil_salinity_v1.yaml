@@ -1,0 +1,206 @@
+# potato_soil_salinity_v1 — flag salinity stress on potato from a soil
+# ECe (saturated-paste extract electrical conductivity) custom signal.
+#
+# Point-in-time threshold rule (KB content track, post-P1). Reads a
+# tenant-defined custom signal coded `soil_salinity` carrying ECe in
+# dS/m. The tree stays dormant (resolves to no_action) until such a
+# signal is ingested for the block — the correct fail-safe behaviour.
+#
+# Thresholds are the canonical FAO-29 / Maas-Hoffman potato values
+# (ECe threshold 1.7 dS/m, ~12% yield loss per dS/m above it; 90/75/50%
+# relative yield at ECe 2.5 / 3.8 / 5.9). They are deliberately
+# conservative for modern cultivars (whose ECe90 can reach 4–5) and can
+# be loosened per tenant via the parameters below.
+
+code: potato_soil_salinity_v1
+name_en: Potato — soil salinity stress
+name_ar: البطاطس — إجهاد ملوحة التربة
+description_en: >-
+  Raises a warning/critical signal when a block's soil saturated-paste
+  ECe (ingested as the custom signal `soil_salinity`, in dS/m) exceeds
+  the potato salinity tolerance threshold. Default thresholds follow
+  FAO-29: 1.7 dS/m onset (~12% yield loss per dS/m), with severe stress
+  above 3.8 dS/m (>25% expected yield loss). Tune per cultivar.
+description_ar: >-
+  يُطلق تنبيهًا تحذيريًا/حرجًا عند تجاوز ملوحة عجينة التربة المُشبعة
+  (المُدخَلة كإشارة مخصّصة باسم `soil_salinity` بوحدة dS/m) لعتبة تحمّل
+  البطاطس للملوحة. العتبات الافتراضية وفق FAO-29: 1.7 dS/m بداية الضرر
+  (~12% فقد في المحصول لكل dS/m)، وإجهاد حاد فوق 3.8 dS/m. عدّلها حسب
+  الصنف.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    ECe 1.7 dS/m threshold and 12%/dS/m slope are the canonical FAO-29
+    (Maas–Hoffman 1977) potato values — robust but conservative: modern
+    cultivars can reach ECe90 of 4–5 dS/m, and arid drip systems have
+    shown steeper slopes (Tunisia, Spunta: 34–54%/dS/m). No
+    Egypt-specific primary threshold was found, so Egypt applicability
+    is inherited from arid/Mediterranean data. ECe ≈ 1.5 × ECw under
+    typical 15–20% leaching. A 5.9%/dS/m slope sometimes cited was
+    checked and rejected. Tune thresholds per cultivar via parameters.
+  citations:
+    - source_type: fao
+      title: >-
+        Water Quality for Agriculture — FAO Irrigation & Drainage Paper
+        29 (Ayers & Westcot), crop salt-tolerance tables
+      url: https://www.fao.org/4/t0234e/t0234e03.htm
+      year: 1985
+    - source_type: peer_reviewed
+      title: >-
+        Nagaz et al. — Yield and water-use efficiency of drip-irrigated
+        potato under different salinity levels of irrigation water
+      doi: 10.3923/ja.2007.324.330
+      year: 2007
+    - source_type: usda
+      title: USDA-NRCS plant salt-tolerance reference (potato)
+      url: https://www.nrcs.usda.gov/plantmaterials/azpmstn10485.pdf
+
+transferability:
+  egypt: medium
+  middle_east: high
+  global: high
+
+parameters:
+  threshold_ece:
+    type: number
+    default: 1.7
+    min: 0.0
+    max: 20.0
+    description: ECe (dS/m) above which potato yield begins to decline (FAO-29 onset).
+  severe_ece:
+    type: number
+    default: 3.8
+    min: 0.0
+    max: 30.0
+    description: ECe (dS/m) above which yield loss exceeds ~25% (severe stress).
+
+root: root
+nodes:
+  root:
+    label_en: Is soil ECe above the potato tolerance threshold?
+    label_ar: هل ملوحة التربة ECe أعلى من عتبة تحمّل البطاطس؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: soil_salinity
+          key: value_numeric
+        right:
+          source: params
+          name: threshold_ece
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the salinity severe (yield loss > 25%)?
+    label_ar: هل الملوحة حادة (فقد المحصول > 25%)؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: soil_salinity
+          key: value_numeric
+        right:
+          source: params
+          name: severe_ece
+    on_match: leaf_severe
+    on_miss: leaf_moderate
+
+  leaf_severe:
+    label_en: Severe salinity — manage leaching/drainage
+    label_ar: ملوحة حادة — أدر الغسل/الصرف
+    outcome:
+      action_type: other
+      severity: critical
+      confidence: 0.85
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        Soil ECe indicates severe salinity for potato (>25% expected
+        yield loss). Confirm with a lab ECe and act on leaching and
+        drainage.
+      text_ar: >-
+        تشير ملوحة التربة ECe إلى إجهاد حاد للبطاطس (فقد متوقع للمحصول
+        > 25%). أكّد بتحليل مخبري وتصرّف بالغسل والصرف.
+      actions:
+        immediate:
+          - text_en: Confirm with a laboratory saturated-paste ECe test.
+            text_ar: أكّد بتحليل مخبري لملوحة عجينة التربة المُشبعة ECe.
+          - text_en: >-
+              Apply a leaching irrigation with the lowest-salinity water
+              available to push salts below the root zone.
+            text_ar: >-
+              طبّق ريّة غسيل بأقل مياه ملوحةً متاحة لدفع الأملاح أسفل منطقة
+              الجذور.
+        short_term:
+          - text_en: >-
+              Increase the leaching fraction and irrigation frequency to
+              keep root-zone salinity down.
+            text_ar: >-
+              ارفع نسبة الغسيل وتكرار الريّ للحفاظ على انخفاض ملوحة منطقة
+              الجذور.
+        long_term:
+          - text_en: >-
+              Improve subsurface drainage; if soil is sodic, apply gypsum;
+              consider a salt-tolerant rotation crop.
+            text_ar: >-
+              حسّن الصرف تحت السطحي؛ وإن كانت التربة صوديّة أضِف الجبس؛ وفكّر
+              في محصول دورة متحمّل للملوحة.
+        monitoring:
+          - text_en: Re-test soil ECe after leaching and track irrigation-water ECw.
+            text_ar: أعد قياس ملوحة التربة ECe بعد الغسل وراقب ملوحة ماء الريّ ECw.
+
+  leaf_moderate:
+    label_en: Moderate salinity — monitor and leach
+    label_ar: ملوحة متوسطة — راقب واغسل
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 336
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil ECe is above the potato salinity threshold (up to ~25%
+        yield loss). Verify and manage with leaching before stress
+        deepens.
+      text_ar: >-
+        ملوحة التربة ECe أعلى من عتبة البطاطس (فقد للمحصول حتى ~25%).
+        تحقّق وأدِرها بالغسل قبل أن يتفاقم الإجهاد.
+      actions:
+        immediate:
+          - text_en: Verify the reading against a recent lab ECe.
+            text_ar: تحقّق من القراءة مقابل تحليل مخبري حديث لـ ECe.
+        short_term:
+          - text_en: >-
+              Add a modest leaching fraction at the next irrigations and
+              prefer lower-ECw water if available.
+            text_ar: >-
+              أضِف نسبة غسيل معتدلة في الريّات القادمة وفضّل المياه الأقل
+              ملوحةً إن توفّرت.
+        long_term:
+          - text_en: >-
+              Review irrigation-water quality and field drainage for the
+              season.
+            text_ar: راجع جودة ماء الريّ وصرف الحقل خلال الموسم.
+        monitoring:
+          - text_en: Re-test ECe in 2–3 weeks to confirm the trend.
+            text_ar: أعد قياس ECe خلال 2–3 أسابيع لتأكيد الاتجاه.
+
+  leaf_no_action:
+    label_en: No action — salinity within tolerance
+    label_ar: لا إجراء — الملوحة ضمن التحمّل
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Soil ECe is within potato's salinity tolerance; no action needed.
+      text_ar: ملوحة التربة ضمن تحمّل البطاطس؛ لا حاجة لإجراء.
