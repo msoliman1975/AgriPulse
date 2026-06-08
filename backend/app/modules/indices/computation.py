@@ -7,9 +7,11 @@ and S3 writes live in the Celery task that calls these functions
 pure means the unit tests can pass tiny hand-crafted fixtures and
 assert exact expected values.
 
-Six standard indices per ARCHITECTURE.md § 9. Their canonical formulas
-are seeded in ``public.indices_catalog`` (PR-A migration 0008); we
-restate them here as actual numpy operations.
+Seven standard indices per ARCHITECTURE.md § 9 (the original six plus
+``ndmi``, added for the KB water-stress catalog). Their canonical
+formulas are seeded in ``public.indices_catalog`` (migration 0008 for
+the first six, 0027 for ``ndmi``); we restate them here as actual numpy
+operations.
 
 All inputs assumed to be FLOAT32 surface-reflectance values in 0..1
 (Sentinel-2 L2A's `evalscript` already normalises to that range — see
@@ -50,7 +52,18 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
 )
 
 # Indices supported in MVP. Order matches the catalog's seeded rows.
-STANDARD_INDEX_CODES: tuple[str, ...] = ("ndvi", "ndwi", "evi", "savi", "ndre", "gndvi")
+# ``ndmi`` (KB P2 prerequisite) was added after the original six — it is
+# the leaf/canopy-moisture index the water-stress catalog needs, distinct
+# from McFeeters ``ndwi`` (surface water) above.
+STANDARD_INDEX_CODES: tuple[str, ...] = (
+    "ndvi",
+    "ndwi",
+    "evi",
+    "savi",
+    "ndre",
+    "gndvi",
+    "ndmi",
+)
 
 
 # --- Aggregate result -----------------------------------------------------
@@ -133,6 +146,17 @@ def gndvi(green: NDArray[Any], nir: NDArray[Any]) -> NDArray[np.float32]:
     return _safe_divide(nir - green, nir + green)
 
 
+def ndmi(nir: NDArray[Any], swir1: NDArray[Any]) -> NDArray[np.float32]:
+    """Normalized Difference Moisture Index: ``(NIR - SWIR1) / (NIR + SWIR1)``.
+
+    Tracks leaf / canopy **water content** (equivalent to NDII) and falls
+    as tissue dries — an early water-stress signal. Not to be confused
+    with ``ndwi`` above (McFeeters Green/NIR), which tracks open surface
+    water, not leaf moisture.
+    """
+    return _safe_divide(nir - swir1, nir + swir1)
+
+
 def compute_all_indices(
     bands: Mapping[str, NDArray[Any]],
 ) -> dict[str, NDArray[np.float32]]:
@@ -148,6 +172,7 @@ def compute_all_indices(
         "savi": savi(bands[BAND_RED], bands[BAND_NIR]),
         "ndre": ndre(bands[BAND_RED_EDGE_1], bands[BAND_NIR]),
         "gndvi": gndvi(bands[BAND_GREEN], bands[BAND_NIR]),
+        "ndmi": ndmi(bands[BAND_NIR], bands[BAND_SWIR1]),
     }
 
 

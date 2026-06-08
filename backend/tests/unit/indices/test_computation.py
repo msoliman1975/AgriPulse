@@ -19,6 +19,7 @@ from app.modules.indices.computation import (
     compute_all_indices,
     evi,
     gndvi,
+    ndmi,
     ndre,
     ndvi,
     ndwi,
@@ -81,18 +82,28 @@ def test_gndvi_uses_green() -> None:
     assert np.isclose(result[0, 0], expected, atol=1e-5)
 
 
-def test_compute_all_indices_returns_six_keys() -> None:
+def test_ndmi_uses_nir_and_swir1() -> None:
+    """NDMI = (NIR - SWIR1) / (NIR + SWIR1); leaf-moisture, not surface water."""
+    swir1 = np.array([[0.30, 0.25], [0.10, 0.0]], dtype=np.float32)
+    result = ndmi(NIR, swir1)
+    assert np.isclose(result[0, 0], (0.50 - 0.30) / (0.50 + 0.30), atol=1e-5)  # 0.25
+    assert np.isclose(result[0, 1], (0.30 - 0.25) / (0.30 + 0.25), atol=1e-5)
+    assert np.isclose(result[1, 0], (0.02 - 0.10) / (0.02 + 0.10), atol=1e-5)
+    assert np.isnan(result[1, 1])  # NIR + SWIR1 == 0 → masked
+
+
+def test_compute_all_indices_returns_seven_keys() -> None:
     bands = {
         BAND_BLUE: BLUE,
         BAND_GREEN: GREEN,
         BAND_RED: RED,
         BAND_RED_EDGE_1: RED_EDGE,
         BAND_NIR: NIR,
-        BAND_SWIR1: NIR,  # SWIR isn't used by the six standard indices
+        BAND_SWIR1: NIR,  # only ndmi uses SWIR1
         BAND_SWIR2: NIR,
     }
     result = compute_all_indices(bands)
-    assert set(result.keys()) == {"ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"}
+    assert set(result.keys()) == {"ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"}
     for arr in result.values():
         assert arr.shape == (2, 2)
         assert arr.dtype == np.float32
