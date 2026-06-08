@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -13,6 +15,10 @@ interface Props {
 
 export function Drawer({ open, onClose, title, children, side = "end" }: Props): ReactNode {
   const { t } = useTranslation("common");
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  // Trap focus inside the panel + restore it on close (matches Modal).
+  useFocusTrap(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -36,6 +42,7 @@ export function Drawer({ open, onClose, title, children, side = "end" }: Props):
         className="absolute inset-0 bg-ap-ink/40"
       />
       <aside
+        ref={panelRef}
         className={`absolute top-0 ${sideClass} h-full w-full max-w-md overflow-y-auto bg-white shadow-xl`}
       >
         <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">

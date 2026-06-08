@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Modal } from "@/components/Modal";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import type { TenantAdminRow } from "@/api/platformAdmins";
@@ -83,9 +84,17 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
 
       {/* Transfer-ownership modal */}
       {openTransfer && owner ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-ap-panel p-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-ap-ink">{t("admins.transfer.title")}</h3>
+        <Modal
+          open
+          onClose={() => {
+            setOpenTransfer(false);
+            setNewOwnerEmail("");
+            setConfirmSlug("");
+          }}
+          labelledBy="transfer-owner-title"
+          className="max-w-md p-4"
+        >
+            <h3 id="transfer-owner-title" className="text-sm font-semibold text-ap-ink">{t("admins.transfer.title")}</h3>
             <p className="mt-2 text-xs text-ap-muted">
               {t("owner.transferIntro", {
                 from: owner.full_name ?? owner.email,
@@ -159,8 +168,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
             {transferMut.error ? (
               <p className="mt-2 text-xs text-ap-crit">{transferMut.error.message}</p>
             ) : null}
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </section>
   );

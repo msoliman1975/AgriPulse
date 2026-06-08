@@ -25,7 +25,7 @@ export function ArchiveButton({ label, busy, onConfirm }: Props): JSX.Element {
   }
   return (
     <span className="flex items-center gap-2" role="dialog" aria-label={label}>
-      <span className="text-sm text-slate-700">{t("actions.confirmArchive")}</span>
+      <span className="text-sm text-ap-ink">{t("actions.confirmArchive")}</span>
       <button
         type="button"
         className="btn btn-primary"

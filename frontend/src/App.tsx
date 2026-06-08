@@ -141,9 +141,9 @@ export function App(): ReactNode {
                 <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
                 {/* Board PR-7 cutover: /plan/:farmId redirects to /board/:farmId.
-                  The legacy PlanPage component stays in the codebase for the
-                  one-plan-at-a-time flow under /plans/:planId/activities; the
-                  farm-scoped Gantt is folded into the board grid. */}
+                  The legacy PlanPage (modules/plan/*) was removed once the
+                  farm-scoped Gantt was folded into the board grid; this
+                  redirect keeps old deep-links working. */}
                 <Route path="/plan/:farmId" element={<RedirectPlanToBoard />} />
                 <Route path="/board/:farmId" element={<BoardPage />} />
                 <Route path="/alerts/:farmId" element={<AlertsPage />} />

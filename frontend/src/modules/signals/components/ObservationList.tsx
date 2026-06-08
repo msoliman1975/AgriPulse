@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
+import { Modal } from "@/components/Modal";
 import {
   listSignalObservations,
   type SignalDefinition,
@@ -428,35 +429,37 @@ function DeleteConfirm({
 }): ReactNode {
   const { t } = useTranslation("signals");
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      role="dialog"
-      aria-modal="true"
+    <Modal
+      open
+      onClose={onCancel}
+      labelledBy="obs-delete-title"
+      blockEscape={pending}
+      className="max-w-sm p-4"
     >
-      <div className="w-full max-w-sm rounded-xl border border-ap-line bg-white p-4 shadow-xl">
-        <h3 className="text-sm font-semibold text-ap-ink">{t("log.list.delete.confirmTitle")}</h3>
-        <p className="mt-1 text-xs text-ap-muted">
-          {t("log.list.delete.confirmBody", { count })}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={pending}
-            className="rounded-md border border-ap-line bg-white px-3 py-1.5 text-xs font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
-          >
-            {t("log.list.delete.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className="rounded-md bg-ap-crit px-3 py-1.5 text-xs font-medium text-white hover:bg-ap-crit/90 disabled:opacity-60"
-          >
-            {pending ? t("log.list.delete.deleting") : t("log.list.delete.confirm")}
-          </button>
-        </div>
+      <h3 id="obs-delete-title" className="text-sm font-semibold text-ap-ink">
+        {t("log.list.delete.confirmTitle")}
+      </h3>
+      <p className="mt-1 text-xs text-ap-muted">
+        {t("log.list.delete.confirmBody", { count })}
+      </p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={pending}
+          className="rounded-md border border-ap-line bg-white px-3 py-1.5 text-xs font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
+        >
+          {t("log.list.delete.cancel")}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={pending}
+          className="rounded-md bg-ap-crit px-3 py-1.5 text-xs font-medium text-white hover:bg-ap-crit/90 disabled:opacity-60"
+        >
+          {pending ? t("log.list.delete.deleting") : t("log.list.delete.confirm")}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }

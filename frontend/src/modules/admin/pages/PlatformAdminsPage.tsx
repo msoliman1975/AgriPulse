@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Modal } from "@/components/Modal";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -81,9 +82,18 @@ export function PlatformAdminsPage(): ReactNode {
 
       {/* Invite modal */}
       {openInvite ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-ap-panel p-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-ap-ink">{t("platformAdmins.inviteTitle")}</h3>
+        <Modal
+          open
+          onClose={() => {
+            setOpenInvite(false);
+            setEmail("");
+            setFullName("");
+            setRole("PlatformAdmin");
+          }}
+          labelledBy="invite-admin-title"
+          className="max-w-md p-4"
+        >
+            <h3 id="invite-admin-title" className="text-sm font-semibold text-ap-ink">{t("platformAdmins.inviteTitle")}</h3>
             <p className="mt-2 text-xs text-ap-muted">{t("platformAdmins.inviteHint")}</p>
             <form
               onSubmit={(e) => {
@@ -168,8 +178,7 @@ export function PlatformAdminsPage(): ReactNode {
                 </p>
               ) : null}
             </form>
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </div>
   );

@@ -8,11 +8,11 @@ import { useCapability } from "@/rbac/useCapability";
 import {
   AlertsIcon,
   GearIcon,
-  ImageryIcon,
   InsightsIcon,
   LandUnitsIcon,
   PlanIcon,
   RecommendationsIcon,
+  ReportsIcon,
   SignalsIcon,
   TenantIcon,
   UsersIcon,
@@ -143,6 +143,9 @@ export function SideNav(): ReactNode {
       aria-label="Primary"
       className="hidden w-56 flex-shrink-0 overflow-y-auto border-e border-ap-line bg-ap-panel py-3 md:block"
     >
+      {/* Single workspace list. Per-farm + tenant configuration (Imagery &
+          weather, Custom signals, Settings hub) moved to the top-bar Configs
+          menu, so the left nav is purely the operational surfaces. */}
       <GroupHeader>{t("common:workspaceNav.workspace")}</GroupHeader>
       <div className="flex flex-col gap-0.5 px-2">
         <SideNavItem
@@ -158,24 +161,15 @@ export function SideNav(): ReactNode {
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
-        {/* F-4: the map-first surface (/labs/map) is now the single Farm
-            management page. The legacy form view at /farms is hidden from the
-            nav but its routes still resolve as a fallback.
-            TODO(nuke-legacy-farms): once /labs/map has full parity, delete the
-            /farms routes + pages and the workspaceNav.farmManagementLegacy key. */}
+        {/* TODO(nuke-legacy-farms): /labs/map is the single Farm-management
+            surface; the legacy /farms form view stays routed as a fallback
+            until /labs/map reaches parity. */}
         <SideNavItem
-          to={hasFarm ? `/alerts/${farmSegment}` : "#"}
-          label={t("common:workspaceNav.alerts")}
-          icon={<AlertsIcon className="h-4 w-4" />}
+          to={hasFarm ? `/board/${farmSegment}` : "#"}
+          label={t("common:workspaceNav.plan")}
+          icon={<PlanIcon className="h-4 w-4" />}
           disabled={!hasFarm}
-          activePathPrefix="/alerts/"
-        />
-        <SideNavItem
-          to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
-          label={t("common:workspaceNav.recommendations")}
-          icon={<RecommendationsIcon className="h-4 w-4" />}
-          disabled={!hasFarm}
-          activePathPrefix="/recommendations/"
+          activePathPrefix="/board/"
         />
         <SideNavItem
           to={hasFarm ? `/signals/${farmSegment}` : "#"}
@@ -185,40 +179,25 @@ export function SideNav(): ReactNode {
           activePathPrefix="/signals/"
         />
         <SideNavItem
-          to={hasFarm ? `/board/${farmSegment}` : "#"}
-          label={t("common:workspaceNav.plan")}
-          icon={<PlanIcon className="h-4 w-4" />}
+          to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
+          label={t("common:workspaceNav.recommendations")}
+          icon={<RecommendationsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
-          activePathPrefix="/board/"
-        />
-        {/* Reports (F-2): the page is a "coming soon" dead-end, so the nav
-            entry is withheld until it ships. The /reports/:farmId route still
-            resolves for any existing deep links. */}
-      </div>
-      {/* Per-farm configuration that genuinely needs a farm context. The
-          tenant-wide config (rules, users, decision trees) lives under
-          the Settings hub so a farm doesn't have to be active. */}
-      <GroupHeader>{t("common:workspaceNav.configuration")}</GroupHeader>
-      <div className="flex flex-col gap-0.5 px-2">
-        <SideNavItem
-          to={hasFarm ? `/config/imagery/${farmSegment}` : "#"}
-          label={t("common:workspaceNav.imageryWeather")}
-          icon={<ImageryIcon className="h-4 w-4" />}
-          disabled={!hasFarm}
-          activePathPrefix="/config/imagery/"
+          activePathPrefix="/recommendations/"
         />
         <SideNavItem
-          to={hasFarm ? `/config/signals/${farmSegment}` : "#"}
-          label={t("common:workspaceNav.customSignals")}
-          icon={<SignalsIcon className="h-4 w-4" />}
+          to={hasFarm ? `/alerts/${farmSegment}` : "#"}
+          label={t("common:workspaceNav.alerts")}
+          icon={<AlertsIcon className="h-4 w-4" />}
           disabled={!hasFarm}
-          activePathPrefix="/config/signals/"
+          activePathPrefix="/alerts/"
         />
         <SideNavItem
-          to="/settings"
-          label={t("common:workspaceNav.settings")}
-          icon={<GearIcon className="h-4 w-4" />}
-          activePathPrefix="/settings"
+          to={hasFarm ? `/reports/${farmSegment}` : "#"}
+          label={t("common:workspaceNav.reports")}
+          icon={<ReportsIcon className="h-4 w-4" />}
+          disabled={!hasFarm}
+          activePathPrefix="/reports/"
         />
       </div>
     </nav>
