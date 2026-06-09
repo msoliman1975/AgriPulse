@@ -173,8 +173,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Format check
-        run: pnpm format:check
+      # NOTE: prettier formatting is enforced by the `pre-commit` job's
+      # prettier hook. The local devDep prettier (package.json) is a newer
+      # 3.x than the pre-commit hook pins and formats a few files differently,
+      # so a second `format:check` here fought the hook. Single prettier gate
+      # (pre-commit) until the two versions are aligned. TODO(prettier-align).
 
       - name: Test
         run: pnpm test

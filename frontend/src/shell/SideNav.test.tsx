@@ -36,8 +36,8 @@ describe("<SideNav> Admin section", () => {
       user: { access_token: jwt({ tenant_role: "TenantAdmin" }) },
     });
     renderNav();
-    expect(screen.queryByText("admin:nav.section")).not.toBeInTheDocument();
-    expect(screen.queryByText("admin:nav.tenants")).not.toBeInTheDocument();
+    expect(screen.queryByText("admin,common:nav.section")).not.toBeInTheDocument();
+    expect(screen.queryByText("admin,common:nav.tenants")).not.toBeInTheDocument();
   });
 
   it("shows the Admin section for PlatformAdmin", () => {
@@ -45,8 +45,8 @@ describe("<SideNav> Admin section", () => {
       user: { access_token: jwt({ platform_role: "PlatformAdmin" }) },
     });
     renderNav();
-    expect(screen.getByText("admin:nav.section")).toBeInTheDocument();
-    const link = screen.getByText("admin:nav.tenants");
+    expect(screen.getByText("admin,common:nav.section")).toBeInTheDocument();
+    const link = screen.getByText("admin,common:nav.tenants");
     expect(link.closest("a")).toHaveAttribute("href", "/platform/tenants");
   });
 });
