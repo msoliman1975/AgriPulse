@@ -14,7 +14,7 @@ import os
 import sys
 import httpx
 
-KC_BASE = "http://keycloak-dev"
+KC_BASE = os.environ.get("KEYCLOAK_BASE_URL", "http://keycloak-dev")
 REALM = "agripulse"
 TENANCY_CLIENT_ID = "agripulse-tenancy"
 

@@ -120,7 +120,7 @@
     {
       "clientId": "agripulse-tenancy",
       "name": "AgriPulse Tenancy (admin)",
-      "description": "Service-account confidential client used by the api to provision Keycloak groups + users when a tenant is created. The secret is replaced post-install by a Job that reads agripulse/<env>/keycloak-client-secret from AWS Secrets Manager; realm import only seeds the client shape.",
+      "description": "Service-account confidential client the api uses to provision Keycloak groups/users on tenant creation. Secret is set post-install by the promote Job; import only seeds the client shape.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
