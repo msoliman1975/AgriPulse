@@ -27,13 +27,13 @@ global:
   # bumped by hand until that's fixed.
   images:
     api:
-      tag: "e41dd87"
+      tag: "d10c3df"
     workers:
-      tag: "e41dd87"
+      tag: "d10c3df"
     frontend:
-      tag: "e41dd87"
+      tag: "d10c3df"
     tileServer:
-      tag: "e41dd87"
+      tag: "d10c3df"
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
