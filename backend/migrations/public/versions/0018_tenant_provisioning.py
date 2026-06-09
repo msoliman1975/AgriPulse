@@ -50,6 +50,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Coerce rows in the status this downgrade is about to disallow, else
+    # recreating the narrower CHECK fails on live data (e.g. a tenant left
+    # mid-provisioning). 'pending_provision' degrades to 'active' — the
+    # closest pre-provisioning-flow state.
+    op.execute("UPDATE public.tenants SET status = 'active' WHERE status = 'pending_provision'")
     op.drop_constraint("ck_tenants_status", "tenants", schema="public", type_="check")
     op.create_check_constraint(
         "ck_tenants_status",
