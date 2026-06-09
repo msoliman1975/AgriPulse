@@ -12,18 +12,18 @@ global:
   # Prod domain — no `dev.` prefix. Each service Ingress renders
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
-  # Pin to a deliberate release SHA (a main commit whose `containers` matrix
-  # is green). Unlike dev, NOT auto-bumped — promotion is hand-written.
-  # TODO(hetzner-live): set to the release SHA at cutover.
+  # Pin to the SHAs actually running on the live cluster (hand-written
+  # promotion — NOT auto-bumped like dev). frontend is a separate build
+  # (8a92127, prod VITE_ URLs); api/workers/tile share 9d140cc.
   images:
     api:
-      tag: "7ebfbfd"
+      tag: "9d140cc"
     workers:
-      tag: "7ebfbfd"
+      tag: "9d140cc"
     frontend:
-      tag: "7ebfbfd"
+      tag: "8a92127"
     tileServer:
-      tag: "7ebfbfd"
+      tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
 # consume all of these; tile-server/frontend ignore the keys they don't read).
 env:
@@ -82,7 +82,7 @@ keycloak:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
   image:
-    tag: "7ebfbfd"
+    tag: "9d140cc"
 # external-dns on Cloudflare instead of Route53. No IRSA — the chart reads a
 # Cloudflare API token from a Secret.
 # TODO(hetzner-live): set provider=cloudflare + reference the CF token secret;
