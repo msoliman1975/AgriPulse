@@ -63,7 +63,15 @@ extraEnvFromSecrets:
 externalSecret:
   enabled: false
 externalSecrets:
-  enabled: false
+  enabled: false # shared chart ClusterSecretStore
+  # keycloak wrapper-chart ExternalSecrets (admin/db/promote) — ESO is off on
+  # Hetzner, so these CRs would fail to apply (no external-secrets.io CRD).
+  admin:
+    enabled: false
+  db:
+    enabled: false
+  promote:
+    enabled: false
 # No prometheus-operator on Hetzner → ServiceMonitor CRD absent; rendering one
 # would fail to apply. (CNPG's PodMonitor is gated separately below.)
 serviceMonitor:
@@ -83,6 +91,14 @@ keycloak:
       cert-manager.io/cluster-issuer: letsencrypt-prod
   image:
     tag: "9d140cc"
+  # No prometheus-operator on Hetzner → ServiceMonitor CRD absent.
+  metrics:
+    serviceMonitor:
+      enabled: false
+  # Live keycloak has no NetworkPolicy; the bitnami default would create one
+  # that restricts traffic. Keep it off (single node, ingress-nginx fronts it).
+  networkPolicy:
+    enabled: false
 # external-dns on Cloudflare instead of Route53. No IRSA — the chart reads a
 # Cloudflare API token from a Secret.
 # TODO(hetzner-live): set provider=cloudflare + reference the CF token secret;
