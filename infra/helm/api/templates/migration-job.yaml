@@ -80,8 +80,15 @@ spec:
                 name: agripulse-app-config
             - configMapRef:
                 name: {{ include "agripulse-api.fullname" . }}
+            {{- if .Values.externalSecret.enabled }}
             - secretRef:
                 name: {{ include "agripulse-api.fullname" . }}-secrets
+            {{- end }}
+            {{- range .Values.extraEnvFromSecrets }}
+            # Plain Secrets to load (no ESO) — Hetzner seeds app secrets directly.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           env:
             - name: DATABASE_PASSWORD
               valueFrom:

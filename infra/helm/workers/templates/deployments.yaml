@@ -52,6 +52,11 @@ spec:
             - secretRef:
                 name: {{ include "agripulse-workers.fullname" $ }}-secrets
             {{- end }}
+            {{- range $.Values.extraEnvFromSecrets }}
+            # Plain Secrets to load (no ESO) — Hetzner seeds app secrets directly.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           {{- with $.Values.databasePasswordSecret }}
           env:
             - name: DATABASE_PASSWORD

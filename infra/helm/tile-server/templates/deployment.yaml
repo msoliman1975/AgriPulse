@@ -43,6 +43,11 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "agripulse-tile-server.fullname" . }}
+            {{- range .Values.extraEnvFromSecrets }}
+            # Plain Secrets to load (no ESO) — e.g. R2 creds on Hetzner.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}
           readinessProbe:
