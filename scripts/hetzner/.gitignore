@@ -1,0 +1,4 @@
+# Never commit secrets or local creds
+.r2-creds.env
+*.creds.env
+*.secret.env
