@@ -103,6 +103,13 @@ keycloak:
 # bitnami Service is `keycloak` (release name), not the chart default
 # `keycloak-dev` (the old AWS App name) — point the hook at the right host.
 promoteBootstrap:
+  # Disabled for the ADOPTED cluster: the realm is already configured (realm
+  # import + the original one-time promote), and re-running this PostSync hook
+  # on every ArgoCD reconcile is fragile — it hits Keycloak's admin REST and
+  # blocks the keycloak sync whenever it can't connect. Login already works
+  # without it. FOLLOW-UP: re-enable (keycloakBaseUrl below is already correct)
+  # once the hook is verified idempotent + fast, for from-scratch reproducibility.
+  enabled: false
   keycloakBaseUrl: http://keycloak
 # external-dns on Cloudflare instead of Route53. No IRSA — the chart reads a
 # Cloudflare API token from a Secret.
