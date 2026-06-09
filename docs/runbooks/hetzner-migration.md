@@ -52,9 +52,14 @@ The 4 WAL/DB follow-ups (`project_wal_incident_and_followups_2026_05_17`) **diss
 
 ## 3. Ordered bring-up (lift-and-shift)
 
-0. **Pre-reqs**: Hetzner project + CPX41 (amd64, Ubuntu) + a Volume; Cloudflare account + R2 bucket(s) for imagery + backups; lower agripulse.cloud DNS TTL.
-1. **Node**: install k3s (disable nothing — keep Traefik+local-path); attach + mount the Volume; install Hetzner CSI if using dynamic volumes.
-2. **ArgoCD**: install; point at `msoliman1975/AgriPulse` (private-repo creds). New overlay `infra/argocd/overlays/hetzner/` (copy dev, strip AWS bits).
+> Steps 0–2 are scripted: `scripts/hetzner/01-provision.sh` (run locally — creates the
+> CPX41 + PG volume + firewall via `hcloud`) and `scripts/hetzner/02-node-bootstrap.sh`
+> (run on the box — mounts the volume, installs k3s with Traefik **off** so the existing
+> ingress-nginx config is reused unchanged, points local-path at the volume, installs ArgoCD).
+
+0. **Pre-reqs**: Hetzner project + API token + SSH key; Cloudflare account + R2 buckets (`agripulse-imagery`, `agripulse-pg-backup`) + an R2 API token; lower agripulse.cloud DNS TTL. Then `01-provision.sh`.
+1. **Node**: `02-node-bootstrap.sh` (k3s + volume + ArgoCD). Decision locked: **keep ingress-nginx** (k3s Traefik disabled) so app Ingress annotations/class are unchanged — least churn, most portable.
+2. **ArgoCD**: installed by the script; point at `msoliman1975/AgriPulse` (private-repo creds). New overlay `infra/argocd/overlays/hetzner/` (copy dev, strip AWS bits) — **the live-validated phase**: IRSA annotations → R2/Cloudflare static creds (api, CNPG backup, external-dns, cert-manager), `karpenter.enabled: false`, `envHost: agripulse.cloud`, CNPG `storageClass` on the volume, secrets seeded (drop or repoint ESO).
 3. **CRDs + operators**: CNPG operator, cert-manager. (Drop Karpenter/EBS-CSI/external-dns appsets.)
 4. **Storage classes**: ensure `local-path` default; PG `storageClass` → the Hetzner volume mount.
 5. **Secrets**: seed app + keycloak + R2 secrets (drop ESO or repoint it). Keycloak DB user bootstrapped correctly this time.
