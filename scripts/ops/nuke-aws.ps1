@@ -236,9 +236,11 @@ if ($SkipTerraform) {
                     -backend-config="dynamodb_table=$LOCK_TABLE"
             }
         }
-        # environment is a required var with no default.
+        # environment + tf_state_bucket are required vars with no default.
+        # (tf_state_bucket has no default in github-oidc.tf; without it terraform
+        # blocks on an interactive prompt and hangs a non-interactive run.)
         Act "terraform destroy -auto-approve (env=dev)" {
-            & terraform destroy -auto-approve -var "environment=dev"
+            & terraform destroy -auto-approve -var "environment=dev" -var "tf_state_bucket=$STATE_BUCKET"
             if ($LASTEXITCODE -ne 0) {
                 Warn "terraform destroy returned non-zero. The phase-3 sweep will mop up the rest."
             }
