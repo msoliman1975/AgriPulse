@@ -16,12 +16,23 @@ spec:
         generators:
           - list:
               elements:
+                # releaseName MUST match the live manual-deploy release names so
+                # ArgoCD adopts the existing resources in place instead of
+                # creating duplicates (fullname = <releaseName>-<chartName>).
+                # These are non-uniform because the hand deploys were; shared's
+                # resources are fixed-name so its releaseName is free.
                 - chart: shared
+                  releaseName: shared
                 - chart: api
+                  releaseName: agripulse-api
                 - chart: workers
+                  releaseName: workers
                 - chart: tile-server
+                  releaseName: tile-server
                 - chart: frontend
+                  releaseName: frontend
                 - chart: keycloak
+                  releaseName: keycloak
           - list:
               elements:
                 # Native YAML booleans (no quotes) so templatePatch below
@@ -56,6 +67,7 @@ spec:
         targetRevision: HEAD
         path: "infra/helm/{{.chart}}"
         helm:
+          releaseName: "{{.releaseName}}"
           valueFiles:
             - "values.yaml"
             - "../../argocd/overlays/{{.env}}/values.yaml"
