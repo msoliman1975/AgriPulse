@@ -22,7 +22,7 @@ spec:
                 # These are non-uniform because the hand deploys were; shared's
                 # resources are fixed-name so its releaseName is free.
                 - chart: shared
-                  releaseName: shared
+                  releaseName: agripulse
                 - chart: api
                   releaseName: agripulse-api
                 - chart: workers
@@ -88,6 +88,9 @@ spec:
           - ServerSideApply=true
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
+          # Don't push the ignored CNPG /spec/bootstrap on sync (it's immutable
+          # post-init; CNPG's webhook would reject the change).
+          - RespectIgnoreDifferences=true
   # Inline template fields are stringly-typed; templatePatch is the only
   # way to render a real boolean into syncPolicy.automated.prune.
   templatePatch: |

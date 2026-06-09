@@ -130,13 +130,15 @@ postgresCluster:
   walStorage:
     size: 30Gi
     storageClass: local-path
+  # Match the live cluster (chart default 4Gi/8Gi) so adoption doesn't restart
+  # the single PG instance (= brief full-app downtime). Tune later in a window.
   resources:
     requests:
       cpu: "1"
-      memory: 2Gi
+      memory: 4Gi
     limits:
       cpu: "2"
-      memory: 4Gi
+      memory: 8Gi
   # No IRSA on Hetzner.
   serviceAccountAnnotations: {}
   # No prometheus-operator → no PodMonitor CRD. CNPG tolerates the missing CRD
@@ -159,10 +161,10 @@ postgresCluster:
         secretAccessKeyKey: SECRET_ACCESS_KEY
 migrations:
   enabled: true
-resources:
-  requests:
-    cpu: 50m
-    memory: 128Mi
-  limits:
-    cpu: 500m
-    memory: 256Mi
+# Keep each chart's own resources (api 512Mi, tile-server 2Gi for GDAL, etc.) —
+# the cx43 node (8 vCPU / 16 GiB) fits them, and the live cluster runs on these.
+# A blanket override here would shrink tile-server to 256Mi and OOM GDAL.
+# Single light-worker replica (matches live; chart default is 2).
+workloads:
+  light:
+    replicaCount: 1
