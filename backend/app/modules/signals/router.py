@@ -218,9 +218,7 @@ async def get_definition_references(
 ) -> dict[str, list[dict[str, str]]]:
     schema = _ensure_tenant(context)
     tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
-    return await service.get_definition_references(
-        definition_id=definition_id, tenant_id=tenant_id
-    )
+    return await service.get_definition_references(definition_id=definition_id, tenant_id=tenant_id)
 
 
 # ---------- Assignments ---------------------------------------------------
@@ -422,9 +420,7 @@ async def get_template_references(
 ) -> dict[str, list[dict[str, str]]]:
     schema = _ensure_tenant(context)
     tenant_id = await _resolve_tenant_id(schema=schema, tenant_session=tenant_session)
-    return await service.get_template_references(
-        template_id=template_id, tenant_id=tenant_id
-    )
+    return await service.get_template_references(template_id=template_id, tenant_id=tenant_id)
 
 
 @router.post(

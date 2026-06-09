@@ -51,9 +51,7 @@ class RecommendationResponse(BaseModel):
     # 4-horizon structured guidance (KB P1-B). Keyed by ActionHorizon;
     # absent horizons are simply omitted. Empty for trees whose leaf
     # carries only the single `text_en` summary.
-    actions: dict[ActionHorizon, list[RecommendationActionItem]] = Field(
-        default_factory=dict
-    )
+    actions: dict[ActionHorizon, list[RecommendationActionItem]] = Field(default_factory=dict)
     confidence: Decimal
     tree_path: list[dict[str, Any]]
     text_en: str

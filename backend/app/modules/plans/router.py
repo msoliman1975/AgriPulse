@@ -333,9 +333,7 @@ async def delete_activity(
 async def create_flat_activity(
     farm_id: UUID,
     payload: FlatActivityCreateRequest,
-    context: RequestContext = Depends(
-        requires_capability("plan.manage", farm_id_param="farm_id")
-    ),
+    context: RequestContext = Depends(requires_capability("plan.manage", farm_id_param="farm_id")),
     service: PlansServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
@@ -363,9 +361,7 @@ async def create_flat_activity(
 async def bulk_create_activities(
     farm_id: UUID,
     payload: BulkActivityCreateRequest,
-    context: RequestContext = Depends(
-        requires_capability("plan.manage", farm_id_param="farm_id")
-    ),
+    context: RequestContext = Depends(requires_capability("plan.manage", farm_id_param="farm_id")),
     service: PlansServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
@@ -392,12 +388,8 @@ async def get_board(
     farm_id: UUID,
     week_start: date_type = Query(),
     weeks: int = Query(default=8, ge=1, le=40),
-    context: RequestContext = Depends(
-        requires_capability("plan.read", farm_id_param="farm_id")
-    ),
+    context: RequestContext = Depends(requires_capability("plan.read", farm_id_param="farm_id")),
     service: PlansServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
-    return await service.get_board(
-        farm_id=farm_id, week_start=week_start, weeks=weeks
-    )
+    return await service.get_board(farm_id=farm_id, week_start=week_start, weeks=weeks)

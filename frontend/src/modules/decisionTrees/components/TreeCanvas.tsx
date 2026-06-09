@@ -485,7 +485,6 @@ interface BranchPortProps {
 }
 
 function BranchPort({
-  parentId: _parentId,
   branch,
   filled,
   nodeX,

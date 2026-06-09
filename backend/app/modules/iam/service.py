@@ -57,9 +57,7 @@ class UserServiceImpl:
         # Migration 0023 added ON UPDATE CASCADE to the seven FKs into
         # public.users.id so the rekey path cascades memberships +
         # preferences + role grants automatically.
-        user = await self._repo.upsert_from_jwt(
-            sub=user_id, email=email, full_name=full_name
-        )
+        user = await self._repo.upsert_from_jwt(sub=user_id, email=email, full_name=full_name)
         if user is None or user.deleted_at is not None:
             raise UserNotFoundError(f"user {user_id} not found")
 

@@ -332,7 +332,7 @@ class GridRepository:
 
         Chunked because asyncpg (and the underlying Postgres protocol)
         cap a single statement at 32_767 parameters. With 13 params
-        per row, a busy scene (a few thousand cells × six indices)
+        per row, a busy scene (a few thousand cells x six indices)
         easily blows past that; chunk to a safe row count to keep each
         execute under the limit.
         """

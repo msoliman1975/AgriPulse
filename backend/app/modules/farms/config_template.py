@@ -47,7 +47,6 @@ from app.modules.farms.models import (
 from app.modules.imagery.models import ImageryAoiSubscription
 from app.modules.weather.models import WeatherSubscription
 
-
 Category = Literal["subscriptions", "irrigation", "org"]
 _LOCK_COLUMN: dict[Category, str] = {
     "subscriptions": "subscriptions_locked",
@@ -106,9 +105,7 @@ class ApplyDiff:
         # A block matches the subscription category only if it matches in
         # both kinds simultaneously.
         by_id = {d.block_id: d.matches for d in self.imagery}
-        return sum(
-            1 for d in self.weather if by_id.get(d.block_id, False) and d.matches
-        )
+        return sum(1 for d in self.weather if by_id.get(d.block_id, False) and d.matches)
 
 
 # ---------- Read --------------------------------------------------------------
@@ -118,12 +115,16 @@ async def get_imagery_template(
     session: AsyncSession, farm_id: UUID
 ) -> tuple[ImageryTemplateRow, ...]:
     rows = (
-        await session.execute(
-            select(FarmImageryTemplate)
-            .where(FarmImageryTemplate.farm_id == farm_id)
-            .order_by(FarmImageryTemplate.product_id)
+        (
+            await session.execute(
+                select(FarmImageryTemplate)
+                .where(FarmImageryTemplate.farm_id == farm_id)
+                .order_by(FarmImageryTemplate.product_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return tuple(
         ImageryTemplateRow(
             product_id=r.product_id,
@@ -139,12 +140,16 @@ async def get_weather_template(
     session: AsyncSession, farm_id: UUID
 ) -> tuple[WeatherTemplateRow, ...]:
     rows = (
-        await session.execute(
-            select(FarmWeatherTemplate)
-            .where(FarmWeatherTemplate.farm_id == farm_id)
-            .order_by(FarmWeatherTemplate.provider_code)
+        (
+            await session.execute(
+                select(FarmWeatherTemplate)
+                .where(FarmWeatherTemplate.farm_id == farm_id)
+                .order_by(FarmWeatherTemplate.provider_code)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return tuple(
         WeatherTemplateRow(
             provider_code=r.provider_code,
@@ -166,12 +171,8 @@ async def replace_imagery_template(
     updated_by: UUID | None,
 ) -> None:
     """Atomic full replace of the imagery template for one farm."""
-    _reject_duplicates(
-        [r.product_id for r in rows], context="imagery template product_id"
-    )
-    await session.execute(
-        delete(FarmImageryTemplate).where(FarmImageryTemplate.farm_id == farm_id)
-    )
+    _reject_duplicates([r.product_id for r in rows], context="imagery template product_id")
+    await session.execute(delete(FarmImageryTemplate).where(FarmImageryTemplate.farm_id == farm_id))
     for r in rows:
         session.add(
             FarmImageryTemplate(
@@ -193,12 +194,8 @@ async def replace_weather_template(
     rows: list[WeatherTemplateRow],
     updated_by: UUID | None,
 ) -> None:
-    _reject_duplicates(
-        [r.provider_code for r in rows], context="weather template provider_code"
-    )
-    await session.execute(
-        delete(FarmWeatherTemplate).where(FarmWeatherTemplate.farm_id == farm_id)
-    )
+    _reject_duplicates([r.provider_code for r in rows], context="weather template provider_code")
+    await session.execute(delete(FarmWeatherTemplate).where(FarmWeatherTemplate.farm_id == farm_id))
     for r in rows:
         session.add(
             FarmWeatherTemplate(
@@ -241,12 +238,8 @@ async def compute_apply_diff(
     weather_diffs: list[BlockDiff] = []
 
     for block_id in block_ids:
-        imagery_diffs.append(
-            await _imagery_diff_for_block(session, block_id, imagery_tpl)
-        )
-        weather_diffs.append(
-            await _weather_diff_for_block(session, block_id, weather_tpl)
-        )
+        imagery_diffs.append(await _imagery_diff_for_block(session, block_id, imagery_tpl))
+        weather_diffs.append(await _weather_diff_for_block(session, block_id, weather_tpl))
 
     return ApplyDiff(imagery=tuple(imagery_diffs), weather=tuple(weather_diffs))
 
@@ -265,7 +258,9 @@ async def _imagery_diff_for_block(
                     ImageryAoiSubscription.deleted_at.is_(None),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     }
     tpl_by_pid = {r.product_id: r for r in template}
 
@@ -338,7 +333,9 @@ async def _weather_diff_for_block(
                     WeatherSubscription.deleted_at.is_(None),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     }
     tpl_by_pc = {r.provider_code: r for r in template}
 
@@ -574,9 +571,7 @@ async def _resolve_target_blocks(
 # ---------- PR-3: Locks ------------------------------------------------------
 
 
-async def get_lock_state(
-    session: AsyncSession, *, farm_id: UUID
-) -> dict[Category, bool]:
+async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Category, bool]:
     """Return the three lock booleans as ``{category: locked}``."""
     row = (
         await session.execute(
@@ -630,9 +625,7 @@ async def lock_category(
     diff_payload = await _build_lock_diff(session, farm_id=farm_id, category=category)
     if diff_payload["matched_blocks"] != diff_payload["total_blocks"]:
         if not force_overwrite:
-            raise LockDivergenceError(
-                farm_id=farm_id, category=category, diff=diff_payload
-            )
+            raise LockDivergenceError(farm_id=farm_id, category=category, diff=diff_payload)
         # Force path — Apply first, then set the lock.
         if category == "subscriptions":
             await apply_template(
@@ -673,11 +666,7 @@ async def _set_lock(
     value: bool,
 ) -> None:
     col = _LOCK_COLUMN[category]
-    stmt = (
-        update(Farm)
-        .where(Farm.id == farm_id, Farm.deleted_at.is_(None))
-        .values({col: value})
-    )
+    stmt = update(Farm).where(Farm.id == farm_id, Farm.deleted_at.is_(None)).values({col: value})
     result = await session.execute(stmt)
     if (getattr(result, "rowcount", 0) or 0) == 0:
         raise FarmNotFoundError(farm_id)
@@ -689,32 +678,28 @@ async def _build_lock_diff(
 ) -> dict[str, Any]:
     """Wrap the right apply-preview for the category in a uniform shape."""
     if category == "subscriptions":
-        diff = await compute_apply_diff(
-            session, farm_id=farm_id, target_block_ids=None
-        )
+        sub_diff = await compute_apply_diff(session, farm_id=farm_id, target_block_ids=None)
         return {
-            "imagery": [_diff_dict(d) for d in diff.imagery],
-            "weather": [_diff_dict(d) for d in diff.weather],
-            "total_blocks": diff.total_blocks,
-            "matched_blocks": diff.matched_blocks,
+            "imagery": [_diff_dict(d) for d in sub_diff.imagery],
+            "weather": [_diff_dict(d) for d in sub_diff.weather],
+            "total_blocks": sub_diff.total_blocks,
+            "matched_blocks": sub_diff.matched_blocks,
         }
     if category == "irrigation":
-        diff = await compute_irrigation_apply_diff(
+        irr_diff = await compute_irrigation_apply_diff(
             session, farm_id=farm_id, target_block_ids=None
         )
         return {
-            "blocks": [_simple_diff(d) for d in diff],
-            "total_blocks": len(diff),
-            "matched_blocks": sum(1 for d in diff if d.matches),
+            "blocks": [_simple_diff(d) for d in irr_diff],
+            "total_blocks": len(irr_diff),
+            "matched_blocks": sum(1 for d in irr_diff if d.matches),
         }
     # org
-    diff = await compute_org_apply_diff(
-        session, farm_id=farm_id, target_block_ids=None
-    )
+    org_diff = await compute_org_apply_diff(session, farm_id=farm_id, target_block_ids=None)
     return {
-        "blocks": [_simple_diff(d) for d in diff],
-        "total_blocks": len(diff),
-        "matched_blocks": sum(1 for d in diff if d.matches),
+        "blocks": [_simple_diff(d) for d in org_diff],
+        "total_blocks": len(org_diff),
+        "matched_blocks": sum(1 for d in org_diff if d.matches),
     }
 
 
@@ -770,9 +755,7 @@ class SimpleBlockDiff:
         return self.before == self.after
 
 
-async def get_irrigation_template(
-    session: AsyncSession, *, farm_id: UUID
-) -> IrrigationTemplate:
+async def get_irrigation_template(session: AsyncSession, *, farm_id: UUID) -> IrrigationTemplate:
     row = (
         await session.execute(
             select(
@@ -836,6 +819,8 @@ async def compute_irrigation_apply_diff(
                 ).where(Block.id == bid)
             )
         ).first()
+        if row is None:
+            continue
         before = {
             "irrigation_system": row.irrigation_system,
             "irrigation_source": row.irrigation_source,
@@ -886,9 +871,7 @@ class OrgTemplate:
 async def get_org_template(session: AsyncSession, *, farm_id: UUID) -> OrgTemplate:
     row = (
         await session.execute(
-            select(Farm.default_tags).where(
-                Farm.id == farm_id, Farm.deleted_at.is_(None)
-            )
+            select(Farm.default_tags).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
         )
     ).first()
     if row is None:
@@ -928,9 +911,9 @@ async def compute_org_apply_diff(
     farm_tags = set(tpl.default_tags)
     diffs: list[SimpleBlockDiff] = []
     for bid in block_ids:
-        row = (
-            await session.execute(select(Block.tags).where(Block.id == bid))
-        ).first()
+        row = (await session.execute(select(Block.tags).where(Block.id == bid))).first()
+        if row is None:
+            continue
         existing = list(row.tags or [])
         existing_set = set(existing)
         # The "after" state preserves block-local tags AND adds farm tags

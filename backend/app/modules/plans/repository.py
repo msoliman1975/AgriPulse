@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date as date_type
-from datetime import datetime, time
+from datetime import UTC, datetime, time
+from datetime import date as date_type
 from typing import Any
 from uuid import UUID
 
@@ -204,7 +204,9 @@ class PlansRepository:
             )
             .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
         )
-        return (result.rowcount or 0) > 0
+        # session.execute() of a DML statement returns a CursorResult at
+        # runtime, but the stubs type it as Result (no .rowcount).
+        return (result.rowcount or 0) > 0  # type: ignore[attr-defined]
 
     async def activity_exists_on(
         self,
@@ -220,13 +222,9 @@ class PlansRepository:
             PlanActivity.activity_type == activity_type,
             PlanActivity.deleted_at.is_(None),
         )
-        return (
-            await self._session.execute(stmt)
-        ).scalars().first() is not None
+        return (await self._session.execute(stmt)).scalars().first() is not None
 
-    async def list_active_blocks(
-        self, *, farm_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_active_blocks(self, *, farm_id: UUID) -> tuple[dict[str, Any], ...]:
         """Active blocks (active_to NULL or future-dated)."""
         rows = (
             (

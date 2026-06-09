@@ -81,9 +81,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.PrimaryKeyConstraint(
-            "farm_id", "product_id", name="pk_farm_imagery_template"
-        ),
+        sa.PrimaryKeyConstraint("farm_id", "product_id", name="pk_farm_imagery_template"),
         sa.ForeignKeyConstraint(
             ["farm_id"],
             ["farms.id"],
@@ -131,9 +129,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.PrimaryKeyConstraint(
-            "farm_id", "provider_code", name="pk_farm_weather_template"
-        ),
+        sa.PrimaryKeyConstraint("farm_id", "provider_code", name="pk_farm_weather_template"),
         sa.ForeignKeyConstraint(
             ["farm_id"],
             ["farms.id"],

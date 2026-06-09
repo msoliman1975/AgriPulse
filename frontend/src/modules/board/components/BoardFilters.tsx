@@ -54,7 +54,7 @@ export function BoardFilters({
       <MultiSelect
         label={t("filters.types")}
         all={ALL_TYPES.map((typ) => ({ id: typ, label: t(`type.${typ}`) }))}
-        selected={types as unknown as Set<string>}
+        selected={types}
         onChange={(s) => setTypes(s as unknown as Set<ActivityType>)}
       />
       <MultiSelect

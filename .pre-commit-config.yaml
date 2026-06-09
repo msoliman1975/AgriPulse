@@ -48,8 +48,11 @@ repos:
       - id: ruff
         files: '^backend/.*\.py$'
         args: [--fix]
-      - id: ruff-format
-        files: '^backend/.*\.py$'
+      # NOTE: ruff-format intentionally NOT enabled — black (below) is the
+      # single source of formatting truth, matching the `backend` CI job's
+      # `black --check`. Running both ruff-format and black fought over a few
+      # files (e.g. recommendations/service.py), which made this hook
+      # permanently red. One formatter only.
 
   - repo: https://github.com/psf/black
     rev: 24.10.0

@@ -395,9 +395,7 @@ class SignalsServiceImpl:
                 definition_id=definition_id, tenant_id=tenant_id
             )
             if refs["decision_trees"] or refs["templates"]:
-                raise SignalDefinitionInUseError(
-                    definition_id=definition_id, references=refs
-                )
+                raise SignalDefinitionInUseError(definition_id=definition_id, references=refs)
         deleted = await self._repo.soft_delete_definition(
             definition_id=definition_id, actor_user_id=actor_user_id
         )
@@ -515,9 +513,7 @@ class SignalsServiceImpl:
         farm-scoped capability check) before deleting."""
         return await self._repo.get_observation(observation_id=observation_id)
 
-    async def get_template_observation_farm(
-        self, *, template_observation_id: UUID
-    ) -> UUID | None:
+    async def get_template_observation_farm(self, *, template_observation_id: UUID) -> UUID | None:
         return await self._repo.get_template_observation_farm(
             template_observation_id=template_observation_id
         )
@@ -895,9 +891,7 @@ class SignalsServiceImpl:
         if existing is None:
             raise SignalTemplateNotFoundError(template_id)
         if not force:
-            refs = await self.get_template_references(
-                template_id=template_id, tenant_id=tenant_id
-            )
+            refs = await self.get_template_references(template_id=template_id, tenant_id=tenant_id)
             if refs["decision_trees"]:
                 raise SignalTemplateInUseError(template_id=template_id, references=refs)
         deleted = await self._repo.soft_delete_template(
@@ -907,9 +901,7 @@ class SignalsServiceImpl:
             return
         await self._audit.record(
             tenant_schema=tenant_schema,
-            event_type=(
-                "signals.template_force_deleted" if force else "signals.template_deleted"
-            ),
+            event_type=("signals.template_force_deleted" if force else "signals.template_deleted"),
             actor_user_id=actor_user_id,
             subject_kind="signal_template",
             subject_id=template_id,
@@ -1266,9 +1258,7 @@ class SignalsServiceImpl:
                 for r in group.rows
             )
             point = (
-                GeopointModel(
-                    latitude=group.location_point_lat, longitude=group.location_point_lon
-                )
+                GeopointModel(latitude=group.location_point_lat, longitude=group.location_point_lon)
                 if group.location_point_lat is not None and group.location_point_lon is not None
                 else None
             )
@@ -1345,9 +1335,7 @@ class SignalsServiceImpl:
             )
         return None
 
-    def _validate_csv_value(
-        self, *, defn: dict[str, Any], row: ParsedCsvRow
-    ) -> CsvRowError | None:
+    def _validate_csv_value(self, *, defn: dict[str, Any], row: ParsedCsvRow) -> CsvRowError | None:
         try:
             self._validate_value(
                 defn=defn,
@@ -1387,9 +1375,11 @@ class SignalsServiceImpl:
                 continue
             if (verr := self._validate_csv_value(defn=defn, row=row)) is not None:
                 errors.append(verr)
-            if (aerr := self._csv_attachment_error(
-                row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
-            )) is not None:
+            if (
+                aerr := self._csv_attachment_error(
+                    row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
+                )
+            ) is not None:
                 errors.append(aerr)
         return errors
 
@@ -1439,9 +1429,11 @@ class SignalsServiceImpl:
                     continue
                 if (verr := self._validate_csv_value(defn=defn, row=row)) is not None:
                     errors.append(verr)
-                if (aerr := self._csv_attachment_error(
-                    row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
-                )) is not None:
+                if (
+                    aerr := self._csv_attachment_error(
+                        row_number=row.row_number, key=row.attachment_s3_key, tenant_id=tenant_id
+                    )
+                ) is not None:
                     errors.append(aerr)
         return errors
 

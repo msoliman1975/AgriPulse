@@ -18,13 +18,12 @@ like ``request: Request`` and silently demotes them to required query
 parameters, breaking POST validation.
 """
 
-from typing import Any
+from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from decimal import Decimal
 
 from app.core.settings import get_settings
 from app.modules.farms import config_template
@@ -32,7 +31,6 @@ from app.modules.farms.config_schemas import (
     ApplyPreviewRequest,
     ApplyPreviewResponse,
     ApplyResponse,
-    BlockDiffSchema,
     IrrigationTemplateSchema,
     LockStateResponse,
     LockToggleRequest,
@@ -145,7 +143,7 @@ async def replace_subscriptions_template(
             updated_by=context.user_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return await get_subscriptions_template(farm_id, context=context, session=session)
 
 
@@ -254,7 +252,10 @@ async def get_locks(
 ) -> dict[str, Any]:
     _ensure_feature_enabled()
     _require_tenant(context)
-    return await config_template.get_lock_state(session, farm_id=farm_id)
+    return cast(
+        "dict[str, Any]",
+        await config_template.get_lock_state(session, farm_id=farm_id),
+    )
 
 
 @router.post(

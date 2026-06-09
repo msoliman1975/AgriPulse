@@ -146,7 +146,7 @@ export function NodeDetailsPanel({
                 {canAddMatch ? (
                   <button
                     type="button"
-                    onClick={() => onAddChild!(node.id, "match")}
+                    onClick={() => onAddChild(node.id, "match")}
                     className="rounded-md border border-ap-line bg-ap-bg/60 px-2 py-1 font-medium text-ap-ink hover:bg-ap-bg"
                   >
                     {t("editor.panel.addMatch")}
@@ -155,7 +155,7 @@ export function NodeDetailsPanel({
                 {canAddMiss ? (
                   <button
                     type="button"
-                    onClick={() => onAddChild!(node.id, "miss")}
+                    onClick={() => onAddChild(node.id, "miss")}
                     className="rounded-md border border-ap-line bg-ap-bg/60 px-2 py-1 font-medium text-ap-ink hover:bg-ap-bg"
                   >
                     {t("editor.panel.addMiss")}

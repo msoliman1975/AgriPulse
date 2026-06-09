@@ -147,12 +147,8 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("area_m2 > 0", name="ck_grid_cells_area_positive"),
     )
-    op.execute(
-        "CREATE INDEX ix_grid_cells_geom_gist ON grid_cells USING GIST (geom)"
-    )
-    op.execute(
-        "CREATE INDEX ix_grid_cells_grid_config_id ON grid_cells (grid_config_id)"
-    )
+    op.execute("CREATE INDEX ix_grid_cells_geom_gist ON grid_cells USING GIST (geom)")
+    op.execute("CREATE INDEX ix_grid_cells_grid_config_id ON grid_cells (grid_config_id)")
 
     # ---- block_grid_aggregates (hypertable) ----------------------------
     # No PK column: hypertables need the time column in any unique
@@ -247,10 +243,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "SELECT remove_compression_policy("
-        "'block_grid_aggregates', if_exists => TRUE)"
-    )
+    op.execute("SELECT remove_compression_policy(" "'block_grid_aggregates', if_exists => TRUE)")
     op.drop_index(
         "ix_block_grid_aggregates_cell_time_index",
         table_name="block_grid_aggregates",
@@ -265,9 +258,7 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_grid_cells_geom_gist")
     op.drop_table("grid_cells")
 
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_grid_configs_updated_at ON grid_configs"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_grid_configs_updated_at ON grid_configs")
     op.drop_index(
         "uq_grid_configs_block_product_active",
         table_name="grid_configs",

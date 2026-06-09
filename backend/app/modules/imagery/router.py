@@ -80,9 +80,7 @@ def _ensure_tenant(context: RequestContext) -> str:
     return schema
 
 
-async def _guard_subscriptions_lock(
-    *, tenant_session: AsyncSession, farm_id: UUID
-) -> None:
+async def _guard_subscriptions_lock(*, tenant_session: AsyncSession, farm_id: UUID) -> None:
     """Reject writes when the farm's subscriptions category is locked.
 
     Gated by the farm-config feature flag so the flag fully owns the

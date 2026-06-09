@@ -69,9 +69,7 @@ def upgrade() -> None:
         sa.Column("role", sa.Text(), nullable=True),
         sa.Column("equipment_type", sa.Text(), nullable=True),
         sa.Column("phone", sa.Text(), nullable=True),
-        sa.Column(
-            "archived_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -84,9 +82,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("now()"),
         ),
-        sa.Column(
-            "deleted_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_by",
             sa.dialects.postgresql.UUID(as_uuid=True),
@@ -173,9 +169,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_activity_resources_resource_id", table_name="activity_resources"
-    )
+    op.drop_index("ix_activity_resources_resource_id", table_name="activity_resources")
     op.drop_table("activity_resources")
     op.execute("DROP INDEX IF EXISTS uq_resources_farm_kind_active_name")
     op.drop_index("ix_resources_farm_kind_archived", table_name="resources")

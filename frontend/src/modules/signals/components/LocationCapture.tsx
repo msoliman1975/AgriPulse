@@ -68,7 +68,7 @@ export function LocationCapture({ onChange, blockId, resetKey }: LocationCapture
     setLonText("");
     setGeoError(null);
     emit("entity", "", "");
-     
+
   }, [resetKey]);
 
   // If the block is cleared while pinning inside it, fall back to entity.

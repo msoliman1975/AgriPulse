@@ -69,9 +69,7 @@ OPTIONAL_COLUMNS: Final[tuple[str, ...]] = (
 )
 KNOWN_COLUMNS: Final[frozenset[str]] = frozenset(REQUIRED_COLUMNS + OPTIONAL_COLUMNS)
 
-_LOCATION_MODES: Final[frozenset[str]] = frozenset(
-    {"entity", "point_in_entity", "free_point"}
-)
+_LOCATION_MODES: Final[frozenset[str]] = frozenset({"entity", "point_in_entity", "free_point"})
 
 
 @dataclass(frozen=True, slots=True)

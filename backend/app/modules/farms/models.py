@@ -153,9 +153,7 @@ class Farm(Base, TimestampedMixin):
     irrigation_locked: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("FALSE")
     )
-    org_locked: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("FALSE")
-    )
+    org_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
 
 
 class Block(Base, TimestampedMixin):

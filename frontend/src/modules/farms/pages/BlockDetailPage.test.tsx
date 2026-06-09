@@ -42,10 +42,17 @@ vi.mock("@/api/cropAssignments", () => ({
   listBlockCrops: listBlockCropsMock,
 }));
 
+const getFarmMock = vi.hoisted(() => vi.fn());
+vi.mock("@/api/farms", () => ({
+  getFarm: getFarmMock,
+}));
+
 describe("BlockDetailPage", () => {
   beforeEach(() => {
     getBlockMock.mockReset();
     listBlockCropsMock.mockReset();
+    getFarmMock.mockReset();
+    getFarmMock.mockResolvedValue({ id: FARM_ID, name: "Test Farm" });
     getBlockMock.mockResolvedValue({
       id: BLOCK_ID,
       farm_id: FARM_ID,

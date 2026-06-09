@@ -405,6 +405,12 @@ forbidden_modules = [
   "app.modules.imagery.router",
   "app.modules.imagery.schemas",
 ]
+# farms.config_template reads the imagery subscription ORM model to compute
+# the per-block Apply diff (PR-2 farm-config). A typed ORM read is preferable
+# to threading the model through the imagery service Protocol.
+ignore_imports = [
+  "app.modules.farms.config_template -> app.modules.imagery.models",
+]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
@@ -454,6 +460,11 @@ forbidden_modules = [
   "app.modules.weather.models",
   "app.modules.weather.router",
   "app.modules.weather.schemas",
+]
+# farms.config_template reads the weather subscription ORM model to compute
+# the per-block Apply diff (PR-2 farm-config) — see the imagery note above.
+ignore_imports = [
+  "app.modules.farms.config_template -> app.modules.weather.models",
 ]
 allow_indirect_imports = true
 
@@ -505,6 +516,12 @@ forbidden_modules = [
   "app.modules.alerts.models",
   "app.modules.alerts.router",
   "app.modules.alerts.schemas",
+]
+# recommendations.service writes grid/tree alerts straight through
+# AlertsRepository (the trees-V1 alert path) rather than a separate alerts
+# service Protocol; the typed repository call is the intended seam.
+ignore_imports = [
+  "app.modules.recommendations.service -> app.modules.alerts.repository",
 ]
 allow_indirect_imports = true
 

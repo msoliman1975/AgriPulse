@@ -111,9 +111,7 @@ def _apply_one(tenant: TenantRecord, *, retention_days: int | None, dry_run: boo
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="List actions without executing.")
-    parser.add_argument(
-        "--only", help="Apply to just this tenant (by slug)."
-    )
+    parser.add_argument("--only", help="Apply to just this tenant (by slug).")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
     logging.basicConfig(

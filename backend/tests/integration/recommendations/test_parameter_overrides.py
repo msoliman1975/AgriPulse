@@ -89,9 +89,7 @@ async def _create_tree_for_tenant(
     code = f"prc_demo_{code_suffix}"
     yaml_str = _PARAM_TREE_YAML.replace("prc_override_demo", code)
     svc = DecisionTreesAuthorService(public_session=admin_session, tenant_id=tenant_id)
-    await svc.create_tree(
-        code=code, crop_code=None, tree_yaml=yaml_str, actor_user_id=None
-    )
+    await svc.create_tree(code=code, crop_code=None, tree_yaml=yaml_str, actor_user_id=None)
     await svc.publish_version(code=code, version=1, actor_user_id=None)
     await admin_session.commit()
     return code
@@ -121,9 +119,7 @@ async def test_override_round_trip_and_engine_apply(
                 tenant_session=tenant_session, public_session=public_session
             )
             # Read with no overrides yet
-            initial = await svc.list_tree_param_overrides(
-                code=code, tenant_id=tenant.tenant_id
-            )
+            initial = await svc.list_tree_param_overrides(code=code, tenant_id=tenant.tenant_id)
             assert initial["found"] is True
             assert initial["overrides"] == {}
             assert initial["declarations"]["ndvi_drop_threshold"]["default"] == -0.15
@@ -138,9 +134,7 @@ async def test_override_round_trip_and_engine_apply(
                 actor_user_id=None,
             )
 
-            after = await svc.list_tree_param_overrides(
-                code=code, tenant_id=tenant.tenant_id
-            )
+            after = await svc.list_tree_param_overrides(code=code, tenant_id=tenant.tenant_id)
             assert after["overrides"]["ndvi_drop_threshold"] == -0.25
 
             # Delete it and the override goes away
@@ -150,9 +144,7 @@ async def test_override_round_trip_and_engine_apply(
                 param_name="ndvi_drop_threshold",
                 actor_user_id=None,
             )
-            cleared = await svc.list_tree_param_overrides(
-                code=code, tenant_id=tenant.tenant_id
-            )
+            cleared = await svc.list_tree_param_overrides(code=code, tenant_id=tenant.tenant_id)
             assert cleared["overrides"] == {}
 
 
@@ -250,9 +242,7 @@ async def test_overrides_bulk_load_for_sweep(
                 tenant_session=tenant_session, public_session=public_session
             )
             # Resolve tree_id via the read endpoint then set override
-            res = await svc.list_tree_param_overrides(
-                code=code, tenant_id=tenant.tenant_id
-            )
+            res = await svc.list_tree_param_overrides(code=code, tenant_id=tenant.tenant_id)
             tree_id = res["tree_id"]
             await svc.upsert_tree_param_override(
                 code=code,
@@ -265,5 +255,6 @@ async def test_overrides_bulk_load_for_sweep(
             grouped = await svc._repo.list_all_param_overrides_visible_to_tenant(
                 tree_ids=(tree_id,)
             )
-            assert grouped[tree_id] == {"ndvi_drop_threshold": Decimal("-0.30")} or \
-                grouped[tree_id] == {"ndvi_drop_threshold": -0.30}
+            assert grouped[tree_id] == {"ndvi_drop_threshold": Decimal("-0.30")} or grouped[
+                tree_id
+            ] == {"ndvi_drop_threshold": -0.30}

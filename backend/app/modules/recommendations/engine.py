@@ -104,9 +104,7 @@ def _build_params(
     return resolved
 
 
-def _substitute_params_in_outcome_params(
-    raw: Any, params: Mapping[str, Any]
-) -> Any:
+def _substitute_params_in_outcome_params(raw: Any, params: Mapping[str, Any]) -> Any:
     """Replace any ``{source: params, name: x}`` ref dict found inside
     an outcome.parameters value with the resolved literal.
 
@@ -229,9 +227,7 @@ def evaluate_tree(  # noqa: PLR0911 - tree-walk returns at each leaf/cut
 
         if "outcome" in node:
             path.append(_step_for_leaf(current, node))
-            outcome = _parse_outcome(
-                node["outcome"], leaf_node_id=current, params=params_resolved
-            )
+            outcome = _parse_outcome(node["outcome"], leaf_node_id=current, params=params_resolved)
             return EvaluationResult(
                 outcome=outcome,
                 path=path,
@@ -299,9 +295,7 @@ def _step_for_leaf(node_id: str, node: Mapping[str, Any]) -> TreePathStep:
     )
 
 
-def _parse_outcome(
-    raw: Any, *, leaf_node_id: str, params: Mapping[str, Any]
-) -> TreeOutcome | None:
+def _parse_outcome(raw: Any, *, leaf_node_id: str, params: Mapping[str, Any]) -> TreeOutcome | None:
     if not isinstance(raw, dict):
         return None
     action_type = raw.get("action_type")

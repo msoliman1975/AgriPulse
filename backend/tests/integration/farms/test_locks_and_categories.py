@@ -98,9 +98,7 @@ async def _create_user(session: AsyncSession, *, tenant_id: UUID, user_id: UUID)
 
 async def _bootstrap(admin_session: AsyncSession, slug: str):
     tenancy = get_tenant_service(admin_session)
-    tenant = await tenancy.create_tenant(
-        slug=slug, name=slug, contact_email=f"ops@{slug}.test"
-    )
+    tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"ops@{slug}.test")
     user_id = uuid4()
     await _create_user(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
     context = make_context(
@@ -128,9 +126,7 @@ async def test_irrigation_lock_with_divergence_returns_409_then_force_succeeds(
 ) -> None:
     tenant, context = await _bootstrap(admin_session, "lk-irrdiv")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -178,9 +174,9 @@ async def test_irrigation_lock_with_divergence_returns_409_then_force_succeeds(
         )
         row = (
             await admin_session.execute(
-                text(
-                    "SELECT irrigation_system FROM blocks WHERE id = :id"
-                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                text("SELECT irrigation_system FROM blocks WHERE id = :id").bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True))
+                ),
                 {"id": UUID(block_id)},
             )
         ).first()
@@ -193,9 +189,7 @@ async def test_locked_block_irrigation_edit_returns_409(
 ) -> None:
     _, context = await _bootstrap(admin_session, "lk-irrblock")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -234,9 +228,7 @@ async def test_locked_block_irrigation_edit_returns_409(
 async def test_unlock_restores_block_edits(admin_session: AsyncSession) -> None:
     _, context = await _bootstrap(admin_session, "lk-unlock")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -276,9 +268,7 @@ async def test_org_apply_is_additive(admin_session: AsyncSession) -> None:
     """Block keeps its local tags; farm template tags are merged in."""
     tenant, context = await _bootstrap(admin_session, "lk-orgmerge")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -326,9 +316,7 @@ async def test_org_apply_is_additive(admin_session: AsyncSession) -> None:
 async def test_locked_org_blocks_tag_edits(admin_session: AsyncSession) -> None:
     _, context = await _bootstrap(admin_session, "lk-orgblock")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
@@ -361,9 +349,7 @@ async def test_locked_org_blocks_tag_edits(admin_session: AsyncSession) -> None:
 async def test_get_lock_state(admin_session: AsyncSession) -> None:
     _, context = await _bootstrap(admin_session, "lk-state")
     app = build_app(context, with_config=True)
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         farm = await c.post(
             "/api/v1/farms",
             json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},

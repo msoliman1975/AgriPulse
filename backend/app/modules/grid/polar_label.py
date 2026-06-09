@@ -54,8 +54,10 @@ def ring_sector(
     machine is operated.
     """
     sectors = max(1, int(sector_count))
-    dx = (centroid_lon - center_lon) * _METERS_PER_DEG_LON_EQUATOR * math.cos(
-        math.radians(center_lat)
+    dx = (
+        (centroid_lon - center_lon)
+        * _METERS_PER_DEG_LON_EQUATOR
+        * math.cos(math.radians(center_lat))
     )
     dy = (centroid_lat - center_lat) * _METERS_PER_DEG_LAT
     radius = math.hypot(dx, dy)

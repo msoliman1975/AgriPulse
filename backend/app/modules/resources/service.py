@@ -55,13 +55,9 @@ class ResourcesService(Protocol):
         actor_user_id: UUID | None,
     ) -> dict[str, Any]: ...
 
-    async def detach(
-        self, *, activity_id: UUID, resource_id: UUID
-    ) -> bool: ...
+    async def detach(self, *, activity_id: UUID, resource_id: UUID) -> bool: ...
 
-    async def list_for_activity(
-        self, *, activity_id: UUID
-    ) -> tuple[dict[str, Any], ...]: ...
+    async def list_for_activity(self, *, activity_id: UUID) -> tuple[dict[str, Any], ...]: ...
 
 
 class ResourcesServiceImpl:
@@ -103,9 +99,7 @@ class ResourcesServiceImpl:
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]:
-        return await self._repo.list(
-            farm_id=farm_id, kind=kind, include_archived=include_archived
-        )
+        return await self._repo.list(farm_id=farm_id, kind=kind, include_archived=include_archived)
 
     async def update(
         self,
@@ -128,24 +122,16 @@ class ResourcesServiceImpl:
             normalized["archived_at"] = datetime.now(UTC)
         elif archive is False:
             normalized["archived_at"] = None
-        normalized.update(
-            {k: v for k, v in changes.items() if v is not None or k == "phone"}
-        )
+        normalized.update({k: v for k, v in changes.items() if v is not None or k == "phone"})
 
         if current["kind"] == "worker":
             if normalized.get("equipment_type") is not None:
-                raise InvalidResourceShapeError(
-                    detail="Workers cannot carry an equipment_type."
-                )
+                raise InvalidResourceShapeError(detail="Workers cannot carry an equipment_type.")
         else:
             if normalized.get("role") is not None:
-                raise InvalidResourceShapeError(
-                    detail="Equipment cannot carry a role."
-                )
+                raise InvalidResourceShapeError(detail="Equipment cannot carry a role.")
             if normalized.get("phone") is not None:
-                raise InvalidResourceShapeError(
-                    detail="Equipment cannot carry a phone."
-                )
+                raise InvalidResourceShapeError(detail="Equipment cannot carry a phone.")
 
         if "name" in normalized and isinstance(normalized["name"], str):
             normalized["name"] = normalized["name"].strip()
@@ -181,16 +167,10 @@ class ResourcesServiceImpl:
         )
         return resource
 
-    async def detach(
-        self, *, activity_id: UUID, resource_id: UUID
-    ) -> bool:
-        return await self._repo.detach(
-            activity_id=activity_id, resource_id=resource_id
-        )
+    async def detach(self, *, activity_id: UUID, resource_id: UUID) -> bool:
+        return await self._repo.detach(activity_id=activity_id, resource_id=resource_id)
 
-    async def list_for_activity(
-        self, *, activity_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
+    async def list_for_activity(self, *, activity_id: UUID) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_for_activity(activity_id=activity_id)
 
 

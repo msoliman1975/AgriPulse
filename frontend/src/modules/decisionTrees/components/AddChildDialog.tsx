@@ -119,6 +119,7 @@ export function AddChildDialog({
             {t("editor.addChild.kind")}
           </legend>
           {KINDS.map((k) => (
+            // eslint-disable-next-line jsx-a11y/label-has-associated-control -- wraps the radio input + i18n description text; jsx-a11y can't resolve t() as accessible text
             <label
               key={k.value}
               className="flex cursor-pointer items-start gap-2 rounded-md border border-ap-line bg-white p-2 hover:bg-ap-bg/40"

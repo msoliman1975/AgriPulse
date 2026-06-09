@@ -47,9 +47,7 @@ def _cell_wkt(x_min: float, y_min: float, x_max: float, y_max: float) -> str:
 def test_compute_cell_aggregates_single_pixel_cell() -> None:
     # Cell exactly over pixel (0,0) — value 0.0.
     cell = _cell_wkt(1000, 1990, 1010, 2000)
-    agg = compute_cell_aggregates(
-        raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell
-    )
+    agg = compute_cell_aggregates(raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell)
     assert agg.valid_pixel_count == 1
     assert agg.total_pixel_count == 1
     assert agg.mean == Decimal("0.0000")
@@ -60,9 +58,7 @@ def test_compute_cell_aggregates_2x2_cell() -> None:
     # Cell covering pixels (row 0..1, col 1..2): values 1, 2, 5, 6.
     # mean = 3.5, min = 1, max = 6, std = 1.802776 → 1.8028.
     cell = _cell_wkt(1010, 1980, 1030, 2000)
-    agg = compute_cell_aggregates(
-        raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell
-    )
+    agg = compute_cell_aggregates(raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell)
     assert agg.valid_pixel_count == 4
     assert agg.total_pixel_count == 4
     assert agg.mean == Decimal("3.5000")
@@ -78,9 +74,7 @@ def test_compute_cell_aggregates_ignores_nan_pixels() -> None:
     raster = RASTER.copy()
     raster[0, 1] = np.nan  # one of the four pixels is masked
     cell = _cell_wkt(1010, 1980, 1030, 2000)
-    agg = compute_cell_aggregates(
-        raster=raster, transform=TRANSFORM, cell_polygon_wkt=cell
-    )
+    agg = compute_cell_aggregates(raster=raster, transform=TRANSFORM, cell_polygon_wkt=cell)
     # Remaining pixels: 2, 5, 6 — mean = 13/3 = 4.3333
     assert agg.valid_pixel_count == 3
     assert agg.total_pixel_count == 4
@@ -90,9 +84,7 @@ def test_compute_cell_aggregates_ignores_nan_pixels() -> None:
 def test_compute_cell_aggregates_all_nan_returns_nulls() -> None:
     raster = np.full_like(RASTER, np.nan)
     cell = _cell_wkt(1010, 1980, 1030, 2000)
-    agg = compute_cell_aggregates(
-        raster=raster, transform=TRANSFORM, cell_polygon_wkt=cell
-    )
+    agg = compute_cell_aggregates(raster=raster, transform=TRANSFORM, cell_polygon_wkt=cell)
     assert agg.valid_pixel_count == 0
     assert agg.total_pixel_count == 4
     assert agg.mean is None
@@ -104,7 +96,5 @@ def test_compute_cell_aggregates_all_nan_returns_nulls() -> None:
 def test_compute_cell_aggregates_cell_off_raster() -> None:
     # Cell completely outside the raster bounds — zero pixels.
     cell = _cell_wkt(5000, 5000, 5010, 5010)
-    agg = compute_cell_aggregates(
-        raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell
-    )
+    agg = compute_cell_aggregates(raster=RASTER, transform=TRANSFORM, cell_polygon_wkt=cell)
     assert agg == CellAggregates(None, None, None, None, 0, 0)

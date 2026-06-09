@@ -154,12 +154,14 @@ def test_generate_cells_assigns_global_indices() -> None:
     """
     a = box(1000, 0, 1400, 200)
     b = box(1200, 0, 1600, 200)
-    a_cells = {(c.row_idx, c.col_idx) for c in generate_cells(
-        boundary_utm_wkt=a.wkt, cell_size_m=Decimal("20")
-    )}
-    b_cells = {(c.row_idx, c.col_idx) for c in generate_cells(
-        boundary_utm_wkt=b.wkt, cell_size_m=Decimal("20")
-    )}
+    a_cells = {
+        (c.row_idx, c.col_idx)
+        for c in generate_cells(boundary_utm_wkt=a.wkt, cell_size_m=Decimal("20"))
+    }
+    b_cells = {
+        (c.row_idx, c.col_idx)
+        for c in generate_cells(boundary_utm_wkt=b.wkt, cell_size_m=Decimal("20"))
+    }
     # The overlap region [1200..1400, 0..200] = 10 cols x 10 rows = 100 cells.
     overlap = a_cells & b_cells
     assert len(overlap) == 100
@@ -186,7 +188,5 @@ def test_generate_cells_clips_to_block_boundary() -> None:
 
 
 def test_generate_cells_empty_for_empty_polygon() -> None:
-    cells = list(
-        generate_cells(boundary_utm_wkt="POLYGON EMPTY", cell_size_m=Decimal("20"))
-    )
+    cells = list(generate_cells(boundary_utm_wkt="POLYGON EMPTY", cell_size_m=Decimal("20")))
     assert cells == []

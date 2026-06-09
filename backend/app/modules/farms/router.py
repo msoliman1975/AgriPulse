@@ -438,8 +438,7 @@ async def update_block(
         from app.modules.farms import config_template
 
         if any(
-            k in data
-            for k in ("irrigation_system", "irrigation_source", "flow_rate_m3_per_hour")
+            k in data for k in ("irrigation_system", "irrigation_source", "flow_rate_m3_per_hour")
         ):
             await config_template.assert_category_unlocked(
                 tenant_session, farm_id=farm_id, category="irrigation"

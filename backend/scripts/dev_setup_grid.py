@@ -6,12 +6,13 @@ mint a JWT just to PUT one config row.
 Usage:
   python -m scripts.dev_setup_grid <tenant_schema> <block_uuid> <product_uuid> <cell_size_m>
 """
+
 import asyncio
 import sys
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.settings import get_settings
 from app.modules.grid.service import get_grid_service
@@ -25,13 +26,16 @@ async def main(tenant_schema: str, block_id: UUID, product_id: UUID, cell_size_m
         await session.execute(text(f"SET LOCAL search_path TO {tenant_schema}, public"))
         svc = get_grid_service(tenant_session=session)
         from decimal import Decimal
+
         cfg = await svc.upsert_config(
             block_id=block_id,
             product_id=product_id,
             cell_size_m=Decimal(str(cell_size_m)),
             created_by=None,
         )
-        print(f"created grid_config id={cfg.id} cells={cfg.cell_count} cell_size={cfg.cell_size_m}m")
+        print(
+            f"created grid_config id={cfg.id} cells={cfg.cell_count} cell_size={cfg.cell_size_m}m"
+        )
     await engine.dispose()
 
 

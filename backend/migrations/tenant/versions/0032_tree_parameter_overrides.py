@@ -72,9 +72,7 @@ def upgrade() -> None:
         ),
         sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.PrimaryKeyConstraint(
-            "tree_id", "param_name", name="pk_tree_parameter_overrides"
-        ),
+        sa.PrimaryKeyConstraint("tree_id", "param_name", name="pk_tree_parameter_overrides"),
     )
     # Indexed for the sweep's per-tree fetch pattern. The PK already
     # supports prefix-scans on tree_id, but a dedicated index is more

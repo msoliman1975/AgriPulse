@@ -12,12 +12,11 @@ from sqlalchemy import Date, DateTime, ForeignKey, Integer, Text, Time, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
-
 # Force-register the Recommendation model so SQLAlchemy can resolve the
 # `recommendation_id` FK at metadata-finalize time, regardless of which
 # routers a given app/test imports.
 from app.modules.recommendations import models as _recommendations_models  # noqa: F401
+from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
 
 class VegetationPlan(Base, TimestampedMixin):
