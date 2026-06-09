@@ -80,11 +80,27 @@ spec:
       {{- end }}
 
   {{- if .Values.postgresCluster.backup.enabled }}
+  {{- $bos := .Values.postgresCluster.backup.barmanObjectStore }}
   backup:
     barmanObjectStore:
-      destinationPath: {{ tpl .Values.postgresCluster.backup.barmanObjectStore.destinationPath . | quote }}
+      destinationPath: {{ tpl $bos.destinationPath . | quote }}
+      {{- with $bos.endpointURL }}
+      # Non-AWS S3 (e.g. Cloudflare R2 / MinIO). Empty for AWS S3.
+      endpointURL: {{ . | quote }}
+      {{- end }}
       s3Credentials:
-        inheritFromIAMRole: {{ .Values.postgresCluster.backup.barmanObjectStore.s3Credentials.inheritFromIAMRole }}
+        {{- if $bos.s3Credentials.inheritFromIAMRole }}
+        inheritFromIAMRole: true
+        {{- else }}
+        # Static S3-compatible creds from a Secret (R2). The keys default to
+        # ACCESS_KEY_ID / SECRET_ACCESS_KEY (matches the agripulse-r2 Secret).
+        accessKeyId:
+          name: {{ $bos.s3Credentials.secretName | quote }}
+          key: {{ $bos.s3Credentials.accessKeyIdKey | default "ACCESS_KEY_ID" | quote }}
+        secretAccessKey:
+          name: {{ $bos.s3Credentials.secretName | quote }}
+          key: {{ $bos.s3Credentials.secretAccessKeyKey | default "SECRET_ACCESS_KEY" | quote }}
+        {{- end }}
       wal:
         compression: {{ .Values.postgresCluster.backup.barmanObjectStore.wal.compression | quote }}
         maxParallel: {{ .Values.postgresCluster.backup.barmanObjectStore.wal.maxParallel }}

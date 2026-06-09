@@ -173,8 +173,15 @@ postgresCluster:
     enabled: true
     barmanObjectStore:
       destinationPath: "s3://agripulse-pg-backup-{{ .Values.global.env }}/pg"
+      # Non-AWS S3 endpoint (Cloudflare R2 / MinIO). Empty = AWS S3.
+      endpointURL: ""
       s3Credentials:
+        # AWS path: inherit the pod's IRSA role. For R2 set this false and
+        # point secretName at a Secret holding the access key + secret.
         inheritFromIAMRole: true
+        secretName: ""
+        accessKeyIdKey: ACCESS_KEY_ID
+        secretAccessKeyKey: SECRET_ACCESS_KEY
       wal:
         compression: gzip
         maxParallel: 4
