@@ -1,0 +1,106 @@
+# Hetzner (single-node k3s) environment overrides for the agripulse-services
+# ApplicationSet. Forked from overlays/dev/values.yaml with every AWS-IRSA
+# binding stripped — on Hetzner there is no IRSA; cloud creds (Cloudflare R2,
+# Cloudflare DNS) are supplied as plain Kubernetes Secrets.
+#
+# STATUS: scaffold. Lines marked `# TODO(hetzner-live)` need the real cluster
+# to validate (chart rendering, CNPG R2 backup, cert issuance) and the actual
+# secret values. To wire Hetzner into deployment, add `env: hetzner` to the
+# generator list in infra/argocd/appsets/services.yaml.
+global:
+  env: hetzner
+  # Prod domain — no `dev.` prefix. Each service Ingress renders
+  # `${ingress.hostPrefix}.${global.envHost}`.
+  envHost: agripulse.cloud
+  # Pin to a deliberate release SHA (a main commit whose `containers` matrix
+  # is green). Unlike dev, NOT auto-bumped — promotion is hand-written.
+  # TODO(hetzner-live): set to the release SHA at cutover.
+  images:
+    api:
+      tag: "7ebfbfd"
+    workers:
+      tag: "7ebfbfd"
+    frontend:
+      tag: "7ebfbfd"
+    tileServer:
+      tag: "7ebfbfd"
+env:
+  # Prod PlatformAdmin identity — must match the Keycloak realm seed user's
+  # email (real domain, not .local).
+  # TODO(hetzner-live): confirm the realm import seeds this email.
+  PLATFORM_ADMIN_EMAIL: admin@agripulse.cloud
+  PLATFORM_ADMIN_FULL_NAME: Platform Admin
+  # TODO(hetzner-live): Sentinel Hub client id for the prod account (secret
+  # supplied separately, no longer from AWS Secrets Manager).
+  SENTINEL_HUB_CLIENT_ID: ""
+labels:
+  partOf: agripulse
+# Single node, no HA.
+replicaCount: 1
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+keycloak:
+  ingress:
+    hostname: keycloak.agripulse.cloud
+    hostnameStrict: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+  image:
+    tag: "7ebfbfd"
+# external-dns on Cloudflare instead of Route53. No IRSA — the chart reads a
+# Cloudflare API token from a Secret.
+# TODO(hetzner-live): set provider=cloudflare + reference the CF token secret;
+# confirm the external-dns chart values support it (or drop external-dns and
+# manage the handful of records by hand in Cloudflare).
+externalDns:
+  serviceAccount:
+    annotations: {}
+# No cluster autoscaler on a fixed VM.
+karpenter:
+  enabled: false
+# cert-manager: no IRSA. Cloudflare DNS-01 (via the CF token) or HTTP-01
+# through ingress-nginx.
+# TODO(hetzner-live): pick DNS-01 (wildcard-capable) vs HTTP-01 and wire the
+# issuer; drop the role-arn annotation (done here).
+certManagerController:
+  serviceAccount:
+    annotations: {}
+# api: no IRSA. R2 (S3-compatible) creds come from a Secret as env vars.
+# TODO(hetzner-live): drop the IRSA SA annotation (done) and confirm the api
+# chart reads R2 endpoint/key/secret from env rather than instance role.
+serviceAccount:
+  create: true
+  annotations: {}
+postgresCluster:
+  instances: 1
+  storage:
+    size: 100Gi
+    # TODO(hetzner-live): a storageClass backed by the detachable volume
+    # (local-path repointed at /mnt/pgdata by 02-node-bootstrap.sh, or a
+    # dedicated SC). Leaving the chart default here until validated.
+    # storageClass: local-path
+  walStorage:
+    size: 30Gi
+    # storageClass: local-path
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  # No IRSA. Barman backups go to R2 via static S3-compatible creds.
+  # TODO(hetzner-live): set the CNPG barmanObjectStore endpoint to the R2
+  # endpoint + reference the R2 cred Secret; drop the role-arn annotation
+  # (done). Verify the shared chart's CNPG backup block supports static creds.
+  serviceAccountAnnotations: {}
+migrations:
+  enabled: true
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
