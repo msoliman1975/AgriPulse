@@ -23,6 +23,7 @@ from app.modules.tenancy.service import (
     TenantNotFoundError,
     get_tenant_service,
 )
+from app.shared.keycloak import FakeKeycloakClient
 
 pytestmark = [pytest.mark.integration]
 
@@ -33,7 +34,10 @@ def _slug(prefix: str) -> str:
 
 
 async def _create(session: AsyncSession, *, slug: str | None = None):
-    service = get_tenant_service(session)
+    # Use the fake Keycloak client so provisioning succeeds and the tenant
+    # lands in `active` (the default Noop client leaves it `pending_provision`,
+    # which can't be suspended/deleted by these lifecycle assertions).
+    service = get_tenant_service(session, keycloak_client=FakeKeycloakClient())
     return await service.create_tenant(
         slug=slug or _slug("life"),
         name="Lifecycle Test",

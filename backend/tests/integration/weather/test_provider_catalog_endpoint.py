@@ -46,8 +46,8 @@ async def test_lists_active_providers_ordered_by_name(admin_session: AsyncSessio
     await admin_session.execute(
         text(
             "INSERT INTO public.weather_providers (code, name, kind, is_active) "
-            "VALUES ('zz_active_other', 'AAA Other Provider', 'http', TRUE), "
-            "       ('zz_inactive', 'Inactive Provider', 'http', FALSE) "
+            "VALUES ('zz_active_other', 'AAA Other Provider', 'open_api', TRUE), "
+            "       ('zz_inactive', 'Inactive Provider', 'open_api', FALSE) "
             "ON CONFLICT (code) DO NOTHING"
         )
     )

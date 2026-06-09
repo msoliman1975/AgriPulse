@@ -106,6 +106,8 @@ async def test_s2_l2a_product_seeded_with_correct_bands(
         "savi",
         "ndre",
         "gndvi",
+        # ndmi advertised on s2_l2a (0027 + 0029 correction).
+        "ndmi",
     }
     assert row.cost_tier == "medium"
 
@@ -121,7 +123,8 @@ async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
         )
     ).all()
     codes = [r.code for r in rows]
-    assert codes == ["evi", "gndvi", "ndre", "ndvi", "ndwi", "savi"]
+    # ndmi added by 0027 (KB P2 moisture index), sorted between gndvi and ndre.
+    assert codes == ["evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"]
     for r in rows:
         assert r.is_standard is True
         assert r.name_en  # non-empty English label
