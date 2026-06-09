@@ -21,7 +21,7 @@
 param(
   [string]$Location     = "fsn1",          # fsn1/nbg1/hel1 (EU)
   [string]$ServerName   = "agripulse-1",
-  [string]$ServerType   = "cx42",          # 8 vCPU / 16 GB Intel x86 (cpx41 retired). cx52 for headroom
+  [string]$ServerType   = "cx43",          # 8 vCPU / 16 GB Intel x86, fsn1 (cpx41 retired). cx53 for headroom
   [string]$Image        = "ubuntu-24.04",
   [string]$VolumeName   = "agripulse-pg",
   [int]   $VolumeSize   = 160,             # GiB (PG data 100 + WAL 30 + slack)
