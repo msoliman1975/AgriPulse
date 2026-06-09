@@ -76,7 +76,34 @@ The 4 WAL/DB follow-ups (`project_wal_incident_and_followups_2026_05_17`) **diss
 
 - **Test a restore BEFORE cutover** — single node = no safety net. Validate `pg_dump → R2 → restore` round-trips, and that the detachable-volume reattach works on node replacement.
 - **Rollback**: keep AWS up until Hetzner passes smoke; DNS flip back if needed (low TTL).
-- **AWS teardown**: `terraform destroy`; then watch for lingering **NAT / EIP / EBS-snapshot / Route53** charges (these survive a partial destroy).
+- **AWS teardown**: do NOT rely on a bare `terraform destroy` — the priciest long-tail resources are not in TF state (Karpenter EC2 nodes, the ingress NLB + ENIs, EBS volumes from PVCs, EBS snapshots, the tfstate bucket + lock table, the KMS key). A naive destroy also *hangs* on the NLB/ENIs that pin the subnets. Use the scripted teardown below.
+
+### 4.1 Scripted full decommission → zero billing
+
+`scripts/ops/nuke-aws.ps1` does the whole teardown in phases: drain k8s-owned cloud resources → `terraform destroy` → tag-based orphan sweep → S3 version-purge → KMS/Secrets/Route53/state-backend cleanup → verify. It is **dry-run by default** and idempotent.
+
+```powershell
+# 1. ALWAYS dry-run first — read-only, changes nothing, prints every action:
+pwsh scripts/ops/nuke-aws.ps1
+
+# 2. When Hetzner has passed smoke and AWS is no longer live:
+pwsh scripts/ops/nuke-aws.ps1 -Execute -ConfirmPhrase "NUKE agripulse 328972548541"
+```
+
+Guardrails: aborts unless the caller's account is `328972548541`; `-Execute` requires the exact confirm phrase; a 10 s Ctrl-C window before live destruction.
+
+**Order dependency**: phase 7 deletes the Route53 zone — only run after `agripulse.cloud` is re-delegated to Cloudflare (NS changed at GoDaddy), or DNS goes dark. See [[project_godaddy_route53_delegation]].
+
+**After running**, verify with Cost Explorer over the *next* full day and walk the residual checklist the script prints. The usual stragglers: KMS key (shows *Pending deletion*, still ~$1/mo until the 7-day window elapses), Route53 zone ($0.50/mo), EBS snapshots, idle EIPs.
+
+### 4.2 Account closure (manual — not scripted)
+
+Closing the account is a console action with a 90-day grace window; it is deliberately left out of the script.
+
+1. Confirm Cost Explorer shows ~$0/day for 2–3 consecutive days first (so you're not closing on top of trailing charges).
+2. AWS Console → **Account** → **Close Account**. (If `328972548541` is an Organizations *member*: `aws organizations close-account --account-id 328972548541`.)
+3. The account is recoverable for **90 days**, then permanently deleted. Any usage in the closure month is still invoiced.
+4. If it's the Organization **management** account, close/remove all member accounts and the org first.
 
 ---
 
