@@ -359,33 +359,35 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     finally:
         imagery_tasks.reset_provider_factory()
 
-    # Six index assets uploaded.
+    # Seven index assets uploaded (ndmi added in KB P2 / #199).
     index_keys = [
         k for k in storage.uploads if k.endswith((".tif",)) and not k.endswith("/raw_bands.tif")
     ]
-    assert len(index_keys) == 6
+    assert len(index_keys) == 7
     suffixes = sorted(k.rsplit("/", 1)[1] for k in index_keys)
     assert suffixes == [
         "evi.tif",
         "gndvi.tif",
+        "ndmi.tif",
         "ndre.tif",
         "ndvi.tif",
         "ndwi.tif",
         "savi.tif",
     ]
 
-    # Result reflects six indices computed.
+    # Result reflects seven indices computed.
     assert result["status"] == "indices_computed"
     assert sorted(result["indices"]) == [
         "evi",
         "gndvi",
+        "ndmi",
         "ndre",
         "ndvi",
         "ndwi",
         "savi",
     ]
 
-    # Six rows in block_index_aggregates with sane stats for the veg-half
+    # Seven rows in block_index_aggregates with sane stats for the veg-half
     # of the synthetic raster (NDVI > 0.5 is roughly expected).
     rows = (
         await admin_session.execute(
@@ -395,7 +397,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
             )
         )
     ).all()
-    assert len(rows) == 6
+    assert len(rows) == 7
     by_index = {r.index_code: r for r in rows}
     assert by_index["ndvi"].mean is not None
     assert by_index["ndvi"].valid_pixel_count > 0
@@ -492,13 +494,13 @@ async def test_compute_indices_idempotent_on_rerun(
     finally:
         imagery_tasks.reset_provider_factory()
 
-    # Still six aggregate rows (idempotency key prevented duplicates).
+    # Still seven aggregate rows (idempotency key prevented duplicates).
     count = (
         await admin_session.execute(
             text(f'SELECT count(*) FROM "{tenant_schema}".' "block_index_aggregates")
         )
     ).scalar_one()
-    assert count == 6
+    assert count == 7
 
 
 # Suppress unused-import warning when these aren't surfaced by name.

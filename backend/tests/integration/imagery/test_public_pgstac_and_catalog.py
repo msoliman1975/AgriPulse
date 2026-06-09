@@ -106,6 +106,8 @@ async def test_s2_l2a_product_seeded_with_correct_bands(
         "savi",
         "ndre",
         "gndvi",
+        # ndmi advertised on s2_l2a (0027 + 0029 correction).
+        "ndmi",
     }
     assert row.cost_tier == "medium"
 
@@ -121,7 +123,8 @@ async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
         )
     ).all()
     codes = [r.code for r in rows]
-    assert codes == ["evi", "gndvi", "ndre", "ndvi", "ndwi", "savi"]
+    # ndmi added by 0027 (KB P2 moisture index), sorted between gndvi and ndre.
+    assert codes == ["evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"]
     for r in rows:
         assert r.is_standard is True
         assert r.name_en  # non-empty English label
@@ -147,11 +150,15 @@ async def test_seed_migration_idempotent(admin_session: AsyncSession) -> None:
     backend_root = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_root / "alembic.ini"), ini_section="public")
     # Downgrade past 0008's seeds, then re-apply everything up to head so
-    # later tests don't see a partially-migrated DB. Upgrading to "head"
-    # (rather than pinning "0008") keeps this test order-independent as
-    # new migrations land in the public chain.
-    command.downgrade(cfg, "0007")
-    command.upgrade(cfg, "head")
+    # later tests don't see a partially-migrated DB. The finally guarantees
+    # restoration even if the downgrade raises partway — the DB is
+    # session-shared, so a half-applied downgrade would poison every later
+    # test. Upgrading to "head" keeps this order-independent as new
+    # migrations land in the public chain.
+    try:
+        command.downgrade(cfg, "0007")
+    finally:
+        command.upgrade(cfg, "head")
 
     count_after = (
         await admin_session.execute(text("SELECT count(*) FROM public.indices_catalog"))

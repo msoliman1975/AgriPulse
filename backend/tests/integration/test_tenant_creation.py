@@ -20,8 +20,11 @@ async def test_create_tenant_bootstraps_schema_and_audits(
 ) -> None:
     from app.modules.tenancy.service import get_tenant_service
     from app.shared.db.ids import schema_name_for
+    from app.shared.keycloak import FakeKeycloakClient
 
-    service = get_tenant_service(admin_session)
+    # Fake Keycloak so provisioning succeeds → tenant lands `active` (the
+    # default Noop client would leave it `pending_provision`).
+    service = get_tenant_service(admin_session, keycloak_client=FakeKeycloakClient())
 
     actor = uuid4()
     result = await service.create_tenant(
