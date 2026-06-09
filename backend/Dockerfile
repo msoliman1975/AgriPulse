@@ -61,9 +61,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     APP_HOME=/app
 
 # Minimal runtime libs: libpq for psycopg, ca-certificates for outbound TLS,
-# tini for proper signal handling under PID 1.
+# tini for proper signal handling under PID 1, libexpat1 for rasterio/GDAL
+# (the grid module imports rasterio at startup; its wheel does not bundle
+# libexpat, so without this the api crashes with "libexpat.so.1: cannot open
+# shared object file").
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libpq5 ca-certificates tini \
+ && apt-get install -y --no-install-recommends libpq5 ca-certificates tini libexpat1 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 app \
  && useradd  --system --uid 10001 --gid app --home-dir "$APP_HOME" --shell /usr/sbin/nologin app \

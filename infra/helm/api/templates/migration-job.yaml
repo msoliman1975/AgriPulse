@@ -66,7 +66,8 @@ spec:
           # blocks the sync instead of rolling pods against a stale
           # schema.
           command:
-            - /bin/sh
+            # bash (not /bin/sh = dash) for `set -o pipefail`.
+            - /bin/bash
             - -c
             - |
               set -euo pipefail
