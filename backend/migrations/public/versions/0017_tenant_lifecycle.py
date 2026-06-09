@@ -108,6 +108,13 @@ def downgrade() -> None:
     )
     op.drop_table("audit_events_archive", schema="public")
 
+    # Coerce any row whose status this downgrade is about to disallow
+    # (e.g. 'pending_delete' from the grace-window flow), otherwise the
+    # narrower CHECK can't be recreated over live data.
+    op.execute(
+        "UPDATE public.tenants SET status = 'active' "
+        "WHERE status NOT IN ('active','suspended','archived')"
+    )
     op.drop_constraint("ck_tenants_status", "tenants", schema="public", type_="check")
     op.create_check_constraint(
         "ck_tenants_status",
