@@ -81,20 +81,18 @@ spec:
           kind: Cluster
           jsonPointers:
             - /spec/bootstrap
+      # MANUAL sync (no `automated`) for the adopted Hetzner cluster. ArgoCD is
+      # the declarative source of truth + drift detector; deploys are git-push
+      # then a manual sync. selfHeal/auto-prune is intentionally DEFERRED: the
+      # CNPG Cluster sits perpetually OutOfSync because the chart adds
+      # spec.bootstrap.initdb.postInitApplicationSQL, which the live (already
+      # bootstrapped) cluster never stored, and ignoreDifferences /spec/bootstrap
+      # doesn't suppress an added sub-field — so selfHeal would churn. Re-enable
+      # `automated: {selfHeal: true, prune: true}` once that's resolved (e.g. a
+      # tighter ignore, or once the cluster is re-created from this chart).
       syncPolicy:
-        automated:
-          selfHeal: true
         syncOptions:
           - ServerSideApply=true
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
-          # Don't push the ignored CNPG /spec/bootstrap on sync (it's immutable
-          # post-init; CNPG's webhook would reject the change).
           - RespectIgnoreDifferences=true
-  # Inline template fields are stringly-typed; templatePatch is the only
-  # way to render a real boolean into syncPolicy.automated.prune.
-  templatePatch: |
-    spec:
-      syncPolicy:
-        automated:
-          prune: {{ .prune }}
