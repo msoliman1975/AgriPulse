@@ -24,15 +24,50 @@ global:
       tag: "7ebfbfd"
     tileServer:
       tag: "7ebfbfd"
+# Top-level env merges into every service chart's own env map (api + workers
+# consume all of these; tile-server/frontend ignore the keys they don't read).
 env:
-  # Prod PlatformAdmin identity — must match the Keycloak realm seed user's
-  # email (real domain, not .local).
-  # TODO(hetzner-live): confirm the realm import seeds this email.
-  PLATFORM_ADMIN_EMAIL: admin@agripulse.cloud
+  # PlatformAdmin identity MUST equal the Keycloak realm seed user
+  # (agripulse-realm.json users[0].email = dev@agripulse.local), else the JWT
+  # email won't match the platform_role_assignments row the bootstrap seeds
+  # and login lands in tenant-user mode instead of PlatformAdmin. Switching to
+  # a real admin email is a separate change that also reseeds the realm user.
+  PLATFORM_ADMIN_EMAIL: dev@agripulse.local
   PLATFORM_ADMIN_FULL_NAME: Platform Admin
-  # TODO(hetzner-live): Sentinel Hub client id for the prod account (secret
-  # supplied separately, no longer from AWS Secrets Manager).
-  SENTINEL_HUB_CLIENT_ID: ""
+  SENTINEL_HUB_CLIENT_ID: "67611d57-1a8d-4833-9a7b-02abde5b23b8"
+  # Keycloak split-URL (Hetzner only): the public issuer host
+  # keycloak.agripulse.cloud does NOT resolve inside the cluster, so only
+  # KEYCLOAK_ISSUER (must match the JWT `iss`) stays public (chart default via
+  # envHost); api/workers reach Keycloak over in-cluster DNS for token + JWKS.
+  KEYCLOAK_BASE_URL: http://keycloak
+  KEYCLOAK_JWKS_URL: http://keycloak/realms/agripulse/protocol/openid-connect/certs
+  # Object storage = Cloudflare R2 (S3-compatible): region "auto" and a single
+  # bucket with no per-env suffix. Endpoint + access keys arrive via the
+  # agripulse-app-secrets Secret (envFrom), not here.
+  S3_REGION: auto
+  S3_BUCKET_UPLOADS: agripulse-imagery
+  AWS_DEFAULT_REGION: auto
+  # No Tempo on Hetzner — disable OTEL so the SDK doesn't retry-storm a
+  # non-existent OTLP collector.
+  OTEL_SDK_DISABLED: "true"
+# Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
+# single shared overlay applies to every service chart, so api/workers/tile
+# all load both — harmless (same R2 account creds; unused keys are ignored).
+# Per-chart scoping would need per-chart value files (a #5 refinement).
+extraEnvFromSecrets:
+  - agripulse-app-secrets
+  - agripulse-r2-gdal
+# No External Secrets Operator on Hetzner — secrets seeded directly.
+# `externalSecret` (api/workers) gates the ExternalSecret CR; `externalSecrets`
+# (shared) gates the ClusterSecretStore. Both off.
+externalSecret:
+  enabled: false
+externalSecrets:
+  enabled: false
+# No prometheus-operator on Hetzner → ServiceMonitor CRD absent; rendering one
+# would fail to apply. (CNPG's PodMonitor is gated separately below.)
+serviceMonitor:
+  enabled: false
 labels:
   partOf: agripulse
 # Single node, no HA.
@@ -59,10 +94,23 @@ externalDns:
 # No cluster autoscaler on a fixed VM.
 karpenter:
   enabled: false
-# cert-manager: no IRSA. Cloudflare DNS-01 (via the CF token) or HTTP-01
-# through ingress-nginx.
-# TODO(hetzner-live): pick DNS-01 (wildcard-capable) vs HTTP-01 and wire the
-# issuer; drop the role-arn annotation (done here).
+# cert-manager: no IRSA. Single-node k3s with ports 80/443 public on the node,
+# so HTTP-01 through ingress-nginx is the simplest issuer (no Cloudflare DNS
+# token needed). This overrides the shared chart's AWS default (DNS-01 via
+# Route53), matching the live cert-manager install + the two ClusterIssuers
+# created this session. The ingress.annotations.cert-manager.io/cluster-issuer
+# below + each service chart's rendered spec.tls block let ingress-shim
+# auto-issue, replacing the manual /root/enable-tls.sh.
+certManager:
+  enabled: true
+  acme:
+    # Matches the live ACME account registration (avoids re-registering on the
+    # GitOps cutover). LE only uses this for expiry notices.
+    email: mohamed75soliman@gmail.com
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
 certManagerController:
   serviceAccount:
     annotations: {}
@@ -74,15 +122,14 @@ serviceAccount:
   annotations: {}
 postgresCluster:
   instances: 1
+  # k3s local-path provisioner (repointed at the detachable volume /mnt/pgdata
+  # by 02-node-bootstrap.sh) — overrides the chart's AWS gp3 default.
   storage:
     size: 100Gi
-    # TODO(hetzner-live): a storageClass backed by the detachable volume
-    # (local-path repointed at /mnt/pgdata by 02-node-bootstrap.sh, or a
-    # dedicated SC). Leaving the chart default here until validated.
-    # storageClass: local-path
+    storageClass: local-path
   walStorage:
     size: 30Gi
-    # storageClass: local-path
+    storageClass: local-path
   resources:
     requests:
       cpu: "1"
@@ -90,11 +137,26 @@ postgresCluster:
     limits:
       cpu: "2"
       memory: 4Gi
-  # No IRSA. Barman backups go to R2 via static S3-compatible creds.
-  # TODO(hetzner-live): set the CNPG barmanObjectStore endpoint to the R2
-  # endpoint + reference the R2 cred Secret; drop the role-arn annotation
-  # (done). Verify the shared chart's CNPG backup block supports static creds.
+  # No IRSA on Hetzner.
   serviceAccountAnnotations: {}
+  # No prometheus-operator → no PodMonitor CRD. CNPG tolerates the missing CRD
+  # (warns) but gate it off for a clean apply.
+  monitoring:
+    enablePodMonitor: false
+  # Barman backups → Cloudflare R2 via static S3 creds from the agripulse-r2
+  # Secret (no IRSA). Single bucket, no per-env suffix. endpointURL carries
+  # only the CF account id (an identifier, not a credential — the R2 access
+  # keys live in the agripulse-r2 Secret), so it is safe to commit and keeps
+  # the CNPG backup fully GitOps-managed.
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://agripulse-pg-backup/pg"
+      endpointURL: "https://83c91caacdfd03a1e6cb07e4fdf882a4.r2.cloudflarestorage.com"
+      s3Credentials:
+        inheritFromIAMRole: false
+        secretName: agripulse-r2
+        accessKeyIdKey: ACCESS_KEY_ID
+        secretAccessKeyKey: SECRET_ACCESS_KEY
 migrations:
   enabled: true
 resources:
