@@ -82,13 +82,10 @@ def upsert_tenancy_client(c: httpx.Client, token: str) -> str:
             json=existing,
         )
         r.raise_for_status()
-        # Reset secret explicitly so it matches the SM value.
-        r = c.put(
-            f"{KC_BASE}/admin/realms/{REALM}/clients/{uuid}/client-secret",
-            headers=h,
-        )
-        r.raise_for_status()
-        # KC just generated a new random one — restore ours.
+        # The client PUT above already set `secret` to our value. Also hit
+        # the dedicated client-secret endpoint (POST) for KC versions that
+        # prefer it; fall back to a client-rep PUT below if POST isn't
+        # supported. (PUT on /client-secret is not valid in KC 26 — it 404s.)
         r = c.post(
             f"{KC_BASE}/admin/realms/{REALM}/clients/{uuid}/client-secret",
             headers=h,
