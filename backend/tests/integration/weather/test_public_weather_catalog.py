@@ -103,10 +103,14 @@ async def test_seed_migration_idempotent(admin_session: AsyncSession) -> None:
 
     backend_root = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_root / "alembic.ini"), ini_section="public")
-    # Upgrade to "head" (not "0010") so later tests don't see a
-    # partially-migrated DB once more migrations land after this one.
-    command.downgrade(cfg, "0009")
-    command.upgrade(cfg, "head")
+    # Always restore to head, even if the downgrade raises partway — the DB is
+    # session-shared, so a half-applied downgrade would poison every later
+    # test (e.g. dropping tenants.suspended_at). The finally guarantees the
+    # schema is whole again regardless of this test's own pass/fail.
+    try:
+        command.downgrade(cfg, "0009")
+    finally:
+        command.upgrade(cfg, "head")
 
     count_after = (
         await admin_session.execute(

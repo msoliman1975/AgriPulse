@@ -147,11 +147,15 @@ async def test_seed_migration_idempotent(admin_session: AsyncSession) -> None:
     backend_root = Path(__file__).resolve().parents[3]
     cfg = Config(str(backend_root / "alembic.ini"), ini_section="public")
     # Downgrade past 0008's seeds, then re-apply everything up to head so
-    # later tests don't see a partially-migrated DB. Upgrading to "head"
-    # (rather than pinning "0008") keeps this test order-independent as
-    # new migrations land in the public chain.
-    command.downgrade(cfg, "0007")
-    command.upgrade(cfg, "head")
+    # later tests don't see a partially-migrated DB. The finally guarantees
+    # restoration even if the downgrade raises partway — the DB is
+    # session-shared, so a half-applied downgrade would poison every later
+    # test. Upgrading to "head" keeps this order-independent as new
+    # migrations land in the public chain.
+    try:
+        command.downgrade(cfg, "0007")
+    finally:
+        command.upgrade(cfg, "head")
 
     count_after = (
         await admin_session.execute(text("SELECT count(*) FROM public.indices_catalog"))
