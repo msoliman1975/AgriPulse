@@ -88,3 +88,27 @@ def downgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         schema="public",
     )
+    # Restore the constraints + partial index that 0012 created, so the
+    # full downgrade chain (which reaches 0012's downgrade) can drop them
+    # symmetrically. Omitting these left the table without
+    # ix_default_rules_status, breaking the migration-roundtrip integration
+    # tests (downgrade past 0012 → "index does not exist").
+    op.create_check_constraint(
+        "ck_default_rules_severity",
+        "default_rules",
+        "severity IN ('info', 'warning', 'critical')",
+        schema="public",
+    )
+    op.create_check_constraint(
+        "ck_default_rules_status",
+        "default_rules",
+        "status IN ('active', 'draft', 'retired')",
+        schema="public",
+    )
+    op.create_index(
+        "ix_default_rules_status",
+        "default_rules",
+        ["status"],
+        schema="public",
+        postgresql_where=sa.text("status = 'active'"),
+    )
