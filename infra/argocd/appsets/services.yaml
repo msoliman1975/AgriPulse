@@ -33,7 +33,10 @@ spec:
                 # were confusing triage. When real staging/production
                 # clusters land, add a destination.server per env (probably
                 # via a third generator) and put those envs back here.
-                - env: dev
+                # Single in-cluster destination = the Hetzner k3s node (AWS/dev
+                # is decommissioned). Only one env may be active here since they
+                # all target https://kubernetes.default.svc.
+                - env: hetzner
                   namespace: agripulse
                   prune: true
   template:
@@ -56,6 +59,16 @@ spec:
           valueFiles:
             - "values.yaml"
             - "../../argocd/overlays/{{.env}}/values.yaml"
+      # CNPG's bootstrap is immutable post-init; the shared chart now renders a
+      # corrected bootstrap (SUPERUSER + postInitApplicationSQL split) that
+      # differs from what the live cluster was created with. Ignore it on
+      # adoption so ArgoCD doesn't sit perpetually OutOfSync or trip the CNPG
+      # webhook. Only the `shared` app carries a CNPG Cluster; harmless elsewhere.
+      ignoreDifferences:
+        - group: postgresql.cnpg.io
+          kind: Cluster
+          jsonPointers:
+            - /spec/bootstrap
       syncPolicy:
         automated:
           selfHeal: true
