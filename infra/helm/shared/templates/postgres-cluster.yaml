@@ -29,6 +29,15 @@ spec:
         {{- range .Values.postgresCluster.postInitSQL }}
         - {{ . | quote }}
         {{- end }}
+      {{- with .Values.postgresCluster.postInitApplicationSQL }}
+      # Runs inside the application database (initdb.database = agripulse),
+      # unlike postInitSQL which runs in `postgres`. CREATE EXTENSION belongs
+      # here so the app actually sees the extensions.
+      postInitApplicationSQL:
+        {{- range . }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
 
   {{- /* CD-13: managed roles. CNPG creates+reconciles each role and
          pulls the password from a k8s Secret. Used for the `keycloak`
@@ -112,5 +121,5 @@ spec:
   {{- end }}
 
   monitoring:
-    enablePodMonitor: true
+    enablePodMonitor: {{ .Values.postgresCluster.monitoring.enablePodMonitor }}
 {{- end }}

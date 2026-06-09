@@ -107,20 +107,28 @@ postgresCluster:
     limits:
       cpu: "2"
       memory: 8Gi
-  # Extensions enabled at first init.
+  # postInitSQL runs in the `postgres` database (as superuser). Role grants
+  # are cluster-wide so they belong here. pgstac's migration 0007 does
+  # `SET ROLE pgstac_ingest`, which requires the app role to be SUPERUSER (or a
+  # member of the pgstac roles). SUPERUSER matches the live cluster and is the
+  # simplest unblock; granting pgstac role membership would be the tighter
+  # long-term fix. (Was `CREATEROLE`, which let pgstac create its roles but not
+  # `SET ROLE` into them — the gap that had to be hand-patched on Hetzner.)
   postInitSQL:
+    - "ALTER ROLE agripulse WITH SUPERUSER;"
+  # Extensions must be created in the APPLICATION database (`agripulse`), which
+  # is what postInitApplicationSQL targets. The old list lived under
+  # postInitSQL, which runs in `postgres` — a DB the app never connects to — so
+  # the extensions were missing in `agripulse` and had to be created by hand.
+  postInitApplicationSQL:
     - "CREATE EXTENSION IF NOT EXISTS postgis;"
     - "CREATE EXTENSION IF NOT EXISTS postgis_topology;"
     - "CREATE EXTENSION IF NOT EXISTS timescaledb;"
     - "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
     - "CREATE EXTENSION IF NOT EXISTS citext;"
     - "CREATE EXTENSION IF NOT EXISTS pgaudit;"
-    # pgstac (used by the imagery catalog migration 0007) creates its
-    # own roles (pgstac_admin, pgstac_ingest, pgstac_read) and needs
-    # btree_gist for catalog indexes. Without CREATEROLE on `agripulse`
-    # the migration aborts with "permission denied to create role".
+    # btree_gist: pgstac catalog indexes (imagery migration 0007).
     - "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-    - "ALTER ROLE agripulse WITH CREATEROLE;"
   # CD-13: roles managed by CNPG. The `keycloak` role owns the keycloak
   # database; its password is the k8s Secret synced from SM by the
   # keycloak chart's ExternalSecret (agripulse-keycloak-db).
@@ -193,6 +201,10 @@ postgresCluster:
     enabled: true
     schedule: "0 0 2 * * *"
     backupOwnerReference: self
+  # PodMonitor for the CNPG pods — needs the prometheus-operator PodMonitor
+  # CRD. Envs without it (Hetzner) set this false so the apply stays clean.
+  monitoring:
+    enablePodMonitor: true
 
 # ---------------------------------------------------------------------------
 # Redis — Celery broker + app-side cache. api/workers consume it via
