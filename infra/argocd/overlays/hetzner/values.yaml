@@ -150,6 +150,12 @@ serviceAccount:
   annotations: {}
 postgresCluster:
   instances: 1
+  # The keycloak DB already exists on the adopted cluster, and this PostSync
+  # hook (CREATE DATABASE IF NOT EXISTS) would re-run on every ArgoCD reconcile
+  # — same hook-churn class as the promote hook. Off for adoption; re-enable for
+  # from-scratch reproducibility.
+  keycloakDbBootstrap:
+    enabled: false
   # k3s local-path provisioner (repointed at the detachable volume /mnt/pgdata
   # by 02-node-bootstrap.sh) — overrides the chart's AWS gp3 default.
   storage:
