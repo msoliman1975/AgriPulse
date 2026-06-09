@@ -48,15 +48,25 @@ echo "==> 3/4 Point local-path provisioner at the volume (${PG_MOUNT})"
 # k3s ships local-path-provisioner defaulting to the OS disk; repoint it so
 # CNPG's PVCs land on the detachable volume. Affects all local-path PVCs —
 # fine on a single node where Postgres is the stateful workload that matters.
+# k3s creates the ConfigMap a few seconds after first start, so wait for it.
+echo "    waiting for k3s to create local-path-config..."
+for _ in $(seq 1 30); do
+  kubectl -n kube-system get configmap local-path-config >/dev/null 2>&1 && break
+  sleep 2
+done
 kubectl -n kube-system patch configmap local-path-config --type merge -p "$(cat <<JSON
 {"data":{"config.json":"{\"nodePathMap\":[{\"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\"paths\":[\"${PG_MOUNT}\"]}]}"}}
 JSON
-)" || echo "    (local-path-config not present yet; re-run after k3s settles)"
+)" || echo "    (could not patch local-path-config; patch manually later)"
 kubectl -n kube-system rollout restart deploy/local-path-provisioner 2>/dev/null || true
 
 echo "==> 4/4 Install ArgoCD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+# Server-side apply: the ApplicationSet CRD is larger than the 262144-byte
+# last-applied-configuration annotation that CLIENT-side apply tries to set,
+# which fails with "metadata.annotations: Too long". --server-side avoids it.
+kubectl apply --server-side --force-conflicts -n argocd \
+  -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 echo "    waiting for argocd-server..."
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s || true
 
