@@ -107,7 +107,12 @@ class TestAlertTrend:
         # never resolves → open on -2, -1, 0.
         farm_id = uuid4()
         block_id = uuid4()
-        now = datetime.now(UTC)
+        # Anchor timestamps to NOON of each day so their position relative to
+        # the service's end-of-day (23:59:59) bucket boundaries is independent
+        # of the wall-clock time this test runs at (the boundaries are
+        # calendar-aligned; building timestamps from a raw `now` made the
+        # day-2 expectation flaky across times of day).
+        noon = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
 
         svc = _impl_with_mocked_repos()
         svc._farms.get_farm_by_id = AsyncMock(return_value={"id": farm_id})  # type: ignore[attr-defined]
@@ -115,12 +120,12 @@ class TestAlertTrend:
         svc._alerts.list_alerts = AsyncMock(  # type: ignore[attr-defined]
             return_value=[
                 {
-                    "created_at": now - timedelta(days=3),
-                    "resolved_at": now - timedelta(days=1, hours=20),
+                    "created_at": noon - timedelta(days=3),
+                    "resolved_at": noon - timedelta(days=1),
                     "severity": "critical",
                 },
                 {
-                    "created_at": now - timedelta(days=2),
+                    "created_at": noon - timedelta(days=2),
                     "resolved_at": None,
                     "severity": "warning",
                 },
