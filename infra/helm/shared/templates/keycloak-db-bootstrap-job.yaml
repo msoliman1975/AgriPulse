@@ -76,12 +76,15 @@ spec:
                 echo "keycloak role never appeared; failing so operator can retry"
                 exit 1
               }
-              # Idempotent CREATE DATABASE: psql exits 0 on the "already
-              # exists" notice if wrapped in \gexec.
-              psql -v ON_ERROR_STOP=1 -tAc \
-                "SELECT 'CREATE DATABASE keycloak OWNER keycloak' \
-                 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='keycloak')\gexec"
-              echo "keycloak database is present."
+              # Idempotent CREATE DATABASE. CREATE DATABASE can't run in a DO
+              # block / transaction, and psql's \gexec is not processed in -c
+              # mode, so use a presence check + conditional create.
+              if psql -tAc "SELECT 1 FROM pg_database WHERE datname='keycloak'" | grep -q 1; then
+                echo "keycloak database already present."
+              else
+                psql -v ON_ERROR_STOP=1 -tAc "CREATE DATABASE keycloak OWNER keycloak"
+                echo "keycloak database created."
+              fi
           resources:
             requests:
               cpu: 50m

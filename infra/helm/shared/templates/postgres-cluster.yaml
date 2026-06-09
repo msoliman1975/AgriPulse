@@ -9,6 +9,10 @@ spec:
   description: AgriPulse primary Postgres cluster (CloudNativePG-managed).
   imageName: {{ .Values.postgresCluster.imageName | quote }}
   instances: {{ .Values.postgresCluster.instances }}
+  # Needed by the keycloak-db bootstrap Job, which connects as superuser to
+  # create the keycloak database. CNPG only mints the `<cluster>-superuser`
+  # Secret when this is true.
+  enableSuperuserAccess: {{ .Values.postgresCluster.enableSuperuserAccess | default true }}
 
   {{- with .Values.postgresCluster.serviceAccountAnnotations }}
   serviceAccountTemplate:
