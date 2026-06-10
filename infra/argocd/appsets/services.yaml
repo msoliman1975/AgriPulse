@@ -79,25 +79,21 @@ spec:
       ignoreDifferences:
         - group: postgresql.cnpg.io
           kind: Cluster
-          # CNPG's operator (fieldManager "manager") mutates the Cluster with
-          # spec defaults the chart doesn't render (encoding, localeCType/Collate,
-          # podAntiAffinityType, backup.target, ...). Ignoring everything that
-          # field-manager owns stops ArgoCD sitting OutOfSync on operator
-          # defaults. /spec/bootstrap is create-only/immutable — keep ignoring it.
-          managedFieldsManagers:
-            - manager
+          # CNPG reconciles these itself and normalizes them away from what the
+          # chart renders, so they sit perpetually OutOfSync otherwise:
+          #  - /spec/bootstrap: create-only/immutable (CNPG adds encoding/locale).
+          #  - /spec/managed: CNPG stores roles with connectionLimit + omits the
+          #    explicit false superuser/createdb/createrole the chart renders.
           jsonPointers:
             - /spec/bootstrap
-      # MANUAL sync (no `automated`) for the adopted Hetzner cluster. ArgoCD is
-      # the declarative source of truth + drift detector; deploys are git-push
-      # then a manual sync. selfHeal/auto-prune is intentionally DEFERRED: the
-      # CNPG Cluster sits perpetually OutOfSync because the chart adds
-      # spec.bootstrap.initdb.postInitApplicationSQL, which the live (already
-      # bootstrapped) cluster never stored, and ignoreDifferences /spec/bootstrap
-      # doesn't suppress an added sub-field — so selfHeal would churn. Re-enable
-      # `automated: {selfHeal: true, prune: true}` once that's resolved (e.g. a
-      # tighter ignore, or once the cluster is re-created from this chart).
+            - /spec/managed
       syncPolicy:
+        automated:
+          # Auto-revert drift. prune stays OFF: this appset includes the `shared`
+          # chart which carries the CNPG Cluster — never let GitOps auto-delete
+          # the database. Removals are handled by a deliberate manual sync.
+          selfHeal: true
+          prune: false
         syncOptions:
           - ServerSideApply=true
           - CreateNamespace=true
