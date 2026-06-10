@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 
 import {
+  deleteImportBatch,
   importSignalObservationsCsv,
   type CsvImportRowError,
   type CsvImportSuccess,
@@ -73,15 +74,12 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
     },
     onSuccess: (data) => {
       setSuccess(data);
-      // Refresh the views that show observations so a freshly-imported
-      // batch appears without a hard reload. Keys must match the actual
-      // queries: the log table + hooks use ["signal_observations", …]
-      // (ObservationList.tsx, queries/signals.ts) and the map overlay
-      // uses ["labs/map/signalObservations", …] (MapExperiencePage.tsx).
-      // The previous keys (["signals","observations"], ["labs","map"])
-      // matched nothing, so the table only updated on a full refresh.
-      void queryClient.invalidateQueries({ queryKey: ["signal_observations"] });
-      void queryClient.invalidateQueries({ queryKey: ["labs/map/signalObservations"] });
+      // Refresh the observations table + map overlay + the import-history
+      // list so a freshly-imported batch shows without a hard reload.
+      // invalidateObservations() carries the correct keys (the #219 fix:
+      // ["signal_observations"] + ["labs/map/signalObservations"]) plus
+      // the import-batches list key.
+      invalidateObservations();
     },
     onError: (err) => {
       const parsed = _parseError(err);
@@ -91,6 +89,26 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
       setTopLevelError(parsed.message);
     },
   });
+
+  // CS-7 "undo this import" — delete every row the just-finished upload
+  // created. Invalidates the same observation views the import touched
+  // plus the import-history list so the undone batch disappears.
+  const undoMutation = useMutation({
+    mutationFn: (batchId: string) => deleteImportBatch(batchId, farmId),
+    onSuccess: () => {
+      setSuccess(null);
+      invalidateObservations();
+    },
+  });
+
+  function invalidateObservations(): void {
+    // The observations list + the map overlay both key on the
+    // observations endpoint — invalidate so a freshly-imported (or
+    // undone) batch shows up without a hard reload.
+    void queryClient.invalidateQueries({ queryKey: ["signal_observations"] });
+    void queryClient.invalidateQueries({ queryKey: ["labs/map/signalObservations"] });
+    void queryClient.invalidateQueries({ queryKey: ["signals", "import-batches", farmId] });
+  }
 
   const handleFile = useCallback(
     (file: File | null) => {
@@ -188,11 +206,45 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
       ) : null}
 
       {success ? (
-        <p
+        <div
           role="status"
-          className="mt-3 rounded-md border border-ap-primary/30 bg-ap-primary-soft p-2 text-xs text-ap-primary"
+          className="mt-3 flex items-center justify-between gap-3 rounded-md border border-ap-primary/30 bg-ap-primary-soft p-2 text-xs text-ap-primary"
         >
-          {t("csvImport.success", { count: success.rows_imported })}
+          <span>{t("csvImport.success", { count: success.rows_imported })}</span>
+          <button
+            type="button"
+            disabled={undoMutation.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  t("csvImport.undo.confirm", {
+                    count: success.rows_imported,
+                    defaultValue:
+                      "Delete all {{count}} records from this import? This cannot be undone.",
+                  }),
+                )
+              ) {
+                undoMutation.mutate(success.import_batch_id);
+              }
+            }}
+            className="shrink-0 rounded border border-ap-crit/40 px-2 py-1 font-medium text-ap-crit hover:bg-ap-crit-soft disabled:opacity-50"
+          >
+            {undoMutation.isPending
+              ? t("csvImport.undo.deleting", { defaultValue: "Deleting…" })
+              : t("csvImport.undo.button", {
+                  count: success.rows_imported,
+                  defaultValue: "Undo this import — delete {{count}} records",
+                })}
+          </button>
+        </div>
+      ) : null}
+
+      {undoMutation.isError ? (
+        <p
+          role="alert"
+          className="mt-2 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-2 text-xs text-ap-crit"
+        >
+          {t("csvImport.undo.error", { defaultValue: "Could not undo this import." })}
         </p>
       ) : null}
 

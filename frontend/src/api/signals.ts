@@ -288,6 +288,19 @@ export async function deleteSignalTemplateObservationGroup(
 // the standard apiClient error interceptor.
 export interface CsvImportSuccess {
   rows_imported: number;
+  // CS-7: the batch id that tags every row this upload inserted, so the
+  // UI can offer an immediate "undo this import".
+  import_batch_id: string;
+}
+
+// CS-7 import history — one past CSV upload, the unit the history list
+// shows and can delete.
+export interface ImportBatch {
+  import_batch_id: string;
+  imported_at: string;
+  row_count: number;
+  signal_codes: string[];
+  recorded_by: string;
 }
 
 export interface CsvImportRowError {
@@ -307,6 +320,26 @@ export async function importSignalObservationsCsv(
     params: { farm_id: farmId, bulk_mode: bulkMode },
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return data;
+}
+
+// CS-7: list past CSV uploads for a farm (newest first).
+export async function listImportBatches(farmId: string): Promise<ImportBatch[]> {
+  const { data } = await apiClient.get<ImportBatch[]>("/v1/signals/import-batches", {
+    params: { farm_id: farmId },
+  });
+  return data;
+}
+
+// CS-7: undo an upload — delete every observation it created.
+export async function deleteImportBatch(
+  batchId: string,
+  farmId: string,
+): Promise<{ deleted: number }> {
+  const { data } = await apiClient.delete<{ deleted: number }>(
+    `/v1/signals/import-batches/${batchId}`,
+    { params: { farm_id: farmId } },
+  );
   return data;
 }
 

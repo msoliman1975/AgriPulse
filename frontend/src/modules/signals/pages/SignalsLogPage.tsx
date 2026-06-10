@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { SignalsCsvImport } from "../components/SignalsCsvImport";
+import { ImportHistory } from "../components/ImportHistory";
 import { ObservationList } from "../components/ObservationList";
 import { LocationCapture, type LocationValue } from "../components/LocationCapture";
 import { ObservedAtPicker } from "../components/ObservedAtPicker";
@@ -86,6 +87,11 @@ export function SignalsLogPage(): ReactNode {
           Operators who can submit one observation can submit many. The
           widget renders its own success/error state inline. */}
       {canRecord ? <SignalsCsvImport farmId={farmId} /> : null}
+
+      {/* CS-7: past CSV uploads with per-upload delete (gated inside on
+          signal.delete_observation). Renders nothing until the first
+          import exists. Shown to anyone who can read signals. */}
+      <ImportHistory farmId={farmId} />
 
       <div
         className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5 text-xs"
