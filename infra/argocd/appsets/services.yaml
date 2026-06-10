@@ -79,6 +79,13 @@ spec:
       ignoreDifferences:
         - group: postgresql.cnpg.io
           kind: Cluster
+          # CNPG's operator (fieldManager "manager") mutates the Cluster with
+          # spec defaults the chart doesn't render (encoding, localeCType/Collate,
+          # podAntiAffinityType, backup.target, ...). Ignoring everything that
+          # field-manager owns stops ArgoCD sitting OutOfSync on operator
+          # defaults. /spec/bootstrap is create-only/immutable — keep ignoring it.
+          managedFieldsManagers:
+            - manager
           jsonPointers:
             - /spec/bootstrap
       # MANUAL sync (no `automated`) for the adopted Hetzner cluster. ArgoCD is
