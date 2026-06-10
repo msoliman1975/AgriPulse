@@ -31,7 +31,7 @@ import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
 import { SignalOverlayControl } from "./SignalOverlayControl";
-import { getGridCells, getWorstGridCells } from "@/api/grid";
+import { getGridCells, type GridWorstCell } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
@@ -584,48 +584,95 @@ function MapForFarm({ farmId }: { farmId: string }) {
   });
   const gridProductId = subscriptionsQ.data?.[0]?.product_id ?? null;
 
-  const gridCellsQ = useQuery({
-    queryKey: ["labs/map/gridCells", selectedId, gridProductId, gridIndex],
-    queryFn: () =>
-      getGridCells(selectedId!, gridProductId!, gridIndex),
-    enabled: Boolean(showGrid && selectedId && gridProductId),
+  // Farm-wide overlay: there's no farm-level cells endpoint, so fan out
+  // per gridded block (each carries its own imagery product = its first
+  // active subscription) and merge client-side. Lazy — only fetched while
+  // the overlay is on. One query with an internal Promise.all keeps the
+  // hook count stable regardless of block count.
+  const overlayBlocks = summaryQ.data?.blocks ?? [];
+  const overlayBlockKey = overlayBlocks.map((b) => b.id).join(",");
+  const farmGridQ = useQuery({
+    queryKey: ["labs/map/farmGrid", farmId, gridIndex, overlayBlockKey],
+    queryFn: async () => {
+      const groups = await Promise.all(
+        overlayBlocks.map(async (b) => {
+          const subs = await listSubscriptions(b.id, { include_inactive: false });
+          const productId = subs[0]?.product_id;
+          if (!productId) return null;
+          const res = await getGridCells(b.id, productId, gridIndex);
+          return { blockId: b.id, productId, cells: res.cells };
+        }),
+      );
+      return groups.filter((g): g is NonNullable<typeof g> => g !== null);
+    },
+    enabled: Boolean(showGrid && overlayBlocks.length > 0),
     staleTime: 30_000,
   });
 
-  // Worst-N under-performing cells for the current index, so a scout can
-  // be dispatched to the exact spot. Only fetched while the overlay is on.
-  const worstCellsQ = useQuery({
-    queryKey: ["labs/map/worstCells", selectedId, gridProductId, gridIndex],
-    queryFn: () => getWorstGridCells(selectedId!, gridProductId!, gridIndex, 5),
-    enabled: Boolean(showGrid && selectedId && gridProductId),
-    staleTime: 30_000,
-  });
+  // cellId -> { blockId, productId } so a clicked cell can fetch its
+  // history against the right block's product.
+  const cellMeta = useMemo(() => {
+    const m = new Map<string, { blockId: string; productId: string }>();
+    for (const g of farmGridQ.data ?? []) {
+      for (const c of g.cells) m.set(c.cell_id, { blockId: g.blockId, productId: g.productId });
+    }
+    return m;
+  }, [farmGridQ.data]);
 
-  // G-2: outline the worst-N cells on the heatmap so the alert/worst list
-  // and the map agree on *where* to scout. Persisted while the overlay is
-  // on; empty when hidden so the highlight layer matches nothing.
-  const highlightedCellIds = useMemo<string[]>(
+  const totalCellCount = useMemo(
+    () => (farmGridQ.data ?? []).reduce((n, g) => n + g.cells.length, 0),
+    [farmGridQ.data],
+  );
+
+  // Farm-wide worst-N (lowest mean) for the scout list + map highlight —
+  // computed client-side from the merged cells (no per-block worst call).
+  const farmWorstCells = useMemo<GridWorstCell[]>(
     () =>
-      showGrid && worstCellsQ.data ? worstCellsQ.data.cells.map((c) => c.cell_id) : [],
-    [showGrid, worstCellsQ.data],
+      (farmGridQ.data ?? [])
+        .flatMap((g) => g.cells)
+        .filter((c) => c.mean !== null)
+        .sort((a, b) => Number(a.mean) - Number(b.mean))
+        .slice(0, 5)
+        .map((c) => ({
+          cell_id: c.cell_id,
+          row_idx: c.row_idx,
+          col_idx: c.col_idx,
+          centroid_lon: c.centroid_lon,
+          centroid_lat: c.centroid_lat,
+          mean: c.mean,
+          valid_pixel_pct: c.valid_pixel_pct,
+          time: c.time,
+          ring: null,
+          sector_label: null,
+        })),
+    [farmGridQ.data],
+  );
+
+  // G-2: outline the worst-N cells on the heatmap so the scout list and
+  // the map agree on *where* to look. Empty when hidden.
+  const highlightedCellIds = useMemo<string[]>(
+    () => (showGrid ? farmWorstCells.map((c) => c.cell_id) : []),
+    [showGrid, farmWorstCells],
   );
 
   const gridCellsFc: FeatureCollection<GeoPolygon, GridCellProps> | null = useMemo(() => {
-    if (!showGrid || !gridCellsQ.data) return null;
+    if (!showGrid || !farmGridQ.data) return null;
     return {
       type: "FeatureCollection",
-      features: gridCellsQ.data.cells.map((c) => ({
-        type: "Feature" as const,
-        geometry: c.geometry,
-        properties: {
-          cell_id: c.cell_id,
-          // -1 is the no-data sentinel that MapCanvas's fill-color
-          // expression maps to grey — see GridCellProps comment.
-          value: c.mean === null ? -1 : Number(c.mean),
-        },
-      })),
+      features: farmGridQ.data.flatMap((g) =>
+        g.cells.map((c) => ({
+          type: "Feature" as const,
+          geometry: c.geometry,
+          properties: {
+            cell_id: c.cell_id,
+            // -1 is the no-data sentinel that MapCanvas's fill-color
+            // expression maps to grey — see GridCellProps comment.
+            value: c.mean === null ? -1 : Number(c.mean),
+          },
+        })),
+      ),
     };
-  }, [showGrid, gridCellsQ.data]);
+  }, [showGrid, farmGridQ.data]);
 
   // CS-8 popup: URL ?signal_obs=<id> drives a side panel that
   // hydrates from the same observations the overlay already loaded
@@ -761,7 +808,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
             geojson={summary.geojson}
             farmBoundary={summary.farm.boundary}
             selectedId={selectedId}
-            onSelect={selectUnit}
+            onSelect={(id) => {
+              // Selecting a block (polygon or its label) closes any open
+              // cell drawer so only one drawer shows at a time.
+              setSelectedCellId(null);
+              selectUnit(id);
+            }}
             fitBoundsKey={farmId}
             drawEnabled={drawing}
             drawTarget={drawTarget ?? "block"}
@@ -799,7 +851,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
             blockFillOpacity={layerPrefs.blockFillOpacity}
             gridCells={gridCellsFc}
             highlightedCellIds={highlightedCellIds}
-            onGridCellClick={(cellId) => setSelectedCellId(cellId)}
+            onGridCellClick={(cellId) => {
+              // Per the UX: a cell click shows ONLY the cell-info drawer.
+              // Close the block drawer so the two don't stack.
+              setSelectedCellId(cellId);
+              closePanel();
+            }}
             signalOverlay={signalOverlay.fc}
             onSignalClick={(observationId) => {
               // The URL `?signal_obs=` drives the SignalObservationPanel
@@ -832,7 +889,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
           onChange={setSignalOverlayDefId}
         />
 
-        {selectedId && gridProductId ? (
+        {summary.blocks.length > 0 ? (
           <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-h-[70vh] max-w-sm flex-col gap-2 overflow-y-auto">
             <GridOverlayPanel
               showGrid={showGrid}
@@ -840,19 +897,25 @@ function MapForFarm({ farmId }: { farmId: string }) {
               indexCode={gridIndex}
               indexOptions={GRID_INDEX_OPTIONS}
               onIndexChange={setGridIndex}
-              cellCount={showGrid ? (gridCellsQ.data?.cells.length ?? null) : null}
-              worstCells={worstCellsQ.data?.cells}
-              worstLoading={worstCellsQ.isLoading}
-              onSelectCell={setSelectedCellId}
+              cellCount={showGrid ? totalCellCount : null}
+              worstCells={farmWorstCells}
+              worstLoading={farmGridQ.isLoading}
+              onSelectCell={(cellId) => {
+                setSelectedCellId(cellId);
+                closePanel();
+              }}
             />
-            <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+            {/* Per-block config (cell size) only when a block is selected. */}
+            {selectedId && gridProductId ? (
+              <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+            ) : null}
           </div>
         ) : null}
 
         <GridCellDrawer
           open={selectedCellId !== null}
           cellId={selectedCellId}
-          productId={gridProductId}
+          productId={selectedCellId ? (cellMeta.get(selectedCellId)?.productId ?? null) : null}
           indexCode={gridIndex}
           onClose={() => setSelectedCellId(null)}
         />
