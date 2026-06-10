@@ -571,9 +571,17 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
-  // Indices offered in the grid picker. Mirror the block detail panel's
-  // trio (the health-relevant ones); the backend stores all six per cell.
-  const GRID_INDEX_OPTIONS: IndexCode[] = ["ndvi", "ndre", "ndwi"];
+  // Every index the pipeline computes + stores per grid cell. Was the
+  // "health trio"; expanded so the map can colour by any of them.
+  const GRID_INDEX_OPTIONS: IndexCode[] = [
+    "ndvi",
+    "ndre",
+    "ndwi",
+    "evi",
+    "savi",
+    "gndvi",
+    "ndmi",
+  ];
 
   const subscriptionsQ = useQuery({
     queryKey: ["labs/map/subscriptions", selectedId],

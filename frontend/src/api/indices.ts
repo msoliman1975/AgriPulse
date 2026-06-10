@@ -4,7 +4,11 @@ import { apiClient } from "./client";
 
 export type TimeseriesGranularity = "daily" | "weekly";
 
-export type IndexCode = "ndvi" | "ndwi" | "evi" | "savi" | "ndre" | "gndvi";
+// ndmi (NIR/SWIR moisture) was added backend-side after the original six
+// (migration 0027); it's computed + stored per scene/cell for SWIR-bearing
+// products (Sentinel-2). Listed here so the grid picker can surface it.
+// NB: SWIR-free products (future PlanetScope 3 m) won't carry it.
+export type IndexCode = "ndvi" | "ndwi" | "evi" | "savi" | "ndre" | "gndvi" | "ndmi";
 
 export interface IndexTimeseriesPoint {
   time: string;
