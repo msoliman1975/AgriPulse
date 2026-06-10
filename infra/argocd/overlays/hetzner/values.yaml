@@ -58,6 +58,10 @@ env:
   # No Tempo on Hetzner — disable OTEL so the SDK doesn't retry-storm a
   # non-existent OTLP collector.
   OTEL_SDK_DISABLED: "true"
+  # TEMPORARY: 90-day historical weather backfill (open_meteo /forecast
+  # past_days max ~92). Revert to the 48h default after the one-off
+  # backfill so routine refreshes don't refetch 90 days every cycle.
+  WEATHER_PAST_HOURS: "2160"
 # Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
 # single shared overlay applies to every service chart, so api/workers/tile
 # all load both — harmless (same R2 account creds; unused keys are ignored).
