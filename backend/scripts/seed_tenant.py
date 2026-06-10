@@ -46,9 +46,7 @@ async def _tenant_exists(slug: str) -> bool:
     factory = AsyncSessionLocal()
     async with factory() as session:
         row = (
-            await session.execute(
-                text("SELECT 1 FROM public.tenants WHERE slug = :s"), {"s": slug}
-            )
+            await session.execute(text("SELECT 1 FROM public.tenants WHERE slug = :s"), {"s": slug})
         ).first()
     return row is not None
 

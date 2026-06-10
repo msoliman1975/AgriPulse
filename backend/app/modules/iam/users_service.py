@@ -405,9 +405,7 @@ class TenantUsersService:
         A member still pending Keycloak provisioning (no real subject)
         can't be re-invited — surface that as ``pending`` so the caller
         knows to retry provisioning first."""
-        await self._require_membership(
-            user_id=user_id, tenant_id=tenant_id, allow_suspended=True
-        )
+        await self._require_membership(user_id=user_id, tenant_id=tenant_id, allow_suspended=True)
         kc_subject = await self._user_keycloak_subject(user_id=user_id)
         if not kc_subject or kc_subject.startswith("pending::"):
             return {
