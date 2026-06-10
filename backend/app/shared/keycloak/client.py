@@ -826,6 +826,29 @@ def set_keycloak_client(client: KeycloakAdminClient | None) -> None:
     _default = client
 
 
+_DEPLOYED_ENVS: frozenset[str] = frozenset({"staging", "production"})
+
+
+def provisioning_config_problems(settings: Settings) -> list[str]:
+    """Return machine-readable problem codes when a *deployed* environment
+    isn't actually wired to provision into Keycloak (IH-3).
+
+    Empty list = healthy (or a dev/test env where the Noop client is an
+    acceptable default). Surfaced loudly at startup so a misconfigured
+    cluster — where every tenant/user create silently lands in
+    ``pending_provision`` and nothing reaches Keycloak — is obvious
+    instead of looking healthy.
+    """
+    if settings.app_env not in _DEPLOYED_ENVS:
+        return []
+    problems: list[str] = []
+    if not settings.keycloak_provisioning_enabled:
+        problems.append("provisioning_disabled")
+    elif not settings.keycloak_admin_client_secret:
+        problems.append("admin_client_secret_missing")
+    return problems
+
+
 def _split_full_name(full_name: str | None) -> tuple[str, str]:
     if not full_name:
         return "", ""

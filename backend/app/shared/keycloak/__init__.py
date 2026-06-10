@@ -13,9 +13,11 @@ Public surface:
 
 from app.shared.keycloak.client import (
     HttpxKeycloakAdminClient,
+    InviteResult,
     KeycloakAdminClient,
     NoopKeycloakClient,
     get_keycloak_client,
+    provisioning_config_problems,
     set_keycloak_client,
 )
 from app.shared.keycloak.errors import (
@@ -28,11 +30,13 @@ from app.shared.keycloak.fakes import FakeKeycloakClient
 __all__ = [
     "FakeKeycloakClient",
     "HttpxKeycloakAdminClient",
+    "InviteResult",
     "KeycloakAdminClient",
     "KeycloakError",
     "KeycloakNotConfiguredError",
     "KeycloakRequestError",
     "NoopKeycloakClient",
     "get_keycloak_client",
+    "provisioning_config_problems",
     "set_keycloak_client",
 ]

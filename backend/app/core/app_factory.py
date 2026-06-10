@@ -27,7 +27,21 @@ from app.shared.correlation import CorrelationIdMiddleware
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """App lifespan â€” startup and shutdown bookkeeping."""
     log = get_logger(__name__)
-    log.info("app_startup", env=get_settings().app_env)
+    settings = get_settings()
+    log.info("app_startup", env=settings.app_env)
+    # IH-3: fail loud if a deployed env isn't actually provisioning into
+    # Keycloak. Otherwise tenant/user creates silently land in
+    # `pending_provision` and nothing reaches Keycloak — a cluster that
+    # looks healthy but provisions nothing.
+    from app.shared.keycloak import provisioning_config_problems
+
+    for problem in provisioning_config_problems(settings):
+        log.error(
+            "keycloak_provisioning_misconfigured",
+            problem=problem,
+            app_env=settings.app_env,
+            hint="set KEYCLOAK_PROVISIONING_ENABLED=true and the tenancy client secret",
+        )
     # Sync decision-tree YAML files into the public catalog so a fresh
     # process picks up authored changes without a manual migration. The
     # loader is idempotent - same content on disk -> no DB writes.
