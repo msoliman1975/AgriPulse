@@ -463,6 +463,9 @@ export function MapCanvas({
           "line-opacity": 0.95,
         },
       });
+      // Keep block name labels above the grid heatmap so they stay legible
+      // (and clickable as the block-open affordance) when the overlay is on.
+      map.moveLayer(LABEL_LAYER);
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -477,10 +480,31 @@ export function MapCanvas({
         onSelectRef.current(props.id);
       });
       map.on("click", GRID_FILL_LAYER, (ev) => {
+        // Block labels sit above the heatmap and are the block-open
+        // affordance; if the click also landed on a label, let the label
+        // handler win so a label opens the block, not a cell.
+        if (map.queryRenderedFeatures(ev.point, { layers: [LABEL_LAYER] }).length > 0) {
+          return;
+        }
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as { cell_id?: string };
         if (props.cell_id) onGridCellClickRef.current?.(props.cell_id);
+      });
+      // Clicking a block's name label selects the block. With the grid
+      // overlay on, the heatmap covers the polygon fill, so the label is
+      // the way to open the block drawer.
+      map.on("click", LABEL_LAYER, (ev) => {
+        const f = ev.features?.[0];
+        if (!f) return;
+        const props = f.properties as Pick<UnitFeatureProps, "id">;
+        onSelectRef.current(props.id);
+      });
+      map.on("mousemove", LABEL_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", LABEL_LAYER, () => {
+        map.getCanvas().style.cursor = "";
       });
       map.on("click", SIGNAL_CIRCLE_LAYER, (ev) => {
         const f = ev.features?.[0];
