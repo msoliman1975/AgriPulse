@@ -289,6 +289,85 @@ function BlockSelect({
   );
 }
 
+// Per-signal CSV sample. Mirrors the importer's column set (see
+// SignalsCsvImport.tsx / backend csv_import.py) but pre-fills THIS
+// signal's code + the value column for its kind, with a few realistic
+// example rows the operator can edit and import. Geopoint values are
+// out of scope for CSV V1, so the button that calls this is hidden for
+// that kind.
+const SAMPLE_CSV_HEADER =
+  "signal_code,observed_at,block_id,value_numeric,value_categorical,value_event,value_boolean,notes";
+
+function _csvCell(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+function buildSignalSampleCsv(defn: SignalDefinition): string {
+  const N = 4;
+  // observed_at: the last N days at 08:00 local time, oldest first.
+  const observedAts: string[] = [];
+  for (let i = N; i >= 1; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    d.setHours(8, 0, 0, 0);
+    observedAts.push(d.toISOString());
+  }
+  // Numeric samples: spread across [value_min, value_max] when bounded,
+  // otherwise a generic pH-ish ramp.
+  let numericSamples: string[] = ["6.5", "6.7", "6.9", "7.1"];
+  const min = defn.value_min != null ? Number(defn.value_min) : null;
+  const max = defn.value_max != null ? Number(defn.value_max) : null;
+  if (min != null && max != null && Number.isFinite(min) && Number.isFinite(max) && max > min) {
+    numericSamples = Array.from({ length: N }, (_, i) => {
+      const v = min + ((max - min) * (i + 1)) / (N + 1);
+      return (Math.round(v * 100) / 100).toString();
+    });
+  }
+  // Categorical / event labels: the signal's own allowed values when it
+  // has them, else a sensible placeholder set.
+  const labels =
+    defn.categorical_values && defn.categorical_values.length > 0
+      ? defn.categorical_values
+      : defn.value_kind === "event"
+        ? ["observed", "spreading", "resolved"]
+        : ["low", "medium", "high"];
+
+  const rows = Array.from({ length: N }, (_, i) => {
+    let vNum = "";
+    let vCat = "";
+    let vEvt = "";
+    let vBool = "";
+    if (defn.value_kind === "numeric") vNum = numericSamples[i];
+    else if (defn.value_kind === "categorical") vCat = labels[i % labels.length];
+    else if (defn.value_kind === "event") vEvt = labels[i % labels.length];
+    else if (defn.value_kind === "boolean") vBool = i % 2 === 0 ? "true" : "false";
+    const notes = i === 0 ? "sample row - edit or delete before importing" : "";
+    return [
+      _csvCell(defn.code),
+      observedAts[i],
+      "", // block_id blank = farm-level; put a block UUID here to scope it
+      _csvCell(vNum),
+      _csvCell(vCat),
+      _csvCell(vEvt),
+      vBool,
+      _csvCell(notes),
+    ].join(",");
+  });
+  return `${[SAMPLE_CSV_HEADER, ...rows].join("\n")}\n`;
+}
+
+function downloadSignalSample(defn: SignalDefinition): void {
+  const blob = new Blob([buildSignalSampleCsv(defn)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${defn.code}-sample.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }): ReactNode {
   const { t } = useTranslation("signals");
   const create = useCreateSignalObservation();
@@ -380,6 +459,22 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
         <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
         {defn.unit ? (
           <span className="text-xs text-ap-muted">{t("config.row.unit", { unit: defn.unit })}</span>
+        ) : null}
+        {/* Per-signal sample file: a tiny CSV pre-filled with this signal's
+            columns + a few example rows for the operator to edit + import.
+            Hidden for geopoint, which CSV V1 can't carry. */}
+        {defn.value_kind !== "geopoint" ? (
+          <button
+            type="button"
+            onClick={() => downloadSignalSample(defn)}
+            className="ms-auto text-[11px] text-ap-primary hover:underline"
+            title={t("log.form.downloadSampleHint", {
+              defaultValue:
+                "A small CSV pre-filled with this signal's columns and a few example rows. Edit it and import via the bulk uploader above.",
+            })}
+          >
+            {t("log.form.downloadSample", { defaultValue: "Download sample file" })}
+          </button>
         ) : null}
       </div>
       <ValueInput
