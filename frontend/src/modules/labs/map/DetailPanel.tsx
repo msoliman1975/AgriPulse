@@ -33,6 +33,10 @@ interface Props {
   onSaveReshape?: () => void;
   onCancelReshape?: () => void;
   reshapeSaving?: boolean;
+  // Block-level sub-block grid config (cell size + backfill). Rendered
+  // as a drawer section by the parent so this stays a presentational
+  // panel with no grid-module dependency.
+  gridConfig?: React.ReactNode;
 }
 
 const HEALTH_LABEL = {
@@ -74,6 +78,7 @@ export function DetailPanel({
   onSaveReshape,
   onCancelReshape,
   reshapeSaving,
+  gridConfig,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<IndexCode | null>(null);
   const editing = Boolean(editableBlock);
@@ -414,6 +419,10 @@ export function DetailPanel({
           </div>
         </Section>
       ) : null}
+
+      {/* BlockGridConfigCard brings its own titled, bordered card, so it
+          renders directly (no Section wrapper) — just drawer spacing. */}
+      {gridConfig ? <div className="mt-4">{gridConfig}</div> : null}
     </aside>
   );
 }
