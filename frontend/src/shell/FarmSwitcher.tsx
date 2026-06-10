@@ -72,6 +72,13 @@ export function FarmSwitcher(): ReactNode {
     navigate(nextPath);
   };
 
+  // The farm switcher is tenant-context UI. On the platform portal
+  // (/platform/*) a PlatformAdmin has no farms to manage, so the
+  // "create your first farm" CTA is pointless there — render nothing.
+  if (location.pathname.startsWith("/platform")) {
+    return null;
+  }
+
   if (farms.length === 0) {
     if (canCreateFarm) {
       return (
