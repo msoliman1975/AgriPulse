@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from app.shared.keycloak.client import group_name_for
+from app.shared.keycloak.client import InviteResult, group_name_for
 from app.shared.keycloak.errors import KeycloakRequestError
 
 
@@ -33,6 +33,7 @@ class FakeUser:
     platform_role: str | None = None
     tenant_id: str | None = None
     tenant_role: str | None = None
+    temporary_password: str | None = None
 
 
 @dataclass
@@ -52,11 +53,23 @@ class FakeKeycloakClient:
         self._closed = False
         # A method name; the next call to that method raises once.
         self.fail_on: str | None = None
+        # Mirrors `settings.keycloak_smtp_enabled`: when False the fake
+        # mints a temporary password instead of "emailing" the reset.
+        self.smtp_enabled: bool = True
 
     def _maybe_fail(self, name: str) -> None:
         if self.fail_on == name:
             self.fail_on = None
             raise KeycloakRequestError(500, "fake forced failure", operation=name)
+
+    def _issue(self, user: FakeUser) -> InviteResult:
+        if self.smtp_enabled:
+            user.actions_emailed = tuple(set(user.actions_emailed) | {"UPDATE_PASSWORD"})
+            user.temporary_password = None
+            return InviteResult(keycloak_user_id=user.id, email_sent=True, temporary_password=None)
+        temp = f"temp-{user.id[:8]}"
+        user.temporary_password = temp
+        return InviteResult(keycloak_user_id=user.id, email_sent=False, temporary_password=temp)
 
     async def ensure_group(self, slug: str) -> str:
         self._maybe_fail("ensure_group")
@@ -75,7 +88,7 @@ class FakeKeycloakClient:
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
         tenant_id: UUID | str | None = None,
-    ) -> str:
+    ) -> InviteResult:
         self._maybe_fail("invite_user")
         if group_id not in self.groups:
             raise KeycloakRequestError(404, "group not found", operation="invite_user")
@@ -84,24 +97,30 @@ class FakeKeycloakClient:
             if user.email == email:
                 self.groups[group_id].member_ids.append(user.id)
                 user.realm_roles = tuple(set(user.realm_roles).union(roles))
-                user.actions_emailed = tuple(set(user.actions_emailed).union({"UPDATE_PASSWORD"}))
                 if tenant_id is not None and roles:
                     user.tenant_id = str(tenant_id)
                     user.tenant_role = roles[0]
-                return user.id
+                return self._issue(user)
         uid = uuid4().hex
-        self.users[uid] = FakeUser(
+        user = FakeUser(
             id=uid,
             email=email,
             full_name=full_name,
             enabled=True,
-            actions_emailed=("UPDATE_PASSWORD",),
             realm_roles=tuple(roles),
             tenant_id=str(tenant_id) if tenant_id is not None else None,
             tenant_role=roles[0] if (tenant_id is not None and roles) else None,
         )
+        self.users[uid] = user
         self.groups[group_id].member_ids.append(uid)
-        return uid
+        return self._issue(user)
+
+    async def resend_invite(self, *, keycloak_user_id: str) -> InviteResult:
+        self._maybe_fail("resend_invite")
+        user = self.users.get(keycloak_user_id)
+        if user is None:
+            raise KeycloakRequestError(404, "user not found", operation="resend_invite")
+        return self._issue(user)
 
     async def add_existing_user_to_group(
         self,
@@ -175,24 +194,24 @@ class FakeKeycloakClient:
         email: str,
         full_name: str | None,
         role: str = "PlatformAdmin",
-    ) -> str:
+    ) -> InviteResult:
         self._maybe_fail("invite_platform_admin")
         for user in self.users.values():
             if user.email == email:
                 user.platform_role = role
                 user.realm_roles = tuple(set(user.realm_roles) | {role})
-                return user.id
+                return self._issue(user)
         uid = uuid4().hex
-        self.users[uid] = FakeUser(
+        user = FakeUser(
             id=uid,
             email=email,
             full_name=full_name,
             enabled=True,
-            actions_emailed=("UPDATE_PASSWORD",),
             realm_roles=(role,),
             platform_role=role,
         )
-        return uid
+        self.users[uid] = user
+        return self._issue(user)
 
     async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None:
         self._maybe_fail("set_platform_role")

@@ -11,12 +11,21 @@ import {
   useDeleteTenantUser,
   useInviteTenantUser,
   useReactivateTenantUser,
+  useResendTenantUserInvite,
   useSuspendTenantUser,
   useTenantUsers,
   useUpdateTenantUser,
 } from "@/queries/users";
 
 const TENANT_ROLES = ["TenantOwner", "TenantAdmin", "BillingAdmin", "Viewer"] as const;
+
+/** A first-login credential surfaced after invite/resend. `password` is
+ * set only when SMTP was unavailable and a temp credential was minted. */
+interface Credential {
+  email: string;
+  emailSent: boolean;
+  password: string | null;
+}
 
 export function UsersConfigPage(): ReactNode {
   const { t } = useTranslation("users");
@@ -27,11 +36,13 @@ export function UsersConfigPage(): ReactNode {
   const canDelete = useCapability("user.delete");
   const [inviting, setInviting] = useState(false);
   const [editing, setEditing] = useState<TenantUser | null>(null);
+  const [credential, setCredential] = useState<Credential | null>(null);
 
   const { data, isLoading, isError } = useTenantUsers();
   const suspendMut = useSuspendTenantUser();
   const reactivateMut = useReactivateTenantUser();
   const deleteMut = useDeleteTenantUser();
+  const resendMut = useResendTenantUserInvite();
 
   if (!canRead) {
     return (
@@ -61,8 +72,13 @@ export function UsersConfigPage(): ReactNode {
         ) : null}
       </header>
 
-      {inviting ? <InviteForm onClose={() => setInviting(false)} /> : null}
+      {inviting ? (
+        <InviteForm onClose={() => setInviting(false)} onCredential={setCredential} />
+      ) : null}
       {editing ? <EditForm user={editing} onClose={() => setEditing(null)} /> : null}
+      {credential ? (
+        <CredentialBanner credential={credential} onDismiss={() => setCredential(null)} />
+      ) : null}
 
       <div className="rounded-xl border border-ap-line bg-ap-panel">
         {isLoading ? (
@@ -94,18 +110,30 @@ export function UsersConfigPage(): ReactNode {
                   canUpdate={canUpdate}
                   canSuspend={canSuspend}
                   canDelete={canDelete}
+                  canInvite={canInvite}
+                  isResending={resendMut.isPending && resendMut.variables === user.id}
                   onEdit={() => setEditing(user)}
                   onSuspend={() => suspendMut.mutate(user.id)}
                   onReactivate={() => reactivateMut.mutate(user.id)}
                   onDelete={() => deleteMut.mutate(user.id)}
+                  onResend={() =>
+                    resendMut.mutate(user.id, {
+                      onSuccess: (res) =>
+                        setCredential({
+                          email: user.email,
+                          emailSent: res.keycloak_email_sent,
+                          password: res.temporary_password,
+                        }),
+                    })
+                  }
                 />
               ))}
             </tbody>
           </table>
         )}
-        {suspendMut.isError || reactivateMut.isError || deleteMut.isError ? (
+        {suspendMut.isError || reactivateMut.isError || deleteMut.isError || resendMut.isError ? (
           <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
-            {(suspendMut.error || reactivateMut.error || deleteMut.error)?.message}
+            {(suspendMut.error || reactivateMut.error || deleteMut.error || resendMut.error)?.message}
           </p>
         ) : null}
       </div>
@@ -118,19 +146,25 @@ function UserRow({
   canUpdate,
   canSuspend,
   canDelete,
+  canInvite,
+  isResending,
   onEdit,
   onSuspend,
   onReactivate,
   onDelete,
+  onResend,
 }: {
   user: TenantUser;
   canUpdate: boolean;
   canSuspend: boolean;
   canDelete: boolean;
+  canInvite: boolean;
+  isResending: boolean;
   onEdit: () => void;
   onSuspend: () => void;
   onReactivate: () => void;
   onDelete: () => void;
+  onResend: () => void;
 }): ReactNode {
   const { t } = useTranslation("users");
   const dateLocale = useDateLocale();
@@ -182,6 +216,16 @@ function UserRow({
               {t("row.edit")}
             </button>
           ) : null}
+          {canInvite && !isPending ? (
+            <button
+              type="button"
+              onClick={onResend}
+              disabled={isResending}
+              className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
+            >
+              {isResending ? t("row.resending") : t("row.resend")}
+            </button>
+          ) : null}
           {canSuspend ? (
             memberStatus === "suspended" ? (
               <button
@@ -216,7 +260,13 @@ function UserRow({
   );
 }
 
-function InviteForm({ onClose }: { onClose: () => void }): ReactNode {
+function InviteForm({
+  onClose,
+  onCredential,
+}: {
+  onClose: () => void;
+  onCredential: (credential: Credential) => void;
+}): ReactNode {
   const { t } = useTranslation("users");
   const invite = useInviteTenantUser();
   const [email, setEmail] = useState("");
@@ -228,20 +278,28 @@ function InviteForm({ onClose }: { onClose: () => void }): ReactNode {
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
     setSuccessMsg(null);
+    const invitedEmail = email.trim();
     invite.mutate(
       {
-        email: email.trim(),
+        email: invitedEmail,
         full_name: fullName.trim(),
         phone: phone.trim() || null,
         tenant_role: tenantRole,
       },
       {
         onSuccess: (res) => {
-          setSuccessMsg(
-            res.keycloak_provisioning === "succeeded"
-              ? t("invite.successProvisioned")
-              : t("invite.successPending"),
-          );
+          if (res.keycloak_provisioning === "succeeded") {
+            // Surface the credential banner (email-sent or temp password).
+            onCredential({
+              email: invitedEmail,
+              emailSent: res.keycloak_email_sent,
+              password: res.temporary_password,
+            });
+            setSuccessMsg(null);
+            onClose();
+          } else {
+            setSuccessMsg(t("invite.successPending"));
+          }
           setEmail("");
           setFullName("");
           setPhone("");
@@ -389,6 +447,86 @@ function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }):
         </button>
       </div>
     </form>
+  );
+}
+
+function CredentialBanner({
+  credential,
+  onDismiss,
+}: {
+  credential: Credential;
+  onDismiss: () => void;
+}): ReactNode {
+  const { t } = useTranslation("users");
+  const [copied, setCopied] = useState(false);
+
+  const copy = (): void => {
+    if (!credential.password) return;
+    void navigator.clipboard.writeText(credential.password).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  if (credential.emailSent) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-ap-ok/40 bg-ap-ok/10 p-3 text-sm text-ap-ink">
+        <span>{t("credential.emailSent", { email: credential.email })}</span>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs font-medium text-ap-muted hover:text-ap-ink"
+        >
+          {t("credential.dismiss")}
+        </button>
+      </div>
+    );
+  }
+
+  if (!credential.password) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-ap-warn/40 bg-ap-warn/10 p-3 text-sm text-ap-ink">
+        <span>{t("credential.pending")}</span>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs font-medium text-ap-muted hover:text-ap-ink"
+        >
+          {t("credential.dismiss")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-ap-primary/40 bg-ap-primary/5 p-4 text-sm">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <h2 className="font-semibold text-ap-ink">
+          {t("credential.tempTitle", { email: credential.email })}
+        </h2>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs font-medium text-ap-muted hover:text-ap-ink"
+        >
+          {t("credential.dismiss")}
+        </button>
+      </div>
+      <p className="mb-3 text-xs text-ap-muted">{t("credential.tempHint")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-ap-muted">{t("credential.tempPassword")}</span>
+        <code className="rounded-md border border-ap-line bg-white px-2 py-1 font-mono text-sm text-ap-ink">
+          {credential.password}
+        </code>
+        <button
+          type="button"
+          onClick={copy}
+          className="rounded-md bg-ap-primary px-2 py-1 text-xs font-medium text-white hover:bg-ap-primary/90"
+        >
+          {copied ? t("credential.copied") : t("credential.copy")}
+        </button>
+      </div>
+    </div>
   );
 }
 

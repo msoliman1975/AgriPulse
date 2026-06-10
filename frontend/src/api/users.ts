@@ -39,6 +39,16 @@ export interface UserInviteResponse {
   membership_id: string;
   keycloak_provisioning: "succeeded" | "pending";
   keycloak_subject: string | null;
+  // IH-2: when no welcome email was sent, temporary_password carries a
+  // one-time credential to hand off (SMTP-free onboarding).
+  keycloak_email_sent: boolean;
+  temporary_password: string | null;
+}
+
+export interface UserResendInviteResponse {
+  keycloak_provisioning: "succeeded" | "pending";
+  keycloak_email_sent: boolean;
+  temporary_password: string | null;
 }
 
 export interface UserUpdatePayload {
@@ -72,4 +82,13 @@ export async function reactivateTenantUser(userId: string): Promise<void> {
 
 export async function deleteTenantUser(userId: string): Promise<void> {
   await apiClient.delete(`/v1/users/${userId}`);
+}
+
+export async function resendTenantUserInvite(
+  userId: string,
+): Promise<UserResendInviteResponse> {
+  const { data } = await apiClient.post<UserResendInviteResponse>(
+    `/v1/users/${userId}:resend-invite`,
+  );
+  return data;
 }
