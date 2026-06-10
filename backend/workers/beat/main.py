@@ -22,6 +22,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.farm_scope_consistency_check_seconds),
         "options": {"queue": "light"},
     },
+    # IH-6: DB -> Keycloak reconciler. Re-asserts each provisioned user's
+    # enabled flag + tenant_id/tenant_role attributes from the DB so a
+    # role flipped in the DB, a suspended membership, or a soft-deleted
+    # user converges in Keycloak within one cycle (gaps G6, G11).
+    "iam.reconcile_keycloak": {
+        "task": "iam.reconcile_keycloak",
+        "schedule": float(_settings.keycloak_reconcile_seconds),
+        "options": {"queue": "light"},
+    },
     # Sweep every active subscription whose last attempt is older than
     # its cadence and enqueue `imagery.discover_scenes`. The actual
     # SH calls + acquisitions happen on the heavy worker queue; this

@@ -71,6 +71,17 @@ class InviteResult:
     temporary_password: str | None = None
 
 
+@dataclass(frozen=True)
+class KeycloakUserState:
+    """Snapshot of the fields the reconciler (IH-6) keeps in sync with the
+    DB: whether the login is enabled and the tenant/platform claims."""
+
+    enabled: bool
+    tenant_id: str | None
+    tenant_role: str | None
+    platform_role: str | None
+
+
 class KeycloakAdminClient(Protocol):
     """Surface area used by tenancy + iam provisioning paths."""
 
@@ -96,6 +107,12 @@ class KeycloakAdminClient(Protocol):
     ) -> None: ...
 
     async def resend_invite(self, *, keycloak_user_id: str) -> InviteResult: ...
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None: ...
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None: ...
 
     async def disable_users_in_group(self, slug: str) -> int: ...
 
@@ -166,6 +183,17 @@ class NoopKeycloakClient:
         raise KeycloakNotConfiguredError(
             "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
         )
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None:
+        # Reconciler treats "unknown" as nothing to do.
+        self._log.warning("keycloak_noop_get_user_state", keycloak_user_id=keycloak_user_id)
+        return None
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None:
+        del tenant_id, tenant_role
+        self._log.warning("keycloak_noop_set_tenant_attributes", keycloak_user_id=keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,
@@ -461,6 +489,38 @@ class HttpxKeycloakAdminClient:
             email_sent=result.email_sent,
         )
         return result
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None:
+        resp = await self._request(
+            "GET",
+            f"/users/{keycloak_user_id}",
+            operation="get_user_state",
+            expected=(200, 404),
+        )
+        if resp.status_code == 404:
+            return None
+        user = resp.json()
+        attrs = user.get("attributes") or {}
+
+        def _first(key: str) -> str | None:
+            values = attrs.get(key)
+            return values[0] if values else None
+
+        return KeycloakUserState(
+            enabled=bool(user.get("enabled", False)),
+            tenant_id=_first("tenant_id"),
+            tenant_role=_first("tenant_role"),
+            platform_role=_first("platform_role"),
+        )
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None:
+        await self._set_tenant_attributes(
+            keycloak_user_id=keycloak_user_id,
+            tenant_id=tenant_id,
+            tenant_role=tenant_role,
+        )
 
     async def disable_users_in_group(self, slug: str) -> int:
         return await self._toggle_users_in_group(slug, enabled=False)

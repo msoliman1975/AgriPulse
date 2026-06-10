@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from app.shared.keycloak.client import InviteResult, group_name_for
+from app.shared.keycloak.client import InviteResult, KeycloakUserState, group_name_for
 from app.shared.keycloak.errors import KeycloakRequestError
 
 
@@ -140,6 +140,28 @@ class FakeKeycloakClient:
         if user is None:
             raise KeycloakRequestError(404, "user not found", operation="resend_invite")
         return self._issue(user)
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None:
+        self._maybe_fail("get_user_state")
+        user = self.users.get(keycloak_user_id)
+        if user is None:
+            return None
+        return KeycloakUserState(
+            enabled=user.enabled,
+            tenant_id=user.tenant_id,
+            tenant_role=user.tenant_role,
+            platform_role=user.platform_role,
+        )
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None:
+        self._maybe_fail("set_tenant_attributes")
+        user = self.users.get(keycloak_user_id)
+        if user is None:
+            raise KeycloakRequestError(404, "user not found", operation="set_tenant_attributes")
+        user.tenant_id = str(tenant_id)
+        user.tenant_role = tenant_role
 
     async def add_existing_user_to_group(
         self,

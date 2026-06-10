@@ -125,6 +125,12 @@ class Settings(BaseSettings):
     # farm is hard-deleted, which is operationally rare.
     farm_scope_consistency_check_seconds: int = 3600
 
+    # IH-6: cadence for the DB -> Keycloak reconciler that re-asserts each
+    # user's enabled flag + tenant attributes from the DB (source of
+    # truth). 15 min keeps the drift window at most one token-refresh
+    # beyond the access-token lifespan.
+    keycloak_reconcile_seconds: int = 900
+
     # Sweep cadence for the Beat task that walks active subscriptions and
     # enqueues `discover_scenes`. Production overrides via env. Hourly in
     # dev so a fresh subscription returns imagery within one Beat cycle.

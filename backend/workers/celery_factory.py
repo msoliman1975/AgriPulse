@@ -27,6 +27,8 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.indices.tasks",
     "app.modules.weather.tasks",
     "app.modules.farms.tasks",
+    # IH-6: periodic DB -> Keycloak reconciler.
+    "app.modules.iam.tasks",
     # Stage 2 of the rules sunset deleted `alerts.tasks`. Trees own
     # alert generation now via `recommendations.tasks`. The Beat
     # config in `workers/beat/main.py` no longer schedules an alerts
