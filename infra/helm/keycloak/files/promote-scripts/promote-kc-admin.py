@@ -40,6 +40,7 @@ from scripts.dev_bootstrap import (  # noqa: E402
     kc_admin_token,
     kc_create_user,
     kc_enable_unmanaged_attributes,
+    kc_ensure_realm_roles,
     kc_get_user,
     kc_set_user_attributes,
     kc_get_client_uuid,
@@ -58,6 +59,9 @@ with httpx.Client(timeout=30.0) as client:
 
     kc_enable_unmanaged_attributes(client, token)
     print("realm: unmanagedAttributePolicy=ENABLED")
+
+    kc_ensure_realm_roles(client, token)
+    print("realm: application roles ensured")
 
     user = kc_get_user(client, token, BOOTSTRAP_EMAIL)
     if user is None:

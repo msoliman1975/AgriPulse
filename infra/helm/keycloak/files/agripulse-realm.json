@@ -14,6 +14,16 @@
   "ssoSessionMaxLifespan": 36000,
   "loginTheme": "agripulse",
   "accountTheme": "agripulse",
+  "roles": {
+    "realm": [
+      { "name": "PlatformAdmin", "description": "AgriPulse staff with full cross-tenant control." },
+      { "name": "PlatformSupport", "description": "Read-only platform support access." },
+      { "name": "TenantOwner", "description": "Tenant super-admin; exactly one per tenant." },
+      { "name": "TenantAdmin", "description": "Tenant admin; all tenant capabilities except billing and ownership transfer." },
+      { "name": "BillingAdmin", "description": "Subscription and billing only." },
+      { "name": "Viewer", "description": "Read-only tenant access." }
+    ]
+  },
   "clients": [
     {
       "clientId": "agripulse-api",

@@ -172,6 +172,40 @@ def kc_create_user(
     return found
 
 
+APP_REALM_ROLES: tuple[str, ...] = (
+    "PlatformAdmin",
+    "PlatformSupport",
+    "TenantOwner",
+    "TenantAdmin",
+    "BillingAdmin",
+    "Viewer",
+)
+
+
+def kc_ensure_realm_roles(
+    client: httpx.Client,
+    token: str,
+    roles: tuple[str, ...] = APP_REALM_ROLES,
+) -> None:
+    """Idempotently create the application realm roles (IH-4).
+
+    The roles are also declared in the realm-import JSON, but Keycloak's
+    realm import can drop the roles block on a re-import, so the promote
+    job re-asserts them. The api no longer auto-creates roles on first
+    assignment (a missing role is now a hard error), so this is the
+    single place roles are provisioned for a deployed cluster.
+    """
+    base = f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/roles"
+    for name in roles:
+        resp = client.post(
+            base,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": name},
+        )
+        if resp.status_code not in (201, 409):  # 409 = already exists
+            resp.raise_for_status()
+
+
 def kc_enable_unmanaged_attributes(client: httpx.Client, token: str) -> None:
     """Allow arbitrary custom attributes on users.
 

@@ -56,11 +56,29 @@ class FakeKeycloakClient:
         # Mirrors `settings.keycloak_smtp_enabled`: when False the fake
         # mints a temporary password instead of "emailing" the reset.
         self.smtp_enabled: bool = True
+        # IH-4: the real client no longer auto-creates realm roles — a
+        # missing role raises. Mirror that: only the seeded application
+        # roles can be assigned. Tests can extend this set if needed.
+        self.known_realm_roles: set[str] = {
+            "PlatformAdmin",
+            "PlatformSupport",
+            "TenantOwner",
+            "TenantAdmin",
+            "BillingAdmin",
+            "Viewer",
+        }
 
     def _maybe_fail(self, name: str) -> None:
         if self.fail_on == name:
             self.fail_on = None
             raise KeycloakRequestError(500, "fake forced failure", operation=name)
+
+    def _check_realm_roles(self, roles: tuple[str, ...], *, operation: str) -> None:
+        for role in roles:
+            if role not in self.known_realm_roles:
+                raise KeycloakRequestError(
+                    404, f"realm role {role!r} does not exist", operation=operation
+                )
 
     def _issue(self, user: FakeUser) -> InviteResult:
         if self.smtp_enabled:
@@ -92,6 +110,7 @@ class FakeKeycloakClient:
         self._maybe_fail("invite_user")
         if group_id not in self.groups:
             raise KeycloakRequestError(404, "group not found", operation="invite_user")
+        self._check_realm_roles(roles, operation="invite_user")
         # Idempotency: if user already exists by email, reuse.
         for user in self.users.values():
             if user.email == email:
@@ -131,6 +150,7 @@ class FakeKeycloakClient:
         tenant_id: UUID | str | None = None,
     ) -> None:
         self._maybe_fail("add_existing_user_to_group")
+        self._check_realm_roles(roles, operation="add_existing_user_to_group")
         if group_id not in self.groups:
             raise KeycloakRequestError(
                 404, "group not found", operation="add_existing_user_to_group"
@@ -196,6 +216,7 @@ class FakeKeycloakClient:
         role: str = "PlatformAdmin",
     ) -> InviteResult:
         self._maybe_fail("invite_platform_admin")
+        self._check_realm_roles((role,), operation="invite_platform_admin")
         for user in self.users.values():
             if user.email == email:
                 user.platform_role = role

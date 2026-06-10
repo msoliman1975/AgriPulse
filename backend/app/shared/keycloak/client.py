@@ -701,6 +701,11 @@ class HttpxKeycloakAdminClient:
 
     async def _assign_realm_role(self, user_id: str, role_name: str) -> None:
         # Look up the role's representation (id required by the mapping API).
+        # IH-4: the application roles (PlatformAdmin, TenantOwner, …) are
+        # seeded into the realm by import + the promote job's
+        # ensure-roles step, so a missing role here is a real error — a
+        # typo or an un-promoted realm — not something to paper over by
+        # silently creating a new role (which used to mask typos).
         resp = await self._request(
             "GET",
             f"/roles/{role_name}",
@@ -708,28 +713,11 @@ class HttpxKeycloakAdminClient:
             expected=(200, 404),
         )
         if resp.status_code == 404:
-            # Fresh realm imports don't ship our application roles
-            # (TenantOwner, TenantAdmin, FarmManager, ...). Auto-create on
-            # first assignment so the invite flow doesn't silently produce
-            # users with no realm role. Subsequent invites find the role
-            # via the GET above and skip this path.
-            self._log.info(
-                "keycloak_role_creating_on_demand",
-                role=role_name,
-                user_id=user_id,
-            )
-            await self._request(
-                "POST",
-                "/roles",
-                operation="create_realm_role",
-                json={"name": role_name},
-                expected=(201, 409),
-            )
-            resp = await self._request(
-                "GET",
-                f"/roles/{role_name}",
-                operation="lookup_role_after_create",
-                expected=(200,),
+            raise KeycloakRequestError(
+                404,
+                f"realm role {role_name!r} does not exist — seed it via the realm "
+                "import + promote ensure-roles step before assigning it",
+                operation="lookup_role",
             )
         role = resp.json()
         await self._request(
