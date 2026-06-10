@@ -118,31 +118,40 @@ spec:
                 name: agripulse-keycloak-promote-bootstrap
           command:
             - /bin/sh
-            - -ec
+            - -c
             - |
+              set -u
+              # failOnError=false makes a transient Keycloak outage (or a
+              # single failing step) a logged warning + clean exit 0 rather
+              # than a failed PostSync hook that blocks the whole keycloak
+              # sync. This is what lets the hook be re-enabled on adopted /
+              # single-node clusters where blocking the sync is unacceptable.
+              FAIL_FAST={{ ternary "1" "0" .Values.promoteBootstrap.failOnError }}
+              fail() {
+                echo "ERROR: $1"
+                if [ "$FAIL_FAST" = "1" ]; then exit 1; fi
+                echo "  (promoteBootstrap.failOnError=false — continuing, sync not blocked)"
+              }
               # Wait until keycloak is actually answering admin requests.
               # ArgoCD considers a Deployment "Healthy" as soon as readiness
               # probes pass, but bitnami keycloak's readiness checks
               # /realms/master/.well-known/openid-configuration which can
               # answer before the admin REST API is fully wired.
               echo "Waiting for keycloak admin REST to answer..."
+              UP=0
               for i in $(seq 1 60); do
                 if /opt/venv/bin/python -c "import httpx; httpx.post('${KEYCLOAK_BASE_URL}/realms/master/protocol/openid-connect/token', data={'grant_type':'password','client_id':'admin-cli','username':'${KEYCLOAK_ADMIN}','password':'${KEYCLOAK_PASSWORD}'}, timeout=10).raise_for_status()" 2>/dev/null; then
-                  echo "Keycloak admin REST is up (attempt $i)"
-                  break
+                  UP=1; echo "Keycloak admin REST is up (attempt $i)"; break
                 fi
                 echo "  not ready yet (attempt $i/60)"
                 sleep 5
               done
-              echo ""
-              echo "=== 1/3 promote-kc-admin.py ==="
-              /opt/venv/bin/python /promote/promote-kc-admin.py
-              echo ""
-              echo "=== 2/3 promote-kc-tenancy.py ==="
-              /opt/venv/bin/python /promote/promote-kc-tenancy.py
-              echo ""
-              echo "=== 3/3 add-tenant-mappers.py ==="
-              /opt/venv/bin/python /promote/add-tenant-mappers.py
+              if [ "$UP" != "1" ]; then fail "keycloak admin REST never answered"; exit 0; fi
+              for step in promote-kc-admin promote-kc-tenancy add-tenant-mappers; do
+                echo ""
+                echo "=== ${step}.py ==="
+                /opt/venv/bin/python /promote/${step}.py || fail "${step}.py failed"
+              done
               echo ""
               echo "Keycloak promotion complete."
           volumeMounts:
