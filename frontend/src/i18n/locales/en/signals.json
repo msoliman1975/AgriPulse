@@ -211,6 +211,8 @@
       "lat": "Latitude",
       "lon": "Longitude",
       "notes": "Notes (optional)",
+      "downloadSample": "Download sample file",
+      "downloadSampleHint": "A small CSV pre-filled with this signal's columns and a few example rows. Edit it and import via the bulk uploader above.",
       "photo": "Photo (optional, max 20MB)",
       "uploading": "Uploading…",
       "recording": "Recording…",
