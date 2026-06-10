@@ -65,6 +65,10 @@ class InvitePlatformAdminResponse(BaseModel):
     keycloak_subject: str | None
     keycloak_provisioning: Literal["succeeded", "pending"]
     role: Literal["PlatformAdmin", "PlatformSupport"]
+    # IH-2: SMTP-free onboarding. When the welcome email wasn't sent,
+    # `temporary_password` carries a one-time credential to hand off.
+    keycloak_email_sent: bool = False
+    temporary_password: str | None = None
 
 
 @router.get("", response_model=list[PlatformAdminRow])

@@ -15,6 +15,7 @@ from app.modules.iam.schemas import (
     TenantUserResponse,
     UserInviteRequest,
     UserInviteResponse,
+    UserResendInviteResponse,
     UserUpdateRequest,
 )
 from app.modules.iam.service import UserNotFoundError, UserService, get_user_service
@@ -155,6 +156,30 @@ async def invite_tenant_user(
             type_="https://agripulse.cloud/problems/iam/user-already-exists",
             extras={"email": exc.email},
         ) from exc
+
+
+@router.post(
+    "/users/{user_id}:resend-invite",
+    response_model=UserResendInviteResponse,
+    summary="Re-issue a user's first-login credential (welcome email / temp password).",
+)
+async def resend_tenant_user_invite(
+    user_id: UUID,
+    context: RequestContext = Depends(requires_capability("user.invite")),
+    service: TenantUsersService = Depends(_users_service),
+    session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    try:
+        return await service.resend_invite(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            actor_user_id=context.user_id,
+            tenant_schema=schema,
+        )
+    except TenantUserNotFoundError as exc:
+        raise _user_not_found(user_id) from exc
 
 
 @router.patch(

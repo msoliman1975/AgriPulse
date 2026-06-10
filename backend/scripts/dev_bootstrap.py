@@ -140,8 +140,15 @@ def kc_create_user(
     email: str,
     password: str,
     full_name: str,
+    temporary: bool = False,
 ) -> dict[str, Any]:
-    """Create a new realm user with credentials. Returns the created user dict."""
+    """Create a new realm user with credentials. Returns the created user dict.
+
+    When ``temporary`` is True the password is marked temporary, so
+    Keycloak forces an UPDATE_PASSWORD on first login — used by the
+    production bootstrap-admin path (IH-1) so the seeded credential is
+    never a durable one.
+    """
     body = {
         "username": email,
         "email": email,
@@ -149,7 +156,7 @@ def kc_create_user(
         "enabled": True,
         "firstName": full_name.split()[0] if full_name else "Dev",
         "lastName": " ".join(full_name.split()[1:]) or "User",
-        "credentials": [{"type": "password", "value": password, "temporary": False}],
+        "credentials": [{"type": "password", "value": password, "temporary": temporary}],
     }
     resp = client.post(
         f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
@@ -163,6 +170,40 @@ def kc_create_user(
     if found is None:  # defensive
         raise RuntimeError(f"Could not create or find Keycloak user {email!r}")
     return found
+
+
+APP_REALM_ROLES: tuple[str, ...] = (
+    "PlatformAdmin",
+    "PlatformSupport",
+    "TenantOwner",
+    "TenantAdmin",
+    "BillingAdmin",
+    "Viewer",
+)
+
+
+def kc_ensure_realm_roles(
+    client: httpx.Client,
+    token: str,
+    roles: tuple[str, ...] = APP_REALM_ROLES,
+) -> None:
+    """Idempotently create the application realm roles (IH-4).
+
+    The roles are also declared in the realm-import JSON, but Keycloak's
+    realm import can drop the roles block on a re-import, so the promote
+    job re-asserts them. The api no longer auto-creates roles on first
+    assignment (a missing role is now a hard error), so this is the
+    single place roles are provisioned for a deployed cluster.
+    """
+    base = f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/roles"
+    for name in roles:
+        resp = client.post(
+            base,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": name},
+        )
+        if resp.status_code not in (201, 409):  # 409 = already exists
+            resp.raise_for_status()
 
 
 def kc_enable_unmanaged_attributes(client: httpx.Client, token: str) -> None:

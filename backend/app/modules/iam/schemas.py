@@ -112,6 +112,20 @@ class UserInviteResponse(BaseModel):
     membership_id: UUID
     keycloak_provisioning: str  # "succeeded" | "pending"
     keycloak_subject: str | None
+    # IH-2: first-login credential outcome. When `keycloak_email_sent` is
+    # False and provisioning succeeded, `temporary_password` carries a
+    # one-time credential for the inviting admin to hand off (SMTP-free
+    # onboarding). It's null when an email went out or when KC is pending.
+    keycloak_email_sent: bool = False
+    temporary_password: str | None = None
+
+
+class UserResendInviteResponse(BaseModel):
+    """POST /v1/users/{user_id}:resend-invite."""
+
+    keycloak_provisioning: str  # "succeeded" | "pending"
+    keycloak_email_sent: bool = False
+    temporary_password: str | None = None
 
 
 class UserUpdateRequest(BaseModel):

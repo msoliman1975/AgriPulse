@@ -34,6 +34,13 @@ externalSecrets:
   # promoteBootstrap.enabled is also off.
   promote:
     enabled: true
+    # IH-1: when true, the promote ExternalSecret also pulls
+    # `agripulse/<env>/keycloak-bootstrap-admin-password` into the Job as
+    # KC_BOOTSTRAP_ADMIN_PASSWORD so a fresh cluster can create the first
+    # PlatformAdmin. Leave off where that SM key doesn't exist yet (e.g.
+    # an already-bootstrapped dev cluster whose realm still has the user)
+    # so the ExternalSecret keeps syncing.
+    bootstrapAdminPassword: false
 
 # BH-2: PostSync hook that drives Keycloak into the realm shape the api
 # expects (tenancy client + service-account roles + smtpServer + tenant
@@ -55,6 +62,18 @@ promoteBootstrap:
     # Hand-bump only matters for `helm template` outside the overlay.
     repository: ghcr.io/msoliman1975/agripulse/api
     tag: ""
+  # IH-1: the bootstrap PlatformAdmin. The realm JSON no longer ships a
+  # hard-coded user for deployed clusters; promote-kc-admin.py ensures
+  # this user exists with platform_role=PlatformAdmin. On a cluster whose
+  # realm predates IH-1 the user already exists and `password` is unused.
+  # For a fresh cluster, set `externalSecrets.promote.bootstrapAdminPassword`
+  # on (sourcing SM `agripulse/<env>/keycloak-bootstrap-admin-password`)
+  # so the job can create the user. `temporary: true` forces a reset on
+  # first login.
+  bootstrapAdmin:
+    email: "dev@agripulse.local"
+    fullName: "Platform Admin"
+    temporary: true
   # Brevo SMTP — non-secret bits. Password comes from SM via the
   # `agripulse-keycloak-promote-bootstrap` ExternalSecret.
   brevo:

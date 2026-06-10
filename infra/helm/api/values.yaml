@@ -195,6 +195,19 @@ databasePasswordSecret:
 migrationJob:
   enabled: true
 
+# IH-5: idempotent PostSync hook Job that seeds one tenant + owner so a
+# fresh environment is usable with zero Keycloak-console clicks. Off by
+# default — turn on per-env and set the slug/owner. No-op when the slug
+# already exists, so it's safe to leave enabled across redeploys.
+seedTenantJob:
+  enabled: false
+  slug: ""
+  name: ""
+  contactEmail: ""
+  ownerEmail: ""
+  ownerFullName: ""
+  tier: "free"
+
 serviceMonitor:
   enabled: true
   interval: 30s

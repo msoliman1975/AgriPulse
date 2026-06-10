@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     # email (UPDATE_PASSWORD action). Empty string omits the param so KC
     # uses the realm default.
     keycloak_invite_redirect_url: str = ""
+    # When False, the invite / welcome flow skips the SMTP-dependent
+    # `execute-actions-email` step and instead sets a one-time temporary
+    # password that is returned in the API response (the inviting admin
+    # hands it off out of band). When True (default) we email the reset
+    # link and only fall back to a temp password if the send fails. Set
+    # False for environments with no SMTP configured so onboarding never
+    # silently strands users without a credential.
+    keycloak_smtp_enabled: bool = True
 
     # --- Platform-admin bootstrap (PR-Reorg6) -----------------------------
     # On cold start, if no PlatformAdmin exists in
@@ -116,6 +124,12 @@ class Settings(BaseSettings):
     # `tenant_<id>.farms`. Hourly is enough â€” orphans only happen when a
     # farm is hard-deleted, which is operationally rare.
     farm_scope_consistency_check_seconds: int = 3600
+
+    # IH-6: cadence for the DB -> Keycloak reconciler that re-asserts each
+    # user's enabled flag + tenant attributes from the DB (source of
+    # truth). 15 min keeps the drift window at most one token-refresh
+    # beyond the access-token lifespan.
+    keycloak_reconcile_seconds: int = 900
 
     # Sweep cadence for the Beat task that walks active subscriptions and
     # enqueues `discover_scenes`. Production overrides via env. Hourly in

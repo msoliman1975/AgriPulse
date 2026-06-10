@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgriPulse — Identity, Tenancy &amp; Roles E2E</title>
+<style>
+  :root{
+    --ink:#13241c; --ink-2:#2f4438; --muted:#5d7368; --line:#dce6df;
+    --bg:#f6f9f6; --card:#ffffff; --mint:#e8f3ec; --sage:#6f8f7c;
+    --green:#1f9d63; --green-d:#157a4b; --pulse:#28c277;
+    --amber:#b9821a; --amber-bg:#fbf3e0; --red:#c0392b; --red-bg:#fbeae8;
+    --blue:#2a6fb0; --blue-bg:#e9f1f9; --shadow:0 1px 2px rgba(20,40,30,.06),0 8px 24px rgba(20,40,30,.05);
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.55;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* ── Header ───────────────────────────────── */
+  header.hero{background:linear-gradient(135deg,#13241c 0%,#1d3a2b 55%,#1f5e3e 100%);color:#eaf4ee;padding:46px 0 40px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px;font-size:18px}
+  .brand .dot{width:13px;height:13px;border-radius:50%;background:var(--pulse);box-shadow:0 0 0 4px rgba(40,194,119,.25)}
+  header.hero h1{font-size:32px;margin:18px 0 8px;line-height:1.15;font-weight:740;letter-spacing:-.4px}
+  header.hero p.sub{margin:0;color:#bcd6c7;max-width:760px;font-size:15.5px}
+  .meta{display:flex;gap:22px;flex-wrap:wrap;margin-top:22px;font-size:12.5px;color:#9fc1ac}
+  .meta b{color:#dcefe2;font-weight:600}
+
+  /* ── TOC ──────────────────────────────────── */
+  nav.toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:-26px auto 0;box-shadow:var(--shadow);position:relative;z-index:2}
+  nav.toc h4{margin:0 0 10px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--sage)}
+  nav.toc ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;counter-reset:t}
+  nav.toc a{counter-increment:t;display:flex;gap:10px;color:var(--ink-2);text-decoration:none;font-size:13.5px;padding:3px 0}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);color:var(--green);font-family:var(--mono);font-size:11.5px;font-weight:600}
+  nav.toc a:hover{color:var(--green-d)}
+
+  section{padding:40px 0 8px}
+  h2{font-size:23px;margin:0 0 4px;letter-spacing:-.3px;display:flex;align-items:center;gap:11px}
+  h2 .n{font-family:var(--mono);font-size:13px;color:#fff;background:var(--green);width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+  h3{font-size:16px;margin:26px 0 8px;color:var(--ink-2)}
+  p{margin:9px 0}
+  .lede{color:var(--muted);font-size:15px;margin:6px 0 18px}
+
+  code{font-family:var(--mono);font-size:.85em;background:var(--mint);color:var(--green-d);padding:1.5px 6px;border-radius:5px;border:1px solid #d3e5d9}
+  .path{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:20px 22px;box-shadow:var(--shadow);margin:16px 0}
+
+  /* ── Tier cards ───────────────────────────── */
+  .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+  .tier{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
+  .tier h4{margin:0 0 3px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .tier .scope{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--sage);font-weight:600}
+  .tier ul{margin:10px 0 0;padding-left:0;list-style:none}
+  .tier li{padding:5px 0;border-top:1px dashed var(--line);font-size:13px;display:flex;justify-content:space-between;gap:8px}
+  .tier li:first-child{border-top:none}
+  .tier li b{font-weight:600;color:var(--ink)}
+  .tier li span{color:var(--muted);font-size:11.5px;text-align:right}
+  .pin{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .p-plat{background:#7c4dff}.p-ten{background:var(--green)}.p-farm{background:var(--amber)}
+
+  /* ── Flow / sequence ──────────────────────── */
+  .seq{counter-reset:s;margin:18px 0;padding:0;list-style:none}
+  .seq>li{counter-increment:s;position:relative;padding:0 0 22px 52px;border-left:2px solid var(--line);margin-left:14px}
+  .seq>li:last-child{border-left-color:transparent;padding-bottom:2px}
+  .seq>li::before{content:counter(s);position:absolute;left:-15px;top:-2px;width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-family:var(--mono);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px var(--bg)}
+  .seq .who{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--sage)}
+  .seq .act{font-weight:600;margin:1px 0 3px;font-size:14.5px}
+  .seq .det{font-size:13px;color:var(--muted)}
+  .seq .det .path{display:block;margin-top:3px}
+
+  /* lane diagram */
+  .lanes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:16px 0;background:var(--card);box-shadow:var(--shadow)}
+  .lane-h{padding:11px 14px;font-size:12px;font-weight:700;text-align:center;color:#fff}
+  .lh-fe{background:#2a6fb0}.lh-api{background:var(--green-d)}.lh-kc{background:#7c4dff}
+  .lane-c{padding:10px 12px;border-top:1px solid var(--line);border-left:1px solid var(--line);font-size:12.5px;min-height:42px}
+  .lane-c:nth-child(3n+1){border-left:none}
+  .lane-c.empty{background:repeating-linear-gradient(45deg,#fafcfa,#fafcfa 6px,#f3f7f4 6px,#f3f7f4 12px)}
+  .lane-c b{font-size:11px;color:var(--green-d);font-family:var(--mono)}
+
+  /* ── Tables ───────────────────────────────── */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--mint);color:var(--ink-2);font-size:11px;letter-spacing:.6px;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:11.5px}
+
+  .badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:20px;text-transform:uppercase;white-space:nowrap}
+  .b-auto{background:var(--mint);color:var(--green-d)}
+  .b-man{background:var(--amber-bg);color:var(--amber)}
+  .b-gap{background:var(--red-bg);color:var(--red)}
+  .b-yes{background:var(--mint);color:var(--green-d)}
+  .b-no{background:#eef1ef;color:var(--muted)}
+
+  .sev{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .s-hi{background:var(--red-bg);color:var(--red)}
+  .s-md{background:var(--amber-bg);color:var(--amber)}
+  .s-lo{background:var(--blue-bg);color:var(--blue)}
+
+  /* ── Callouts ─────────────────────────────── */
+  .note{border-radius:11px;padding:14px 16px 14px 18px;margin:16px 0;border:1px solid;font-size:13.5px}
+  .note h5{margin:0 0 5px;font-size:13px;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+  .note.gap{background:var(--red-bg);border-color:#f0cfc9}
+  .note.gap h5{color:var(--red)}
+  .note.fix{background:var(--mint);border-color:#cfe5d6}
+  .note.fix h5{color:var(--green-d)}
+  .note.info{background:var(--blue-bg);border-color:#cfe0f0}
+  .note.info h5{color:var(--blue)}
+  .note ul{margin:6px 0 0;padding-left:18px}
+  .note li{margin:3px 0}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;background:var(--mint);border:1px solid #d3e5d9;border-radius:8px;padding:3px 9px;font-size:12px;font-family:var(--mono);color:var(--green-d);margin:2px 4px 2px 0}
+
+  details{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:10px 0;box-shadow:var(--shadow)}
+  summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:13.5px;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ ";color:var(--green)}
+  details[open] summary::before{content:"▾ "}
+  details .body{padding:0 16px 14px;font-size:13px}
+
+  footer{margin-top:48px;padding:26px 0 50px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+
+  @media(max-width:760px){
+    .tiers,.lanes{grid-template-columns:1fr}
+    nav.toc ol{grid-template-columns:1fr}
+    .lane-c{border-left:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> AgriPulse</div>
+    <h1>Identity, Tenancy &amp; Roles — End-to-End</h1>
+    <p class="sub">How platform admins, tenant admins, and tenant users are provisioned across the FastAPI backend, the platform Postgres, and Keycloak 26 — what is seeded, what is automated, and where the gaps are if the goal is to minimise hands-on Keycloak management.</p>
+    <div class="meta">
+      <span><b>Realm</b> agripulse (single realm, tenant_id as JWT claim)</span>
+      <span><b>Keycloak</b> 26.0.8 (Bitnami chart)</span>
+      <span><b>Auth</b> OIDC · 15-min access tokens</span>
+      <span><b>Status</b> reference doc · 2026-06-09</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#model">The identity model — 3 stores, 3 tiers</a></li>
+      <li><a href="#roles">Roles &amp; capability matrix</a></li>
+      <li><a href="#seed">What is seeded today</a></li>
+      <li><a href="#bootstrap">Flow A — Fresh-deploy bootstrap</a></li>
+      <li><a href="#tenant">Flow B — Tenant creation + first owner</a></li>
+      <li><a href="#invite">Flow C — User invitation &amp; login</a></li>
+      <li><a href="#admins">Flow D — Granting admins</a></li>
+      <li><a href="#gaps">Gap analysis</a></li>
+      <li><a href="#seeding">Recommended seeding strategy</a></li>
+    </ol>
+  </nav>
+
+  <!-- ───────────────────────── 1 ───────────────────────── -->
+  <section id="model">
+    <h2><span class="n">1</span> The identity model</h2>
+    <p class="lede">Identity is deliberately split across <b>three stores</b>. Understanding this split is the key to every flow and every gap below.</p>
+
+    <div class="lanes">
+      <div class="lane-h lh-kc">Keycloak (auth)</div>
+      <div class="lane-h lh-api">Platform Postgres (truth)</div>
+      <div class="lane-h lh-fe">JWT (transport)</div>
+
+      <div class="lane-c"><b>users</b> — credentials, email, password. The login authority.</div>
+      <div class="lane-c"><b>public.users</b> — global person row, links to <code>keycloak_subject</code>.</div>
+      <div class="lane-c"><b>sub / email / name</b> — who you are.</div>
+
+      <div class="lane-c"><b>groups</b> <code>tenant-&lt;slug&gt;</code> — used for member discovery &amp; legacy kcadm ops.</div>
+      <div class="lane-c"><b>tenant_memberships</b> + <b>tenant_role_assignments</b> — the authoritative role record. Supports many tenants per user.</div>
+      <div class="lane-c"><b>tenant_id / tenant_role</b> — single-valued attributes → claims.</div>
+
+      <div class="lane-c"><b>realm roles</b> — auto-created lazily on first assignment (TenantOwner, …).</div>
+      <div class="lane-c"><b>platform_role_assignments</b> + <b>farm_scopes</b> (farm-tier roles live <em>only</em> here + JWT).</div>
+      <div class="lane-c"><b>platform_role / farm_scopes</b> — drive RBAC in the API.</div>
+    </div>
+
+    <div class="note info">
+      <h5>◆ How they connect at request time</h5>
+      Keycloak signs a JWT carrying <code>tenant_id</code>, <code>tenant_role</code>, <code>platform_role</code> and <code>farm_scopes</code> (projected from KC <em>user attributes</em> via protocol mappers). The API middleware (<span class="path">backend/app/shared/auth/middleware.py</span>) validates the token against JWKS, builds a <code>RequestContext</code> (<span class="path">…/auth/context.py</span>), then resolves permissions <b>PlatformRole → TenantRole → FarmScope (first match wins)</b> against <span class="path">app/shared/rbac/role_capabilities.yaml</span>. Tenant routing does <code>SET LOCAL search_path TO tenant_&lt;uuid&gt;, public</code> — the tenant is taken from the claim, never the URL.
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 2 ───────────────────────── -->
+  <section id="roles">
+    <h2><span class="n">2</span> Roles &amp; capabilities</h2>
+    <p class="lede">Ten roles across three scopes. Defined as enums in <span class="path">app/shared/auth/context.py</span>; capabilities mapped in <span class="path">app/shared/rbac/role_capabilities.yaml</span>.</p>
+
+    <div class="tiers">
+      <div class="tier">
+        <span class="scope"><span class="pin p-plat"></span> Platform scope</span>
+        <h4>AgriPulse staff</h4>
+        <ul>
+          <li><b>PlatformAdmin</b><span>all caps <code>*</code></span></li>
+          <li><b>PlatformSupport</b><span>~23 read-only</span></li>
+        </ul>
+      </div>
+      <div class="tier">
+        <span class="scope"><span class="pin p-ten"></span> Tenant scope</span>
+        <h4>Customer org</h4>
+        <ul>
+          <li><b>TenantOwner</b><span>~76 caps · 1 per tenant</span></li>
+          <li><b>TenantAdmin</b><span>~74 · no billing/transfer</span></li>
+          <li><b>BillingAdmin</b><span>subscriptions only</span></li>
+          <li><b>Viewer</b><span>read-only</span></li>
+        </ul>
+      </div>
+      <div class="tier">
+        <span class="scope"><span class="pin p-farm"></span> Farm scope</span>
+        <h4>Per-farm grants</h4>
+        <ul>
+          <li><b>FarmManager</b><span>~43 caps</span></li>
+          <li><b>Agronomist</b><span>~30 · no geometry</span></li>
+          <li><b>FieldOperator</b><span>~19</span></li>
+          <li><b>Scout</b><span>~13 · observations</span></li>
+          <li><b>Viewer</b><span>~11 read-only</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note info">
+      <h5>◆ Important asymmetry</h5>
+      Only <b>platform</b> and <b>tenant</b> roles map to Keycloak realm roles + attributes. The five <b>farm-scoped</b> roles exist <em>only</em> in the DB and the <code>farm_scopes</code> JWT claim — they are never realm roles. So the Keycloak realm only ever represents part of the authorisation model; the DB is the real source of truth.
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 3 ───────────────────────── -->
+  <section id="seed">
+    <h2><span class="n">3</span> What is seeded today</h2>
+    <p class="lede">A fresh deploy seeds three things automatically. Note how little of it is identity data.</p>
+
+    <table>
+      <thead><tr><th>Layer</th><th>Seeded by</th><th>What lands</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Keycloak realm</b></td>
+          <td><span class="path">infra/helm/keycloak/files/agripulse-realm.json</span> (<code>--import-realm</code>, first boot only)</td>
+          <td>The <code>agripulse-api</code> public client (+ 5 protocol mappers), the <code>agripulse-tenancy</code> service-account client (placeholder secret), and <b>one user</b>: <code>dev@agripulse.local</code> / password <code>dev</code>. <b>No roles, no groups.</b></td>
+        </tr>
+        <tr>
+          <td><b>Realm post-install</b></td>
+          <td>PostSync promote Job → <span class="path">promote-scripts/*.py</span></td>
+          <td>Enables <code>unmanagedAttributePolicy</code>; sets <code>platform_role=PlatformAdmin</code> on the dev user; sets the tenancy client secret; grants <code>realm-management</code> roles to the service account; wires SMTP (Brevo); re-asserts the tenant mappers.</td>
+        </tr>
+        <tr>
+          <td><b>Platform Postgres</b></td>
+          <td>Alembic migrations <code>0006…0027</code></td>
+          <td>Egyptian crops, imagery/weather catalogs, recommendation templates, platform setting defaults, grid thresholds, NDMI. <b>No tenants, no users.</b></td>
+        </tr>
+        <tr>
+          <td><b>First PlatformAdmin</b></td>
+          <td>Startup hook → <span class="path">platform_admins/bootstrap.py</span></td>
+          <td>If <code>PLATFORM_ADMIN_EMAIL</code> is set <em>and</em> no PlatformAdmin exists yet, invites that user (idempotent). Default is empty → <b>skipped</b>.</td>
+        </tr>
+        <tr>
+          <td><b>Dev tenant + owner</b></td>
+          <td><span class="path">backend/scripts/dev_bootstrap.py</span> (dev only)</td>
+          <td>Creates <code>dev-tenant</code> schema and wires <code>dev@agripulse.local</code> as its TenantOwner. Not run in production.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note gap">
+      <h5>▲ The net of it</h5>
+      Out of the box, the <b>only</b> usable login in any environment is the hard-coded <code>dev@agripulse.local / dev</code> seeded in the realm JSON (which ships in git and is identical for the dev and helm/prod realm files). Everything else — real platform admins, every tenant, every tenant user — is created at runtime through the API, and every runtime-created user depends on working SMTP to ever set a password. There is no production seed of a real admin or tenant.
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 4 ───────────────────────── -->
+  <section id="bootstrap">
+    <h2><span class="n">4</span> Flow A — Fresh-deploy bootstrap</h2>
+    <p class="lede">From <code>helm install</code> to a working first login.</p>
+    <ol class="seq">
+      <li><div class="who">Keycloak pod</div><div class="act">Realm import on first boot</div><div class="det">StatefulSet starts with <code>--import-realm</code>, loads the realm JSON: two clients + the dev user. Import is <b>first-time only</b>.</div></li>
+      <li><div class="who">ArgoCD PostSync</div><div class="act">Promote Job runs (sync-wave 3)</div><div class="det">Waits for the admin REST to answer, then runs the three promote scripts: unmanaged-attributes ON, dev user → PlatformAdmin attribute + mapper, tenancy client secret set, service-account roles granted, SMTP configured.<span class="path">infra/helm/keycloak/templates/promote-bootstrap-job.yaml</span></div></li>
+      <li><div class="who">API pod</div><div class="act">Migrations + optional admin bootstrap</div><div class="det">Public-schema migrations seed catalogs/defaults. Lifespan hook reads <code>PLATFORM_ADMIN_EMAIL</code>; if set and no admin exists, calls <code>invite_admin()</code>.<span class="path">app/core/app_factory.py · platform_admins/bootstrap.py</span></div></li>
+      <li><div class="who">Operator</div><div class="act">First login</div><div class="det">Signs in as <code>dev@agripulse.local</code> (or the bootstrapped admin, once they complete the emailed password reset). Token now carries <code>platform_role=PlatformAdmin</code> → full <code>/platform</code> access.</div></li>
+    </ol>
+    <div class="note gap">
+      <h5>▲ Gap surfaced here</h5>
+      The env-var <code>PLATFORM_ADMIN_EMAIL</code> path calls <code>invite_admin()</code>, which creates the user <b>password-less</b> and fires an <code>execute-actions-email</code> reset. So even the "official" first admin cannot log in until Brevo SMTP works. The only SMTP-independent credential is the shipped <code>dev/dev</code> — which is unsuitable for production.
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 5 ───────────────────────── -->
+  <section id="tenant">
+    <h2><span class="n">5</span> Flow B — Tenant creation + first owner</h2>
+    <p class="lede"><code>POST /api/v1/admin/tenants</code> · requires <code>platform.manage_tenants</code> (PlatformAdmin only) · 3-step wizard at <span class="path">/platform/tenants/create</span>.</p>
+
+    <ol class="seq">
+      <li><div class="who">PlatformAdmin · FE</div><div class="act">Fills the wizard</div><div class="det">Profile (slug 3–32 <code>[a-z0-9-]</code>, name, contact) → Owner (owner_email, owner_full_name, tier) → Review.<span class="path">frontend/src/modules/admin/pages/TenantCreatePage.tsx</span></div></li>
+      <li><div class="who">API</div><div class="act">Writes tenant rows + schema</div><div class="det"><code>tenants</code>, <code>tenant_settings</code>, <code>tenant_subscriptions</code>; then <code>CREATE SCHEMA</code> + per-tenant migrations.<span class="path">tenancy/service.py:372 · tenancy/bootstrap.py</span></div></li>
+      <li><div class="who">API → Keycloak</div><div class="act">Provisions the tenant group</div><div class="det"><code>ensure_group(slug)</code> → KC group <code>tenant-&lt;slug&gt;</code>, UUID stored on <code>tenant.keycloak_group_id</code>.</div></li>
+      <li><div class="who">API → Keycloak</div><div class="act">Invites the owner as TenantOwner</div><div class="det"><code>invite_user()</code> creates the KC user, adds to group, assigns the (auto-created) <code>TenantOwner</code> realm role, sets <code>tenant_id</code>+<code>tenant_role</code> attributes inline, fires the password-reset email. Mirrors DB rows in <code>users</code>, <code>tenant_memberships</code>, <code>tenant_role_assignments</code>.</div></li>
+      <li><div class="who">API</div><div class="act">Settles status</div><div class="det">KC ok → <code>active</code>, returns <code>owner_user_id</code>. KC failed → <code>pending_provision</code> (DB rows kept), retry via <code>POST …/{id}/retry-provisioning</code>.</div></li>
+      <li><div class="who">Owner</div><div class="act">Sets password &amp; logs in</div><div class="det">Receives reset email → sets password → first login lazily confirms membership; token carries their <code>tenant_id</code>.</div></li>
+    </ol>
+
+    <details>
+      <summary>Tenant lifecycle state machine</summary>
+      <div class="body">
+        <p><code>active</code> ⇄ <code>suspended</code> → <code>pending_delete</code> (30-day grace, <code>cancel_delete</code> → <code>suspended</code>) → <code>purge</code> (irreversible). Failed provisioning → <code>pending_provision</code> → <code>retry_provisioning</code> → <code>active</code>. Suspended/pending-delete tenants block non-platform logins at the middleware.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ───────────────────────── 6 ───────────────────────── -->
+  <section id="invite">
+    <h2><span class="n">6</span> Flow C — User invitation &amp; login</h2>
+    <p class="lede"><code>POST /api/v1/users:invite</code> · requires <code>user.invite</code> (TenantOwner / TenantAdmin) · UI at <span class="path">/settings → Users</span>. There is <b>no public self-registration</b> — the realm sign-up form is disabled on purpose.</p>
+
+    <ol class="seq">
+      <li><div class="who">TenantAdmin · FE</div><div class="act">Invites by email + role</div><div class="det">Role ∈ {TenantOwner, TenantAdmin, BillingAdmin, Viewer}. Farm-scoped roles are granted separately, per farm.</div></li>
+      <li><div class="who">API</div><div class="act">Reuse-or-create the global person</div><div class="det">One <code>public.users</code> row per email across all tenants; <code>keycloak_subject</code> holds the KC UUID, or <code>pending::&lt;email&gt;</code> if KC is unavailable.<span class="path">iam/users_service.py:174</span></div></li>
+      <li><div class="who">API → Keycloak</div><div class="act">Create user, group, role, attributes</div><div class="det">User + group membership + realm role + <code>tenant_id</code>/<code>tenant_role</code> attributes set <b>inline in the POST</b> (KC26 PUT-wipes-missing-fields gotcha).</div></li>
+      <li><div class="who">API → Keycloak</div><div class="act">Send password-reset email</div><div class="det"><code>PUT /users/{id}/execute-actions-email</code> with <code>UPDATE_PASSWORD</code>. Best-effort — logged, never fails the invite.</div></li>
+      <li><div class="who">API</div><div class="act">Mirror DB rows + audit</div><div class="det"><code>tenant_memberships</code> + <code>tenant_role_assignments</code>; <code>iam.user_invited</code> audit event.</div></li>
+      <li><div class="who">User</div><div class="act">Reset → login</div><div class="det">Email link → set password → login. Within ≤15 min the token reflects their role.</div></li>
+    </ol>
+  </section>
+
+  <!-- ───────────────────────── 7 ───────────────────────── -->
+  <section id="admins">
+    <h2><span class="n">7</span> Flow D — Granting platform &amp; tenant admins</h2>
+    <table>
+      <thead><tr><th>Action</th><th>Endpoint</th><th>Capability</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Invite PlatformAdmin / PlatformSupport</td><td><code>POST /v1/admin/platform-admins:invite</code></td><td><code>platform.manage_platform_admins</code></td><td>Self-service among platform staff. KC user with <code>platform_role</code> attribute, no tenant group. UI: <span class="path">/platform/admins</span>.</td></tr>
+        <tr><td>Grant TenantAdmin/Owner on a tenant</td><td><code>POST /v1/admin/tenants/{id}/admins:assign</code></td><td><code>platform.manage_tenant_admins</code></td><td>User must already exist. Upserts <code>tenant_role_assignments</code>; emits a <b>guardrail</b> warning audit + in-app inbox to peer admins.</td></tr>
+        <tr><td>Bootstrap first PlatformAdmin</td><td>env <code>PLATFORM_ADMIN_EMAIL</code></td><td>—</td><td>Startup hook, idempotent. Still emails a password reset.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ───────────────────────── 8 ───────────────────────── -->
+  <section id="gaps">
+    <h2><span class="n">8</span> Gap analysis</h2>
+    <p class="lede">Ranked by impact on a low-touch, seed-driven operation. <span class="sev s-hi">HIGH</span> blocks or risks production; <span class="sev s-md">MED</span> is friction/drift; <span class="sev s-lo">LOW</span> is polish.</p>
+
+    <div class="note fix">
+      <h5>✓ Status — branch <code>feat/identity-hardening</code> (2026-06-09)</h5>
+      <b>Closed &amp; verified:</b> G1 (IH-1), G2 (IH-2), G3 (IH-3), G5 (IH-4), G4 (IH-5), G6 + G11 (IH-6). 435 backend unit tests green; mypy/ruff clean; frontend tsc/eslint clean; helm templates render.
+      <br><b>Deferred:</b> G7 (IH-7, multi-tenant claim + switcher) — auth-core change, scheduled as a follow-up gated on a live Keycloak + Playwright e2e pass.
+      <br><b>Out of scope (noted in IH-PLAN):</b> G9 (JWKS rotation restart), G10 (in-app RBAC matrix).
+    </div>
+
+    <table>
+      <thead><tr><th style="width:34px">#</th><th>Gap</th><th style="width:70px">Severity</th><th>Why it matters / what breaks</th></tr></thead>
+      <tbody>
+        <tr><td><b>G1</b><br><span class="badge b-auto">✓ IH-1</span></td><td>Hard-coded <code>dev/dev</code> ships in the realm JSON used for <em>both</em> dev and helm/prod</td><td><span class="sev s-hi">HIGH</span></td><td>A known credential in git becomes a real, enabled, email-verified login in any cluster that imports this realm. <code>bruteForceProtected:false</code> compounds it.</td></tr>
+        <tr><td><b>G2</b><br><span class="badge b-auto">✓ IH-2</span></td><td>Every runtime-created user is password-less and 100% dependent on SMTP</td><td><span class="sev s-hi">HIGH</span></td><td>If Brevo is mis-keyed or down, the invite "succeeds" but the user can <em>never</em> log in. No temp-password, no admin "copy invite link", no resend button in the UI. Includes the bootstrapped first PlatformAdmin.</td></tr>
+        <tr><td><b>G3</b><br><span class="badge b-auto">✓ IH-3</span></td><td><code>keycloak_provisioning_enabled = False</code> by default</td><td><span class="sev s-hi">HIGH</span></td><td>Out of the box the API wires the <code>NoopKeycloakClient</code>: every tenant create lands in <code>pending_provision</code> and no KC user/group is made. Easy to deploy "successfully" yet provision nothing.</td></tr>
+        <tr><td><b>G4</b><br><span class="badge b-auto">✓ IH-5</span></td><td>No production seed of a real admin or first tenant</td><td><span class="sev s-md">MED</span></td><td>Day-one prod has only <code>dev/dev</code>. The intended path (env-var admin) needs SMTP (see G2) and is off by default (empty email).</td></tr>
+        <tr><td><b>G5</b><br><span class="badge b-auto">✓ IH-4</span></td><td>Realm roles &amp; tenant groups are <em>not</em> seeded — created lazily on first assignment</td><td><span class="sev s-md">MED</span></td><td>A freshly imported realm shows an empty role list; an operator browsing Keycloak can't see or pre-assign roles. Auto-create masks typos (a mistyped role name silently creates a new role).</td></tr>
+        <tr><td><b>G6</b><br><span class="badge b-auto">✓ IH-6</span></td><td>Three-way role storage with no reconciliation (KC attribute · KC realm role · DB)</td><td><span class="sev s-md">MED</span></td><td>Change a role in the DB and the JWT attribute is stale until KC is also updated <em>and</em> the token refreshes (≤15 min). No drift-detector or re-sync job; the DB is "truth" but the claim is what the API trusts.</td></tr>
+        <tr><td><b>G7</b><br><span class="badge b-man">deferred</span></td><td>JWT carries a single <code>tenant_id</code>/<code>tenant_role</code>, but the DB models many memberships</td><td><span class="sev s-md">MED</span></td><td><code>tenant_memberships</code> supports a person in several tenants, yet the attribute is single-valued — no tenant-switcher. A multi-tenant user is effectively pinned to one tenant in the token.</td></tr>
+        <tr><td><b>G8</b></td><td>Realm import is first-boot only; re-import drops mappers/SMTP</td><td><span class="sev s-md">MED</span></td><td>Editing <code>agripulse-realm.json</code> needs a StatefulSet restart to re-import, and the promote scripts must re-assert mappers/SMTP each time. Real drift risk between git and the live realm.</td></tr>
+        <tr><td><b>G9</b></td><td>JWKS cache requires a manual <code>rollout restart</code> after KC key rotation</td><td><span class="sev s-lo">LOW</span></td><td>Documented manual step; tokens fail validation until the API restarts to pick up new keys.</td></tr>
+        <tr><td><b>G10</b></td><td>No UI for farm-scoped role assignment review / RBAC matrix</td><td><span class="sev s-lo">LOW</span></td><td>Already tracked (role-admin parking). Farm grants are API-only; no way to audit "who can do what" in-app.</td></tr>
+        <tr><td><b>G11</b><br><span class="badge b-auto">✓ IH-6</span></td><td>No de-provisioning sync from DB delete → Keycloak</td><td><span class="sev s-lo">LOW</span></td><td>Soft-deleting a user/membership in the DB doesn't necessarily disable the KC login unless the suspend/delete path is taken; partial-state risk.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ───────────────────────── 9 ───────────────────────── -->
+  <section id="seeding">
+    <h2><span class="n">9</span> Recommended seeding strategy</h2>
+    <p class="lede">Concrete changes — ordered by leverage — to make the system seed-driven and cut Keycloak hand-management to near zero.</p>
+
+    <div class="note fix">
+      <h5>✓ S1 — Seed realm roles &amp; remove lazy auto-create (fixes G5)</h5>
+      Add a <code>roles.realm[]</code> block to <code>agripulse-realm.json</code> listing all platform + tenant roles (TenantOwner, TenantAdmin, BillingAdmin, Viewer, PlatformAdmin, PlatformSupport). Then change <code>_assign_realm_role()</code> to <b>look up only</b> (error on missing) instead of auto-creating — so a typo fails loudly instead of inventing a role.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S2 — Replace <code>dev/dev</code> with environment-gated seed users (fixes G1, G4)</h5>
+      Split the realm file: keep <code>dev@agripulse.local / dev</code> <b>only</b> in <span class="path">infra/dev/keycloak/</span>. For helm/prod, seed a real bootstrap admin whose credential is a <b>temporary</b> password (<code>"temporary": true</code>) pulled from a Secret/ExternalSecret, forcing <code>UPDATE_PASSWORD</code> at first login — no SMTP needed. Set <code>bruteForceProtected: true</code> for non-dev.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S3 — SMTP-independent invite fallback (fixes G2)</h5>
+      When <code>execute-actions-email</code> fails (or always, behind a flag), have <code>invite_user()</code> set a one-time temporary password and return a <b>reset link / token</b> in the API response. Surface a "Copy invite link" + "Resend email" action in the Users UI so an admin can hand off credentials out-of-band. This removes the single hard SMTP dependency from the whole onboarding chain.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S4 — Make provisioning the default &amp; fail-loud (fixes G3)</h5>
+      Flip <code>keycloak_provisioning_enabled</code> to <code>True</code> in the helm values (it already needs the tenancy secret, which the promote job sets). Add a startup readiness check that logs a <b>prominent warning</b> if the Noop client is wired in a non-dev profile, so a misconfigured cluster is obvious rather than silently no-op.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S5 — Optional production tenant seed (fixes G4)</h5>
+      Promote <code>dev_bootstrap.py</code>'s tenant+owner logic into a guarded, idempotent <b>seed job</b> driven by env/Secret (<code>SEED_TENANT_SLUG</code>, <code>SEED_OWNER_EMAIL</code>). Lets a new environment come up with one real tenant + owner with zero clicks and zero Keycloak console time.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S6 — DB→Keycloak reconcile job (fixes G6, G11)</h5>
+      A periodic (or post-write) reconciler that reads <code>tenant_role_assignments</code> / membership status as truth and pushes attribute + enabled-flag updates into Keycloak. Closes the drift window and ensures DB soft-deletes actually disable the login.
+    </div>
+
+    <div class="note fix">
+      <h5>✓ S7 — Multi-valued tenant claim + switcher (fixes G7)</h5>
+      Make <code>tenant_role</code>/<code>tenant_id</code> multivalued (or add a <code>memberships</code> claim) and add a tenant-switcher in the UI, so users who legitimately belong to multiple tenants aren't pinned to one. Larger change — schedule behind the above.
+    </div>
+
+    <h3>Priority order</h3>
+    <p>
+      <span class="pill">1 · S2 + S3 (unblock prod login)</span>
+      <span class="pill">2 · S4 (provisioning on)</span>
+      <span class="pill">3 · S1 (seed roles)</span>
+      <span class="pill">4 · S5 (tenant seed)</span>
+      <span class="pill">5 · S6 (reconcile)</span>
+      <span class="pill">6 · S7 (multi-tenant)</span>
+    </p>
+
+    <div class="note info">
+      <h5>◆ Net effect on Keycloak management</h5>
+      With S1–S5 in place, the only standing Keycloak chores left are key-rotation restarts (G9) and intentional realm-shape edits (G8) — everything about <em>tenants, users, and roles</em> becomes seed- or API-driven, and the Keycloak admin console drops out of the day-to-day operating loop.
+    </div>
+  </section>
+
+  <footer class="wrap">
+    Generated from a read-only sweep of the AgriPulse codebase — backend <span class="path">app/modules/{tenancy,iam,platform_admins}</span>, <span class="path">app/shared/{auth,rbac,keycloak}</span>, and <span class="path">infra/helm/keycloak</span>. File references are accurate as of <b>main @ 7f03f73 · 2026-06-09</b>. No source files were modified.
+  </footer>
+</div>
+</body>
+</html>

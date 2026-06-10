@@ -1,0 +1,84 @@
+{{- /*
+IH-5: PostSync hook Job that seeds one tenant + owner via the tenancy
+service (scripts/seed_tenant.py). Runs after the api Deployment is up
+(so the cold-start platform-admin bootstrap has run) and after the
+Keycloak promote job, hence sync-wave "5".
+
+Idempotent: the script no-ops when SEED_TENANT_SLUG is empty or the
+slug already exists, so it's safe to leave enabled across redeploys.
+
+Same image + env wiring as the migration Job (configmap + ExternalSecret
++ DATABASE_PASSWORD), plus the SEED_* knobs from values.
+*/ -}}
+{{- if .Values.seedTenantJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agripulse-api.fullname" . }}-seed-tenant
+  labels:
+    {{- include "agripulse-api.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "agripulse-api.labels" . | nindent 8 }}
+        app.kubernetes.io/component: seed-tenant
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "agripulse-api.serviceAccountName" . }}
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: seed-tenant
+          image: {{ include "agripulse-api.imageRef" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app
+          command:
+            - /opt/venv/bin/python
+            - -m
+            - scripts.seed_tenant
+          envFrom:
+            - configMapRef:
+                name: agripulse-app-config
+            - configMapRef:
+                name: {{ include "agripulse-api.fullname" . }}
+            {{- if .Values.externalSecret.enabled }}
+            - secretRef:
+                name: {{ include "agripulse-api.fullname" . }}-secrets
+            {{- end }}
+            {{- range .Values.extraEnvFromSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.databasePasswordSecret.name }}
+                  key: {{ .Values.databasePasswordSecret.key }}
+            - name: SEED_TENANT_SLUG
+              value: {{ .Values.seedTenantJob.slug | quote }}
+            - name: SEED_TENANT_NAME
+              value: {{ .Values.seedTenantJob.name | quote }}
+            - name: SEED_TENANT_CONTACT_EMAIL
+              value: {{ .Values.seedTenantJob.contactEmail | quote }}
+            - name: SEED_OWNER_EMAIL
+              value: {{ .Values.seedTenantJob.ownerEmail | quote }}
+            - name: SEED_OWNER_FULL_NAME
+              value: {{ .Values.seedTenantJob.ownerFullName | quote }}
+            - name: SEED_TENANT_TIER
+              value: {{ .Values.seedTenantJob.tier | quote }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+{{- end }}

@@ -133,13 +133,19 @@ class PlatformAdminsRoleService:
 
         kc_subject: str | None = global_user.keycloak_subject if global_user else None
         provisioning_status = "pending"
+        # First-login credential outcome (IH-2) — surfaced so the UI can
+        # show a copy-able temp password when SMTP is unavailable.
+        keycloak_email_sent = False
+        temporary_password: str | None = None
 
         if global_user is None:
             try:
-                kc_user_id = await self._kc.invite_platform_admin(
+                invite_result = await self._kc.invite_platform_admin(
                     email=email, full_name=full_name, role=role
                 )
-                kc_subject = kc_user_id
+                kc_subject = invite_result.keycloak_user_id
+                keycloak_email_sent = invite_result.email_sent
+                temporary_password = invite_result.temporary_password
                 provisioning_status = "succeeded"
             except KeycloakError as exc:
                 self._log.warning(
@@ -233,6 +239,8 @@ class PlatformAdminsRoleService:
             "user_id": user_id,
             "keycloak_subject": kc_subject,
             "keycloak_provisioning": provisioning_status,
+            "keycloak_email_sent": keycloak_email_sent,
+            "temporary_password": temporary_password,
             "role": role,
         }
 

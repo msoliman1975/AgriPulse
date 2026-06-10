@@ -20,7 +20,9 @@ never present a freshly-expired token.
 from __future__ import annotations
 
 import asyncio
+import secrets
 import time
+from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -35,11 +37,49 @@ from app.shared.keycloak.errors import (
 
 _TOKEN_REFRESH_SLACK_SECONDS: float = 30.0
 _GROUP_NAME_PREFIX: str = "tenant-"
+_TEMP_PASSWORD_LENGTH: int = 16
+# Unambiguous alphabet — no 0/O/1/l/I — so a temp credential read aloud
+# or copy-pasted by an admin doesn't get mis-keyed.
+_TEMP_PASSWORD_ALPHABET: str = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
 
 
 def group_name_for(slug: str) -> str:
     """Return the canonical Keycloak group name for a tenant slug."""
     return f"{_GROUP_NAME_PREFIX}{slug}"
+
+
+def _generate_temp_password() -> str:
+    """A one-time temporary password handed back to the inviting admin
+    when no SMTP path is available. Keycloak forces UPDATE_PASSWORD on
+    first login (the credential is set ``temporary=True``)."""
+    return "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(_TEMP_PASSWORD_LENGTH))
+
+
+@dataclass(frozen=True)
+class InviteResult:
+    """Outcome of provisioning a user's first-login credential.
+
+    ``email_sent`` is True when the SMTP ``execute-actions-email`` went
+    out. When it's False (SMTP disabled or the send failed), a one-time
+    ``temporary_password`` is minted and returned so the inviting admin
+    can hand the credential off out of band — the user is still forced
+    to set their own password on first login.
+    """
+
+    keycloak_user_id: str
+    email_sent: bool
+    temporary_password: str | None = None
+
+
+@dataclass(frozen=True)
+class KeycloakUserState:
+    """Snapshot of the fields the reconciler (IH-6) keeps in sync with the
+    DB: whether the login is enabled and the tenant/platform claims."""
+
+    enabled: bool
+    tenant_id: str | None
+    tenant_role: str | None
+    platform_role: str | None
 
 
 class KeycloakAdminClient(Protocol):
@@ -55,7 +95,7 @@ class KeycloakAdminClient(Protocol):
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
         tenant_id: UUID | str | None = None,
-    ) -> str: ...
+    ) -> InviteResult: ...
 
     async def add_existing_user_to_group(
         self,
@@ -64,6 +104,14 @@ class KeycloakAdminClient(Protocol):
         group_id: str,
         roles: tuple[str, ...] = (),
         tenant_id: UUID | str | None = None,
+    ) -> None: ...
+
+    async def resend_invite(self, *, keycloak_user_id: str) -> InviteResult: ...
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None: ...
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
     ) -> None: ...
 
     async def disable_users_in_group(self, slug: str) -> int: ...
@@ -84,7 +132,7 @@ class KeycloakAdminClient(Protocol):
         email: str,
         full_name: str | None,
         role: str = "PlatformAdmin",
-    ) -> str: ...
+    ) -> InviteResult: ...
 
     async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None: ...
 
@@ -124,11 +172,28 @@ class NoopKeycloakClient:
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
         tenant_id: UUID | str | None = None,
-    ) -> str:
+    ) -> InviteResult:
         del email, full_name, group_id, roles, tenant_id
         raise KeycloakNotConfiguredError(
             "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
         )
+
+    async def resend_invite(self, *, keycloak_user_id: str) -> InviteResult:
+        del keycloak_user_id
+        raise KeycloakNotConfiguredError(
+            "Keycloak provisioning disabled — set keycloak_provisioning_enabled=true"
+        )
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None:
+        # Reconciler treats "unknown" as nothing to do.
+        self._log.warning("keycloak_noop_get_user_state", keycloak_user_id=keycloak_user_id)
+        return None
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None:
+        del tenant_id, tenant_role
+        self._log.warning("keycloak_noop_set_tenant_attributes", keycloak_user_id=keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,
@@ -175,7 +240,7 @@ class NoopKeycloakClient:
         email: str,
         full_name: str | None,
         role: str = "PlatformAdmin",
-    ) -> str:
+    ) -> InviteResult:
         del full_name
         self._log.warning("keycloak_noop_invite_platform_admin", email=email, role=role)
         raise KeycloakNotConfiguredError(
@@ -312,7 +377,7 @@ class HttpxKeycloakAdminClient:
         group_id: str,
         roles: tuple[str, ...] = ("TenantOwner",),
         tenant_id: UUID | str | None = None,
-    ) -> str:
+    ) -> InviteResult:
         # We do NOT pass `groups` in the create body — KC requires the
         # group path, not the id, which makes mistakes easy. Add the user
         # via the explicit users/{id}/groups/{gid} call below.
@@ -365,24 +430,20 @@ class HttpxKeycloakAdminClient:
         for role in roles:
             await self._assign_realm_role(user_id, role)
 
-        # Best-effort: the user object + group membership + role mapping all
-        # exist at this point, which is enough for the tenant to be usable.
-        # If the realm has no SMTP configured, or SMTP is transiently down,
-        # we don't want to fail the whole provisioning flow — operators can
-        # set a password manually in KC admin or fix SMTP and re-trigger
-        # the reset. Log the failure so it's traceable.
-        try:
-            await self._send_password_reset(user_id)
-        except KeycloakRequestError as exc:
-            self._log.warning(
-                "keycloak_password_reset_email_failed",
-                user_id=user_id,
-                email=email,
-                error=str(exc),
-            )
-
-        self._log.info("keycloak_invite_user", email=email, user_id=user_id, group_id=group_id)
-        return user_id
+        # The user object + group membership + role mapping all exist at
+        # this point, which is enough for the tenant to be usable. Issue
+        # a first-login credential: email the reset link when SMTP is
+        # available, otherwise mint a one-time temporary password that
+        # the caller hands off out of band. See `_issue_credential`.
+        result = await self._issue_credential(user_id, email=email)
+        self._log.info(
+            "keycloak_invite_user",
+            email=email,
+            user_id=user_id,
+            group_id=group_id,
+            email_sent=result.email_sent,
+        )
+        return result
 
     async def add_existing_user_to_group(
         self,
@@ -414,6 +475,51 @@ class HttpxKeycloakAdminClient:
             user_id=keycloak_user_id,
             group_id=group_id,
             roles=list(roles),
+        )
+
+    async def resend_invite(self, *, keycloak_user_id: str) -> InviteResult:
+        """Re-issue a first-login credential for an already-provisioned
+        Keycloak user. Used by the `:resend-invite` endpoint when the
+        original welcome email never arrived. Same email-or-temp-password
+        policy as the initial invite."""
+        result = await self._issue_credential(keycloak_user_id, email=None)
+        self._log.info(
+            "keycloak_resend_invite",
+            user_id=keycloak_user_id,
+            email_sent=result.email_sent,
+        )
+        return result
+
+    async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None:
+        resp = await self._request(
+            "GET",
+            f"/users/{keycloak_user_id}",
+            operation="get_user_state",
+            expected=(200, 404),
+        )
+        if resp.status_code == 404:
+            return None
+        user = resp.json()
+        attrs = user.get("attributes") or {}
+
+        def _first(key: str) -> str | None:
+            values = attrs.get(key)
+            return values[0] if values else None
+
+        return KeycloakUserState(
+            enabled=bool(user.get("enabled", False)),
+            tenant_id=_first("tenant_id"),
+            tenant_role=_first("tenant_role"),
+            platform_role=_first("platform_role"),
+        )
+
+    async def set_tenant_attributes(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+    ) -> None:
+        await self._set_tenant_attributes(
+            keycloak_user_id=keycloak_user_id,
+            tenant_id=tenant_id,
+            tenant_role=tenant_role,
         )
 
     async def disable_users_in_group(self, slug: str) -> int:
@@ -481,7 +587,7 @@ class HttpxKeycloakAdminClient:
         email: str,
         full_name: str | None,
         role: str = "PlatformAdmin",
-    ) -> str:
+    ) -> InviteResult:
         """Create (or find) a Keycloak user with no tenant group + set
         the `platform_role` user attribute. Mirrors what
         `dev_promote_platform_admin.py` does so the JWT carries the
@@ -529,16 +635,7 @@ class HttpxKeycloakAdminClient:
         # path that gates on the role itself.
         await self._assign_realm_role(user_id, role)
 
-        try:
-            await self._send_password_reset(user_id)
-        except KeycloakRequestError as exc:
-            self._log.warning(
-                "keycloak_password_reset_email_failed",
-                user_id=user_id,
-                email=email,
-                error=str(exc),
-            )
-        return user_id
+        return await self._issue_credential(user_id, email=email)
 
     async def set_platform_role(self, *, keycloak_user_id: str, role: str) -> None:
         """Set the `platform_role` user attribute. Idempotent — if
@@ -664,6 +761,11 @@ class HttpxKeycloakAdminClient:
 
     async def _assign_realm_role(self, user_id: str, role_name: str) -> None:
         # Look up the role's representation (id required by the mapping API).
+        # IH-4: the application roles (PlatformAdmin, TenantOwner, …) are
+        # seeded into the realm by import + the promote job's
+        # ensure-roles step, so a missing role here is a real error — a
+        # typo or an un-promoted realm — not something to paper over by
+        # silently creating a new role (which used to mask typos).
         resp = await self._request(
             "GET",
             f"/roles/{role_name}",
@@ -671,28 +773,11 @@ class HttpxKeycloakAdminClient:
             expected=(200, 404),
         )
         if resp.status_code == 404:
-            # Fresh realm imports don't ship our application roles
-            # (TenantOwner, TenantAdmin, FarmManager, ...). Auto-create on
-            # first assignment so the invite flow doesn't silently produce
-            # users with no realm role. Subsequent invites find the role
-            # via the GET above and skip this path.
-            self._log.info(
-                "keycloak_role_creating_on_demand",
-                role=role_name,
-                user_id=user_id,
-            )
-            await self._request(
-                "POST",
-                "/roles",
-                operation="create_realm_role",
-                json={"name": role_name},
-                expected=(201, 409),
-            )
-            resp = await self._request(
-                "GET",
-                f"/roles/{role_name}",
-                operation="lookup_role_after_create",
-                expected=(200,),
+            raise KeycloakRequestError(
+                404,
+                f"realm role {role_name!r} does not exist — seed it via the realm "
+                "import + promote ensure-roles step before assigning it",
+                operation="lookup_role",
             )
         role = resp.json()
         await self._request(
@@ -702,6 +787,49 @@ class HttpxKeycloakAdminClient:
             json=[{"id": role["id"], "name": role["name"]}],
             expected=(204,),
         )
+
+    async def _issue_credential(self, user_id: str, *, email: str | None) -> InviteResult:
+        """Issue a first-login credential: email the UPDATE_PASSWORD link
+        when SMTP is enabled, otherwise (or on a send failure) mint a
+        one-time temporary password and return it.
+
+        This is the single SMTP-failure-tolerant path used by
+        ``invite_user``, ``invite_platform_admin``, and ``resend_invite``
+        so onboarding never hard-depends on a working mail server.
+        """
+        email_sent = False
+        if self._settings.keycloak_smtp_enabled:
+            try:
+                await self._send_password_reset(user_id)
+                email_sent = True
+            except KeycloakRequestError as exc:
+                self._log.warning(
+                    "keycloak_password_reset_email_failed",
+                    user_id=user_id,
+                    email=email,
+                    error=str(exc),
+                )
+        temporary_password = None
+        if not email_sent:
+            temporary_password = await self._set_temporary_password(user_id)
+        return InviteResult(
+            keycloak_user_id=user_id,
+            email_sent=email_sent,
+            temporary_password=temporary_password,
+        )
+
+    async def _set_temporary_password(self, user_id: str) -> str:
+        """Set a one-time temporary password on the user (forces
+        UPDATE_PASSWORD on first login) and return the plaintext once."""
+        password = _generate_temp_password()
+        await self._request(
+            "PUT",
+            f"/users/{user_id}/reset-password",
+            operation="set_temporary_password",
+            json={"type": "password", "value": password, "temporary": True},
+            expected=(204,),
+        )
+        return password
 
     async def _send_password_reset(self, user_id: str) -> None:
         params: dict[str, str] = {}
@@ -744,6 +872,29 @@ def set_keycloak_client(client: KeycloakAdminClient | None) -> None:
     """Test hook — install or clear the singleton client."""
     global _default
     _default = client
+
+
+_DEPLOYED_ENVS: frozenset[str] = frozenset({"staging", "production"})
+
+
+def provisioning_config_problems(settings: Settings) -> list[str]:
+    """Return machine-readable problem codes when a *deployed* environment
+    isn't actually wired to provision into Keycloak (IH-3).
+
+    Empty list = healthy (or a dev/test env where the Noop client is an
+    acceptable default). Surfaced loudly at startup so a misconfigured
+    cluster — where every tenant/user create silently lands in
+    ``pending_provision`` and nothing reaches Keycloak — is obvious
+    instead of looking healthy.
+    """
+    if settings.app_env not in _DEPLOYED_ENVS:
+        return []
+    problems: list[str] = []
+    if not settings.keycloak_provisioning_enabled:
+        problems.append("provisioning_disabled")
+    elif not settings.keycloak_admin_client_secret:
+        problems.append("admin_client_secret_missing")
+    return problems
 
 
 def _split_full_name(full_name: str | None) -> tuple[str, str]:

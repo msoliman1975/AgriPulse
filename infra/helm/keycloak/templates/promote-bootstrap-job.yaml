@@ -89,6 +89,16 @@ spec:
               value: {{ .Values.promoteBootstrap.keycloakBaseUrl | quote }}
             - name: KEYCLOAK_REALM
               value: "agripulse"
+            # IH-1: bootstrap PlatformAdmin identity. The password (if
+            # needed for a fresh cluster) arrives via envFrom as
+            # KC_BOOTSTRAP_ADMIN_PASSWORD when
+            # externalSecrets.promote.bootstrapAdminPassword is on.
+            - name: KC_BOOTSTRAP_ADMIN_EMAIL
+              value: {{ .Values.promoteBootstrap.bootstrapAdmin.email | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_NAME
+              value: {{ .Values.promoteBootstrap.bootstrapAdmin.fullName | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_TEMPORARY
+              value: {{ .Values.promoteBootstrap.bootstrapAdmin.temporary | quote }}
             # Brevo SMTP non-secret bits — login + from-email rarely
             # change. Override via overlay if they do.
             - name: BREVO_HOST

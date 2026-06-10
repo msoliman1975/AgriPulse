@@ -4,11 +4,13 @@ import {
   type TenantUser,
   type UserInvitePayload,
   type UserInviteResponse,
+  type UserResendInviteResponse,
   type UserUpdatePayload,
   deleteTenantUser,
   inviteTenantUser,
   listTenantUsers,
   reactivateTenantUser,
+  resendTenantUserInvite,
   suspendTenantUser,
   updateTenantUser,
 } from "@/api/users";
@@ -65,6 +67,16 @@ export function useDeleteTenantUser() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: deleteTenantUser,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tenant_users"] });
+    },
+  });
+}
+
+export function useResendTenantUserInvite() {
+  const qc = useQueryClient();
+  return useMutation<UserResendInviteResponse, Error, string>({
+    mutationFn: resendTenantUserInvite,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tenant_users"] });
     },

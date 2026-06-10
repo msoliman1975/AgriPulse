@@ -24,7 +24,19 @@
     "edit": "Edit",
     "suspend": "Suspend",
     "reactivate": "Reactivate",
-    "delete": "Delete"
+    "delete": "Delete",
+    "resend": "Resend invite",
+    "resending": "Resending…"
+  },
+  "credential": {
+    "emailSent": "Welcome email sent to {{email}}.",
+    "tempTitle": "Share these one-time sign-in details with {{email}}",
+    "tempHint": "No welcome email was sent (SMTP unavailable). The user is forced to set a new password on first login.",
+    "tempPassword": "Temporary password",
+    "copy": "Copy",
+    "copied": "Copied",
+    "pending": "Keycloak provisioning is offline — no credential could be issued yet.",
+    "dismiss": "Dismiss"
   },
   "invite": {
     "title": "Invite user",

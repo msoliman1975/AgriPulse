@@ -214,20 +214,28 @@ class TenantUsersService:
 
         keycloak_subject: str | None = global_user_row.keycloak_subject if global_user_row else None
         provisioning_status = "pending"
+        # First-login credential outcome (IH-2). For a brand-new KC user
+        # we either emailed the reset link or minted a temp password the
+        # caller hands off. For the attach-existing path the user already
+        # has a credential, so there's nothing new to surface.
+        keycloak_email_sent = False
+        temporary_password: str | None = None
 
         # Try to invite via Keycloak. Best-effort; a Noop client raises
         # KeycloakNotConfiguredError and we mark the row as pending.
         if global_user_row is None:
             try:
                 group_id = await self._kc.ensure_group(slug)
-                kc_user_id = await self._kc.invite_user(
+                invite_result = await self._kc.invite_user(
                     email=email,
                     full_name=full_name,
                     group_id=group_id,
                     roles=(tenant_role,),
                     tenant_id=tenant_id,
                 )
-                keycloak_subject = kc_user_id
+                keycloak_subject = invite_result.keycloak_user_id
+                keycloak_email_sent = invite_result.email_sent
+                temporary_password = invite_result.temporary_password
                 provisioning_status = "succeeded"
             except KeycloakError as exc:
                 self._log.warning(
@@ -377,6 +385,56 @@ class TenantUsersService:
             "membership_id": membership_id,
             "keycloak_provisioning": provisioning_status,
             "keycloak_subject": keycloak_subject,
+            "keycloak_email_sent": keycloak_email_sent,
+            "temporary_password": temporary_password,
+        }
+
+    async def resend_invite(
+        self,
+        *,
+        user_id: UUID,
+        tenant_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        """Re-issue the first-login credential for a tenant member whose
+        welcome email never arrived. Returns the same email_sent /
+        temporary_password shape as ``invite_user`` so the UI can show a
+        copy-able credential when SMTP is unavailable.
+
+        A member still pending Keycloak provisioning (no real subject)
+        can't be re-invited — surface that as ``pending`` so the caller
+        knows to retry provisioning first."""
+        await self._require_membership(user_id=user_id, tenant_id=tenant_id, allow_suspended=True)
+        kc_subject = await self._user_keycloak_subject(user_id=user_id)
+        if not kc_subject or kc_subject.startswith("pending::"):
+            return {
+                "keycloak_provisioning": "pending",
+                "keycloak_email_sent": False,
+                "temporary_password": None,
+            }
+        try:
+            result = await self._kc.resend_invite(keycloak_user_id=kc_subject)
+        except KeycloakError as exc:
+            self._log.warning("iam_resend_invite_failed", user_id=str(user_id), error=str(exc))
+            return {
+                "keycloak_provisioning": "pending",
+                "keycloak_email_sent": False,
+                "temporary_password": None,
+            }
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="iam.user_invite_resent",
+            actor_user_id=actor_user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            farm_id=None,
+            details={"keycloak_email_sent": result.email_sent},
+        )
+        return {
+            "keycloak_provisioning": "succeeded",
+            "keycloak_email_sent": result.email_sent,
+            "temporary_password": result.temporary_password,
         }
 
     async def update_user(
