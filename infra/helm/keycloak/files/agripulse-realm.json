@@ -8,7 +8,7 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
-  "bruteForceProtected": false,
+  "bruteForceProtected": true,
   "accessTokenLifespan": 900,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
@@ -138,21 +138,6 @@
       }
     }
   ],
-  "users": [
-    {
-      "username": "dev@agripulse.local",
-      "email": "dev@agripulse.local",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Dev",
-      "lastName": "User",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "dev",
-          "temporary": false
-        }
-      ]
-    }
-  ]
+  "_comment_users": "Deployed clusters (helm) deliberately ship NO seed user — IH-1. The first PlatformAdmin is created by the PostSync promote job (promote-kc-admin.py) from KC_BOOTSTRAP_ADMIN_EMAIL + a temporary password sourced from a Secret, forcing UPDATE_PASSWORD on first login. The local docker-compose realm at infra/dev/keycloak/agripulse-realm.json keeps the dev/dev convenience user.",
+  "users": []
 }

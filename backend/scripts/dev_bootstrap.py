@@ -140,8 +140,15 @@ def kc_create_user(
     email: str,
     password: str,
     full_name: str,
+    temporary: bool = False,
 ) -> dict[str, Any]:
-    """Create a new realm user with credentials. Returns the created user dict."""
+    """Create a new realm user with credentials. Returns the created user dict.
+
+    When ``temporary`` is True the password is marked temporary, so
+    Keycloak forces an UPDATE_PASSWORD on first login — used by the
+    production bootstrap-admin path (IH-1) so the seeded credential is
+    never a durable one.
+    """
     body = {
         "username": email,
         "email": email,
@@ -149,7 +156,7 @@ def kc_create_user(
         "enabled": True,
         "firstName": full_name.split()[0] if full_name else "Dev",
         "lastName": " ".join(full_name.split()[1:]) or "User",
-        "credentials": [{"type": "password", "value": password, "temporary": False}],
+        "credentials": [{"type": "password", "value": password, "temporary": temporary}],
     }
     resp = client.post(
         f"{KEYCLOAK_BASE_URL}/admin/realms/{KEYCLOAK_REALM}/users",
