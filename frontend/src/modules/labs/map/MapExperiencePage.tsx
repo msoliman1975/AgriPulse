@@ -573,6 +573,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [showGrid, setShowGrid] = useState<boolean>(false);
   const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
 
   // Every index the pipeline computes + stores per grid cell. Was the
   // "health trio"; expanded so the map can colour by any of them.
@@ -626,13 +627,21 @@ function MapForFarm({ farmId }: { farmId: string }) {
     return m;
   }, [summaryQ.data]);
 
-  // cellId -> { blockId, productId, lat, lon, value, blockName } so a
+  // cellId -> { blockId, productId, lat, lon, value, time, blockName } so a
   // clicked cell can fetch its history against the right block's product
-  // and the compact popup can render its current value + location.
+  // and the compact popup can render its current value + scene time + location.
   const cellMeta = useMemo(() => {
     const m = new Map<
       string,
-      { blockId: string; productId: string; lat: number; lon: number; value: number | null; blockName: string }
+      {
+        blockId: string;
+        productId: string;
+        lat: number;
+        lon: number;
+        value: number | null;
+        time: string | null;
+        blockName: string;
+      }
     >();
     for (const g of farmGridQ.data ?? []) {
       for (const c of g.cells) {
@@ -642,12 +651,39 @@ function MapForFarm({ farmId }: { farmId: string }) {
           lat: c.centroid_lat,
           lon: c.centroid_lon,
           value: c.mean === null ? null : Number(c.mean),
+          time: c.time,
           blockName: blockNameById.get(g.blockId) ?? g.blockId,
         });
       }
     }
     return m;
   }, [farmGridQ.data, blockNameById]);
+
+  // Block-average baseline for the selected cell. The backend anomaly
+  // detector flags a cell when its mean is >= DEFAULT_K (1.5) std-devs
+  // BELOW its block's own spatial mean for that scene (see
+  // backend/app/modules/grid/anomaly.py). We reproduce that judgement
+  // client-side from the already-loaded cells — no backend call. Returns
+  // null when the block has too few valid cells (<5) or the cell value is
+  // null. Per-block anomaly_z_threshold overrides are NOT surfaced in V1.
+  const selectedCellBaseline = useMemo<{ blockMean: number; z: number } | null>(() => {
+    if (!selectedCellId) return null;
+    const meta = cellMeta.get(selectedCellId);
+    if (!meta || meta.value === null) return null;
+    const group = (farmGridQ.data ?? []).find((g) => g.blockId === meta.blockId);
+    if (!group) return null;
+    const means = group.cells
+      .map((c) => (c.mean === null ? null : Number(c.mean)))
+      .filter((v): v is number => v !== null);
+    if (means.length < 5) return null;
+    const blockMean = means.reduce((s, v) => s + v, 0) / means.length;
+    const variance = means.reduce((s, v) => s + (v - blockMean) ** 2, 0) / means.length;
+    const blockStd = Math.sqrt(variance);
+    // Positive z = the cell sits BELOW the block average (anomaly-flagged
+    // direction); >= 1.5 means the backend would flag it.
+    const z = blockStd > 0 ? (blockMean - meta.value) / blockStd : 0;
+    return { blockMean, z };
+  }, [selectedCellId, cellMeta, farmGridQ.data]);
 
   const totalCellCount = useMemo(
     () => (farmGridQ.data ?? []).reduce((n, g) => n + g.cells.length, 0),
@@ -903,10 +939,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
             blockFillOpacity={layerPrefs.blockFillOpacity}
             gridCells={gridCellsFc}
             highlightedCellIds={highlightedCellIds}
-            onGridCellClick={(cellId) => {
+            onGridCellClick={(cellId, point) => {
               // Per the UX: a cell click shows ONLY the cell-info drawer.
-              // Close the block drawer so the two don't stack.
+              // Close the block drawer so the two don't stack. The click
+              // pixel coords anchor the popup next to the clicked cell.
               setSelectedCellId(cellId);
+              setCellClickPoint(point);
               closePanel();
             }}
             signalOverlay={signalOverlay.fc}
@@ -945,7 +983,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
           lat={selectedCellId ? (cellMeta.get(selectedCellId)?.lat ?? null) : null}
           lon={selectedCellId ? (cellMeta.get(selectedCellId)?.lon ?? null) : null}
           blockName={selectedCellId ? (cellMeta.get(selectedCellId)?.blockName ?? null) : null}
-          onClose={() => setSelectedCellId(null)}
+          x={cellClickPoint?.x ?? null}
+          y={cellClickPoint?.y ?? null}
+          time={selectedCellId ? (cellMeta.get(selectedCellId)?.time ?? null) : null}
+          baselineMean={selectedCellBaseline?.blockMean ?? null}
+          z={selectedCellBaseline?.z ?? null}
+          onClose={() => {
+            setSelectedCellId(null);
+            setCellClickPoint(null);
+          }}
         />
 
         {selectedObservationId ? (

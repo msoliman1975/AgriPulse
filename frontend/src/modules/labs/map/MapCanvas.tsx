@@ -78,7 +78,7 @@ interface Props {
   // in its properties; the heatmap color ramp reads `value`, the click
   // handler reads `cell_id`.
   gridCells?: FeatureCollection<Polygon, GridCellProps> | null;
-  onGridCellClick?: (cellId: string) => void;
+  onGridCellClick?: (cellId: string, point: { x: number; y: number }) => void;
   // G-2: cell ids to outline on the heatmap (the worst-N / alert-cited
   // cells), so a scout can see exactly where to go. Empty = none.
   highlightedCellIds?: string[];
@@ -489,7 +489,8 @@ export function MapCanvas({
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as { cell_id?: string };
-        if (props.cell_id) onGridCellClickRef.current?.(props.cell_id);
+        if (props.cell_id)
+          onGridCellClickRef.current?.(props.cell_id, { x: ev.point.x, y: ev.point.y });
       });
       // Clicking a block's name label selects the block. With the grid
       // overlay on, the heatmap covers the polygon fill, so the label is
