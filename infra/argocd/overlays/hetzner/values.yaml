@@ -13,15 +13,16 @@ global:
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
-  # promotion — NOT auto-bumped like dev). frontend is a separate build
-  # (9b3c256 = PRs #215..#221, prod VITE_ URLs); api/workers/tile share 9d140cc.
+  # promotion — NOT auto-bumped like dev). e51e61d = PRs #215..#223;
+  # api/workers carry #222 (signals import-batches + migration 0038 via the
+  # PreSync job). tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "9d140cc"
+      tag: "e51e61d"
     workers:
-      tag: "9d140cc"
+      tag: "e51e61d"
     frontend:
-      tag: "9b3c256"
+      tag: "e51e61d"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
