@@ -36,7 +36,6 @@ import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
 import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
-import { GridOverlayPanel } from "@/modules/grid/GridOverlayPanel";
 import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
@@ -572,9 +571,17 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
-  // Indices offered in the grid picker. Mirror the block detail panel's
-  // trio (the health-relevant ones); the backend stores all six per cell.
-  const GRID_INDEX_OPTIONS: IndexCode[] = ["ndvi", "ndre", "ndwi"];
+  // Every index the pipeline computes + stores per grid cell. Was the
+  // "health trio"; expanded so the map can colour by any of them.
+  const GRID_INDEX_OPTIONS: IndexCode[] = [
+    "ndvi",
+    "ndre",
+    "ndwi",
+    "evi",
+    "savi",
+    "gndvi",
+    "ndmi",
+  ];
 
   const subscriptionsQ = useQuery({
     queryKey: ["labs/map/subscriptions", selectedId],
@@ -749,6 +756,21 @@ function MapForFarm({ farmId }: { farmId: string }) {
         }}
         hasActiveBlocks={hasActiveBlocks}
         onOpenAutoBlock={() => navigate(`/farms/${farmId}/blocks/auto-grid`)}
+        // Farm-wide sub-block grid control (moved here from the floating
+        // panel). Available whenever the farm has blocks.
+        gridAvailable={summary.blocks.length > 0}
+        showGrid={showGrid}
+        onToggleGrid={setShowGrid}
+        gridIndex={gridIndex}
+        gridIndexOptions={GRID_INDEX_OPTIONS}
+        onGridIndexChange={setGridIndex}
+        gridCellCount={showGrid ? totalCellCount : null}
+        gridWorstCells={farmWorstCells}
+        gridWorstLoading={farmGridQ.isLoading}
+        onSelectGridCell={(cellId) => {
+          setSelectedCellId(cellId);
+          closePanel();
+        }}
       />
 
       {farmDrawerMode ? (
@@ -889,28 +911,10 @@ function MapForFarm({ farmId }: { farmId: string }) {
           onChange={setSignalOverlayDefId}
         />
 
-        {summary.blocks.length > 0 ? (
-          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-h-[70vh] max-w-sm flex-col gap-2 overflow-y-auto">
-            <GridOverlayPanel
-              showGrid={showGrid}
-              onToggleGrid={setShowGrid}
-              indexCode={gridIndex}
-              indexOptions={GRID_INDEX_OPTIONS}
-              onIndexChange={setGridIndex}
-              cellCount={showGrid ? totalCellCount : null}
-              worstCells={farmWorstCells}
-              worstLoading={farmGridQ.isLoading}
-              onSelectCell={(cellId) => {
-                setSelectedCellId(cellId);
-                closePanel();
-              }}
-            />
-            {/* Per-block config (cell size) only when a block is selected. */}
-            {selectedId && gridProductId ? (
-              <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
-            ) : null}
-          </div>
-        ) : null}
+        {/* The grid show/index/worst control now lives in the top toolbar,
+            and the per-block cell-size + backfill config now lives inside
+            the block drawer (DetailPanel) — see its `gridConfig` slot
+            below — since it's block-level. Nothing grid-related floats. */}
 
         <GridCellDrawer
           open={selectedCellId !== null}
@@ -961,6 +965,14 @@ function MapForFarm({ farmId }: { farmId: string }) {
               setReshapeCandidate(null);
             }}
             reshapeSaving={updateBlockMut.isPending}
+            // Block-level sub-block grid config (cell size + backfill).
+            // Rendered as a section inside the drawer when this block has
+            // an imagery subscription (= a product to grid against).
+            gridConfig={
+              selectedId && gridProductId ? (
+                <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+              ) : null
+            }
           />
         ) : null}
 
@@ -1063,6 +1075,16 @@ function Toolbar({
   onCreateFarm,
   hasActiveBlocks,
   onOpenAutoBlock,
+  gridAvailable,
+  showGrid,
+  onToggleGrid,
+  gridIndex,
+  gridIndexOptions,
+  onGridIndexChange,
+  gridCellCount,
+  gridWorstCells,
+  gridWorstLoading,
+  onSelectGridCell,
 }: {
   drawTarget: DrawTarget | null;
   onToggleDrawBlock: () => void;
@@ -1075,6 +1097,16 @@ function Toolbar({
   onCreateFarm: () => void;
   hasActiveBlocks: boolean;
   onOpenAutoBlock: () => void;
+  gridAvailable: boolean;
+  showGrid: boolean;
+  onToggleGrid: (next: boolean) => void;
+  gridIndex: IndexCode;
+  gridIndexOptions: IndexCode[];
+  onGridIndexChange: (code: IndexCode) => void;
+  gridCellCount: number | null;
+  gridWorstCells: GridWorstCell[];
+  gridWorstLoading: boolean;
+  onSelectGridCell: (cellId: string) => void;
 }) {
   // The active-farm context (name, area, governorate, status) now lives
   // in the shell header next to the tenant badge — that's why this
@@ -1195,6 +1227,18 @@ function Toolbar({
             aria-label="Block fill opacity"
           />
         </label>
+        <GridToolbarControl
+          available={gridAvailable}
+          showGrid={showGrid}
+          onToggleGrid={onToggleGrid}
+          indexCode={gridIndex}
+          indexOptions={gridIndexOptions}
+          onIndexChange={onGridIndexChange}
+          cellCount={gridCellCount}
+          worstCells={gridWorstCells}
+          worstLoading={gridWorstLoading}
+          onSelectCell={onSelectGridCell}
+        />
         <span className="text-slate-300">|</span>
         <Swatch color="#97C459" label="Healthy" />
         <Swatch color="#EF9F27" label="Watch" />
@@ -1236,6 +1280,116 @@ function Toolbar({
         </button>
       </div>
     </header>
+  );
+}
+
+// Farm-wide sub-block grid control, in the top toolbar (replaces the
+// old floating GridOverlayPanel). Toggle + index live inline like the
+// other layer controls; the worst-cells list is a small popover so the
+// toolbar stays one row. Renders nothing until the farm has blocks.
+function GridToolbarControl({
+  available,
+  showGrid,
+  onToggleGrid,
+  indexCode,
+  indexOptions,
+  onIndexChange,
+  cellCount,
+  worstCells,
+  worstLoading,
+  onSelectCell,
+}: {
+  available: boolean;
+  showGrid: boolean;
+  onToggleGrid: (next: boolean) => void;
+  indexCode: IndexCode;
+  indexOptions: IndexCode[];
+  onIndexChange: (code: IndexCode) => void;
+  cellCount: number | null;
+  worstCells: GridWorstCell[];
+  worstLoading: boolean;
+  onSelectCell: (cellId: string) => void;
+}) {
+  const [worstOpen, setWorstOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!worstOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setWorstOpen(false);
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [worstOpen]);
+
+  if (!available) return null;
+
+  return (
+    <>
+      <span className="text-slate-300">|</span>
+      <LayerToggle label="Grid" checked={showGrid} onChange={onToggleGrid} />
+      {showGrid ? (
+        <>
+          {cellCount != null ? (
+            <span className="text-[10px] text-slate-400">{cellCount} cells</span>
+          ) : null}
+          <select
+            value={indexCode}
+            onChange={(e) => onIndexChange(e.target.value as IndexCode)}
+            aria-label="Grid index"
+            className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-slate-700"
+          >
+            {indexOptions.map((c) => (
+              <option key={c} value={c}>
+                {c.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <div ref={wrapRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setWorstOpen((o) => !o)}
+              aria-expanded={worstOpen}
+              className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+            >
+              Lowest ▾
+            </button>
+            {worstOpen ? (
+              <div className="absolute end-0 top-full z-30 mt-1 w-48 rounded-md border border-slate-200 bg-white p-2 text-[11px] shadow-lg">
+                <p className="mb-1 font-medium text-slate-600">
+                  Lowest {indexCode.toUpperCase()} cells
+                </p>
+                {worstLoading ? (
+                  <p className="text-slate-400">Loading…</p>
+                ) : worstCells.length === 0 ? (
+                  <p className="text-slate-400">No observations yet.</p>
+                ) : (
+                  <ul className="flex flex-col gap-0.5">
+                    {worstCells.map((c, i) => (
+                      <li key={c.cell_id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectCell(c.cell_id);
+                            setWorstOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded px-1 py-0.5 hover:bg-slate-50"
+                        >
+                          <span className="text-slate-500">#{i + 1}</span>
+                          <span className="font-mono text-slate-800">
+                            {c.mean === null ? "—" : Number(c.mean).toFixed(3)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 

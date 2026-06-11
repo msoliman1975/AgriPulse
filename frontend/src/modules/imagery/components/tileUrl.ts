@@ -68,6 +68,9 @@ export function visualizationDefaults(indexCode: IndexCode): {
       return { rescaleMin: -0.2, rescaleMax: 0.7, colormap: "greens" };
     case "gndvi":
       return { rescaleMin: -0.2, rescaleMax: 0.8, colormap: "greens" };
+    case "ndmi":
+      // Moisture index (NIR/SWIR), ~[-1,1]; blues like ndwi.
+      return { rescaleMin: -0.5, rescaleMax: 0.5, colormap: "blues" };
   }
 }
 
