@@ -14,14 +14,14 @@ global:
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev). frontend is a separate build
-  # (3e34604 = PRs #215+#216+#217, prod VITE_ URLs); api/workers/tile share 9d140cc.
+  # (d7de1e6 = PRs #215+#216+#217+#218+#219, prod VITE_ URLs); api/workers/tile share 9d140cc.
   images:
     api:
       tag: "9d140cc"
     workers:
       tag: "9d140cc"
     frontend:
-      tag: "3e34604"
+      tag: "d7de1e6"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
