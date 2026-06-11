@@ -30,15 +30,18 @@ import {
 import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
-import { SignalOverlayControl } from "./SignalOverlayControl";
 import { getGridCells, type GridWorstCell } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
-import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
+import { GridCellPopup } from "@/modules/grid/GridCellPopup";
 import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
-import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
+import {
+  listSignalDefinitions,
+  listSignalObservations,
+  type SignalDefinition,
+} from "@/api/signals";
 import { DetailPanel } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
@@ -616,15 +619,35 @@ function MapForFarm({ farmId }: { farmId: string }) {
     staleTime: 30_000,
   });
 
-  // cellId -> { blockId, productId } so a clicked cell can fetch its
-  // history against the right block's product.
+  // block id -> display name, for the cell popup's "Block" row.
+  const blockNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of summaryQ.data?.blocks ?? []) m.set(b.id, b.name ?? b.code ?? b.id);
+    return m;
+  }, [summaryQ.data]);
+
+  // cellId -> { blockId, productId, lat, lon, value, blockName } so a
+  // clicked cell can fetch its history against the right block's product
+  // and the compact popup can render its current value + location.
   const cellMeta = useMemo(() => {
-    const m = new Map<string, { blockId: string; productId: string }>();
+    const m = new Map<
+      string,
+      { blockId: string; productId: string; lat: number; lon: number; value: number | null; blockName: string }
+    >();
     for (const g of farmGridQ.data ?? []) {
-      for (const c of g.cells) m.set(c.cell_id, { blockId: g.blockId, productId: g.productId });
+      for (const c of g.cells) {
+        m.set(c.cell_id, {
+          blockId: g.blockId,
+          productId: g.productId,
+          lat: c.centroid_lat,
+          lon: c.centroid_lon,
+          value: c.mean === null ? null : Number(c.mean),
+          blockName: blockNameById.get(g.blockId) ?? g.blockId,
+        });
+      }
     }
     return m;
-  }, [farmGridQ.data]);
+  }, [farmGridQ.data, blockNameById]);
 
   const totalCellCount = useMemo(
     () => (farmGridQ.data ?? []).reduce((n, g) => n + g.cells.length, 0),
@@ -771,6 +794,13 @@ function MapForFarm({ farmId }: { farmId: string }) {
           setSelectedCellId(cellId);
           closePanel();
         }}
+        // Signal overlay control (moved here from the floating
+        // SignalOverlayControl). Mirrors the grid control pattern.
+        signalAvailable={(signalDefinitionsQ.data ?? []).length > 0}
+        signalDefinitions={signalDefinitionsQ.data ?? []}
+        signalDefId={signalOverlayDefId}
+        onSignalChange={setSignalOverlayDefId}
+        signalObsCount={signalOverlay.observationCount}
       />
 
       {farmDrawerMode ? (
@@ -901,26 +931,20 @@ function MapForFarm({ farmId }: { farmId: string }) {
           }}
         />
 
-        <SignalOverlayControl
-          definitions={signalDefinitionsQ.data ?? []}
-          selectedDefinitionId={signalOverlayDefId}
-          observationCount={signalOverlay.observationCount}
-          skippedCount={signalOverlay.skippedCount}
-          isLoading={signalObservationsQ.isLoading}
-          isError={signalObservationsQ.isError}
-          onChange={setSignalOverlayDefId}
-        />
-
         {/* The grid show/index/worst control now lives in the top toolbar,
             and the per-block cell-size + backfill config now lives inside
             the block drawer (DetailPanel) — see its `gridConfig` slot
             below — since it's block-level. Nothing grid-related floats. */}
 
-        <GridCellDrawer
+        <GridCellPopup
           open={selectedCellId !== null}
           cellId={selectedCellId}
           productId={selectedCellId ? (cellMeta.get(selectedCellId)?.productId ?? null) : null}
           indexCode={gridIndex}
+          value={selectedCellId ? (cellMeta.get(selectedCellId)?.value ?? null) : null}
+          lat={selectedCellId ? (cellMeta.get(selectedCellId)?.lat ?? null) : null}
+          lon={selectedCellId ? (cellMeta.get(selectedCellId)?.lon ?? null) : null}
+          blockName={selectedCellId ? (cellMeta.get(selectedCellId)?.blockName ?? null) : null}
           onClose={() => setSelectedCellId(null)}
         />
 
@@ -1085,6 +1109,11 @@ function Toolbar({
   gridWorstCells,
   gridWorstLoading,
   onSelectGridCell,
+  signalAvailable,
+  signalDefinitions,
+  signalDefId,
+  onSignalChange,
+  signalObsCount,
 }: {
   drawTarget: DrawTarget | null;
   onToggleDrawBlock: () => void;
@@ -1107,6 +1136,11 @@ function Toolbar({
   gridWorstCells: GridWorstCell[];
   gridWorstLoading: boolean;
   onSelectGridCell: (cellId: string) => void;
+  signalAvailable: boolean;
+  signalDefinitions: readonly SignalDefinition[];
+  signalDefId: string | null;
+  onSignalChange: (id: string | null) => void;
+  signalObsCount: number;
 }) {
   // The active-farm context (name, area, governorate, status) now lives
   // in the shell header next to the tenant badge — that's why this
@@ -1238,6 +1272,13 @@ function Toolbar({
           worstCells={gridWorstCells}
           worstLoading={gridWorstLoading}
           onSelectCell={onSelectGridCell}
+        />
+        <SignalToolbarControl
+          available={signalAvailable}
+          definitions={signalDefinitions}
+          selectedDefinitionId={signalDefId}
+          onChange={onSignalChange}
+          obsCount={signalObsCount}
         />
         <span className="text-slate-300">|</span>
         <Swatch color="#97C459" label="Healthy" />
@@ -1388,6 +1429,50 @@ function GridToolbarControl({
             ) : null}
           </div>
         </>
+      ) : null}
+    </>
+  );
+}
+
+// Signal overlay control, in the top toolbar (replaces the old floating
+// SignalOverlayControl). Mirrors GridToolbarControl: a label + inline
+// select, with the observation count as muted text once a signal is
+// picked. Renders nothing until the tenant has signal definitions.
+function SignalToolbarControl({
+  available,
+  definitions,
+  selectedDefinitionId,
+  onChange,
+  obsCount,
+}: {
+  available: boolean;
+  definitions: readonly SignalDefinition[];
+  selectedDefinitionId: string | null;
+  onChange: (id: string | null) => void;
+  obsCount: number;
+}) {
+  if (!available) return null;
+  return (
+    <>
+      <span className="text-slate-300">|</span>
+      <label className="flex items-center gap-1">
+        <span className="text-[10px] text-slate-500">Signal</span>
+        <select
+          value={selectedDefinitionId ?? ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+          aria-label="Signal overlay"
+          className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-slate-700"
+        >
+          <option value="">— none —</option>
+          {definitions.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name} ({d.code})
+            </option>
+          ))}
+        </select>
+      </label>
+      {selectedDefinitionId ? (
+        <span className="text-[10px] text-slate-400">{obsCount} obs</span>
       ) : null}
     </>
   );
