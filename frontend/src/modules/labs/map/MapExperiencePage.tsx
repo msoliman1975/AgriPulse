@@ -574,6 +574,9 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
+  // Click pixel coords for the observation popup — anchors it next to the
+  // clicked signal dot, the same way cellClickPoint anchors the cell popup.
+  const [obsClickPoint, setObsClickPoint] = useState<{ x: number; y: number } | null>(null);
 
   // Every index the pipeline computes + stores per grid cell. Was the
   // "health trio"; expanded so the map can colour by any of them.
@@ -750,6 +753,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
     if (!selectedObservationId || !signalObservationsQ.data) return null;
     return signalObservationsQ.data.find((o) => o.id === selectedObservationId) ?? null;
   }, [selectedObservationId, signalObservationsQ.data]);
+
+  // Drop the anchor point whenever the observation popup closes via any
+  // path other than the dot click that set it (deep-link cleared, back
+  // nav, panel-driven removal) so a stale anchor can't reposition a
+  // freshly opened popup. When `signal_obs` is absent the popup is hidden
+  // and the point should be null.
+  useEffect(() => {
+    if (!selectedObservationId) setObsClickPoint(null);
+  }, [selectedObservationId]);
 
   if (summaryQ.isLoading) {
     return <FullState>Loading farm map…</FullState>;
@@ -939,22 +951,32 @@ function MapForFarm({ farmId }: { farmId: string }) {
             blockFillOpacity={layerPrefs.blockFillOpacity}
             gridCells={gridCellsFc}
             highlightedCellIds={highlightedCellIds}
+            selectedGridCellId={selectedCellId}
             onGridCellClick={(cellId, point) => {
-              // Per the UX: a cell click shows ONLY the cell-info drawer.
-              // Close the block drawer so the two don't stack. The click
-              // pixel coords anchor the popup next to the clicked cell.
+              // Per the UX: a cell click shows ONLY the cell-info popup.
+              // Close the block drawer AND the observation popup so only
+              // one popup shows at a time. The click pixel coords anchor
+              // the popup next to the clicked cell.
               setSelectedCellId(cellId);
               setCellClickPoint(point);
               closePanel();
+              const next = new URLSearchParams(search);
+              next.delete("signal_obs");
+              setSearch(next, { replace: true });
             }}
             signalOverlay={signalOverlay.fc}
-            onSignalClick={(observationId) => {
+            onSignalClick={(observationId, point) => {
               // The URL `?signal_obs=` drives the SignalObservationPanel
               // (rendered below). Keeping the id in the URL means a
               // deep-link to a specific observation works on its own.
+              // Opening an observation closes the cell popup so the two
+              // don't stack. The click coords anchor the popup to the dot.
               const next = new URLSearchParams(search);
               next.set("signal_obs", observationId);
               setSearch(next, { replace: true });
+              setObsClickPoint(point);
+              setSelectedCellId(null);
+              setCellClickPoint(null);
             }}
           />
         )}
@@ -999,10 +1021,13 @@ function MapForFarm({ farmId }: { farmId: string }) {
             observation={selectedObservation}
             definition={selectedSignalDefinition}
             isLoading={signalObservationsQ.isLoading}
+            x={obsClickPoint?.x ?? null}
+            y={obsClickPoint?.y ?? null}
             onClose={() => {
               const next = new URLSearchParams(search);
               next.delete("signal_obs");
               setSearch(next, { replace: true });
+              setObsClickPoint(null);
             }}
           />
         ) : null}
