@@ -152,6 +152,13 @@ class SignalObservation(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
 
+    # CS-7 batch undo: the CSV upload that created this row. NULL for
+    # single-shot / template observations recorded outside a CSV import.
+    # One fresh UUID per upload, assigned by the service layer. Backed by
+    # a partial index (migration 0038) for the list / delete-by-batch
+    # lookups.
+    import_batch_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
     # CS-1 D7 (synonym path — full rename deferred): new code can read
     # / write `observed_at` and `recorded_at`. The underlying DB
     # columns (`time`, `inserted_at`) are unchanged so the TimescaleDB

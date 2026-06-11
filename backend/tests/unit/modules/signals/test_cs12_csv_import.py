@@ -298,7 +298,8 @@ async def test_templated_csv_routes_group_to_template_observation() -> None:
         tenant_schema="t",
         tenant_id=uuid4(),
     )
-    assert out == {"rows_imported": 2}
+    assert out["rows_imported"] == 2
+    assert "import_batch_id" in out
     # The 2 rows went in as ONE template observation, not 2 flat inserts.
     impl.create_template_observation.assert_awaited_once()
     assert impl._repo.insert_observation.await_count == 0

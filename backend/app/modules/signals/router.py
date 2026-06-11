@@ -32,10 +32,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.signals.schemas import (
+    ImportBatchRead,
     SignalAssignmentCreateRequest,
     SignalAssignmentResponse,
     SignalAttachmentInitRequest,
     SignalAttachmentInitResponse,
+    SignalCsvImportResponse,
     SignalDefinitionCreateRequest,
     SignalDefinitionResponse,
     SignalDefinitionUpdateRequest,
@@ -547,7 +549,7 @@ async def create_observation(
 @router.post(
     "/signals/csv-import",
     status_code=status.HTTP_200_OK,
-    response_model=None,
+    response_model=SignalCsvImportResponse,
     summary="Strict CSV import for signal observations (CS-7 / CS-12).",
 )
 async def import_observations_csv(
@@ -561,7 +563,7 @@ async def import_observations_csv(
     context: RequestContext = Depends(get_current_context),
     service: SignalsServiceImpl = Depends(_service),
     tenant_session: AsyncSession = Depends(get_db_session),
-) -> dict[str, int]:
+) -> dict[str, Any]:
     schema = _ensure_tenant(context)
     # signal.record on the target farm; per-row farm_id is fixed by
     # the query param so we authorize once instead of N times. Bulk mode
@@ -589,6 +591,44 @@ async def import_observations_csv(
         tenant_id=tenant_id,
         bulk_mode=bulk_mode,
     )
+
+
+@router.get(
+    "/signals/import-batches",
+    response_model=list[ImportBatchRead],
+    summary="List past CSV uploads for a farm (CS-7 import history).",
+)
+async def list_import_batches(
+    farm_id: UUID = Query(..., description="Farm whose CSV upload history to list."),
+    context: RequestContext = Depends(requires_capability("signal.read")),
+    service: SignalsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    schema = _ensure_tenant(context)
+    return list(await service.list_import_batches(farm_id=farm_id, tenant_schema=schema))
+
+
+@router.delete(
+    "/signals/import-batches/{import_batch_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Undo a CSV upload — delete every observation it created (CS-7).",
+)
+async def delete_import_batch(
+    import_batch_id: UUID,
+    farm_id: UUID = Query(..., description="Farm the upload was recorded against."),
+    context: RequestContext = Depends(get_current_context),
+    service: SignalsServiceImpl = Depends(_service),
+) -> dict[str, int]:
+    schema = _ensure_tenant(context)
+    # Farm-scoped delete capability — the farm comes from the query param
+    # (same as the list endpoint); the batch id alone doesn't encode it.
+    _ensure_farm_capability(context, "signal.delete_observation", farm_id)
+    deleted = await service.delete_import_batch(
+        import_batch_id=import_batch_id,
+        farm_id=farm_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    return {"deleted": deleted}
 
 
 @router.get(
