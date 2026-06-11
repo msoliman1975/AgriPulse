@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SignalDefinition, SignalObservation } from "@/api/signals";
+import { AnchoredPopup } from "@/components/AnchoredPopup";
 import { useDateLocale } from "@/hooks/useDateLocale";
 
 import { formatObservationValue } from "./signalOverlay";
@@ -11,23 +12,28 @@ interface Props {
   observation: SignalObservation | null;
   definition: SignalDefinition | null;
   isLoading: boolean;
+  // Click pixel coords (relative to the map container) — anchor the card
+  // next to the clicked observation dot. Null falls back to the fixed
+  // top-right corner. Mirrors GridCellPopup so the two read as siblings.
+  x: number | null;
+  y: number | null;
   onClose: () => void;
 }
 
 /**
- * Inline observation popup for the Labs map. Renders the
- * full SignalObservation when the user clicks a marker in the
- * CS-8 overlay; data comes from the same react-query result the
- * overlay already loaded, so no extra API round-trip.
- *
- * Positioned bottom-left (the overlay picker holds bottom-right;
- * the unit-detail panel sits along the right edge). Stacks nicely
- * with both.
+ * Inline observation popup for the Labs map. Renders the full
+ * SignalObservation when the user clicks a marker in the CS-8 overlay;
+ * data comes from the same react-query result the overlay already loaded,
+ * so no extra API round-trip. Card chrome + the descriptive title + the
+ * click-anchoring all come from the shared AnchoredPopup wrapper, so this
+ * looks + behaves identically to the grid-cell popup.
  */
 export function SignalObservationPanel({
   observation,
   definition,
   isLoading,
+  x,
+  y,
   onClose,
 }: Props): ReactNode {
   const { t } = useTranslation("signals");
@@ -35,27 +41,17 @@ export function SignalObservationPanel({
 
   if (isLoading) {
     return (
-      <div className="pointer-events-auto absolute bottom-2 left-2 z-10 min-w-[260px] rounded-md border border-slate-300 bg-white/95 p-3 text-xs shadow-md">
-        <p className="text-slate-500">{t("observationPanel.loading")}</p>
-      </div>
+      <AnchoredPopup x={x} y={y} title={t("observationPanel.title")} onClose={onClose}>
+        <p className="text-ap-muted">{t("observationPanel.loading")}</p>
+      </AnchoredPopup>
     );
   }
 
   if (!observation) {
     return (
-      <div className="pointer-events-auto absolute bottom-2 left-2 z-10 min-w-[260px] rounded-md border border-slate-300 bg-white/95 p-3 text-xs shadow-md">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-rose-700">{t("observationPanel.notFound")}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100"
-            aria-label={t("observationPanel.close")}
-          >
-            ×
-          </button>
-        </div>
-      </div>
+      <AnchoredPopup x={x} y={y} title={t("observationPanel.title")} onClose={onClose}>
+        <p className="text-ap-crit">{t("observationPanel.notFound")}</p>
+      </AnchoredPopup>
     );
   }
 
@@ -66,38 +62,24 @@ export function SignalObservationPanel({
     definition?.name ?? observation.signal_code ?? observation.signal_definition_id;
 
   return (
-    <aside
-      className="pointer-events-auto absolute bottom-2 left-2 z-10 min-w-[280px] max-w-[360px] rounded-md border border-slate-300 bg-white/95 p-3 text-xs shadow-md"
-      role="dialog"
-      aria-label={t("observationPanel.title")}
+    <AnchoredPopup
+      x={x}
+      y={y}
+      title={t("observationPanel.title")}
+      subtitle={definitionLabel}
+      onClose={onClose}
     >
-      <header className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">
-            {t("observationPanel.title")}
-          </p>
-          <h3 className="text-sm font-semibold text-slate-900">{definitionLabel}</h3>
-          <p className="font-mono text-[10px] text-slate-500">{observation.signal_code}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100"
-          aria-label={t("observationPanel.close")}
-        >
-          ×
-        </button>
-      </header>
+      <p className="mb-2 font-mono text-[10px] text-ap-muted">{observation.signal_code}</p>
 
-      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-slate-700">
-        <dt className="text-slate-500">{t("observationPanel.value")}</dt>
-        <dd className="font-mono tabular-nums text-slate-900">
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[11px]">
+        <dt className="text-ap-muted">{t("observationPanel.value")}</dt>
+        <dd className="font-mono tabular-nums text-ap-ink">
           {valueDisplay}
-          {definition?.unit ? <span className="ms-1 text-slate-500">{definition.unit}</span> : null}
+          {definition?.unit ? <span className="ms-1 text-ap-muted">{definition.unit}</span> : null}
         </dd>
 
-        <dt className="text-slate-500">{t("observationPanel.observedAt")}</dt>
-        <dd>
+        <dt className="text-ap-muted">{t("observationPanel.observedAt")}</dt>
+        <dd className="text-ap-ink">
           {formatDistanceToNow(parseISO(observedAtIso), {
             addSuffix: true,
             locale: dateLocale,
@@ -106,8 +88,8 @@ export function SignalObservationPanel({
 
         {recordedAtIso !== observedAtIso ? (
           <>
-            <dt className="text-slate-500">{t("observationPanel.recordedAt")}</dt>
-            <dd>
+            <dt className="text-ap-muted">{t("observationPanel.recordedAt")}</dt>
+            <dd className="text-ap-ink">
               {formatDistanceToNow(parseISO(recordedAtIso), {
                 addSuffix: true,
                 locale: dateLocale,
@@ -116,13 +98,15 @@ export function SignalObservationPanel({
           </>
         ) : null}
 
-        <dt className="text-slate-500">{t("observationPanel.locationMode")}</dt>
-        <dd>{t(`observationPanel.locationModes.${observation.location_mode ?? "entity"}`)}</dd>
+        <dt className="text-ap-muted">{t("observationPanel.locationMode")}</dt>
+        <dd className="text-ap-ink">
+          {t(`observationPanel.locationModes.${observation.location_mode ?? "entity"}`)}
+        </dd>
 
         {observation.location_point ? (
           <>
-            <dt className="text-slate-500">{t("observationPanel.locationPoint")}</dt>
-            <dd className="font-mono text-[10px]">
+            <dt className="text-ap-muted">{t("observationPanel.locationPoint")}</dt>
+            <dd className="font-mono text-[10px] text-ap-ink">
               {observation.location_point.latitude.toFixed(5)},{" "}
               {observation.location_point.longitude.toFixed(5)}
             </dd>
@@ -131,15 +115,17 @@ export function SignalObservationPanel({
 
         {observation.block_id ? (
           <>
-            <dt className="text-slate-500">{t("observationPanel.block")}</dt>
-            <dd className="font-mono text-[10px]">{observation.block_id.slice(0, 8)}…</dd>
+            <dt className="text-ap-muted">{t("observationPanel.block")}</dt>
+            <dd className="font-mono text-[10px] text-ap-ink">
+              {observation.block_id.slice(0, 8)}…
+            </dd>
           </>
         ) : null}
 
         {observation.template_observation_id ? (
           <>
-            <dt className="text-slate-500">{t("observationPanel.template")}</dt>
-            <dd className="text-[10px] text-slate-500">
+            <dt className="text-ap-muted">{t("observationPanel.template")}</dt>
+            <dd className="text-[10px] text-ap-muted">
               {observation.template_observation_id === observation.id
                 ? t("observationPanel.templateLead")
                 : t("observationPanel.templateSibling")}
@@ -149,7 +135,7 @@ export function SignalObservationPanel({
       </dl>
 
       {observation.notes ? (
-        <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] italic text-slate-600">
+        <p className="mt-2 border-t border-ap-line pt-2 text-[11px] italic text-ap-muted">
           {observation.notes}
         </p>
       ) : null}
@@ -164,6 +150,6 @@ export function SignalObservationPanel({
           {t("observationPanel.attachment")}
         </a>
       ) : null}
-    </aside>
+    </AnchoredPopup>
   );
 }

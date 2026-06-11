@@ -72,7 +72,7 @@ interface Props {
   // (possibly empty) shows it. Click on a marker fires onSignalClick
   // with the underlying observation id.
   signalOverlay?: FeatureCollection<Point, SignalOverlayProps> | null;
-  onSignalClick?: (observationId: string) => void;
+  onSignalClick?: (observationId: string, point: { x: number; y: number }) => void;
   // Sub-block grid overlay (PR-grid). `null` hides; an FC shows.
   // Each feature must carry { cell_id: string, value: number | null }
   // in its properties; the heatmap color ramp reads `value`, the click
@@ -82,6 +82,10 @@ interface Props {
   // G-2: cell ids to outline on the heatmap (the worst-N / alert-cited
   // cells), so a scout can see exactly where to go. Empty = none.
   highlightedCellIds?: string[];
+  // The currently-open cell popup's cell — outlined with a bold blue
+  // border so the operator can see which cell the popup refers to.
+  // Distinct from the pink worst-N highlight. Null = none selected.
+  selectedGridCellId?: string | null;
 }
 
 export interface GridCellProps {
@@ -113,6 +117,7 @@ const GRID_SOURCE_ID = "subblock-grid";
 const GRID_FILL_LAYER = "subblock-grid-fill";
 const GRID_LINE_LAYER = "subblock-grid-line";
 const GRID_HIGHLIGHT_LAYER = "subblock-grid-highlight";
+const GRID_SELECTED_LAYER = "subblock-grid-selected";
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -178,6 +183,7 @@ export function MapCanvas({
   gridCells = null,
   onGridCellClick,
   highlightedCellIds = [],
+  selectedGridCellId = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -463,8 +469,30 @@ export function MapCanvas({
           "line-opacity": 0.95,
         },
       });
+      // Selected-cell outline — a bold blue border over the cell whose
+      // popup is currently open, so the operator can see which cell the
+      // popup describes. Deliberately distinct from the pink worst-N
+      // highlight above. Starts matching nothing; the selectedGridCellId
+      // effect swaps the filter.
+      map.addLayer({
+        id: GRID_SELECTED_LAYER,
+        type: "line",
+        source: GRID_SOURCE_ID,
+        filter: ["==", ["get", "cell_id"], ""],
+        paint: {
+          "line-color": "#1d4ed8", // blue-700 — distinct from pink worst-N
+          "line-width": 3,
+          "line-opacity": 1,
+        },
+      });
       // Keep block name labels above the grid heatmap so they stay legible
       // (and clickable as the block-open affordance) when the overlay is on.
+      // Raise the signal dots above the heatmap too so they stay visible +
+      // clickable. Order ends up grid < signals < labels — labels still win
+      // a click (the GRID handler guards on them), the signal dots win over
+      // grid cells (the GRID handler also guards on them).
+      if (map.getLayer(SIGNAL_HALO_LAYER)) map.moveLayer(SIGNAL_HALO_LAYER);
+      if (map.getLayer(SIGNAL_CIRCLE_LAYER)) map.moveLayer(SIGNAL_CIRCLE_LAYER);
       map.moveLayer(LABEL_LAYER);
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
@@ -484,6 +512,12 @@ export function MapCanvas({
         // affordance; if the click also landed on a label, let the label
         // handler win so a label opens the block, not a cell.
         if (map.queryRenderedFeatures(ev.point, { layers: [LABEL_LAYER] }).length > 0) {
+          return;
+        }
+        // Observation dots sit above the heatmap and have their own click
+        // handler; if the click also landed on a dot, let the signal
+        // handler win so a dot opens the observation, not a cell.
+        if (map.queryRenderedFeatures(ev.point, { layers: [SIGNAL_CIRCLE_LAYER] }).length > 0) {
           return;
         }
         const f = ev.features?.[0];
@@ -512,7 +546,7 @@ export function MapCanvas({
         if (!f) return;
         const props = f.properties as { observation_id?: string };
         if (props.observation_id) {
-          onSignalClickRef.current?.(props.observation_id);
+          onSignalClickRef.current?.(props.observation_id, { x: ev.point.x, y: ev.point.y });
         }
       });
     });
@@ -612,7 +646,12 @@ export function MapCanvas({
       const visible = gridCells !== null;
       const fc = gridCells ?? { type: "FeatureCollection", features: [] };
       src.setData(fc);
-      for (const layerId of [GRID_FILL_LAYER, GRID_LINE_LAYER, GRID_HIGHLIGHT_LAYER]) {
+      for (const layerId of [
+        GRID_FILL_LAYER,
+        GRID_LINE_LAYER,
+        GRID_HIGHLIGHT_LAYER,
+        GRID_SELECTED_LAYER,
+      ]) {
         if (!map.getLayer(layerId)) continue;
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
@@ -645,6 +684,20 @@ export function MapCanvas({
     if (map.getLayer(GRID_HIGHLIGHT_LAYER)) apply();
     else map.once("load", apply);
   }, [highlightedCellIds]);
+
+  // Outline the cell whose popup is open via a filter swap on the selected
+  // layer — same gate-on-layer-existing rationale as the highlight effect
+  // above. Empty/null selection matches nothing.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(GRID_SELECTED_LAYER)) return;
+      map.setFilter(GRID_SELECTED_LAYER, ["==", ["get", "cell_id"], selectedGridCellId ?? ""]);
+    };
+    if (map.getLayer(GRID_SELECTED_LAYER)) apply();
+    else map.once("load", apply);
+  }, [selectedGridCellId]);
 
   // Visibility + opacity toggles. Each prop maps to one or two MapLibre
   // layers; if a layer hasn't been added yet (style still loading) we

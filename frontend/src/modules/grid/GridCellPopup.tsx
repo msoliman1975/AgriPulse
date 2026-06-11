@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+
+import { AnchoredPopup } from "@/components/AnchoredPopup";
 
 import { getGridCellHistory } from "../../api/grid";
 import type { IndexCode } from "../../api/indices";
@@ -27,11 +29,6 @@ interface Props {
   onClose: () => void;
 }
 
-// Offset the card from the click point so it doesn't sit under the cursor.
-const ANCHOR_OFFSET = 10;
-// Keep the card at least this far from the parent container's edges.
-const EDGE_PAD = 4;
-
 function formatSceneTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -48,8 +45,9 @@ function formatSceneTime(iso: string): string {
  * Compact floating popup for a clicked grid cell. Surfaces the latest
  * min/mean/max, the cell coordinate, its block, the scene timestamp, and
  * the block-average baseline used to flag the cell — plus a (placeholder)
- * "scout this area" action. Anchored next to the clicked cell when click
- * coords are supplied; otherwise pinned top-right. Plain-English inline
+ * "scout this area" action. Card chrome, the descriptive title, and the
+ * click-anchoring live in the shared AnchoredPopup wrapper so this and the
+ * signal-observation popup look + behave identically. Plain-English inline
  * copy to match the map toolbar (no i18n keys).
  */
 export function GridCellPopup({
@@ -77,43 +75,6 @@ export function GridCellPopup({
     enabled: open && cellId !== null && productId !== null,
   });
 
-  const anchored = x !== null && y !== null;
-  const cardRef = useRef<HTMLDivElement | null>(null);
-  // Adjusted (clamped/flipped) position once we can measure the card. Until
-  // then we render at the raw offset to avoid a frame at (0,0).
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-  useLayoutEffect(() => {
-    if (!open || !anchored || x === null || y === null) {
-      setPos(null);
-      return;
-    }
-    const card = cardRef.current;
-    // offsetParent is the nearest positioned ancestor — the map container
-    // (`relative flex-1 overflow-hidden`) that wraps both the canvas and
-    // this popup, so its rect shares the same coordinate space as `x`/`y`.
-    const parent = card?.offsetParent as HTMLElement | null;
-    if (!card || !parent) return;
-    const cardRect = card.getBoundingClientRect();
-    const parentRect = parent.getBoundingClientRect();
-    const w = cardRect.width;
-    const h = cardRect.height;
-    const maxLeft = parentRect.width - w - EDGE_PAD;
-    const maxTop = parentRect.height - h - EDGE_PAD;
-
-    let left = x + ANCHOR_OFFSET;
-    let top = y + ANCHOR_OFFSET;
-    // If we'd overflow the right edge, flip to the left of the click.
-    if (left > maxLeft) left = x - w - ANCHOR_OFFSET;
-    // If we'd overflow the bottom edge, flip above the click.
-    if (top > maxTop) top = y - h - ANCHOR_OFFSET;
-    // Clamp inside the container regardless (covers tiny containers / flips
-    // that still overshoot).
-    left = Math.max(EDGE_PAD, Math.min(left, maxLeft));
-    top = Math.max(EDGE_PAD, Math.min(top, maxTop));
-    setPos({ left, top });
-  }, [open, anchored, x, y, value, baselineMean, z, time, blockName, data]);
-
   if (!open) return null;
 
   // Latest non-null point drives the min/mean/max readout — same logic
@@ -121,17 +82,6 @@ export function GridCellPopup({
   const latest = data ? [...data.points].reverse().find((p) => p.mean !== null) ?? null : null;
   const headline =
     value != null ? value.toFixed(3) : latest?.mean != null ? Number(latest.mean).toFixed(3) : "—";
-
-  // When anchored, position via inline style (and drop the fixed-corner
-  // Tailwind classes). Until measured, render at the raw offset.
-  const anchorStyle =
-    anchored && x !== null && y !== null
-      ? ({
-          position: "absolute",
-          left: pos?.left ?? x + ANCHOR_OFFSET,
-          top: pos?.top ?? y + ANCHOR_OFFSET,
-        } as const)
-      : undefined;
 
   // Baseline status copy + token. Positive z = below the block average
   // (the anomaly-flagged direction); >= 1.5σ-below is what the backend
@@ -161,30 +111,10 @@ export function GridCellPopup({
         : "bg-ap-line/70 text-ap-ink";
 
   return (
-    <div
-      ref={cardRef}
-      style={anchorStyle}
-      className={clsx(
-        "pointer-events-auto z-30 w-64 rounded-md border border-ap-line bg-ap-panel p-3 text-xs shadow-lg",
-        !anchored && "absolute top-14 end-4",
-      )}
-    >
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ap-muted">
-            {indexCode.toUpperCase()}
-          </p>
-          <p className="text-lg font-semibold text-ap-ink">{headline}</p>
-          {time ? <p className="text-[10px] text-ap-muted">as of {formatSceneTime(time)}</p> : null}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="rounded p-0.5 text-ap-muted hover:bg-ap-bg hover:text-ap-ink"
-        >
-          ✕
-        </button>
+    <AnchoredPopup x={x} y={y} title="Grid cell" subtitle={indexCode.toUpperCase()} onClose={onClose}>
+      <div className="mb-2">
+        <p className="text-lg font-semibold text-ap-ink">{headline}</p>
+        {time ? <p className="text-[10px] text-ap-muted">as of {formatSceneTime(time)}</p> : null}
       </div>
 
       <dl className="mb-2 grid grid-cols-3 gap-1.5">
@@ -244,7 +174,7 @@ export function GridCellPopup({
       >
         Scout this area →
       </button>
-    </div>
+    </AnchoredPopup>
   );
 }
 
