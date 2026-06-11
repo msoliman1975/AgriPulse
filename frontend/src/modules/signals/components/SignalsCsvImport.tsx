@@ -73,11 +73,15 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
     },
     onSuccess: (data) => {
       setSuccess(data);
-      // The observations list + the map overlay both key on the
-      // observations endpoint — invalidate so a freshly-imported batch
-      // shows up without a hard reload.
-      void queryClient.invalidateQueries({ queryKey: ["signals", "observations"] });
-      void queryClient.invalidateQueries({ queryKey: ["labs", "map"] });
+      // Refresh the views that show observations so a freshly-imported
+      // batch appears without a hard reload. Keys must match the actual
+      // queries: the log table + hooks use ["signal_observations", …]
+      // (ObservationList.tsx, queries/signals.ts) and the map overlay
+      // uses ["labs/map/signalObservations", …] (MapExperiencePage.tsx).
+      // The previous keys (["signals","observations"], ["labs","map"])
+      // matched nothing, so the table only updated on a full refresh.
+      void queryClient.invalidateQueries({ queryKey: ["signal_observations"] });
+      void queryClient.invalidateQueries({ queryKey: ["labs/map/signalObservations"] });
     },
     onError: (err) => {
       const parsed = _parseError(err);
