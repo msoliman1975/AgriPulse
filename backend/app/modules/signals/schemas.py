@@ -294,6 +294,29 @@ class SignalTemplateObservationCreateResponse(BaseModel):
     observation_count: int
 
 
+class SignalCsvImportResponse(BaseModel):
+    """POST /signals/csv-import — rows inserted plus the batch id that
+    tags them all, so the UI can offer an immediate "undo this import"."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    rows_imported: int
+    import_batch_id: UUID
+
+
+class ImportBatchRead(BaseModel):
+    """One past CSV upload — the unit the import-history UI lists and can
+    delete. ``signal_codes`` are the distinct signals the upload touched."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    import_batch_id: UUID
+    imported_at: datetime
+    row_count: int
+    signal_codes: list[str]
+    recorded_by: UUID
+
+
 class SignalAttachmentInitRequest(BaseModel):
     """POST /api/v1/signals/observations:upload-init.
 

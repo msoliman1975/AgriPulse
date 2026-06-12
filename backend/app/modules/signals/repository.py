@@ -559,6 +559,9 @@ class SignalsRepository:
         template_observation_id: UUID | None = None,
         location_mode: str = "entity",
         location_point_wkt: str | None = None,
+        # CS-7 batch undo: the CSV upload that created this row (NULL for
+        # the single-shot / template record paths).
+        import_batch_id: UUID | None = None,
     ) -> None:
         stmt = text(
             """
@@ -566,7 +569,8 @@ class SignalsRepository:
                     time, id, signal_definition_id, farm_id, block_id,
                     value_numeric, value_categorical, value_event, value_boolean,
                     value_geopoint, attachment_s3_key, notes, recorded_by,
-                    template_observation_id, location_mode, location_point
+                    template_observation_id, location_mode, location_point,
+                    import_batch_id
                 ) VALUES (
                     :time, :id, :def_id, :farm_id, :block_id,
                     :value_numeric, :value_categorical, :value_event, :value_boolean,
@@ -575,7 +579,8 @@ class SignalsRepository:
                     :attachment_s3_key, :notes, :recorded_by,
                     :template_observation_id, :location_mode,
                     CASE WHEN :location_point IS NULL THEN NULL
-                         ELSE ST_GeomFromText(:location_point, 4326) END
+                         ELSE ST_GeomFromText(:location_point, 4326) END,
+                    :import_batch_id
                 )
                 """
         ).bindparams(
@@ -585,6 +590,7 @@ class SignalsRepository:
             bindparam("block_id", type_=PG_UUID(as_uuid=True)),
             bindparam("recorded_by", type_=PG_UUID(as_uuid=True)),
             bindparam("template_observation_id", type_=PG_UUID(as_uuid=True)),
+            bindparam("import_batch_id", type_=PG_UUID(as_uuid=True)),
             # asyncpg can't infer the type of a bare NULL used only in
             # "CASE WHEN :geopoint IS NULL ... ST_GeomFromText(:geopoint)"
             # (the PostGIS overload leaves it ambiguous). Pin both WKT
@@ -610,6 +616,7 @@ class SignalsRepository:
             "template_observation_id": template_observation_id,
             "location_mode": location_mode,
             "location_point": location_point_wkt,
+            "import_batch_id": import_batch_id,
         }
         try:
             await self._session.execute(stmt, params)
@@ -685,6 +692,51 @@ class SignalsRepository:
                 bindparam("tid", type_=PG_UUID(as_uuid=True))
             ),
             {"tid": template_observation_id},
+        )
+        await self._session.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    # ---- CSV import batches (CS-7 undo) -------------------------------
+
+    async def list_import_batches(self, *, farm_id: UUID) -> tuple[dict[str, Any], ...]:
+        """One row per CSV upload that touched ``farm_id``.
+
+        Aggregates the observations carrying an ``import_batch_id``:
+        ``imported_at`` is the earliest insert in the batch, ``row_count``
+        the number of observations, ``signal_codes`` the distinct signal
+        codes (joined to definitions), ``recorded_by`` the actor (one per
+        batch in practice — MIN picks a stable representative). Newest
+        upload first.
+        """
+        sql = text(
+            """
+            SELECT o.import_batch_id AS import_batch_id,
+                   MIN(o.inserted_at) AS imported_at,
+                   COUNT(*) AS row_count,
+                   array_agg(DISTINCT d.code) AS signal_codes,
+                   MIN(o.recorded_by::text)::uuid AS recorded_by
+            FROM signal_observations o
+            JOIN signal_definitions d ON d.id = o.signal_definition_id
+            WHERE o.farm_id = :farm_id
+              AND o.import_batch_id IS NOT NULL
+            GROUP BY o.import_batch_id
+            ORDER BY MIN(o.inserted_at) DESC
+            """
+        ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
+        rows = (await self._session.execute(sql, {"farm_id": farm_id})).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def delete_by_import_batch(self, *, import_batch_id: UUID, farm_id: UUID) -> int:
+        """Hard-delete every observation from one CSV upload (farm-scoped).
+        Returns the number of rows deleted (0 if the batch is unknown)."""
+        result = await self._session.execute(
+            text(
+                "DELETE FROM signal_observations " "WHERE import_batch_id = :id AND farm_id = :farm"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": import_batch_id, "farm": farm_id},
         )
         await self._session.flush()
         return int(getattr(result, "rowcount", 0) or 0)

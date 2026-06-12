@@ -45,6 +45,13 @@
         "template_code": "Template code — set to record this row as part of a template submission.",
         "template_member_position": "0-based member position within the template (required with template_code)."
       }
+    },
+    "undo": {
+      "button": "Undo this import — delete {{count}} records",
+      "button_one": "Undo this import — delete {{count}} record",
+      "confirm": "Delete all {{count}} records from this import? This cannot be undone.",
+      "deleting": "Deleting…",
+      "error": "Could not undo this import."
     }
   },
   "observationPanel": {
@@ -211,6 +218,8 @@
       "lat": "Latitude",
       "lon": "Longitude",
       "notes": "Notes (optional)",
+      "downloadSample": "Download sample file",
+      "downloadSampleHint": "A small CSV pre-filled with this signal's columns and a few example rows. Edit it and import via the bulk uploader above.",
       "photo": "Photo (optional, max 20MB)",
       "uploading": "Uploading…",
       "recording": "Recording…",
@@ -289,5 +298,17 @@
     "event": "event",
     "boolean": "boolean",
     "geopoint": "geopoint"
+  },
+  "importHistory": {
+    "title": "Import history",
+    "subtitle": "Past CSV uploads for this farm. Deleting one removes every record it created.",
+    "col": {
+      "importedAt": "Imported",
+      "rowCount": "Records",
+      "signals": "Signals"
+    },
+    "delete": "Delete",
+    "deleteConfirm": "Delete all {{count}} records from this import? This cannot be undone.",
+    "deleteError": "Could not delete this import."
   }
 }

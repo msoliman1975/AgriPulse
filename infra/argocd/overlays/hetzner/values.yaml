@@ -13,15 +13,16 @@ global:
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
-  # promotion — NOT auto-bumped like dev). frontend is a separate build
-  # (8a92127, prod VITE_ URLs); api/workers/tile share 9d140cc.
+  # promotion — NOT auto-bumped like dev). e51e61d = PRs #215..#223;
+  # api/workers carry #222 (signals import-batches + migration 0038 via the
+  # PreSync job). tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "9d140cc"
+      tag: "e51e61d"
     workers:
-      tag: "9d140cc"
+      tag: "e51e61d"
     frontend:
-      tag: "8a92127"
+      tag: "e51e61d"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
@@ -34,7 +35,15 @@ env:
   # a real admin email is a separate change that also reseeds the realm user.
   PLATFORM_ADMIN_EMAIL: dev@agripulse.local
   PLATFORM_ADMIN_FULL_NAME: Platform Admin
-  SENTINEL_HUB_CLIENT_ID: "67611d57-1a8d-4833-9a7b-02abde5b23b8"
+  # Copernicus Data Space Ecosystem (CDSE) — the EU's FREE Sentinel Hub
+  # (10k PU/month). Replaces the expired commercial trial. Same SH Process/
+  # Catalog API, so only these 4 env vars + SENTINEL_HUB_CLIENT_SECRET in the
+  # hand-seeded agripulse-app-secrets differ. client_id is non-secret (paired
+  # with the secret). CDSE OAuth client via dataspace.copernicus.eu.
+  SENTINEL_HUB_CLIENT_ID: "sh-c6548100-d4ae-48e7-ba8e-898c7c9e9499"
+  SENTINEL_HUB_OAUTH_URL: "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+  SENTINEL_HUB_PROCESS_URL: "https://sh.dataspace.copernicus.eu/api/v1/process"
+  SENTINEL_HUB_CATALOG_URL: "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search"
   # Keycloak split-URL (Hetzner only): the public issuer host
   # keycloak.agripulse.cloud does NOT resolve inside the cluster, so only
   # KEYCLOAK_ISSUER (must match the JWT `iss`) stays public (chart default via

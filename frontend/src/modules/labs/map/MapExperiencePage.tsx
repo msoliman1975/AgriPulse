@@ -30,16 +30,18 @@ import {
 import { loadMapSummary, loadUnitDetail } from "./api";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
-import { SignalOverlayControl } from "./SignalOverlayControl";
-import { getGridCells, getWorstGridCells } from "@/api/grid";
+import { getGridCells, type GridWorstCell } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
-import { GridCellDrawer } from "@/modules/grid/GridCellDrawer";
-import { GridOverlayPanel } from "@/modules/grid/GridOverlayPanel";
+import { GridCellPopup } from "@/modules/grid/GridCellPopup";
 import type { FeatureCollection, Polygon as GeoPolygon } from "geojson";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "./signalOverlay";
-import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
+import {
+  listSignalDefinitions,
+  listSignalObservations,
+  type SignalDefinition,
+} from "@/api/signals";
 import { DetailPanel } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
@@ -571,10 +573,22 @@ function MapForFarm({ farmId }: { farmId: string }) {
   const [showGrid, setShowGrid] = useState<boolean>(false);
   const [gridIndex, setGridIndex] = useState<IndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
+  // Click pixel coords for the observation popup — anchors it next to the
+  // clicked signal dot, the same way cellClickPoint anchors the cell popup.
+  const [obsClickPoint, setObsClickPoint] = useState<{ x: number; y: number } | null>(null);
 
-  // Indices offered in the grid picker. Mirror the block detail panel's
-  // trio (the health-relevant ones); the backend stores all six per cell.
-  const GRID_INDEX_OPTIONS: IndexCode[] = ["ndvi", "ndre", "ndwi"];
+  // Every index the pipeline computes + stores per grid cell. Was the
+  // "health trio"; expanded so the map can colour by any of them.
+  const GRID_INDEX_OPTIONS: IndexCode[] = [
+    "ndvi",
+    "ndre",
+    "ndwi",
+    "evi",
+    "savi",
+    "gndvi",
+    "ndmi",
+  ];
 
   const subscriptionsQ = useQuery({
     queryKey: ["labs/map/subscriptions", selectedId],
@@ -584,48 +598,150 @@ function MapForFarm({ farmId }: { farmId: string }) {
   });
   const gridProductId = subscriptionsQ.data?.[0]?.product_id ?? null;
 
-  const gridCellsQ = useQuery({
-    queryKey: ["labs/map/gridCells", selectedId, gridProductId, gridIndex],
-    queryFn: () =>
-      getGridCells(selectedId!, gridProductId!, gridIndex),
-    enabled: Boolean(showGrid && selectedId && gridProductId),
+  // Farm-wide overlay: there's no farm-level cells endpoint, so fan out
+  // per gridded block (each carries its own imagery product = its first
+  // active subscription) and merge client-side. Lazy — only fetched while
+  // the overlay is on. One query with an internal Promise.all keeps the
+  // hook count stable regardless of block count.
+  const overlayBlocks = summaryQ.data?.blocks ?? [];
+  const overlayBlockKey = overlayBlocks.map((b) => b.id).join(",");
+  const farmGridQ = useQuery({
+    queryKey: ["labs/map/farmGrid", farmId, gridIndex, overlayBlockKey],
+    queryFn: async () => {
+      const groups = await Promise.all(
+        overlayBlocks.map(async (b) => {
+          const subs = await listSubscriptions(b.id, { include_inactive: false });
+          const productId = subs[0]?.product_id;
+          if (!productId) return null;
+          const res = await getGridCells(b.id, productId, gridIndex);
+          return { blockId: b.id, productId, cells: res.cells };
+        }),
+      );
+      return groups.filter((g): g is NonNullable<typeof g> => g !== null);
+    },
+    enabled: Boolean(showGrid && overlayBlocks.length > 0),
     staleTime: 30_000,
   });
 
-  // Worst-N under-performing cells for the current index, so a scout can
-  // be dispatched to the exact spot. Only fetched while the overlay is on.
-  const worstCellsQ = useQuery({
-    queryKey: ["labs/map/worstCells", selectedId, gridProductId, gridIndex],
-    queryFn: () => getWorstGridCells(selectedId!, gridProductId!, gridIndex, 5),
-    enabled: Boolean(showGrid && selectedId && gridProductId),
-    staleTime: 30_000,
-  });
+  // block id -> display name, for the cell popup's "Block" row.
+  const blockNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of summaryQ.data?.blocks ?? []) m.set(b.id, b.name ?? b.code ?? b.id);
+    return m;
+  }, [summaryQ.data]);
 
-  // G-2: outline the worst-N cells on the heatmap so the alert/worst list
-  // and the map agree on *where* to scout. Persisted while the overlay is
-  // on; empty when hidden so the highlight layer matches nothing.
-  const highlightedCellIds = useMemo<string[]>(
+  // cellId -> { blockId, productId, lat, lon, value, time, blockName } so a
+  // clicked cell can fetch its history against the right block's product
+  // and the compact popup can render its current value + scene time + location.
+  const cellMeta = useMemo(() => {
+    const m = new Map<
+      string,
+      {
+        blockId: string;
+        productId: string;
+        lat: number;
+        lon: number;
+        value: number | null;
+        time: string | null;
+        blockName: string;
+      }
+    >();
+    for (const g of farmGridQ.data ?? []) {
+      for (const c of g.cells) {
+        m.set(c.cell_id, {
+          blockId: g.blockId,
+          productId: g.productId,
+          lat: c.centroid_lat,
+          lon: c.centroid_lon,
+          value: c.mean === null ? null : Number(c.mean),
+          time: c.time,
+          blockName: blockNameById.get(g.blockId) ?? g.blockId,
+        });
+      }
+    }
+    return m;
+  }, [farmGridQ.data, blockNameById]);
+
+  // Block-average baseline for the selected cell. The backend anomaly
+  // detector flags a cell when its mean is >= DEFAULT_K (1.5) std-devs
+  // BELOW its block's own spatial mean for that scene (see
+  // backend/app/modules/grid/anomaly.py). We reproduce that judgement
+  // client-side from the already-loaded cells — no backend call. Returns
+  // null when the block has too few valid cells (<5) or the cell value is
+  // null. Per-block anomaly_z_threshold overrides are NOT surfaced in V1.
+  const selectedCellBaseline = useMemo<{ blockMean: number; z: number } | null>(() => {
+    if (!selectedCellId) return null;
+    const meta = cellMeta.get(selectedCellId);
+    if (!meta || meta.value === null) return null;
+    const group = (farmGridQ.data ?? []).find((g) => g.blockId === meta.blockId);
+    if (!group) return null;
+    const means = group.cells
+      .map((c) => (c.mean === null ? null : Number(c.mean)))
+      .filter((v): v is number => v !== null);
+    if (means.length < 5) return null;
+    const blockMean = means.reduce((s, v) => s + v, 0) / means.length;
+    const variance = means.reduce((s, v) => s + (v - blockMean) ** 2, 0) / means.length;
+    const blockStd = Math.sqrt(variance);
+    // Positive z = the cell sits BELOW the block average (anomaly-flagged
+    // direction); >= 1.5 means the backend would flag it.
+    const z = blockStd > 0 ? (blockMean - meta.value) / blockStd : 0;
+    return { blockMean, z };
+  }, [selectedCellId, cellMeta, farmGridQ.data]);
+
+  const totalCellCount = useMemo(
+    () => (farmGridQ.data ?? []).reduce((n, g) => n + g.cells.length, 0),
+    [farmGridQ.data],
+  );
+
+  // Farm-wide worst-N (lowest mean) for the scout list + map highlight —
+  // computed client-side from the merged cells (no per-block worst call).
+  const farmWorstCells = useMemo<GridWorstCell[]>(
     () =>
-      showGrid && worstCellsQ.data ? worstCellsQ.data.cells.map((c) => c.cell_id) : [],
-    [showGrid, worstCellsQ.data],
+      (farmGridQ.data ?? [])
+        .flatMap((g) => g.cells)
+        .filter((c) => c.mean !== null)
+        .sort((a, b) => Number(a.mean) - Number(b.mean))
+        .slice(0, 5)
+        .map((c) => ({
+          cell_id: c.cell_id,
+          row_idx: c.row_idx,
+          col_idx: c.col_idx,
+          centroid_lon: c.centroid_lon,
+          centroid_lat: c.centroid_lat,
+          mean: c.mean,
+          valid_pixel_pct: c.valid_pixel_pct,
+          time: c.time,
+          ring: null,
+          sector_label: null,
+        })),
+    [farmGridQ.data],
+  );
+
+  // G-2: outline the worst-N cells on the heatmap so the scout list and
+  // the map agree on *where* to look. Empty when hidden.
+  const highlightedCellIds = useMemo<string[]>(
+    () => (showGrid ? farmWorstCells.map((c) => c.cell_id) : []),
+    [showGrid, farmWorstCells],
   );
 
   const gridCellsFc: FeatureCollection<GeoPolygon, GridCellProps> | null = useMemo(() => {
-    if (!showGrid || !gridCellsQ.data) return null;
+    if (!showGrid || !farmGridQ.data) return null;
     return {
       type: "FeatureCollection",
-      features: gridCellsQ.data.cells.map((c) => ({
-        type: "Feature" as const,
-        geometry: c.geometry,
-        properties: {
-          cell_id: c.cell_id,
-          // -1 is the no-data sentinel that MapCanvas's fill-color
-          // expression maps to grey — see GridCellProps comment.
-          value: c.mean === null ? -1 : Number(c.mean),
-        },
-      })),
+      features: farmGridQ.data.flatMap((g) =>
+        g.cells.map((c) => ({
+          type: "Feature" as const,
+          geometry: c.geometry,
+          properties: {
+            cell_id: c.cell_id,
+            // -1 is the no-data sentinel that MapCanvas's fill-color
+            // expression maps to grey — see GridCellProps comment.
+            value: c.mean === null ? -1 : Number(c.mean),
+          },
+        })),
+      ),
     };
-  }, [showGrid, gridCellsQ.data]);
+  }, [showGrid, farmGridQ.data]);
 
   // CS-8 popup: URL ?signal_obs=<id> drives a side panel that
   // hydrates from the same observations the overlay already loaded
@@ -637,6 +753,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
     if (!selectedObservationId || !signalObservationsQ.data) return null;
     return signalObservationsQ.data.find((o) => o.id === selectedObservationId) ?? null;
   }, [selectedObservationId, signalObservationsQ.data]);
+
+  // Drop the anchor point whenever the observation popup closes via any
+  // path other than the dot click that set it (deep-link cleared, back
+  // nav, panel-driven removal) so a stale anchor can't reposition a
+  // freshly opened popup. When `signal_obs` is absent the popup is hidden
+  // and the point should be null.
+  useEffect(() => {
+    if (!selectedObservationId) setObsClickPoint(null);
+  }, [selectedObservationId]);
 
   if (summaryQ.isLoading) {
     return <FullState>Loading farm map…</FullState>;
@@ -702,6 +827,28 @@ function MapForFarm({ farmId }: { farmId: string }) {
         }}
         hasActiveBlocks={hasActiveBlocks}
         onOpenAutoBlock={() => navigate(`/farms/${farmId}/blocks/auto-grid`)}
+        // Farm-wide sub-block grid control (moved here from the floating
+        // panel). Available whenever the farm has blocks.
+        gridAvailable={summary.blocks.length > 0}
+        showGrid={showGrid}
+        onToggleGrid={setShowGrid}
+        gridIndex={gridIndex}
+        gridIndexOptions={GRID_INDEX_OPTIONS}
+        onGridIndexChange={setGridIndex}
+        gridCellCount={showGrid ? totalCellCount : null}
+        gridWorstCells={farmWorstCells}
+        gridWorstLoading={farmGridQ.isLoading}
+        onSelectGridCell={(cellId) => {
+          setSelectedCellId(cellId);
+          closePanel();
+        }}
+        // Signal overlay control (moved here from the floating
+        // SignalOverlayControl). Mirrors the grid control pattern.
+        signalAvailable={(signalDefinitionsQ.data ?? []).length > 0}
+        signalDefinitions={signalDefinitionsQ.data ?? []}
+        signalDefId={signalOverlayDefId}
+        onSignalChange={setSignalOverlayDefId}
+        signalObsCount={signalOverlay.observationCount}
       />
 
       {farmDrawerMode ? (
@@ -761,7 +908,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
             geojson={summary.geojson}
             farmBoundary={summary.farm.boundary}
             selectedId={selectedId}
-            onSelect={selectUnit}
+            onSelect={(id) => {
+              // Selecting a block (polygon or its label) closes any open
+              // cell drawer so only one drawer shows at a time.
+              setSelectedCellId(null);
+              selectUnit(id);
+            }}
             fitBoundsKey={farmId}
             drawEnabled={drawing}
             drawTarget={drawTarget ?? "block"}
@@ -799,15 +951,32 @@ function MapForFarm({ farmId }: { farmId: string }) {
             blockFillOpacity={layerPrefs.blockFillOpacity}
             gridCells={gridCellsFc}
             highlightedCellIds={highlightedCellIds}
-            onGridCellClick={(cellId) => setSelectedCellId(cellId)}
+            selectedGridCellId={selectedCellId}
+            onGridCellClick={(cellId, point) => {
+              // Per the UX: a cell click shows ONLY the cell-info popup.
+              // Close the block drawer AND the observation popup so only
+              // one popup shows at a time. The click pixel coords anchor
+              // the popup next to the clicked cell.
+              setSelectedCellId(cellId);
+              setCellClickPoint(point);
+              closePanel();
+              const next = new URLSearchParams(search);
+              next.delete("signal_obs");
+              setSearch(next, { replace: true });
+            }}
             signalOverlay={signalOverlay.fc}
-            onSignalClick={(observationId) => {
+            onSignalClick={(observationId, point) => {
               // The URL `?signal_obs=` drives the SignalObservationPanel
               // (rendered below). Keeping the id in the URL means a
               // deep-link to a specific observation works on its own.
+              // Opening an observation closes the cell popup so the two
+              // don't stack. The click coords anchor the popup to the dot.
               const next = new URLSearchParams(search);
               next.set("signal_obs", observationId);
               setSearch(next, { replace: true });
+              setObsClickPoint(point);
+              setSelectedCellId(null);
+              setCellClickPoint(null);
             }}
           />
         )}
@@ -822,39 +991,29 @@ function MapForFarm({ farmId }: { farmId: string }) {
           }}
         />
 
-        <SignalOverlayControl
-          definitions={signalDefinitionsQ.data ?? []}
-          selectedDefinitionId={signalOverlayDefId}
-          observationCount={signalOverlay.observationCount}
-          skippedCount={signalOverlay.skippedCount}
-          isLoading={signalObservationsQ.isLoading}
-          isError={signalObservationsQ.isError}
-          onChange={setSignalOverlayDefId}
-        />
+        {/* The grid show/index/worst control now lives in the top toolbar,
+            and the per-block cell-size + backfill config now lives inside
+            the block drawer (DetailPanel) — see its `gridConfig` slot
+            below — since it's block-level. Nothing grid-related floats. */}
 
-        {selectedId && gridProductId ? (
-          <div className="pointer-events-auto absolute bottom-4 start-4 z-10 flex max-h-[70vh] max-w-sm flex-col gap-2 overflow-y-auto">
-            <GridOverlayPanel
-              showGrid={showGrid}
-              onToggleGrid={setShowGrid}
-              indexCode={gridIndex}
-              indexOptions={GRID_INDEX_OPTIONS}
-              onIndexChange={setGridIndex}
-              cellCount={showGrid ? (gridCellsQ.data?.cells.length ?? null) : null}
-              worstCells={worstCellsQ.data?.cells}
-              worstLoading={worstCellsQ.isLoading}
-              onSelectCell={setSelectedCellId}
-            />
-            <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
-          </div>
-        ) : null}
-
-        <GridCellDrawer
+        <GridCellPopup
           open={selectedCellId !== null}
           cellId={selectedCellId}
-          productId={gridProductId}
+          productId={selectedCellId ? (cellMeta.get(selectedCellId)?.productId ?? null) : null}
           indexCode={gridIndex}
-          onClose={() => setSelectedCellId(null)}
+          value={selectedCellId ? (cellMeta.get(selectedCellId)?.value ?? null) : null}
+          lat={selectedCellId ? (cellMeta.get(selectedCellId)?.lat ?? null) : null}
+          lon={selectedCellId ? (cellMeta.get(selectedCellId)?.lon ?? null) : null}
+          blockName={selectedCellId ? (cellMeta.get(selectedCellId)?.blockName ?? null) : null}
+          x={cellClickPoint?.x ?? null}
+          y={cellClickPoint?.y ?? null}
+          time={selectedCellId ? (cellMeta.get(selectedCellId)?.time ?? null) : null}
+          baselineMean={selectedCellBaseline?.blockMean ?? null}
+          z={selectedCellBaseline?.z ?? null}
+          onClose={() => {
+            setSelectedCellId(null);
+            setCellClickPoint(null);
+          }}
         />
 
         {selectedObservationId ? (
@@ -862,10 +1021,13 @@ function MapForFarm({ farmId }: { farmId: string }) {
             observation={selectedObservation}
             definition={selectedSignalDefinition}
             isLoading={signalObservationsQ.isLoading}
+            x={obsClickPoint?.x ?? null}
+            y={obsClickPoint?.y ?? null}
             onClose={() => {
               const next = new URLSearchParams(search);
               next.delete("signal_obs");
               setSearch(next, { replace: true });
+              setObsClickPoint(null);
             }}
           />
         ) : null}
@@ -898,6 +1060,14 @@ function MapForFarm({ farmId }: { farmId: string }) {
               setReshapeCandidate(null);
             }}
             reshapeSaving={updateBlockMut.isPending}
+            // Block-level sub-block grid config (cell size + backfill).
+            // Rendered as a section inside the drawer when this block has
+            // an imagery subscription (= a product to grid against).
+            gridConfig={
+              selectedId && gridProductId ? (
+                <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+              ) : null
+            }
           />
         ) : null}
 
@@ -1000,6 +1170,21 @@ function Toolbar({
   onCreateFarm,
   hasActiveBlocks,
   onOpenAutoBlock,
+  gridAvailable,
+  showGrid,
+  onToggleGrid,
+  gridIndex,
+  gridIndexOptions,
+  onGridIndexChange,
+  gridCellCount,
+  gridWorstCells,
+  gridWorstLoading,
+  onSelectGridCell,
+  signalAvailable,
+  signalDefinitions,
+  signalDefId,
+  onSignalChange,
+  signalObsCount,
 }: {
   drawTarget: DrawTarget | null;
   onToggleDrawBlock: () => void;
@@ -1012,6 +1197,21 @@ function Toolbar({
   onCreateFarm: () => void;
   hasActiveBlocks: boolean;
   onOpenAutoBlock: () => void;
+  gridAvailable: boolean;
+  showGrid: boolean;
+  onToggleGrid: (next: boolean) => void;
+  gridIndex: IndexCode;
+  gridIndexOptions: IndexCode[];
+  onGridIndexChange: (code: IndexCode) => void;
+  gridCellCount: number | null;
+  gridWorstCells: GridWorstCell[];
+  gridWorstLoading: boolean;
+  onSelectGridCell: (cellId: string) => void;
+  signalAvailable: boolean;
+  signalDefinitions: readonly SignalDefinition[];
+  signalDefId: string | null;
+  onSignalChange: (id: string | null) => void;
+  signalObsCount: number;
 }) {
   // The active-farm context (name, area, governorate, status) now lives
   // in the shell header next to the tenant badge — that's why this
@@ -1132,6 +1332,25 @@ function Toolbar({
             aria-label="Block fill opacity"
           />
         </label>
+        <GridToolbarControl
+          available={gridAvailable}
+          showGrid={showGrid}
+          onToggleGrid={onToggleGrid}
+          indexCode={gridIndex}
+          indexOptions={gridIndexOptions}
+          onIndexChange={onGridIndexChange}
+          cellCount={gridCellCount}
+          worstCells={gridWorstCells}
+          worstLoading={gridWorstLoading}
+          onSelectCell={onSelectGridCell}
+        />
+        <SignalToolbarControl
+          available={signalAvailable}
+          definitions={signalDefinitions}
+          selectedDefinitionId={signalDefId}
+          onChange={onSignalChange}
+          obsCount={signalObsCount}
+        />
         <span className="text-slate-300">|</span>
         <Swatch color="#97C459" label="Healthy" />
         <Swatch color="#EF9F27" label="Watch" />
@@ -1173,6 +1392,160 @@ function Toolbar({
         </button>
       </div>
     </header>
+  );
+}
+
+// Farm-wide sub-block grid control, in the top toolbar (replaces the
+// old floating GridOverlayPanel). Toggle + index live inline like the
+// other layer controls; the worst-cells list is a small popover so the
+// toolbar stays one row. Renders nothing until the farm has blocks.
+function GridToolbarControl({
+  available,
+  showGrid,
+  onToggleGrid,
+  indexCode,
+  indexOptions,
+  onIndexChange,
+  cellCount,
+  worstCells,
+  worstLoading,
+  onSelectCell,
+}: {
+  available: boolean;
+  showGrid: boolean;
+  onToggleGrid: (next: boolean) => void;
+  indexCode: IndexCode;
+  indexOptions: IndexCode[];
+  onIndexChange: (code: IndexCode) => void;
+  cellCount: number | null;
+  worstCells: GridWorstCell[];
+  worstLoading: boolean;
+  onSelectCell: (cellId: string) => void;
+}) {
+  const [worstOpen, setWorstOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!worstOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setWorstOpen(false);
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [worstOpen]);
+
+  if (!available) return null;
+
+  return (
+    <>
+      <span className="text-slate-300">|</span>
+      <LayerToggle label="Grid" checked={showGrid} onChange={onToggleGrid} />
+      {showGrid ? (
+        <>
+          {cellCount != null ? (
+            <span className="text-[10px] text-slate-400">{cellCount} cells</span>
+          ) : null}
+          <select
+            value={indexCode}
+            onChange={(e) => onIndexChange(e.target.value as IndexCode)}
+            aria-label="Grid index"
+            className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-slate-700"
+          >
+            {indexOptions.map((c) => (
+              <option key={c} value={c}>
+                {c.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <div ref={wrapRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setWorstOpen((o) => !o)}
+              aria-expanded={worstOpen}
+              className="rounded border border-slate-300 px-1.5 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+            >
+              Lowest ▾
+            </button>
+            {worstOpen ? (
+              <div className="absolute end-0 top-full z-30 mt-1 w-48 rounded-md border border-slate-200 bg-white p-2 text-[11px] shadow-lg">
+                <p className="mb-1 font-medium text-slate-600">
+                  Lowest {indexCode.toUpperCase()} cells
+                </p>
+                {worstLoading ? (
+                  <p className="text-slate-400">Loading…</p>
+                ) : worstCells.length === 0 ? (
+                  <p className="text-slate-400">No observations yet.</p>
+                ) : (
+                  <ul className="flex flex-col gap-0.5">
+                    {worstCells.map((c, i) => (
+                      <li key={c.cell_id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectCell(c.cell_id);
+                            setWorstOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded px-1 py-0.5 hover:bg-slate-50"
+                        >
+                          <span className="text-slate-500">#{i + 1}</span>
+                          <span className="font-mono text-slate-800">
+                            {c.mean === null ? "—" : Number(c.mean).toFixed(3)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+// Signal overlay control, in the top toolbar (replaces the old floating
+// SignalOverlayControl). Mirrors GridToolbarControl: a label + inline
+// select, with the observation count as muted text once a signal is
+// picked. Renders nothing until the tenant has signal definitions.
+function SignalToolbarControl({
+  available,
+  definitions,
+  selectedDefinitionId,
+  onChange,
+  obsCount,
+}: {
+  available: boolean;
+  definitions: readonly SignalDefinition[];
+  selectedDefinitionId: string | null;
+  onChange: (id: string | null) => void;
+  obsCount: number;
+}) {
+  if (!available) return null;
+  return (
+    <>
+      <span className="text-slate-300">|</span>
+      <label className="flex items-center gap-1">
+        <span className="text-[10px] text-slate-500">Signal</span>
+        <select
+          value={selectedDefinitionId ?? ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+          aria-label="Signal overlay"
+          className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px] text-slate-700"
+        >
+          <option value="">— none —</option>
+          {definitions.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name} ({d.code})
+            </option>
+          ))}
+        </select>
+      </label>
+      {selectedDefinitionId ? (
+        <span className="text-[10px] text-slate-400">{obsCount} obs</span>
+      ) : null}
+    </>
   );
 }
 

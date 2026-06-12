@@ -33,6 +33,10 @@ interface Props {
   onSaveReshape?: () => void;
   onCancelReshape?: () => void;
   reshapeSaving?: boolean;
+  // Block-level sub-block grid config (cell size + backfill). Rendered
+  // as a drawer section by the parent so this stays a presentational
+  // panel with no grid-module dependency.
+  gridConfig?: React.ReactNode;
 }
 
 const HEALTH_LABEL = {
@@ -74,6 +78,7 @@ export function DetailPanel({
   onSaveReshape,
   onCancelReshape,
   reshapeSaving,
+  gridConfig,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<IndexCode | null>(null);
   const editing = Boolean(editableBlock);
@@ -126,7 +131,7 @@ export function DetailPanel({
       </p>
 
       {!editing && !reshaping ? (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           {onStartEdit ? (
             <button
               type="button"
@@ -143,6 +148,15 @@ export function DetailPanel({
               className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
             >
               Reshape
+            </button>
+          ) : null}
+          {onInactivate ? (
+            <button
+              type="button"
+              onClick={onInactivate}
+              className="ms-auto rounded border border-red-300 px-2 py-0.5 text-[11px] text-red-700 hover:bg-red-50"
+            >
+              Inactivate
             </button>
           ) : null}
         </div>
@@ -285,26 +299,57 @@ export function DetailPanel({
         ) : null}
       </Section>
 
+      {detail.weather_3d.length > 0 ? (
+        <Section title="Weather (3-day)">
+          <div className="mt-1 grid grid-cols-3 gap-2">
+            {detail.weather_3d.map((d, i) => (
+              <div key={i} className="rounded-md border border-slate-200 bg-white p-2 text-center">
+                <div className="text-[10px] text-slate-500">{d.day}</div>
+                <div className="text-[15px] font-medium text-slate-900">
+                  {d.temp_c_max != null ? `${Math.round(d.temp_c_max)}°` : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      ) : null}
+
       <Section title="Irrigation">
-        <Row label="Last">
-          {detail.irrigation.last
-            ? `${daysAgo(detail.irrigation.last.date)} · ${detail.irrigation.last.volume_mm} mm`
-            : "—"}
-        </Row>
-        <Row label="Next">
-          {detail.irrigation.next ? (
-            <span className={detail.irrigation.next.is_emergency ? "font-bold text-red-700" : ""}>
-              {detail.irrigation.next.date} · {detail.irrigation.next.volume_mm} mm
-            </span>
-          ) : (
-            "—"
-          )}
-        </Row>
-        <Row label="Soil moisture">
-          {detail.irrigation.soil_moisture_pct != null
-            ? `${detail.irrigation.soil_moisture_pct}% (${detail.irrigation.soil_status})`
-            : "—"}
-        </Row>
+        <div className="mt-1 grid grid-cols-3 gap-2">
+          <div className="rounded-md border border-slate-200 bg-white p-2 text-center">
+            <div className="text-[10px] uppercase text-slate-500">Last</div>
+            <div className="text-[15px] font-medium text-slate-900">
+              {detail.irrigation.last ? `${detail.irrigation.last.volume_mm} mm` : "—"}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {detail.irrigation.last ? daysAgo(detail.irrigation.last.date) : " "}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white p-2 text-center">
+            <div className="text-[10px] uppercase text-slate-500">Next</div>
+            <div
+              className={`text-[15px] font-medium ${
+                detail.irrigation.next?.is_emergency ? "text-red-700" : "text-slate-900"
+              }`}
+            >
+              {detail.irrigation.next ? `${detail.irrigation.next.volume_mm} mm` : "—"}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {detail.irrigation.next ? detail.irrigation.next.date : " "}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white p-2 text-center">
+            <div className="text-[10px] uppercase text-slate-500">Soil</div>
+            <div className="text-[15px] font-medium text-slate-900">
+              {detail.irrigation.soil_moisture_pct != null
+                ? `${detail.irrigation.soil_moisture_pct}%`
+                : "—"}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {detail.irrigation.soil_moisture_pct != null ? detail.irrigation.soil_status : " "}
+            </div>
+          </div>
+        </div>
       </Section>
 
       {detail.recommendations.length > 0 ? (
@@ -368,43 +413,16 @@ export function DetailPanel({
 
       {detail.integration ? (
         <Section title="Integrations">
-          <IntegrationRow label="Weather" status={detail.integration.weather} />
-          <IntegrationRow label="Imagery" status={detail.integration.imagery} />
-        </Section>
-      ) : null}
-
-      {detail.weather_3d.length > 0 ? (
-        <Section title="Weather (3-day)">
-          <div className="mt-1 grid grid-cols-3 gap-2">
-            {detail.weather_3d.map((d, i) => (
-              <div key={i} className="rounded-md border border-slate-200 bg-white p-2 text-center">
-                <div className="text-[10px] text-slate-500">{d.day}</div>
-                <div className="text-[13px] font-medium text-slate-900">
-                  {d.temp_c_max != null ? `${Math.round(d.temp_c_max)}°` : "—"}
-                </div>
-              </div>
-            ))}
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <IntegrationRow label="Weather" status={detail.integration.weather} />
+            <IntegrationRow label="Imagery" status={detail.integration.imagery} />
           </div>
         </Section>
       ) : null}
 
-      <button
-        type="button"
-        className="mt-4 w-full rounded-md bg-slate-900 py-2 text-xs font-medium text-white hover:bg-slate-800"
-        onClick={() => alert("Stub: AI assistant integration not wired in v1.")}
-      >
-        Ask Claude what to do ↗
-      </button>
-
-      {onInactivate ? (
-        <button
-          type="button"
-          onClick={onInactivate}
-          className="mt-2 w-full rounded-md border border-red-300 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
-        >
-          Inactivate block…
-        </button>
-      ) : null}
+      {/* BlockGridConfigCard brings its own titled, bordered card, so it
+          renders directly (no Section wrapper) — just drawer spacing. */}
+      {gridConfig ? <div className="mt-4">{gridConfig}</div> : null}
     </aside>
   );
 }
@@ -653,7 +671,7 @@ function IntegrationRow({ label, status }: { label: string; status: IntegrationK
         ? "text-emerald-700"
         : "text-slate-500";
   return (
-    <div className="mt-1 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]">
+    <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]">
       <div className="flex items-center justify-between">
         <span className="font-medium text-slate-800">{label}</span>
         <span className={`text-[10px] ${tone}`}>
@@ -687,15 +705,6 @@ function Section({
         {hint ? <span className="ms-1 font-normal normal-case text-slate-400">{hint}</span> : null}
       </h3>
       {children}
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mt-1 flex justify-between gap-2 text-[11px]">
-      <span className="text-slate-500">{label}:</span>
-      <span className="text-end text-slate-800">{children}</span>
     </div>
   );
 }

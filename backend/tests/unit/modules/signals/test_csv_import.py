@@ -249,7 +249,9 @@ class TestImportObservationsCsv:
             tenant_schema="t_x",
             tenant_id=uuid4(),
         )
-        assert out == {"rows_imported": 2}
+        assert out["rows_imported"] == 2
+        # The import now stamps + returns a per-upload batch id.
+        assert "import_batch_id" in out
         assert repo.insert_observation.await_count == 2
         # Audit emitted once with the row count + codes.
         audit_call = impl._audit.record.await_args  # type: ignore[attr-defined]

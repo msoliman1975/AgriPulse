@@ -238,6 +238,7 @@ class SignalsService(Protocol):
         members: tuple[SignalTemplateObservationMemberSubmission, ...],
         recorded_by: UUID,
         tenant_schema: str,
+        import_batch_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
 
@@ -989,6 +990,7 @@ class SignalsServiceImpl:
         members: tuple[SignalTemplateObservationMemberSubmission, ...],
         recorded_by: UUID,
         tenant_schema: str,
+        import_batch_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Atomic N-row insert with shared template_observation_id (D8).
 
@@ -1111,6 +1113,7 @@ class SignalsServiceImpl:
                 template_observation_id=lead_observation_id,
                 location_mode=location_mode,
                 location_point_wkt=location_point_wkt,
+                import_batch_id=import_batch_id,
             )
 
         await self._audit.record(
@@ -1169,7 +1172,7 @@ class SignalsServiceImpl:
         tenant_schema: str,
         tenant_id: UUID,
         bulk_mode: bool = False,
-    ) -> dict[str, int]:
+    ) -> dict[str, Any]:
         """Strict-mode CSV import (D4) — flat rows + templated groups (CS-12).
 
         ``bulk_mode`` raises the row/byte ceilings (the route gates it on
@@ -1221,6 +1224,10 @@ class SignalsServiceImpl:
                 ]
             )
 
+        # CS-7 undo: tag every row from this upload with one fresh batch id
+        # so the whole upload can be listed and deleted as a unit later.
+        import_batch_id = uuid4()
+
         # All-or-nothing insert: the caller's session wraps the whole batch
         # in one transaction, so a mid-loop DB error rolls back everything.
         for row in flat_rows:
@@ -1241,6 +1248,7 @@ class SignalsServiceImpl:
                 recorded_by=recorded_by,
                 location_mode=row.location_mode,
                 location_point_wkt=_csv_point_wkt(row.location_point_lat, row.location_point_lon),
+                import_batch_id=import_batch_id,
             )
 
         inserted = len(flat_rows)
@@ -1272,6 +1280,7 @@ class SignalsServiceImpl:
                 members=members,
                 recorded_by=recorded_by,
                 tenant_schema=tenant_schema,
+                import_batch_id=import_batch_id,
             )
             inserted += len(group.rows)
 
@@ -1288,9 +1297,40 @@ class SignalsServiceImpl:
                 "template_groups": len(groups),
                 "bulk_mode": bulk_mode,
                 "signal_codes": sorted({r.signal_code for r in parsed.rows}),
+                "import_batch_id": str(import_batch_id),
             },
         )
-        return {"rows_imported": inserted}
+        return {"rows_imported": inserted, "import_batch_id": import_batch_id}
+
+    async def list_import_batches(
+        self, *, farm_id: UUID, tenant_schema: str
+    ) -> tuple[dict[str, Any], ...]:
+        """Past CSV uploads for a farm, newest first (CS-7 import history)."""
+        return await self._repo.list_import_batches(farm_id=farm_id)
+
+    async def delete_import_batch(
+        self,
+        *,
+        import_batch_id: UUID,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> int:
+        """Delete every observation created by one CSV upload (CS-7 undo).
+        Returns the number of rows removed (0 if the batch is unknown)."""
+        deleted = await self._repo.delete_by_import_batch(
+            import_batch_id=import_batch_id, farm_id=farm_id
+        )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="signals.import_batch_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="signal_observation",
+            subject_id=import_batch_id,
+            farm_id=farm_id,
+            details={"import_batch_id": str(import_batch_id), "deleted": deleted},
+        )
+        return deleted
 
     async def _resolve_csv_defs(self, codes: set[str]) -> dict[str, dict[str, Any]]:
         """Load each referenced signal definition once, keyed by code."""
