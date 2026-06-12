@@ -112,13 +112,21 @@ keycloak:
 # bitnami Service is `keycloak` (release name), not the chart default
 # `keycloak-dev` (the old AWS App name) — point the hook at the right host.
 promoteBootstrap:
-  # Disabled for the ADOPTED cluster: the realm is already configured (realm
-  # import + the original one-time promote), and re-running this PostSync hook
-  # on every ArgoCD reconcile is fragile — it hits Keycloak's admin REST and
-  # blocks the keycloak sync whenever it can't connect. Login already works
-  # without it. FOLLOW-UP: re-enable (keycloakBaseUrl below is already correct)
-  # once the hook is verified idempotent + fast, for from-scratch reproducibility.
-  enabled: false
+  # Re-enabled with failOnError:false (the FOLLOW-UP the disabled note called
+  # for). The original concern — a failed PostSync hook blocking the keycloak
+  # sync when Keycloak is briefly unreachable — is now addressed: failOnError
+  # false turns any step failure (or KC-unreachable) into a logged warning +
+  # clean exit 0, so the sync is never blocked. The scripts are idempotent.
+  #
+  # Why it's needed: without it the agripulse-tenancy service-account client
+  # keeps the realm-import PLACEHOLDER secret, so the api can't get an admin
+  # token (401 unauthorized_client) and tenant provisioning fails. promote-kc-
+  # tenancy.py sets the client secret from the hand-seeded TENANCY_CLIENT_SECRET
+  # and is self-contained (httpx only), so it works even while the pinned api
+  # image predates the promote-kc-admin.py dev_bootstrap helpers (that step just
+  # logs a non-fatal warning until the image is promoted).
+  enabled: true
+  failOnError: false
   keycloakBaseUrl: http://keycloak
 # external-dns on Cloudflare instead of Route53. No IRSA — the chart reads a
 # Cloudflare API token from a Secret.

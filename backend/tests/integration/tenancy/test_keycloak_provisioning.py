@@ -25,7 +25,7 @@ from app.modules.tenancy.service import (
     NothingToProvisionError,
     get_tenant_service,
 )
-from app.shared.keycloak import FakeKeycloakClient
+from app.shared.keycloak import FakeKeycloakClient, KeycloakError
 
 pytestmark = [pytest.mark.integration]
 
@@ -123,6 +123,34 @@ async def test_retry_provisioning_succeeds_after_failure(
     assert snapshot.keycloak_group_id is not None
     assert snapshot.pending_owner_email is None
     assert len(fake.users) == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_provisioning_propagates_keycloak_error(
+    admin_session: AsyncSession,
+) -> None:
+    """When Keycloak is reachable but the call still fails (e.g. bad
+    service-account credentials), retry must surface the KeycloakError so
+    the router can map it to a clean 502 — not let it escape as an
+    unhandled 500 (which the SPA reports as an opaque "Network Error")."""
+    fake = FakeKeycloakClient()
+    fake.fail_on = "ensure_group"
+    service = get_tenant_service(admin_session, keycloak_client=fake)
+
+    created = await service.create_tenant(
+        slug=_slug("kcerr"),
+        name="KcErr",
+        contact_email="ops@kcerr.test",
+        owner_email="owner@kcerr.test",
+        owner_full_name="Owner KcErr",
+        actor_user_id=uuid4(),
+    )
+    assert created.status == "pending_provision"
+
+    # Re-arm the failure so the retry's ensure_group call fails too.
+    fake.fail_on = "ensure_group"
+    with pytest.raises(KeycloakError):
+        await service.retry_provisioning(created.tenant_id, actor_user_id=uuid4())
 
 
 @pytest.mark.asyncio
