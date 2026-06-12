@@ -43,10 +43,7 @@ export function OperationsLogReport({ farmId, since, until }: ReportProps): Reac
       e.severity ?? "",
       e.detail ?? "",
     ]);
-    downloadCsv(
-      `operations-log_${since.slice(0, 10)}_${until.slice(0, 10)}`,
-      toCsv(headers, rows),
-    );
+    downloadCsv(`operations-log_${since.slice(0, 10)}_${until.slice(0, 10)}`, toCsv(headers, rows));
   };
 
   return (

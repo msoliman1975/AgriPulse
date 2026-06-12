@@ -20,10 +20,7 @@ export function ReportsPage(): ReactNode {
   // from the decoded claims (not a hook-per-report) so the list stays
   // dynamic without breaking the rules-of-hooks.
   const available = useMemo(
-    () =>
-      farmId
-        ? REPORTS.filter((r) => hasCapability(claims, r.capability, { farmId }))
-        : [],
+    () => (farmId ? REPORTS.filter((r) => hasCapability(claims, r.capability, { farmId })) : []),
     [claims, farmId],
   );
 

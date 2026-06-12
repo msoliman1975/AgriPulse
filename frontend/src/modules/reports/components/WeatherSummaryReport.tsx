@@ -113,8 +113,14 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
 function StatCards({ stats }: { stats: WeatherSummaryStats }): ReactNode {
   const { t } = useTranslation("reports");
   const cards: Array<[string, string]> = [
-    [t("weatherSummary.cards.tempRange"), `${fmt(stats.temp_min_c)} – ${fmt(stats.temp_max_c, 1, "°C")}`],
-    [t("weatherSummary.cards.rain"), `${fmt(stats.precip_mm_total, 1, " mm")} (${stats.rain_days}d)`],
+    [
+      t("weatherSummary.cards.tempRange"),
+      `${fmt(stats.temp_min_c)} – ${fmt(stats.temp_max_c, 1, "°C")}`,
+    ],
+    [
+      t("weatherSummary.cards.rain"),
+      `${fmt(stats.precip_mm_total, 1, " mm")} (${stats.rain_days}d)`,
+    ],
     [t("weatherSummary.cards.et0"), fmt(stats.et0_mm_total, 1, " mm")],
     [t("weatherSummary.cards.gddCum"), fmt(stats.gdd_cumulative_season, 0, " °C·d")],
   ];
@@ -140,7 +146,9 @@ function CropContext({ crops }: { crops: WeatherCropContext[] }): ReactNode {
           className="rounded-full border border-ap-line bg-ap-panel px-2.5 py-1 text-ap-muted"
         >
           <span className="font-medium text-ap-ink">{c.name_en}</span>
-          {c.gdd_base_temp_c ? ` · ${t("weatherSummary.base")} ${Number(c.gdd_base_temp_c).toFixed(1)}°C` : ""}
+          {c.gdd_base_temp_c
+            ? ` · ${t("weatherSummary.base")} ${Number(c.gdd_base_temp_c).toFixed(1)}°C`
+            : ""}
           {c.default_growing_season_days
             ? ` · ${c.default_growing_season_days} ${t("weatherSummary.days")}`
             : ""}

@@ -71,7 +71,10 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       b.avg_cloud_pct ?? "",
       b.scene_count,
     ]);
-    downloadCsv(`crop-health_${indexCode}_${since.slice(0, 10)}_${until.slice(0, 10)}`, toCsv(headers, rows));
+    downloadCsv(
+      `crop-health_${indexCode}_${since.slice(0, 10)}_${until.slice(0, 10)}`,
+      toCsv(headers, rows),
+    );
   };
 
   return (

@@ -1,11 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  WaterBalanceBlockRow,
-  WaterBalanceSummary,
-  WaterBalanceWeather,
-} from "@/api/reports";
+import type { WaterBalanceBlockRow, WaterBalanceSummary, WaterBalanceWeather } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWaterBalanceReport } from "@/queries/reports";
@@ -47,10 +43,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
       b.adherence_pct ?? "",
       b.last_scheduled_for ?? "",
     ]);
-    downloadCsv(
-      `water-balance_${since.slice(0, 10)}_${until.slice(0, 10)}`,
-      toCsv(headers, rows),
-    );
+    downloadCsv(`water-balance_${since.slice(0, 10)}_${until.slice(0, 10)}`, toCsv(headers, rows));
   };
 
   return (

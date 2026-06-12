@@ -70,12 +70,7 @@ export async function getCropHealthReport(
 
 // ---- PR-2: Field Variability / Zone Anomaly ------------------------------
 
-export type ZoneAnomalyStatus =
-  | "anomalies"
-  | "clear"
-  | "insufficient"
-  | "no_data"
-  | "no_grid";
+export type ZoneAnomalyStatus = "anomalies" | "clear" | "insufficient" | "no_data" | "no_grid";
 
 export interface ZoneAnomalyBlockRow {
   block_id: string;

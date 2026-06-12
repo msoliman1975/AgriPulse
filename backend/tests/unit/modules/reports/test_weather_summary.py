@@ -32,9 +32,36 @@ def D(v: str) -> Decimal:
 
 def test_weather_stats_rollup() -> None:
     rows = [
-        _row(1, tmin=D("8"), tmax=D("22"), tmean=D("15"), precip=D("0"), et0=D("4.0"), gdd=D("5"), cum=D("100")),
-        _row(2, tmin=D("6"), tmax=D("25"), tmean=D("16"), precip=D("3.5"), et0=D("5.0"), gdd=D("6"), cum=D("106")),
-        _row(3, tmin=D("9"), tmax=D("20"), tmean=D("14"), precip=D("0"), et0=D("3.0"), gdd=D("4"), cum=D("110")),
+        _row(
+            1,
+            tmin=D("8"),
+            tmax=D("22"),
+            tmean=D("15"),
+            precip=D("0"),
+            et0=D("4.0"),
+            gdd=D("5"),
+            cum=D("100"),
+        ),
+        _row(
+            2,
+            tmin=D("6"),
+            tmax=D("25"),
+            tmean=D("16"),
+            precip=D("3.5"),
+            et0=D("5.0"),
+            gdd=D("6"),
+            cum=D("106"),
+        ),
+        _row(
+            3,
+            tmin=D("9"),
+            tmax=D("20"),
+            tmean=D("14"),
+            precip=D("0"),
+            et0=D("3.0"),
+            gdd=D("4"),
+            cum=D("110"),
+        ),
     ]
     s = _weather_stats(rows)
     assert s.days_with_data == 3

@@ -325,9 +325,7 @@ class ReportsService:
             blocks_with_anomalies=blocks_with_anomalies,
             total_flagged_cells=total_flagged_cells,
             total_flagged_area_ha=(
-                total_flagged_area.quantize(Decimal("0.001"))
-                if blocks_with_anomalies
-                else None
+                total_flagged_area.quantize(Decimal("0.001")) if blocks_with_anomalies else None
             ),
         )
         return ZoneAnomalyReportResponse(
@@ -546,9 +544,7 @@ class ReportsService:
         # The alerts fetch also returns alerts only *resolved* in the
         # window (opened earlier) so the resolved-count is accurate; emit
         # log entries only for alerts actually *opened* in the window.
-        opened_alerts = [
-            al for al in alerts if period.since <= al["created_at"] <= period.until
-        ]
+        opened_alerts = [al for al in alerts if period.since <= al["created_at"] <= period.until]
         for al in opened_alerts:
             entries.append(
                 OpsLogEntry(
@@ -842,8 +838,10 @@ async def _select_water_balance_weather(
     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
     row = (
-        await session.execute(sql, {"farm_id": farm_id, "since": since, "until": until})
-    ).mappings().one()
+        (await session.execute(sql, {"farm_id": farm_id, "since": since, "until": until}))
+        .mappings()
+        .one()
+    )
     return dict(row)
 
 
@@ -875,9 +873,7 @@ async def _select_water_balance_blocks(
         """
     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
-    result = await session.execute(
-        sql, {"farm_id": farm_id, "since": since, "until": until}
-    )
+    result = await session.execute(sql, {"farm_id": farm_id, "since": since, "until": until})
     return {row["block_id"]: dict(row) for row in result.mappings().all()}
 
 

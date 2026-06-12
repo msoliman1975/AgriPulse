@@ -124,9 +124,7 @@ async def get_weather_summary_report(
     farm_id: UUID,
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
-    context: RequestContext = Depends(
-        requires_capability("weather.read", farm_id_param="farm_id")
-    ),
+    context: RequestContext = Depends(requires_capability("weather.read", farm_id_param="farm_id")),
     service: ReportsService = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
