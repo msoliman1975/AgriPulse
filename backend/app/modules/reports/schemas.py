@@ -54,6 +54,9 @@ class CropHealthBlockRow(BaseModel):
     block_name: str
     crop_name_en: str | None = None
     crop_name_ar: str | None = None
+    # Hierarchical taxonomy path of the block's current crop, e.g.
+    # "mango.alphonso.short" / "cotton" (empty when none).
+    crop_path: str | None = None
     status: CropHealthStatus
     last_value: Decimal | None
     last_observed_at: datetime | None
@@ -88,6 +91,9 @@ class CropHealthReportResponse(BaseModel):
     farm_name: str
     index_code: str
     period: ReportPeriod
+    # Echoes the crop-taxonomy path prefix the report was filtered to
+    # (None = whole farm), so the FE can render the active filter chip.
+    crop_path: str | None = None
     blocks: list[CropHealthBlockRow]
     summary: CropHealthSummary
 
@@ -263,6 +269,9 @@ class WeatherSummaryReportResponse(BaseModel):
     farm_id: UUID
     farm_name: str
     period: ReportPeriod
+    # Echoes the crop-taxonomy path prefix the crop context was filtered to
+    # (None = every current crop on the farm).
+    crop_path: str | None = None
     stats: WeatherSummaryStats
     daily: list[WeatherDailyPoint]
     crops: list[WeatherCropContext]

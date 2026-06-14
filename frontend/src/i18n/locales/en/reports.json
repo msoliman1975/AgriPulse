@@ -16,6 +16,15 @@
     "print": "Print / Save PDF"
   },
   "loadFailed": "Couldn't load this report. Try again.",
+  "filter": {
+    "crop": "Crop",
+    "variety": "Variety",
+    "strain": "Strain",
+    "allCrops": "All crops",
+    "allVarieties": "All varieties",
+    "allStrains": "All strains",
+    "activePath": "Active crop filter"
+  },
   "catalog": {
     "crop-health": {
       "title": "Crop Health",
@@ -51,6 +60,7 @@
     "headers": {
       "block": "Block",
       "crop": "Crop",
+      "cropPath": "Crop path",
       "status": "Status",
       "last": "latest",
       "observed": "Observed",

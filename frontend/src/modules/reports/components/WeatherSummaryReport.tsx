@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bar,
@@ -19,6 +19,7 @@ import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherSummaryReport } from "@/queries/reports";
 
 import type { ReportProps } from "../registry";
+import { CropPathFilter } from "./CropPathFilter";
 import { ReportShell } from "./ReportShell";
 
 function num(v: string | null): number | null {
@@ -43,7 +44,12 @@ interface ChartPoint {
 
 export function WeatherSummaryReport({ farmId, since, until }: ReportProps): ReactNode {
   const { t } = useTranslation("reports");
-  const { data, isLoading, isError } = useWeatherSummaryReport(farmId, { since, until });
+  const [cropPath, setCropPath] = useState<string | null>(null);
+  const { data, isLoading, isError } = useWeatherSummaryReport(farmId, {
+    since,
+    until,
+    ...(cropPath ? { crop_path: cropPath } : {}),
+  });
 
   const chart = useMemo<ChartPoint[]>(
     () =>
@@ -92,6 +98,9 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
+      <div className="print-hide mb-4">
+        <CropPathFilter value={cropPath} onChange={setCropPath} />
+      </div>
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
       ) : isError ? (

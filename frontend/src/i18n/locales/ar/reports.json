@@ -16,6 +16,15 @@
     "print": "طباعة / حفظ PDF"
   },
   "loadFailed": "تعذّر تحميل هذا التقرير. حاول مرة أخرى.",
+  "filter": {
+    "crop": "المحصول",
+    "variety": "الصنف",
+    "strain": "السلالة",
+    "allCrops": "كل المحاصيل",
+    "allVarieties": "كل الأصناف",
+    "allStrains": "كل السلالات",
+    "activePath": "تصفية المحصول النشطة"
+  },
   "catalog": {
     "crop-health": {
       "title": "صحة المحصول",
@@ -51,6 +60,7 @@
     "headers": {
       "block": "القطعة",
       "crop": "المحصول",
+      "cropPath": "مسار المحصول",
       "status": "الحالة",
       "last": "الأحدث",
       "observed": "تاريخ الرصد",

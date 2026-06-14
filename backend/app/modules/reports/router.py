@@ -64,6 +64,12 @@ async def get_crop_health_report(
     index_code: str = Query(default="ndvi", min_length=1, max_length=64),
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
+    crop_path: str | None = Query(
+        default=None,
+        max_length=256,
+        description="Crop-taxonomy path prefix filter, e.g. 'mango' / "
+        "'mango.alphonso' / 'mango.alphonso.short'.",
+    ),
     # Same gate as the insights index endpoints — an operator who can
     # read one block's indices can read the farm report.
     context: RequestContext = Depends(requires_capability("index.read", farm_id_param="farm_id")),
@@ -71,7 +77,7 @@ async def get_crop_health_report(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     out = await service.get_crop_health_report(
-        farm_id=farm_id, index_code=index_code, since=since, until=until
+        farm_id=farm_id, index_code=index_code, since=since, until=until, crop_path=crop_path
     )
     return out.model_dump(mode="json")
 
@@ -124,11 +130,19 @@ async def get_weather_summary_report(
     farm_id: UUID,
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
+    crop_path: str | None = Query(
+        default=None,
+        max_length=256,
+        description="Crop-taxonomy path prefix filter for the crop context, "
+        "e.g. 'mango' / 'mango.alphonso' / 'mango.alphonso.short'.",
+    ),
     context: RequestContext = Depends(requires_capability("weather.read", farm_id_param="farm_id")),
     service: ReportsService = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
-    out = await service.get_weather_summary_report(farm_id=farm_id, since=since, until=until)
+    out = await service.get_weather_summary_report(
+        farm_id=farm_id, since=since, until=until, crop_path=crop_path
+    )
     return out.model_dump(mode="json")
 
 
