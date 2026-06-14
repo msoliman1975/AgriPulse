@@ -32,7 +32,12 @@ INDICES_KEYS: tuple[str, ...] = (
 # current block_crops row (categorical, e.g. tuber_bulking). Compare with
 # eq/ne/in. Resolves via ``block_attributes`` and is None until a stage is
 # set, so stage-gated rules fail closed.
-BLOCK_FIELDS: tuple[str, ...] = ("crop_category", "growth_stage")
+# ``crop_path`` / ``crop_strain`` (crop taxonomy) carry the block's current
+# hierarchical path (``mango.alphonso.short``) and its strain segment
+# (``short``); both resolve via ``block_attributes`` and are None when the
+# block has no crop / no strain level. Compare with eq/ne/in to branch a
+# tree on a specific variety or strain.
+BLOCK_FIELDS: tuple[str, ...] = ("crop_category", "growth_stage", "crop_path", "crop_strain")
 
 
 @dataclass(frozen=True, slots=True)

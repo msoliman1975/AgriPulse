@@ -47,6 +47,7 @@ from app.modules.recommendations.repository import RecommendationsRepository
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.conditions import ConditionContext
+from app.shared.crop_taxonomy import path_matches, strain_code
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 
@@ -140,6 +141,7 @@ class RecommendationsServiceImpl:
             crop_id,
             crop_category,
             growth_stage,
+            crop_path,
         ) = await self._repo.get_block_current_crop(block_id=block_id)
 
         if farm_id is None:
@@ -167,7 +169,11 @@ class RecommendationsServiceImpl:
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
-            block_attributes={"growth_stage": growth_stage},
+            block_attributes={
+                "growth_stage": growth_stage,
+                "crop_path": crop_path,
+                "crop_strain": strain_code(crop_path),
+            },
             latest_index_aggregates=latest,
             weather=weather,
             signals=signals,
@@ -185,9 +191,18 @@ class RecommendationsServiceImpl:
         trees_skipped_crop = 0
         recommendations_opened = 0
         for tree in trees:
-            # Per-crop trees only apply when the block's current crop
-            # matches. Crop-agnostic trees (crop_id is NULL) always apply.
-            if tree["crop_id"] is not None and tree["crop_id"] != crop_id:
+            # Targeting precedence:
+            #   * crop_path set  → match by hierarchical path prefix, so a
+            #     tree can target a whole crop (``mango``), a variety
+            #     (``mango.alphonso``) or an exact strain.
+            #   * else crop_id set → legacy exact-crop match.
+            #   * else            → crop-agnostic, always applies.
+            tree_path = tree.get("crop_path")
+            if tree_path:
+                if not path_matches(tree_path, crop_path):
+                    trees_skipped_crop += 1
+                    continue
+            elif tree["crop_id"] is not None and tree["crop_id"] != crop_id:
                 trees_skipped_crop += 1
                 continue
             trees_evaluated += 1
@@ -248,7 +263,10 @@ class RecommendationsServiceImpl:
                 text_en=result.outcome.text_en,
                 text_ar=result.outcome.text_ar,
                 valid_until=valid_until,
-                evaluation_snapshot=result.evaluation_snapshot,
+                # Snapshot the block's crop path alongside the evaluated
+                # signals so the recommendation stays self-describing even
+                # if the block's crop is reassigned later.
+                evaluation_snapshot={**result.evaluation_snapshot, "crop_path": crop_path},
                 actor_user_id=actor_user_id,
             )
             if not inserted:
@@ -824,7 +842,12 @@ class DecisionTreesAuthorService:
         if compiled.get("code") != code:
             raise _DecisionTreeCodeMismatchError(expected=code, got=str(compiled.get("code")))
         compiled_hash = _hash_compiled(compiled)
-        crop_id = await self._repo.resolve_crop_id(crop_code)
+        crop_path = compiled.get("crop_path")
+        # crop_code from the request takes precedence; otherwise derive it
+        # from the path's first segment so crop_id stays populated.
+        crop_id = await self._repo.resolve_crop_id(
+            crop_code or (crop_path.split(".")[0] if crop_path else None)
+        )
 
         tree_id = await self._repo.insert_tree(
             code=code,
@@ -834,6 +857,7 @@ class DecisionTreesAuthorService:
             description_en=compiled.get("description_en"),
             description_ar=compiled.get("description_ar"),
             crop_id=crop_id,
+            crop_path=crop_path,
             applicable_regions=compiled.get("applicable_regions") or [],
             actor_user_id=actor_user_id,
         )
@@ -919,7 +943,10 @@ class DecisionTreesAuthorService:
         )
         # Sync the human-friendly metadata on the tree row even before
         # publish so the catalog list reflects what the author last saved.
-        crop_id = await self._repo.resolve_crop_id(compiled.get("crop_code"))
+        crop_path = compiled.get("crop_path")
+        crop_id = await self._repo.resolve_crop_id(
+            compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
+        )
         await self._repo.update_tree_metadata(
             tree_id=tree["id"],
             name_en=compiled["name_en"],
@@ -927,6 +954,7 @@ class DecisionTreesAuthorService:
             description_en=compiled.get("description_en"),
             description_ar=compiled.get("description_ar"),
             crop_id=crop_id,
+            crop_path=crop_path,
             applicable_regions=compiled.get("applicable_regions") or [],
             actor_user_id=actor_user_id,
         )
@@ -1058,7 +1086,9 @@ class DecisionTreesAuthorService:
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
-        _, _, crop_category, growth_stage = await repo.get_block_current_crop(block_id=block_id)
+        _, _, crop_category, growth_stage, crop_path = await repo.get_block_current_crop(
+            block_id=block_id
+        )
         weather = (
             await load_weather_snapshot(tenant_session, farm_id=farm_id)
             if farm_id is not None
@@ -1082,7 +1112,11 @@ class DecisionTreesAuthorService:
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
-            block_attributes={"growth_stage": growth_stage},
+            block_attributes={
+                "growth_stage": growth_stage,
+                "crop_path": crop_path,
+                "crop_strain": strain_code(crop_path),
+            },
             latest_index_aggregates=latest_indices,
             weather=weather,
             signals=signals,

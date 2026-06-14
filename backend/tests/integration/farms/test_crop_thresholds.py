@@ -84,6 +84,51 @@ def test_resolve_phenology_returns_none_when_neither_present() -> None:
     assert resolve_phenology_stages(crop_stages=None, variety_override=None) is None
 
 
+def test_resolve_thresholds_strain_wins_over_variety_and_crop() -> None:
+    out = resolve_thresholds(
+        crop_thresholds={"ndvi_deviation_warning_pct": -10, "frost_threshold_c": 2},
+        variety_thresholds={"ndvi_deviation_warning_pct": -15},
+        strain_thresholds={"frost_threshold_c": 0},
+    )
+    assert out == {"ndvi_deviation_warning_pct": -15, "frost_threshold_c": 0}
+
+
+def test_resolve_thresholds_strain_only_when_others_null() -> None:
+    out = resolve_thresholds(
+        crop_thresholds=None,
+        variety_thresholds=None,
+        strain_thresholds={"chill_hours_required": 150},
+    )
+    assert out == {"chill_hours_required": 150}
+
+
+def test_resolve_phenology_strain_override_beats_variety() -> None:
+    crop_stages = {"stages": [{"name": "vegetative", "start_gdd": 0, "end_gdd": 500}]}
+    variety_override = {"stages": [{"name": "vegetative", "start_gdd": 0, "end_gdd": 400}]}
+    strain_override = {"stages": [{"name": "vegetative", "start_gdd": 0, "end_gdd": 350}]}
+    assert (
+        resolve_phenology_stages(
+            crop_stages=crop_stages,
+            variety_override=variety_override,
+            strain_override=strain_override,
+        )
+        is strain_override
+    )
+
+
+def test_resolve_phenology_falls_back_to_variety_when_strain_null() -> None:
+    crop_stages = {"stages": [{"name": "vegetative", "start_gdd": 0, "end_gdd": 500}]}
+    variety_override = {"stages": [{"name": "vegetative", "start_gdd": 0, "end_gdd": 400}]}
+    assert (
+        resolve_phenology_stages(
+            crop_stages=crop_stages,
+            variety_override=variety_override,
+            strain_override=None,
+        )
+        is variety_override
+    )
+
+
 # ---------------------------------------------------------------------------
 # Catalog endpoints expose the new fields
 # ---------------------------------------------------------------------------

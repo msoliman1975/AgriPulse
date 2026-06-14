@@ -114,6 +114,53 @@ def test_growth_stage_in_operator() -> None:
     assert evaluate(tree, _stage_ctx("emergence"))[0] is False
 
 
+# ---- crop_path / crop_strain block fields (crop taxonomy) -----------------
+
+
+def _crop_ctx(*, crop_path: str | None, crop_strain: str | None) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        block_attributes={"crop_path": crop_path, "crop_strain": crop_strain},
+    )
+
+
+def test_parse_block_value_ref_crop_path_and_strain() -> None:
+    assert parse_value_ref({"source": "block", "field": "crop_path"}).field == "crop_path"
+    assert parse_value_ref({"source": "block", "field": "crop_strain"}).field == "crop_strain"
+
+
+def test_crop_strain_eq_branches_on_strain() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "block", "field": "crop_strain"},
+        "right": "short",
+    }
+    ctx = _crop_ctx(crop_path="mango.alphonso.short", crop_strain="short")
+    assert evaluate(tree, ctx)[0] is True
+    other = _crop_ctx(crop_path="mango.alphonso.long", crop_strain="long")
+    assert evaluate(tree, other)[0] is False
+
+
+def test_crop_strain_unset_fails_closed() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "block", "field": "crop_strain"},
+        "right": "short",
+    }
+    # Variety-level crop has no strain segment -> None -> fail-closed.
+    assert evaluate(tree, _crop_ctx(crop_path="mango.alphonso", crop_strain=None))[0] is False
+
+
+def test_crop_path_eq_exact_match() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "block", "field": "crop_path"},
+        "right": "mango.alphonso.short",
+    }
+    ctx = _crop_ctx(crop_path="mango.alphonso.short", crop_strain="short")
+    assert evaluate(tree, ctx)[0] is True
+
+
 def test_parse_value_ref_unknown_source_raises() -> None:
     with pytest.raises(ConditionParseError):
         parse_value_ref({"source": "weather", "field": "temp_c"})
