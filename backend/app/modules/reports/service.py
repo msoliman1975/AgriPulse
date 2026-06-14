@@ -1001,9 +1001,11 @@ async def _select_weather_crop_context(
           AND bc.deleted_at IS NULL
           AND bc.is_current IS TRUE
           AND (
-              :crop_path IS NULL
-              OR bc.crop_path = :crop_path
-              OR bc.crop_path LIKE :crop_path || '.%'
+              -- Cast the bind so asyncpg can infer the parameter type; an
+              -- untyped NULL/`|| '.%'` bind raises AmbiguousParameterError.
+              CAST(:crop_path AS text) IS NULL
+              OR bc.crop_path = CAST(:crop_path AS text)
+              OR bc.crop_path LIKE CAST(:crop_path AS text) || '.%'
           )
         GROUP BY c.id, c.name_en, c.name_ar, c.gdd_base_temp_c, c.default_growing_season_days
         ORDER BY block_count DESC, c.name_en ASC
