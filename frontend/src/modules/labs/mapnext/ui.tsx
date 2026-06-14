@@ -23,7 +23,7 @@ export function Dot({ color, className }: { color: string; className?: string })
 export function SectionHeader({ children }: { children: ReactNode }): ReactNode {
   return (
     <div className="mt-4 mb-1.5 flex items-center gap-2 px-4">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-ap-primary">
+      <span className="text-xs font-bold uppercase tracking-wide text-ap-primary">
         {children}
       </span>
       <span className="h-px flex-1 bg-ap-line" />
@@ -48,8 +48,8 @@ export function MCard({
   return (
     <div className="mx-4 my-2 overflow-hidden rounded-xl border border-ap-line">
       <div className="flex items-center gap-2 bg-ap-bg/60 px-3 py-2.5">
-        {icon ? <span className="text-[15px] leading-none">{icon}</span> : null}
-        <span className="flex-1 text-[12.5px] font-bold text-ap-ink">{title}</span>
+        {icon ? <span className="text-base leading-none">{icon}</span> : null}
+        <span className="flex-1 text-xs font-bold text-ap-ink">{title}</span>
         {value != null ? (
           <span className="text-sm font-bold tabular-nums" style={valueColor ? { color: valueColor } : undefined}>
             {value}
@@ -65,7 +65,7 @@ export function MCard({
 
 export function KV({ k, v, vColor }: { k: ReactNode; v: ReactNode; vColor?: string }): ReactNode {
   return (
-    <div className="flex justify-between py-1 text-[13px]">
+    <div className="flex justify-between py-1 text-sm">
       <span className="text-ap-muted">{k}</span>
       <span className="font-semibold tabular-nums" style={vColor ? { color: vColor } : undefined}>
         {v}
@@ -94,7 +94,7 @@ export function Expander({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-[13px] font-semibold text-ap-ink hover:bg-ap-bg/50"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-sm font-semibold text-ap-ink hover:bg-ap-bg/50"
       >
         {icon ? <span className="leading-none">{icon}</span> : null}
         <span>{title}</span>
@@ -103,7 +103,7 @@ export function Expander({
           ›
         </span>
       </button>
-      {open ? <div className="border-t border-ap-line px-3 py-2.5 text-[13px]">{children}</div> : null}
+      {open ? <div className="border-t border-ap-line px-3 py-2.5 text-sm">{children}</div> : null}
     </div>
   );
 }
@@ -120,7 +120,7 @@ export function Sparkline({
 }): ReactNode {
   const vals = points.filter((p): p is number => p != null);
   if (vals.length < 2) {
-    return <div className="text-[12px] text-ap-muted">Not enough data for a trend.</div>;
+    return <div className="text-xs text-ap-muted">Not enough data for a trend.</div>;
   }
   const min = Math.min(...vals);
   const max = Math.max(...vals);
@@ -203,7 +203,7 @@ export function Popover({
 
 export function PopHeading({ children }: { children: ReactNode }): ReactNode {
   return (
-    <div className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-ap-muted">
+    <div className="px-2.5 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-ap-muted">
       {children}
     </div>
   );
@@ -230,14 +230,14 @@ export function PopItem({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] font-medium transition-colors",
+        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-sm font-medium transition-colors",
         disabled ? "cursor-not-allowed opacity-50" : "hover:bg-ap-primary-soft",
         danger ? "text-ap-crit" : "text-ap-ink",
       )}
     >
       {icon ? <span className="w-4 text-center leading-none">{icon}</span> : null}
       <span className="flex-1">{children}</span>
-      {hint != null ? <span className="text-[11px] font-normal text-ap-muted">{hint}</span> : null}
+      {hint != null ? <span className="text-xs font-normal text-ap-muted">{hint}</span> : null}
     </button>
   );
 }

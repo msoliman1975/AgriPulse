@@ -33,14 +33,11 @@ import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
 import { FarmDefaultsTab } from "../map/FarmDefaultsTab";
 import { FarmMembersTab } from "../map/FarmMembersTab";
-import type { IndexCode } from "../map/types";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
 
 const LAST_FARM_KEY = "labs/map/lastFarm";
-// Every index the grid pipeline stores per cell (sub-block resolution).
-const GRID_INDEX_OPTIONS: ApiIndexCode[] = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi", "ndmi"];
 
 export function FarmConsolePage(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
@@ -80,7 +77,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const selectedId = search.get("unit");
 
   const qc = useQueryClient();
-  const [activeIndex, setActiveIndex] = useState<IndexCode>("ndvi");
+  // One index drives both the map grid overlay and the inspector featured card.
+  const [activeIndex, setActiveIndex] = useState<ApiIndexCode>("ndvi");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerState>({
@@ -93,7 +91,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   });
   // Grid overlay
   const [showGrid, setShowGrid] = useState(false);
-  const [gridIndex, setGridIndex] = useState<ApiIndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
   // Signal observation overlay
@@ -156,14 +153,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const overlayBlocks = summaryQ.data?.blocks ?? [];
   const overlayKey = overlayBlocks.map((b) => b.id).join(",");
   const farmGridQ = useQuery({
-    queryKey: ["labs/mapnext/farmGrid", farmId, gridIndex, overlayKey],
+    queryKey: ["labs/mapnext/farmGrid", farmId, activeIndex, overlayKey],
     queryFn: async () => {
       const groups = await Promise.all(
         overlayBlocks.map(async (b) => {
           const subs = await listSubscriptions(b.id, { include_inactive: false });
           const productId = subs[0]?.product_id;
           if (!productId) return null;
-          const res = await getGridCells(b.id, productId, gridIndex);
+          const res = await getGridCells(b.id, productId, activeIndex);
           return { blockId: b.id, productId, cells: res.cells };
         }),
       );
@@ -350,9 +347,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           setShowGrid((s) => !s);
           setSelectedCellId(null);
         }}
-        gridIndex={gridIndex}
-        onGridIndexChange={setGridIndex}
-        gridIndexOptions={GRID_INDEX_OPTIONS}
         signalDefs={(signalDefsQ.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
         signalDefId={signalDefId}
         onSignalDefChange={(id) => {
@@ -401,12 +395,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           {/* Reshape banner */}
           {reshaping ? (
             <div className="absolute left-1/2 top-3.5 z-20 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-ap-panel px-4 py-2 shadow-card">
-              <span className="text-[13px] font-semibold text-ap-ink">{t("page.reshapeTitle")}</span>
+              <span className="text-sm font-semibold text-ap-ink">{t("page.reshapeTitle")}</span>
               <button
                 type="button"
                 disabled={!reshapeCandidate || reshapeMut.isPending}
                 onClick={() => reshapeCandidate && reshapeMut.mutate({ blockId: reshapeTarget.id, boundary: reshapeCandidate })}
-                className="h-8 rounded-lg bg-ap-primary px-3 text-[13px] font-semibold text-white disabled:opacity-50"
+                className="h-8 rounded-lg bg-ap-primary px-3 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {t("manage.save")}
               </button>
@@ -416,7 +410,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                   setReshapeTarget(null);
                   setReshapeCandidate(null);
                 }}
-                className="h-8 rounded-lg border border-ap-line px-3 text-[13px] font-semibold text-ap-ink"
+                className="h-8 rounded-lg border border-ap-line px-3 text-sm font-semibold text-ap-ink"
               >
                 {t("manage.cancel")}
               </button>
@@ -429,7 +423,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               open
               cellId={selectedCellId}
               productId={cellMeta.get(selectedCellId)?.productId ?? null}
-              indexCode={gridIndex}
+              indexCode={activeIndex}
               value={cellMeta.get(selectedCellId)?.value ?? null}
               lat={cellMeta.get(selectedCellId)?.lat ?? null}
               lon={cellMeta.get(selectedCellId)?.lon ?? null}
@@ -464,7 +458,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           ) : null}
 
           {toast ? (
-            <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-ap-ink/85 px-3.5 py-1.5 text-[12.5px] text-white shadow-card">
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-ap-ink/85 px-3.5 py-1.5 text-xs text-white shadow-card">
               {toast}
             </div>
           ) : null}
@@ -480,7 +474,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               onActiveIndexChange={setActiveIndex}
               onClose={deselect}
               farmId={farmId}
-              onScout={() => flash(t("page.scoutToast"))}
               gridProductId={gridProductId}
               onReshape={() => void openReshape()}
               onInactivate={() => setInactivateOpen(true)}
@@ -537,7 +530,7 @@ function SettingsDrawer({
           <span className="text-xl">⚙</span>
           <div>
             <h2 className="text-lg font-bold text-ap-ink">{t("settings.title")}</h2>
-            <div className="text-[12px] text-ap-muted">{farmName}</div>
+            <div className="text-xs text-ap-muted">{farmName}</div>
           </div>
           <button
             type="button"
@@ -555,7 +548,7 @@ function SettingsDrawer({
               type="button"
               onClick={() => setTab(tb.id)}
               className={
-                "rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-semibold " +
+                "rounded-t-lg border-b-2 px-3.5 py-2 text-sm font-semibold " +
                 (tab === tb.id ? "border-ap-primary text-ap-primary" : "border-transparent text-ap-muted hover:text-ap-ink")
               }
             >
@@ -574,7 +567,7 @@ function SettingsDrawer({
 }
 
 const settingsInput =
-  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-[13px] text-ap-ink focus:border-ap-primary focus:outline-none";
+  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
 
 function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
@@ -605,8 +598,8 @@ function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/farmsList"] });
     },
   });
-  if (farmQ.isLoading) return <div className="text-[13px] text-ap-muted">{t("inspector.loading")}</div>;
-  if (farmQ.isError || !f) return <div className="text-[13px] text-ap-crit">{t("manage.editLoadError")}</div>;
+  if (farmQ.isLoading) return <div className="text-sm text-ap-muted">{t("inspector.loading")}</div>;
+  if (farmQ.isError || !f) return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
   return (
     <form
       onSubmit={(e) => {
@@ -615,24 +608,24 @@ function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
       }}
     >
       <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.name")}</span>
+        <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.name")}</span>
         <input className={settingsInput} value={state.name ?? ""} onChange={(e) => set({ name: e.target.value })} />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.governorate")}</span>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.governorate")}</span>
           <input className={settingsInput} value={state.governorate ?? ""} onChange={(e) => set({ governorate: e.target.value || null })} />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.district")}</span>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.district")}</span>
           <input className={settingsInput} value={state.district ?? ""} onChange={(e) => set({ district: e.target.value || null })} />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.city")}</span>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.city")}</span>
           <input className={settingsInput} value={state.nearest_city ?? ""} onChange={(e) => set({ nearest_city: e.target.value || null })} />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.water")}</span>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.water")}</span>
           <select className={settingsInput} value={state.primary_water_source ?? ""} onChange={(e) => set({ primary_water_source: (e.target.value || null) as WaterSource | null })}>
             <option value="">—</option>
             {WATER_SOURCES.map((w) => <option key={w} value={w}>{w}</option>)}
@@ -640,19 +633,19 @@ function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
         </label>
       </div>
       <label className="mb-3 block">
-        <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("manage.tags")}</span>
+        <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("manage.tags")}</span>
         <input className={settingsInput} value={(state.tags ?? []).join(", ")} onChange={(e) => set({ tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
       </label>
-      {mut.isError ? <div className="mb-2 text-[12px] text-ap-crit">{t("manage.saveError")}</div> : null}
+      {mut.isError ? <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={mut.isPending} className="h-9 rounded-lg bg-ap-primary px-4 text-[13px] font-semibold text-white disabled:opacity-60">
+        <button type="submit" disabled={mut.isPending} className="h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-60">
           {mut.isPending ? t("manage.saving") : t("manage.save")}
         </button>
-        {mut.isSuccess && !form ? <span className="text-[12px] text-ap-good">{t("settingsFarm.saved")}</span> : null}
+        {mut.isSuccess && !form ? <span className="text-xs text-ap-good">{t("settingsFarm.saved")}</span> : null}
         <button
           type="button"
           onClick={() => navigate(`/labs/map-legacy/${farmId}`)}
-          className="ms-auto text-[12px] text-ap-muted underline hover:text-ap-ink"
+          className="ms-auto text-xs text-ap-muted underline hover:text-ap-ink"
         >
           {t("settingsFarm.editAoi")}
         </button>
