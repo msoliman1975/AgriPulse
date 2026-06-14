@@ -175,3 +175,15 @@ class AppliableTemplate(PlanTemplateSummary):
     """A published template that matches the farm + the blocks it fits."""
 
     matching_blocks: list[AppliableBlock] = Field(default_factory=list)
+
+
+# ---- Phenology resolution (authoring stage-picker; PR-E3) ------------------
+
+
+class ResolvedPhenologyResponse(BaseModel):
+    """Resolved phenology stages for a crop path — feeds the authoring UI's
+    stage picker so it only offers valid stage codes."""
+
+    crop_path: str
+    is_perennial: bool = False
+    stages: list[dict[str, Any]] = Field(default_factory=list)

@@ -12,12 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
-import type {
-  ActivityType,
-  BoardActivity,
-  BoardBlock,
-  BoardResourceChip,
-} from "@/api/plans";
+import type { ActivityType, BoardActivity, BoardBlock, BoardResourceChip } from "@/api/plans";
 import { Skeleton } from "@/components/Skeleton";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
@@ -27,13 +22,11 @@ import { useScheduleRecommendation } from "@/queries/recScheduling";
 
 import { ActivityChip } from "../components/ActivityChip";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog";
+import { ApplyTemplateDialog } from "../components/ApplyTemplateDialog";
 import { BoardCell, type RecDropPayload } from "../components/BoardCell";
 import { BoardFilters } from "../components/BoardFilters";
 import { BoardMobileList } from "../components/BoardMobileList";
-import {
-  BulkAddDialog,
-  type SelectedCell,
-} from "../components/BulkAddDialog";
+import { BulkAddDialog, type SelectedCell } from "../components/BulkAddDialog";
 import { QuickAddDialog } from "../components/QuickAddDialog";
 import { RecommendationsRail } from "../components/RecommendationsRail";
 
@@ -56,7 +49,10 @@ interface ColumnDef {
  * The backend endpoint only speaks (weekStart, weeks). We translate the
  * view-mode window into the smallest week-aligned superset that covers
  * it and aggregate client-side. */
-function computeWindow(mode: ViewMode, anchor: Date): {
+function computeWindow(
+  mode: ViewMode,
+  anchor: Date,
+): {
   columns: ColumnDef[];
   fetchStart: string;
   fetchWeeks: number;
@@ -109,11 +105,7 @@ function computeWindow(mode: ViewMode, anchor: Date): {
 function daysInMonth(monthStart: Date): number {
   // last-day-of-month via the date-overflow trick: day 0 of next month
   // is the last day of this month.
-  return new Date(
-    monthStart.getFullYear(),
-    monthStart.getMonth() + 1,
-    0,
-  ).getDate();
+  return new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 }
 
 /**
@@ -132,9 +124,7 @@ export function BoardPage(): ReactNode {
   const isMobile = useIsMobile();
 
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  const [anchor, setAnchor] = useState<Date>(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 }),
-  );
+  const [anchor, setAnchor] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   const range = useMemo(() => computeWindow(viewMode, anchor), [viewMode, anchor]);
   const boardQ = useBoard(farmId ?? null, range.fetchStart, range.fetchWeeks);
@@ -152,9 +142,7 @@ export function BoardPage(): ReactNode {
     focusLane ? new Set([focusLane]) : new Set(),
   );
   const [filterTypes, setFilterTypes] = useState<Set<ActivityType>>(new Set());
-  const [filterResourceIds, setFilterResourceIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [filterResourceIds, setFilterResourceIds] = useState<Set<string>>(new Set());
 
   // Bulk selection — set of "${blockId}|${columnStart}" keys.
   const [bulkSelection, setBulkSelection] = useState<Set<string>>(new Set());
@@ -166,6 +154,7 @@ export function BoardPage(): ReactNode {
     columnUnit: "day" | "month";
   } | null>(null);
   const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
+  const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
 
   // Open the deep-linked activity once the board data is available, re-anchoring
   // the window so it is actually visible. Runs once: the guard ref stops it from
@@ -240,9 +229,7 @@ export function BoardPage(): ReactNode {
         if (!byId.has(r.id)) byId.set(r.id, r);
       }
     }
-    return Array.from(byId.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [boardQ.data]);
 
   function toggleCellSelection(blockId: string, columnStart: string) {
@@ -302,9 +289,7 @@ export function BoardPage(): ReactNode {
   // Selected-cell tuples for BulkAddDialog — only week-mode bulk-add
   // is supported (semantic = "same day-of-week across N selected weeks").
   const selectedCells: SelectedCell[] = useMemo(() => {
-    const byBlock = new Map(
-      (boardQ.data?.blocks ?? []).map((b) => [b.id, b.code]),
-    );
+    const byBlock = new Map((boardQ.data?.blocks ?? []).map((b) => [b.id, b.code]));
     return Array.from(bulkSelection)
       .map((k): SelectedCell | null => {
         const [blockId, weekStart] = k.split("|");
@@ -339,12 +324,17 @@ export function BoardPage(): ReactNode {
           <p className="mt-1 text-sm text-ap-muted">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setApplyTemplateOpen(true)}
+              className="rounded-md border border-ap-primary px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary-soft"
+            >
+              {t("template.applyButton")}
+            </button>
+          ) : null}
           <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
-          <RangeNavigator
-            label={rangeLabel}
-            onShift={shiftAnchor}
-            onToday={onTodayPressed}
-          />
+          <RangeNavigator label={rangeLabel} onShift={shiftAnchor} onToday={onTodayPressed} />
         </div>
       </header>
 
@@ -439,9 +429,7 @@ export function BoardPage(): ReactNode {
               }}
             />
           </div>
-          {canManage ? (
-            <RecommendationsRail farmId={farmId} draggable />
-          ) : null}
+          {canManage ? <RecommendationsRail farmId={farmId} draggable /> : null}
         </div>
       )}
 
@@ -468,6 +456,9 @@ export function BoardPage(): ReactNode {
           activity={openActivity}
           onClose={() => setOpenActivity(null)}
         />
+      ) : null}
+      {applyTemplateOpen ? (
+        <ApplyTemplateDialog farmId={farmId} onClose={() => setApplyTemplateOpen(false)} />
       ) : null}
     </div>
   );
@@ -502,9 +493,7 @@ function ViewModeToggle({ mode, onChange }: ViewModeToggleProps): ReactNode {
             onClick={() => onChange(m.id)}
             className={
               "px-3 py-1 transition-colors " +
-              (active
-                ? "bg-ap-primary text-white"
-                : "text-ap-ink hover:bg-ap-bg/40")
+              (active ? "bg-ap-primary text-white" : "text-ap-ink hover:bg-ap-bg/40")
             }
           >
             {m.label}
@@ -521,11 +510,7 @@ interface RangeNavigatorProps {
   onToday: () => void;
 }
 
-function RangeNavigator({
-  label,
-  onShift,
-  onToday,
-}: RangeNavigatorProps): ReactNode {
+function RangeNavigator({ label, onShift, onToday }: RangeNavigatorProps): ReactNode {
   const { t } = useTranslation("board");
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -607,8 +592,7 @@ function BoardGrid({
   // Cap visible chips per cell — month-day cells are narrow (~56px),
   // season month-cells are mid-width but cover ~30 days of activity.
   // Week-day cells are wide enough to show everything.
-  const maxVisibleChips =
-    viewMode === "week" ? Infinity : viewMode === "month" ? 2 : 3;
+  const maxVisibleChips = viewMode === "week" ? Infinity : viewMode === "month" ? 2 : 3;
   const compactCells = viewMode === "month";
   // The column representing "today" — day-grid matches the exact day,
   // season-grid (month columns) matches the current month.
@@ -664,9 +648,7 @@ function BoardGrid({
                     ? cellActivities.length - maxVisibleChips
                     : 0;
                 const visible =
-                  overflow > 0
-                    ? cellActivities.slice(0, maxVisibleChips)
-                    : cellActivities;
+                  overflow > 0 ? cellActivities.slice(0, maxVisibleChips) : cellActivities;
                 const isSelected = selection.has(key);
                 return (
                   <BoardCell
@@ -675,13 +657,10 @@ function BoardGrid({
                     selected={isSelected}
                     compact={compactCells}
                     today={isTodayColumn(col)}
-                    onClick={(modifiers) =>
-                      onCellClick(block.id, col.start, col.unit, modifiers)
-                    }
+                    onClick={(modifiers) => onCellClick(block.id, col.start, col.unit, modifiers)}
                     onRecDrop={
                       onRecDrop
-                        ? (payload) =>
-                            onRecDrop(block.id, col.start, col.unit, payload)
+                        ? (payload) => onRecDrop(block.id, col.start, col.unit, payload)
                         : undefined
                     }
                   >

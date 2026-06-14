@@ -1,0 +1,109 @@
+{
+  "list": {
+    "title": "قوالب الخطط",
+    "subtitle": "قوالب خطط زراعية مُدارة من المنصة ومرتبطة بالمحصول. يطبّق المستأجرون قالبًا منشورًا على القطع المطابقة للمحصول.",
+    "newButton": "قالب جديد",
+    "filterLabel": "الحالة",
+    "loadFailed": "تعذّر تحميل قوالب الخطط.",
+    "empty": "لا توجد قوالب خطط بعد.",
+    "col": {
+      "name": "القالب",
+      "cropPath": "مسار المحصول",
+      "status": "الحالة",
+      "updated": "آخر تحديث"
+    }
+  },
+  "status": {
+    "all": "الكل",
+    "draft": "مسودة",
+    "published": "منشور",
+    "archived": "مؤرشف"
+  },
+  "anchor": {
+    "start": "البداية + إزاحة",
+    "milestone": "معلم",
+    "stage": "مرحلة النمو"
+  },
+  "activityType": {
+    "planting": "زراعة",
+    "fertilizing": "تسميد",
+    "spraying": "رش",
+    "pruning": "تقليم",
+    "harvesting": "حصاد",
+    "irrigation": "ري",
+    "soil_prep": "تحضير التربة",
+    "observation": "ملاحظة"
+  },
+  "editor": {
+    "titleNew": "قالب خطة جديد",
+    "titleEdit": "تعديل قالب الخطة",
+    "back": "رجوع",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "publish": "نشر",
+    "archive": "أرشفة",
+    "delete": "حذف القالب",
+    "confirmDelete": "هل تريد إيقاف هذا القالب؟ سيتم أرشفته وتحرير رمزه.",
+    "section": {
+      "header": "القالب",
+      "milestones": "المعالم",
+      "activities": "الأنشطة",
+      "timeline": "معاينة الجدول الزمني"
+    },
+    "field": {
+      "name": "الاسم",
+      "code": "الرمز",
+      "codeHint": "مفتاح فريد دائم. لا يمكن تغييره بعد الإنشاء.",
+      "cropPath": "استهداف المحصول",
+      "country": "الدولة (اختياري)",
+      "region": "المنطقة (اختياري)",
+      "description": "الوصف",
+      "dayFromStart": "اليوم",
+      "activityType": "نوع النشاط",
+      "anchor": "الإسناد",
+      "offset": "الإزاحة (أيام)",
+      "duration": "المدة",
+      "product": "المنتج (اختياري)"
+    },
+    "addMilestone": "إضافة معلم",
+    "noMilestones": "لا توجد معالم. أضِف معلمًا لإسناد الأنشطة إلى يوم مُسمّى.",
+    "addActivity": "إضافة نشاط",
+    "noActivities": "لا توجد أنشطة بعد.",
+    "remove": "إزالة",
+    "pickMilestone": "اختر معلمًا…",
+    "pickStage": "اختر مرحلة…",
+    "noStages": "لا توجد مراحل فينولوجية لمسار المحصول هذا — لن تُجدوَل الأنشطة المسندة إلى المراحل.",
+    "timelineEmpty": "أضِف أنشطة لمعاينة الجدول.",
+    "dayN": "اليوم {{day}}",
+    "stageAnchored": "مُسند إلى مرحلة (يُحَل لكل قطعة عند التطبيق)",
+    "atStage": "عند {{stage}} + {{offset}} يوم",
+    "err": {
+      "codeRequired": "الرمز مطلوب.",
+      "nameRequired": "الاسم مطلوب.",
+      "cropRequired": "اختر مسار استهداف المحصول.",
+      "milestoneRequired": "النشاط المسند إلى معلم يحتاج إلى معلم.",
+      "stageRequired": "النشاط المسند إلى مرحلة يحتاج إلى مرحلة."
+    }
+  },
+  "apply": {
+    "title": "تطبيق قالب خطة",
+    "step": "الخطوة {{current}} من {{total}}",
+    "noTemplates": "لا توجد قوالب منشورة تطابق محاصيل هذه المزرعة بعد.",
+    "matchingBlocks": "{{count}} بلوكات",
+    "blocksHint": "البلوكات المطابقة للمحصول محددة مسبقًا. حدّد تاريخ بدء كل بلوك (الافتراضي هو تاريخ زراعته).",
+    "startDate": "البدء",
+    "seasonLabel": "تسمية الموسم",
+    "seasonYear": "سنة الموسم",
+    "previewSummary": "سيتم جدولة {{total}} نشاطًا · تم تخطي {{skipped}}.",
+    "noActivitiesForBlock": "لا تُحَل أنشطة لهذا البلوك.",
+    "skippedForBlock": "تم تخطي {{count}} نشاطًا (تعذّر حل المرحلة).",
+    "doneSummary": "تم التطبيق — أُنشئ {{created}} نشاطًا، وتم تخطي {{skipped}}.",
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "next": "التالي",
+    "preview": "معاينة الجدول",
+    "confirm": "تطبيق",
+    "applying": "جارٍ التطبيق…"
+  }
+}

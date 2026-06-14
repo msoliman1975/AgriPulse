@@ -125,6 +125,12 @@ export function SideNav(): ReactNode {
             activePathPrefix="/platform/crops"
           />
           <SideNavItem
+            to="/platform/plan-templates"
+            label={t("nav.planTemplates")}
+            icon={<PlanIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/plan-templates"
+          />
+          <SideNavItem
             to="/platform/admins"
             label={t("nav.platformAdmins")}
             icon={<UsersIcon className="h-4 w-4" />}

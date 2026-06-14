@@ -10,7 +10,7 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,6 +127,172 @@ class PlanTemplatesRepository:
         out["milestones"] = [_milestone_dict(m) for m in milestones]
         out["activities"] = [_activity_dict(a) for a in activities]
         return out
+
+    # ---- Authoring writes (public) ------------------------------------
+
+    async def get_template_by_code(self, *, code: str) -> PlanTemplate | None:
+        return (
+            await self._public.execute(
+                select(PlanTemplate).where(
+                    PlanTemplate.code == code, PlanTemplate.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+
+    async def _crop_id_for_path(self, *, crop_path: str) -> UUID | None:
+        segments = [s for s in crop_path.split(".") if s]
+        if not segments:
+            return None
+        row = (
+            await self._public.execute(
+                text("SELECT id FROM public.crops WHERE code = :c AND deleted_at IS NULL"),
+                {"c": segments[0]},
+            )
+        ).first()
+        return row.id if row is not None else None
+
+    async def _insert_children(
+        self,
+        *,
+        template_id: UUID,
+        milestones: list[dict[str, Any]],
+        activities: list[dict[str, Any]],
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Insert milestones then activities, resolving each milestone-anchored
+        activity's ``milestone_code`` to the freshly-minted milestone id."""
+        code_to_id: dict[str, UUID] = {}
+        for m in milestones:
+            mid = uuid7()
+            code_to_id[m["code"]] = mid
+            self._public.add(
+                PlanTemplateMilestone(
+                    id=mid,
+                    template_id=template_id,
+                    code=m["code"],
+                    name=m["name"],
+                    day_from_start=int(m["day_from_start"]),
+                    sort_order=int(m.get("sort_order", 0)),
+                    created_by=actor_user_id,
+                    updated_by=actor_user_id,
+                )
+            )
+        # Persist milestones before the activities that FK-reference them so the
+        # constraint holds regardless of unit-of-work insert ordering.
+        if milestones:
+            await self._public.flush()
+        for a in activities:
+            milestone_id: UUID | None = None
+            if a.get("anchor") == "milestone":
+                mcode = a.get("milestone_code")
+                if mcode is not None:
+                    milestone_id = code_to_id.get(str(mcode))
+            self._public.add(
+                PlanTemplateActivity(
+                    id=uuid7(),
+                    template_id=template_id,
+                    activity_type=a["activity_type"],
+                    anchor=a["anchor"],
+                    milestone_id=milestone_id,
+                    stage_code=a.get("stage_code") if a.get("anchor") == "stage" else None,
+                    offset_days=int(a.get("offset_days", 0)),
+                    duration_days=int(a.get("duration_days", 1)),
+                    product_name=a.get("product_name"),
+                    dosage=a.get("dosage"),
+                    notes=a.get("notes"),
+                    start_time=a.get("start_time"),
+                    sort_order=int(a.get("sort_order", 0)),
+                    created_by=actor_user_id,
+                    updated_by=actor_user_id,
+                )
+            )
+
+    async def create_full_tree(
+        self,
+        *,
+        header: dict[str, Any],
+        milestones: list[dict[str, Any]],
+        activities: list[dict[str, Any]],
+        actor_user_id: UUID | None,
+    ) -> UUID:
+        template_id = uuid7()
+        crop_id = await self._crop_id_for_path(crop_path=header["crop_path"])
+        self._public.add(
+            PlanTemplate(
+                id=template_id,
+                code=header["code"],
+                name=header["name"],
+                crop_path=header["crop_path"],
+                crop_id=crop_id,
+                country=header.get("country"),
+                region=header.get("region"),
+                description=header.get("description"),
+                status="draft",
+                created_by=actor_user_id,
+                updated_by=actor_user_id,
+            )
+        )
+        await self._insert_children(
+            template_id=template_id,
+            milestones=milestones,
+            activities=activities,
+            actor_user_id=actor_user_id,
+        )
+        await self._public.flush()
+        return template_id
+
+    async def replace_full_tree(
+        self,
+        *,
+        template: PlanTemplate,
+        header: dict[str, Any],
+        milestones: list[dict[str, Any]],
+        activities: list[dict[str, Any]],
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Atomically replace a template's header + children. ``status`` is not
+        touched here (publish/archive are separate transitions)."""
+        await self._public.execute(
+            delete(PlanTemplateActivity).where(PlanTemplateActivity.template_id == template.id)
+        )
+        await self._public.execute(
+            delete(PlanTemplateMilestone).where(PlanTemplateMilestone.template_id == template.id)
+        )
+        template.code = header["code"]
+        template.name = header["name"]
+        template.crop_path = header["crop_path"]
+        template.crop_id = await self._crop_id_for_path(crop_path=header["crop_path"])
+        template.country = header.get("country")
+        template.region = header.get("region")
+        template.description = header.get("description")
+        template.updated_by = actor_user_id
+        await self._public.flush()
+        await self._insert_children(
+            template_id=template.id,
+            milestones=milestones,
+            activities=activities,
+            actor_user_id=actor_user_id,
+        )
+        await self._public.flush()
+
+    async def set_status(
+        self, *, template: PlanTemplate, status: str, actor_user_id: UUID | None
+    ) -> None:
+        template.status = status
+        template.updated_by = actor_user_id
+        await self._public.flush()
+
+    async def soft_delete(self, *, template: PlanTemplate, actor_user_id: UUID | None) -> None:
+        """Retire = archive + stamp ``deleted_at`` so the code frees up."""
+        template.status = "archived"
+        template.updated_by = actor_user_id
+        await self._public.execute(
+            text("UPDATE public.plan_templates SET deleted_at = now() WHERE id = :id").bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True))
+            ),
+            {"id": template.id},
+        )
+        await self._public.flush()
 
     # ---- Catalog phenology resolution (public) ------------------------
 

@@ -1,0 +1,109 @@
+{
+  "list": {
+    "title": "Plan templates",
+    "subtitle": "Platform-curated agriculture plan templates keyed by crop. Tenants apply a published template to their matching-crop blocks.",
+    "newButton": "New template",
+    "filterLabel": "Status",
+    "loadFailed": "Couldn't load plan templates.",
+    "empty": "No plan templates yet.",
+    "col": {
+      "name": "Template",
+      "cropPath": "Crop path",
+      "status": "Status",
+      "updated": "Updated"
+    }
+  },
+  "status": {
+    "all": "All",
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived"
+  },
+  "anchor": {
+    "start": "Start + offset",
+    "milestone": "Milestone",
+    "stage": "Growth stage"
+  },
+  "activityType": {
+    "planting": "Planting",
+    "fertilizing": "Fertilizing",
+    "spraying": "Spraying",
+    "pruning": "Pruning",
+    "harvesting": "Harvesting",
+    "irrigation": "Irrigation",
+    "soil_prep": "Soil prep",
+    "observation": "Observation"
+  },
+  "editor": {
+    "titleNew": "New plan template",
+    "titleEdit": "Edit plan template",
+    "back": "Back",
+    "save": "Save",
+    "saving": "Saving…",
+    "publish": "Publish",
+    "archive": "Archive",
+    "delete": "Delete template",
+    "confirmDelete": "Retire this template? It will be archived and its code freed.",
+    "section": {
+      "header": "Template",
+      "milestones": "Milestones",
+      "activities": "Activities",
+      "timeline": "Timeline preview"
+    },
+    "field": {
+      "name": "Name",
+      "code": "Code",
+      "codeHint": "Permanent unique key. Cannot be changed after creation.",
+      "cropPath": "Crop targeting",
+      "country": "Country (optional)",
+      "region": "Region (optional)",
+      "description": "Description",
+      "dayFromStart": "Day",
+      "activityType": "Activity type",
+      "anchor": "Anchor",
+      "offset": "Offset (days)",
+      "duration": "Duration",
+      "product": "Product (optional)"
+    },
+    "addMilestone": "Add milestone",
+    "noMilestones": "No milestones. Add one to anchor activities to a named day.",
+    "addActivity": "Add activity",
+    "noActivities": "No activities yet.",
+    "remove": "Remove",
+    "pickMilestone": "Pick a milestone…",
+    "pickStage": "Pick a stage…",
+    "noStages": "No phenology stages resolve for this crop path — stage-anchored activities won't schedule.",
+    "timelineEmpty": "Add activities to preview the schedule.",
+    "dayN": "Day {{day}}",
+    "stageAnchored": "Stage-anchored (resolved per block at apply time)",
+    "atStage": "at {{stage}} + {{offset}}d",
+    "err": {
+      "codeRequired": "Code is required.",
+      "nameRequired": "Name is required.",
+      "cropRequired": "Pick a crop targeting path.",
+      "milestoneRequired": "A milestone-anchored activity needs a milestone.",
+      "stageRequired": "A stage-anchored activity needs a stage."
+    }
+  },
+  "apply": {
+    "title": "Apply plan template",
+    "step": "Step {{current}} of {{total}}",
+    "noTemplates": "No published templates match this farm's crops yet.",
+    "matchingBlocks": "{{count}} blocks",
+    "blocksHint": "Matching-crop blocks are pre-selected. Set each block's start date (defaults to its planting date).",
+    "startDate": "Start",
+    "seasonLabel": "Season label",
+    "seasonYear": "Season year",
+    "previewSummary": "{{total}} activities will be scheduled · {{skipped}} skipped.",
+    "noActivitiesForBlock": "No activities resolve for this block.",
+    "skippedForBlock": "{{count}} activity skipped (stage not resolvable).",
+    "doneSummary": "Applied — {{created}} activities created, {{skipped}} skipped.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "preview": "Preview schedule",
+    "confirm": "Apply",
+    "applying": "Applying…"
+  }
+}

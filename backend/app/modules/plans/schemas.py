@@ -115,6 +115,11 @@ class ActivityResponse(BaseModel):
     completed_by: UUID | None
     created_at: datetime
     updated_at: datetime
+    # Provenance (PR-E): manual | template | recommendation. When a row was
+    # materialised from a stage-anchored template activity, anchored_stage_code
+    # carries the phenology stage it was scheduled at.
+    source: str = "manual"
+    anchored_stage_code: str | None = None
 
 
 class CalendarResponse(BaseModel):

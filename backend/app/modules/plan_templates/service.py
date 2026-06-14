@@ -16,8 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.plan_templates.apply import resolve_schedule
-from app.modules.plan_templates.errors import PlanTemplateNotFoundError
+from app.modules.plan_templates.errors import (
+    PlanTemplateConflictError,
+    PlanTemplateNotFoundError,
+    PlanTemplateValidationError,
+)
 from app.modules.plan_templates.repository import PlanTemplatesRepository
+from app.modules.plan_templates.schemas import PlanTemplateWriteRequest
 from app.shared.crop_taxonomy import path_matches
 
 
@@ -49,6 +54,108 @@ class PlanTemplatesService:
         if tree is None:
             raise PlanTemplateNotFoundError(template_id)
         return tree
+
+    async def resolve_phenology(self, *, crop_path: str) -> dict[str, Any]:
+        """Resolved phenology stages for a crop path (deepest-wins). Powers the
+        platform authoring stage-picker so it only offers valid stage codes."""
+        is_perennial, stages = await self._repo.resolve_phenology_for_path(crop_path=crop_path)
+        return {"crop_path": crop_path, "is_perennial": is_perennial, "stages": stages}
+
+    # ---- Authoring (platform; whole-tree write) -----------------------
+
+    async def _validate_tree(self, payload: PlanTemplateWriteRequest) -> None:
+        """Cross-field + stage-existence validation the schema can't express."""
+        milestone_codes = [m.code for m in payload.milestones]
+        if len(milestone_codes) != len(set(milestone_codes)):
+            raise PlanTemplateValidationError(reason="Duplicate milestone codes in template.")
+        milestone_set = set(milestone_codes)
+
+        needs_stages = any(a.anchor == "stage" for a in payload.activities)
+        stage_codes: set[str] = set()
+        if needs_stages:
+            _, stages = await self._repo.resolve_phenology_for_path(crop_path=payload.crop_path)
+            stage_codes = {str(s["code"]) for s in stages if s.get("code")}
+
+        for idx, a in enumerate(payload.activities):
+            if a.anchor == "milestone":
+                if not a.milestone_code:
+                    raise PlanTemplateValidationError(
+                        reason=f"Activity #{idx + 1} anchors to a milestone but has no milestone_code."
+                    )
+                if a.milestone_code not in milestone_set:
+                    raise PlanTemplateValidationError(
+                        reason=f"Activity #{idx + 1} references unknown milestone "
+                        f"{a.milestone_code!r}."
+                    )
+            elif a.anchor == "stage":
+                if not a.stage_code:
+                    raise PlanTemplateValidationError(
+                        reason=f"Activity #{idx + 1} anchors to a stage but has no stage_code."
+                    )
+                if a.stage_code not in stage_codes:
+                    raise PlanTemplateValidationError(
+                        reason=f"Activity #{idx + 1} references stage {a.stage_code!r} which is not "
+                        f"in the resolved phenology for {payload.crop_path!r}."
+                    )
+
+    @staticmethod
+    def _tree_dicts(
+        payload: PlanTemplateWriteRequest,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        milestones = [m.model_dump() for m in payload.milestones]
+        activities = [a.model_dump() for a in payload.activities]
+        return milestones, activities
+
+    async def create_template(
+        self, *, payload: PlanTemplateWriteRequest, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        if await self._repo.get_template_by_code(code=payload.code) is not None:
+            raise PlanTemplateConflictError(code=payload.code)
+        await self._validate_tree(payload)
+        milestones, activities = self._tree_dicts(payload)
+        template_id = await self._repo.create_full_tree(
+            header=payload.model_dump(exclude={"milestones", "activities"}),
+            milestones=milestones,
+            activities=activities,
+            actor_user_id=actor_user_id,
+        )
+        return await self.get_full_tree(template_id=template_id)
+
+    async def update_template(
+        self, *, template_id: UUID, payload: PlanTemplateWriteRequest, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        template = await self._repo.get_template(template_id=template_id)
+        if template is None:
+            raise PlanTemplateNotFoundError(template_id)
+        if template.code != payload.code:
+            clash = await self._repo.get_template_by_code(code=payload.code)
+            if clash is not None and clash.id != template_id:
+                raise PlanTemplateConflictError(code=payload.code)
+        await self._validate_tree(payload)
+        milestones, activities = self._tree_dicts(payload)
+        await self._repo.replace_full_tree(
+            template=template,
+            header=payload.model_dump(exclude={"milestones", "activities"}),
+            milestones=milestones,
+            activities=activities,
+            actor_user_id=actor_user_id,
+        )
+        return await self.get_full_tree(template_id=template_id)
+
+    async def set_status(
+        self, *, template_id: UUID, status: str, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        template = await self._repo.get_template(template_id=template_id)
+        if template is None:
+            raise PlanTemplateNotFoundError(template_id)
+        await self._repo.set_status(template=template, status=status, actor_user_id=actor_user_id)
+        return await self.get_full_tree(template_id=template_id)
+
+    async def delete_template(self, *, template_id: UUID, actor_user_id: UUID | None) -> None:
+        template = await self._repo.get_template(template_id=template_id)
+        if template is None:
+            raise PlanTemplateNotFoundError(template_id)
+        await self._repo.soft_delete(template=template, actor_user_id=actor_user_id)
 
     async def list_appliable(self, *, farm_id: UUID) -> list[dict[str, Any]]:
         """Published templates that match at least one of the farm's current

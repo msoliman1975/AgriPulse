@@ -54,6 +54,8 @@ import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
+import { PlatformPlanTemplatesPage } from "@/modules/admin/pages/PlatformPlanTemplatesPage";
+import { PlanTemplateEditorPage } from "@/modules/admin/pages/PlanTemplateEditorPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
 import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
 import { PlatformHealthTenantDrillPage } from "@/modules/admin/pages/PlatformHealthTenantDrillPage";
@@ -262,6 +264,9 @@ export function App(): ReactNode {
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
+                <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
+                <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
+                <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
                 <Route
