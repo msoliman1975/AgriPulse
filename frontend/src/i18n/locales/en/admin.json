@@ -4,6 +4,7 @@
     "tenants": "Tenants",
     "defaults": "Platform defaults",
     "crops": "Crop catalog",
+    "planTemplates": "Plan templates",
     "platformAdmins": "Platform admins",
     "platformHealth": "Integration health"
   },
