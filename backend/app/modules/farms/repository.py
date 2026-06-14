@@ -1016,6 +1016,27 @@ class FarmsRepository:
             )
         ).scalar_one_or_none()
 
+    async def list_block_crops_for_advance(self) -> list[BlockCrop]:
+        """Current, non-locked, live block_crops eligible for phenology
+        auto-advance: ``is_current`` + not deleted + lock off + a crop path
+        set + an in-progress lifecycle status."""
+        rows = (
+            (
+                await self._tenant.execute(
+                    select(BlockCrop).where(
+                        BlockCrop.is_current.is_(True),
+                        BlockCrop.deleted_at.is_(None),
+                        BlockCrop.growth_stage_locked.is_(False),
+                        BlockCrop.crop_path != "",
+                        BlockCrop.status.notin_(("completed", "aborted")),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return list(rows)
+
     async def update_block_crop(
         self, *, bc: BlockCrop, fields: dict[str, Any], actor_user_id: UUID | None
     ) -> dict[str, Any]:

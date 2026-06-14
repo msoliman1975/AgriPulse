@@ -22,6 +22,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.farm_scope_consistency_check_seconds),
         "options": {"queue": "light"},
     },
+    # Phenology auto-advance: per-tenant daily sweep that moves each
+    # eligible block to its calendar/age-derived growth_stage (writes
+    # GrowthStageLog source='derived'). Locked blocks are skipped; the
+    # recommendation engine reads the resulting stage unchanged.
+    "phenology.advance_growth_stages": {
+        "task": "phenology.advance_growth_stages",
+        "schedule": float(_settings.phenology_advance_seconds),
+        "options": {"queue": "light"},
+    },
     # IH-6: DB -> Keycloak reconciler. Re-asserts each provisioned user's
     # enabled flag + tenant_id/tenant_role attributes from the DB so a
     # role flipped in the DB, a suspended membership, or a soft-deleted

@@ -27,6 +27,8 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.indices.tasks",
     "app.modules.weather.tasks",
     "app.modules.farms.tasks",
+    # Phenology auto-advance sweep (writes growth_stage source='derived').
+    "app.modules.farms.phenology_tasks",
     # IH-6: periodic DB -> Keycloak reconciler.
     "app.modules.iam.tasks",
     # Stage 2 of the rules sunset deleted `alerts.tasks`. Trees own
