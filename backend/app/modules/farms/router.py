@@ -68,6 +68,7 @@ from app.modules.farms.schemas import (
     GrowthStageTransitionRequest,
     PivotCreateRequest,
     PivotCreateResponse,
+    ResolvedTaxonomyResponse,
 )
 from app.modules.farms.service import FarmService, get_farm_service
 from app.shared.auth.context import RequestContext
@@ -1133,6 +1134,20 @@ async def list_variety_strains(
     return await service.list_variety_strains(crop_variety_id=crop_variety_id)
 
 
+@router.get(
+    "/crops/resolved-taxonomy",
+    response_model=ResolvedTaxonomyResponse,
+    summary="Resolve phenology stages + canopy size classes (deepest-wins) for a crop path.",
+)
+async def get_resolved_taxonomy(
+    crop_path: str = Query(min_length=1),
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.get_resolved_taxonomy(crop_path=crop_path)
+
+
 # ---------- Crop catalog authoring (platform-only) -------------------------
 #
 # Mounted under /admin like the other platform-curated surfaces. Reads allow
@@ -1222,6 +1237,11 @@ async def admin_create_variety(
         code=payload.code,
         name_en=payload.name_en,
         name_ar=payload.name_ar,
+        overrides={
+            "default_thresholds": payload.default_thresholds,
+            "phenology_stages_override": payload.phenology_stages_override,
+            "size_classes_override": payload.size_classes_override,
+        },
         actor_user_id=context.user_id,
     )
 
@@ -1278,6 +1298,11 @@ async def admin_create_strain(
         code=payload.code,
         name_en=payload.name_en,
         name_ar=payload.name_ar,
+        overrides={
+            "default_thresholds": payload.default_thresholds,
+            "phenology_stages_override": payload.phenology_stages_override,
+            "size_classes_override": payload.size_classes_override,
+        },
         actor_user_id=context.user_id,
     )
 

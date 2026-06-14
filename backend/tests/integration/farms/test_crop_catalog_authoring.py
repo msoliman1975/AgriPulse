@@ -108,6 +108,80 @@ async def test_full_catalog_authoring_roundtrip() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_crop_with_phenology_and_size_classes() -> None:
+    code = f"mango-{uuid4().hex[:6]}"
+    async with _platform_client() as client:
+        r = await client.post(
+            "/api/v1/admin/crops",
+            json={
+                "code": code,
+                "name_en": "Mango",
+                "name_ar": "مانجو",
+                "category": "fruit_tree",
+                "is_perennial": True,
+                "classification_depth": "variety",
+                "phenology_stages": {
+                    "stages": [
+                        {
+                            "code": "pre_flowering",
+                            "name_en": "Pre-flowering",
+                            "name_ar": "ما قبل التزهير",
+                            "order": 1,
+                            "advance": {
+                                "mode": "calendar_doy",
+                                "start_doy": "12-01",
+                                "end_doy": "01-31",
+                            },
+                        }
+                    ]
+                },
+                "size_classes": {
+                    "classes": [
+                        {"code": "small", "name_en": "Small", "name_ar": "صغير", "order": 1},
+                        {"code": "large", "name_en": "Large", "name_ar": "كبير", "order": 2},
+                    ]
+                },
+            },
+        )
+        assert r.status_code == 201, r.text
+        crop = r.json()
+        assert crop["phenology_stages"]["stages"][0]["code"] == "pre_flowering"
+        assert len(crop["size_classes"]["classes"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_create_perennial_crop_rejects_days_from_planting() -> None:
+    code = f"mango-{uuid4().hex[:6]}"
+    async with _platform_client() as client:
+        r = await client.post(
+            "/api/v1/admin/crops",
+            json={
+                "code": code,
+                "name_en": "Mango",
+                "name_ar": "مانجو",
+                "category": "fruit_tree",
+                "is_perennial": True,
+                "phenology_stages": {
+                    "stages": [
+                        {
+                            "code": "veg",
+                            "name_en": "Veg",
+                            "name_ar": "خضري",
+                            "order": 1,
+                            "advance": {
+                                "mode": "days_from_planting",
+                                "start_day": 0,
+                                "end_day": 40,
+                            },
+                        }
+                    ]
+                },
+            },
+        )
+        assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
 async def test_create_variety_on_missing_crop_404() -> None:
     async with _platform_client() as client:
         r = await client.post(

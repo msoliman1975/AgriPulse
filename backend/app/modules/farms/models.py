@@ -57,6 +57,9 @@ class Crop(Base, TimestampedMixin):
     # Platform-curated rule thresholds inherited by every variety —
     # see `app.modules.farms.crop_thresholds.resolve` for merge rules.
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Canopy size-class lookup ``{"classes": [{code, name_en, name_ar, order}]}``.
+    # Resolved deepest-wins like phenology; surfaced as the block size dropdown.
+    size_classes: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
     # How deep a block assignment for this crop is classified, and thus
     # how deep its canonical path goes:
@@ -98,6 +101,7 @@ class CropVariety(Base, TimestampedMixin):
     # merge keywise.
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    size_classes_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -132,6 +136,7 @@ class CropVarietyStrain(Base, TimestampedMixin):
     )
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    size_classes_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 

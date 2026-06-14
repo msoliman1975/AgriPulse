@@ -96,6 +96,19 @@ class CropCatalogConflictError(APIError):
         )
 
 
+class CropCatalogValidationError(APIError):
+    """A ``phenology_stages`` / ``size_classes`` payload has a bad shape or a
+    mode that doesn't fit the crop's cycle (perennial vs annual). 422."""
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid crop catalog payload",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/crop-catalog-validation",
+        )
+
+
 class FarmCodeConflictError(APIError):
     def __init__(self, code: str) -> None:
         super().__init__(

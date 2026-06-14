@@ -851,6 +851,41 @@ class FarmsRepository:
             )
         ).scalar_one_or_none()
 
+    async def resolve_taxonomy_by_path(
+        self, *, crop_path: str
+    ) -> tuple[Crop | None, CropVariety | None, CropVarietyStrain | None]:
+        """Walk a ``<crop>[.<variety>[.<strain>]]`` path to its catalog rows.
+
+        Returns ``(crop, variety, strain)`` with ``None`` for any level the
+        path doesn't reach or that isn't found.
+        """
+        segments = [s for s in crop_path.split(".") if s]
+        if not segments:
+            return None, None, None
+        crop = (
+            await self._public.execute(select(Crop).where(Crop.code == segments[0]))
+        ).scalar_one_or_none()
+        if crop is None or len(segments) == 1:
+            return crop, None, None
+        variety = (
+            await self._public.execute(
+                select(CropVariety).where(
+                    CropVariety.crop_id == crop.id, CropVariety.code == segments[1]
+                )
+            )
+        ).scalar_one_or_none()
+        if variety is None or len(segments) == 2:
+            return crop, variety, None
+        strain = (
+            await self._public.execute(
+                select(CropVarietyStrain).where(
+                    CropVarietyStrain.crop_variety_id == variety.id,
+                    CropVarietyStrain.code == segments[2],
+                )
+            )
+        ).scalar_one_or_none()
+        return crop, variety, strain
+
     async def crop_code_exists(self, *, code: str) -> bool:
         return (
             await self._public.execute(select(Crop.id).where(Crop.code == code))
@@ -890,14 +925,25 @@ class FarmsRepository:
         return _crop_dict(crop)
 
     async def create_variety(
-        self, *, crop_id: UUID, crop_code: str, code: str, name_en: str, name_ar: str | None
+        self,
+        *,
+        crop_id: UUID,
+        crop_code: str,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        overrides = overrides or {}
         row = CropVariety(
             crop_id=crop_id,
             code=code,
             name_en=name_en,
             name_ar=name_ar,
             path=f"{crop_code}.{code}",
+            default_thresholds=overrides.get("default_thresholds"),
+            phenology_stages_override=overrides.get("phenology_stages_override"),
+            size_classes_override=overrides.get("size_classes_override"),
         )
         self._public.add(row)
         await self._public.flush()
@@ -921,13 +967,18 @@ class FarmsRepository:
         code: str,
         name_en: str,
         name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        overrides = overrides or {}
         row = CropVarietyStrain(
             crop_variety_id=crop_variety_id,
             code=code,
             name_en=name_en,
             name_ar=name_ar,
             path=f"{variety_path}.{code}",
+            default_thresholds=overrides.get("default_thresholds"),
+            phenology_stages_override=overrides.get("phenology_stages_override"),
+            size_classes_override=overrides.get("size_classes_override"),
         )
         self._public.add(row)
         await self._public.flush()
@@ -1582,6 +1633,7 @@ def _crop_dict(r: Crop) -> dict[str, Any]:
         "relevant_indices": list(r.relevant_indices or []),
         "phenology_stages": r.phenology_stages,
         "default_thresholds": r.default_thresholds,
+        "size_classes": r.size_classes,
         "classification_depth": r.classification_depth,
         "is_active": r.is_active,
     }
@@ -1598,6 +1650,7 @@ def _variety_dict(r: CropVariety) -> dict[str, Any]:
         "attributes": dict(r.attributes or {}),
         "default_thresholds": r.default_thresholds,
         "phenology_stages_override": r.phenology_stages_override,
+        "size_classes_override": r.size_classes_override,
         "is_active": r.is_active,
     }
 
@@ -1613,6 +1666,7 @@ def _strain_dict(r: CropVarietyStrain) -> dict[str, Any]:
         "attributes": dict(r.attributes or {}),
         "default_thresholds": r.default_thresholds,
         "phenology_stages_override": r.phenology_stages_override,
+        "size_classes_override": r.size_classes_override,
         "is_active": r.is_active,
     }
 
