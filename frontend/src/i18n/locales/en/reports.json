@@ -1,0 +1,168 @@
+{
+  "title": "Reports",
+  "subtitle": "Standard farm-management and vegetation reports for the selected farm.",
+  "pickFarm": "Pick a farm to view its reports.",
+  "empty": "No reports are available for this farm yet.",
+  "selectorLabel": "Select a report",
+  "range": {
+    "from": "From",
+    "to": "To",
+    "last30": "Last 30 days",
+    "last90": "Last 90 days"
+  },
+  "shell": {
+    "period": "{{from}} – {{to}}",
+    "exportCsv": "Export CSV",
+    "print": "Print / Save PDF"
+  },
+  "loadFailed": "Couldn't load this report. Try again.",
+  "catalog": {
+    "crop-health": {
+      "title": "Crop Health",
+      "description": "Per-block vegetation index summary vs the historical baseline."
+    },
+    "zone-anomaly": {
+      "title": "Field Variability",
+      "description": "Within-block grid cells that deviate from the block average."
+    },
+    "water-balance": {
+      "title": "Water Balance",
+      "description": "ET₀ and rainfall vs recommended and applied irrigation per block."
+    },
+    "weather-summary": {
+      "title": "Weather & GDD",
+      "description": "Temperature, rainfall, ET₀ and growing-degree-day accumulation."
+    },
+    "operations-log": {
+      "title": "Operations Log",
+      "description": "Activities, alerts and recommendations across the period."
+    }
+  },
+  "cropHealth": {
+    "index": "Index",
+    "empty": "No imagery in this period for the selected farm.",
+    "coverage": "{{withData}} of {{total}} blocks with imagery",
+    "status": {
+      "normal": "Normal",
+      "watch": "Watch",
+      "stressed": "Stressed",
+      "unknown": "No data"
+    },
+    "headers": {
+      "block": "Block",
+      "crop": "Crop",
+      "status": "Status",
+      "last": "latest",
+      "observed": "Observed",
+      "z": "Baseline z",
+      "trend": "Trend",
+      "min": "Min",
+      "max": "Max",
+      "valid": "Valid px",
+      "cloud": "Cloud",
+      "scenes": "Scenes"
+    }
+  },
+  "zoneAnomaly": {
+    "empty": "No grid data in this period for the selected farm.",
+    "status": {
+      "anomalies": "Anomalies",
+      "clear": "Clear",
+      "insufficient": "Insufficient",
+      "no_data": "No recent scene",
+      "no_grid": "No grid"
+    },
+    "summary": {
+      "blocksFlagged": "blocks with anomalies",
+      "cells": "flagged cells",
+      "hectares": "ha flagged",
+      "coverage": "{{withGrid}} of {{total}} blocks gridded"
+    },
+    "headers": {
+      "block": "Block",
+      "status": "Status",
+      "scene": "Scene",
+      "cells": "Cells",
+      "flagged": "Flagged",
+      "area": "Area",
+      "worstZ": "Worst z",
+      "mean": "Mean",
+      "std": "Std",
+      "meanStd": "Mean ± Std",
+      "threshold": "Threshold k"
+    }
+  },
+  "waterBalance": {
+    "empty": "No irrigation or weather data in this period for the selected farm.",
+    "cards": {
+      "et0": "ET₀ demand",
+      "rain": "Rainfall",
+      "applied": "Irrigation applied",
+      "recommended": "Recommended"
+    },
+    "headers": {
+      "block": "Block",
+      "scheduled": "Scheduled",
+      "applied": "Applied",
+      "skipped": "Skipped",
+      "pending": "Pending",
+      "recommended": "Recommended",
+      "appliedMm": "Applied mm",
+      "adherence": "Adherence",
+      "last": "Last"
+    }
+  },
+  "weatherSummary": {
+    "empty": "No weather data in this period for the selected farm.",
+    "base": "base",
+    "days": "days",
+    "cards": {
+      "tempRange": "Temp range",
+      "rain": "Rainfall",
+      "et0": "ET₀ total",
+      "gddCum": "GDD season"
+    },
+    "charts": {
+      "tempPrecip": "Temperature & rainfall",
+      "gdd": "GDD accumulation (base 10°C)"
+    },
+    "series": {
+      "tmax": "Max temp",
+      "tmin": "Min temp",
+      "precip": "Rain",
+      "gddCum": "Cumulative GDD"
+    },
+    "headers": {
+      "date": "Date",
+      "tmin": "Min °C",
+      "tmax": "Max °C",
+      "tmean": "Mean °C",
+      "precip": "Rain mm",
+      "et0": "ET₀ mm",
+      "gdd": "GDD",
+      "gddCum": "GDD cumulative"
+    }
+  },
+  "opsLog": {
+    "empty": "No activities, alerts or recommendations in this period.",
+    "kind": {
+      "activity": "Activity",
+      "alert": "Alert",
+      "recommendation": "Recommendation"
+    },
+    "summary": {
+      "activities": "{{total}} total · {{done}} done · {{skipped}} skipped",
+      "alerts": "{{opened}} opened · {{resolved}} resolved",
+      "recommendations": "{{total}} raised · {{applied}} applied · {{dismissed}} dismissed"
+    },
+    "headers": {
+      "date": "Date",
+      "type": "Type",
+      "block": "Block",
+      "title": "Detail",
+      "status": "Status",
+      "severity": "Severity",
+      "detail": "Notes"
+    }
+  }
+}

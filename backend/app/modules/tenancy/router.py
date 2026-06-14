@@ -41,7 +41,7 @@ from app.modules.tenancy.service import (
 )
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session
-from app.shared.keycloak import KeycloakNotConfiguredError
+from app.shared.keycloak import KeycloakError, KeycloakNotConfiguredError
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1/admin/tenants", tags=["admin-tenants"])
@@ -162,6 +162,18 @@ async def retry_provisioning(
             title="Keycloak provisioning disabled",
             detail=str(exc),
             type_="https://agripulse.cloud/problems/keycloak-not-configured",
+        ) from exc
+    except KeycloakError as exc:
+        # Keycloak reachable but the call failed (e.g. bad service-account
+        # credentials, missing role, transient 5xx). The tenant stays in
+        # `pending_provision` — surface a readable 502 instead of letting
+        # the raw error escape as a CORS-less 500 (which the SPA reports
+        # as an opaque "Network Error").
+        raise APIError(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            title="Keycloak provisioning failed",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/keycloak-provisioning-failed",
         ) from exc
     return _detail(snapshot)
 

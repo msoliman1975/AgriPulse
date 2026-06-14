@@ -53,6 +53,12 @@ externalSecrets:
 # api image (Python + httpx + scripts/dev_bootstrap.py already there).
 promoteBootstrap:
   enabled: true
+  # When true (default), any failing promote step (or Keycloak being
+  # unreachable) fails the PostSync hook — surfaces the problem loudly on
+  # a fresh deploy. Set false on adopted / single-node clusters where a
+  # failed hook blocking the keycloak sync is worse than a logged warning;
+  # the scripts are idempotent, so the next sync retries.
+  failOnError: true
   # In-cluster URL the scripts hit. The bitnami chart's Service name is
   # `keycloak-dev` per ArgoCD App `keycloak-dev`. Override per overlay
   # if the App name changes.

@@ -96,3 +96,39 @@
     margin-block-end: theme("spacing.1");
   }
 }
+
+/*
+ * Print-to-PDF support for the Reports surface. A report wraps its
+ * printable content in `.report-print-area`; everything else on the
+ * page (side-nav, top-bar, the report selector, export buttons) is
+ * hidden so the browser's "Save as PDF" emits just the report. The
+ * visibility trick hides all descendants then re-shows the print area,
+ * so it works regardless of the app-shell DOM structure. Controls
+ * inside the print area opt out with `.print-hide`.
+ */
+@media print {
+  body {
+    background-color: #ffffff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .report-print-area,
+  .report-print-area * {
+    visibility: visible;
+  }
+
+  .report-print-area {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+}
