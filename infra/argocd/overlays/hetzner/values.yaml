@@ -13,24 +13,22 @@ global:
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
-  # promotion — NOT auto-bumped like dev). 88d9e7b = PR #229 (crop-catalog UX:
-  # 5571e3b = phenology-spine Track B+C+D on top of Track A:
-  #   #236 block canopy_size_class + growth_stage_locked (tenant migration 0040)
-  #   #237 soil + canopy size exposed to the rules engine
-  #   #238 phenology auto-advance Beat task (writes growth_stage source='derived')
-  #   #239 mango decision trees (NDMI/NDRE/SAVI + stress induction)
-  # Tenant migration 0040 runs via the PreSync migrate_tenants job.
+  # promotion — NOT auto-bumped like dev).
+  # 2b17ae0 = plan-templates Track E (PR #242, E1..E5) on top of Track A-D:
+  #   E1/E2 catalog + apply engine (public migration 0034, tenant 0041)
+  #   E3 platform authoring API + /platform/plan-templates UI
+  #   E4 tenant apply wizard + board badges (source/anchored_stage_code)
+  #   E5 seed mango-season-eg template (public migration 0035)
+  # Public migrations 0034/0035 + tenant 0041 run via the PreSync migrate jobs.
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "5571e3b"
+      tag: "2b17ae0"
     workers:
-      tag: "5571e3b"
+      tag: "2b17ae0"
     frontend:
-      # d49810c = PR #235 (CropPicker strain-less-variety message) — #236 on top
-      # is backend-only so frontend@d49810c == the #235 frontend. Frontend-only —
-      # api/workers stay on their own (phenology) promotion.
-      tag: "d49810c"
+      # 2b17ae0 = Track E frontend (authoring UI + apply wizard + board badges).
+      tag: "2b17ae0"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
