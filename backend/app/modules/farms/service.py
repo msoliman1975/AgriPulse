@@ -21,9 +21,14 @@ from app.modules.farms import auto_grid as _auto_grid
 from app.modules.farms import cascade as _cascade
 from app.modules.farms import geometry as _geometry
 from app.modules.farms import pivot_geometry as _pivot_geometry
+from app.modules.farms.crop_thresholds import (
+    resolve_phenology_stages,
+    resolve_size_classes,
+)
 from app.modules.farms.errors import (
     BlockNotFoundError,
     CropCatalogConflictError,
+    CropCatalogValidationError,
     CropNotFoundError,
     CropStrainNotFoundError,
     CropVarietyNotFoundError,
@@ -48,6 +53,10 @@ from app.modules.farms.events import (
     FarmMemberRevokedV1,
     FarmReactivatedV1,
     FarmUpdatedV1,
+)
+from app.modules.farms.phenology import (
+    validate_phenology_payload,
+    validate_size_classes_payload,
 )
 from app.modules.farms.repository import FarmsRepository
 from app.shared.db.ids import uuid7
@@ -415,6 +424,8 @@ class FarmService(Protocol):
 
     async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]: ...
 
+    async def get_resolved_taxonomy(self, *, crop_path: str) -> dict[str, Any]: ...
+
     # ---- Crop catalog authoring (platform-only) -----------------------
 
     async def list_crops_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]: ...
@@ -442,6 +453,7 @@ class FarmService(Protocol):
         code: str,
         name_en: str,
         name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]: ...
 
@@ -456,6 +468,7 @@ class FarmService(Protocol):
         code: str,
         name_en: str,
         name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]: ...
 
@@ -1833,6 +1846,33 @@ class FarmServiceImpl:
     async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_variety_strains(crop_variety_id=crop_variety_id)
 
+    async def get_resolved_taxonomy(self, *, crop_path: str) -> dict[str, Any]:
+        """Resolve phenology + size classes (deepest-wins) for a crop path.
+
+        ``crop_path`` is ``<crop>`` / ``<crop>.<variety>`` /
+        ``<crop>.<variety>.<strain>``. Missing levels just don't contribute
+        an override. Raises ``CropNotFoundError`` if the crop segment is
+        unknown.
+        """
+        crop, variety, strain = await self._repo.resolve_taxonomy_by_path(crop_path=crop_path)
+        if crop is None:
+            raise CropNotFoundError(crop_path)  # type: ignore[arg-type]
+        phenology = resolve_phenology_stages(
+            crop_stages=crop.phenology_stages,
+            variety_override=variety.phenology_stages_override if variety else None,
+            strain_override=strain.phenology_stages_override if strain else None,
+        )
+        size_classes = resolve_size_classes(
+            crop_classes=crop.size_classes,
+            variety_override=variety.size_classes_override if variety else None,
+            strain_override=strain.size_classes_override if strain else None,
+        )
+        return {
+            "crop_path": crop_path,
+            "phenology_stages": phenology,
+            "size_classes": size_classes,
+        }
+
     # ---- Crop catalog authoring (platform-only) -----------------------
 
     async def _audit_catalog(
@@ -1880,6 +1920,12 @@ class FarmServiceImpl:
         self, *, fields: dict[str, Any], actor_user_id: UUID | None
     ) -> dict[str, Any]:
         code = fields["code"]
+        _validate_catalog_payloads(
+            phenology=fields.get("phenology_stages"),
+            size_classes=fields.get("size_classes"),
+            is_perennial=bool(fields.get("is_perennial", False)),
+            has_gdd_base=fields.get("gdd_base_temp_c") is not None,
+        )
         if await self._repo.crop_code_exists(code=code):
             raise CropCatalogConflictError(level="crop", code=code)
         out = await self._repo.create_crop(fields=fields)
@@ -1898,6 +1944,14 @@ class FarmServiceImpl:
         crop = await self._repo.get_crop(crop_id=crop_id)
         if crop is None:
             raise CropNotFoundError(crop_id)
+        is_perennial = fields.get("is_perennial", crop.is_perennial)
+        gdd_base = fields.get("gdd_base_temp_c", crop.gdd_base_temp_c)
+        _validate_catalog_payloads(
+            phenology=fields.get("phenology_stages"),
+            size_classes=fields.get("size_classes"),
+            is_perennial=bool(is_perennial),
+            has_gdd_base=gdd_base is not None,
+        )
         out = await self._repo.update_crop(crop=crop, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_updated",
@@ -1915,15 +1969,28 @@ class FarmServiceImpl:
         code: str,
         name_en: str,
         name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         crop = await self._repo.get_crop(crop_id=crop_id)
         if crop is None:
             raise CropNotFoundError(crop_id)
+        overrides = overrides or {}
+        _validate_catalog_payloads(
+            phenology=overrides.get("phenology_stages_override"),
+            size_classes=overrides.get("size_classes_override"),
+            is_perennial=crop.is_perennial,
+            has_gdd_base=crop.gdd_base_temp_c is not None,
+        )
         if await self._repo.variety_code_exists(crop_id=crop_id, code=code):
             raise CropCatalogConflictError(level="variety", code=code)
         out = await self._repo.create_variety(
-            crop_id=crop_id, crop_code=crop.code, code=code, name_en=name_en, name_ar=name_ar
+            crop_id=crop_id,
+            crop_code=crop.code,
+            code=code,
+            name_en=name_en,
+            name_ar=name_ar,
+            overrides=overrides,
         )
         await self._audit_catalog(
             event_type="farms.crop_variety_created",
@@ -1940,6 +2007,13 @@ class FarmServiceImpl:
         variety = await self._repo.get_variety(variety_id=variety_id)
         if variety is None:
             raise CropVarietyNotFoundError(variety_id)
+        crop = await self._repo.get_crop(crop_id=variety.crop_id)
+        _validate_catalog_payloads(
+            phenology=fields.get("phenology_stages_override"),
+            size_classes=fields.get("size_classes_override"),
+            is_perennial=bool(crop.is_perennial) if crop else False,
+            has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
+        )
         out = await self._repo.update_variety(variety=variety, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_variety_updated",
@@ -1957,11 +2031,20 @@ class FarmServiceImpl:
         code: str,
         name_en: str,
         name_ar: str | None,
+        overrides: dict[str, Any] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         variety = await self._repo.get_variety(variety_id=crop_variety_id)
         if variety is None:
             raise CropVarietyNotFoundError(crop_variety_id)
+        overrides = overrides or {}
+        crop = await self._repo.get_crop(crop_id=variety.crop_id)
+        _validate_catalog_payloads(
+            phenology=overrides.get("phenology_stages_override"),
+            size_classes=overrides.get("size_classes_override"),
+            is_perennial=bool(crop.is_perennial) if crop else False,
+            has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
+        )
         if await self._repo.strain_code_exists(crop_variety_id=crop_variety_id, code=code):
             raise CropCatalogConflictError(level="strain", code=code)
         out = await self._repo.create_strain(
@@ -1970,6 +2053,7 @@ class FarmServiceImpl:
             code=code,
             name_en=name_en,
             name_ar=name_ar,
+            overrides=overrides,
         )
         await self._audit_catalog(
             event_type="farms.crop_strain_created",
@@ -1986,6 +2070,14 @@ class FarmServiceImpl:
         strain = await self._repo.get_strain(strain_id=strain_id)
         if strain is None:
             raise CropStrainNotFoundError(strain_id)
+        variety = await self._repo.get_variety(variety_id=strain.crop_variety_id)
+        crop = await self._repo.get_crop(crop_id=variety.crop_id) if variety is not None else None
+        _validate_catalog_payloads(
+            phenology=fields.get("phenology_stages_override"),
+            size_classes=fields.get("size_classes_override"),
+            is_perennial=bool(crop.is_perennial) if crop else False,
+            has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
+        )
         out = await self._repo.update_strain(strain=strain, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_strain_updated",
@@ -1995,6 +2087,28 @@ class FarmServiceImpl:
             details={"fields": sorted(fields.keys())},
         )
         return out
+
+
+def _validate_catalog_payloads(
+    *,
+    phenology: dict[str, Any] | None,
+    size_classes: dict[str, Any] | None,
+    is_perennial: bool,
+    has_gdd_base: bool,
+) -> None:
+    """Shape-validate phenology + size-class payloads, mapping failures to 422.
+
+    Skips a payload when it is ``None`` (not being set / being cleared).
+    """
+    try:
+        if phenology is not None:
+            validate_phenology_payload(
+                phenology, is_perennial=is_perennial, has_gdd_base=has_gdd_base
+            )
+        if size_classes is not None:
+            validate_size_classes_payload(size_classes)
+    except ValueError as exc:  # pydantic.ValidationError is a ValueError
+        raise CropCatalogValidationError(reason=str(exc)) from exc
 
 
 def _geo_point_to_ewkt(geo_point: dict[str, Any] | None) -> str | None:

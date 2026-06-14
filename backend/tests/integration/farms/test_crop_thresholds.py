@@ -18,7 +18,15 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.farms.crop_thresholds import resolve_phenology_stages, resolve_thresholds
+from app.modules.farms.crop_thresholds import (
+    resolve_phenology_stages,
+    resolve_size_classes,
+    resolve_thresholds,
+)
+from app.modules.farms.phenology import (
+    validate_phenology_payload,
+    validate_size_classes_payload,
+)
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import TenantRole
 
@@ -130,6 +138,156 @@ def test_resolve_phenology_falls_back_to_variety_when_strain_null() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Size-class resolution (mirrors phenology: wholesale deepest-wins)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_size_classes_strain_wins() -> None:
+    crop = {"classes": [{"code": "small", "name_en": "S", "name_ar": "ص", "order": 1}]}
+    variety = {"classes": [{"code": "medium", "name_en": "M", "name_ar": "م", "order": 1}]}
+    strain = {"classes": [{"code": "large", "name_en": "L", "name_ar": "ك", "order": 1}]}
+    assert (
+        resolve_size_classes(crop_classes=crop, variety_override=variety, strain_override=strain)
+        is strain
+    )
+
+
+def test_resolve_size_classes_falls_back_to_crop() -> None:
+    crop = {"classes": [{"code": "small", "name_en": "S", "name_ar": "ص", "order": 1}]}
+    assert (
+        resolve_size_classes(crop_classes=crop, variety_override=None, strain_override=None) is crop
+    )
+
+
+def test_resolve_size_classes_none_when_absent() -> None:
+    assert resolve_size_classes(crop_classes=None, variety_override=None) is None
+
+
+# ---------------------------------------------------------------------------
+# Phenology / size-class shape validation
+# ---------------------------------------------------------------------------
+
+_PERENNIAL_STAGES = {
+    "stages": [
+        {
+            "code": "pre_flowering",
+            "name_en": "Pre-flowering",
+            "name_ar": "ما قبل التزهير",
+            "order": 1,
+            "advance": {"mode": "calendar_doy", "start_doy": "12-01", "end_doy": "01-31"},
+        }
+    ]
+}
+
+_ANNUAL_STAGES = {
+    "stages": [
+        {
+            "code": "vegetative",
+            "name_en": "Vegetative",
+            "name_ar": "نمو خضري",
+            "order": 1,
+            "advance": {"mode": "days_from_planting", "start_day": 0, "end_day": 40},
+        }
+    ]
+}
+
+
+def test_validate_phenology_perennial_calendar_ok() -> None:
+    out = validate_phenology_payload(_PERENNIAL_STAGES, is_perennial=True, has_gdd_base=False)
+    assert out.stages[0].advance.mode == "calendar_doy"
+
+
+def test_validate_phenology_annual_days_ok() -> None:
+    out = validate_phenology_payload(_ANNUAL_STAGES, is_perennial=False, has_gdd_base=False)
+    assert out.stages[0].advance.mode == "days_from_planting"
+
+
+def test_validate_phenology_perennial_rejects_days_mode() -> None:
+    with pytest.raises(ValueError, match="not allowed"):
+        validate_phenology_payload(_ANNUAL_STAGES, is_perennial=True, has_gdd_base=False)
+
+
+def test_validate_phenology_annual_rejects_calendar_doy() -> None:
+    with pytest.raises(ValueError, match="not allowed"):
+        validate_phenology_payload(_PERENNIAL_STAGES, is_perennial=False, has_gdd_base=False)
+
+
+def test_validate_phenology_gdd_requires_base() -> None:
+    gdd = {
+        "stages": [
+            {
+                "code": "veg",
+                "name_en": "Veg",
+                "name_ar": "خضري",
+                "order": 1,
+                "advance": {"mode": "gdd_from_planting", "start_gdd": 0, "end_gdd": 500},
+            }
+        ]
+    }
+    with pytest.raises(ValueError, match="gdd_base_temp_c"):
+        validate_phenology_payload(gdd, is_perennial=False, has_gdd_base=False)
+    # With a base temp it passes.
+    assert validate_phenology_payload(gdd, is_perennial=False, has_gdd_base=True)
+
+
+def test_validate_phenology_rejects_duplicate_codes() -> None:
+    dup = {
+        "stages": [
+            {
+                "code": "veg",
+                "name_en": "A",
+                "name_ar": "أ",
+                "order": 1,
+                "advance": {"mode": "manual"},
+            },
+            {
+                "code": "veg",
+                "name_en": "B",
+                "name_ar": "ب",
+                "order": 2,
+                "advance": {"mode": "manual"},
+            },
+        ]
+    }
+    with pytest.raises(ValueError, match="unique"):
+        validate_phenology_payload(dup, is_perennial=True, has_gdd_base=False)
+
+
+def test_validate_phenology_rejects_bad_doy() -> None:
+    bad = {
+        "stages": [
+            {
+                "code": "x",
+                "name_en": "X",
+                "name_ar": "س",
+                "order": 1,
+                "advance": {"mode": "calendar_doy", "start_doy": "13-40", "end_doy": "01-31"},
+            }
+        ]
+    }
+    with pytest.raises(ValueError, match="MM-DD"):
+        validate_phenology_payload(bad, is_perennial=True, has_gdd_base=False)
+
+
+def test_validate_size_classes_ok_and_dup_rejected() -> None:
+    ok = {
+        "classes": [
+            {"code": "small", "name_en": "S", "name_ar": "ص", "order": 1},
+            {"code": "large", "name_en": "L", "name_ar": "ك", "order": 2},
+        ]
+    }
+    assert validate_size_classes_payload(ok)
+    dup = {
+        "classes": [
+            {"code": "small", "name_en": "S", "name_ar": "ص", "order": 1},
+            {"code": "small", "name_en": "S2", "name_ar": "ص٢", "order": 2},
+        ]
+    }
+    with pytest.raises(ValueError, match="unique"):
+        validate_size_classes_payload(dup)
+
+
+# ---------------------------------------------------------------------------
 # Catalog endpoints expose the new fields
 # ---------------------------------------------------------------------------
 
@@ -219,3 +377,80 @@ async def test_crops_catalog_exposes_thresholds(admin_session: AsyncSession) -> 
         variety_thresholds=v["default_thresholds"],
     )
     assert merged == {"ndvi_deviation_warning_pct": -15, "frost_threshold_c": 2}
+
+
+@pytest.mark.asyncio
+async def test_resolved_taxonomy_endpoint_merges_levels(admin_session: AsyncSession) -> None:
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="pheno-resolve",
+        name="Pheno Resolve",
+        contact_email="ops@pheno-resolve.test",
+    )
+    user_id = uuid4()
+    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+
+    crop_id = uuid4()
+    variety_id = uuid4()
+    crop_code = f"mango-{crop_id.hex[:6]}"
+    crop_stages = (
+        '{"stages": [{"code": "veg_flush", "name_en": "Flush", "name_ar": "نمو", '
+        '"order": 1, "advance": {"mode": "calendar_doy", "start_doy": "03-01", '
+        '"end_doy": "05-15"}}]}'
+    )
+    crop_sizes = (
+        '{"classes": [{"code": "small", "name_en": "Small", "name_ar": "صغير", "order": 1}]}'
+    )
+    variety_stages = (
+        '{"stages": [{"code": "pre_flowering", "name_en": "Pre-flower", '
+        '"name_ar": "تزهير", "order": 1, "advance": {"mode": "calendar_doy", '
+        '"start_doy": "12-01", "end_doy": "01-31"}}]}'
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.crops "
+            "(id, code, name_en, name_ar, category, is_perennial, "
+            " phenology_stages, size_classes, classification_depth, is_active) "
+            "VALUES (:id, :code, 'Mango', 'مانجو', 'fruit_tree', TRUE, "
+            "        CAST(:stages AS jsonb), CAST(:sizes AS jsonb), 'variety', TRUE)"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {"id": crop_id, "code": crop_code, "stages": crop_stages, "sizes": crop_sizes},
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.crop_varieties "
+            "(id, crop_id, code, name_en, path, phenology_stages_override, is_active) "
+            "VALUES (:vid, :cid, 'keitt', 'Keitt', :path, CAST(:stages AS jsonb), TRUE)"
+        ).bindparams(
+            bindparam("vid", type_=PG_UUID(as_uuid=True)),
+            bindparam("cid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {
+            "vid": variety_id,
+            "cid": crop_id,
+            "path": f"{crop_code}.keitt",
+            "stages": variety_stages,
+        },
+    )
+    await admin_session.commit()
+
+    context = make_context(
+        user_id=user_id,
+        tenant_id=tenant.tenant_id,
+        tenant_role=TenantRole.TENANT_ADMIN,
+    )
+    app = build_app(context)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Variety path → variety phenology override wins; size falls back to crop.
+        r = await client.get(
+            "/api/v1/crops/resolved-taxonomy", params={"crop_path": f"{crop_code}.keitt"}
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["phenology_stages"]["stages"][0]["code"] == "pre_flowering"
+        assert body["size_classes"]["classes"][0]["code"] == "small"
+
+        # Crop path → crop's own phenology.
+        r2 = await client.get("/api/v1/crops/resolved-taxonomy", params={"crop_path": crop_code})
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["phenology_stages"]["stages"][0]["code"] == "veg_flush"

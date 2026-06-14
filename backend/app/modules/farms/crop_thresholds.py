@@ -78,3 +78,22 @@ def resolve_phenology_stages(
     if variety_override is not None:
         return variety_override
     return crop_stages
+
+
+def resolve_size_classes(
+    *,
+    crop_classes: dict[str, Any] | None,
+    variety_override: dict[str, Any] | None,
+    strain_override: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Deepest non-NULL canopy-size-class override wins (strain → variety → crop).
+
+    Mirrors :func:`resolve_phenology_stages`: the ``{"classes": [...]}``
+    payload is replaced wholesale rather than merged. Returns ``None`` when
+    no level defines size classes.
+    """
+    if strain_override is not None:
+        return strain_override
+    if variety_override is not None:
+        return variety_override
+    return crop_classes

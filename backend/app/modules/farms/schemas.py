@@ -70,6 +70,7 @@ class CropResponse(BaseModel):
     relevant_indices: list[str]
     phenology_stages: dict[str, Any] | None = None
     default_thresholds: dict[str, Any] | None = None
+    size_classes: dict[str, Any] | None = None
     # How deep a block assignment for this crop is classified:
     # crop_only | variety | variety_strain. Drives the picker depth.
     classification_depth: str = "crop_only"
@@ -89,6 +90,7 @@ class CropVarietyResponse(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
     is_active: bool = True
 
 
@@ -105,7 +107,16 @@ class CropVarietyStrainResponse(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
     is_active: bool = True
+
+
+class ResolvedTaxonomyResponse(BaseModel):
+    """Phenology + size classes resolved (deepest-wins) for a crop path."""
+
+    crop_path: str
+    phenology_stages: dict[str, Any] | None = None
+    size_classes: dict[str, Any] | None = None
 
 
 # ---------- Crop catalog authoring (platform-only) --------------------------
@@ -124,7 +135,14 @@ class CropCreateRequest(BaseModel):
     scientific_name: str | None = Field(default=None, max_length=255)
     classification_depth: ClassificationDepth = "crop_only"
     default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
+    gdd_base_temp_c: Decimal | None = Field(default=None, ge=0, le=40)
+    gdd_upper_temp_c: Decimal | None = Field(default=None, ge=0, le=60)
     relevant_indices: list[str] = Field(default_factory=lambda: ["ndvi"])
+    # Validated for shape here; the perennial/annual cross-check happens in
+    # the service (it needs the resolved ``is_perennial``).
+    phenology_stages: dict[str, Any] | None = None
+    default_thresholds: dict[str, Any] | None = None
+    size_classes: dict[str, Any] | None = None
 
     @field_validator("code")
     @classmethod
@@ -144,7 +162,12 @@ class CropUpdateRequest(BaseModel):
     scientific_name: str | None = Field(default=None, max_length=255)
     classification_depth: ClassificationDepth | None = None
     default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
+    gdd_base_temp_c: Decimal | None = Field(default=None, ge=0, le=40)
+    gdd_upper_temp_c: Decimal | None = Field(default=None, ge=0, le=60)
     relevant_indices: list[str] | None = None
+    phenology_stages: dict[str, Any] | None = None
+    default_thresholds: dict[str, Any] | None = None
+    size_classes: dict[str, Any] | None = None
     is_active: bool | None = None
 
 
@@ -154,6 +177,9 @@ class CropVarietyCreateRequest(BaseModel):
     code: str
     name_en: str = Field(min_length=1, max_length=255)
     name_ar: str | None = Field(default=None, max_length=255)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
 
     @field_validator("code")
     @classmethod
@@ -166,6 +192,9 @@ class CropVarietyUpdateRequest(BaseModel):
 
     name_en: str | None = Field(default=None, min_length=1, max_length=255)
     name_ar: str | None = Field(default=None, max_length=255)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
     is_active: bool | None = None
 
 
@@ -175,6 +204,9 @@ class CropStrainCreateRequest(BaseModel):
     code: str
     name_en: str = Field(min_length=1, max_length=255)
     name_ar: str | None = Field(default=None, max_length=255)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
 
     @field_validator("code")
     @classmethod
@@ -187,6 +219,9 @@ class CropStrainUpdateRequest(BaseModel):
 
     name_en: str | None = Field(default=None, min_length=1, max_length=255)
     name_ar: str | None = Field(default=None, max_length=255)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
+    size_classes_override: dict[str, Any] | None = None
     is_active: bool | None = None
 
 
