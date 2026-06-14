@@ -59,6 +59,7 @@ from app.modules.farms.phenology import (
     validate_phenology_payload,
     validate_size_classes_payload,
 )
+from app.modules.farms.phenology_advance import stage_for_date
 from app.modules.farms.repository import FarmsRepository
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
@@ -309,6 +310,8 @@ class FarmService(Protocol):
     ) -> dict[str, Any]: ...
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
+
+    async def advance_growth_stages(self, *, tenant_schema: str) -> dict[str, int]: ...
 
     async def record_growth_stage_transition(
         self,
@@ -1419,6 +1422,62 @@ class FarmServiceImpl:
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_block_crops(block_id=block_id)
+
+    async def advance_growth_stages(self, *, tenant_schema: str) -> dict[str, int]:
+        """Move every eligible block to its calendar/age-derived phenology
+        stage, writing a ``source='derived'`` GrowthStageLog row when it
+        changes. Locked blocks are excluded by the repo query. Idempotent:
+        a block already on its computed stage is a no-op.
+        """
+        candidates = await self._repo.list_block_crops_for_advance()
+        today = _date.today()
+        evaluated = 0
+        advanced = 0
+        no_stages = 0
+        for bc in candidates:
+            evaluated += 1
+            crop, variety, strain = await self._repo.resolve_taxonomy_by_path(
+                crop_path=bc.crop_path
+            )
+            if crop is None:
+                no_stages += 1
+                continue
+            resolved = resolve_phenology_stages(
+                crop_stages=crop.phenology_stages,
+                variety_override=variety.phenology_stages_override if variety else None,
+                strain_override=strain.phenology_stages_override if strain else None,
+            )
+            stages = (resolved or {}).get("stages") or []
+            if not stages:
+                no_stages += 1
+                continue
+            target = stage_for_date(
+                stages,
+                is_perennial=crop.is_perennial,
+                planting_date=bc.planting_date,
+                today=today,
+            )
+            if target is None or target == bc.growth_stage:
+                continue
+            await self.record_growth_stage_transition(
+                block_id=bc.block_id,
+                stage=target,
+                source="derived",
+                transition_date=None,
+                block_crop_id=bc.id,
+                notes="auto-advanced by phenology task",
+                actor_user_id=None,
+                tenant_schema=tenant_schema,
+            )
+            advanced += 1
+        self._log.info(
+            "phenology_advance_done",
+            tenant_schema=tenant_schema,
+            evaluated=evaluated,
+            advanced=advanced,
+            no_stages=no_stages,
+        )
+        return {"evaluated": evaluated, "advanced": advanced, "no_stages": no_stages}
 
     # ---- Growth-stage logs (PR-3) -----------------------------------
 

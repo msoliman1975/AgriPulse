@@ -125,6 +125,11 @@ class Settings(BaseSettings):
     # farm is hard-deleted, which is operationally rare.
     farm_scope_consistency_check_seconds: int = 3600
 
+    # Phenology auto-advance sweep cadence. Daily is plenty — stage windows
+    # are day-granular (calendar DOY / days-from-planting). Runs after the
+    # weather-derive cadence so any future GDD-based stages see fresh data.
+    phenology_advance_seconds: int = 86400
+
     # IH-6: cadence for the DB -> Keycloak reconciler that re-asserts each
     # user's enabled flag + tenant attributes from the DB (source of
     # truth). 15 min keeps the drift window at most one token-refresh
