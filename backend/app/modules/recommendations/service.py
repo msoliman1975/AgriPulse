@@ -142,7 +142,9 @@ class RecommendationsServiceImpl:
             crop_category,
             growth_stage,
             crop_path,
+            canopy_size_class,
         ) = await self._repo.get_block_current_crop(block_id=block_id)
+        soil_texture, salinity_class = await self._repo.get_block_soil(block_id=block_id)
 
         if farm_id is None:
             self._log.info("recommendations_skip_no_farm", block_id=str(block_id))
@@ -173,6 +175,9 @@ class RecommendationsServiceImpl:
                 "growth_stage": growth_stage,
                 "crop_path": crop_path,
                 "crop_strain": strain_code(crop_path),
+                "soil_texture": soil_texture,
+                "salinity_class": salinity_class,
+                "canopy_size_class": canopy_size_class,
             },
             latest_index_aggregates=latest,
             weather=weather,
@@ -1086,9 +1091,15 @@ class DecisionTreesAuthorService:
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
-        _, _, crop_category, growth_stage, crop_path = await repo.get_block_current_crop(
-            block_id=block_id
-        )
+        (
+            _,
+            _,
+            crop_category,
+            growth_stage,
+            crop_path,
+            canopy_size_class,
+        ) = await repo.get_block_current_crop(block_id=block_id)
+        soil_texture, salinity_class = await repo.get_block_soil(block_id=block_id)
         weather = (
             await load_weather_snapshot(tenant_session, farm_id=farm_id)
             if farm_id is not None
@@ -1116,6 +1127,9 @@ class DecisionTreesAuthorService:
                 "growth_stage": growth_stage,
                 "crop_path": crop_path,
                 "crop_strain": strain_code(crop_path),
+                "soil_texture": soil_texture,
+                "salinity_class": salinity_class,
+                "canopy_size_class": canopy_size_class,
             },
             latest_index_aggregates=latest_indices,
             weather=weather,
