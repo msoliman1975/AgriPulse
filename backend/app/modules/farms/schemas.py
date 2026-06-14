@@ -70,6 +70,9 @@ class CropResponse(BaseModel):
     relevant_indices: list[str]
     phenology_stages: dict[str, Any] | None = None
     default_thresholds: dict[str, Any] | None = None
+    # How deep a block assignment for this crop is classified:
+    # crop_only | variety | variety_strain. Drives the picker depth.
+    classification_depth: str = "crop_only"
 
 
 class CropVarietyResponse(BaseModel):
@@ -80,6 +83,23 @@ class CropVarietyResponse(BaseModel):
     code: str
     name_en: str
     name_ar: str | None
+    # Canonical hierarchical code "<crop>.<variety>".
+    path: str = ""
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    default_thresholds: dict[str, Any] | None = None
+    phenology_stages_override: dict[str, Any] | None = None
+
+
+class CropVarietyStrainResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    crop_variety_id: UUID
+    code: str
+    name_en: str
+    name_ar: str | None
+    # Canonical hierarchical code "<crop>.<variety>.<strain>".
+    path: str = ""
     attributes: dict[str, Any] = Field(default_factory=dict)
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None

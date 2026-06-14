@@ -408,6 +408,8 @@ class FarmService(Protocol):
 
     async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]: ...
 
+    async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]: ...
+
 
 # ---------- Implementation --------------------------------------------------
 
@@ -1772,6 +1774,9 @@ class FarmServiceImpl:
 
     async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_crop_varieties(crop_id=crop_id)
+
+    async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
+        return await self._repo.list_variety_strains(crop_variety_id=crop_variety_id)
 
 
 def _geo_point_to_ewkt(geo_point: dict[str, Any] | None) -> str | None:

@@ -46,6 +46,7 @@ from app.modules.farms.schemas import (
     BlockUpdateRequest,
     CropResponse,
     CropVarietyResponse,
+    CropVarietyStrainResponse,
     FarmCreateRequest,
     FarmDetailResponse,
     FarmInactivationPreviewResponse,
@@ -1109,3 +1110,17 @@ async def list_crop_varieties(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_crop_varieties(crop_id=crop_id)
+
+
+@router.get(
+    "/crop-varieties/{crop_variety_id}/strains",
+    response_model=list[CropVarietyStrainResponse],
+    summary="List active strains for a crop variety (deepest taxonomy level).",
+)
+async def list_variety_strains(
+    crop_variety_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_variety_strains(crop_variety_id=crop_variety_id)

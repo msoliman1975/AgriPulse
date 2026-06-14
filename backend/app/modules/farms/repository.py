@@ -37,6 +37,7 @@ from app.modules.farms.models import (
     BlockCrop,
     Crop,
     CropVariety,
+    CropVarietyStrain,
     Farm,
     FarmAttachment,
     GrowthStageLog,
@@ -784,6 +785,7 @@ class FarmsRepository:
                 "relevant_indices": list(r.relevant_indices or []),
                 "phenology_stages": r.phenology_stages,
                 "default_thresholds": r.default_thresholds,
+                "classification_depth": r.classification_depth,
             }
             for r in rows
         ]
@@ -802,6 +804,32 @@ class FarmsRepository:
                 "code": r.code,
                 "name_en": r.name_en,
                 "name_ar": r.name_ar,
+                "path": r.path,
+                "attributes": dict(r.attributes or {}),
+                "default_thresholds": r.default_thresholds,
+                "phenology_stages_override": r.phenology_stages_override,
+            }
+            for r in rows
+        ]
+
+    async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(CropVarietyStrain)
+            .where(
+                CropVarietyStrain.crop_variety_id == crop_variety_id,
+                CropVarietyStrain.is_active.is_(True),
+            )
+            .order_by(CropVarietyStrain.name_en)
+        )
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "crop_variety_id": r.crop_variety_id,
+                "code": r.code,
+                "name_en": r.name_en,
+                "name_ar": r.name_ar,
+                "path": r.path,
                 "attributes": dict(r.attributes or {}),
                 "default_thresholds": r.default_thresholds,
                 "phenology_stages_override": r.phenology_stages_override,

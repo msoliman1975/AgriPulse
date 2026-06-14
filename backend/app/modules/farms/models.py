@@ -58,6 +58,16 @@ class Crop(Base, TimestampedMixin):
     # see `app.modules.farms.crop_thresholds.resolve` for merge rules.
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    # How deep a block assignment for this crop is classified, and thus
+    # how deep its canonical path goes:
+    #   crop_only      -> "<crop>"                (no varieties)
+    #   variety        -> "<crop>.<variety>"      (varieties, no strains)
+    #   variety_strain -> "<crop>.<variety>.<strain>"
+    # The catalog guarantees nodes exist at each level for the crop; a
+    # block must specify exactly to this depth. No "none" sentinels.
+    classification_depth: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'crop_only'")
+    )
 
 
 class CropVariety(Base, TimestampedMixin):
@@ -75,6 +85,9 @@ class CropVariety(Base, TimestampedMixin):
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name_en: Mapped[str] = mapped_column(Text, nullable=False)
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Canonical hierarchical code: "<crop.code>.<variety.code>". Stable
+    # (codes are immutable) and the cross-consumer targeting key.
+    path: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
     attributes: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
@@ -83,6 +96,40 @@ class CropVariety(Base, TimestampedMixin):
     # ``phenology_stages_override``, when non-null, replaces the crop's
     # ``phenology_stages`` wholesale — the array is too irregular to
     # merge keywise.
+    default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
+class CropVarietyStrain(Base, TimestampedMixin):
+    """Within-variety selection (e.g. Mango → Alphonso → Short Alphonso).
+
+    The third and deepest level of the crop taxonomy. Mirrors
+    ``CropVariety``'s override columns one level down: a strain's
+    ``default_thresholds`` shallow-merge over the *resolved* variety
+    thresholds (strain wins per key), extending the crop → variety →
+    strain override chain in ``crop_thresholds.resolve``.
+    """
+
+    __tablename__ = "crop_variety_strains"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    crop_variety_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crop_varieties.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Canonical path: "<crop.code>.<variety.code>.<strain.code>".
+    path: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
+    attributes: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
