@@ -48,7 +48,8 @@
     "overlays": "Overlays",
     "grid": "Sub-block grid",
     "gridIndex": "Grid index",
-    "signalNote": "Signal overlay arrives in a later iteration."
+    "signals": "Signals",
+    "signalsNone": "— none —"
   },
   "add": {
     "block": "Draw block",
@@ -126,12 +127,17 @@
   },
   "settings": {
     "title": "Farm settings",
-    "note": "Rare, manager-only configuration. For now these open the existing config pages; native panels arrive in a later iteration.",
-    "defaults": "Block defaults & subscriptions",
-    "defaultsDesc": "Imagery & weather templates applied to blocks",
-    "members": "Members",
-    "membersDesc": "People with access to this farm",
-    "farm": "Farm & lifecycle",
-    "farmDesc": "Farm metadata, AOI and inactivation"
+    "tabDefaults": "Block defaults",
+    "tabMembers": "Members",
+    "tabFarm": "Farm"
+  },
+  "settingsFarm": {
+    "name": "Farm name",
+    "governorate": "Governorate",
+    "district": "District",
+    "city": "Nearest city",
+    "water": "Water source",
+    "saved": "Saved",
+    "editAoi": "Edit AOI on the legacy map →"
   }
 }

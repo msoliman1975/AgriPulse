@@ -33,6 +33,9 @@ interface Props {
   gridIndex: ApiIndexCode;
   onGridIndexChange: (c: ApiIndexCode) => void;
   gridIndexOptions: ApiIndexCode[];
+  signalDefs: { id: string; name: string }[];
+  signalDefId: string | null;
+  onSignalDefChange: (id: string | null) => void;
 }
 
 function Chip({
@@ -78,6 +81,9 @@ export function ViewBar({
   gridIndex,
   onGridIndexChange,
   gridIndexOptions,
+  signalDefs,
+  signalDefId,
+  onSignalDefChange,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const navigate = useNavigate();
@@ -161,7 +167,21 @@ export function ViewBar({
           onChange={(v) => onLayersChange({ fillOpacity: v })}
         />
         <PopDivider />
-        <div className="px-2.5 pb-1 text-[11px] text-ap-muted">{t("layers.signalNote")}</div>
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <span className="text-[12px] text-ap-muted">{t("layers.signals")}</span>
+          <select
+            value={signalDefId ?? ""}
+            onChange={(e) => onSignalDefChange(e.target.value || null)}
+            className="flex-1 rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-[13px] text-ap-ink"
+          >
+            <option value="">{t("layers.signalsNone")}</option>
+            {signalDefs.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </Popover>
 
       {/* Add menu — create flows delegate to existing routes for now */}
@@ -173,7 +193,7 @@ export function ViewBar({
         <PopItem icon="▩" onClick={() => { close(); navigate(`/farms/${farmId}/blocks/auto-grid`); }}>
           {t("add.autoGrid")}
         </PopItem>
-        <PopItem icon="◎" onClick={() => { close(); navigate(`/labs/map/${farmId}`); }} hint={t("add.viaMap")}>
+        <PopItem icon="◎" onClick={() => { close(); navigate(`/labs/map-legacy/${farmId}`); }} hint={t("add.viaMap")}>
           {t("add.pivot")}
         </PopItem>
       </Popover>

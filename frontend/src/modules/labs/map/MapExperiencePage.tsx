@@ -131,7 +131,7 @@ function FarmPickerRedirect() {
     const last =
       typeof window !== "undefined" ? window.localStorage.getItem(LAST_FARM_STORAGE_KEY) : null;
     const target = farmsQ.data.items.find((f) => f.id === last) ?? farmsQ.data.items[0];
-    if (target) navigate(`/labs/map/${target.id}`, { replace: true });
+    if (target) navigate(`/labs/map-legacy/${target.id}`, { replace: true });
   }, [farmsQ.data, navigate]);
 
   if (farmsQ.isLoading) return <FullState>Loading farms…</FullState>;
@@ -445,7 +445,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
       setFarmPanel("details");
       setPendingFarmAoi(null);
       setPendingFarmAoiAreaM2(null);
-      navigate(`/labs/map/${newFarm.id}`, { replace: false });
+      navigate(`/labs/map-legacy/${newFarm.id}`, { replace: false });
     },
   });
 
@@ -470,7 +470,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
       setFarmDrawerMode(null);
       setFarmPanel("details");
       // Navigate away because the farm is now hidden.
-      navigate("/labs/map", { replace: true });
+      navigate("/labs/map-legacy", { replace: true });
     },
   });
 

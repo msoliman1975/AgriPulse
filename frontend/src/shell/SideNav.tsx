@@ -167,6 +167,12 @@ export function SideNav(): ReactNode {
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
+        <SideNavItem
+          to={hasFarm ? `/labs/map-legacy/${farmSegment}` : "/labs/map-legacy"}
+          label={t("common:workspaceNav.farmManagementLegacy")}
+          icon={<LandUnitsIcon className="h-4 w-4" />}
+          activePathPrefix="/labs/map-legacy"
+        />
         {/* TODO(nuke-legacy-farms): /labs/map is the single Farm-management
             surface; the legacy /farms form view stays routed as a fallback
             until /labs/map reaches parity. */}

@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
 
-import { listFarms } from "@/api/farms";
+import { getFarm, listFarms, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
 import {
   getBlock,
   getBlockInactivationPreview,
@@ -24,10 +24,15 @@ import {
 import { getGridCells } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { loadMapSummary, loadUnitDetail } from "../map/api";
 import { MapCanvas, type GridCellProps } from "../map/MapCanvas";
 import { GridCellPopup } from "@/modules/grid/GridCellPopup";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
+import { SignalObservationPanel } from "../map/SignalObservationPanel";
+import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
+import { FarmDefaultsTab } from "../map/FarmDefaultsTab";
+import { FarmMembersTab } from "../map/FarmMembersTab";
 import type { IndexCode } from "../map/types";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
@@ -55,7 +60,7 @@ function FarmRedirect(): ReactNode {
     if (!farmsQ.data) return;
     const last = typeof window !== "undefined" ? window.localStorage.getItem(LAST_FARM_KEY) : null;
     const target = farmsQ.data.items.find((f) => f.id === last) ?? farmsQ.data.items[0];
-    if (target) navigate(`/labs/map-next/${target.id}`, { replace: true });
+    if (target) navigate(`/labs/map/${target.id}`, { replace: true });
   }, [farmsQ.data, navigate]);
 
   return (
@@ -91,6 +96,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [gridIndex, setGridIndex] = useState<ApiIndexCode>("ndvi");
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
+  // Signal observation overlay
+  const [signalDefId, setSignalDefId] = useState<string | null>(null);
+  const [obsClickPoint, setObsClickPoint] = useState<{ x: number; y: number } | null>(null);
+  const selectedObsId = search.get("signal_obs");
   // Reshape + inactivate (page-level: need the map / a modal)
   const [reshapeTarget, setReshapeTarget] = useState<BlockDetail | null>(null);
   const [reshapeCandidate, setReshapeCandidate] = useState<Polygon | null>(null);
@@ -225,9 +234,37 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     return { blockMean: mean, z: std > 0 ? (mean - meta.value) / std : 0 };
   }, [selectedCellId, cellMeta, farmGridQ.data]);
 
+  // Signal overlay: definitions for the picker + observations for the active one.
+  const signalDefsQ = useQuery({
+    queryKey: ["labs/mapnext/signalDefs"],
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 5 * 60_000,
+  });
+  const signalObsQ = useQuery({
+    queryKey: ["labs/mapnext/signalObs", farmId, signalDefId],
+    queryFn: () => listSignalObservations({ farm_id: farmId, signal_definition_id: signalDefId ?? undefined, limit: 500 }),
+    enabled: Boolean(farmId && signalDefId),
+    staleTime: 30_000,
+  });
+  const selectedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
+  const blockCentroids = useMemo(
+    () => (summaryQ.data ? blockCentroidsFromGeojson(summaryQ.data.geojson) : new Map<string, [number, number]>()),
+    [summaryQ.data],
+  );
+  const signalOverlayFc = useMemo(() => {
+    if (!signalDefId) return null;
+    if (!signalObsQ.data) return { type: "FeatureCollection" as const, features: [] };
+    return buildSignalOverlay(signalObsQ.data, blockCentroids, { valueKind: selectedSignalDef?.value_kind ?? null }).features;
+  }, [signalDefId, signalObsQ.data, blockCentroids, selectedSignalDef]);
+  const selectedObs = useMemo(
+    () => (selectedObsId && signalObsQ.data ? (signalObsQ.data.find((o) => o.id === selectedObsId) ?? null) : null),
+    [selectedObsId, signalObsQ.data],
+  );
+
   const select = (id: string) => {
     const next = new URLSearchParams(search);
     next.set("unit", id);
+    next.delete("signal_obs");
     setSearch(next, { replace: false });
     setSelectedCellId(null);
   };
@@ -316,6 +353,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         gridIndex={gridIndex}
         onGridIndexChange={setGridIndex}
         gridIndexOptions={GRID_INDEX_OPTIONS}
+        signalDefs={(signalDefsQ.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
+        signalDefId={signalDefId}
+        onSignalDefChange={(id) => {
+          setSignalDefId(id);
+          const next = new URLSearchParams(search);
+          next.delete("signal_obs");
+          setSearch(next, { replace: true });
+        }}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -340,6 +385,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             onGridCellClick={(cellId, point) => {
               setSelectedCellId(cellId);
               setCellClickPoint(point);
+            }}
+            signalOverlay={signalOverlayFc}
+            onSignalClick={(observationId, point) => {
+              const next = new URLSearchParams(search);
+              next.set("signal_obs", observationId);
+              setSearch(next, { replace: true });
+              setObsClickPoint(point);
+              setSelectedCellId(null);
             }}
             reshapeBlock={reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null}
             onReshape={(poly) => setReshapeCandidate(poly)}
@@ -393,6 +446,23 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             />
           ) : null}
 
+          {/* Signal observation popup */}
+          {selectedObsId ? (
+            <SignalObservationPanel
+              observation={selectedObs}
+              definition={selectedSignalDef}
+              isLoading={signalObsQ.isLoading}
+              x={obsClickPoint?.x ?? null}
+              y={obsClickPoint?.y ?? null}
+              onClose={() => {
+                const next = new URLSearchParams(search);
+                next.delete("signal_obs");
+                setSearch(next, { replace: true });
+                setObsClickPoint(null);
+              }}
+            />
+          ) : null}
+
           {toast ? (
             <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-ap-ink/85 px-3.5 py-1.5 text-[12.5px] text-white shadow-card">
               {toast}
@@ -438,10 +508,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   );
 }
 
-// Farm-level config (rare, manager-only) — for v1 this drawer deep-links
-// into the existing, fully-built config pages rather than re-implementing
-// them. The redesign value is the IA: one quiet entry point off the daily
-// surface. Native panels can replace these links in a later iteration.
+// Farm-level config (rare, manager-only). Native panels: block defaults +
+// members reuse the existing tab components; the Farm tab is a compact form.
+// One quiet entry point off the daily surface.
+type SettingsTab = "defaults" | "members" | "farm";
+
 function SettingsDrawer({
   farmId,
   farmName,
@@ -452,34 +523,16 @@ function SettingsDrawer({
   onClose: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const navigate = useNavigate();
-  const go = (path: string) => {
-    onClose();
-    navigate(path);
-  };
-  const Item = ({ icon, title, desc, path }: { icon: string; title: string; desc: string; path: string }) => (
-    <button
-      type="button"
-      onClick={() => go(path)}
-      className="flex w-full items-start gap-3 rounded-xl border border-ap-line bg-ap-panel p-3.5 text-start hover:bg-ap-primary-soft"
-    >
-      <span className="text-lg leading-none">{icon}</span>
-      <span className="flex-1">
-        <span className="block text-[14px] font-semibold text-ap-ink">{title}</span>
-        <span className="block text-[12px] text-ap-muted">{desc}</span>
-      </span>
-      <span className="text-ap-muted">›</span>
-    </button>
-  );
+  const [tab, setTab] = useState<SettingsTab>("defaults");
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: "defaults", label: t("settings.tabDefaults") },
+    { id: "members", label: t("settings.tabMembers") },
+    { id: "farm", label: t("settings.tabFarm") },
+  ];
   return (
     <>
-      <button
-        type="button"
-        aria-label="Close settings"
-        className="fixed inset-0 z-[90] bg-ap-ink/30"
-        onClick={onClose}
-      />
-      <aside className="fixed inset-y-0 end-0 z-[100] flex w-[480px] max-w-[92vw] flex-col bg-ap-panel shadow-2xl">
+      <button type="button" aria-label="Close settings" className="fixed inset-0 z-[90] bg-ap-ink/30" onClick={onClose} />
+      <aside className="fixed inset-y-0 end-0 z-[100] flex w-[560px] max-w-[94vw] flex-col bg-ap-panel shadow-2xl">
         <div className="flex items-center gap-3 border-b border-ap-line px-5 py-4">
           <span className="text-xl">⚙</span>
           <div>
@@ -495,15 +548,115 @@ function SettingsDrawer({
             ✕
           </button>
         </div>
-        <div className="flex-1 space-y-3 overflow-auto p-5">
-          <div className="rounded-xl border border-ap-primary-soft bg-ap-primary-soft/40 p-3 text-[12.5px] text-ap-primary">
-            {t("settings.note")}
-          </div>
-          <Item icon="🛰️" title={t("settings.defaults")} desc={t("settings.defaultsDesc")} path={`/config/imagery/${farmId}`} />
-          <Item icon="👥" title={t("settings.members")} desc={t("settings.membersDesc")} path={`/farms/${farmId}/members`} />
-          <Item icon="🌾" title={t("settings.farm")} desc={t("settings.farmDesc")} path={`/farms/${farmId}/edit`} />
+        <div className="flex gap-1 border-b border-ap-line px-4 pt-2.5">
+          {tabs.map((tb) => (
+            <button
+              key={tb.id}
+              type="button"
+              onClick={() => setTab(tb.id)}
+              className={
+                "rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-semibold " +
+                (tab === tb.id ? "border-ap-primary text-ap-primary" : "border-transparent text-ap-muted hover:text-ap-ink")
+              }
+            >
+              {tb.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-auto p-5">
+          {tab === "defaults" ? <FarmDefaultsTab farmId={farmId} /> : null}
+          {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
+          {tab === "farm" ? <FarmEditTab farmId={farmId} /> : null}
         </div>
       </aside>
     </>
+  );
+}
+
+const settingsInput =
+  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-[13px] text-ap-ink focus:border-ap-primary focus:outline-none";
+const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
+
+function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
+  const { t } = useTranslation("farmConsole");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const farmQ = useQuery({ queryKey: ["labs/mapnext/farm", farmId], queryFn: () => getFarm(farmId), staleTime: 30_000 });
+  const [form, setForm] = useState<FarmUpdatePayload | null>(null);
+  const f = farmQ.data;
+  const state: FarmUpdatePayload =
+    form ??
+    (f
+      ? {
+          name: f.name,
+          governorate: f.governorate,
+          district: f.district,
+          nearest_city: f.nearest_city,
+          primary_water_source: f.primary_water_source,
+          tags: f.tags,
+        }
+      : {});
+  const set = (patch: Partial<FarmUpdatePayload>) => setForm({ ...state, ...patch });
+  const mut = useMutation({
+    mutationFn: (patch: FarmUpdatePayload) => updateFarm(farmId, patch),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/farm", farmId] });
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/farmsList"] });
+    },
+  });
+  if (farmQ.isLoading) return <div className="text-[13px] text-ap-muted">{t("inspector.loading")}</div>;
+  if (farmQ.isError || !f) return <div className="text-[13px] text-ap-crit">{t("manage.editLoadError")}</div>;
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        mut.mutate(state);
+      }}
+    >
+      <label className="mb-3 block">
+        <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.name")}</span>
+        <input className={settingsInput} value={state.name ?? ""} onChange={(e) => set({ name: e.target.value })} />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.governorate")}</span>
+          <input className={settingsInput} value={state.governorate ?? ""} onChange={(e) => set({ governorate: e.target.value || null })} />
+        </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.district")}</span>
+          <input className={settingsInput} value={state.district ?? ""} onChange={(e) => set({ district: e.target.value || null })} />
+        </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.city")}</span>
+          <input className={settingsInput} value={state.nearest_city ?? ""} onChange={(e) => set({ nearest_city: e.target.value || null })} />
+        </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("settingsFarm.water")}</span>
+          <select className={settingsInput} value={state.primary_water_source ?? ""} onChange={(e) => set({ primary_water_source: (e.target.value || null) as WaterSource | null })}>
+            <option value="">—</option>
+            {WATER_SOURCES.map((w) => <option key={w} value={w}>{w}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="mb-3 block">
+        <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{t("manage.tags")}</span>
+        <input className={settingsInput} value={(state.tags ?? []).join(", ")} onChange={(e) => set({ tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+      </label>
+      {mut.isError ? <div className="mb-2 text-[12px] text-ap-crit">{t("manage.saveError")}</div> : null}
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={mut.isPending} className="h-9 rounded-lg bg-ap-primary px-4 text-[13px] font-semibold text-white disabled:opacity-60">
+          {mut.isPending ? t("manage.saving") : t("manage.save")}
+        </button>
+        {mut.isSuccess && !form ? <span className="text-[12px] text-ap-good">{t("settingsFarm.saved")}</span> : null}
+        <button
+          type="button"
+          onClick={() => navigate(`/labs/map-legacy/${farmId}`)}
+          className="ms-auto text-[12px] text-ap-muted underline hover:text-ap-ink"
+        >
+          {t("settingsFarm.editAoi")}
+        </button>
+      </div>
+    </form>
   );
 }
