@@ -37,6 +37,9 @@ class VegetationPlan(Base, TimestampedMixin):
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'draft'"))
+    # Set when the plan was created/refreshed by applying a plan template
+    # (logical ref to public.plan_templates.id).
+    applied_template_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class PlanActivity(Base, TimestampedMixin):
@@ -85,3 +88,11 @@ class PlanActivity(Base, TimestampedMixin):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'scheduled'"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Provenance for template-applied rows (PR-E). ``source`` distinguishes
+    # manual board edits from template/recommendation-generated rows so
+    # re-apply can regenerate only its own scheduled rows.
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'manual'"))
+    applied_template_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    template_activity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Phenology stage this activity was anchored to (for the board badge).
+    anchored_stage_code: Mapped[str | None] = mapped_column(Text, nullable=True)
