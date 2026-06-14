@@ -37,6 +37,7 @@ roles:
       - alert.read
       - alert_rule.read
       - plan.read
+      - plan_template.read
       - recommendation.read
       - decision_tree.read
       - analytics.read
@@ -97,7 +98,9 @@ roles:
       - alert_rule.read
       - alert_rule.manage
       - plan.read
+      - plan_template.read
       - plan.manage
+      - plan_template.apply
       - plan_activity.complete
       - resource.read
       - resource.manage
@@ -171,7 +174,9 @@ roles:
       - alert_rule.read
       - alert_rule.manage
       - plan.read
+      - plan_template.read
       - plan.manage
+      - plan_template.apply
       - plan_activity.complete
       - resource.read
       - resource.manage
@@ -240,7 +245,9 @@ roles:
       - alert.snooze
       - alert_rule.read
       - plan.read
+      - plan_template.read
       - plan.manage
+      - plan_template.apply
       - plan_activity.complete
       - resource.read
       - resource.manage
@@ -278,6 +285,7 @@ roles:
       - alert.snooze
       - alert_rule.read
       - plan.read
+      - plan_template.read
       - plan_activity.complete
       - resource.read
       - irrigation.schedule.read
@@ -309,6 +317,7 @@ roles:
       - alert.read
       - alert.acknowledge
       - plan.read
+      - plan_template.read
       - plan_activity.complete
       - resource.read
       - irrigation.schedule.read
@@ -334,6 +343,7 @@ roles:
       - signal.record
       - alert.read
       - plan.read
+      - plan_template.read
       - resource.read
       - irrigation.schedule.read
       - recommendation.read
@@ -354,6 +364,7 @@ roles:
       - signal.read
       - alert.read
       - plan.read
+      - plan_template.read
       - resource.read
       - irrigation.schedule.read
       - recommendation.read
