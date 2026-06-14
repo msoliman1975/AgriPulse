@@ -14,6 +14,7 @@ export interface Crop {
   default_growing_season_days: number | null;
   relevant_indices: string[];
   classification_depth: ClassificationDepth;
+  is_active: boolean;
 }
 
 export interface CropVariety {
@@ -24,6 +25,7 @@ export interface CropVariety {
   name_ar: string | null;
   // Canonical hierarchical code "<crop>.<variety>".
   path: string;
+  is_active: boolean;
 }
 
 export interface CropVarietyStrain {
@@ -34,6 +36,7 @@ export interface CropVarietyStrain {
   name_ar: string | null;
   // Canonical hierarchical code "<crop>.<variety>.<strain>".
   path: string;
+  is_active: boolean;
 }
 
 export async function listCrops(category?: string): Promise<Crop[]> {

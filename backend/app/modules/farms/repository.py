@@ -810,72 +810,138 @@ class FarmsRepository:
             stmt = stmt.where(Crop.category == category)
         stmt = stmt.order_by(Crop.name_en)
         rows = (await self._public.execute(stmt)).scalars().all()
-        return [
-            {
-                "id": r.id,
-                "code": r.code,
-                "name_en": r.name_en,
-                "name_ar": r.name_ar,
-                "scientific_name": r.scientific_name,
-                "category": r.category,
-                "is_perennial": r.is_perennial,
-                "default_growing_season_days": r.default_growing_season_days,
-                "gdd_base_temp_c": r.gdd_base_temp_c,
-                "gdd_upper_temp_c": r.gdd_upper_temp_c,
-                "relevant_indices": list(r.relevant_indices or []),
-                "phenology_stages": r.phenology_stages,
-                "default_thresholds": r.default_thresholds,
-                "classification_depth": r.classification_depth,
-            }
-            for r in rows
-        ]
+        return [_crop_dict(r) for r in rows]
 
-    async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]:
-        stmt = (
-            select(CropVariety)
-            .where(CropVariety.crop_id == crop_id, CropVariety.is_active.is_(True))
-            .order_by(CropVariety.name_en)
-        )
+    async def list_crop_varieties(
+        self, *, crop_id: UUID, include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        stmt = select(CropVariety).where(CropVariety.crop_id == crop_id)
+        if not include_inactive:
+            stmt = stmt.where(CropVariety.is_active.is_(True))
+        stmt = stmt.order_by(CropVariety.name_en)
         rows = (await self._public.execute(stmt)).scalars().all()
-        return [
-            {
-                "id": r.id,
-                "crop_id": r.crop_id,
-                "code": r.code,
-                "name_en": r.name_en,
-                "name_ar": r.name_ar,
-                "path": r.path,
-                "attributes": dict(r.attributes or {}),
-                "default_thresholds": r.default_thresholds,
-                "phenology_stages_override": r.phenology_stages_override,
-            }
-            for r in rows
-        ]
+        return [_variety_dict(r) for r in rows]
 
-    async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
-        stmt = (
-            select(CropVarietyStrain)
-            .where(
-                CropVarietyStrain.crop_variety_id == crop_variety_id,
-                CropVarietyStrain.is_active.is_(True),
+    async def list_variety_strains(
+        self, *, crop_variety_id: UUID, include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        stmt = select(CropVarietyStrain).where(CropVarietyStrain.crop_variety_id == crop_variety_id)
+        if not include_inactive:
+            stmt = stmt.where(CropVarietyStrain.is_active.is_(True))
+        stmt = stmt.order_by(CropVarietyStrain.name_en)
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [_strain_dict(r) for r in rows]
+
+    # ---- Crop catalog authoring (platform) -----------------------------
+
+    async def get_crop(self, *, crop_id: UUID) -> Crop | None:
+        return (
+            await self._public.execute(select(Crop).where(Crop.id == crop_id))
+        ).scalar_one_or_none()
+
+    async def get_variety(self, *, variety_id: UUID) -> CropVariety | None:
+        return (
+            await self._public.execute(select(CropVariety).where(CropVariety.id == variety_id))
+        ).scalar_one_or_none()
+
+    async def get_strain(self, *, strain_id: UUID) -> CropVarietyStrain | None:
+        return (
+            await self._public.execute(
+                select(CropVarietyStrain).where(CropVarietyStrain.id == strain_id)
             )
-            .order_by(CropVarietyStrain.name_en)
+        ).scalar_one_or_none()
+
+    async def crop_code_exists(self, *, code: str) -> bool:
+        return (
+            await self._public.execute(select(Crop.id).where(Crop.code == code))
+        ).first() is not None
+
+    async def variety_code_exists(self, *, crop_id: UUID, code: str) -> bool:
+        return (
+            await self._public.execute(
+                select(CropVariety.id).where(
+                    CropVariety.crop_id == crop_id, CropVariety.code == code
+                )
+            )
+        ).first() is not None
+
+    async def strain_code_exists(self, *, crop_variety_id: UUID, code: str) -> bool:
+        return (
+            await self._public.execute(
+                select(CropVarietyStrain.id).where(
+                    CropVarietyStrain.crop_variety_id == crop_variety_id,
+                    CropVarietyStrain.code == code,
+                )
+            )
+        ).first() is not None
+
+    async def create_crop(self, *, fields: dict[str, Any]) -> dict[str, Any]:
+        row = Crop(**fields)
+        self._public.add(row)
+        await self._public.flush()
+        await self._public.refresh(row)
+        return _crop_dict(row)
+
+    async def update_crop(self, *, crop: Crop, fields: dict[str, Any]) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(crop, key, value)
+        await self._public.flush()
+        await self._public.refresh(crop)
+        return _crop_dict(crop)
+
+    async def create_variety(
+        self, *, crop_id: UUID, crop_code: str, code: str, name_en: str, name_ar: str | None
+    ) -> dict[str, Any]:
+        row = CropVariety(
+            crop_id=crop_id,
+            code=code,
+            name_en=name_en,
+            name_ar=name_ar,
+            path=f"{crop_code}.{code}",
         )
-        rows = (await self._public.execute(stmt)).scalars().all()
-        return [
-            {
-                "id": r.id,
-                "crop_variety_id": r.crop_variety_id,
-                "code": r.code,
-                "name_en": r.name_en,
-                "name_ar": r.name_ar,
-                "path": r.path,
-                "attributes": dict(r.attributes or {}),
-                "default_thresholds": r.default_thresholds,
-                "phenology_stages_override": r.phenology_stages_override,
-            }
-            for r in rows
-        ]
+        self._public.add(row)
+        await self._public.flush()
+        await self._public.refresh(row)
+        return _variety_dict(row)
+
+    async def update_variety(
+        self, *, variety: CropVariety, fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(variety, key, value)
+        await self._public.flush()
+        await self._public.refresh(variety)
+        return _variety_dict(variety)
+
+    async def create_strain(
+        self,
+        *,
+        crop_variety_id: UUID,
+        variety_path: str,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+    ) -> dict[str, Any]:
+        row = CropVarietyStrain(
+            crop_variety_id=crop_variety_id,
+            code=code,
+            name_en=name_en,
+            name_ar=name_ar,
+            path=f"{variety_path}.{code}",
+        )
+        self._public.add(row)
+        await self._public.flush()
+        await self._public.refresh(row)
+        return _strain_dict(row)
+
+    async def update_strain(
+        self, *, strain: CropVarietyStrain, fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(strain, key, value)
+        await self._public.flush()
+        await self._public.refresh(strain)
+        return _strain_dict(strain)
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         stmt = (
@@ -1498,6 +1564,56 @@ def _attachment_row_to_dict(row: Any, *, owner_kind: str, owner_id: UUID) -> dic
         "geo_point": _decode_geojson(row.geo_point_geojson),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+    }
+
+
+def _crop_dict(r: Crop) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "code": r.code,
+        "name_en": r.name_en,
+        "name_ar": r.name_ar,
+        "scientific_name": r.scientific_name,
+        "category": r.category,
+        "is_perennial": r.is_perennial,
+        "default_growing_season_days": r.default_growing_season_days,
+        "gdd_base_temp_c": r.gdd_base_temp_c,
+        "gdd_upper_temp_c": r.gdd_upper_temp_c,
+        "relevant_indices": list(r.relevant_indices or []),
+        "phenology_stages": r.phenology_stages,
+        "default_thresholds": r.default_thresholds,
+        "classification_depth": r.classification_depth,
+        "is_active": r.is_active,
+    }
+
+
+def _variety_dict(r: CropVariety) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "crop_id": r.crop_id,
+        "code": r.code,
+        "name_en": r.name_en,
+        "name_ar": r.name_ar,
+        "path": r.path,
+        "attributes": dict(r.attributes or {}),
+        "default_thresholds": r.default_thresholds,
+        "phenology_stages_override": r.phenology_stages_override,
+        "is_active": r.is_active,
+    }
+
+
+def _strain_dict(r: CropVarietyStrain) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "crop_variety_id": r.crop_variety_id,
+        "code": r.code,
+        "name_en": r.name_en,
+        "name_ar": r.name_ar,
+        "path": r.path,
+        "attributes": dict(r.attributes or {}),
+        "default_thresholds": r.default_thresholds,
+        "phenology_stages_override": r.phenology_stages_override,
+        "is_active": r.is_active,
     }
 
 
