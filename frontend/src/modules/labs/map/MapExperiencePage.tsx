@@ -42,6 +42,7 @@ import {
   listSignalObservations,
   type SignalDefinition,
 } from "@/api/signals";
+import { BlockCropAssignCard } from "./BlockCropAssignCard";
 import { DetailPanel } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
@@ -580,15 +581,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
 
   // Every index the pipeline computes + stores per grid cell. Was the
   // "health trio"; expanded so the map can colour by any of them.
-  const GRID_INDEX_OPTIONS: IndexCode[] = [
-    "ndvi",
-    "ndre",
-    "ndwi",
-    "evi",
-    "savi",
-    "gndvi",
-    "ndmi",
-  ];
+  const GRID_INDEX_OPTIONS: IndexCode[] = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi", "ndmi"];
 
   const subscriptionsQ = useQuery({
     queryKey: ["labs/map/subscriptions", selectedId],
@@ -1066,6 +1059,20 @@ function MapForFarm({ farmId }: { farmId: string }) {
             gridConfig={
               selectedId && gridProductId ? (
                 <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+              ) : null
+            }
+            cropAssign={
+              selectedId && detailQ.data ? (
+                <BlockCropAssignCard
+                  blockId={selectedId}
+                  farmId={farmId}
+                  hasCurrentCrop={detailQ.data.crop_assignment !== null}
+                  onAssigned={() =>
+                    queryClient.invalidateQueries({
+                      queryKey: ["labs/map/detail", farmId, selectedId],
+                    })
+                  }
+                />
               ) : null
             }
           />

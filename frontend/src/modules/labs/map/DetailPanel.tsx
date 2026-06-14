@@ -37,6 +37,10 @@ interface Props {
   // as a drawer section by the parent so this stays a presentational
   // panel with no grid-module dependency.
   gridConfig?: React.ReactNode;
+  // Inline crop-assignment control rendered in the Plan section (block
+  // drawer only). Null for units that can't take a crop / users lacking
+  // the capability.
+  cropAssign?: React.ReactNode;
 }
 
 const HEALTH_LABEL = {
@@ -79,6 +83,7 @@ export function DetailPanel({
   onCancelReshape,
   reshapeSaving,
   gridConfig,
+  cropAssign,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<IndexCode | null>(null);
   const editing = Boolean(editableBlock);
@@ -213,7 +218,7 @@ export function DetailPanel({
         <span className="text-[10px] opacity-80">Updated {updated}</span>
       </div>
 
-      {detail.plan || detail.crop_assignment ? (
+      {detail.plan || detail.crop_assignment || cropAssign ? (
         <Section title="Plan">
           {detail.plan ? (
             <div className="mt-1 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]">
@@ -254,6 +259,7 @@ export function DetailPanel({
           ) : (
             <p className="mt-1 text-[11px] text-slate-500">No crop assigned.</p>
           )}
+          {cropAssign}
         </Section>
       ) : null}
 
