@@ -23,10 +23,10 @@ global:
     workers:
       tag: "88d9e7b"
     frontend:
-      # 82e5668 = PR #230 (Farm Console iteration 2: shell-context, sub-block
-      # grid overlay, native in-place manage) on top of #228. Frontend-only —
-      # no backend delta, so api/workers stay at 88d9e7b.
-      tag: "82e5668"
+      # 7a22c4b = PR #231 (Farm Console iter 3: map-flicker fix, signal overlay,
+      # native settings panels, /labs/map flip + legacy at /labs/map-legacy) on
+      # top of #228/#230. Frontend-only — api/workers stay at 88d9e7b.
+      tag: "7a22c4b"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
