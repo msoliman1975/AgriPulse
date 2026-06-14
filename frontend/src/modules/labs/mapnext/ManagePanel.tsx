@@ -47,7 +47,7 @@ export function ManagePanel({ mode, blockId, farmId, hasCurrentCrop, gridProduct
         gridProductId ? (
           <BlockGridConfigCard blockId={blockId} productId={gridProductId} />
         ) : (
-          <div className="rounded-xl border border-ap-line p-4 text-[13px] text-ap-muted">
+          <div className="rounded-xl border border-ap-line p-4 text-sm text-ap-muted">
             {t("manage.noGridProduct")}
           </div>
         )
@@ -59,14 +59,14 @@ export function ManagePanel({ mode, blockId, farmId, hasCurrentCrop, gridProduct
 function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <label className="mb-3 block">
-      <span className="mb-1 block text-[12px] font-semibold text-ap-muted">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-ap-muted">{label}</span>
       {children}
     </label>
   );
 }
 
 const inputCls =
-  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-[13px] text-ap-ink focus:border-ap-primary focus:outline-none";
+  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
 
 function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }): ReactNode {
   const { t } = useTranslation("farmConsole");
@@ -102,8 +102,8 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
     },
   });
 
-  if (blockQ.isLoading) return <div className="text-[13px] text-ap-muted">{t("inspector.loading")}</div>;
-  if (blockQ.isError || !b) return <div className="text-[13px] text-ap-crit">{t("manage.editLoadError")}</div>;
+  if (blockQ.isLoading) return <div className="text-sm text-ap-muted">{t("inspector.loading")}</div>;
+  if (blockQ.isError || !b) return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
 
   return (
     <form
@@ -162,12 +162,12 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
       <Field label={t("manage.notes")}>
         <textarea className={inputCls} rows={3} value={state.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} />
       </Field>
-      {mut.isError ? <div className="mb-2 text-[12px] text-ap-crit">{t("manage.saveError")}</div> : null}
+      {mut.isError ? <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
       <div className="flex gap-2">
-        <button type="submit" disabled={mut.isPending} className="h-9 flex-1 rounded-lg bg-ap-primary text-[13px] font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60">
+        <button type="submit" disabled={mut.isPending} className="h-9 flex-1 rounded-lg bg-ap-primary text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60">
           {mut.isPending ? t("manage.saving") : t("manage.save")}
         </button>
-        <button type="button" onClick={onDone} className="h-9 rounded-lg border border-ap-line px-4 text-[13px] font-semibold text-ap-ink hover:bg-ap-bg/60">
+        <button type="button" onClick={onDone} className="h-9 rounded-lg border border-ap-line px-4 text-sm font-semibold text-ap-ink hover:bg-ap-bg/60">
           {t("manage.cancel")}
         </button>
       </div>
