@@ -14,6 +14,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.farms.errors import CropTaxonomyError
+from app.modules.farms.repository import _resolve_crop_path
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import TenantRole
 
@@ -21,6 +23,61 @@ from .conftest import build_app, make_context
 from .test_farms_crud import _create_user_in_tenant
 
 pytestmark = [pytest.mark.integration]
+
+
+# ---- exact classification-depth resolver (pure) ----------------------------
+
+
+def test_path_crop_only() -> None:
+    assert (
+        _resolve_crop_path(
+            depth="crop_only",
+            crop_code="cotton",
+            crop_variety_id=None,
+            variety_path=None,
+            crop_variety_strain_id=None,
+            strain_path=None,
+        )
+        == "cotton"
+    )
+
+
+def test_path_variety_strain_full() -> None:
+    assert (
+        _resolve_crop_path(
+            depth="variety_strain",
+            crop_code="mango",
+            crop_variety_id=uuid4(),
+            variety_path="mango.alphonso",
+            crop_variety_strain_id=uuid4(),
+            strain_path="mango.alphonso.short",
+        )
+        == "mango.alphonso.short"
+    )
+
+
+def test_path_variety_strain_missing_strain_raises() -> None:
+    with pytest.raises(CropTaxonomyError):
+        _resolve_crop_path(
+            depth="variety_strain",
+            crop_code="mango",
+            crop_variety_id=uuid4(),
+            variety_path="mango.alphonso",
+            crop_variety_strain_id=None,
+            strain_path=None,
+        )
+
+
+def test_path_crop_only_with_variety_raises() -> None:
+    with pytest.raises(CropTaxonomyError):
+        _resolve_crop_path(
+            depth="crop_only",
+            crop_code="cotton",
+            crop_variety_id=uuid4(),
+            variety_path="x",
+            crop_variety_strain_id=None,
+            strain_path=None,
+        )
 
 
 @pytest.mark.asyncio

@@ -333,6 +333,14 @@ class BlockCrop(Base, TimestampedMixin):
     )
     crop_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     crop_variety_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Deepest taxonomy node assigned (logical cross-schema ref to
+    # public.crop_variety_strains). Set only for variety_strain crops.
+    crop_variety_strain_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    # Denormalized canonical path ("<crop>[.<variety>[.<strain>]]") at the
+    # crop's classification depth — the cross-consumer targeting key.
+    crop_path: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
     season_label: Mapped[str] = mapped_column(Text, nullable=False)
     planting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     expected_harvest_start: Mapped[date | None] = mapped_column(Date, nullable=True)

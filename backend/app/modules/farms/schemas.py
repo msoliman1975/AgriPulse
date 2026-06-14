@@ -423,6 +423,7 @@ class BlockCropAssignRequest(BaseModel):
 
     crop_id: UUID
     crop_variety_id: UUID | None = None
+    crop_variety_strain_id: UUID | None = None
     season_label: str = Field(min_length=1, max_length=64)
     planting_date: date | None = None
     expected_harvest_start: date | None = None
@@ -452,6 +453,8 @@ class BlockCropResponse(BaseModel):
     block_id: UUID
     crop_id: UUID
     crop_variety_id: UUID | None
+    crop_variety_strain_id: UUID | None = None
+    crop_path: str = ""
     season_label: str
     planting_date: date | None
     expected_harvest_start: date | None
