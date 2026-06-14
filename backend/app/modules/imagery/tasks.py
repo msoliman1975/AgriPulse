@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -225,9 +225,17 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
         product = await _lookup_product(session, subscription["product_id"])
 
         # Window: from `last_successful_ingest_at` (or 90 days ago, the
-        # retention floor per ARCH Â§9) up to now.
+        # retention floor per ARCH Â§9) up to now, pulled back by a lookback
+        # buffer. The watermark is wall-clock but the catalogue `from` filter
+        # is scene *sensing* time; without the buffer a scene sensed before a
+        # poll but published after it falls behind the watermark and is
+        # skipped forever. Re-scanning the buffer each poll is safe because
+        # `upsert_pending_ingestion_job` is idempotent (already-seen scenes
+        # return created=False and are skipped without re-acquisition).
         now = datetime.now(UTC)
-        window_start = subscription["last_successful_ingest_at"] or _ninety_days_ago(now)
+        window_start = (
+            subscription["last_successful_ingest_at"] or _ninety_days_ago(now)
+        ) - timedelta(hours=settings.imagery_discovery_lookback_hours)
 
         cloud_cap = (
             subscription["cloud_cover_max_pct"]
@@ -280,7 +288,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
                     },
                 )
                 await repo.touch_subscription_attempt(
-                    subscription_id=subscription_id, attempted_at=now, success=False
+                    subscription_id=subscription_id, attempted_at=now, ingested=False
                 )
                 bus.publish(
                     IngestionFailedV1(job_id=marker_id, error="sentinel_hub_not_configured")
@@ -356,8 +364,14 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
             else:
                 queued += 1
 
+        # `ingested=bool(queued)`: advance the ingest watermark only when this
+        # poll actually queued usable imagery. An empty or all-cloud poll still
+        # records the attempt (heartbeat) but must NOT bump the watermark —
+        # otherwise it would lie about staleness and bury publication-lagged
+        # scenes (the original bug). Already-ingested scenes re-seen via the
+        # lookback are created=False and don't count toward `queued`.
         await repo.touch_subscription_attempt(
-            subscription_id=subscription_id, attempted_at=now, success=True
+            subscription_id=subscription_id, attempted_at=now, ingested=bool(queued)
         )
 
     # Enqueue acquisition for every queued job. We do this OUTSIDE the
@@ -902,8 +916,6 @@ async def _fail_job(
 
 
 def _ninety_days_ago(now: datetime) -> datetime:
-    from datetime import timedelta
-
     return now - timedelta(days=90)
 
 

@@ -240,6 +240,16 @@ class Settings(BaseSettings):
     # (NULL = use these defaults) â€” applied by service code in PR-B/PR-C.
     imagery_cloud_cover_visualization_max_pct: int = 60
     imagery_cloud_cover_aggregation_max_pct: int = 20
+    # Discovery re-scans `[last_successful_ingest_at - lookback, now]` on every
+    # poll. The watermark is wall-clock, but the catalogue `from` filter is
+    # scene *sensing* time — a scene sensed before a poll but published to the
+    # catalogue after it would otherwise fall behind the watermark and be
+    # skipped forever. The lookback re-covers that publication-latency gap;
+    # `upsert_pending_ingestion_job` is idempotent on (subscription_id,
+    # scene_id), so the overlap costs one cheap catalogue search and no
+    # re-acquisition. 48h comfortably covers a 24h cadence + L2A latency and
+    # tolerates one missed poll.
+    imagery_discovery_lookback_hours: int = 48
 
     # --- Tile server -----------------------------------------------------
     # Served to the frontend via GET /api/v1/config in PR-C so the SPA
