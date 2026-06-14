@@ -871,11 +871,28 @@ class RecommendationsRepository:
         ).first()
         return row.farm_id if row is not None else None
 
+    async def get_block_soil(self, *, block_id: UUID) -> tuple[str | None, str | None]:
+        """Return (soil_texture, salinity_class) for the block — block-source
+        fields read by the recommendation engine (e.g. sandy -> SAVI path)."""
+        row = (
+            await self._tenant.execute(
+                text(
+                    "SELECT soil_texture, salinity_class FROM blocks "
+                    "WHERE id = :block_id AND deleted_at IS NULL"
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                {"block_id": block_id},
+            )
+        ).first()
+        if row is None:
+            return None, None
+        return row.soil_texture, row.salinity_class
+
     async def get_block_current_crop(
         self, *, block_id: UUID
-    ) -> tuple[UUID | None, UUID | None, str | None, str | None, str | None]:
+    ) -> tuple[UUID | None, UUID | None, str | None, str | None, str | None, str | None]:
         """Return (block_crop_id, crop_id, crop_category, growth_stage,
-        crop_path) for the active assignment, or all-None if none.
+        crop_path, canopy_size_class) for the active assignment, or all-None
+        if none.
 
         ``growth_stage`` (KB P3) is the stored phenological stage on the
         block_crops row — manually set today via the farms UX; conditions
@@ -889,7 +906,8 @@ class RecommendationsRepository:
             await self._tenant.execute(
                 text(
                     """
-                    SELECT id AS block_crop_id, crop_id, growth_stage, crop_path
+                    SELECT id AS block_crop_id, crop_id, growth_stage, crop_path,
+                           canopy_size_class
                     FROM block_crops
                     WHERE block_id = :block_id
                       AND is_current = TRUE
@@ -901,7 +919,7 @@ class RecommendationsRepository:
             )
         ).first()
         if row is None:
-            return None, None, None, None, None
+            return None, None, None, None, None, None
         crop_row = (
             await self._public.execute(
                 text("SELECT category FROM public.crops WHERE id = :crop_id").bindparams(
@@ -911,7 +929,14 @@ class RecommendationsRepository:
             )
         ).first()
         category = crop_row.category if crop_row is not None else None
-        return row.block_crop_id, row.crop_id, category, row.growth_stage, row.crop_path
+        return (
+            row.block_crop_id,
+            row.crop_id,
+            category,
+            row.growth_stage,
+            row.crop_path,
+            row.canopy_size_class,
+        )
 
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
         rows = (

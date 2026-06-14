@@ -37,7 +37,18 @@ INDICES_KEYS: tuple[str, ...] = (
 # (``short``); both resolve via ``block_attributes`` and are None when the
 # block has no crop / no strain level. Compare with eq/ne/in to branch a
 # tree on a specific variety or strain.
-BLOCK_FIELDS: tuple[str, ...] = ("crop_category", "growth_stage", "crop_path", "crop_strain")
+# ``soil_texture`` (sandy/loam/clay variants) + ``salinity_class`` come from
+# the block; ``canopy_size_class`` from the current block_crop's resolved
+# size-class pick — used e.g. to branch small/sandy onto the SAVI path.
+BLOCK_FIELDS: tuple[str, ...] = (
+    "crop_category",
+    "growth_stage",
+    "crop_path",
+    "crop_strain",
+    "soil_texture",
+    "salinity_class",
+    "canopy_size_class",
+)
 
 
 @dataclass(frozen=True, slots=True)
