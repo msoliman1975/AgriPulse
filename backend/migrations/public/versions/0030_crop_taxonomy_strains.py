@@ -179,5 +179,14 @@ def downgrade() -> None:
         "DELETE FROM public.crop_varieties WHERE crop_id IN (SELECT id FROM public.crops WHERE code = 'mango')"
     )
     op.drop_column("crop_varieties", "path", schema="public")
-    op.drop_constraint("ck_crops_classification_depth", "crops", schema="public")
+    # The metadata naming convention (ck_%(table_name)s_%(constraint_name)s)
+    # is applied at create time, so the upgrade's create_check_constraint
+    # ("ck_crops_classification_depth") actually produced
+    # "ck_crops_ck_crops_classification_depth". drop_constraint does NOT
+    # re-apply the convention, so drop by the real name; IF EXISTS keeps the
+    # session-shared migration-roundtrip tests resilient.
+    op.execute(
+        "ALTER TABLE public.crops "
+        "DROP CONSTRAINT IF EXISTS ck_crops_ck_crops_classification_depth"
+    )
     op.drop_column("crops", "classification_depth", schema="public")
