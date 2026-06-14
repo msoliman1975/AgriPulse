@@ -43,6 +43,7 @@ import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTr
 import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
 import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
+import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
@@ -139,6 +140,11 @@ export function App(): ReactNode {
                   replace it. See docs/proposals/map-first.md. */}
                 <Route path="/labs/map" element={<MapExperiencePage />} />
                 <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
+                {/* Redesigned Farm Console — progressive-disclosure re-take of
+                  /labs/map. Runs alongside the legacy map for iteration; see
+                  docs/proposals/farm-management-redesign.md. */}
+                <Route path="/labs/map-next" element={<FarmConsolePage />} />
+                <Route path="/labs/map-next/:farmId" element={<FarmConsolePage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
                 {/* Board PR-7 cutover: /plan/:farmId redirects to /board/:farmId.
                   The legacy PlanPage (modules/plan/*) was removed once the
