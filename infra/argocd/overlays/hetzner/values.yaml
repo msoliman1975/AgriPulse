@@ -13,17 +13,17 @@ global:
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
-  # promotion — NOT auto-bumped like dev). 70c62fd = PR #224 (Crop → Variety →
-  # Strain taxonomy: catalog, picker, path targeting, report filters); applies
-  # public migrations 0030+0031 and tenant 0039 via the PreSync migration job.
-  # tile-server unchanged (no backend delta) stays 9d140cc.
+  # promotion — NOT auto-bumped like dev). 563a6c2 = PR #225 (weather-report
+  # crop_path asyncpg-cast hotfix) on top of #224 (Crop → Variety → Strain
+  # taxonomy). Public migrations 0030+0031 + tenant 0039 applied via the
+  # PreSync migration job. tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "70c62fd"
+      tag: "563a6c2"
     workers:
-      tag: "70c62fd"
+      tag: "563a6c2"
     frontend:
-      tag: "70c62fd"
+      tag: "563a6c2"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
