@@ -105,6 +105,10 @@ capabilities:
     description: Create, edit, or retire crops, varieties, and strains in the catalog.
     scope: platform
     status: active
+  plan_template.manage:
+    description: Author platform-curated plan templates (create, edit, publish, archive).
+    scope: platform
+    status: active
   tenant.manage_integrations:
     description: Edit weather, imagery, email, and webhook configs at any inheritance tier.
     scope: tenant
@@ -263,6 +267,14 @@ capabilities:
     status: active
   plan_activity.complete:
     description: Mark a scheduled activity as completed or skipped.
+    scope: farm
+    status: active
+  plan_template.read:
+    description: View appliable plan templates + preview their schedule for a farm.
+    scope: farm
+    status: active
+  plan_template.apply:
+    description: Apply a plan template to a farm's matching-crop blocks.
     scope: farm
     status: active
 
