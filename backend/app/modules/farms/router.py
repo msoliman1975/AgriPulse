@@ -37,6 +37,7 @@ from app.modules.farms.schemas import (
     BlockCreateRequest,
     BlockCropAssignRequest,
     BlockCropResponse,
+    BlockCropUpdateRequest,
     BlockDetailResponse,
     BlockInactivationPreviewResponse,
     BlockInactivationRequest,
@@ -662,11 +663,41 @@ async def assign_block_crop(
         plant_density_per_ha=payload.plant_density_per_ha,
         row_spacing_m=payload.row_spacing_m,
         plant_spacing_m=payload.plant_spacing_m,
+        canopy_size_class=payload.canopy_size_class,
         notes=payload.notes,
         make_current=payload.make_current,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         correlation_id=_correlation_id(request),
+    )
+
+
+@router.patch(
+    "/blocks/{block_id}/crop-assignments/{block_crop_id}",
+    response_model=BlockCropResponse,
+    summary="Update a block crop's agronomy fields (canopy size, stage lock, lifecycle).",
+)
+async def update_block_crop(
+    block_id: UUID,
+    block_crop_id: UUID,
+    payload: BlockCropUpdateRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "crop_assignment.update", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+
+    return await service.update_block_crop(
+        block_id=block_id,
+        block_crop_id=block_crop_id,
+        fields=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
     )
 
 

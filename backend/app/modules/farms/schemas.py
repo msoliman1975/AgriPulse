@@ -551,14 +551,20 @@ class BlockCropAssignRequest(BaseModel):
     plant_density_per_ha: Decimal | None = None
     row_spacing_m: Decimal | None = None
     plant_spacing_m: Decimal | None = None
+    # One of the crop's resolved ``size_classes`` codes (validated server-side).
+    canopy_size_class: str | None = None
     notes: str | None = None
     make_current: bool = True
 
 
 class BlockCropUpdateRequest(BaseModel):
+    # Growth stage is intentionally NOT settable here — it has its own
+    # transition endpoint that appends to GrowthStageLog. This patch covers
+    # the agronomy/lifecycle fields editable in place.
     model_config = ConfigDict(extra="forbid")
 
-    growth_stage: str | None = None
+    canopy_size_class: str | None = None
+    growth_stage_locked: bool | None = None
     expected_harvest_start: date | None = None
     expected_harvest_end: date | None = None
     actual_harvest_date: date | None = None
@@ -583,8 +589,10 @@ class BlockCropResponse(BaseModel):
     plant_density_per_ha: Decimal | None
     row_spacing_m: Decimal | None
     plant_spacing_m: Decimal | None
+    canopy_size_class: str | None = None
     growth_stage: str | None
     growth_stage_updated_at: datetime | None
+    growth_stage_locked: bool = False
     is_current: bool
     status: BlockCropStatus
     notes: str | None
