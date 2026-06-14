@@ -15,13 +15,15 @@ global:
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev). 88d9e7b = PR #229 (crop-catalog UX:
   # real category dropdown + clearer add-variety/strain affordances) on top of
-  # #224/#225/#226/#227 (taxonomy + map crop-assign + /platform/crops authoring).
-  # No new migration. tile-server unchanged (no backend delta) stays 9d140cc.
+  # c7be0c2 = phenology-spine Track A (#232 phenology/size shape + validation +
+  # /crops/resolved-taxonomy; #233 seed mango+potato phenology + size classes).
+  # New public migrations 0032/0033 run via the PreSync migrate job.
+  # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "88d9e7b"
+      tag: "c7be0c2"
     workers:
-      tag: "88d9e7b"
+      tag: "c7be0c2"
     frontend:
       # 7a22c4b = PR #231 (Farm Console iter 3: map-flicker fix, signal overlay,
       # native settings panels, /labs/map flip + legacy at /labs/map-legacy) on
