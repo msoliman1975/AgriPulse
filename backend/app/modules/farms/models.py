@@ -354,9 +354,17 @@ class BlockCrop(Base, TimestampedMixin):
     plant_density_per_ha: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     row_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     plant_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # Canopy size pick from the crop's resolved ``size_classes`` lookup; a
+    # block-source field for the recommendation engine (small -> SAVI path).
+    canopy_size_class: Mapped[str | None] = mapped_column(Text, nullable=True)
     growth_stage: Mapped[str | None] = mapped_column(Text, nullable=True)
     growth_stage_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # When true, the phenology auto-advance task skips this block (a manual
+    # growth_stage stays authoritative).
+    growth_stage_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
     )
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'planned'"))

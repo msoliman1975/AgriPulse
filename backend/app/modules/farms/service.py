@@ -27,6 +27,7 @@ from app.modules.farms.crop_thresholds import (
 )
 from app.modules.farms.errors import (
     BlockNotFoundError,
+    CropAssignmentNotFoundError,
     CropCatalogConflictError,
     CropCatalogValidationError,
     CropNotFoundError,
@@ -293,7 +294,18 @@ class FarmService(Protocol):
         make_current: bool,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        canopy_size_class: str | None = None,
         correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def update_block_crop(
+        self,
+        *,
+        block_id: UUID,
+        block_crop_id: UUID,
+        fields: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
     ) -> dict[str, Any]: ...
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
@@ -1261,8 +1273,16 @@ class FarmServiceImpl:
         make_current: bool,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        canopy_size_class: str | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
+        if canopy_size_class is not None:
+            await self._validate_canopy_size_class(
+                canopy_size_class,
+                crop_id=crop_id,
+                crop_variety_id=crop_variety_id,
+                crop_variety_strain_id=crop_variety_strain_id,
+            )
         bc_id = uuid7()
         result = await self._repo.insert_block_crop(
             block_crop_id=bc_id,
@@ -1277,6 +1297,7 @@ class FarmServiceImpl:
             plant_density_per_ha=plant_density_per_ha,
             row_spacing_m=row_spacing_m,
             plant_spacing_m=plant_spacing_m,
+            canopy_size_class=canopy_size_class,
             notes=notes,
             make_current=make_current,
             actor_user_id=actor_user_id,
@@ -1311,6 +1332,88 @@ class FarmServiceImpl:
                 season_label=season_label,
                 actor_user_id=actor_user_id,
             )
+        )
+        return result
+
+    async def _resolve_size_class_codes(
+        self,
+        *,
+        crop_id: UUID,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None,
+    ) -> set[str]:
+        crop = await self._repo.get_crop(crop_id=crop_id)
+        variety = (
+            await self._repo.get_variety(variety_id=crop_variety_id)
+            if crop_variety_id is not None
+            else None
+        )
+        strain = (
+            await self._repo.get_strain(strain_id=crop_variety_strain_id)
+            if crop_variety_strain_id is not None
+            else None
+        )
+        resolved = resolve_size_classes(
+            crop_classes=crop.size_classes if crop else None,
+            variety_override=variety.size_classes_override if variety else None,
+            strain_override=strain.size_classes_override if strain else None,
+        )
+        if not resolved:
+            return set()
+        return {c.get("code") for c in resolved.get("classes", [])}
+
+    async def _validate_canopy_size_class(
+        self,
+        value: str,
+        *,
+        crop_id: UUID,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None,
+    ) -> None:
+        codes = await self._resolve_size_class_codes(
+            crop_id=crop_id,
+            crop_variety_id=crop_variety_id,
+            crop_variety_strain_id=crop_variety_strain_id,
+        )
+        if value not in codes:
+            raise CropCatalogValidationError(
+                reason=(
+                    f"canopy_size_class {value!r} is not a valid size class for this crop "
+                    f"(allowed: {sorted(codes)})"
+                )
+            )
+
+    async def update_block_crop(
+        self,
+        *,
+        block_id: UUID,
+        block_crop_id: UUID,
+        fields: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        bc = await self._repo.get_block_crop(block_crop_id=block_crop_id)
+        if bc is None or bc.block_id != block_id:
+            raise CropAssignmentNotFoundError(block_crop_id)
+        if fields.get("canopy_size_class") is not None:
+            await self._validate_canopy_size_class(
+                fields["canopy_size_class"],
+                crop_id=bc.crop_id,
+                crop_variety_id=bc.crop_variety_id,
+                crop_variety_strain_id=bc.crop_variety_strain_id,
+            )
+        result = await self._repo.update_block_crop(
+            bc=bc, fields=fields, actor_user_id=actor_user_id
+        )
+        block = await self._repo.get_block_by_id(block_id, with_boundary=False)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_crop_updated",
+            actor_user_id=actor_user_id,
+            subject_kind="block_crop",
+            subject_id=block_crop_id,
+            farm_id=block["farm_id"] if block else None,
+            details={"fields": sorted(fields.keys())},
         )
         return result
 

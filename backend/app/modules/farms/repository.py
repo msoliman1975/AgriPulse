@@ -704,6 +704,8 @@ class FarmsRepository:
         notes: str | None,
         make_current: bool,
         actor_user_id: UUID | None,
+        canopy_size_class: str | None = None,
+        growth_stage_locked: bool = False,
     ) -> dict[str, Any]:
         # Confirm block exists.
         block_exists = await self._tenant.execute(
@@ -790,6 +792,8 @@ class FarmsRepository:
             plant_density_per_ha=plant_density_per_ha,
             row_spacing_m=row_spacing_m,
             plant_spacing_m=plant_spacing_m,
+            canopy_size_class=canopy_size_class,
+            growth_stage_locked=growth_stage_locked,
             notes=notes,
             is_current=make_current,
             status="growing" if make_current else "planned",
@@ -1002,6 +1006,25 @@ class FarmsRepository:
         )
         rows = (await self._tenant.execute(stmt)).scalars().all()
         return [_block_crop_to_dict(r) for r in rows]
+
+    async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
+        return (
+            await self._tenant.execute(
+                select(BlockCrop).where(
+                    BlockCrop.id == block_crop_id, BlockCrop.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+
+    async def update_block_crop(
+        self, *, bc: BlockCrop, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(bc, key, value)
+        bc.updated_by = actor_user_id
+        await self._tenant.flush()
+        await self._tenant.refresh(bc)
+        return _block_crop_to_dict(bc)
 
     # ---- Growth-stage logs (PR-3) -----------------------------------
 
@@ -1575,8 +1598,10 @@ def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
         "plant_density_per_ha": bc.plant_density_per_ha,
         "row_spacing_m": bc.row_spacing_m,
         "plant_spacing_m": bc.plant_spacing_m,
+        "canopy_size_class": bc.canopy_size_class,
         "growth_stage": bc.growth_stage,
         "growth_stage_updated_at": bc.growth_stage_updated_at,
+        "growth_stage_locked": bc.growth_stage_locked,
         "is_current": bc.is_current,
         "status": bc.status,
         "notes": bc.notes,
