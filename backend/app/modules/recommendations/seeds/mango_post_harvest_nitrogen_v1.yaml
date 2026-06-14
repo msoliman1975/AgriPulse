@@ -1,0 +1,137 @@
+# mango_post_harvest_nitrogen_v1 — flag low canopy chlorophyll/nitrogen
+# during the post-harvest flush, when the tree rebuilds reserves for next
+# season and post-harvest fertilization is critical.
+#
+# Uses NDRE (NIR-RedEdge), not NDVI: mango's dense, dark canopy saturates
+# NDVI, so NDVI flattens and hides chlorophyll/N variation. NDRE penetrates
+# deeper and stays sensitive to medium-high chlorophyll — the right index
+# for late-season / post-harvest nitrogen decisions in tree crops.
+
+code: mango_post_harvest_nitrogen_v1
+name_en: Mango — post-harvest nitrogen / chlorophyll deficiency
+name_ar: المانجو — نقص النيتروجين/الكلوروفيل بعد الحصاد
+description_en: >-
+  During the post-harvest flush, a low NDRE indicates weak canopy
+  chlorophyll / nitrogen status just when the tree is rebuilding reserves
+  for the next season. Warns so the grower can act on post-harvest
+  fertilization. NDRE is used because mango's dense canopy saturates NDVI.
+description_ar: >-
+  خلال النمو بعد الحصاد، يشير انخفاض NDRE إلى ضعف الكلوروفيل/النيتروجين في
+  المجموع الخضري في وقت تبني فيه الشجرة احتياطيها للموسم القادم. يُحذّر
+  ليتصرّف المزارع بالتسميد بعد الحصاد. يُستخدم NDRE لأن كثافة مجموع المانجو
+  تُشبع NDVI.
+
+crop_path: mango
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    NDVI saturates over dense, multi-layered tree canopies (high LAI), so
+    it loses sensitivity to chlorophyll/N in mango. NDRE's red-edge band
+    penetrates deeper and stays sensitive to medium-high chlorophyll,
+    making it the standard index for late-season nitrogen mapping in
+    orchards. Absolute NDRE thresholds are cultivar/site dependent — tune
+    per tenant; the default is a conservative low-chlorophyll cutoff.
+  citations:
+    - source_type: remote_sensing
+      title: "EOS — NDVI vs NDRE: saturation and red-edge sensitivity"
+      url: https://eos.com/blog/ndvi-vs-ndre/
+      year: 2023
+    - source_type: remote_sensing
+      title: "Aerobotics — NDRE vs NDVI for dense tree canopies"
+      url: https://blog.aerobotics.com/ndre-vs-ndvi-whats-the-difference
+      year: 2022
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: high
+
+parameters:
+  low_ndre:
+    type: number
+    default: 0.30
+    min: -1.0
+    max: 1.0
+    description: >-
+      NDRE mean below which canopy chlorophyll/nitrogen is considered
+      deficient during the post-harvest flush.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in the post-harvest flush stage?
+    label_ar: هل القطعة في مرحلة النمو بعد الحصاد؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: block
+          field: growth_stage
+        right: post_harvest_flush
+    on_match: ndre_check
+    on_miss: leaf_no_action
+
+  ndre_check:
+    label_en: Is canopy NDRE below the deficiency threshold?
+    label_ar: هل NDRE للمجموع أقل من عتبة النقص؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: low_ndre
+    on_match: leaf_warn
+    on_miss: leaf_no_action
+
+  leaf_warn:
+    label_en: Low NDRE post-harvest — check nitrogen
+    label_ar: NDRE منخفض بعد الحصاد — راجع النيتروجين
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 336
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy NDRE is low during the post-harvest flush, suggesting weak
+        chlorophyll / nitrogen status while the tree rebuilds reserves.
+        Review the post-harvest fertilization program and confirm with
+        leaf analysis. (NDRE is used because mango's dense canopy
+        saturates NDVI.)
+      text_ar: >-
+        NDRE للمجموع منخفض خلال النمو بعد الحصاد، ما يشير لضعف
+        الكلوروفيل/النيتروجين بينما تبني الشجرة احتياطيها. راجع برنامج
+        التسميد بعد الحصاد وأكّد بتحليل الأوراق. (يُستخدم NDRE لأن كثافة
+        مجموع المانجو تُشبع NDVI.)
+      actions:
+        immediate:
+          - text_en: Confirm with a leaf-tissue nitrogen analysis on affected trees.
+            text_ar: أكّد بتحليل نيتروجين أنسجة الأوراق على الأشجار المتأثرة.
+        short_term:
+          - text_en: >-
+              Apply post-harvest nitrogen (split with fertigation) to
+              rebuild canopy reserves for the next cycle.
+            text_ar: >-
+              طبّق نيتروجينًا بعد الحصاد (مُجزّأ مع الريّ بالتسميد) لإعادة
+              بناء احتياطي المجموع للدورة القادمة.
+        monitoring:
+          - text_en: Re-check NDRE 2–3 weeks after fertilization to confirm recovery.
+            text_ar: أعد فحص NDRE بعد 2–3 أسابيع من التسميد لتأكيد التعافي.
+
+  leaf_no_action:
+    label_en: No action — NDRE adequate or not post-harvest
+    label_ar: لا إجراء — NDRE كافٍ أو ليست بعد الحصاد
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: No post-harvest nitrogen deficiency detected.
+      text_ar: لم يُكتشف نقص نيتروجين بعد الحصاد.
