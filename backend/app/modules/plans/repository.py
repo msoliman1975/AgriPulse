@@ -270,6 +270,7 @@ class PlansRepository:
                           a.notes, a.status,
                           a.completed_at, a.completed_by,
                           a.created_at, a.updated_at,
+                          a.source, a.anchored_stage_code,
                           COALESCE(
                             (
                               SELECT json_agg(
@@ -325,7 +326,8 @@ class PlansRepository:
                                a.scheduled_date, a.duration_days, a.start_time,
                                a.product_name, a.dosage,
                                a.notes, a.status, a.completed_at, a.completed_by,
-                               a.created_at, a.updated_at
+                               a.created_at, a.updated_at,
+                               a.source, a.anchored_stage_code
                         FROM plan_activities a
                         WHERE a.farm_id = :farm_id
                           AND a.deleted_at IS NULL
@@ -376,6 +378,8 @@ def _activity_to_dict(row: PlanActivity) -> dict[str, Any]:
         "completed_by": row.completed_by,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+        "source": row.source,
+        "anchored_stage_code": row.anchored_stage_code,
     }
 
 

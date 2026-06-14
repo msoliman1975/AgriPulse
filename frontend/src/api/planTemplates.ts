@@ -168,3 +168,87 @@ export async function resolveTemplatePhenology(cropPath: string): Promise<Resolv
   });
   return data;
 }
+
+// ---- Tenant apply (cap plan_template.read / plan_template.apply) -----------
+
+export interface AppliableBlock {
+  block_id: string;
+  block_code: string | null;
+  crop_path: string;
+  planting_date: string | null;
+}
+
+export interface AppliableTemplate extends PlanTemplateSummary {
+  matching_blocks: AppliableBlock[];
+}
+
+export interface ApplyBlock {
+  block_id: string;
+  start_date: string;
+}
+
+export interface ApplyRequest {
+  farm_id: string;
+  season_label: string;
+  season_year: number;
+  blocks: ApplyBlock[];
+}
+
+export interface ResolvedActivityPreview {
+  template_activity_id: string;
+  activity_type: string;
+  scheduled_date: string;
+  duration_days: number;
+  anchored_stage_code: string | null;
+}
+
+export interface BlockSchedule {
+  block_id: string;
+  block_code: string | null;
+  activities: ResolvedActivityPreview[];
+  skipped: Record<string, unknown>[];
+}
+
+export interface PreviewResponse {
+  template_id: string;
+  blocks: BlockSchedule[];
+  total_activities: number;
+  total_skipped: number;
+}
+
+export interface ApplyResponse {
+  template_id: string;
+  plan_id: string;
+  blocks_applied: number;
+  activities_created: number;
+  skipped: number;
+}
+
+export async function listAppliableTemplates(farmId: string): Promise<AppliableTemplate[]> {
+  const { data } = await apiClient.get<AppliableTemplate[]>("/v1/plan-templates/appliable", {
+    params: { farm_id: farmId },
+  });
+  return data;
+}
+
+export async function previewTemplateApply(
+  templateId: string,
+  body: ApplyRequest,
+): Promise<PreviewResponse> {
+  const { data } = await apiClient.post<PreviewResponse>(
+    `/v1/plan-templates/${templateId}/preview`,
+    body,
+  );
+  return data;
+}
+
+export async function applyTemplate(
+  templateId: string,
+  body: ApplyRequest,
+): Promise<ApplyResponse> {
+  const { data } = await apiClient.post<ApplyResponse>(
+    `/v1/plan-templates/${templateId}/apply`,
+    body,
+  );
+  return data;
+}

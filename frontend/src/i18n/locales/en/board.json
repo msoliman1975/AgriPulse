@@ -3,6 +3,12 @@
   "subtitle": "Plan across all blocks. Click a cell to schedule.",
   "loadFailed": "Couldn't load the plan — try again.",
   "empty": "No active blocks on this farm yet.",
+  "template": {
+    "badge": "Tpl",
+    "fromTemplate": "Generated from a plan template",
+    "atStage": "scheduled at {{stage}}",
+    "applyButton": "Apply template"
+  },
   "nav": {
     "prev": "Prev",
     "next": "Next",

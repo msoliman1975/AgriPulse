@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  applyTemplate,
   archivePlanTemplate,
   createPlanTemplate,
   deletePlanTemplate,
   getPlanTemplate,
+  listAppliableTemplates,
   listPlanTemplates,
+  previewTemplateApply,
   publishPlanTemplate,
   resolveTemplatePhenology,
   updatePlanTemplate,
+  type ApplyRequest,
+  type ApplyResponse,
   type PlanTemplateDetail,
   type PlanTemplateWriteRequest,
   type TemplateStatus,
@@ -80,3 +85,27 @@ export function useDeletePlanTemplate() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ROOT }),
   });
 }
+
+// ---- Tenant apply ---------------------------------------------------------
+
+export function useAppliableTemplates(farmId: string | null) {
+  return useQuery({
+    queryKey: [...ROOT, "appliable", farmId] as const,
+    queryFn: () => listAppliableTemplates(farmId as string),
+    enabled: !!farmId,
+    staleTime: 30_000,
+  });
+}
+
+export function useApplyTemplate(farmId: string | null) {
+  const qc = useQueryClient();
+  return useMutation<ApplyResponse, Error, { templateId: string; body: ApplyRequest }>({
+    mutationFn: ({ templateId, body }) => applyTemplate(templateId, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["board", farmId] });
+      void qc.invalidateQueries({ queryKey: ["plans", farmId] });
+    },
+  });
+}
+
+export { previewTemplateApply };

@@ -84,5 +84,26 @@
       "milestoneRequired": "A milestone-anchored activity needs a milestone.",
       "stageRequired": "A stage-anchored activity needs a stage."
     }
+  },
+  "apply": {
+    "title": "Apply plan template",
+    "step": "Step {{current}} of {{total}}",
+    "noTemplates": "No published templates match this farm's crops yet.",
+    "matchingBlocks": "{{count}} blocks",
+    "blocksHint": "Matching-crop blocks are pre-selected. Set each block's start date (defaults to its planting date).",
+    "startDate": "Start",
+    "seasonLabel": "Season label",
+    "seasonYear": "Season year",
+    "previewSummary": "{{total}} activities will be scheduled · {{skipped}} skipped.",
+    "noActivitiesForBlock": "No activities resolve for this block.",
+    "skippedForBlock": "{{count}} activity skipped (stage not resolvable).",
+    "doneSummary": "Applied — {{created}} activities created, {{skipped}} skipped.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "preview": "Preview schedule",
+    "confirm": "Apply",
+    "applying": "Applying…"
   }
 }

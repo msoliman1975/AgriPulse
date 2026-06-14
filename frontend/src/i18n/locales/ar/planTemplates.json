@@ -84,5 +84,26 @@
       "milestoneRequired": "النشاط المسند إلى معلم يحتاج إلى معلم.",
       "stageRequired": "النشاط المسند إلى مرحلة يحتاج إلى مرحلة."
     }
+  },
+  "apply": {
+    "title": "تطبيق قالب خطة",
+    "step": "الخطوة {{current}} من {{total}}",
+    "noTemplates": "لا توجد قوالب منشورة تطابق محاصيل هذه المزرعة بعد.",
+    "matchingBlocks": "{{count}} بلوكات",
+    "blocksHint": "البلوكات المطابقة للمحصول محددة مسبقًا. حدّد تاريخ بدء كل بلوك (الافتراضي هو تاريخ زراعته).",
+    "startDate": "البدء",
+    "seasonLabel": "تسمية الموسم",
+    "seasonYear": "سنة الموسم",
+    "previewSummary": "سيتم جدولة {{total}} نشاطًا · تم تخطي {{skipped}}.",
+    "noActivitiesForBlock": "لا تُحَل أنشطة لهذا البلوك.",
+    "skippedForBlock": "تم تخطي {{count}} نشاطًا (تعذّر حل المرحلة).",
+    "doneSummary": "تم التطبيق — أُنشئ {{created}} نشاطًا، وتم تخطي {{skipped}}.",
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "next": "التالي",
+    "preview": "معاينة الجدول",
+    "confirm": "تطبيق",
+    "applying": "جارٍ التطبيق…"
   }
 }

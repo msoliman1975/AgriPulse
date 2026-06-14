@@ -43,6 +43,8 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
   const dayLabel = format(parseISO(activity.scheduled_date), "EEE");
   const isCompleted = activity.status === "completed";
   const isSkipped = activity.status === "skipped";
+  const fromTemplate = activity.source === "template";
+  const stageCode = activity.anchored_stage_code ?? null;
 
   return (
     <button
@@ -59,17 +61,28 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
       <span className="flex items-center gap-1 font-medium">
         <span aria-hidden="true">{icon}</span>
         <span className="truncate">{t(`type.${activity.activity_type}`)}</span>
+        {fromTemplate ? (
+          <span
+            className="rounded bg-ap-accent/15 px-1 text-[9px] font-semibold uppercase text-ap-accent"
+            title={t("template.fromTemplate")}
+          >
+            {t("template.badge")}
+          </span>
+        ) : null}
         <span className="ms-auto text-[10px] uppercase text-ap-muted">{dayLabel}</span>
       </span>
+      {stageCode ? (
+        <span className="truncate text-[10px] text-ap-muted" title={stageCode}>
+          {t("template.atStage", { stage: stageCode })}
+        </span>
+      ) : null}
       {activity.resources.length > 0 ? (
         <span className="truncate text-[11px] text-ap-muted">
           {activity.resources
             .slice(0, 2)
             .map((r) => `${r.kind === "worker" ? "👤" : "🔧"} ${r.name}`)
             .join(" · ")}
-          {activity.resources.length > 2
-            ? ` +${activity.resources.length - 2}`
-            : ""}
+          {activity.resources.length > 2 ? ` +${activity.resources.length - 2}` : ""}
         </span>
       ) : null}
     </button>

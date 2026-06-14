@@ -44,6 +44,10 @@ export interface PlanActivity {
   completed_by: string | null;
   created_at: string;
   updated_at: string;
+  // Provenance (PR-E): "manual" | "template" | "recommendation". For
+  // stage-anchored template rows, anchored_stage_code is the stage it landed on.
+  source?: string;
+  anchored_stage_code?: string | null;
 }
 
 export interface PlanCreatePayload {
@@ -201,10 +205,9 @@ export async function getBoard(
   weekStart: string,
   weeks = 8,
 ): Promise<BoardResponse> {
-  const { data } = await apiClient.get<BoardResponse>(
-    `/v1/farms/${farmId}/board`,
-    { params: { week_start: weekStart, weeks } },
-  );
+  const { data } = await apiClient.get<BoardResponse>(`/v1/farms/${farmId}/board`, {
+    params: { week_start: weekStart, weeks },
+  });
   return data;
 }
 
@@ -212,10 +215,7 @@ export async function createFlatActivity(
   farmId: string,
   payload: FlatActivityCreatePayload,
 ): Promise<PlanActivity> {
-  const { data } = await apiClient.post<PlanActivity>(
-    `/v1/farms/${farmId}/activities`,
-    payload,
-  );
+  const { data } = await apiClient.post<PlanActivity>(`/v1/farms/${farmId}/activities`, payload);
   return data;
 }
 
