@@ -36,7 +36,7 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
     >
       <div className="flex h-[46px] flex-none items-center gap-2 border-b border-ap-line px-3">
         {!collapsed ? (
-          <span className="flex-1 text-[12px] font-bold uppercase tracking-wide text-ap-muted">
+          <span className="flex-1 text-xs font-bold uppercase tracking-wide text-ap-muted">
             {t("rail.title")}
           </span>
         ) : null}
@@ -59,7 +59,7 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
           {pivots.map((b) => (
             <Row key={b.id} block={b} summary={summaries[b.id]} active={b.id === selectedId} onSelect={onSelect} />
           ))}
-          {units.length === 0 ? <div className="px-2 py-6 text-center text-[12px] text-ap-muted">{t("rail.empty")}</div> : null}
+          {units.length === 0 ? <div className="px-2 py-6 text-center text-xs text-ap-muted">{t("rail.empty")}</div> : null}
         </div>
       ) : null}
     </aside>
@@ -67,7 +67,7 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
 }
 
 function Group({ label }: { label: string }): ReactNode {
-  return <div className="px-2 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-wide text-ap-muted">{label}</div>;
+  return <div className="px-2 pb-1 pt-2.5 text-xs font-bold uppercase tracking-wide text-ap-muted">{label}</div>;
 }
 
 function Row({
@@ -93,12 +93,12 @@ function Row({
     >
       <Dot color={HEALTH_DOT[summary.health]} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-semibold text-ap-ink">{name}</div>
+        <div className="truncate text-sm font-semibold text-ap-ink">{name}</div>
         {summary.alert_count > 0 ? (
-          <div className="text-[11px] text-ap-crit">⚠ {summary.alert_count}</div>
+          <div className="text-xs text-ap-crit">⚠ {summary.alert_count}</div>
         ) : null}
       </div>
-      <span className="text-[12px] font-semibold tabular-nums text-ap-muted">
+      <span className="text-xs font-semibold tabular-nums text-ap-muted">
         {summary.ndvi_current != null ? summary.ndvi_current.toFixed(2) : "—"}
       </span>
     </button>
