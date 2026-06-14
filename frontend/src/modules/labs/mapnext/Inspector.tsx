@@ -1,16 +1,16 @@
 // Redesigned block inspector for /labs/map-next.
 //
 // Monitor view (read-only) is the default; sections are ordered
-// urgency -> cause -> response -> sources. "Manage" is a one-click menu
-// that delegates to the existing edit routes for v1 (write flows are
-// reused, not rebuilt — see docs/proposals/farm-management-redesign.md).
+// urgency -> cause -> response -> sources. "Manage" flips the inspector
+// into an in-place edit sub-view (ManagePanel) — no navigation to legacy
+// screens. See docs/proposals/farm-management-redesign.md.
 import clsx from "clsx";
-import { useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { IndexCode, IndexSeries, UnitDetail } from "../map/types";
 import { HEALTH_DOT, INDEX_META, INDEX_ORDER } from "./constants";
+import { ManagePanel, type ManageMode } from "./ManagePanel";
 import {
   Dot,
   Expander,
@@ -58,6 +58,14 @@ interface Props {
   onClose: () => void;
   farmId: string;
   onScout: () => void;
+  // First active imagery product for the selected block (enables grid config).
+  gridProductId: string | null;
+  // Page-level manage actions that need the map / a modal.
+  onReshape: () => void;
+  onInactivate: () => void;
+  // Bumped to force the inspector back to the monitor view (e.g. after the
+  // page commits a reshape/inactivate).
+  resetKey?: number;
 }
 
 export function Inspector({
@@ -69,11 +77,23 @@ export function Inspector({
   onClose,
   farmId,
   onScout,
+  gridProductId,
+  onReshape,
+  onInactivate,
+  resetKey,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const navigate = useNavigate();
   const manageRef = useRef<HTMLButtonElement>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [manageMode, setManageMode] = useState<ManageMode | null>(null);
+
+  // Drop any in-flight manage sub-view when the selection changes or the page
+  // signals a reset (e.g. reshape/inactivate committed).
+  const selId = detail?.id;
+  useEffect(() => {
+    setManageMode(null);
+    setManageOpen(false);
+  }, [selId, resetKey]);
 
   if (error) {
     return (
@@ -98,10 +118,35 @@ export function Inspector({
   const watch = detail.alerts.length - crit;
   const featured = detail.indices[activeIndex];
 
-  const manage = (path: string) => {
-    setManageOpen(false);
-    navigate(path);
-  };
+  // In-place Manage sub-view (edit / crop / grid). Reshape + inactivate are
+  // handled by the page (map + modal) via callbacks.
+  if (manageMode) {
+    const titles: Record<ManageMode, string> = {
+      edit: t("inspector.editDetails"),
+      crop: t("inspector.assignCrop"),
+      grid: t("inspector.gridConfig"),
+    };
+    return (
+      <Shell
+        onClose={onClose}
+        eyebrow={t("inspector.manageHeading")}
+        title={
+          <button type="button" onClick={() => setManageMode(null)} className="flex items-center gap-2 text-start">
+            <span className="text-ap-muted">‹</span> {titles[manageMode]}
+          </button>
+        }
+      >
+        <ManagePanel
+          mode={manageMode}
+          blockId={detail.id}
+          farmId={farmId}
+          hasCurrentCrop={detail.crop_assignment != null}
+          gridProductId={gridProductId}
+          onDone={() => setManageMode(null)}
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell
@@ -141,20 +186,20 @@ export function Inspector({
           </button>
           <Popover open={manageOpen} onClose={() => setManageOpen(false)} anchorRef={manageRef}>
             <PopHeading>{t("inspector.manageHeading")}</PopHeading>
-            <PopItem icon="✎" onClick={() => manage(`/farms/${farmId}/blocks/${detail.id}/edit`)}>
+            <PopItem icon="✎" onClick={() => { setManageOpen(false); setManageMode("edit"); }}>
               {t("inspector.editDetails")}
             </PopItem>
-            <PopItem icon="🌱" onClick={() => manage(`/farms/${farmId}/blocks/${detail.id}/edit`)}>
+            <PopItem icon="🌱" onClick={() => { setManageOpen(false); setManageMode("crop"); }}>
               {t("inspector.assignCrop")}
             </PopItem>
-            <PopItem icon="⬡" onClick={() => manage(`/labs/map/${farmId}?unit=${detail.id}`)}>
+            <PopItem icon="⬡" onClick={() => { setManageOpen(false); onReshape(); }}>
               {t("inspector.reshape")}
             </PopItem>
-            <PopItem icon="◫" onClick={() => manage(`/labs/map/${farmId}?unit=${detail.id}`)}>
+            <PopItem icon="◫" onClick={() => { setManageOpen(false); setManageMode("grid"); }}>
               {t("inspector.gridConfig")}
             </PopItem>
             <PopDivider />
-            <PopItem icon="⊘" danger onClick={() => manage(`/labs/map/${farmId}?unit=${detail.id}`)}>
+            <PopItem icon="⊘" danger onClick={() => { setManageOpen(false); onInactivate(); }}>
               {t("inspector.inactivate")}
             </PopItem>
           </Popover>

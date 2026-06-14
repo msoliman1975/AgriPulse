@@ -14,6 +14,7 @@ const PINNED_PREFIXES = [
   "/alerts/",
   "/reports/",
   "/config/",
+  "/labs/map-next/",
 ];
 
 /**

@@ -6,7 +6,26 @@
     "loading": "Loading farm…",
     "loadError": "Couldn't load this farm.",
     "retry": "Retry",
-    "scoutToast": "📍 Scout task — coming in a later iteration"
+    "scoutToast": "📍 Scout task — coming in a later iteration",
+    "reshapeHint": "Drag the boundary vertices, then Save.",
+    "reshapeTitle": "Reshaping boundary",
+    "previewError": "Couldn't load the impact preview."
+  },
+  "manage": {
+    "noGridProduct": "This block has no active imagery subscription yet, so there's no grid to configure.",
+    "editLoadError": "Couldn't load this block.",
+    "name": "Name",
+    "irrSystem": "Irrigation system",
+    "irrSource": "Irrigation source",
+    "soilTexture": "Soil texture",
+    "salinity": "Salinity class",
+    "soilPh": "Soil pH",
+    "tags": "Tags (comma-separated)",
+    "notes": "Notes",
+    "saveError": "Couldn't save — please retry.",
+    "saving": "Saving…",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "viewbar": {
     "index": "Index",
@@ -26,7 +45,10 @@
     "labels": "Labels",
     "borderOpacity": "Border opacity",
     "fillOpacity": "Block fill opacity",
-    "overlaysNote": "Grid & signal overlays arrive in a later iteration."
+    "overlays": "Overlays",
+    "grid": "Sub-block grid",
+    "gridIndex": "Grid index",
+    "signalNote": "Signal overlay arrives in a later iteration."
   },
   "add": {
     "block": "Draw block",
