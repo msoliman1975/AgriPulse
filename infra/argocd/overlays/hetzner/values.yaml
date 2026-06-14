@@ -14,16 +14,18 @@ global:
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev). 88d9e7b = PR #229 (crop-catalog UX:
-  # real category dropdown + clearer add-variety/strain affordances) on top of
-  # c7be0c2 = phenology-spine Track A (#232 phenology/size shape + validation +
-  # /crops/resolved-taxonomy; #233 seed mango+potato phenology + size classes).
-  # New public migrations 0032/0033 run via the PreSync migrate job.
+  # 5571e3b = phenology-spine Track B+C+D on top of Track A:
+  #   #236 block canopy_size_class + growth_stage_locked (tenant migration 0040)
+  #   #237 soil + canopy size exposed to the rules engine
+  #   #238 phenology auto-advance Beat task (writes growth_stage source='derived')
+  #   #239 mango decision trees (NDMI/NDRE/SAVI + stress induction)
+  # Tenant migration 0040 runs via the PreSync migrate_tenants job.
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "c7be0c2"
+      tag: "5571e3b"
     workers:
-      tag: "c7be0c2"
+      tag: "5571e3b"
     frontend:
       # d49810c = PR #235 (CropPicker strain-less-variety message) — #236 on top
       # is backend-only so frontend@d49810c == the #235 frontend. Frontend-only —
