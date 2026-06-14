@@ -25,11 +25,10 @@ global:
     workers:
       tag: "c7be0c2"
     frontend:
-      # 3197be4 = PR #234 (Farm Console iter 4: 7-index selector, collapsed
-      # inspector sections, area/faddan + recs-to-top + signals-in-topbar,
-      # full-bleed, type-scale polish). Frontend-only — api/workers stay on
-      # their own (phenology) promotion.
-      tag: "3197be4"
+      # d49810c = PR #235 (CropPicker strain-less-variety message) — #236 on top
+      # is backend-only so frontend@d49810c == the #235 frontend. Frontend-only —
+      # api/workers stay on their own (phenology) promotion.
+      tag: "d49810c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
