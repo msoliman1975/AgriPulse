@@ -232,10 +232,16 @@ export function DetailPanel({
               {detail.crop_assignment.variety_name
                 ? ` · ${detail.crop_assignment.variety_name}`
                 : ""}
+              {detail.crop_assignment.strain_name ? ` · ${detail.crop_assignment.strain_name}` : ""}
               <span className="text-slate-500">
                 {" · "}
                 {detail.crop_assignment.season_label}
               </span>
+              {detail.crop_assignment.crop_path ? (
+                <div className="font-mono text-[10px] text-emerald-700">
+                  {detail.crop_assignment.crop_path}
+                </div>
+              ) : null}
               {detail.crop_assignment.planting_date ? (
                 <div className="text-[10px] text-slate-500">
                   Planted {detail.crop_assignment.planting_date}

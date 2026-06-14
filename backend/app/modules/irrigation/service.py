@@ -116,6 +116,7 @@ class IrrigationServiceImpl:
         phenology = resolve_phenology_stages(
             crop_stages=ctx.get("crop_phenology_stages"),
             variety_override=ctx.get("variety_phenology_override"),
+            strain_override=ctx.get("strain_phenology_override"),
         )
 
         inputs = IrrigationInputs(

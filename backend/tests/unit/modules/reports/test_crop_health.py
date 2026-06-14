@@ -91,7 +91,7 @@ class TestCropHealthReport:
             }
 
         async def fake_crops(*_args: object, **_kwargs: object) -> dict:
-            return {b_normal: ("Wheat", "قمح")}
+            return {b_normal: ("Wheat", "قمح", "wheat")}
 
         monkeypatch.setattr(svc_module, "_select_crop_health_stats", fake_stats)
         monkeypatch.setattr(svc_module, "_select_block_current_crops", fake_crops)
@@ -113,6 +113,7 @@ class TestCropHealthReport:
         # Crop name attached to the block that has one.
         normal_row = next(r for r in out.blocks if r.block_name == "B-Normal")
         assert normal_row.crop_name_en == "Wheat"
+        assert normal_row.crop_path == "wheat"
         assert normal_row.trend_pct == Decimal("13.33")  # (0.68-0.60)/0.60
 
         # No-data block carries nulls + zero scene count.
@@ -127,6 +128,47 @@ class TestCropHealthReport:
         assert out.summary.unknown == 1
         # avg of 0.680 + 0.250 = 0.465
         assert out.summary.avg_last_value == Decimal("0.465")
+
+    async def test_crop_path_filter_keeps_only_matching_blocks(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        farm_id = uuid4()
+        b_alphonso, b_eswwy, b_nocrop = uuid4(), uuid4(), uuid4()
+        s = _service()
+        s._farms.get_farm_by_id = AsyncMock(return_value={"id": farm_id, "name": "Orchard"})  # type: ignore[attr-defined]
+        s._farms.list_blocks = AsyncMock(  # type: ignore[attr-defined]
+            return_value=[
+                {"id": b_alphonso, "name": "A-Alphonso"},
+                {"id": b_eswwy, "name": "B-Eswwy"},
+                {"id": b_nocrop, "name": "C-NoCrop"},
+            ]
+        )
+
+        async def no_stats(*_args: object, **_kwargs: object) -> dict:
+            return {}
+
+        async def fake_crops(*_args: object, **_kwargs: object) -> dict:
+            return {
+                b_alphonso: ("Mango", None, "mango.alphonso.short"),
+                b_eswwy: ("Mango", None, "mango.eswwy.long"),
+                # b_nocrop intentionally absent (no current crop).
+            }
+
+        monkeypatch.setattr(svc_module, "_select_crop_health_stats", no_stats)
+        monkeypatch.setattr(svc_module, "_select_block_current_crops", fake_crops)
+
+        # Whole-variety prefix keeps only the Alphonso block; the sibling
+        # variety and the crop-less block are dropped.
+        out = await s.get_crop_health_report(
+            farm_id=farm_id,
+            index_code="ndvi",
+            since=None,
+            until=None,
+            crop_path="mango.alphonso",
+        )
+        assert [r.block_name for r in out.blocks] == ["A-Alphonso"]
+        assert out.crop_path == "mango.alphonso"
+        assert out.summary.block_count == 1
 
     async def test_empty_farm(self, monkeypatch: pytest.MonkeyPatch) -> None:
         farm_id = uuid4()

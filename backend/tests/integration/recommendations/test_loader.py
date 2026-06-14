@@ -64,6 +64,29 @@ def test_all_seed_files_compile() -> None:
         assert compiled["code"], f"{path.name} compiled without a code"
 
 
+# --- crop_path targeting (crop taxonomy) -------------------------------
+
+
+def test_crop_path_defaults_to_none() -> None:
+    compiled = compile_tree(_minimal_leaf_spec(), source_path="x")
+    assert compiled["crop_path"] is None
+
+
+def test_crop_path_compiles_when_present() -> None:
+    compiled = compile_tree(_minimal_leaf_spec(crop_path="mango.alphonso.short"), source_path="x")
+    assert compiled["crop_path"] == "mango.alphonso.short"
+
+
+def test_crop_path_rejects_empty_segment() -> None:
+    with pytest.raises(Exception, match="empty segment"):
+        compile_tree(_minimal_leaf_spec(crop_path="mango..short"), source_path="x")
+
+
+def test_crop_path_rejects_non_string() -> None:
+    with pytest.raises(Exception, match="crop_path"):
+        compile_tree(_minimal_leaf_spec(crop_path=123), source_path="x")
+
+
 # --- evidence / transferability provenance blocks (KB P1-A) -----------
 
 

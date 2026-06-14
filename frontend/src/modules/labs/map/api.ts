@@ -10,7 +10,14 @@ import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { getBlock, listBlocks, type Block, type BlockDetail } from "@/api/blocks";
 import { getBlocksSummary } from "@/api/blocksSummary";
 import { listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
-import { listCrops, listCropVarieties, type Crop, type CropVariety } from "@/api/crops";
+import {
+  listCrops,
+  listCropVarieties,
+  listVarietyStrains,
+  type Crop,
+  type CropVariety,
+  type CropVarietyStrain,
+} from "@/api/crops";
 import { getFarm, type FarmDetail } from "@/api/farms";
 import { getTimeseries, type IndexCode as ApiIndexCode } from "@/api/indices";
 import { listAlerts } from "@/api/alerts";
@@ -425,6 +432,7 @@ async function safeSignalObs(blockId: string, since: string): Promise<SignalObse
 // the same /v1/crops rows.
 const cropCache = new Map<string, Crop>();
 const varietyCache = new Map<string, CropVariety>();
+const strainCache = new Map<string, CropVarietyStrain>();
 
 async function resolveCropAssignment(
   c: BlockCropAssignment | null,
@@ -432,6 +440,7 @@ async function resolveCropAssignment(
   if (!c) return null;
   let cropName = "—";
   let varietyName: string | null = null;
+  let strainName: string | null = null;
   const cached = cropCache.get(c.crop_id);
   if (cached) cropName = cached.name_en;
   else {
@@ -456,9 +465,24 @@ async function resolveCropAssignment(
       }
     }
   }
+  if (c.crop_variety_strain_id && c.crop_variety_id) {
+    const s = strainCache.get(c.crop_variety_strain_id);
+    if (s) strainName = s.name_en;
+    else {
+      try {
+        const ss = await listVarietyStrains(c.crop_variety_id);
+        for (const strain of ss) strainCache.set(strain.id, strain);
+        strainName = strainCache.get(c.crop_variety_strain_id)?.name_en ?? null;
+      } catch {
+        strainName = null;
+      }
+    }
+  }
   return {
     crop_name: cropName,
     variety_name: varietyName,
+    strain_name: strainName,
+    crop_path: c.crop_path,
     season_label: c.season_label,
     planting_date: c.planting_date,
     growth_stage: c.growth_stage,

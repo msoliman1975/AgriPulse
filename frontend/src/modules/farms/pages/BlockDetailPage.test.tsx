@@ -18,6 +18,7 @@ vi.mock("@/modules/indices/components/IndexTrendChart", () => ({ IndexTrendChart
 vi.mock("@/api/crops", () => ({
   listCrops: vi.fn().mockResolvedValue([]),
   listCropVarieties: vi.fn().mockResolvedValue([]),
+  listVarietyStrains: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("@/api/attachments", () => ({
   listFarmAttachments: vi.fn().mockResolvedValue([]),

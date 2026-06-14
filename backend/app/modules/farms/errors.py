@@ -82,6 +82,20 @@ class BlockCodeConflictError(APIError):
         )
 
 
+class CropTaxonomyError(APIError):
+    """A crop assignment violates the crop's classification depth — e.g.
+    a variety_strain crop missing its strain, or a crop_only crop given a
+    variety. Surfaces as 422."""
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid crop taxonomy selection",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/invalid-crop-taxonomy",
+        )
+
+
 class InvalidUnitTypeError(APIError):
     """Pivot/sector parent rules violated. Surfaces as 422.
 

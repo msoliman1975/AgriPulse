@@ -11,6 +11,7 @@ import {
   type OperationsLogReportResponse,
   type RangeParams,
   type WaterBalanceReportResponse,
+  type WeatherSummaryParams,
   type WeatherSummaryReportResponse,
   type ZoneAnomalyReportResponse,
 } from "@/api/reports";
@@ -58,7 +59,7 @@ export function useWaterBalanceReport(
 /** Weather & GDD summary report for a farm over a date range. */
 export function useWeatherSummaryReport(
   farmId: string,
-  params: RangeParams,
+  params: WeatherSummaryParams,
 ): ReturnType<typeof useQuery<WeatherSummaryReportResponse>> {
   return useQuery({
     queryKey: ["reports", "weather-summary", farmId, params] as const,

@@ -40,7 +40,8 @@ class IrrigationRepository:
                     SELECT b.id AS block_id, b.farm_id,
                            b.irrigation_system,
                            bc.id AS block_crop_id,
-                           bc.crop_id, bc.crop_variety_id, bc.growth_stage
+                           bc.crop_id, bc.crop_variety_id,
+                           bc.crop_variety_strain_id, bc.growth_stage
                     FROM blocks b
                     LEFT JOIN block_crops bc
                       ON bc.block_id = b.id
@@ -102,6 +103,27 @@ class IrrigationRepository:
             )
             if v_row is not None:
                 out["variety_phenology_override"] = v_row["phenology_stages_override"]
+
+        out["strain_phenology_override"] = None
+        if out.get("crop_variety_strain_id") is not None:
+            s_row = (
+                (
+                    await self._public.execute(
+                        text(
+                            """
+                        SELECT phenology_stages_override
+                        FROM public.crop_variety_strains
+                        WHERE id = :id AND is_active = TRUE
+                        """
+                        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                        {"id": out["crop_variety_strain_id"]},
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if s_row is not None:
+                out["strain_phenology_override"] = s_row["phenology_stages_override"]
         return out
 
     async def get_recent_weather(

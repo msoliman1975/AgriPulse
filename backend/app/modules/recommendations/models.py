@@ -46,6 +46,10 @@ class DecisionTree(Base, TimestampedMixin):
     description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     crop_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Hierarchical taxonomy path the tree targets, prefix-matched against a
+    # block's ``block_crops.crop_path`` (e.g. ``mango`` / ``mango.alphonso``
+    # / ``mango.alphonso.short``). NULL → fall back to ``crop_id`` match.
+    crop_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     applicable_regions: Mapped[list[str]] = mapped_column(
         ARRAY(Text),
         nullable=False,

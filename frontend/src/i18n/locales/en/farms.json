@@ -158,6 +158,8 @@
     "submit": "Assign crop",
     "variety": "Variety",
     "noVariety": "— none —",
+    "strain": "Strain",
+    "noStrain": "— none —",
     "back": "Back to farm",
     "unitType": {
       "block": "Block",

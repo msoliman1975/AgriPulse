@@ -26,6 +26,7 @@ from app.modules.farms.errors import (
     BlockCodeConflictError,
     BlockNotFoundError,
     CropNotFoundError,
+    CropTaxonomyError,
     FarmCodeConflictError,
     FarmMemberAlreadyAssignedError,
     FarmMembershipMissingError,
@@ -37,6 +38,7 @@ from app.modules.farms.models import (
     BlockCrop,
     Crop,
     CropVariety,
+    CropVarietyStrain,
     Farm,
     FarmAttachment,
     GrowthStageLog,
@@ -691,6 +693,7 @@ class FarmsRepository:
         block_id: UUID,
         crop_id: UUID,
         crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None = None,
         season_label: str,
         planting_date: Any,
         expected_harvest_start: Any,
@@ -709,23 +712,59 @@ class FarmsRepository:
         if block_exists.first() is None:
             raise BlockNotFoundError(block_id)
 
-        # Confirm crop exists in the public catalog (cross-schema logical FK).
-        crop_exists = await self._public.execute(
-            select(Crop.id).where(Crop.id == crop_id, Crop.is_active.is_(True))
-        )
-        if crop_exists.first() is None:
-            raise CropNotFoundError(crop_id)
-
-        if crop_variety_id is not None:
-            v_exists = await self._public.execute(
-                select(CropVariety.id).where(
-                    CropVariety.id == crop_variety_id,
-                    CropVariety.crop_id == crop_id,
-                    CropVariety.is_active.is_(True),
+        # Confirm crop exists + read its code + classification depth.
+        crop_row = (
+            await self._public.execute(
+                select(Crop.code, Crop.classification_depth).where(
+                    Crop.id == crop_id, Crop.is_active.is_(True)
                 )
             )
-            if v_exists.first() is None:
+        ).first()
+        if crop_row is None:
+            raise CropNotFoundError(crop_id)
+
+        # Resolve + validate variety / strain containment, collecting paths.
+        variety_path: str | None = None
+        if crop_variety_id is not None:
+            v_row = (
+                await self._public.execute(
+                    select(CropVariety.path).where(
+                        CropVariety.id == crop_variety_id,
+                        CropVariety.crop_id == crop_id,
+                        CropVariety.is_active.is_(True),
+                    )
+                )
+            ).first()
+            if v_row is None:
                 raise CropNotFoundError(crop_variety_id)
+            variety_path = v_row.path
+
+        strain_path: str | None = None
+        if crop_variety_strain_id is not None:
+            if crop_variety_id is None:
+                raise CropTaxonomyError(reason="A strain requires a variety.")
+            s_row = (
+                await self._public.execute(
+                    select(CropVarietyStrain.path).where(
+                        CropVarietyStrain.id == crop_variety_strain_id,
+                        CropVarietyStrain.crop_variety_id == crop_variety_id,
+                        CropVarietyStrain.is_active.is_(True),
+                    )
+                )
+            ).first()
+            if s_row is None:
+                raise CropNotFoundError(crop_variety_strain_id)
+            strain_path = s_row.path
+
+        # Enforce exact classification depth + derive the canonical path.
+        crop_path = _resolve_crop_path(
+            depth=crop_row.classification_depth,
+            crop_code=crop_row.code,
+            crop_variety_id=crop_variety_id,
+            variety_path=variety_path,
+            crop_variety_strain_id=crop_variety_strain_id,
+            strain_path=strain_path,
+        )
 
         # Two-phase: flip prior current to FALSE, then insert. The unique
         # partial index on (block_id) WHERE is_current = TRUE makes the
@@ -742,6 +781,8 @@ class FarmsRepository:
             block_id=block_id,
             crop_id=crop_id,
             crop_variety_id=crop_variety_id,
+            crop_variety_strain_id=crop_variety_strain_id,
+            crop_path=crop_path,
             season_label=season_label,
             planting_date=planting_date,
             expected_harvest_start=expected_harvest_start,
@@ -784,6 +825,7 @@ class FarmsRepository:
                 "relevant_indices": list(r.relevant_indices or []),
                 "phenology_stages": r.phenology_stages,
                 "default_thresholds": r.default_thresholds,
+                "classification_depth": r.classification_depth,
             }
             for r in rows
         ]
@@ -802,6 +844,32 @@ class FarmsRepository:
                 "code": r.code,
                 "name_en": r.name_en,
                 "name_ar": r.name_ar,
+                "path": r.path,
+                "attributes": dict(r.attributes or {}),
+                "default_thresholds": r.default_thresholds,
+                "phenology_stages_override": r.phenology_stages_override,
+            }
+            for r in rows
+        ]
+
+    async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
+        stmt = (
+            select(CropVarietyStrain)
+            .where(
+                CropVarietyStrain.crop_variety_id == crop_variety_id,
+                CropVarietyStrain.is_active.is_(True),
+            )
+            .order_by(CropVarietyStrain.name_en)
+        )
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "crop_variety_id": r.crop_variety_id,
+                "code": r.code,
+                "name_en": r.name_en,
+                "name_ar": r.name_ar,
+                "path": r.path,
                 "attributes": dict(r.attributes or {}),
                 "default_thresholds": r.default_thresholds,
                 "phenology_stages_override": r.phenology_stages_override,
@@ -1345,12 +1413,43 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
     return out
 
 
+def _resolve_crop_path(
+    *,
+    depth: str,
+    crop_code: str,
+    crop_variety_id: UUID | None,
+    variety_path: str | None,
+    crop_variety_strain_id: UUID | None,
+    strain_path: str | None,
+) -> str:
+    """Enforce a crop's exact classification depth and return the
+    canonical path. Raises CropTaxonomyError on a depth mismatch."""
+    if depth == "crop_only":
+        if crop_variety_id is not None or crop_variety_strain_id is not None:
+            raise CropTaxonomyError(
+                reason="This crop is not sub-classified; omit variety and strain."
+            )
+        return crop_code
+    if depth == "variety":
+        if crop_variety_id is None:
+            raise CropTaxonomyError(reason="This crop requires a variety.")
+        if crop_variety_strain_id is not None:
+            raise CropTaxonomyError(reason="This crop has no strain level; omit the strain.")
+        return variety_path or crop_code
+    # variety_strain
+    if crop_variety_id is None or crop_variety_strain_id is None:
+        raise CropTaxonomyError(reason="This crop requires both a variety and a strain.")
+    return strain_path or crop_code
+
+
 def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
     return {
         "id": bc.id,
         "block_id": bc.block_id,
         "crop_id": bc.crop_id,
         "crop_variety_id": bc.crop_variety_id,
+        "crop_variety_strain_id": bc.crop_variety_strain_id,
+        "crop_path": bc.crop_path,
         "season_label": bc.season_label,
         "planting_date": bc.planting_date,
         "expected_harvest_start": bc.expected_harvest_start,

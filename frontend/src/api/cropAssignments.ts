@@ -7,6 +7,9 @@ export interface BlockCropAssignment {
   block_id: string;
   crop_id: string;
   crop_variety_id: string | null;
+  crop_variety_strain_id: string | null;
+  // Denormalized hierarchical path, e.g. "mango.alphonso.short" or "cotton".
+  crop_path: string;
   season_label: string;
   planting_date: string | null;
   expected_harvest_start: string | null;
@@ -27,6 +30,7 @@ export interface BlockCropAssignment {
 export interface BlockCropAssignPayload {
   crop_id: string;
   crop_variety_id?: string | null;
+  crop_variety_strain_id?: string | null;
   season_label: string;
   planting_date?: string | null;
   expected_harvest_start?: string | null;

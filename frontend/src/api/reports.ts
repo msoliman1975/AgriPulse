@@ -17,6 +17,7 @@ export interface CropHealthBlockRow {
   block_name: string;
   crop_name_en: string | null;
   crop_name_ar: string | null;
+  crop_path: string | null;
   status: CropHealthStatus;
   last_value: string | null;
   last_observed_at: string | null;
@@ -47,6 +48,7 @@ export interface CropHealthReportResponse {
   farm_name: string;
   index_code: string;
   period: ReportPeriod;
+  crop_path: string | null;
   blocks: CropHealthBlockRow[];
   summary: CropHealthSummary;
 }
@@ -55,6 +57,8 @@ export interface CropHealthParams {
   index_code?: string;
   since?: string;
   until?: string;
+  /** Crop-taxonomy path prefix filter (e.g. "mango.alphonso.short"). */
+  crop_path?: string;
 }
 
 export async function getCropHealthReport(
@@ -211,14 +215,21 @@ export interface WeatherSummaryReportResponse {
   farm_id: string;
   farm_name: string;
   period: ReportPeriod;
+  crop_path: string | null;
   stats: WeatherSummaryStats;
   daily: WeatherDailyPoint[];
   crops: WeatherCropContext[];
 }
 
+/** Weather-summary params: date range plus an optional crop-taxonomy
+ * path prefix that narrows the crop context list. */
+export interface WeatherSummaryParams extends RangeParams {
+  crop_path?: string;
+}
+
 export async function getWeatherSummaryReport(
   farmId: string,
-  params: RangeParams = {},
+  params: WeatherSummaryParams = {},
 ): Promise<WeatherSummaryReportResponse> {
   const { data } = await apiClient.get<WeatherSummaryReportResponse>(
     `/v1/farms/${farmId}/reports/weather-summary`,

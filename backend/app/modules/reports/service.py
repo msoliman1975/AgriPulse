@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
 from app.modules.grid.anomaly import DEFAULT_K, DEFAULT_MIN_CELLS, DEFAULT_MIN_STD
+from app.shared.crop_taxonomy import path_matches
 
 from .schemas import (
     CropHealthBlockRow,
@@ -105,6 +106,7 @@ class ReportsService:
         index_code: str,
         since: datetime | None,
         until: datetime | None,
+        crop_path: str | None = None,
     ) -> CropHealthReportResponse:
         """Per-block vegetation summary for one index over the window.
 
@@ -112,7 +114,12 @@ class ReportsService:
         spatial percentiles + baseline z per block; blocks with no scene
         in the window still appear (with null metrics) so the report
         lists the whole farm. Status is derived from the latest z so it
-        is index-agnostic."""
+        is index-agnostic.
+
+        When ``crop_path`` is given, only blocks whose current crop falls
+        under that taxonomy path prefix are included (``mango`` = every
+        Mango block, ``mango.alphonso.short`` = exactly Short Alphonso);
+        blocks with no crop are dropped while a filter is active."""
         farm = await self._load_farm(farm_id)
         period = resolve_period(since, until)
         blocks = await self._list_active_blocks(farm_id)
@@ -125,6 +132,11 @@ class ReportsService:
             until=period.until,
         )
         crops = await _select_block_current_crops(self._session, farm_id=farm_id)
+
+        if crop_path:
+            blocks = [
+                b for b in blocks if path_matches(crop_path, _crop_path_of(crops.get(b["id"])))
+            ]
 
         rows: list[CropHealthBlockRow] = []
         counts = {"normal": 0, "watch": 0, "stressed": 0, "unknown": 0}
@@ -147,6 +159,7 @@ class ReportsService:
                         block_name=block_name,
                         crop_name_en=crop[0] if crop else None,
                         crop_name_ar=crop[1] if crop else None,
+                        crop_path=(crop[2] or None) if crop else None,
                         status=status,
                         last_value=None,
                         last_observed_at=None,
@@ -179,6 +192,7 @@ class ReportsService:
                     block_name=block_name,
                     crop_name_en=crop[0] if crop else None,
                     crop_name_ar=crop[1] if crop else None,
+                    crop_path=(crop[2] or None) if crop else None,
                     status=status,
                     last_value=last_value,
                     last_observed_at=s["last_time"],
@@ -214,6 +228,7 @@ class ReportsService:
             farm_name=farm["name"],
             index_code=index_code,
             period=period,
+            crop_path=crop_path,
             blocks=rows,
             summary=summary,
         )
@@ -454,16 +469,24 @@ class ReportsService:
         farm_id: UUID,
         since: datetime | None,
         until: datetime | None,
+        crop_path: str | None = None,
     ) -> WeatherSummaryReportResponse:
         """Farm temperature / rainfall / ET₀ / GDD roll-up plus the daily
-        series for charting and the current-crop agronomic context."""
+        series for charting and the current-crop agronomic context.
+
+        The weather series is farm-level, so ``crop_path`` narrows only
+        the crop context list (and its block counts) to crops under that
+        taxonomy path prefix — the reader can then judge accumulated GDD
+        against just the variety/strain they care about."""
         farm = await self._load_farm(farm_id)
         period = resolve_period(since, until)
 
         rows = await _select_weather_daily(
             self._session, farm_id=farm_id, since=period.since.date(), until=period.until.date()
         )
-        crops = await _select_weather_crop_context(self._session, farm_id=farm_id)
+        crops = await _select_weather_crop_context(
+            self._session, farm_id=farm_id, crop_path=crop_path
+        )
 
         daily = [
             WeatherDailyPoint(
@@ -495,6 +518,7 @@ class ReportsService:
             farm_id=farm_id,
             farm_name=farm["name"],
             period=period,
+            crop_path=crop_path,
             stats=stats,
             daily=daily,
             crops=crop_ctx,
@@ -605,6 +629,13 @@ def get_reports_service(
 # --- module-level helpers ---------------------------------------------------
 
 
+def _crop_path_of(crop: tuple[str, str | None, str] | None) -> str | None:
+    """Pull the crop_path out of a (name_en, name_ar, crop_path) tuple,
+    or None when the block has no current crop — keeps the crop-health
+    filter readable."""
+    return crop[2] if crop else None
+
+
 def _status_from_z(z: Decimal | None) -> CropHealthStatus:
     """Map a baseline z-score to a vegetation status. Only the negative
     side (below normal) is a concern."""
@@ -702,15 +733,16 @@ async def _select_crop_health_stats(
 
 async def _select_block_current_crops(
     session: AsyncSession, *, farm_id: UUID
-) -> dict[UUID, tuple[str, str | None]]:
-    """Current crop name (en, ar) per block for a farm. Only the
-    is_current assignment is returned; blocks with none are absent."""
+) -> dict[UUID, tuple[str, str | None, str]]:
+    """Current crop (name_en, name_ar, crop_path) per block for a farm.
+    Only the is_current assignment is returned; blocks with none are
+    absent. ``crop_path`` backs the crop-taxonomy report filter."""
     from sqlalchemy import bindparam, text
     from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
     sql = text(
         """
-        SELECT bc.block_id, c.name_en, c.name_ar
+        SELECT bc.block_id, c.name_en, c.name_ar, bc.crop_path
         FROM block_crops bc
         JOIN blocks b ON b.id = bc.block_id AND b.deleted_at IS NULL
         JOIN public.crops c ON c.id = bc.crop_id
@@ -721,7 +753,10 @@ async def _select_block_current_crops(
     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
     result = await session.execute(sql, {"farm_id": farm_id})
-    return {row["block_id"]: (row["name_en"], row["name_ar"]) for row in result.mappings().all()}
+    return {
+        row["block_id"]: (row["name_en"], row["name_ar"], row["crop_path"] or "")
+        for row in result.mappings().all()
+    }
 
 
 async def _select_blocks_with_grid(session: AsyncSession, *, farm_id: UUID) -> set[UUID]:
@@ -943,10 +978,14 @@ async def _select_weather_daily(
 
 
 async def _select_weather_crop_context(
-    session: AsyncSession, *, farm_id: UUID
+    session: AsyncSession, *, farm_id: UUID, crop_path: str | None = None
 ) -> list[dict[str, Any]]:
     """Current crops on the farm with their GDD base temp + default
-    season length, for interpreting the accumulated GDD."""
+    season length, for interpreting the accumulated GDD.
+
+    ``crop_path`` (optional) restricts to block assignments under that
+    hierarchical taxonomy prefix — exact path or any descendant — so the
+    block counts reflect only the matching variety/strain."""
     from sqlalchemy import bindparam, text
     from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
@@ -961,12 +1000,17 @@ async def _select_weather_crop_context(
         WHERE b.farm_id = :farm_id
           AND bc.deleted_at IS NULL
           AND bc.is_current IS TRUE
+          AND (
+              :crop_path IS NULL
+              OR bc.crop_path = :crop_path
+              OR bc.crop_path LIKE :crop_path || '.%'
+          )
         GROUP BY c.id, c.name_en, c.name_ar, c.gdd_base_temp_c, c.default_growing_season_days
         ORDER BY block_count DESC, c.name_en ASC
         """
     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
-    result = await session.execute(sql, {"farm_id": farm_id})
+    result = await session.execute(sql, {"farm_id": farm_id, "crop_path": crop_path})
     return [dict(r) for r in result.mappings().all()]
 
 

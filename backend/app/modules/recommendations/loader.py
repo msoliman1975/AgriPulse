@@ -64,6 +64,19 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     if not isinstance(code, str) or not code:
         raise DecisionTreeParseError(path=source_path, detail="missing 'code'")
 
+    crop_path = spec.get("crop_path")
+    if crop_path is not None:
+        if not isinstance(crop_path, str) or not crop_path:
+            raise DecisionTreeParseError(
+                path=source_path, detail="'crop_path' must be a non-empty string"
+            )
+        # The path is dot-joined catalog codes; reject empty segments so a
+        # typo like ``mango..short`` can't silently widen the match.
+        if any(seg == "" for seg in crop_path.split(".")):
+            raise DecisionTreeParseError(
+                path=source_path, detail=f"'crop_path' {crop_path!r} has an empty segment"
+            )
+
     name_en = spec.get("name_en")
     if not isinstance(name_en, str) or not name_en:
         raise DecisionTreeParseError(path=source_path, detail="missing 'name_en'")
@@ -106,6 +119,7 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
         "description_en": spec.get("description_en"),
         "description_ar": spec.get("description_ar"),
         "crop_code": spec.get("crop_code"),
+        "crop_path": crop_path,
         "applicable_regions": list(spec.get("applicable_regions") or []),
         "parameters": parameters_decl,
         "evidence": evidence,
@@ -577,7 +591,10 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         compiled = compile_tree(raw, source_path=str(path))
         compiled_hash = _hash_compiled(compiled)
-        crop_code = compiled.get("crop_code")
+        crop_path = compiled.get("crop_path")
+        # When a tree targets by path, derive crop_code from the path's first
+        # segment so crop_id stays populated for display + crop-scoped reads.
+        crop_code = compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
         crop_id = await _resolve_crop_id(public_session, crop_code)
 
         # Fetch existing platform tree by code. After PR-A, code uniqueness
@@ -608,6 +625,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                 description_en=compiled.get("description_en"),
                 description_ar=compiled.get("description_ar"),
                 crop_id=crop_id,
+                crop_path=crop_path,
                 applicable_regions=compiled.get("applicable_regions") or [],
             )
             latest_version: int | None = None
@@ -624,6 +642,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                            description_en = :description_en,
                            description_ar = :description_ar,
                            crop_id = :crop_id,
+                           crop_path = :crop_path,
                            applicable_regions = :applicable_regions,
                            is_active = TRUE,
                            updated_at = now()
@@ -636,6 +655,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                     "description_en": compiled.get("description_en"),
                     "description_ar": compiled.get("description_ar"),
                     "crop_id": crop_id,
+                    "crop_path": crop_path,
                     "applicable_regions": compiled.get("applicable_regions") or [],
                     "id": tree_id,
                 },
@@ -684,6 +704,7 @@ async def _insert_tree(
     description_en: str | None,
     description_ar: str | None,
     crop_id: Any,
+    crop_path: str | None = None,
     applicable_regions: list[str],
 ) -> Any:
     row = (
@@ -692,9 +713,9 @@ async def _insert_tree(
                 """
                 INSERT INTO public.decision_trees
                     (code, name_en, name_ar, description_en, description_ar,
-                     crop_id, applicable_regions, is_active)
+                     crop_id, crop_path, applicable_regions, is_active)
                 VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
-                        :crop_id, :applicable_regions, TRUE)
+                        :crop_id, :crop_path, :applicable_regions, TRUE)
                 RETURNING id
                 """
             ),
@@ -705,6 +726,7 @@ async def _insert_tree(
                 "description_en": description_en,
                 "description_ar": description_ar,
                 "crop_id": crop_id,
+                "crop_path": crop_path,
                 "applicable_regions": applicable_regions,
             },
         )

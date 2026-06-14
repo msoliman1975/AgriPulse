@@ -7,6 +7,7 @@ import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useCropHealthReport } from "@/queries/reports";
 
 import type { ReportProps } from "../registry";
+import { CropPathFilter } from "./CropPathFilter";
 import { ReportShell } from "./ReportShell";
 
 // Indices the report can run on. NDVI default; the rest cover the
@@ -29,10 +30,12 @@ function fmt(value: string | null, digits = 3): string {
 export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNode {
   const { t } = useTranslation("reports");
   const [indexCode, setIndexCode] = useState("ndvi");
+  const [cropPath, setCropPath] = useState<string | null>(null);
   const { data, isLoading, isError } = useCropHealthReport(farmId, {
     index_code: indexCode,
     since,
     until,
+    ...(cropPath ? { crop_path: cropPath } : {}),
   });
 
   const handleExport = (): void => {
@@ -40,6 +43,7 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
     const headers = [
       t("cropHealth.headers.block"),
       t("cropHealth.headers.crop"),
+      t("cropHealth.headers.cropPath"),
       t("cropHealth.headers.status"),
       `${indexCode.toUpperCase()} ${t("cropHealth.headers.last")}`,
       t("cropHealth.headers.observed"),
@@ -57,6 +61,7 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
     const rows: CsvCell[][] = data.blocks.map((b) => [
       b.block_name,
       b.crop_name_en ?? "",
+      b.crop_path ?? "",
       t(`cropHealth.status.${b.status}`),
       b.last_value ?? "",
       b.last_observed_at?.slice(0, 10) ?? "",
@@ -84,19 +89,22 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
-      <div className="print-hide mb-4 flex items-center gap-2">
-        <span className="label mb-0">{t("cropHealth.index")}</span>
-        <select
-          className="input w-auto"
-          value={indexCode}
-          onChange={(e) => setIndexCode(e.target.value)}
-        >
-          {INDEX_CODES.map((code) => (
-            <option key={code} value={code}>
-              {code.toUpperCase()}
-            </option>
-          ))}
-        </select>
+      <div className="print-hide mb-4 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="label mb-0">{t("cropHealth.index")}</span>
+          <select
+            className="input w-auto"
+            value={indexCode}
+            onChange={(e) => setIndexCode(e.target.value)}
+          >
+            {INDEX_CODES.map((code) => (
+              <option key={code} value={code}>
+                {code.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+        <CropPathFilter value={cropPath} onChange={setCropPath} />
       </div>
 
       {isLoading ? (
@@ -186,7 +194,12 @@ function CropHealthTable({
               <td className="px-3 py-2 text-ap-ink">
                 <div className="font-medium">{b.block_name}</div>
                 {b.crop_name_en ? (
-                  <div className="text-[11px] text-ap-muted">{b.crop_name_en}</div>
+                  <div className="text-[11px] text-ap-muted">
+                    {b.crop_name_en}
+                    {b.crop_path ? (
+                      <span className="ms-1 font-mono text-ap-primary">{b.crop_path}</span>
+                    ) : null}
+                  </div>
                 ) : null}
               </td>
               <td className="px-3 py-2">
