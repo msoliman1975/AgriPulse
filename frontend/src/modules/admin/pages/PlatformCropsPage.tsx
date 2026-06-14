@@ -18,7 +18,22 @@ import {
 } from "@/queries/cropCatalog";
 
 const DEPTHS: ClassificationDepth[] = ["crop_only", "variety", "variety_strain"];
-const CATEGORIES = ["cereal", "fruit_tree", "vegetable", "fiber", "legume", "oilseed", "forage"];
+// Known categories already in the catalog, plus a couple of common extras.
+// The form's category control is a dropdown of these with an "Other…"
+// escape so a brand-new category can still be typed.
+const CATEGORIES = [
+  "cereal",
+  "fruit_tree",
+  "vegetable",
+  "legume",
+  "oilseed",
+  "fiber",
+  "fodder",
+  "sugar",
+  "root_tuber",
+  "herb",
+];
+const OTHER = "__other__";
 
 function apiMsg(err: unknown): string {
   return isApiError(err) ? (err.problem.detail ?? err.problem.title) : String(err);
@@ -108,27 +123,29 @@ function CropRow({
   const [addingVariety, setAddingVariety] = useState(false);
   const updateCrop = useUpdateCrop();
 
-  const hasChildren = crop.classification_depth !== "crop_only";
-  const varieties = useAdminVarieties(crop.id, includeInactive, open && hasChildren);
+  const canHaveChildren = crop.classification_depth !== "crop_only";
+  const varieties = useAdminVarieties(crop.id, includeInactive, open && canHaveChildren);
 
   return (
     <div className={crop.is_active ? "" : "opacity-60"}>
       <div className="flex items-center gap-2 px-4 py-2.5">
         <button
-          className="w-4 text-ap-muted disabled:invisible"
-          disabled={!hasChildren}
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-start"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? t("crops.collapse") : t("crops.expand")}
         >
-          {hasChildren ? (open ? "▾" : "▸") : ""}
+          <span className="w-4 text-ap-muted">{open ? "▾" : "▸"}</span>
+          <span className="min-w-0">
+            <span className="font-medium text-ap-ink">{crop.name_en}</span>
+            {crop.name_ar ? (
+              <span className="ms-2 text-xs text-ap-muted">{crop.name_ar}</span>
+            ) : null}
+            <span className="ms-2 font-mono text-[11px] text-ap-primary">{crop.code}</span>
+            <DepthBadge depth={crop.classification_depth} />
+            {!crop.is_active ? <RetiredBadge /> : null}
+          </span>
         </button>
-        <div className="min-w-0 flex-1">
-          <span className="font-medium text-ap-ink">{crop.name_en}</span>
-          {crop.name_ar ? <span className="ms-2 text-xs text-ap-muted">{crop.name_ar}</span> : null}
-          <span className="ms-2 font-mono text-[11px] text-ap-primary">{crop.code}</span>
-          <DepthBadge depth={crop.classification_depth} />
-          {!crop.is_active ? <RetiredBadge /> : null}
-        </div>
         {canManage ? (
           <RowActions
             isActive={crop.is_active}
@@ -152,12 +169,29 @@ function CropRow({
         </div>
       ) : null}
 
-      {open && hasChildren ? (
+      {open && !canHaveChildren ? (
+        <div className="border-t border-ap-line bg-ap-bg/30 px-4 py-2 ps-10 text-xs text-ap-muted">
+          {t("crops.cropOnlyHint")}
+          {canManage ? (
+            <button
+              className="ms-1 text-ap-primary hover:underline"
+              onClick={() => setEditing(true)}
+            >
+              {t("crops.changeDepth")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {open && canHaveChildren ? (
         <div className="ps-10">
           {varieties.isLoading ? (
             <p className="px-4 py-2 text-xs text-ap-muted">{t("crops.loading")}</p>
           ) : (
             <div className="divide-y divide-ap-line border-t border-ap-line">
+              {(varieties.data ?? []).length === 0 ? (
+                <p className="px-4 py-2 text-xs text-ap-muted">{t("crops.noVarieties")}</p>
+              ) : null}
               {(varieties.data ?? []).map((v) => (
                 <VarietyRow
                   key={v.id}
@@ -177,7 +211,7 @@ function CropRow({
                     />
                   ) : (
                     <button
-                      className="text-xs text-ap-primary hover:underline"
+                      className="rounded border border-dashed border-ap-primary px-2 py-1 text-xs text-ap-primary hover:bg-ap-primary-soft"
                       onClick={() => setAddingVariety(true)}
                     >
                       + {t("crops.addVariety")}
@@ -219,20 +253,21 @@ function VarietyRow({
     <div className={variety.is_active ? "" : "opacity-60"}>
       <div className="flex items-center gap-2 px-4 py-2">
         <button
-          className="w-4 text-ap-muted disabled:invisible"
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-start disabled:cursor-default"
           disabled={!hasChildren}
           onClick={() => setOpen((v) => !v)}
         >
-          {hasChildren ? (open ? "▾" : "▸") : ""}
+          <span className="w-4 text-ap-muted">{hasChildren ? (open ? "▾" : "▸") : ""}</span>
+          <span className="min-w-0">
+            <span className="text-sm text-ap-ink">{variety.name_en}</span>
+            {variety.name_ar ? (
+              <span className="ms-2 text-xs text-ap-muted">{variety.name_ar}</span>
+            ) : null}
+            <span className="ms-2 font-mono text-[11px] text-ap-primary">{variety.path}</span>
+            {!variety.is_active ? <RetiredBadge /> : null}
+          </span>
         </button>
-        <div className="min-w-0 flex-1">
-          <span className="text-sm text-ap-ink">{variety.name_en}</span>
-          {variety.name_ar ? (
-            <span className="ms-2 text-xs text-ap-muted">{variety.name_ar}</span>
-          ) : null}
-          <span className="ms-2 font-mono text-[11px] text-ap-primary">{variety.path}</span>
-          {!variety.is_active ? <RetiredBadge /> : null}
-        </div>
         {canManage ? (
           <RowActions
             isActive={variety.is_active}
@@ -260,6 +295,9 @@ function VarietyRow({
             <p className="px-4 py-2 text-xs text-ap-muted">{t("crops.loading")}</p>
           ) : (
             <div className="divide-y divide-ap-line border-t border-ap-line">
+              {(strains.data ?? []).length === 0 ? (
+                <p className="px-4 py-2 text-xs text-ap-muted">{t("crops.noStrains")}</p>
+              ) : null}
               {(strains.data ?? []).map((s) => (
                 <StrainRow key={s.id} strain={s} canManage={canManage} />
               ))}
@@ -273,7 +311,7 @@ function VarietyRow({
                     />
                   ) : (
                     <button
-                      className="text-xs text-ap-primary hover:underline"
+                      className="rounded border border-dashed border-ap-primary px-2 py-1 text-xs text-ap-primary hover:bg-ap-primary-soft"
                       onClick={() => setAddingStrain(true)}
                     >
                       + {t("crops.addStrain")}
@@ -400,6 +438,9 @@ function CropForm({
   const [nameEn, setNameEn] = useState(crop?.name_en ?? "");
   const [nameAr, setNameAr] = useState(crop?.name_ar ?? "");
   const [category, setCategory] = useState(crop?.category ?? "cereal");
+  // True when the crop's category isn't one of the known options, so the
+  // dropdown shows "Other…" and reveals a free-text input.
+  const [customCat, setCustomCat] = useState(crop ? !CATEGORIES.includes(crop.category) : false);
   const [depth, setDepth] = useState<ClassificationDepth>(
     crop?.classification_depth ?? "crop_only",
   );
@@ -476,18 +517,35 @@ function CropForm({
           />
         </Field>
         <Field label={t("crops.form.category")}>
-          <input
+          <select
             className="input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            list="crop-categories"
-            required
-          />
-          <datalist id="crop-categories">
+            value={customCat ? OTHER : category}
+            onChange={(e) => {
+              if (e.target.value === OTHER) {
+                setCustomCat(true);
+                setCategory("");
+              } else {
+                setCustomCat(false);
+                setCategory(e.target.value);
+              }
+            }}
+          >
             {CATEGORIES.map((c) => (
-              <option key={c} value={c} />
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
-          </datalist>
+            <option value={OTHER}>{t("crops.form.categoryOther")}</option>
+          </select>
+          {customCat ? (
+            <input
+              className="input mt-1"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder={t("crops.form.categoryCustom")}
+              required
+            />
+          ) : null}
         </Field>
         <Field label={t("crops.form.depth")}>
           <select
