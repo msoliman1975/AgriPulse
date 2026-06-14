@@ -43,7 +43,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_decision_trees_crop_path", table_name="decision_trees", schema="public"
-    )
+    op.drop_index("ix_decision_trees_crop_path", table_name="decision_trees", schema="public")
     op.drop_column("decision_trees", "crop_path", schema="public")
