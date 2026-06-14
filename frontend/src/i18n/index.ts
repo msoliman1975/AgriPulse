@@ -23,6 +23,7 @@ import enIntegrations from "./locales/en/integrations.json";
 import enResources from "./locales/en/resources.json";
 import enBoard from "./locales/en/board.json";
 import enReports from "./locales/en/reports.json";
+import enFarmConsole from "./locales/en/farmConsole.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -44,6 +45,7 @@ import arIntegrations from "./locales/ar/integrations.json";
 import arResources from "./locales/ar/resources.json";
 import arBoard from "./locales/ar/board.json";
 import arReports from "./locales/ar/reports.json";
+import arFarmConsole from "./locales/ar/farmConsole.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -76,6 +78,7 @@ const resources = {
     resources: enResources,
     board: enBoard,
     reports: enReports,
+    farmConsole: enFarmConsole,
   },
   ar: {
     common: arCommon,
@@ -99,6 +102,7 @@ const resources = {
     resources: arResources,
     board: arBoard,
     reports: arReports,
+    farmConsole: arFarmConsole,
   },
 } as const;
 
@@ -132,6 +136,7 @@ void i18n
       "resources",
       "board",
       "reports",
+      "farmConsole",
     ],
     interpolation: { escapeValue: false },
     detection: {
