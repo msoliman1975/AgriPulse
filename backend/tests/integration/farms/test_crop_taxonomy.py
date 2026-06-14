@@ -110,7 +110,9 @@ async def test_taxonomy_depth_varieties_strains_and_paths(admin_session: AsyncSe
 
         varieties = (await client.get(f"/api/v1/crops/{mango['id']}/varieties")).json()
         by_code = {v["code"]: v for v in varieties}
-        assert set(by_code) == {"alphonso", "eswwy"}
+        # 0030 seeds the alphonso/eswwy worked example; 0033 adds the 5
+        # commercial varieties alongside them.
+        assert {"alphonso", "eswwy"}.issubset(set(by_code))
         assert by_code["alphonso"]["path"] == "mango.alphonso"
         assert by_code["eswwy"]["path"] == "mango.eswwy"
 
