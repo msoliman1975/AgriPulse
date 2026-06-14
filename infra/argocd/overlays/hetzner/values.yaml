@@ -25,10 +25,11 @@ global:
     workers:
       tag: "c7be0c2"
     frontend:
-      # 7a22c4b = PR #231 (Farm Console iter 3: map-flicker fix, signal overlay,
-      # native settings panels, /labs/map flip + legacy at /labs/map-legacy) on
-      # top of #228/#230. Frontend-only — api/workers stay at 88d9e7b.
-      tag: "7a22c4b"
+      # 3197be4 = PR #234 (Farm Console iter 4: 7-index selector, collapsed
+      # inspector sections, area/faddan + recs-to-top + signals-in-topbar,
+      # full-bleed, type-scale polish). Frontend-only — api/workers stay on
+      # their own (phenology) promotion.
+      tag: "3197be4"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
