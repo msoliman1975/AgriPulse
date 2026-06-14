@@ -44,9 +44,15 @@ from app.modules.farms.schemas import (
     BlockReactivationResponse,
     BlockResponse,
     BlockUpdateRequest,
+    CropCreateRequest,
     CropResponse,
+    CropStrainCreateRequest,
+    CropStrainUpdateRequest,
+    CropUpdateRequest,
+    CropVarietyCreateRequest,
     CropVarietyResponse,
     CropVarietyStrainResponse,
+    CropVarietyUpdateRequest,
     FarmCreateRequest,
     FarmDetailResponse,
     FarmInactivationPreviewResponse,
@@ -1125,3 +1131,170 @@ async def list_variety_strains(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return await service.list_variety_strains(crop_variety_id=crop_variety_id)
+
+
+# ---------- Crop catalog authoring (platform-only) -------------------------
+#
+# Mounted under /admin like the other platform-curated surfaces. Reads allow
+# include_inactive (so the catalog manager can see retired nodes); all reads
+# need platform.read, all writes need platform.manage_crops. Codes are
+# immutable (they anchor the canonical path); "delete" is a soft retire via
+# is_active=false on the update endpoints.
+
+
+@router.get(
+    "/admin/crops",
+    response_model=list[CropResponse],
+    summary="List crops in the catalog (platform; optionally include retired).",
+)
+async def admin_list_crops(
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_crops_admin(include_inactive=include_inactive)
+
+
+@router.post(
+    "/admin/crops",
+    response_model=CropResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a crop in the catalog (platform).",
+)
+async def admin_create_crop(
+    payload: CropCreateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.create_crop(fields=payload.model_dump(), actor_user_id=context.user_id)
+
+
+@router.patch(
+    "/admin/crops/{crop_id}",
+    response_model=CropResponse,
+    summary="Update a crop (platform). Code is immutable; is_active toggles retire.",
+)
+async def admin_update_crop(
+    crop_id: UUID,
+    payload: CropUpdateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.update_crop(
+        crop_id=crop_id,
+        fields=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.get(
+    "/admin/crops/{crop_id}/varieties",
+    response_model=list[CropVarietyResponse],
+    summary="List a crop's varieties (platform; optionally include retired).",
+)
+async def admin_list_varieties(
+    crop_id: UUID,
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_crop_varieties_admin(
+        crop_id=crop_id, include_inactive=include_inactive
+    )
+
+
+@router.post(
+    "/admin/crops/{crop_id}/varieties",
+    response_model=CropVarietyResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a variety under a crop (platform).",
+)
+async def admin_create_variety(
+    crop_id: UUID,
+    payload: CropVarietyCreateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.create_variety(
+        crop_id=crop_id,
+        code=payload.code,
+        name_en=payload.name_en,
+        name_ar=payload.name_ar,
+        actor_user_id=context.user_id,
+    )
+
+
+@router.patch(
+    "/admin/crop-varieties/{crop_variety_id}",
+    response_model=CropVarietyResponse,
+    summary="Update a variety (platform). Code immutable; is_active toggles retire.",
+)
+async def admin_update_variety(
+    crop_variety_id: UUID,
+    payload: CropVarietyUpdateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.update_variety(
+        variety_id=crop_variety_id,
+        fields=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.get(
+    "/admin/crop-varieties/{crop_variety_id}/strains",
+    response_model=list[CropVarietyStrainResponse],
+    summary="List a variety's strains (platform; optionally include retired).",
+)
+async def admin_list_strains(
+    crop_variety_id: UUID,
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_variety_strains_admin(
+        crop_variety_id=crop_variety_id, include_inactive=include_inactive
+    )
+
+
+@router.post(
+    "/admin/crop-varieties/{crop_variety_id}/strains",
+    response_model=CropVarietyStrainResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a strain under a variety (platform).",
+)
+async def admin_create_strain(
+    crop_variety_id: UUID,
+    payload: CropStrainCreateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.create_strain(
+        crop_variety_id=crop_variety_id,
+        code=payload.code,
+        name_en=payload.name_en,
+        name_ar=payload.name_ar,
+        actor_user_id=context.user_id,
+    )
+
+
+@router.patch(
+    "/admin/crop-variety-strains/{strain_id}",
+    response_model=CropVarietyStrainResponse,
+    summary="Update a strain (platform). Code immutable; is_active toggles retire.",
+)
+async def admin_update_strain(
+    strain_id: UUID,
+    payload: CropStrainUpdateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.update_strain(
+        strain_id=strain_id,
+        fields=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+    )

@@ -60,6 +60,42 @@ class CropNotFoundError(APIError):
         )
 
 
+class CropVarietyNotFoundError(APIError):
+    def __init__(self, variety_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Crop variety not found",
+            detail=f"No crop variety with id {variety_id} in the catalog.",
+            type_=f"{_TYPE_BASE}/crop-variety-not-found",
+            extras={"crop_variety_id": str(variety_id)},
+        )
+
+
+class CropStrainNotFoundError(APIError):
+    def __init__(self, strain_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Crop strain not found",
+            detail=f"No crop strain with id {strain_id} in the catalog.",
+            type_=f"{_TYPE_BASE}/crop-strain-not-found",
+            extras={"crop_variety_strain_id": str(strain_id)},
+        )
+
+
+class CropCatalogConflictError(APIError):
+    """A crop / variety / strain code collides with an existing sibling
+    (the catalog enforces unique codes per level). Surfaces as 409."""
+
+    def __init__(self, *, level: str, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Crop catalog code already in use",
+            detail=f"Another {level} already uses code {code!r} at this level.",
+            type_=f"{_TYPE_BASE}/crop-catalog-conflict",
+            extras={"level": level, "code": code},
+        )
+
+
 class FarmCodeConflictError(APIError):
     def __init__(self, code: str) -> None:
         super().__init__(

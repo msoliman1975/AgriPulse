@@ -3,8 +3,43 @@
     "section": "Platform",
     "tenants": "Tenants",
     "defaults": "Platform defaults",
+    "crops": "Crop catalog",
     "platformAdmins": "Platform admins",
     "platformHealth": "Integration health"
+  },
+  "crops": {
+    "title": "Crop catalog",
+    "subtitle": "Author the Crop → Variety → Strain taxonomy. Codes are permanent (they anchor the canonical path); retiring hides a node without deleting it.",
+    "readonlyHint": "You have read-only access — editing needs the crop-catalog management capability.",
+    "showRetired": "Show retired",
+    "addCrop": "Add crop",
+    "addVariety": "Add variety",
+    "addStrain": "Add strain",
+    "edit": "Edit",
+    "retire": "Retire",
+    "restore": "Restore",
+    "retired": "Retired",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the crop catalog.",
+    "empty": "No crops in the catalog yet.",
+    "depth": {
+      "crop_only": "Crop only",
+      "variety": "Variety",
+      "variety_strain": "Variety + Strain"
+    },
+    "form": {
+      "code": "Code",
+      "nameEn": "Name (EN)",
+      "nameAr": "Name (AR)",
+      "category": "Category",
+      "depth": "Classification depth",
+      "perennial": "Perennial",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    }
   },
   "platformHealth": {
     "title": "Cross-tenant integration health",

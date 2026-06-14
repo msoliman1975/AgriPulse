@@ -60,6 +60,7 @@ export type Capability =
   | "platform.manage_defaults"
   | "platform.manage_tenant_admins"
   | "platform.manage_platform_admins"
+  | "platform.manage_crops"
   | "tenant.manage_integrations"
   | "tenant.read_integration_health";
 

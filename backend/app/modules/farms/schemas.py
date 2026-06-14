@@ -73,6 +73,7 @@ class CropResponse(BaseModel):
     # How deep a block assignment for this crop is classified:
     # crop_only | variety | variety_strain. Drives the picker depth.
     classification_depth: str = "crop_only"
+    is_active: bool = True
 
 
 class CropVarietyResponse(BaseModel):
@@ -88,6 +89,7 @@ class CropVarietyResponse(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
+    is_active: bool = True
 
 
 class CropVarietyStrainResponse(BaseModel):
@@ -103,6 +105,89 @@ class CropVarietyStrainResponse(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
+    is_active: bool = True
+
+
+# ---------- Crop catalog authoring (platform-only) --------------------------
+
+ClassificationDepth = Literal["crop_only", "variety", "variety_strain"]
+
+
+class CropCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str = Field(min_length=1, max_length=255)
+    category: str = Field(min_length=1, max_length=64)
+    is_perennial: bool = False
+    scientific_name: str | None = Field(default=None, max_length=255)
+    classification_depth: ClassificationDepth = "crop_only"
+    default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
+    relevant_indices: list[str] = Field(default_factory=lambda: ["ndvi"])
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+
+class CropUpdateRequest(BaseModel):
+    # ``code`` is immutable — it anchors the canonical path on every
+    # descendant variety/strain + the denormalized block_crops.crop_path.
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, min_length=1, max_length=255)
+    category: str | None = Field(default=None, min_length=1, max_length=64)
+    is_perennial: bool | None = None
+    scientific_name: str | None = Field(default=None, max_length=255)
+    classification_depth: ClassificationDepth | None = None
+    default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
+    relevant_indices: list[str] | None = None
+    is_active: bool | None = None
+
+
+class CropVarietyCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+
+class CropVarietyUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
+    is_active: bool | None = None
+
+
+class CropStrainCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+
+class CropStrainUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
+    is_active: bool | None = None
 
 
 # ---------- Farms -----------------------------------------------------------

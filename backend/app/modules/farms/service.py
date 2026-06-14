@@ -23,6 +23,10 @@ from app.modules.farms import geometry as _geometry
 from app.modules.farms import pivot_geometry as _pivot_geometry
 from app.modules.farms.errors import (
     BlockNotFoundError,
+    CropCatalogConflictError,
+    CropNotFoundError,
+    CropStrainNotFoundError,
+    CropVarietyNotFoundError,
     FarmNotFoundError,
     InvalidUnitTypeError,
 )
@@ -410,6 +414,54 @@ class FarmService(Protocol):
     async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]: ...
 
     async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]: ...
+
+    # ---- Crop catalog authoring (platform-only) -----------------------
+
+    async def list_crops_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]: ...
+
+    async def list_crop_varieties_admin(
+        self, *, crop_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]: ...
+
+    async def list_variety_strains_admin(
+        self, *, crop_variety_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]: ...
+
+    async def create_crop(
+        self, *, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
+    async def update_crop(
+        self, *, crop_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
+    async def create_variety(
+        self,
+        *,
+        crop_id: UUID,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]: ...
+
+    async def update_variety(
+        self, *, variety_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
+    async def create_strain(
+        self,
+        *,
+        crop_variety_id: UUID,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]: ...
+
+    async def update_strain(
+        self, *, strain_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
 
 
 # ---------- Implementation --------------------------------------------------
@@ -1780,6 +1832,169 @@ class FarmServiceImpl:
 
     async def list_variety_strains(self, *, crop_variety_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_variety_strains(crop_variety_id=crop_variety_id)
+
+    # ---- Crop catalog authoring (platform-only) -----------------------
+
+    async def _audit_catalog(
+        self,
+        *,
+        event_type: str,
+        subject_kind: str,
+        subject_id: UUID,
+        actor_user_id: UUID | None,
+        details: dict[str, Any],
+    ) -> None:
+        await self._audit.record(
+            tenant_schema=None,
+            event_type=event_type,
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind=subject_kind,
+            subject_id=subject_id,
+            farm_id=None,
+            details=details,
+        )
+
+    async def list_crops_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]:
+        return await self._repo.list_crops(include_inactive=include_inactive)
+
+    async def list_crop_varieties_admin(
+        self, *, crop_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]:
+        if await self._repo.get_crop(crop_id=crop_id) is None:
+            raise CropNotFoundError(crop_id)
+        return await self._repo.list_crop_varieties(
+            crop_id=crop_id, include_inactive=include_inactive
+        )
+
+    async def list_variety_strains_admin(
+        self, *, crop_variety_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]:
+        if await self._repo.get_variety(variety_id=crop_variety_id) is None:
+            raise CropVarietyNotFoundError(crop_variety_id)
+        return await self._repo.list_variety_strains(
+            crop_variety_id=crop_variety_id, include_inactive=include_inactive
+        )
+
+    async def create_crop(
+        self, *, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        code = fields["code"]
+        if await self._repo.crop_code_exists(code=code):
+            raise CropCatalogConflictError(level="crop", code=code)
+        out = await self._repo.create_crop(fields=fields)
+        await self._audit_catalog(
+            event_type="farms.crop_created",
+            subject_kind="crop",
+            subject_id=out["id"],
+            actor_user_id=actor_user_id,
+            details={"code": code},
+        )
+        return out
+
+    async def update_crop(
+        self, *, crop_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        crop = await self._repo.get_crop(crop_id=crop_id)
+        if crop is None:
+            raise CropNotFoundError(crop_id)
+        out = await self._repo.update_crop(crop=crop, fields=fields)
+        await self._audit_catalog(
+            event_type="farms.crop_updated",
+            subject_kind="crop",
+            subject_id=crop_id,
+            actor_user_id=actor_user_id,
+            details={"fields": sorted(fields.keys())},
+        )
+        return out
+
+    async def create_variety(
+        self,
+        *,
+        crop_id: UUID,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        crop = await self._repo.get_crop(crop_id=crop_id)
+        if crop is None:
+            raise CropNotFoundError(crop_id)
+        if await self._repo.variety_code_exists(crop_id=crop_id, code=code):
+            raise CropCatalogConflictError(level="variety", code=code)
+        out = await self._repo.create_variety(
+            crop_id=crop_id, crop_code=crop.code, code=code, name_en=name_en, name_ar=name_ar
+        )
+        await self._audit_catalog(
+            event_type="farms.crop_variety_created",
+            subject_kind="crop_variety",
+            subject_id=out["id"],
+            actor_user_id=actor_user_id,
+            details={"path": out["path"]},
+        )
+        return out
+
+    async def update_variety(
+        self, *, variety_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        variety = await self._repo.get_variety(variety_id=variety_id)
+        if variety is None:
+            raise CropVarietyNotFoundError(variety_id)
+        out = await self._repo.update_variety(variety=variety, fields=fields)
+        await self._audit_catalog(
+            event_type="farms.crop_variety_updated",
+            subject_kind="crop_variety",
+            subject_id=variety_id,
+            actor_user_id=actor_user_id,
+            details={"fields": sorted(fields.keys())},
+        )
+        return out
+
+    async def create_strain(
+        self,
+        *,
+        crop_variety_id: UUID,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        variety = await self._repo.get_variety(variety_id=crop_variety_id)
+        if variety is None:
+            raise CropVarietyNotFoundError(crop_variety_id)
+        if await self._repo.strain_code_exists(crop_variety_id=crop_variety_id, code=code):
+            raise CropCatalogConflictError(level="strain", code=code)
+        out = await self._repo.create_strain(
+            crop_variety_id=crop_variety_id,
+            variety_path=variety.path,
+            code=code,
+            name_en=name_en,
+            name_ar=name_ar,
+        )
+        await self._audit_catalog(
+            event_type="farms.crop_strain_created",
+            subject_kind="crop_variety_strain",
+            subject_id=out["id"],
+            actor_user_id=actor_user_id,
+            details={"path": out["path"]},
+        )
+        return out
+
+    async def update_strain(
+        self, *, strain_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        strain = await self._repo.get_strain(strain_id=strain_id)
+        if strain is None:
+            raise CropStrainNotFoundError(strain_id)
+        out = await self._repo.update_strain(strain=strain, fields=fields)
+        await self._audit_catalog(
+            event_type="farms.crop_strain_updated",
+            subject_kind="crop_variety_strain",
+            subject_id=strain_id,
+            actor_user_id=actor_user_id,
+            details={"fields": sorted(fields.keys())},
+        )
+        return out
 
 
 def _geo_point_to_ewkt(geo_point: dict[str, Any] | None) -> str | None:

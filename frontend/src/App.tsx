@@ -1,13 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useParams,
-} from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import { AuthCallback } from "@/auth/AuthCallback";
 import { AuthProvider } from "@/auth/AuthProvider";
@@ -58,6 +51,7 @@ import { PlatformLayout } from "@/modules/admin/pages/PlatformLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
+import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
 import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
@@ -245,10 +239,7 @@ export function App(): ReactNode {
                       keeps it cleanly separate from the editor route so
                       a user navigating from the list can switch views
                       without losing editor state. */}
-                  <Route
-                    path="decision-trees/:code/view"
-                    element={<DecisionTreeViewerPage />}
-                  />
+                  <Route path="decision-trees/:code/view" element={<DecisionTreeViewerPage />} />
                 </Route>
               </Route>
               {/* Platform Management Portal â€” capability gate sits
@@ -261,6 +252,7 @@ export function App(): ReactNode {
                 <Route path="tenants/new" element={<AdminTenantCreatePage />} />
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
+                <Route path="crops" element={<PlatformCropsPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
                 <Route
