@@ -42,6 +42,8 @@ export function BlockDetailPage(): JSX.Element {
   // assign-crop form state
   const [cropId, setCropId] = useState<string | null>(null);
   const [cropVarietyId, setCropVarietyId] = useState<string | null>(null);
+  const [cropVarietyStrainId, setCropVarietyStrainId] = useState<string | null>(null);
+  const [cropSelectionComplete, setCropSelectionComplete] = useState(false);
   const [seasonLabel, setSeasonLabel] = useState("");
   const [plantingDate, setPlantingDate] = useState("");
 
@@ -83,6 +85,7 @@ export function BlockDetailPage(): JSX.Element {
       const created = await assignBlockCrop(blockId, {
         crop_id: cropId,
         crop_variety_id: cropVarietyId,
+        crop_variety_strain_id: cropVarietyStrainId,
         season_label: seasonLabel,
         planting_date: plantingDate || null,
         make_current: true,
@@ -90,6 +93,7 @@ export function BlockDetailPage(): JSX.Element {
       setHistory((prev) => [created, ...prev.map((h) => ({ ...h, is_current: false }))]);
       setCropId(null);
       setCropVarietyId(null);
+      setCropVarietyStrainId(null);
       setSeasonLabel("");
       setPlantingDate("");
     } catch (err) {
@@ -158,6 +162,10 @@ export function BlockDetailPage(): JSX.Element {
         <h2 className="text-lg font-semibold text-ap-ink">{t("block.currentCrop")}</h2>
         {current ? (
           <p className="mt-2 text-sm text-ap-ink">
+            {current.crop_path ? (
+              <span className="font-mono text-ap-primary">{current.crop_path}</span>
+            ) : null}
+            {current.crop_path ? " · " : ""}
             {current.season_label} ·{" "}
             {t(`status.${current.status === "growing" ? "active" : "active"}`)}
           </p>
@@ -176,10 +184,13 @@ export function BlockDetailPage(): JSX.Element {
             <CropPicker
               cropId={cropId}
               cropVarietyId={cropVarietyId}
-              onChange={(c, v) => {
+              cropVarietyStrainId={cropVarietyStrainId}
+              onChange={(c, v, s) => {
                 setCropId(c);
                 setCropVarietyId(v);
+                setCropVarietyStrainId(s);
               }}
+              onValidityChange={setCropSelectionComplete}
             />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -207,7 +218,11 @@ export function BlockDetailPage(): JSX.Element {
                 />
               </div>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={!cropId || busy}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!cropSelectionComplete || !seasonLabel || busy}
+            >
               {t("block.submit")}
             </button>
           </form>

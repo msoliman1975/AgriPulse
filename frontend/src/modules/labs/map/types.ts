@@ -68,6 +68,9 @@ export interface UnitDetail {
   crop_assignment: {
     crop_name: string;
     variety_name: string | null;
+    strain_name: string | null;
+    // Denormalized hierarchical path, e.g. "mango.alphonso.short".
+    crop_path: string;
     season_label: string;
     planting_date: string | null;
     growth_stage: string | null;
