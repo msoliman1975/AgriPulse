@@ -1,0 +1,166 @@
+# mango_canopy_health_v1 — "sudden drop -> scout" health alert that picks
+# the right greenness index for the block's canopy/soil context.
+#
+# Standard NDVI gets noisy over sparse mango canopies with bright bare
+# soil between trees (young orchards, high-density foreign varieties, sandy
+# reclamation land). SAVI (soil-adjusted, L=0.5) suppresses that soil
+# background. So this tree branches:
+#   * small canopy OR sandy soil -> evaluate SAVI's baseline deviation
+#   * otherwise                  -> evaluate NDVI's baseline deviation
+# and scouts when the chosen index drops sharply below the block's own
+# day-of-year baseline (self-calibrating z-score — no absolute per-variety
+# matrix needed).
+
+code: mango_canopy_health_v1
+name_en: Mango — canopy health drop (SAVI on sparse/sandy, else NDVI)
+name_ar: المانجو — هبوط صحة المجموع (SAVI للمتناثر/الرملي، وإلا NDVI)
+description_en: >-
+  Scouts a mango block when its greenness drops sharply below its own
+  seasonal baseline. Uses SAVI for small canopies or sandy soil (where
+  bare-soil background makes NDVI noisy) and NDVI otherwise.
+description_ar: >-
+  يطلب استكشاف قطعة المانجو عند هبوط الاخضرار بحدّة دون خط الأساس الموسمي
+  الخاص بها. يستخدم SAVI للمجاميع الصغيرة أو التربة الرملية (حيث تجعل خلفية
+  التربة العارية NDVI مشوّشًا) وNDVI فيما عدا ذلك.
+
+crop_path: mango
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    SAVI (L=0.5) was designed to minimise soil-brightness influence in
+    sparse/low-cover canopies and bright soils without per-soil
+    recalibration — well suited to young/high-density mango and desert
+    reclamation soils. NDVI saturates/destabilises over exposed soil. The
+    drop is measured as a baseline_deviation z-score against the block's
+    own day-of-year history, so it self-calibrates across varieties and
+    soils (no absolute value matrix).
+  citations:
+    - source_type: remote_sensing
+      title: USGS / Wikipedia — Soil-Adjusted Vegetation Index (L=0.5)
+      url: https://en.wikipedia.org/wiki/Soil-adjusted_vegetation_index
+      year: 2023
+    - source_type: remote_sensing
+      title: ClimateEngine — SAVI for sparse vegetative cover
+      url: https://support.climateengine.org/article/118-soil-adjusted-vegetation-index-savi
+      year: 2023
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: high
+
+parameters:
+  drop_sigma:
+    type: number
+    default: -1.5
+    min: -6.0
+    max: 0.0
+    description: >-
+      Baseline-deviation (z-score) at/below which the chosen greenness
+      index counts as a sharp drop worth scouting.
+
+root: root
+nodes:
+  root:
+    label_en: Is the canopy small?
+    label_ar: هل المجموع الخضري صغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: block
+          field: canopy_size_class
+        right: small
+    on_match: savi_check
+    on_miss: soil_check
+
+  soil_check:
+    label_en: Is the soil sandy?
+    label_ar: هل التربة رملية؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: block
+          field: soil_texture
+        right: sandy
+    on_match: savi_check
+    on_miss: ndvi_check
+
+  savi_check:
+    label_en: Has SAVI dropped sharply below baseline?
+    label_ar: هل هبط SAVI بحدّة دون خط الأساس؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: indices
+          index_code: savi
+          key: baseline_deviation
+        right:
+          source: params
+          name: drop_sigma
+    on_match: leaf_scout
+    on_miss: leaf_no_action
+
+  ndvi_check:
+    label_en: Has NDVI dropped sharply below baseline?
+    label_ar: هل هبط NDVI بحدّة دون خط الأساس؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right:
+          source: params
+          name: drop_sigma
+    on_match: leaf_scout
+    on_miss: leaf_no_action
+
+  leaf_scout:
+    label_en: Greenness dropped — scout the block
+    label_ar: هبط الاخضرار — استكشف القطعة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 72
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy greenness has dropped sharply below this block's seasonal
+        baseline. Scout for stress (water, pest/disease, nutrient) and
+        confirm on the ground. The soil-adjusted SAVI was used where the
+        canopy is small or the soil is sandy.
+      text_ar: >-
+        هبط اخضرار المجموع بحدّة دون خط الأساس الموسمي لهذه القطعة. استكشف
+        الإجهاد (ماء، آفات/أمراض، تغذية) وأكّد ميدانيًا. استُخدم SAVI المعدّل
+        للتربة حيث المجموع صغير أو التربة رملية.
+      actions:
+        immediate:
+          - text_en: Walk the block and inspect the trees showing the drop.
+            text_ar: تجوّل في القطعة وافحص الأشجار التي تُظهر الهبوط.
+        short_term:
+          - text_en: >-
+              Diagnose the cause (irrigation fault, pest/disease, nutrient)
+              and act accordingly.
+            text_ar: >-
+              شخّص السبب (عطل ريّ، آفة/مرض، تغذية) وتصرّف وفقًا لذلك.
+        monitoring:
+          - text_en: Re-check the index on the next scene to confirm recovery.
+            text_ar: أعد فحص المؤشر في المشهد القادم لتأكيد التعافي.
+
+  leaf_no_action:
+    label_en: No action — greenness within baseline
+    label_ar: لا إجراء — الاخضرار ضمن خط الأساس
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Canopy greenness is within the seasonal baseline.
+      text_ar: اخضرار المجموع ضمن خط الأساس الموسمي.
