@@ -132,13 +132,16 @@ export function App(): ReactNode {
                 {/* Labs: experimental map-first surface for live validation.
                   Complements the existing list/table flow â€” does not
                   replace it. See docs/proposals/map-first.md. */}
-                <Route path="/labs/map" element={<MapExperiencePage />} />
-                <Route path="/labs/map/:farmId" element={<MapExperiencePage />} />
-                {/* Redesigned Farm Console — progressive-disclosure re-take of
-                  /labs/map. Runs alongside the legacy map for iteration; see
-                  docs/proposals/farm-management-redesign.md. */}
+                {/* /labs/map is now the redesigned Farm Console (progressive
+                  disclosure). The previous map is kept as Legacy at
+                  /labs/map-legacy. /labs/map-next stays as an alias for old
+                  links. See docs/proposals/farm-management-redesign.md. */}
+                <Route path="/labs/map" element={<FarmConsolePage />} />
+                <Route path="/labs/map/:farmId" element={<FarmConsolePage />} />
                 <Route path="/labs/map-next" element={<FarmConsolePage />} />
                 <Route path="/labs/map-next/:farmId" element={<FarmConsolePage />} />
+                <Route path="/labs/map-legacy" element={<MapExperiencePage />} />
+                <Route path="/labs/map-legacy/:farmId" element={<MapExperiencePage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
                 {/* Board PR-7 cutover: /plan/:farmId redirects to /board/:farmId.
                   The legacy PlanPage (modules/plan/*) was removed once the

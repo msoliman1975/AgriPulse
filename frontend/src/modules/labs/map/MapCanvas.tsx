@@ -204,6 +204,8 @@ export function MapCanvas({
   onSignalClickRef.current = onSignalClick;
   const onGridCellClickRef = useRef(onGridCellClick);
   onGridCellClickRef.current = onGridCellClick;
+  // Tracks the farm we last fit-bounds to, so data refetches don't re-zoom.
+  const lastFitKeyRef = useRef<string | null>(null);
 
   // Initial mount.
   useEffect(() => {
@@ -218,6 +220,15 @@ export function MapCanvas({
     mapRef.current = map;
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
+
+    // maplibre's trackResize only listens to WINDOW resizes, so when a side
+    // panel (the inspector) opens/closes and resizes this container — not the
+    // window — the canvas keeps its old size and the map appears to jump/zoom.
+    // Observe the container and resize the map explicitly.
+    const resizeObserver = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
 
     map.on("load", () => {
       // Farm AOI source + layers — placed first so block layers render above.
@@ -560,12 +571,16 @@ export function MapCanvas({
         }
         drawRef.current = null;
       }
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // Push GeoJSON data + fit bounds whenever data changes.
+  // Push GeoJSON data whenever it changes, but fit bounds ONLY when the farm
+  // (fitBoundsKey) changes — not on every 60s data refetch, which would
+  // re-zoom the map out from under the user (the flicker bug). lastFitKeyRef
+  // records the farm we last fitted to; null means "not yet fitted".
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -576,8 +591,13 @@ export function MapCanvas({
       const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       if (!src) return;
       src.setData(geojson);
-      const bounds = computeBounds(geojson, farmBoundary ?? null);
-      if (bounds) map.fitBounds(bounds, { padding: 40, duration: 600 });
+      if (lastFitKeyRef.current !== fitBoundsKey) {
+        const bounds = computeBounds(geojson, farmBoundary ?? null);
+        if (bounds) {
+          map.fitBounds(bounds, { padding: 40, duration: 600 });
+          lastFitKeyRef.current = fitBoundsKey;
+        }
+      }
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
