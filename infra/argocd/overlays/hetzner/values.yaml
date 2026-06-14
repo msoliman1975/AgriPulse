@@ -13,17 +13,17 @@ global:
   # `${ingress.hostPrefix}.${global.envHost}`.
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
-  # promotion — NOT auto-bumped like dev). 6dc4f7b = PR #227 (platform
-  # crop-catalog authoring at /platform/crops + platform.manage_crops cap) on
-  # top of #224/#225/#226 (Crop → Variety → Strain taxonomy + map crop-assign).
+  # promotion — NOT auto-bumped like dev). 88d9e7b = PR #229 (crop-catalog UX:
+  # real category dropdown + clearer add-variety/strain affordances) on top of
+  # #224/#225/#226/#227 (taxonomy + map crop-assign + /platform/crops authoring).
   # No new migration. tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "6dc4f7b"
+      tag: "88d9e7b"
     workers:
-      tag: "6dc4f7b"
+      tag: "88d9e7b"
     frontend:
-      tag: "6dc4f7b"
+      tag: "88d9e7b"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
