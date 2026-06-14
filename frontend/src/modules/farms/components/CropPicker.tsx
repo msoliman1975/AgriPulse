@@ -36,6 +36,7 @@ export function CropPicker({
   const [crops, setCrops] = useState<Crop[]>([]);
   const [varieties, setVarieties] = useState<CropVariety[]>([]);
   const [strains, setStrains] = useState<CropVarietyStrain[]>([]);
+  const [strainsLoading, setStrainsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,13 +73,18 @@ export function CropPicker({
     let cancelled = false;
     if (!cropVarietyId) {
       setStrains([]);
+      setStrainsLoading(false);
       return;
     }
+    setStrainsLoading(true);
     listVarietyStrains(cropVarietyId)
       .then((data) => {
         if (!cancelled) setStrains(data);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setStrainsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -166,6 +172,9 @@ export function CropPicker({
               </option>
             ))}
           </select>
+          {cropVarietyId && !strainsLoading && strains.length === 0 ? (
+            <p className="mt-1 text-xs text-ap-warn">{t("block.noStrainsForVariety")}</p>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -160,6 +160,7 @@
     "noVariety": "— none —",
     "strain": "Strain",
     "noStrain": "— none —",
+    "noStrainsForVariety": "This variety has no strains in the catalog yet — pick a variety that has them, or add strains in the crop catalog (/platform/crops).",
     "back": "Back to farm",
     "unitType": {
       "block": "Block",
