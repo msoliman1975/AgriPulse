@@ -515,6 +515,19 @@ class FarmServiceImpl:
 
     # ---- Farms ------------------------------------------------------
 
+    async def _attach_farm_managers(self, farms: list[dict[str, Any]]) -> None:
+        """Populate each farm dict's derived, read-only ``farm_manager``.
+
+        U-4a replaced the stored ``farm_manager_id`` column with this
+        derivation (the active FarmManager farm-scope holder, earliest
+        grant). One batched cross-schema query for the whole list.
+        """
+        if not farms:
+            return
+        managers = await self._repo.farm_managers_for(farm_ids=[f["id"] for f in farms])
+        for farm in farms:
+            farm["farm_manager"] = managers.get(farm["id"])
+
     async def create_farm(
         self,
         *,
@@ -588,6 +601,8 @@ class FarmServiceImpl:
                 created_at=farm["created_at"],
             )
         )
+        # A just-created farm has no FarmManager scope yet.
+        farm["farm_manager"] = None
         return _stamp_area_unit(farm, preferred_unit)
 
     async def list_farms(
@@ -607,12 +622,14 @@ class FarmServiceImpl:
             tag=tag,
             include_inactive=include_inactive,
         )
+        await self._attach_farm_managers(rows)
         return [_stamp_area_unit(r, preferred_unit) for r in rows]
 
     async def get_farm(self, *, farm_id: UUID, preferred_unit: str) -> dict[str, Any]:
         farm = await self._repo.get_farm_by_id(farm_id)
         if farm is None:
             raise FarmNotFoundError(farm_id)
+        await self._attach_farm_managers([farm])
         return _stamp_area_unit(farm, preferred_unit)
 
     async def update_farm(
@@ -664,6 +681,7 @@ class FarmServiceImpl:
                     actor_user_id=actor_user_id,
                 )
             )
+        await self._attach_farm_managers([farm])
         return _stamp_area_unit(farm, preferred_unit)
 
     async def preview_farm_inactivation(self, *, farm_id: UUID) -> dict[str, Any]:
