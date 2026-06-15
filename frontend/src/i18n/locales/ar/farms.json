@@ -63,6 +63,8 @@
     "soilTexture": "قوام التربة",
     "salinityClass": "الملوحة",
     "soilPh": "حموضة التربة",
+    "agronomist": "المهندس الزراعي",
+    "agronomistNone": "— غير معيّن —",
     "notes": "ملاحظات",
     "submitBlockCreate": "إنشاء القطعة",
     "submitBlockUpdate": "حفظ القطعة",
