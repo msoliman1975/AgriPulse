@@ -194,10 +194,22 @@ class ImageryRepository:
         *,
         subscription_id: UUID,
         attempted_at: datetime,
-        success: bool,
+        ingested: bool,
     ) -> None:
+        """Record a discovery poll against the subscription.
+
+        `last_attempted_at` is the wall-clock heartbeat — it advances on
+        *every* completed poll (success or not) and is what the
+        integration-health "overdue" check keys off, since polling on
+        cadence is the part we control. `last_successful_ingest_at`
+        advances only when the poll actually queued usable imagery; it is
+        the discovery-window watermark and the honest "last imagery we
+        pulled" signal. Conflating the two (the pre-fix behaviour) bumped
+        the watermark on every empty poll, which both hid genuine staleness
+        and let publication-lagged scenes slip behind the watermark.
+        """
         values: dict[str, Any] = {"last_attempted_at": attempted_at}
-        if success:
+        if ingested:
             values["last_successful_ingest_at"] = attempted_at
         await self._session.execute(
             update(ImageryAoiSubscription)

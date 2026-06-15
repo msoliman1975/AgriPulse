@@ -18,7 +18,7 @@ Asserts the gate criteria from the prompt:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -293,3 +293,137 @@ async def test_pipeline_idempotent_on_rerun(
         )
     ).scalar_one()
     assert items_count == 1
+
+
+class _CapturingProvider:
+    """Fake provider that records the kwargs `discover` was called with."""
+
+    code = "sentinel_hub"
+
+    def __init__(self, scenes: tuple[DiscoveredScene, ...]) -> None:
+        self._scenes = scenes
+        self.discover_kwargs: dict[str, Any] | None = None
+
+    async def discover(self, **kwargs: Any) -> tuple[DiscoveredScene, ...]:
+        self.discover_kwargs = kwargs
+        return self._scenes
+
+    async def fetch(self, **_: Any) -> FetchResult:  # pragma: no cover
+        raise AssertionError("unexpected fetch in discovery-only test")
+
+    async def aclose(self) -> None:
+        pass
+
+
+async def _read_sub_timestamps(
+    admin_session: AsyncSession, *, tenant_schema: str, sub_id: UUID
+) -> tuple[datetime | None, datetime | None]:
+    row = (
+        await admin_session.execute(
+            text(
+                "SELECT last_attempted_at, last_successful_ingest_at "
+                f'FROM "{tenant_schema}".imagery_aoi_subscriptions WHERE id = :id'
+            ),
+            {"id": sub_id},
+        )
+    ).one()
+    return row.last_attempted_at, row.last_successful_ingest_at
+
+
+@pytest.mark.asyncio
+async def test_discovery_window_applies_lookback_buffer(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`from_datetime` passed to the provider is the watermark minus the
+    configured lookback — so a scene sensed before the last poll but
+    published after it is still re-covered rather than skipped forever."""
+    from app.core.settings import get_settings
+
+    sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
+        admin_session, slug="imagery-lookback"
+    )
+    watermark = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+    await admin_session.execute(
+        text(
+            f'UPDATE "{tenant_schema}".imagery_aoi_subscriptions '
+            "SET last_successful_ingest_at = :ts WHERE id = :id"
+        ),
+        {"ts": watermark, "id": sub_id},
+    )
+    await admin_session.commit()
+
+    provider = _CapturingProvider(())
+    imagery_tasks.set_provider_factory(lambda: provider)
+    try:
+        await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+    lookback = get_settings().imagery_discovery_lookback_hours
+    assert provider.discover_kwargs is not None
+    assert provider.discover_kwargs["from_datetime"] == watermark - timedelta(hours=lookback)
+
+
+@pytest.mark.asyncio
+async def test_empty_poll_does_not_advance_ingest_watermark(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty poll records the attempt heartbeat but must NOT advance the
+    ingest watermark — otherwise it hides staleness and buries late scenes."""
+    sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
+        admin_session, slug="imagery-empty-poll"
+    )
+    # Fresh subscription: both timestamps start NULL.
+    before_attempt, before_ingest = await _read_sub_timestamps(
+        admin_session, tenant_schema=tenant_schema, sub_id=sub_id
+    )
+    assert before_ingest is None
+
+    imagery_tasks.set_provider_factory(lambda: _CapturingProvider(()))
+    try:
+        await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+    after_attempt, after_ingest = await _read_sub_timestamps(
+        admin_session, tenant_schema=tenant_schema, sub_id=sub_id
+    )
+    assert after_attempt is not None
+    assert after_attempt != before_attempt
+    assert after_ingest is None  # never ingested -> watermark untouched
+
+
+@pytest.mark.asyncio
+async def test_successful_poll_advances_both_timestamps(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A poll that queues a usable scene advances both the heartbeat and the
+    ingest watermark."""
+    sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
+        admin_session, slug="imagery-ingest-poll"
+    )
+    scenes = (
+        DiscoveredScene(
+            scene_id="S2A_INGEST_20260301",
+            scene_datetime=datetime(2026, 3, 1, 8, 30, tzinfo=UTC),
+            cloud_cover_pct=Decimal("5.00"),
+            geometry_geojson={"type": "Polygon", "coordinates": []},
+        ),
+    )
+    from app.modules.imagery.tasks import acquire_scene
+
+    monkeypatch.setattr(acquire_scene, "delay", lambda *a, **k: None)
+    imagery_tasks.set_provider_factory(lambda: _CapturingProvider(scenes))
+    try:
+        await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+    after_attempt, after_ingest = await _read_sub_timestamps(
+        admin_session, tenant_schema=tenant_schema, sub_id=sub_id
+    )
+    assert after_attempt is not None
+    assert after_ingest is not None
