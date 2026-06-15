@@ -274,7 +274,7 @@ export function PlanTemplateEditorPage(): ReactNode {
             <span className="mb-1 block text-xs font-medium text-ap-muted">
               {t("editor.field.cropPath")}
             </span>
-            <CropPathFilter value={cropPath} onChange={setCropPath} />
+            <CropPathFilter value={cropPath} onChange={setCropPath} scope="platform" />
           </div>
           <Field label={t("editor.field.country")}>
             <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
