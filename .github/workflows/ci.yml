@@ -270,7 +270,7 @@ jobs:
         # `AWS_TERRAFORM_PLAN_ROLE_ARN`. The backend-less validate path
         # below picks up whichever case the OIDC path skips.
         if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.base.repo.full_name && vars.AWS_TERRAFORM_PLAN_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_TERRAFORM_PLAN_ROLE_ARN }}
           aws-region: eu-south-1
