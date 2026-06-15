@@ -3,18 +3,11 @@
 import { apiClient } from "./client";
 
 export type ResourceKind = "worker" | "equipment";
-export type WorkerRole =
-  | "agronomist"
-  | "operator"
-  | "scout"
-  | "field_worker"
-  | "manager";
-export type EquipmentType =
-  | "tractor"
-  | "sprayer"
-  | "irrigation_pump"
-  | "harvester"
-  | "other";
+// U-2: canonical role vocabulary shared with IAM per-farm roles (FarmRole).
+// FarmManager / Agronomist / FieldOperator / Scout mirror FarmRole exactly;
+// FieldWorker is the worker-only extra (generic labour, no login).
+export type WorkerRole = "FarmManager" | "Agronomist" | "FieldOperator" | "Scout" | "FieldWorker";
+export type EquipmentType = "tractor" | "sprayer" | "irrigation_pump" | "harvester" | "other";
 
 export interface Resource {
   id: string;
@@ -24,6 +17,8 @@ export interface Resource {
   role: WorkerRole | null;
   equipment_type: EquipmentType | null;
   phone: string | null;
+  // U-3: optional link to a tenant member (membership_id). null = unlinked.
+  membership_id: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -35,6 +30,7 @@ export interface ResourceCreatePayload {
   role?: WorkerRole | null;
   equipment_type?: EquipmentType | null;
   phone?: string | null;
+  membership_id?: string | null;
 }
 
 export interface ResourceUpdatePayload {
@@ -42,6 +38,8 @@ export interface ResourceUpdatePayload {
   role?: WorkerRole | null;
   equipment_type?: EquipmentType | null;
   phone?: string | null;
+  // Send a membership_id to link, or explicit null to unlink.
+  membership_id?: string | null;
   archive?: boolean;
 }
 
@@ -49,10 +47,9 @@ export async function listResources(
   farmId: string,
   options: { kind?: ResourceKind; include_archived?: boolean } = {},
 ): Promise<Resource[]> {
-  const { data } = await apiClient.get<Resource[]>(
-    `/v1/farms/${farmId}/resources`,
-    { params: options },
-  );
+  const { data } = await apiClient.get<Resource[]>(`/v1/farms/${farmId}/resources`, {
+    params: options,
+  });
   return data;
 }
 
@@ -65,10 +62,7 @@ export async function createResource(
   farmId: string,
   payload: ResourceCreatePayload,
 ): Promise<Resource> {
-  const { data } = await apiClient.post<Resource>(
-    `/v1/farms/${farmId}/resources`,
-    payload,
-  );
+  const { data } = await apiClient.post<Resource>(`/v1/farms/${farmId}/resources`, payload);
   return data;
 }
 
@@ -76,26 +70,17 @@ export async function updateResource(
   resourceId: string,
   payload: ResourceUpdatePayload,
 ): Promise<Resource> {
-  const { data } = await apiClient.patch<Resource>(
-    `/v1/resources/${resourceId}`,
-    payload,
-  );
+  const { data } = await apiClient.patch<Resource>(`/v1/resources/${resourceId}`, payload);
   return data;
 }
 
-export async function attachResource(
-  activityId: string,
-  resourceId: string,
-): Promise<Resource> {
+export async function attachResource(activityId: string, resourceId: string): Promise<Resource> {
   const { data } = await apiClient.post<Resource>(
     `/v1/activities/${activityId}/resources/${resourceId}`,
   );
   return data;
 }
 
-export async function detachResource(
-  activityId: string,
-  resourceId: string,
-): Promise<void> {
+export async function detachResource(activityId: string, resourceId: string): Promise<void> {
   await apiClient.delete(`/v1/activities/${activityId}/resources/${resourceId}`);
 }

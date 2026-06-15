@@ -1,7 +1,13 @@
-"""Celery app factory shared by the three worker entrypoints.
+"""Celery app factory shared by the three task-worker entrypoints.
 
 Each entrypoint picks a queue and calls `build_celery("light"|"heavy"|"beat")`.
 The returned `Celery` instance is what the `celery` CLI binds to.
+
+Terminology: a "task worker" here is a background-job process consuming a
+Celery queue. It is unrelated to the in-app "Worker" domain concept (farm
+personnel in `app.modules.resources`, surfaced under Settings ▸ Workers).
+Keep the two senses distinct in code and docs — say "task worker / queue"
+for this tier.
 """
 
 from __future__ import annotations

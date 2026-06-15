@@ -33,6 +33,7 @@ class ResourcesRepository:
         role: str | None,
         equipment_type: str | None,
         phone: str | None,
+        membership_id: UUID | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         resource = Resource(
@@ -43,6 +44,7 @@ class ResourcesRepository:
             role=role,
             equipment_type=equipment_type,
             phone=phone,
+            membership_id=membership_id,
             archived_at=None,
             created_by=actor_user_id,
             updated_by=actor_user_id,
@@ -174,6 +176,7 @@ def _to_dict(row: Resource | None) -> dict[str, Any]:
         "role": row.role,
         "equipment_type": row.equipment_type,
         "phone": row.phone,
+        "membership_id": row.membership_id,
         "archived_at": row.archived_at,
         "created_at": row.created_at,
         "updated_at": row.updated_at,

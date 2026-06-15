@@ -26,6 +26,7 @@ class ResourcesService(Protocol):
         role: str | None,
         equipment_type: str | None,
         phone: str | None,
+        membership_id: UUID | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]: ...
 
@@ -73,6 +74,7 @@ class ResourcesServiceImpl:
         role: str | None,
         equipment_type: str | None,
         phone: str | None,
+        membership_id: UUID | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         return await self._repo.insert(
@@ -83,6 +85,7 @@ class ResourcesServiceImpl:
             role=role,
             equipment_type=equipment_type,
             phone=phone,
+            membership_id=membership_id,
             actor_user_id=actor_user_id,
         )
 
@@ -122,7 +125,12 @@ class ResourcesServiceImpl:
             normalized["archived_at"] = datetime.now(UTC)
         elif archive is False:
             normalized["archived_at"] = None
-        normalized.update({k: v for k, v in changes.items() if v is not None or k == "phone"})
+        # `phone` and `membership_id` are nullable links the caller may
+        # explicitly clear, so a literal null must pass through (unlink);
+        # every other field treats null as "leave untouched".
+        normalized.update(
+            {k: v for k, v in changes.items() if v is not None or k in ("phone", "membership_id")}
+        )
 
         if current["kind"] == "worker":
             if normalized.get("equipment_type") is not None:
@@ -132,6 +140,8 @@ class ResourcesServiceImpl:
                 raise InvalidResourceShapeError(detail="Equipment cannot carry a role.")
             if normalized.get("phone") is not None:
                 raise InvalidResourceShapeError(detail="Equipment cannot carry a phone.")
+            if normalized.get("membership_id") is not None:
+                raise InvalidResourceShapeError(detail="Equipment cannot be linked to a member.")
 
         if "name" in normalized and isinstance(normalized["name"], str):
             normalized["name"] = normalized["name"].strip()

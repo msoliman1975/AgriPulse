@@ -186,7 +186,7 @@ async def test_board_includes_blocks_and_activities_with_resources(
         worker = (
             await client.post(
                 f"/api/v1/farms/{farm_id}/resources",
-                json={"kind": "worker", "name": "Ahmed", "role": "operator"},
+                json={"kind": "worker", "name": "Ahmed", "role": "FieldOperator"},
             )
         ).json()
         attach = await client.post(f"/api/v1/activities/{activity['id']}/resources/{worker['id']}")
@@ -216,4 +216,4 @@ async def test_board_includes_blocks_and_activities_with_resources(
         assert a["block_id"] == b1
         assert len(a["resources"]) == 1
         assert a["resources"][0]["name"] == "Ahmed"
-        assert a["resources"][0]["role"] == "operator"
+        assert a["resources"][0]["role"] == "FieldOperator"
