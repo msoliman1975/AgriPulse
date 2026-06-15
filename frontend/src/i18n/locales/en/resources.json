@@ -26,16 +26,20 @@
   "col": {
     "name": "Name",
     "role": "Role",
+    "member": "Linked member",
     "phone": "Phone",
     "type": "Type",
     "status": "Status"
   },
+  "link": {
+    "none": "— Not linked —"
+  },
   "role": {
-    "agronomist": "Agronomist",
-    "operator": "Operator",
-    "scout": "Scout / Observer",
-    "field_worker": "Field worker",
-    "manager": "Manager"
+    "FarmManager": "Farm manager",
+    "Agronomist": "Agronomist",
+    "FieldOperator": "Field operator",
+    "Scout": "Scout / Observer",
+    "FieldWorker": "Field worker"
   },
   "equipmentType": {
     "tractor": "Tractor",

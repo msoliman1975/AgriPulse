@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Users & roles",
-    "subtitle": "Tenant-level users and their tenant-wide roles. Per-farm role assignments live on each farm's Members page.",
+    "title": "Team & roles",
+    "subtitle": "Everyone in this tenant and their tenant-wide roles. Per-farm role assignments live on each farm's Members page.",
     "loadFailed": "Failed to load users.",
     "empty": "No users in this tenant yet.",
     "newButton": "Invite user",

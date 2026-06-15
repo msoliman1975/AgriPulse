@@ -26,16 +26,20 @@
   "col": {
     "name": "الاسم",
     "role": "الدور",
+    "member": "العضو المرتبط",
     "phone": "الهاتف",
     "type": "النوع",
     "status": "الحالة"
   },
+  "link": {
+    "none": "— غير مرتبط —"
+  },
   "role": {
-    "agronomist": "مهندس زراعي",
-    "operator": "مشغّل",
-    "scout": "مراقب",
-    "field_worker": "عامل ميداني",
-    "manager": "مدير"
+    "FarmManager": "مدير مزرعة",
+    "Agronomist": "مهندس زراعي",
+    "FieldOperator": "مشغّل ميداني",
+    "Scout": "مراقب",
+    "FieldWorker": "عامل ميداني"
   },
   "equipmentType": {
     "tractor": "جرار",

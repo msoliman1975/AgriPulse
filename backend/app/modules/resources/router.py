@@ -90,6 +90,7 @@ async def create_resource(
         role=payload.role,
         equipment_type=payload.equipment_type,
         phone=payload.phone,
+        membership_id=payload.membership_id,
         actor_user_id=context.user_id,
     )
 

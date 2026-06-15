@@ -1,9 +1,11 @@
 apiVersion: v2
 name: agripulse-workers
 description: |
-  AgriPulse Celery workers (light + heavy queues) and beat scheduler.
-  ARCHITECTURE.md Â§ 3.1 commits Celery + Redis broker; this chart runs
-  the three matching Deployments off the same image as the API.
+  AgriPulse Celery TASK workers (light + heavy task queues) and beat
+  scheduler. NOTE: "task workers" here are background-job processes — NOT
+  the in-app "Workers" (farm personnel under Settings ▸ Workers, the
+  resources module). ARCHITECTURE.md Â§ 3.1 commits Celery + Redis broker;
+  this chart runs the three matching Deployments off the same image as the API.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

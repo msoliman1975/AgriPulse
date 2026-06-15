@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Users · Members · Workers — concept map &amp; unification</title>
+<style>
+  :root{
+    --bg:#0f1410;
+    --panel:#161d17;
+    --panel-2:#1c241d;
+    --ink:#e8efe6;
+    --muted:#9aa89a;
+    --line:#2a342a;
+    --green:#5fb87a;
+    --green-deep:#2f7d4f;
+    --sage:#86c79a;
+    --amber:#e6b34a;
+    --rust:#d97c5a;
+    --sky:#6fb0d6;
+    --violet:#9b8cd0;
+    --radius:14px;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:radial-gradient(1200px 700px at 80% -10%,#1a241b 0%,var(--bg) 55%);
+    color:var(--ink);font-family:var(--sans);line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--sage);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,.mono{font-family:var(--mono);font-size:.86em}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;color:var(--green);font-weight:600}
+  h1{font-size:clamp(2rem,4.4vw,3.1rem);line-height:1.08;margin:.4em 0 .3em;font-weight:780;letter-spacing:-.02em}
+  h1 .u{color:var(--sky)}
+  h1 .m{color:var(--sage)}
+  h1 .w{color:var(--amber)}
+  .lede{font-size:1.12rem;color:var(--muted);max-width:740px}
+  .meta{margin-top:22px;font-size:.82rem;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap}
+  .meta b{color:var(--ink);font-weight:600}
+
+  /* ---------- nav ---------- */
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(15,20,16,.86);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+  nav.toc a{font-size:.8rem;color:var(--muted);padding:5px 11px;border-radius:99px;border:1px solid transparent}
+  nav.toc a:hover{color:var(--ink);border-color:var(--line);background:var(--panel);text-decoration:none}
+
+  section{padding:48px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em;font-weight:720}
+  h2 .num{color:var(--green);font-variant-numeric:tabular-nums;margin-right:.4em;font-weight:800}
+  .sub{color:var(--muted);margin:0 0 26px;max-width:760px}
+  h3{font-size:1.06rem;margin:30px 0 12px;font-weight:680}
+
+  /* ---------- tldr ---------- */
+  .tldr{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);
+    border-radius:var(--radius);padding:24px 26px;margin-top:30px}
+  .tldr h4{margin:0 0 14px;font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--green)}
+  .tldr ul{margin:0;padding-left:18px}
+  .tldr li{margin:7px 0}
+  .tldr li b{color:var(--ink)}
+
+  /* ---------- concept cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px}
+  .card.u::before{background:var(--sky)}
+  .card.m::before{background:var(--sage)}
+  .card.w::before{background:var(--amber)}
+  .card .tag{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+  .card h3{margin:8px 0 4px;font-size:1.25rem}
+  .card.u h3{color:var(--sky)}
+  .card.m h3{color:var(--sage)}
+  .card.w h3{color:var(--amber)}
+  .card .one{font-size:.92rem;color:var(--muted);min-height:48px}
+  .kv{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:.84rem}
+  .kv div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+  .kv span:first-child{color:var(--muted)}
+  .kv span:last-child{text-align:right}
+
+  /* ---------- generic table ---------- */
+  .tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:.86rem;overflow:hidden;border-radius:10px;border:1px solid var(--line)}
+  .tbl th{background:var(--panel-2);text-align:left;padding:11px 13px;font-weight:600;color:var(--ink);border-bottom:1px solid var(--line);font-size:.78rem;letter-spacing:.03em;text-transform:uppercase}
+  .tbl td{padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--muted)}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl td b{color:var(--ink);font-weight:600}
+  .tbl tr:hover td{background:rgba(255,255,255,.015)}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:.74rem;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);white-space:nowrap}
+  .pill.sky{border-color:#2c4655;color:var(--sky)}
+  .pill.sage{border-color:#2c4a37;color:var(--sage)}
+  .pill.amber{border-color:#534528;color:var(--amber)}
+  .pill.violet{border-color:#3b3559;color:var(--violet)}
+  .pill.rust{border-color:#523228;color:var(--rust)}
+
+  /* ---------- role planes ---------- */
+  .planes{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+  .plane{display:grid;grid-template-columns:170px 1fr;gap:18px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .plane .lbl{font-weight:700}
+  .plane .lbl small{display:block;color:var(--muted);font-weight:400;font-size:.76rem;margin-top:2px}
+  .plane .roles{display:flex;gap:8px;flex-wrap:wrap}
+  .plane.p-platform{border-left:3px solid var(--violet)}
+  .plane.p-tenant{border-left:3px solid var(--sky)}
+  .plane.p-farm{border-left:3px solid var(--sage)}
+  .plane.p-worker{border-left:3px solid var(--amber)}
+  .plane.p-domain{border-left:3px solid var(--rust)}
+
+  /* ---------- overlap matrix ---------- */
+  .matrix{width:100%;border-collapse:collapse;margin-top:18px;font-size:.85rem;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .matrix th,.matrix td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left}
+  .matrix th{background:var(--panel-2);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+  .matrix td:first-child{color:var(--ink);font-weight:600}
+  .matrix tr:last-child td{border-bottom:none}
+  .eq{color:var(--green);font-weight:700}
+  .x{color:var(--rust)}
+  .dash{color:var(--line)}
+
+  /* ---------- callout ---------- */
+  .callout{display:flex;gap:14px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;padding:16px 18px;margin-top:20px}
+  .callout.warn{border-left-color:var(--rust)}
+  .callout.good{border-left-color:var(--green)}
+  .callout .ic{font-size:1.2rem;line-height:1.4}
+  .callout p{margin:0;font-size:.92rem;color:var(--muted)}
+  .callout p b{color:var(--ink)}
+
+  /* ---------- recommendation ---------- */
+  .rec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-top:16px}
+  .rec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .rec-head .rid{font-family:var(--mono);font-size:.8rem;color:var(--green);font-weight:700}
+  .rec-head h3{margin:0;font-size:1.15rem}
+  .rec-meta{margin-left:auto;display:flex;gap:8px}
+  .badge{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:99px;font-weight:600}
+  .b-impact-hi{background:rgba(95,184,122,.16);color:var(--green)}
+  .b-impact-md{background:rgba(230,179,74,.16);color:var(--amber)}
+  .b-effort-lo{background:rgba(111,176,214,.14);color:var(--sky)}
+  .b-effort-md{background:rgba(155,140,208,.16);color:var(--violet)}
+  .b-effort-hi{background:rgba(217,124,90,.16);color:var(--rust)}
+  .rec p{color:var(--muted);margin:12px 0 0}
+  .rec .why{font-size:.9rem}
+  .rec ul{color:var(--muted);font-size:.9rem;margin:10px 0 0;padding-left:20px}
+  .rec ul li{margin:5px 0}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  .flowbox{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .flowbox h4{margin:0 0 10px;font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .flow{font-family:var(--mono);font-size:.82rem;line-height:1.9;color:var(--ink)}
+  .flow .arrow{color:var(--green)}
+  .flow .c{color:var(--muted)}
+
+  footer{padding:40px 0 70px;color:var(--muted);font-size:.84rem}
+  .fp{font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+
+  @media(max-width:880px){
+    .cards{grid-template-columns:1fr}
+    .twocol{grid-template-columns:1fr}
+    .plane{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">AgriPulse · Identity architecture review</div>
+    <h1><span class="u">Users</span>, <span class="m">Members</span> &amp; <span class="w">Workers</span><br>— three people-models, one platform</h1>
+    <p class="lede">Three concepts in the app all describe "a person connected to a farm" — but they live in different tables, carry different role vocabularies, and never link to each other. This document maps how each works <b>today</b>, where they overlap, and a staged plan to <b>unify</b> them.</p>
+    <div class="meta">
+      <span><b>Scope</b> backend IAM · resources module · farm/block domain fields</span>
+      <span><b>Audience</b> product + engineering</span>
+      <span><b>Date</b> 2026-06-14</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#tldr">TL;DR</a>
+    <a href="#concepts">The three concepts</a>
+    <a href="#roles">Role landscape</a>
+    <a href="#overlap">The overlap</a>
+    <a href="#collision">Worker name-collision</a>
+    <a href="#unify">Unification plan</a>
+    <a href="#target">Target model</a>
+  </div>
+</nav>
+
+<!-- ============== TLDR ============== -->
+<section id="tldr">
+  <div class="wrap">
+    <h2><span class="num">01</span>The short version</h2>
+    <p class="sub">If you read nothing else.</p>
+    <div class="tldr">
+      <h4>Five things to know</h4>
+      <ul>
+        <li><b>User vs Member is intentional and healthy.</b> A <b>User</b> is one global login identity (Keycloak-backed, one row per email). A <b>Member</b> is that user <i>inside one tenant</i> — a <code>tenant_membership</code> row with its own status and roles. Same person, two layers. This is correct multi-tenant design; keep it.</li>
+        <li><b>"Workers" is a different beast entirely.</b> A <b>Worker</b> is a <code>resources</code> record (<code>kind='worker'</code>) — a name + role + phone with <b>no login and no permissions</b>. It exists only to be tagged onto plan activities. It is <i>not</i> in the IAM stack at all.</li>
+        <li><b>The real problem is duplicated role vocabularies.</b> Farm IAM roles (<span class="pill sage">Agronomist</span> <span class="pill sage">Scout</span> <span class="pill sage">FieldOperator</span> <span class="pill sage">FarmManager</span>) and Worker roles (<span class="pill amber">agronomist</span> <span class="pill amber">scout</span> <span class="pill amber">operator</span> <span class="pill amber">manager</span>) are <b>the same words in two unlinked tables</b>. The same human can exist as both, twice, with no connection.</li>
+        <li><b>A third assignment path exists too:</b> <code>farm.farm_manager_id</code> and <code>block.agronomist_id</code> point directly at user IDs — a domain-routing shortcut that bypasses both IAM roles and the worker catalog.</li>
+        <li><b>"Workers" also means Celery</b> (the <code>backend/workers/</code> infra). Pure name collision — never user-facing — but it muddies conversation and search. Worth a rename.</li>
+      </ul>
+    </div>
+    <div class="callout">
+      <div class="ic">🎯</div>
+      <p><b>The opportunity in one line:</b> unify the <i>role vocabulary</i> across IAM farm-scopes and the worker catalog, give a worker an optional link to a login member, and collapse the ad-hoc <code>*_id</code> domain fields into that one model — so "who is the scout on this farm" has exactly one answer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== CONCEPTS ============== -->
+<section id="concepts">
+  <div class="wrap">
+    <h2><span class="num">02</span>The three concepts, as-is</h2>
+    <p class="sub">What each one actually is in the code today — entity, table, where it surfaces, and crucially whether it can <i>log in</i>.</p>
+
+    <div class="cards">
+      <div class="card u">
+        <div class="tag">public.users</div>
+        <h3>User</h3>
+        <div class="one">A global login identity. One row per email, across all tenants. Backed by Keycloak credentials.</div>
+        <div class="kv">
+          <div><span>Can log in?</span><span><b style="color:var(--green)">Yes</b></span></div>
+          <div><span>Scope</span><span>Global (all tenants)</span></div>
+          <div><span>Identity store</span><span>Keycloak <code>sub</code></span></div>
+          <div><span>Surfaced as</span><span><code>GET /me</code></span></div>
+          <div><span>Status values</span><span>active · suspended · archived</span></div>
+        </div>
+      </div>
+
+      <div class="card m">
+        <div class="tag">public.tenant_memberships</div>
+        <h3>Member</h3>
+        <div class="one">A user <i>inside one tenant</i> — the join that carries tenant + farm roles. This is what the "Users" admin screen really manages.</div>
+        <div class="kv">
+          <div><span>Can log in?</span><span><b style="color:var(--green)">Yes</b> (via its User)</span></div>
+          <div><span>Scope</span><span>One (user × tenant)</span></div>
+          <div><span>Carries</span><span>tenant roles + farm scopes</span></div>
+          <div><span>Surfaced as</span><span><code>GET /v1/users</code></span></div>
+          <div><span>Status values</span><span>invited · active · suspended · archived</span></div>
+        </div>
+      </div>
+
+      <div class="card w">
+        <div class="tag">tenant_*.resources (kind='worker')</div>
+        <h3>Worker</h3>
+        <div class="one">A farm-personnel record: name, role, phone. No account, no permissions. Exists to be attached to plan activities.</div>
+        <div class="kv">
+          <div><span>Can log in?</span><span><b style="color:var(--rust)">No</b></span></div>
+          <div><span>Scope</span><span>Per farm</span></div>
+          <div><span>Carries</span><span>a free role label + phone</span></div>
+          <div><span>Surfaced as</span><span><code>/settings/workers</code></span></div>
+          <div><span>Status values</span><span>active · archived</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Side-by-side</h3>
+    <table class="tbl">
+      <thead><tr><th>Dimension</th><th>User</th><th>Member</th><th>Worker</th></tr></thead>
+      <tbody>
+        <tr><td><b>Question it answers</b></td><td>"Who is this login?"</td><td>"What can this person do in <i>this</i> tenant?"</td><td>"Who did the field job?"</td></tr>
+        <tr><td><b>Table</b></td><td><code>public.users</code></td><td><code>public.tenant_memberships</code></td><td><code>resources</code> (per-tenant schema)</td></tr>
+        <tr><td><b>Module</b></td><td><code>app.modules.iam</code></td><td><code>app.modules.iam</code></td><td><code>app.modules.resources</code></td></tr>
+        <tr><td><b>Keycloak link</b></td><td><code>keycloak_subject</code></td><td>inherits via User</td><td><span class="x">none</span></td></tr>
+        <tr><td><b>Roles attached</b></td><td>platform roles</td><td>tenant roles + per-farm scopes</td><td>one descriptive label</td></tr>
+        <tr><td><b>Created by</b></td><td>invite / JWT upsert</td><td>invite to tenant</td><td>manual CRUD in Settings</td></tr>
+        <tr><td><b>Lifecycle</b></td><td>soft-delete when last membership gone</td><td>invite → active → suspend → soft-delete</td><td>create → archive → restore</td></tr>
+        <tr><td><b>Where it shows in UI</b></td><td>profile / avatar / <code>/me</code></td><td>tenant user-management list</td><td>Settings ▸ Workers; activity chips</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout good">
+      <div class="ic">✓</div>
+      <p><b>User → Member is not the overlap to fix.</b> It's a clean two-layer split: identity (global) vs membership (tenant-scoped), which is exactly what lets one consultant belong to several tenants. The confusion is purely <i>naming</i> — both the screen and the route are called "Users" even though they manage <i>memberships</i>. A label tweak, not a refactor.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== ROLES ============== -->
+<section id="roles">
+  <div class="wrap">
+    <h2><span class="num">03</span>The role landscape — five planes</h2>
+    <p class="sub">"Role" is overloaded. There are <b>four</b> IAM role planes (permission-bearing, capability-checked) plus a <b>fifth</b> descriptive plane on workers that grants nothing. Access checks <i>never</i> compare role strings — they resolve capabilities through Platform → Tenant → Farm.</p>
+
+    <div class="planes">
+      <div class="plane p-platform">
+        <div class="lbl">Platform<small>on the User · global</small></div>
+        <div class="roles">
+          <span class="pill violet">PlatformAdmin</span>
+          <span class="pill violet">PlatformSupport</span>
+          <span class="mono" style="color:var(--muted);align-self:center;font-size:.8rem">→ <code>platform_role_assignments</code></span>
+        </div>
+      </div>
+      <div class="plane p-tenant">
+        <div class="lbl">Tenant<small>on the Member · tenant-wide</small></div>
+        <div class="roles">
+          <span class="pill sky">TenantOwner</span>
+          <span class="pill sky">TenantAdmin</span>
+          <span class="pill sky">BillingAdmin</span>
+          <span class="mono" style="color:var(--muted);align-self:center;font-size:.8rem">→ <code>tenant_role_assignments</code></span>
+        </div>
+      </div>
+      <div class="plane p-farm">
+        <div class="lbl">Farm scope<small>on the Member · per farm</small></div>
+        <div class="roles">
+          <span class="pill sage">FarmManager</span>
+          <span class="pill sage">Agronomist</span>
+          <span class="pill sage">FieldOperator</span>
+          <span class="pill sage">Scout</span>
+          <span class="pill sage">Viewer</span>
+          <span class="mono" style="color:var(--muted);align-self:center;font-size:.8rem">→ <code>farm_scopes</code></span>
+        </div>
+      </div>
+      <div class="plane p-worker">
+        <div class="lbl">Worker label<small>on the Resource · grants nothing</small></div>
+        <div class="roles">
+          <span class="pill amber">agronomist</span>
+          <span class="pill amber">operator</span>
+          <span class="pill amber">scout</span>
+          <span class="pill amber">field_worker</span>
+          <span class="pill amber">manager</span>
+          <span class="mono" style="color:var(--muted);align-self:center;font-size:.8rem">→ <code>resources.role</code></span>
+        </div>
+      </div>
+      <div class="plane p-domain">
+        <div class="lbl">Domain pointers<small>on farm/block · direct user_id</small></div>
+        <div class="roles">
+          <span class="pill rust">farm.farm_manager_id</span>
+          <span class="pill rust">block.agronomist_id</span>
+          <span class="mono" style="color:var(--muted);align-self:center;font-size:.8rem">→ columns on domain tables</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="ic">⚖️</div>
+      <p><b>Only planes 1–3 are real permissions.</b> Resolution is first-match in order Platform → Tenant → Farm, all via <code>has_capability(...)</code> against the YAML capability maps — code never branches on a role name. Plane 4 (worker label) is purely cosmetic. Plane 5 (the <code>*_id</code> pointers) is domain routing that no capability check consults — a fourth, redundant way to say "this person owns this farm/block."</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== OVERLAP ============== -->
+<section id="overlap">
+  <div class="wrap">
+    <h2><span class="num">04</span>Where they collide: one vocabulary, three homes</h2>
+    <p class="sub">The same agronomic roles are spelled out in the farm-scope enum, the worker enum, and the domain pointer columns — with no shared source of truth and no link between the records.</p>
+
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>Concept</th>
+          <th>Farm IAM role <span class="pill sage" style="font-size:.66rem">permission</span></th>
+          <th>Worker label <span class="pill amber" style="font-size:.66rem">cosmetic</span></th>
+          <th>Domain pointer <span class="pill rust" style="font-size:.66rem">column</span></th>
+          <th>Same human?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Manager</td><td>FarmManager</td><td>manager</td><td>farm.farm_manager_id</td><td><span class="eq">likely ✓</span></td></tr>
+        <tr><td>Agronomist</td><td>Agronomist</td><td>agronomist</td><td>block.agronomist_id</td><td><span class="eq">likely ✓</span></td></tr>
+        <tr><td>Scout</td><td>Scout</td><td>scout</td><td><span class="dash">—</span></td><td><span class="eq">likely ✓</span></td></tr>
+        <tr><td>Operator</td><td>FieldOperator</td><td>operator</td><td><span class="dash">—</span></td><td><span class="eq">likely ✓</span></td></tr>
+        <tr><td>Generic labour</td><td><span class="dash">—</span></td><td>field_worker</td><td><span class="dash">—</span></td><td>worker-only</td></tr>
+        <tr><td>Read-only</td><td>Viewer</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>IAM-only</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Why this hurts</h3>
+    <div class="twocol">
+      <div class="flowbox">
+        <h4>The duplicate-person trap</h4>
+        <div class="flow">
+          <span class="c"># Today, Salma the agronomist is…</span><br>
+          member <span class="arrow">→</span> farm_scope <span class="c">Agronomist</span><br>
+          <span class="c">…and ALSO, separately…</span><br>
+          worker <span class="arrow">→</span> role <span class="c">agronomist</span><br><br>
+          <span class="c"># two rows, no link.</span><br>
+          <span class="c"># Assign activity? pick the worker.</span><br>
+          <span class="c"># Check permission? read the scope.</span><br>
+          <span class="c"># Nothing ties them together.</span>
+        </div>
+      </div>
+      <div class="flowbox">
+        <h4>Consequences</h4>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:.9rem;line-height:1.7">
+          <li><b>Double data entry</b> — invite Salma <i>and</i> re-create her as a worker.</li>
+          <li><b>Drift</b> — she leaves; her membership is suspended but the worker record lingers on activities.</li>
+          <li><b>No accountability join</b> — "show every activity Salma logged" can't be answered from her login identity.</li>
+          <li><b>Vocabulary skew</b> — <code>FieldOperator</code> vs <code>operator</code>, <code>FarmManager</code> vs <code>manager</code> means reporting must hand-map.</li>
+          <li><b>Three answers to one question</b> — "who manages this farm?" → a farm_scope, a worker, or a <code>farm_manager_id</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <div class="ic">⚠</div>
+      <p><b>Edge already in the codebase:</b> the invite endpoint defaults <code>tenant_role="Viewer"</code>, but <code>Viewer</code> is a <i>farm-scope</i> role, not a tenant role. That single mislabel is exactly the class of bug this fragmentation breeds — and it's the same family as the production "Viewer invites 500'd" incident already fixed in migration 0036.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== COLLISION ============== -->
+<section id="collision">
+  <div class="wrap">
+    <h2><span class="num">05</span>The fourth "worker": Celery</h2>
+    <p class="sub">Worth naming so it never re-enters the conversation: <code>backend/workers/</code> is infrastructure, not people.</p>
+    <table class="tbl">
+      <thead><tr><th></th><th>Domain Worker (people)</th><th>Infra Worker (Celery)</th></tr></thead>
+      <tbody>
+        <tr><td><b>What</b></td><td>Farm personnel record</td><td>Background task process</td></tr>
+        <tr><td><b>Lives in</b></td><td><code>app.modules.resources</code></td><td><code>backend/workers/</code> (light · heavy · beat)</td></tr>
+        <tr><td><b>User-facing?</b></td><td>Yes — Settings ▸ Workers</td><td>Never — K8s Deployments only</td></tr>
+        <tr><td><b>Deployed as</b></td><td>DB rows</td><td>Helm chart <code>agripulse-workers</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout good">
+      <div class="ic">✓</div>
+      <p><b>No user-facing collision today</b> — the UI only ever calls the people-records "Workers." But the shared word costs you in code search, docs, and onboarding. Cheap fix: keep "Workers" for people in the UI, and refer to the Celery side consistently as <b>task workers / queues</b> in code and docs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== UNIFY ============== -->
+<section id="unify">
+  <div class="wrap">
+    <h2><span class="num">06</span>Unification plan — staged &amp; low-risk</h2>
+    <p class="sub">Ordered so each step ships value alone and nothing forces a big-bang migration. Impact/effort are rough engineering calls.</p>
+
+    <div class="callout good">
+      <div class="ic">✅</div>
+      <p><b>Status (2026-06-14):</b> <b>U-1, U-5, U-2, U-3 implemented</b> in the working tree (uncommitted). U-1 relabels the tenant screen <b>"Team"</b> (not "Members" — that name is already the per-farm farm-scope page). U-2 canonicalises worker roles to the FarmRole vocabulary (tenant migration <code>0043</code> + alignment test). U-3 adds the optional <code>membership_id</code> link (tenant migration <code>0044</code>, link picker in Settings ▸ Workers). Verified: frontend tsc + eslint + prettier, backend ruff + mypy + unit test, linear migration chain. <b>U-4 deferred</b> to the farm-block-config work that already touches <code>farm_manager_id</code>/<code>agronomist_id</code>. The deeper unified activity picker (workers + members in one board control) is incremental follow-up.</p>
+    </div>
+
+    <div class="rec">
+      <div class="rec-head">
+        <span class="rid">U-1</span>
+        <h3>Rename the screen: "Users" → "Members" (or "Team")</h3>
+        <div class="rec-meta">
+          <span class="badge b-impact-md">impact · med</span>
+          <span class="badge b-effort-lo">effort · low</span>
+        </div>
+      </div>
+      <p class="why"><b>What:</b> The <code>/v1/users</code> management UI manages tenant <i>memberships</i>, not global users. Relabel it (i18n + nav) to "Members" / "Team," and reserve "User" for the global identity / profile. No schema change.</p>
+      <p class="why"><b>Why:</b> Removes the single biggest source of conceptual confusion at near-zero cost. Makes the User-vs-Member layering legible instead of hidden.</p>
+    </div>
+
+    <div class="rec">
+      <div class="rec-head">
+        <span class="rid">U-2</span>
+        <h3>One shared role vocabulary</h3>
+        <div class="rec-meta">
+          <span class="badge b-impact-hi">impact · high</span>
+          <span class="badge b-effort-md">effort · med</span>
+        </div>
+      </div>
+      <p class="why"><b>What:</b> Make worker labels reuse the farm-role enum. Map <code>operator→FieldOperator</code>, <code>manager→FarmManager</code>, align casing, and keep <code>field_worker</code> (generic labour) + <code>Viewer</code> as the only plane-specific extras. Define it once (the existing role enum / capability YAML) and have both the worker catalog and farm-scopes read from it.</p>
+      <ul>
+        <li>Reporting and pickers stop needing a hand-maintained translation table.</li>
+        <li>A backfill maps existing <code>resources.role</code> strings to the canonical set.</li>
+        <li>Pure value normalization — no relationship change yet, so it's safe to ship first.</li>
+      </ul>
+    </div>
+
+    <div class="rec">
+      <div class="rec-head">
+        <span class="rid">U-3</span>
+        <h3>Let a Worker optionally <i>be</i> a Member</h3>
+        <div class="rec-meta">
+          <span class="badge b-impact-hi">impact · high</span>
+          <span class="badge b-effort-md">effort · med</span>
+        </div>
+      </div>
+      <p class="why"><b>What:</b> Add a nullable <code>membership_id</code> on the worker resource. A worker is then one of two flavours: <b>linked</b> (a real login member who also does field work) or <b>unlinked</b> (a labourer with no account — the common case). The activity-assignment UI shows both in one picker.</p>
+      <ul>
+        <li>Invite Salma once → she's available as a worker automatically, no re-entry.</li>
+        <li>"Every activity Salma logged" becomes a join, not a guess.</li>
+        <li>Unlinked workers still work exactly as today — nothing breaks.</li>
+        <li>Suspending a member can flag/auto-archive their linked worker record.</li>
+      </ul>
+    </div>
+
+    <div class="rec">
+      <div class="rec-head">
+        <span class="rid">U-4</span>
+        <h3>Retire the ad-hoc <code>*_id</code> pointers</h3>
+        <div class="rec-meta">
+          <span class="badge b-impact-md">impact · med</span>
+          <span class="badge b-effort-hi">effort · high</span>
+        </div>
+      </div>
+      <p class="why"><b>What:</b> Treat <code>farm.farm_manager_id</code> and <code>block.agronomist_id</code> as <i>derived</i> from the unified model (the member holding the FarmManager scope on that farm; the linked agronomist on that block) rather than free-standing columns. Migrate readers to the resolver, then drop the columns once nothing writes them.</p>
+      <p class="why"><b>Why:</b> Collapses the fifth role plane into the canonical one so "who manages this farm" has exactly one source of truth. Highest effort because callers and the farm-block-config model touch these fields — do it last.</p>
+    </div>
+
+    <div class="rec">
+      <div class="rec-head">
+        <span class="rid">U-5</span>
+        <h3>Rename Celery "workers" in code &amp; docs</h3>
+        <div class="rec-meta">
+          <span class="badge b-impact-md">impact · low</span>
+          <span class="badge b-effort-lo">effort · low</span>
+        </div>
+      </div>
+      <p class="why"><b>What:</b> Standardize on "task workers / queues" for the Celery tier in code comments, runbooks and Helm component labels. Leave the people-facing "Workers" UI as-is. Eliminates the search/onboarding ambiguity without touching deployments.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== TARGET ============== -->
+<section id="target">
+  <div class="wrap">
+    <h2><span class="num">07</span>Target model — one person, clearly layered</h2>
+    <p class="sub">After U-1…U-4, the same human resolves through a single chain instead of three parallel ones.</p>
+
+    <div class="twocol">
+      <div class="flowbox">
+        <h4>Today — fragmented</h4>
+        <div class="flow">
+          User <span class="c">(login)</span><br>
+          &nbsp;└ Member <span class="c">(tenant)</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;└ farm_scope <span class="pill sage" style="font-size:.66rem">Agronomist</span><br><br>
+          Worker <span class="pill amber" style="font-size:.66rem">agronomist</span> <span class="x">⟂ no link</span><br><br>
+          block.agronomist_id <span class="pill rust" style="font-size:.66rem">user_id</span> <span class="x">⟂ no link</span>
+        </div>
+      </div>
+      <div class="flowbox">
+        <h4>Target — one spine</h4>
+        <div class="flow">
+          User <span class="c">(login, global)</span><br>
+          &nbsp;└ Member <span class="c">(tenant)</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;├ farm_scope <span class="pill sage" style="font-size:.66rem">Agronomist</span> <span class="c">← permission</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;└ Worker <span class="c">(linked)</span> <span class="arrow">→</span> activities<br><br>
+          Unlinked Worker <span class="c">(labour, no login)</span> <span class="arrow">→</span> activities<br><br>
+          <span class="c">"agronomist of block" = resolver, not a column</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>What stays, what changes</h3>
+    <table class="tbl">
+      <thead><tr><th>Decision</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><b>Keep</b> User ↔ Member two-layer split</td><td>It's correct multi-tenant design; only the <i>labels</i> change.</td></tr>
+        <tr><td><b>Keep</b> unlinked workers</td><td>Day-labour with no account is a real, common case — must stay supported.</td></tr>
+        <tr><td><b>Unify</b> the role enum</td><td>One canonical set drives permissions, worker labels, pickers, and reports.</td></tr>
+        <tr><td><b>Link</b> worker → membership (optional)</td><td>Removes double entry; enables per-person accountability.</td></tr>
+        <tr><td><b>Derive</b> the <code>*_id</code> pointers</td><td>Single source of truth for "who owns this farm/block."</td></tr>
+        <tr><td><b>Disambiguate</b> Celery "workers"</td><td>Cosmetic clarity; no runtime change.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout good">
+      <div class="ic">★</div>
+      <p><b>Sequencing:</b> U-1 and U-5 are quick wins (labels only). U-2 normalizes data safely. U-3 adds the link and unlocks the real value. U-4 is the cleanup that finally retires the redundant plane — schedule it alongside the farm-block-config work that already touches those columns.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Evidence base — <span class="fp">app/modules/iam/models.py</span> <span class="fp">shared/auth/context.py</span> <span class="fp">shared/rbac/role_capabilities.yaml</span> <span class="fp">migrations/public/0003_iam_tables.py</span> <span class="fp">app/modules/resources/{models,schemas,router}.py</span> <span class="fp">app/modules/farms/models.py</span> <span class="fp">backend/workers/</span> · <span class="fp">infra/helm/workers/</span></p>
+    <p style="margin-top:14px">AgriPulse · identity architecture review · drafted 2026-06-14. Roles &amp; capability mechanics reflect the shipped IAM model (Platform → Tenant → Farm resolution, capability-checked, eight permission-bearing roles + one cosmetic worker label).</p>
+  </div>
+</footer>
+
+</body>
+</html>

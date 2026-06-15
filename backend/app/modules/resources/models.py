@@ -36,6 +36,10 @@ class Resource(Base, TimestampedMixin):
     role: Mapped[str | None] = mapped_column(Text, nullable=True)
     equipment_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # U-3: optional link to a public.tenant_memberships row (login member who
+    # also does field work). NULL = unlinked labour. No FK — cross-schema
+    # logical reference, like farm_scopes.farm_id. See migration 0044.
+    membership_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

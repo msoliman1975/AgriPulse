@@ -95,7 +95,7 @@ async def test_worker_crud_round_trip(admin_session: AsyncSession) -> None:
             json={
                 "kind": "worker",
                 "name": "  Ahmed Hassan  ",
-                "role": "agronomist",
+                "role": "Agronomist",
                 "phone": "+201112233445",
             },
         )
@@ -103,7 +103,7 @@ async def test_worker_crud_round_trip(admin_session: AsyncSession) -> None:
         body = created.json()
         assert body["kind"] == "worker"
         assert body["name"] == "Ahmed Hassan"  # trimmed
-        assert body["role"] == "agronomist"
+        assert body["role"] == "Agronomist"
         assert body["phone"] == "+201112233445"
         assert body["equipment_type"] is None
         assert body["archived_at"] is None
@@ -126,11 +126,63 @@ async def test_worker_crud_round_trip(admin_session: AsyncSession) -> None:
         # PATCH name + role
         patched = await client.patch(
             f"/api/v1/resources/{resource_id}",
-            json={"name": "Ahmed H.", "role": "scout"},
+            json={"name": "Ahmed H.", "role": "Scout"},
         )
         assert patched.status_code == 200, patched.text
         assert patched.json()["name"] == "Ahmed H."
-        assert patched.json()["role"] == "scout"
+        assert patched.json()["role"] == "Scout"
+
+
+@pytest.mark.asyncio
+async def test_worker_membership_link_round_trip(admin_session: AsyncSession) -> None:
+    """U-3: a worker can be linked to a member, unlinked, and re-linked.
+
+    The link is a cross-schema logical reference (no FK), so any membership
+    UUID round-trips at this layer — we assert the plumbing, not referential
+    integrity. Equipment must reject a membership link (kind-shape rule).
+    """
+    _t, context, farm_id, _b = await _bootstrap(admin_session, "bd-link")
+    app = _build_app(context)
+    membership_id = str(uuid4())
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        created = await client.post(
+            f"/api/v1/farms/{farm_id}/resources",
+            json={
+                "kind": "worker",
+                "name": "Salma",
+                "role": "Agronomist",
+                "membership_id": membership_id,
+            },
+        )
+        assert created.status_code == 201, created.text
+        resource_id = created.json()["id"]
+        assert created.json()["membership_id"] == membership_id
+
+        # Explicit null unlinks.
+        unlinked = await client.patch(
+            f"/api/v1/resources/{resource_id}", json={"membership_id": None}
+        )
+        assert unlinked.status_code == 200, unlinked.text
+        assert unlinked.json()["membership_id"] is None
+
+        # Re-link.
+        relinked = await client.patch(
+            f"/api/v1/resources/{resource_id}", json={"membership_id": membership_id}
+        )
+        assert relinked.status_code == 200, relinked.text
+        assert relinked.json()["membership_id"] == membership_id
+
+        # Equipment cannot be linked to a member.
+        bad = await client.post(
+            f"/api/v1/farms/{farm_id}/resources",
+            json={
+                "kind": "equipment",
+                "name": "Tractor #9",
+                "equipment_type": "tractor",
+                "membership_id": membership_id,
+            },
+        )
+        assert bad.status_code == 422, bad.text
 
 
 @pytest.mark.asyncio
@@ -154,7 +206,7 @@ async def test_equipment_create_and_kind_shape_rules(
                 "kind": "equipment",
                 "name": "Tractor 1",
                 "equipment_type": "tractor",
-                "role": "operator",
+                "role": "FieldOperator",
             },
         )
         assert bad_role.status_code == 422, bad_role.text
@@ -199,21 +251,21 @@ async def test_duplicate_active_name_rejected_case_insensitive(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         first = await client.post(
             f"/api/v1/farms/{farm_id}/resources",
-            json={"kind": "worker", "name": "Khalid", "role": "operator"},
+            json={"kind": "worker", "name": "Khalid", "role": "FieldOperator"},
         )
         assert first.status_code == 201
 
         # Same case
         dup = await client.post(
             f"/api/v1/farms/{farm_id}/resources",
-            json={"kind": "worker", "name": "Khalid", "role": "operator"},
+            json={"kind": "worker", "name": "Khalid", "role": "FieldOperator"},
         )
         assert dup.status_code == 409, dup.text
 
         # Different case still rejected (uq on lower(name))
         dup_case = await client.post(
             f"/api/v1/farms/{farm_id}/resources",
-            json={"kind": "worker", "name": "khalid", "role": "operator"},
+            json={"kind": "worker", "name": "khalid", "role": "FieldOperator"},
         )
         assert dup_case.status_code == 409, dup_case.text
 
@@ -237,7 +289,7 @@ async def test_archive_restore_round_trip(admin_session: AsyncSession) -> None:
         created = (
             await client.post(
                 f"/api/v1/farms/{farm_id}/resources",
-                json={"kind": "worker", "name": "Yousef", "role": "field_worker"},
+                json={"kind": "worker", "name": "Yousef", "role": "FieldWorker"},
             )
         ).json()
         resource_id = created["id"]
@@ -299,7 +351,7 @@ async def test_attach_and_detach_resource_to_activity(
         worker = (
             await client.post(
                 f"/api/v1/farms/{farm_id}/resources",
-                json={"kind": "worker", "name": "Ali", "role": "operator"},
+                json={"kind": "worker", "name": "Ali", "role": "FieldOperator"},
             )
         ).json()
         tractor = (
@@ -355,7 +407,7 @@ async def test_attach_archived_resource_rejected(
         worker = (
             await client.post(
                 f"/api/v1/farms/{farm_id}/resources",
-                json={"kind": "worker", "name": "Mona", "role": "scout"},
+                json={"kind": "worker", "name": "Mona", "role": "Scout"},
             )
         ).json()
         await client.patch(f"/api/v1/resources/{worker['id']}", json={"archive": True})
