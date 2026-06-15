@@ -18,6 +18,8 @@ global:
   #   fix #245) + 05d0edd (invite Viewer fix #243), so it carries all of them
   #   forward. delete_user now revokes tenant_role/farm_scope grants + keeps
   #   platform-admin accounts. No new migration in #246 (public head stays 0036).
+  # frontend f7c2692 = map zoom controls + config-menu z-index overlap fix
+  #   (PR #262) — descendant of fa3fb73. Frontend-only; api/workers stay fa3fb73.
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
@@ -25,7 +27,7 @@ global:
     workers:
       tag: "fa3fb73"
     frontend:
-      tag: "fa3fb73"
+      tag: "f7c2692"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
