@@ -10,6 +10,7 @@
 
 Run inside the api pod (it has httpx + cluster DNS to keycloak-dev).
 """
+
 import os
 import sys
 import httpx
@@ -139,9 +140,7 @@ def grant_realm_mgmt_roles(c: httpx.Client, token: str, client_uuid: str) -> Non
     rm_uuid = r.json()[0]["id"]
 
     # Fetch all available realm-management client roles
-    r = c.get(
-        f"{KC_BASE}/admin/realms/{REALM}/clients/{rm_uuid}/roles", headers=h
-    )
+    r = c.get(f"{KC_BASE}/admin/realms/{REALM}/clients/{rm_uuid}/roles", headers=h)
     r.raise_for_status()
     by_name = {role["name"]: role for role in r.json()}
 
@@ -168,6 +167,41 @@ def grant_realm_mgmt_roles(c: httpx.Client, token: str, client_uuid: str) -> Non
     )
     r.raise_for_status()
     print(f"granted {len(chosen)} realm-management roles to service account")
+
+
+def ensure_tenant_roles(c: httpx.Client, token: str) -> None:
+    """Idempotently create the tenant realm roles the invite flow assigns.
+
+    The realm JSON ships these, but Keycloak realm-import has been observed to
+    drop realm roles (and smtpServer + mappers), so a fresh/re-imported cluster
+    can be missing them — which makes `invite_user`'s role lookup 404 and
+    degrade invites to `pending`. Creating any missing role here is a cheap
+    self-heal.
+    """
+    h = {"Authorization": f"Bearer {token}"}
+    desired = {
+        "TenantOwner": "Tenant super-admin (one per tenant).",
+        "TenantAdmin": "Tenant administrator.",
+        "BillingAdmin": "Tenant billing administrator.",
+        "Viewer": "Read-only tenant member (default invite role).",
+    }
+    r = c.get(f"{KC_BASE}/admin/realms/{REALM}/roles", headers=h)
+    r.raise_for_status()
+    existing = {role["name"] for role in r.json()}
+    created = []
+    for name, desc in desired.items():
+        if name in existing:
+            continue
+        resp = c.post(
+            f"{KC_BASE}/admin/realms/{REALM}/roles",
+            headers=h,
+            json={"name": name, "description": desc},
+        )
+        # 201 created; 409 = a concurrent create won the race — both fine.
+        if resp.status_code not in (201, 409):
+            resp.raise_for_status()
+        created.append(name)
+    print(f"tenant realm roles ensured (created {created or 'none'})")
 
 
 def configure_smtp(c: httpx.Client, token: str) -> None:
@@ -197,6 +231,7 @@ def main() -> None:
         print("got admin token")
         uuid = upsert_tenancy_client(c, tok)
         grant_realm_mgmt_roles(c, tok, uuid)
+        ensure_tenant_roles(c, tok)
         configure_smtp(c, tok)
     print("DONE")
 
