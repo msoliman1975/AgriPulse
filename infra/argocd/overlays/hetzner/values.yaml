@@ -14,18 +14,18 @@ global:
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev).
-  # 05d0edd = invite Viewer-role fix (PR #243) on top of plan-templates Track E
-  #   (#242, 2b17ae0). Migration 0036 adds 'Viewer' to the tenant_role_assignments
-  #   CHECK so default-role invites stop 500ing. Public migrations 0034/0035/0036
-  #   + tenant 0041 run via the PreSync migrate jobs.
+  # fa3fb73 = delete-orphan cleanup (PR #246) — descendant of eec597a (imagery
+  #   fix #245) + 05d0edd (invite Viewer fix #243), so it carries all of them
+  #   forward. delete_user now revokes tenant_role/farm_scope grants + keeps
+  #   platform-admin accounts. No new migration in #246 (public head stays 0036).
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "eec597a"
+      tag: "fa3fb73"
     workers:
-      tag: "eec597a"
+      tag: "fa3fb73"
     frontend:
-      tag: "05d0edd"
+      tag: "fa3fb73"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
