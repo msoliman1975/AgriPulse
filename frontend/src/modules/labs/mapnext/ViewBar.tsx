@@ -2,7 +2,6 @@
 // switcher live in the app shell Header — this page follows that context.
 // Page controls only: Index · Layers ▾ · Signals ▾ · + Add ▾ · ⚙.
 import { useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
@@ -19,7 +18,6 @@ export interface LayerState {
 }
 
 interface Props {
-  farmId: string;
   activeIndex: ApiIndexCode;
   onIndexChange: (c: ApiIndexCode) => void;
   layers: LayerState;
@@ -30,6 +28,9 @@ interface Props {
   signalDefs: { id: string; name: string }[];
   signalDefId: string | null;
   onSignalDefChange: (id: string | null) => void;
+  onAddBlock: () => void;
+  onAddPivot: () => void;
+  onAutoBlock: () => void;
 }
 
 function Chip({
@@ -68,7 +69,6 @@ function Chip({
 }
 
 export function ViewBar({
-  farmId,
   activeIndex,
   onIndexChange,
   layers,
@@ -79,9 +79,11 @@ export function ViewBar({
   signalDefs,
   signalDefId,
   onSignalDefChange,
+  onAddBlock,
+  onAddPivot,
+  onAutoBlock,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const navigate = useNavigate();
   const indexRef = useRef<HTMLButtonElement>(null);
   const layersRef = useRef<HTMLButtonElement>(null);
   const signalsRef = useRef<HTMLButtonElement>(null);
@@ -157,17 +159,17 @@ export function ViewBar({
         ))}
       </Popover>
 
-      {/* Add menu — create flows delegate to existing routes for now */}
+      {/* Add menu — native in-console create flows (draw on the map). */}
       <Popover open={open === "add"} onClose={close} anchorRef={addRef} align="end">
         <PopHeading>{t("viewbar.addToFarm")}</PopHeading>
-        <PopItem icon="▦" onClick={() => { close(); navigate(`/farms/${farmId}/blocks/new`); }} hint={t("add.viaForm")}>
+        <PopItem icon="▦" onClick={() => { close(); onAddBlock(); }} hint={t("add.viaDraw")}>
           {t("add.block")}
         </PopItem>
-        <PopItem icon="▩" onClick={() => { close(); navigate(`/farms/${farmId}/blocks/auto-grid`); }}>
-          {t("add.autoGrid")}
-        </PopItem>
-        <PopItem icon="◎" onClick={() => { close(); navigate(`/labs/map-legacy/${farmId}`); }} hint={t("add.viaMap")}>
+        <PopItem icon="◎" onClick={() => { close(); onAddPivot(); }} hint={t("add.viaDraw")}>
           {t("add.pivot")}
+        </PopItem>
+        <PopItem icon="▩" onClick={() => { close(); onAutoBlock(); }} hint={t("add.viaGrid")}>
+          {t("add.autoGrid")}
         </PopItem>
       </Popover>
     </header>

@@ -14,10 +14,14 @@ import type { FeatureCollection, Polygon } from "geojson";
 
 import { getFarm, listFarms, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
 import {
+  autoGrid,
+  createBlock,
+  createPivot,
   getBlock,
   getBlockInactivationPreview,
   inactivateBlock,
   updateBlock,
+  type AutoGridCandidate,
   type Block,
   type BlockDetail,
 } from "@/api/blocks";
@@ -26,13 +30,14 @@ import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { loadMapSummary, loadUnitDetail } from "../map/api";
-import { MapCanvas, type GridCellProps } from "../map/MapCanvas";
+import { MapCanvas, type GridCellProps, type DrawProgress } from "../map/MapCanvas";
 import { GridCellPopup } from "@/modules/grid/GridCellPopup";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
 import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
-import { FarmDefaultsTab } from "../map/FarmDefaultsTab";
 import { FarmMembersTab } from "../map/FarmMembersTab";
+import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
+import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
@@ -102,6 +107,21 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [reshapeCandidate, setReshapeCandidate] = useState<Polygon | null>(null);
   const [inactivateOpen, setInactivateOpen] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+
+  // Native +Add create flows (draw on the console map; no navigation).
+  const [drawTarget, setDrawTarget] = useState<"block" | "pivot" | null>(null);
+  const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
+  const [pendingBlock, setPendingBlock] = useState<{ polygon: Polygon; areaM2: number } | null>(null);
+  const [pendingPivot, setPendingPivot] = useState<{ lat: number; lon: number; radiusM: number } | null>(null);
+  // Auto-block panel.
+  const [autoOpen, setAutoOpen] = useState(false);
+  const [cellSize, setCellSize] = useState(200);
+  const [candidates, setCandidates] = useState<AutoGridCandidate[] | null>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
+  const [autoComputing, setAutoComputing] = useState(false);
+  const [autoCreating, setAutoCreating] = useState(false);
+  const [autoCreatedCount, setAutoCreatedCount] = useState<number | null>(null);
+  const [autoError, setAutoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(LAST_FARM_KEY, farmId);
@@ -314,6 +334,109 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     },
   });
 
+  // ---- Native create flows ------------------------------------------------
+  const resetCreate = () => {
+    setDrawTarget(null);
+    setDrawProgress(null);
+    setPendingBlock(null);
+    setPendingPivot(null);
+  };
+  const closeAuto = () => {
+    setAutoOpen(false);
+    setCandidates(null);
+    setSelectedCandidates(new Set());
+    setAutoError(null);
+    setAutoCreatedCount(null);
+  };
+  const startDrawBlock = () => {
+    closeAuto();
+    setReshapeTarget(null);
+    setPendingPivot(null);
+    setPendingBlock(null);
+    setDrawTarget("block");
+  };
+  const startDrawPivot = () => {
+    closeAuto();
+    setReshapeTarget(null);
+    setPendingBlock(null);
+    setPendingPivot(null);
+    setDrawTarget("pivot");
+  };
+  const startAutoBlock = () => {
+    resetCreate();
+    setReshapeTarget(null);
+    setAutoOpen(true);
+  };
+
+  const createBlockMut = useMutation({
+    mutationFn: ({ polygon, code, name }: { polygon: Polygon; code: string; name: string }) =>
+      createBlock(farmId, { code, name: name || null, boundary: polygon, unit_type: "block" }),
+    onSuccess: (newBlock) => {
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+      resetCreate();
+      select(newBlock.id);
+      flash(t("create.blockCreated"));
+    },
+  });
+  const createPivotMut = useMutation({
+    mutationFn: ({ lat, lon, radiusM, code, name, sectorCount }: { lat: number; lon: number; radiusM: number; code: string; name: string; sectorCount: number }) =>
+      createPivot(farmId, { code, name: name || null, center: { lat, lon }, radius_m: radiusM, sector_count: sectorCount }),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+      resetCreate();
+      select(result.pivot.id);
+      flash(t("create.pivotCreated"));
+    },
+  });
+
+  const computeAutoGrid = async () => {
+    setAutoComputing(true);
+    setAutoError(null);
+    setAutoCreatedCount(null);
+    try {
+      const res = await autoGrid(farmId, cellSize);
+      setCandidates(res.candidates);
+      setSelectedCandidates(new Set(res.candidates.map((c) => c.code)));
+    } catch (err) {
+      setAutoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAutoComputing(false);
+    }
+  };
+  const commitAutoBlock = async () => {
+    if (!candidates) return;
+    const chosen = candidates.filter((c) => selectedCandidates.has(c.code));
+    setAutoCreating(true);
+    setAutoError(null);
+    setAutoCreatedCount(0);
+    try {
+      let done = 0;
+      for (const c of chosen) {
+        await createBlock(farmId, { code: c.code, name: c.code, boundary: c.boundary, unit_type: "block" });
+        done += 1;
+        setAutoCreatedCount(done);
+      }
+      void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+      closeAuto();
+      flash(t("autoBlock.created", { n: chosen.length }));
+    } catch (err) {
+      setAutoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAutoCreating(false);
+    }
+  };
+
+  // Preview overlay: the candidates currently selected for creation.
+  const autoBlockPreviewFc = useMemo<FeatureCollection<Polygon> | null>(() => {
+    if (!autoOpen || !candidates) return null;
+    return {
+      type: "FeatureCollection",
+      features: candidates
+        .filter((c) => selectedCandidates.has(c.code))
+        .map((c) => ({ type: "Feature" as const, geometry: c.boundary, properties: { code: c.code } })),
+    };
+  }, [autoOpen, candidates, selectedCandidates]);
+
   if (summaryQ.isLoading) {
     return <div className="grid h-full place-items-center text-sm text-ap-muted">{t("page.loading")}</div>;
   }
@@ -336,7 +459,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <ViewBar
-        farmId={farmId}
         activeIndex={activeIndex}
         onIndexChange={setActiveIndex}
         layers={layers}
@@ -355,6 +477,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           next.delete("signal_obs");
           setSearch(next, { replace: true });
         }}
+        onAddBlock={startDrawBlock}
+        onAddPivot={startDrawPivot}
+        onAutoBlock={startAutoBlock}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -390,7 +515,73 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             }}
             reshapeBlock={reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null}
             onReshape={(poly) => setReshapeCandidate(poly)}
+            drawEnabled={drawTarget != null && !reshaping}
+            drawTarget={drawTarget ?? "block"}
+            onDrawProgress={setDrawProgress}
+            onPolygonDrawn={(poly, areaM2, target) => {
+              setDrawProgress(null);
+              if (target === "block") setPendingBlock({ polygon: poly, areaM2 });
+            }}
+            onPivotDrawn={(r) => setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })}
+            autoBlockPreview={autoBlockPreviewFc}
           />
+
+          {/* Draw-in-progress hint (before a shape is completed) */}
+          {drawTarget && !pendingBlock && !pendingPivot ? (
+            <DrawHintBar kind={drawTarget} vertices={drawProgress?.vertices} areaM2={drawProgress?.areaM2} onCancel={resetCreate} />
+          ) : null}
+
+          {/* Create-block capture (after drawing a polygon) */}
+          {pendingBlock ? (
+            <CreateBlockPanel
+              areaM2={pendingBlock.areaM2}
+              submitting={createBlockMut.isPending}
+              error={createBlockMut.isError ? t("create.createFailed") : null}
+              onSubmit={({ code, name }) => createBlockMut.mutate({ polygon: pendingBlock.polygon, code, name })}
+              onCancel={resetCreate}
+            />
+          ) : null}
+
+          {/* Create-pivot capture (after drawing a center + radius) */}
+          {pendingPivot ? (
+            <CreatePivotPanel
+              centerLat={pendingPivot.lat}
+              centerLon={pendingPivot.lon}
+              radiusM={pendingPivot.radiusM}
+              submitting={createPivotMut.isPending}
+              error={createPivotMut.isError ? t("create.createFailed") : null}
+              onSubmit={({ code, name, sector_count }) =>
+                createPivotMut.mutate({ lat: pendingPivot.lat, lon: pendingPivot.lon, radiusM: pendingPivot.radiusM, code, name, sectorCount: sector_count })
+              }
+              onCancel={resetCreate}
+            />
+          ) : null}
+
+          {/* Auto-block panel (cell size → compute → pick → create) */}
+          {autoOpen ? (
+            <AutoBlockPanel
+              cellSize={cellSize}
+              onCellSize={setCellSize}
+              onCompute={() => void computeAutoGrid()}
+              computing={autoComputing}
+              candidates={candidates}
+              selected={selectedCandidates}
+              onToggle={(code) =>
+                setSelectedCandidates((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(code)) next.delete(code);
+                  else next.add(code);
+                  return next;
+                })
+              }
+              onToggleAll={(all) => setSelectedCandidates(all ? new Set((candidates ?? []).map((c) => c.code)) : new Set())}
+              creating={autoCreating}
+              progressDone={autoCreatedCount}
+              error={autoError}
+              onCreate={() => void commitAutoBlock()}
+              onClose={closeAuto}
+            />
+          ) : null}
 
           {/* Reshape banner */}
           {reshaping ? (
@@ -516,11 +707,11 @@ function SettingsDrawer({
   onClose: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const [tab, setTab] = useState<SettingsTab>("defaults");
+  const [tab, setTab] = useState<SettingsTab>("farm");
   const tabs: { id: SettingsTab; label: string }[] = [
+    { id: "farm", label: t("settings.tabFarm") },
     { id: "defaults", label: t("settings.tabDefaults") },
     { id: "members", label: t("settings.tabMembers") },
-    { id: "farm", label: t("settings.tabFarm") },
   ];
   return (
     <>
@@ -557,9 +748,9 @@ function SettingsDrawer({
           ))}
         </div>
         <div className="flex-1 overflow-auto p-5">
-          {tab === "defaults" ? <FarmDefaultsTab farmId={farmId} /> : null}
-          {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
           {tab === "farm" ? <FarmEditTab farmId={farmId} /> : null}
+          {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} /> : null}
+          {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
         </div>
       </aside>
     </>
