@@ -187,10 +187,11 @@ class Farm(Base, TimestampedMixin):
     )
     active_to: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    # Farm-block config model PR-1 (tenant migration 0027): Farm-only
-    # "manager" role + Shared-bucket templates + per-category locks.
-    # Templates and locks are inert until PR-2/PR-3 wire them up.
-    farm_manager_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Farm-block config model PR-1 (tenant migration 0027): Shared-bucket
+    # templates + per-category locks. Inert until PR-2/PR-3 wire them up.
+    # (The Farm-only "manager" pointer farm_manager_id was dropped in U-4a /
+    # tenant migration 0045 — the farm manager is now derived read-only from
+    # the FarmManager farm-scope. See FarmResponse.farm_manager.)
     default_irrigation_system: Mapped[str | None] = mapped_column(Text, nullable=True)
     default_irrigation_source: Mapped[str | None] = mapped_column(Text, nullable=True)
     default_flow_rate_m3_per_hour: Mapped[Decimal | None] = mapped_column(

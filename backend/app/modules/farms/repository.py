@@ -1243,6 +1243,40 @@ class FarmsRepository:
             for r in result.all()
         ]
 
+    async def farm_managers_for(self, *, farm_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
+        """Map farm_id -> {membership_id, full_name} for the primary manager.
+
+        "Primary" = the active ``FarmManager`` farm-scope with the earliest
+        grant. Farms with no FarmManager scope are absent from the map.
+        U-4a derives this in place of the dropped ``farm_manager_id`` column.
+
+        Cross-schema read via the public session — ``farm_scopes``,
+        ``tenant_memberships`` and ``users`` all live in ``public``. Batched
+        (one query for N farms) to keep list endpoints free of N+1.
+        """
+        if not farm_ids:
+            return {}
+        result = await self._public.execute(
+            text(
+                """
+                SELECT DISTINCT ON (fs.farm_id)
+                       fs.farm_id, fs.membership_id, u.full_name
+                FROM public.farm_scopes fs
+                JOIN public.tenant_memberships tm ON tm.id = fs.membership_id
+                JOIN public.users u ON u.id = tm.user_id
+                WHERE fs.role = 'FarmManager'
+                  AND fs.revoked_at IS NULL
+                  AND fs.farm_id = ANY(:fids)
+                ORDER BY fs.farm_id, fs.granted_at ASC
+                """
+            ).bindparams(_bind_uuid_array("fids")),
+            {"fids": farm_ids},
+        )
+        return {
+            r.farm_id: {"membership_id": r.membership_id, "full_name": r.full_name}
+            for r in result.all()
+        }
+
     # ---- Attachments -----------------------------------------------
 
     async def insert_farm_attachment(
@@ -1506,6 +1540,12 @@ def _bind_text_array(name: str) -> Any:
     from sqlalchemy import bindparam
 
     return bindparam(name, type_=ARRAY(Text))
+
+
+def _bind_uuid_array(name: str) -> Any:
+    from sqlalchemy import bindparam
+
+    return bindparam(name, type_=ARRAY(PG_UUID(as_uuid=True)))
 
 
 def _is_unique_violation(exc: IntegrityError, constraint_name: str) -> bool:
