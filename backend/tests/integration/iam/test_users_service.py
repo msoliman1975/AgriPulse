@@ -71,6 +71,34 @@ def _users_service(admin_session: AsyncSession, fake: FakeKeycloakClient) -> Ten
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["TenantOwner", "TenantAdmin", "BillingAdmin", "Viewer"])
+async def test_invite_accepts_every_tenant_role(admin_session: AsyncSession, role: str) -> None:
+    """Every role the invite API/UI offers must be insertable.
+
+    Regression for the default-role 500: the tenant_role_assignments CHECK
+    constraint omitted 'Viewer' (the DEFAULT invite role), so a default invite
+    raised CheckViolationError. The role lands in tenant_role_assignments via a
+    real DB insert here (FakeKeycloakClient can't catch the DB CHECK), so this
+    fails pre-0036 for 'Viewer' and passes after.
+    """
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="role")
+    svc = _users_service(admin_session, fake)
+
+    result = await svc.invite_user(
+        email=f"{role.lower()}@role.test",
+        full_name=f"{role} User",
+        phone=None,
+        tenant_role=role,
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+    assert result["keycloak_provisioning"] == "succeeded"
+    rows = await svc.list_users(tenant_id=tenant_id)
+    assert rows[0]["tenant_roles"] == [role]
+
+
+@pytest.mark.asyncio
 async def test_invite_fresh_user_provisions_keycloak_and_db(
     admin_session: AsyncSession,
 ) -> None:
