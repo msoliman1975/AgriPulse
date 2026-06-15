@@ -74,7 +74,7 @@ _BLOCK_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
         "soil_texture",
         "salinity_class",
         "soil_ph",
-        "agronomist_id",
+        "agronomist_membership_id",
         "notes",
         "tags",
     }
@@ -153,7 +153,7 @@ def _row_geom_select_for_block(*, with_boundary: bool) -> tuple[Any, ...]:
         Block.soil_texture,
         Block.salinity_class,
         Block.soil_ph,
-        Block.agronomist_id,
+        Block.agronomist_membership_id,
         Block.notes,
         Block.tags,
         Block.active_from,
@@ -440,7 +440,7 @@ class FarmsRepository:
         soil_texture: str | None,
         salinity_class: str | None,
         soil_ph: Decimal | None,
-        agronomist_id: UUID | None,
+        agronomist_membership_id: UUID | None,
         notes: str | None,
         tags: list[str],
         actor_user_id: UUID | None,
@@ -463,7 +463,7 @@ class FarmsRepository:
                 boundary_utm, centroid, area_m2, aoi_hash,
                 elevation_m, irrigation_system, irrigation_source,
                 soil_texture, salinity_class, soil_ph,
-                agronomist_id, notes, tags, active_from,
+                agronomist_membership_id, notes, tags, active_from,
                 unit_type, parent_unit_id, irrigation_geometry,
                 created_by, updated_by
             )
@@ -474,7 +474,7 @@ class FarmsRepository:
                 0, '',
                 :elevation_m, :irrigation_system, :irrigation_source,
                 :soil_texture, :salinity_class, :soil_ph,
-                :agronomist_id, :notes, :tags,
+                :agronomist_membership_id, :notes, :tags,
                 COALESCE(:active_from, current_date),
                 :unit_type, :parent_unit_id, CAST(:irrigation_geometry AS jsonb),
                 :actor, :actor
@@ -485,7 +485,7 @@ class FarmsRepository:
             _bind_uuid("id"),
             _bind_uuid("farm_id"),
             _bind_uuid("actor"),
-            _bind_uuid("agronomist_id"),
+            _bind_uuid("agronomist_membership_id"),
             _bind_uuid("parent_unit_id"),
             _bind_text_array("tags"),
         )
@@ -504,7 +504,7 @@ class FarmsRepository:
                     "soil_texture": soil_texture,
                     "salinity_class": salinity_class,
                     "soil_ph": soil_ph,
-                    "agronomist_id": agronomist_id,
+                    "agronomist_membership_id": agronomist_membership_id,
                     "notes": notes,
                     "tags": tags,
                     "unit_type": unit_type,
@@ -614,8 +614,8 @@ class FarmsRepository:
             f"RETURNING id"
         )
         stmt = text(sql).bindparams(_bind_uuid("id"), _bind_uuid("actor"))
-        if "agronomist_id" in params:
-            stmt = stmt.bindparams(_bind_uuid("agronomist_id"))
+        if "agronomist_membership_id" in params:
+            stmt = stmt.bindparams(_bind_uuid("agronomist_membership_id"))
         if "tags" in params:
             stmt = stmt.bindparams(_bind_text_array("tags"))
 
@@ -1597,7 +1597,7 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "soil_texture": row.soil_texture,
         "salinity_class": row.salinity_class,
         "soil_ph": row.soil_ph,
-        "agronomist_id": row.agronomist_id,
+        "agronomist_membership_id": row.agronomist_membership_id,
         "notes": row.notes,
         "tags": list(row.tags or []),
         "active_from": row.active_from,

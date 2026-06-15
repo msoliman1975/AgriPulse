@@ -39,7 +39,7 @@ describe("BlockEditPage", () => {
       soil_texture: null,
       salinity_class: null,
       soil_ph: null,
-      agronomist_id: null,
+      agronomist_membership_id: null,
       notes: null,
       tags: [],
       status: "active",
