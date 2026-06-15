@@ -247,7 +247,12 @@ class Block(Base, TimestampedMixin):
     soil_ec_ds_per_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     soil_organic_matter_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     last_soil_test_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    agronomist_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # U-4b: per-block agronomist referenced by membership (cross-schema
+    # logical ref to public.tenant_memberships, no FK — like the U-3 worker
+    # link). Repointed from the raw users.id column in tenant migration 0046.
+    agronomist_membership_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     # Lifecycle: see Farm.active_from / active_to.
     active_from: Mapped[date] = mapped_column(
         Date, nullable=False, server_default=text("current_date")
