@@ -381,7 +381,7 @@ jobs:
       # but the gha cache (mode=max, scoped per image) keeps subsequent
       # PRs cheap.
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: linux/amd64,linux/arm64
 
