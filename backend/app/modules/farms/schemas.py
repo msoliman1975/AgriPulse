@@ -386,7 +386,8 @@ class BlockCreateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
-    agronomist_id: UUID | None = None
+    # U-4b: per-block agronomist, referenced by tenant membership_id.
+    agronomist_membership_id: UUID | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
     # Land-unit polymorphism: defaults to plain `block` so existing
@@ -423,7 +424,7 @@ class BlockUpdateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
-    agronomist_id: UUID | None = None
+    agronomist_membership_id: UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
     irrigation_geometry: dict[str, Any] | None = None
@@ -447,7 +448,7 @@ class BlockResponse(BaseModel):
     soil_texture: SoilTexture | None
     salinity_class: SalinityClass | None
     soil_ph: Decimal | None
-    agronomist_id: UUID | None
+    agronomist_membership_id: UUID | None
     notes: str | None
     tags: list[str]
     active_from: date

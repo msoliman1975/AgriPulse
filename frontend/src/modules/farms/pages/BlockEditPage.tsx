@@ -60,6 +60,7 @@ export function BlockEditPage(): JSX.Element {
           soil_texture: block.soil_texture,
           salinity_class: block.salinity_class,
           soil_ph: block.soil_ph,
+          agronomist_membership_id: block.agronomist_membership_id,
           notes: block.notes,
         }}
         initialBoundary={block.boundary}

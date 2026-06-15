@@ -1,6 +1,6 @@
 # U-4 scope — retire the domain-pointer role plane
 
-**Status:** scoped 2026-06-14, decisions locked, not started.
+**Status:** scoped 2026-06-14. **PR-U4a SHIPPED** (`e8b83b9`, `feat/u4a-farm-manager-derived`). **PR-U4b SHIPPED** (`feat/u4b-block-agronomist-membership`, stacked on U4a). Both stacked on `feat/identity-unification`; merge that first.
 **Parent:** `docs/proposals/identity-users-members-workers-unification.html` (U-4).
 **Builds on:** branch `feat/identity-unification` (commit `b529fe5`, tenant migration head **0044**). U-4 migrations chain off 0044, so U-4 lands on top of that branch (or after it merges).
 

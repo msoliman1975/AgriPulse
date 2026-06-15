@@ -339,7 +339,7 @@ async def create_block(
         soil_texture=payload.soil_texture,
         salinity_class=payload.salinity_class,
         soil_ph=payload.soil_ph,
-        agronomist_id=payload.agronomist_id,
+        agronomist_membership_id=payload.agronomist_membership_id,
         notes=payload.notes,
         tags=payload.tags,
         unit_type=payload.unit_type,
