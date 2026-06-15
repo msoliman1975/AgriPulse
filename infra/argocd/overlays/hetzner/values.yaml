@@ -14,20 +14,19 @@ global:
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev).
-  # fa3fb73 = delete-orphan cleanup (PR #246) — descendant of eec597a (imagery
-  #   fix #245) + 05d0edd (invite Viewer fix #243), so it carries all of them
-  #   forward. delete_user now revokes tenant_role/farm_scope grants + keeps
-  #   platform-admin accounts. No new migration in #246 (public head stays 0036).
-  # frontend f7c2692 = map zoom controls + config-menu z-index overlap fix
-  #   (PR #262) — descendant of fa3fb73. Frontend-only; api/workers stay fa3fb73.
+  # 3683f19 = identity unification U-1..U-4 (PRs #264 #267 #268): Users→"Team"
+  #   label, worker role vocab canonicalised + worker↔member link, farm_manager
+  #   derived from FarmManager scope, block agronomist repointed to membership
+  #   + UI picker. Tenant migrations 0043-0046 run on PreSync (public head stays
+  #   0036). api + workers + frontend promoted together off the same SHA.
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "fa3fb73"
+      tag: "3683f19"
     workers:
-      tag: "fa3fb73"
+      tag: "3683f19"
     frontend:
-      tag: "f7c2692"
+      tag: "3683f19"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
