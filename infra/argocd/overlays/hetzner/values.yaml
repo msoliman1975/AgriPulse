@@ -14,21 +14,18 @@ global:
   envHost: agripulse.cloud
   # Pin to the SHAs actually running on the live cluster (hand-written
   # promotion — NOT auto-bumped like dev).
-  # 2b17ae0 = plan-templates Track E (PR #242, E1..E5) on top of Track A-D:
-  #   E1/E2 catalog + apply engine (public migration 0034, tenant 0041)
-  #   E3 platform authoring API + /platform/plan-templates UI
-  #   E4 tenant apply wizard + board badges (source/anchored_stage_code)
-  #   E5 seed mango-season-eg template (public migration 0035)
-  # Public migrations 0034/0035 + tenant 0041 run via the PreSync migrate jobs.
+  # 05d0edd = invite Viewer-role fix (PR #243) on top of plan-templates Track E
+  #   (#242, 2b17ae0). Migration 0036 adds 'Viewer' to the tenant_role_assignments
+  #   CHECK so default-role invites stop 500ing. Public migrations 0034/0035/0036
+  #   + tenant 0041 run via the PreSync migrate jobs.
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "2b17ae0"
+      tag: "05d0edd"
     workers:
-      tag: "2b17ae0"
+      tag: "05d0edd"
     frontend:
-      # 2b17ae0 = Track E frontend (authoring UI + apply wizard + board badges).
-      tag: "2b17ae0"
+      tag: "05d0edd"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
