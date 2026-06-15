@@ -51,7 +51,7 @@ export function ConfigsMenu(): ReactNode {
       {open ? (
         <div
           role="menu"
-          className="absolute end-0 z-30 mt-1 w-56 overflow-hidden rounded-md border border-ap-line bg-ap-panel py-1 shadow-lg"
+          className="absolute end-0 z-40 mt-1 w-56 overflow-hidden rounded-md border border-ap-line bg-ap-panel py-1 shadow-lg"
         >
           <ConfigFarmLink
             to={farmId ? `/config/imagery/${farmId}` : undefined}

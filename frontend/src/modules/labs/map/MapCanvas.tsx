@@ -220,6 +220,7 @@ export function MapCanvas({
     mapRef.current = map;
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
 
     // maplibre's trackResize only listens to WINDOW resizes, so when a side
     // panel (the inspector) opens/closes and resizes this container — not the
