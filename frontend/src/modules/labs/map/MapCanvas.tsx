@@ -86,6 +86,10 @@ interface Props {
   // border so the operator can see which cell the popup refers to.
   // Distinct from the pink worst-N highlight. Null = none selected.
   selectedGridCellId?: string | null;
+  // Auto-block candidate preview (Farm Console). `null` hides; an FC of
+  // clipped candidate polygons paints them translucent over the map so the
+  // operator sees exactly what auto-blocking will create before committing.
+  autoBlockPreview?: FeatureCollection<Polygon> | null;
 }
 
 export interface GridCellProps {
@@ -118,6 +122,10 @@ const GRID_FILL_LAYER = "subblock-grid-fill";
 const GRID_LINE_LAYER = "subblock-grid-line";
 const GRID_HIGHLIGHT_LAYER = "subblock-grid-highlight";
 const GRID_SELECTED_LAYER = "subblock-grid-selected";
+// Auto-block candidate preview (Farm Console).
+const PREVIEW_SOURCE_ID = "autoblock-preview";
+const PREVIEW_FILL_LAYER = "autoblock-preview-fill";
+const PREVIEW_LINE_LAYER = "autoblock-preview-line";
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -184,6 +192,7 @@ export function MapCanvas({
   onGridCellClick,
   highlightedCellIds = [],
   selectedGridCellId = null,
+  autoBlockPreview = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -496,6 +505,27 @@ export function MapCanvas({
           "line-opacity": 1,
         },
       });
+      // Auto-block candidate preview — translucent cyan fills with a dashed
+      // outline, painted over the satellite base so the operator previews
+      // exactly the clipped candidates auto-blocking will create. Starts
+      // empty; the autoBlockPreview effect swaps the data + visibility.
+      map.addSource(PREVIEW_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: PREVIEW_FILL_LAYER,
+        type: "fill",
+        source: PREVIEW_SOURCE_ID,
+        paint: { "fill-color": "#22d3ee", "fill-opacity": 0.3 },
+      });
+      map.addLayer({
+        id: PREVIEW_LINE_LAYER,
+        type: "line",
+        source: PREVIEW_SOURCE_ID,
+        paint: { "line-color": "#0891b2", "line-width": 1.2, "line-dasharray": [2, 1] },
+      });
+
       // Keep block name labels above the grid heatmap so they stay legible
       // (and clickable as the block-open affordance) when the overlay is on.
       // Raise the signal dots above the heatmap too so they stay visible +
@@ -679,6 +709,25 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [gridCells]);
+
+  // Auto-block candidate preview — same null = hide / FC = show pattern.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const src = map.getSource(PREVIEW_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+      const visible = autoBlockPreview != null;
+      src.setData(autoBlockPreview ?? { type: "FeatureCollection", features: [] });
+      for (const layerId of [PREVIEW_FILL_LAYER, PREVIEW_LINE_LAYER]) {
+        if (!map.getLayer(layerId)) continue;
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [autoBlockPreview]);
 
   // G-2: outline the cited cells (worst-N / alert) via a filter swap on
   // the highlight layer — same lightweight pattern as the block selection
