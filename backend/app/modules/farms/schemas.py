@@ -245,7 +245,6 @@ class FarmCreateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] = Field(default_factory=list)
-    farm_manager_id: UUID | None = None
     # Optional explicit activation date. Defaults to today server-side.
     # Allowed in past (historic backfill) or future (planned activation).
     active_from: date | None = None
@@ -272,7 +271,18 @@ class FarmUpdateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] | None = None
-    farm_manager_id: UUID | None = None
+
+
+class FarmManagerRef(BaseModel):
+    """The farm's primary manager — derived, read-only (U-4a).
+
+    Resolved from the active ``FarmManager`` farm-scope with the earliest
+    grant; ``null`` when the farm has no FarmManager assigned. Replaces the
+    dropped ``farm_manager_id`` column (tenant migration 0045).
+    """
+
+    membership_id: UUID
+    full_name: str | None = None
 
 
 class FarmResponse(BaseModel):
@@ -299,7 +309,8 @@ class FarmResponse(BaseModel):
     active_from: date
     active_to: date | None
     is_active: bool
-    farm_manager_id: UUID | None = None
+    # Derived, read-only — the active FarmManager farm-scope holder (U-4a).
+    farm_manager: FarmManagerRef | None = None
     # Defaults bucket (Shared) — surfaced read-only in PR-1; full
     # template authoring + lock semantics arrive in PR-2 / PR-3.
     default_irrigation_system: IrrigationSystem | None = None

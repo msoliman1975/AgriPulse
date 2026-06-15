@@ -9,6 +9,13 @@ export type OwnershipType = "owned" | "leased" | "partnership" | "other";
 export type WaterSource = "well" | "canal" | "nile" | "desalinated" | "rainfed" | "mixed";
 export type AreaUnitName = "feddan" | "acre" | "hectare";
 
+// Derived, read-only — the active FarmManager farm-scope holder (U-4a),
+// replacing the dropped farm_manager_id column.
+export interface FarmManagerRef {
+  membership_id: string;
+  full_name: string | null;
+}
+
 export interface Farm {
   id: string;
   code: string;
@@ -32,6 +39,7 @@ export interface Farm {
   active_from: string; // ISO date
   active_to: string | null;
   is_active: boolean;
+  farm_manager: FarmManagerRef | null;
   created_at: string;
   updated_at: string;
 }
