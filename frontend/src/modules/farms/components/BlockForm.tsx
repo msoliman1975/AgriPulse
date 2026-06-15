@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Polygon } from "geojson";
 
@@ -10,6 +10,8 @@ import {
   type SalinityClass,
   type SoilTexture,
 } from "@/api/blocks";
+import { listTenantUsers, type TenantUser } from "@/api/users";
+import { useCapability } from "@/rbac/useCapability";
 import { MapDraw } from "./MapDraw";
 import { AoiUploader } from "./AoiUploader";
 
@@ -83,6 +85,31 @@ export function BlockForm({
   const [uploadedPolygon, setUploadedPolygon] = useState<Polygon | null>(null);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
 
+  // U-4b: per-block agronomist picker. The agronomist is now a tenant
+  // member (agronomist_membership_id). Only offered when the caller can
+  // list members (user.read); otherwise the existing value is preserved
+  // untouched. Members are optional context, so a load failure is silent.
+  const canReadMembers = useCapability("user.read");
+  const [members, setMembers] = useState<TenantUser[]>([]);
+  const [agronomistMembershipId, setAgronomistMembershipId] = useState<string | null>(
+    initial?.agronomist_membership_id ?? null,
+  );
+  useEffect(() => {
+    if (!canReadMembers) return;
+    let cancelled = false;
+    listTenantUsers().then(
+      (rows) => {
+        if (!cancelled) setMembers(rows);
+      },
+      () => {
+        /* members are optional context — ignore a load failure */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [canReadMembers]);
+
   const handleSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     setBoundaryError(null);
@@ -115,6 +142,7 @@ export function BlockForm({
       soil_texture: soilTexture || null,
       salinity_class: salinityClass || null,
       soil_ph: soilPh ? Number(soilPh) : null,
+      agronomist_membership_id: agronomistMembershipId,
       notes: notes || null,
       tags: [],
     };
@@ -235,6 +263,26 @@ export function BlockForm({
             onChange={(e) => setSoilPh(e.target.value)}
           />
         </div>
+        {canReadMembers ? (
+          <div>
+            <label className="label" htmlFor="block-agronomist">
+              {t("form.agronomist")}
+            </label>
+            <select
+              id="block-agronomist"
+              className="input"
+              value={agronomistMembershipId ?? ""}
+              onChange={(e) => setAgronomistMembershipId(e.target.value || null)}
+            >
+              <option value="">{t("form.agronomistNone")}</option>
+              {members.map((m) => (
+                <option key={m.membership_id} value={m.membership_id}>
+                  {m.full_name || m.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div className="sm:col-span-2">
           <label className="label" htmlFor="block-notes">
             {t("form.notes")}

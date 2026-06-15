@@ -63,6 +63,8 @@
     "soilTexture": "Soil texture",
     "salinityClass": "Salinity",
     "soilPh": "Soil pH",
+    "agronomist": "Agronomist",
+    "agronomistNone": "— Unassigned —",
     "notes": "Notes",
     "submitBlockCreate": "Create block",
     "submitBlockUpdate": "Save block",
