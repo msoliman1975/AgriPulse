@@ -450,6 +450,80 @@ async def test_delete_user_in_single_tenant_archives_global_and_kc(
     # KC user removed.
     assert kc_subject not in fake.users
 
+    # No lingering active tenant-role grants for the archived membership
+    # (the soft membership-delete doesn't cascade, so delete_user revokes).
+    active_roles = (
+        await admin_session.execute(
+            text(
+                "SELECT count(*) AS c FROM public.tenant_role_assignments "
+                "WHERE membership_id = :mid AND revoked_at IS NULL"
+            ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+            {"mid": result["membership_id"]},
+        )
+    ).first()
+    assert active_roles.c == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_last_tenant_keeps_user_when_platform_admin(
+    admin_session: AsyncSession,
+) -> None:
+    """A platform admin who is also a tenant user, deleted from their last
+    tenant, keeps their global user + KC account (they're still a real
+    platform account) — only the membership + its grants go. Guards the
+    dangling-platform-grant orphan."""
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="delplat")
+    svc = _users_service(admin_session, fake)
+
+    result = await svc.invite_user(
+        email="delplat@delplat.test",
+        full_name="Del Platform",
+        phone=None,
+        tenant_role="TenantAdmin",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+    user_id = result["user_id"]
+    kc_subject = result["keycloak_subject"]
+    # Grant them an active platform role directly.
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.platform_role_assignments (user_id, role) "
+            "VALUES (:uid, 'PlatformAdmin')"
+        ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+        {"uid": user_id},
+    )
+
+    await svc.delete_user(
+        user_id=user_id, tenant_id=tenant_id, actor_user_id=None, tenant_schema=schema
+    )
+
+    # Membership gone from the tenant view, grants revoked...
+    assert await svc.list_users(tenant_id=tenant_id) == []
+    active_roles = (
+        await admin_session.execute(
+            text(
+                "SELECT count(*) AS c FROM public.tenant_role_assignments "
+                "WHERE membership_id = :mid AND revoked_at IS NULL"
+            ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+            {"mid": result["membership_id"]},
+        )
+    ).first()
+    assert active_roles.c == 0
+    # ...but the global user + KC account SURVIVE (still a platform admin).
+    user_status = (
+        await admin_session.execute(
+            text("SELECT status, deleted_at FROM public.users WHERE id = :uid").bindparams(
+                bindparam("uid", type_=PG_UUID(as_uuid=True))
+            ),
+            {"uid": user_id},
+        )
+    ).first()
+    assert user_status.status == "active"
+    assert user_status.deleted_at is None
+    assert kc_subject in fake.users
+
 
 @pytest.mark.asyncio
 async def test_delete_user_in_multi_tenant_keeps_global_and_kc(
