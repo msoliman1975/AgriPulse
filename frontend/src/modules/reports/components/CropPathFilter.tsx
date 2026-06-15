@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { listAdminCrops, listAdminStrains, listAdminVarieties } from "@/api/cropCatalog";
 import {
   listCrops,
   listCropVarieties,
@@ -15,6 +16,13 @@ interface Props {
   value: string | null;
   /** Emits the resolved path prefix, or null when cleared back to "all". */
   onChange: (cropPath: string | null) => void;
+  /**
+   * Which catalog endpoints to read. "tenant" (default) uses the
+   * tenant-scoped /v1/crops… reads; "platform" uses /v1/admin/crops…,
+   * needed on PlatformAdmin pages (e.g. plan-template authoring) where the
+   * JWT has no tenant and /v1/crops 403s.
+   */
+  scope?: "tenant" | "platform";
 }
 
 /**
@@ -25,7 +33,7 @@ interface Props {
  * "mango.alphonso.short". The variety/strain selects appear only as deep
  * as the crop's classification_depth allows.
  */
-export function CropPathFilter({ value, onChange }: Props): ReactNode {
+export function CropPathFilter({ value, onChange, scope = "tenant" }: Props): ReactNode {
   const { t, i18n } = useTranslation("reports");
   const [crops, setCrops] = useState<Crop[]>([]);
   const [varieties, setVarieties] = useState<CropVariety[]>([]);
@@ -39,7 +47,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
 
   useEffect(() => {
     let cancelled = false;
-    listCrops()
+    (scope === "platform" ? listAdminCrops() : listCrops())
       .then((data) => {
         if (!cancelled) setCrops(data);
       })
@@ -47,7 +55,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scope]);
 
   // Reset local selection when the filter is cleared from outside.
   useEffect(() => {
@@ -64,7 +72,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
       setVarieties([]);
       return;
     }
-    listCropVarieties(cropId)
+    (scope === "platform" ? listAdminVarieties(cropId) : listCropVarieties(cropId))
       .then((data) => {
         if (!cancelled) setVarieties(data);
       })
@@ -72,7 +80,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [cropId]);
+  }, [cropId, scope]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +88,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
       setStrains([]);
       return;
     }
-    listVarietyStrains(varietyId)
+    (scope === "platform" ? listAdminStrains(varietyId) : listVarietyStrains(varietyId))
       .then((data) => {
         if (!cancelled) setStrains(data);
       })
@@ -88,7 +96,7 @@ export function CropPathFilter({ value, onChange }: Props): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [varietyId]);
+  }, [varietyId, scope]);
 
   const isAr = i18n.language === "ar";
   const cropLabel = (c: Crop): string => (isAr ? c.name_ar || c.name_en : c.name_en);
