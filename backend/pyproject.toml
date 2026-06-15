@@ -32,7 +32,7 @@ dependencies = [
   # migration. Pinned to the 0.8.x line that ships with STAC API 1.0.
   # `psycopg-pool` is consumed by pypgstac's PgstacDB connection helper
   # but not pinned by the package's own metadata, so we list it here.
-  "pypgstac>=0.8.5,<0.9",
+  "pypgstac>=0.8.5,<0.10",
   "psycopg-pool>=3.2,<4",
 
   # Raster + AOI ops for the heavy-queue compute_indices task.
