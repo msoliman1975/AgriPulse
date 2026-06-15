@@ -43,7 +43,9 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "blocks",
-        sa.Column("agronomist_membership_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column(
+            "agronomist_membership_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=True
+        ),
     )
     op.execute(
         """
