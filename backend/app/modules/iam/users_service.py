@@ -588,9 +588,31 @@ class TenantUsersService:
             ),
             {"uid": user_id, "tid": tenant_id, "actor": actor_user_id},
         )
+        # Revoke this membership's grants. The soft membership-delete does NOT
+        # fire the ON DELETE CASCADE, so without this the tenant-role and
+        # farm-scope rows linger as active (revoked_at IS NULL) pointing at an
+        # archived membership. Scope by the membership(s) for (user, tenant).
+        _membership_filter = (
+            "membership_id IN (SELECT id FROM public.tenant_memberships "
+            "WHERE user_id = :uid AND tenant_id = :tid)"
+        )
+        for table in ("public.tenant_role_assignments", "public.farm_scopes"):
+            await self._public.execute(
+                text(
+                    f"UPDATE {table} SET revoked_at = now() "
+                    f"WHERE revoked_at IS NULL AND {_membership_filter}"
+                ).bindparams(
+                    bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"uid": user_id, "tid": tenant_id},
+            )
         # If the user has no other active memberships, soft-delete the
         # global user row + their Keycloak account so a long-since-departed
-        # employee isn't left enabled.
+        # employee isn't left enabled — UNLESS they still hold an active
+        # platform role, in which case the account is still a real (platform)
+        # user and must survive (deleting it would dangle the platform grant
+        # and the KC subject it points at).
         remaining = (
             await self._public.execute(
                 text(
@@ -600,7 +622,18 @@ class TenantUsersService:
                 {"uid": user_id},
             )
         ).first()
-        if remaining is not None and int(remaining.c) == 0:
+        platform = (
+            await self._public.execute(
+                text(
+                    "SELECT count(*) AS c FROM public.platform_role_assignments "
+                    "WHERE user_id = :uid AND revoked_at IS NULL"
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id},
+            )
+        ).first()
+        no_memberships = remaining is not None and int(remaining.c) == 0
+        no_platform = platform is None or int(platform.c) == 0
+        if no_memberships and no_platform:
             await self._public.execute(
                 text(
                     "UPDATE public.users "
