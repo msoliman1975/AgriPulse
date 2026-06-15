@@ -21,9 +21,9 @@ global:
   # tile-server unchanged (no backend delta) stays 9d140cc.
   images:
     api:
-      tag: "05d0edd"
+      tag: "eec597a"
     workers:
-      tag: "05d0edd"
+      tag: "eec597a"
     frontend:
       tag: "05d0edd"
     tileServer:
