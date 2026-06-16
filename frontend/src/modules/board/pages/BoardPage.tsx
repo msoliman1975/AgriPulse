@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/Skeleton";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
 import { useBoard } from "@/queries/board";
+import { usePlans } from "@/queries/plans";
+import { useAppliableTemplates } from "@/queries/planTemplates";
 
 import { useScheduleRecommendation } from "@/queries/recScheduling";
 
@@ -128,6 +130,22 @@ export function BoardPage(): ReactNode {
 
   const range = useMemo(() => computeWindow(viewMode, anchor), [viewMode, anchor]);
   const boardQ = useBoard(farmId ?? null, range.fetchStart, range.fetchWeeks);
+
+  // Season picker: the displayed season is the anchor's year (defaults to the
+  // current season as of today). Offer the years the farm has plans for, plus
+  // a window around now so the user can still navigate without existing plans.
+  const plansQ = usePlans(farmId, {});
+  const appliableQ = useAppliableTemplates(farmId ?? null);
+  const seasonYears = useMemo(() => {
+    const now = new Date().getFullYear();
+    const years = new Set<number>([now - 1, now, now + 1]);
+    for (const p of plansQ.data ?? []) years.add(p.season_year);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [plansQ.data]);
+  const selectedYear = anchor.getFullYear();
+  function changeSeasonYear(year: number) {
+    setAnchor((prev) => addYears(prev, year - prev.getFullYear()));
+  }
 
   // Deep-link context preserved through the /plan -> /board redirect: callers
   // (Alerts, Insights "Upcoming activities") pass ?activity=&lane= to focus a
@@ -333,6 +351,7 @@ export function BoardPage(): ReactNode {
               {t("template.applyButton")}
             </button>
           ) : null}
+          <SeasonSelect year={selectedYear} years={seasonYears} onChange={changeSeasonYear} />
           <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
           <RangeNavigator label={rangeLabel} onShift={shiftAnchor} onToday={onTodayPressed} />
         </div>
@@ -372,6 +391,20 @@ export function BoardPage(): ReactNode {
           </div>
         ) : null}
       </div>
+
+      {!boardQ.isLoading &&
+      !boardQ.isError &&
+      (boardQ.data?.blocks?.length ?? 0) > 0 &&
+      (boardQ.data?.activities?.length ?? 0) === 0 ? (
+        <div className="rounded-lg border border-ap-warn/30 bg-ap-warn/5 px-4 py-3 text-sm">
+          <p className="font-medium text-ap-ink">{t("noPlan.title", { year: selectedYear })}</p>
+          <p className="mt-1 text-ap-muted">
+            {!appliableQ.isLoading && (appliableQ.data?.length ?? 0) === 0
+              ? t("noPlan.noMatch")
+              : t("noPlan.empty")}
+          </p>
+        </div>
+      ) : null}
 
       {boardQ.isLoading ? (
         <Skeleton className="h-96 w-full" />
@@ -461,6 +494,35 @@ export function BoardPage(): ReactNode {
         <ApplyTemplateDialog farmId={farmId} onClose={() => setApplyTemplateOpen(false)} />
       ) : null}
     </div>
+  );
+}
+
+interface SeasonSelectProps {
+  year: number;
+  years: number[];
+  onChange: (year: number) => void;
+}
+
+/** Picks which season (year) the board shows. Defaults to the current
+ * season (the anchor's year, initialised to today). */
+function SeasonSelect({ year, years, onChange }: SeasonSelectProps): ReactNode {
+  const { t } = useTranslation("board");
+  return (
+    <label className="inline-flex items-center gap-1.5 text-sm text-ap-muted">
+      <span className="sr-only">{t("season.label")}</span>
+      <select
+        aria-label={t("season.label")}
+        value={year}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="rounded-md border border-ap-line bg-white px-2 py-1 text-ap-ink"
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {t("season.option", { year: y })}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

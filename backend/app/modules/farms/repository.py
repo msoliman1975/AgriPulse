@@ -302,6 +302,7 @@ class FarmsRepository:
         governorate: str | None,
         tag: str | None,
         include_inactive: bool,
+        farm_ids: list[UUID] | None = None,
     ) -> list[dict[str, Any]]:
         stmt = select(*_row_geom_select_for_farm(with_boundary=False))
         if not include_inactive:
@@ -311,6 +312,9 @@ class FarmsRepository:
                 Farm.deleted_at.is_(None),
                 (Farm.active_to.is_(None)) | (Farm.active_to > func.current_date()),
             )
+        if farm_ids is not None:
+            # SMK-RBAC-GAP-02: restrict to a farm-scoped user's visible farms.
+            stmt = stmt.where(Farm.id.in_(farm_ids))
         if governorate:
             stmt = stmt.where(Farm.governorate == governorate)
         if tag:

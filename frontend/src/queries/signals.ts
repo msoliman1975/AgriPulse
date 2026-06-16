@@ -35,10 +35,10 @@ import {
   updateSignalTemplate,
 } from "@/api/signals";
 
-export function useSignalDefinitions(includeInactive = false) {
+export function useSignalDefinitions(includeInactive = false, farmId?: string) {
   return useQuery({
-    queryKey: ["signal_definitions", { includeInactive }] as const,
-    queryFn: () => listSignalDefinitions(includeInactive),
+    queryKey: ["signal_definitions", { includeInactive, farmId }] as const,
+    queryFn: () => listSignalDefinitions(includeInactive, farmId),
     staleTime: 60_000,
   });
 }

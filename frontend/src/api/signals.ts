@@ -139,9 +139,12 @@ export interface ListObservationParams {
   limit?: number;
 }
 
-export async function listSignalDefinitions(includeInactive = false): Promise<SignalDefinition[]> {
+export async function listSignalDefinitions(
+  includeInactive = false,
+  farmId?: string,
+): Promise<SignalDefinition[]> {
   const { data } = await apiClient.get<SignalDefinition[]>("/v1/signals/definitions", {
-    params: { include_inactive: includeInactive },
+    params: { include_inactive: includeInactive, farm_id: farmId },
   });
   return data;
 }
@@ -189,9 +192,7 @@ export async function getSignalDefinitionReferences(id: string): Promise<SignalR
 }
 
 export async function getSignalTemplateReferences(id: string): Promise<SignalReferences> {
-  const { data } = await apiClient.get<SignalReferences>(
-    `/v1/signals/templates/${id}/references`,
-  );
+  const { data } = await apiClient.get<SignalReferences>(`/v1/signals/templates/${id}/references`);
   return data;
 }
 
@@ -263,9 +264,7 @@ export async function listSignalObservations(
 
 // CS-11 delete (capability: signal.delete_observation). Hard-delete; the
 // audit log preserves the row. Both return { deleted: <rows removed> }.
-export async function deleteSignalObservation(
-  observationId: string,
-): Promise<{ deleted: number }> {
+export async function deleteSignalObservation(observationId: string): Promise<{ deleted: number }> {
   const { data } = await apiClient.delete<{ deleted: number }>(
     `/v1/signals/observations/${observationId}`,
   );

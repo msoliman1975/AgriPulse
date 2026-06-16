@@ -107,7 +107,12 @@ async def list_recommendations(
     state_filter: list[str] | None = Query(default=None, alias="state"),
     action_type: list[str] | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(requires_capability("recommendation.read")),
+    # SMK-RBAC-GAP-02: gate on the farm in scope so a farm-scoped-only user can
+    # read their farm's recommendations (the page always passes ?farm_id=).
+    # Tenant/platform callers still pass via their tenant role (farm_id ignored).
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
