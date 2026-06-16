@@ -1222,6 +1222,50 @@ class FarmsRepository:
             "revoked_at": row.revoked_at,
         }
 
+    async def get_membership_farm_scopes_for_kc(
+        self, *, membership_id: UUID
+    ) -> tuple[str | None, list[dict[str, str]]]:
+        """Return ``(keycloak_subject, all of the user's active farm scopes)``
+        for the user that owns ``membership_id``.
+
+        Used to re-project the ``farm_scopes`` Keycloak user attribute after a
+        grant/revoke so the JWT claim the auth middleware reads stays in sync
+        with ``public.farm_scopes`` (the source of truth). The Keycloak
+        attribute is per-user (global), so we aggregate scopes across *all* of
+        the user's memberships — a grant in one tenant must not clobber another.
+        ``keycloak_subject`` is ``None`` for an unknown membership;
+        ``pending::`` subjects are returned as-is and skipped by the caller."""
+        result = await self._public.execute(
+            text(
+                """
+                SELECT u.keycloak_subject AS kc,
+                       fs.farm_id AS farm_id,
+                       fs.role AS role
+                FROM public.tenant_memberships m0
+                JOIN public.users u ON u.id = m0.user_id
+                LEFT JOIN public.tenant_memberships m ON m.user_id = u.id
+                LEFT JOIN public.farm_scopes fs
+                       ON fs.membership_id = m.id AND fs.revoked_at IS NULL
+                WHERE m0.id = :mid
+                """
+            ).bindparams(_bind_uuid("mid")),
+            {"mid": membership_id},
+        )
+        rows = result.all()
+        if not rows:
+            return None, []
+        seen: set[tuple[str, str]] = set()
+        scopes: list[dict[str, str]] = []
+        for r in rows:
+            if r.farm_id is None:
+                continue
+            key = (str(r.farm_id), r.role)
+            if key in seen:
+                continue
+            seen.add(key)
+            scopes.append({"farm_id": str(r.farm_id), "role": r.role})
+        return rows[0].kc, scopes
+
     async def list_farm_members(self, *, farm_id: UUID) -> list[dict[str, Any]]:
         result = await self._public.execute(
             text(

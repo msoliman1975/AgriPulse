@@ -33,6 +33,7 @@ class FakeUser:
     platform_role: str | None = None
     tenant_id: str | None = None
     tenant_role: str | None = None
+    farm_scopes: tuple[dict[str, str], ...] = ()
     temporary_password: str | None = None
 
 
@@ -162,6 +163,13 @@ class FakeKeycloakClient:
             raise KeycloakRequestError(404, "user not found", operation="set_tenant_attributes")
         user.tenant_id = str(tenant_id)
         user.tenant_role = tenant_role
+
+    async def set_farm_scopes(self, *, keycloak_user_id: str, scopes: list[dict[str, str]]) -> None:
+        self._maybe_fail("set_farm_scopes")
+        user = self.users.get(keycloak_user_id)
+        if user is None:
+            raise KeycloakRequestError(404, "user not found", operation="set_farm_scopes")
+        user.farm_scopes = tuple({"farm_id": str(s["farm_id"]), "role": s["role"]} for s in scopes)
 
     async def add_existing_user_to_group(
         self,

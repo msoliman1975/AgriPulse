@@ -63,6 +63,7 @@ from app.modules.farms.phenology_advance import stage_for_date
 from app.modules.farms.repository import FarmsRepository
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
+from app.shared.keycloak.client import KeycloakAdminClient, get_keycloak_client
 from app.shared.storage import (
     PresignedDownload,
     StorageClient,
@@ -504,6 +505,7 @@ class FarmServiceImpl:
         audit_service: AuditService | None = None,
         event_bus: EventBus | None = None,
         storage_client: StorageClient | None = None,
+        keycloak_client: KeycloakAdminClient | None = None,
     ) -> None:
         self._tenant_session = tenant_session
         self._public_session = public_session
@@ -511,7 +513,28 @@ class FarmServiceImpl:
         self._audit = audit_service or get_audit_service()
         self._bus = event_bus or get_default_bus()
         self._storage = storage_client or get_storage_client()
+        self._kc = keycloak_client or get_keycloak_client()
         self._log = get_logger(__name__)
+
+    async def _sync_member_scopes_to_kc(self, *, membership_id: UUID) -> None:
+        """Re-project a membership's active farm scopes into Keycloak so they
+        reach the JWT (`farm_scopes` claim) and the auth middleware grants
+        farm-scoped capabilities. Best-effort: a Keycloak hiccup must not fail
+        the grant/revoke — it is logged and the next sync / reconcile recovers.
+        """
+        try:
+            kc_subject, scopes = await self._repo.get_membership_farm_scopes_for_kc(
+                membership_id=membership_id
+            )
+            if not kc_subject or kc_subject.startswith("pending::"):
+                return
+            await self._kc.set_farm_scopes(keycloak_user_id=kc_subject, scopes=scopes)
+        except Exception as exc:  # best-effort sync, never fatal
+            self._log.warning(
+                "farm_scopes_keycloak_sync_failed",
+                membership_id=str(membership_id),
+                error=str(exc),
+            )
 
     # ---- Farms ------------------------------------------------------
 
@@ -1605,6 +1628,7 @@ class FarmServiceImpl:
             actor_user_id=actor_user_id,
         )
         await self._public_session.flush()
+        await self._sync_member_scopes_to_kc(membership_id=membership_id)
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -1645,6 +1669,7 @@ class FarmServiceImpl:
             actor_user_id=actor_user_id,
         )
         await self._public_session.flush()
+        await self._sync_member_scopes_to_kc(membership_id=result["membership_id"])
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -2307,6 +2332,7 @@ def get_farm_service(
     audit_service: AuditService | None = None,
     event_bus: EventBus | None = None,
     storage_client: StorageClient | None = None,
+    keycloak_client: KeycloakAdminClient | None = None,
 ) -> FarmService:
     """Factory used by routers and Celery tasks."""
     return FarmServiceImpl(
@@ -2315,4 +2341,5 @@ def get_farm_service(
         audit_service=audit_service,
         event_bus=event_bus,
         storage_client=storage_client,
+        keycloak_client=keycloak_client,
     )
