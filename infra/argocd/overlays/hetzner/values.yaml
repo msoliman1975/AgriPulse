@@ -20,11 +20,14 @@ global:
   #   + UI picker. Tenant migrations 0043-0046 run on PreSync (public head stays
   #   0036). api + workers + frontend promoted together off the same SHA.
   # tile-server unchanged (no backend delta) stays 9d140cc.
+  # b5a5d0f = #269 backend fixes: auto-grid clips to farm boundary + farm_scopes
+  #   synced to Keycloak so farm-scoped roles work (SMK-RBAC-BUG-01). Backend-only
+  #   → api + workers bumped; frontend stays 3683f19 (no FE delta).
   images:
     api:
-      tag: "3683f19"
+      tag: "b5a5d0f"
     workers:
-      tag: "3683f19"
+      tag: "b5a5d0f"
     frontend:
       tag: "3683f19"
     tileServer:
