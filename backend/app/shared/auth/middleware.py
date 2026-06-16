@@ -12,6 +12,7 @@ with an RFC 7807 problem+json body â€” handled in app.core.errors.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -101,7 +102,16 @@ def _build_context(claims: dict[str, Any]) -> RequestContext:
 
 
 def _iter_farm_scopes(items: Iterable[Any]) -> Iterable[FarmScope]:
-    for item in items:
+    for raw in items:
+        # The `farm_scopes-mapper` is a multivalued String mapper, so each
+        # scope arrives as a JSON object *string* (e.g. '{"farm_id":...}').
+        # Parse those into dicts; tolerate already-dict items too.
+        item: Any = raw
+        if isinstance(item, str):
+            try:
+                item = json.loads(item)
+            except (ValueError, TypeError):
+                continue
         if not isinstance(item, dict):
             continue
         try:

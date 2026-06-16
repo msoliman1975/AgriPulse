@@ -20,6 +20,7 @@ never present a freshly-expired token.
 from __future__ import annotations
 
 import asyncio
+import json
 import secrets
 import time
 from dataclasses import dataclass
@@ -114,6 +115,10 @@ class KeycloakAdminClient(Protocol):
         self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
     ) -> None: ...
 
+    async def set_farm_scopes(
+        self, *, keycloak_user_id: str, scopes: list[dict[str, str]]
+    ) -> None: ...
+
     async def disable_users_in_group(self, slug: str) -> int: ...
 
     async def enable_users_in_group(self, slug: str) -> int: ...
@@ -194,6 +199,10 @@ class NoopKeycloakClient:
     ) -> None:
         del tenant_id, tenant_role
         self._log.warning("keycloak_noop_set_tenant_attributes", keycloak_user_id=keycloak_user_id)
+
+    async def set_farm_scopes(self, *, keycloak_user_id: str, scopes: list[dict[str, str]]) -> None:
+        del scopes
+        self._log.warning("keycloak_noop_set_farm_scopes", keycloak_user_id=keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,
@@ -687,6 +696,42 @@ class HttpxKeycloakAdminClient:
             "PUT",
             f"/users/{keycloak_user_id}",
             operation="set_tenant_attributes",
+            json=user,
+            expected=(204,),
+        )
+
+    async def set_farm_scopes(self, *, keycloak_user_id: str, scopes: list[dict[str, str]]) -> None:
+        """Project a user's full active farm scopes into the `farm_scopes`
+        Keycloak user attribute so they surface in the JWT (via the
+        `farm_scopes-mapper`) and the auth middleware grants farm-scoped
+        capabilities.
+
+        `scopes` is the FULL current set for the user — an empty list clears
+        the attribute. Each scope is stored as a compact JSON object string;
+        the multivalued mapper emits them as a JSON array of strings, which
+        the middleware parses back into objects. Same GET-merge-PUT dance as
+        `_set_tenant_attributes` so we don't blank the user's other fields.
+        """
+        resp = await self._request(
+            "GET",
+            f"/users/{keycloak_user_id}",
+            operation="set_farm_scopes_get",
+            expected=(200,),
+        )
+        user = resp.json()
+        attrs = dict(user.get("attributes") or {})
+        attrs["farm_scopes"] = [
+            json.dumps(
+                {"farm_id": str(s["farm_id"]), "role": s["role"]},
+                separators=(",", ":"),
+            )
+            for s in scopes
+        ]
+        user["attributes"] = attrs
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}",
+            operation="set_farm_scopes",
             json=user,
             expected=(204,),
         )
