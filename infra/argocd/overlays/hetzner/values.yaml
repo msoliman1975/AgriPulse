@@ -22,14 +22,17 @@ global:
   # tile-server unchanged (no backend delta) stays 9d140cc.
   # b5a5d0f = #269 backend fixes: auto-grid clips to farm boundary + farm_scopes
   #   synced to Keycloak so farm-scoped roles work (SMK-RBAC-BUG-01). Backend-only
-  #   → api + workers bumped; frontend stays 3683f19 (no FE delta).
+  #   → api + workers bumped; frontend stayed 3683f19 (no FE delta).
+  # be230ac = #270: farm-scoped list access (SMK-RBAC-GAP-02 — switcher + recs/
+  #   alerts/signals), Settings "Rules & thresholds" nav removed, board season
+  #   picker + no-matching-plan message. Backend + frontend → all three bumped.
   images:
     api:
-      tag: "b5a5d0f"
+      tag: "be230ac"
     workers:
-      tag: "b5a5d0f"
+      tag: "be230ac"
     frontend:
-      tag: "3683f19"
+      tag: "be230ac"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
