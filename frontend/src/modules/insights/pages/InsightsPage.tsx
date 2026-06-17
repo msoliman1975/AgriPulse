@@ -16,6 +16,7 @@ import { FarmTrendChart } from "../components/FarmTrendChart";
 import { FarmWeatherChart } from "../components/FarmWeatherChart";
 import { KPICards } from "../components/KPICards";
 import { SeasonContextBar } from "../components/SeasonContextBar";
+import { WeatherIndicesStrip } from "../components/WeatherIndicesStrip";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -33,7 +34,11 @@ export function InsightsPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("insights");
   const dateLocale = useDateLocale();
-  const { data: farm, isLoading, isError } = useQuery({
+  const {
+    data: farm,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["farms", "detail", farmId] as const,
     queryFn: () => getFarm(farmId!),
     enabled: Boolean(farmId),
@@ -109,6 +114,8 @@ export function InsightsPage(): ReactNode {
       <FarmTrendChart farmId={farmId} />
 
       {canReadWeather && firstBlock ? <FarmWeatherChart blockId={firstBlock.id} /> : null}
+
+      {canReadWeather ? <WeatherIndicesStrip farmId={farmId} /> : null}
 
       <BlockHealthScorecard farmId={farmId} />
     </div>
