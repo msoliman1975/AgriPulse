@@ -10,6 +10,8 @@ import { useTranslation } from "react-i18next";
 
 import type { AutoGridCandidate } from "@/api/blocks";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
+import { m2ToUnit, unitToM2 } from "@/lib/units";
+import type { AreaUnit } from "@/prefs/PrefsContext";
 
 const inputCls =
   "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
@@ -207,11 +209,13 @@ export function CreatePivotPanel({
   );
 }
 
-// ---- Auto-block (cell size → compute → pick → create) ----------------------
+// ---- Auto-block (max area → compute → pick → create) -----------------------
 
 export function AutoBlockPanel({
-  cellSize,
-  onCellSize,
+  maxAreaM2,
+  onMaxAreaM2,
+  unit,
+  effectiveCellSizeM,
   onCompute,
   computing,
   candidates,
@@ -224,8 +228,13 @@ export function AutoBlockPanel({
   onCreate,
   onClose,
 }: {
-  cellSize: number;
-  onCellSize: (v: number) => void;
+  // Canonical per-block area cap in m²; the input renders/accepts it in the
+  // user's preferred area unit. effectiveCellSizeM is the grid cell the
+  // backend actually applied (echoed from the last compute), or null.
+  maxAreaM2: number;
+  onMaxAreaM2: (m2: number) => void;
+  unit: AreaUnit;
+  effectiveCellSizeM: number | null;
   onCompute: () => void;
   computing: boolean;
   candidates: AutoGridCandidate[] | null;
@@ -239,10 +248,14 @@ export function AutoBlockPanel({
   onClose: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
+  const { t: tArea } = useTranslation("farms");
   const selectedArea = (candidates ?? [])
     .filter((c) => selected.has(c.code))
     .reduce((sum, c) => sum + Number(c.area_m2), 0);
   const allSelected = candidates != null && candidates.length > 0 && selected.size === candidates.length;
+  // Show the cap in the user's unit, rounded to 2 dp so the number input stays
+  // tidy; round-trip through unitToM2 on edit keeps m² as the source of truth.
+  const maxAreaInUnit = Math.round(m2ToUnit(maxAreaM2, unit) * 100) / 100;
 
   return (
     <div className="absolute start-3 top-3 z-30 flex max-h-[calc(100%-1.5rem)] w-[300px] max-w-[88vw] flex-col rounded-2xl border border-ap-line bg-ap-panel shadow-card">
@@ -256,22 +269,28 @@ export function AutoBlockPanel({
 
       <div className="border-b border-ap-line p-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("autoBlock.cellSize")}</span>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {t("autoBlock.maxArea", { unit: tArea(`area.${unit}`) })}
+          </span>
           <div className="flex items-center gap-2">
             <input
               type="number"
-              min={10}
-              max={5000}
-              step={10}
+              min={0.1}
+              step={0.5}
               className={inputCls}
-              value={cellSize}
-              onChange={(e) => onCellSize(Number(e.target.value))}
+              value={maxAreaInUnit}
+              onChange={(e) => onMaxAreaM2(unitToM2(Number(e.target.value), unit))}
               disabled={computing || creating}
             />
             <button type="button" onClick={onCompute} disabled={computing || creating} className={primaryBtn + " flex-none"}>
               {computing ? t("autoBlock.computing") : t("autoBlock.compute")}
             </button>
           </div>
+          {effectiveCellSizeM != null ? (
+            <span className="mt-1 block text-xs text-ap-muted">
+              {t("autoBlock.cellNote", { m: effectiveCellSizeM })}
+            </span>
+          ) : null}
         </label>
       </div>
 

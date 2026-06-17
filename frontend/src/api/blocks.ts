@@ -217,9 +217,28 @@ export async function createPivot(
   };
 }
 
-export async function autoGrid(farmId: string, cellSizeM: number): Promise<AutoGridResponse> {
-  const { data } = await apiClient.post<AutoGridResponse>(`/v1/farms/${farmId}/blocks/auto-grid`, {
-    cell_size_m: cellSizeM,
-  });
+/**
+ * Compute candidate blocks by tiling the farm. Drive the grid either by cell
+ * edge ({@link AutoGridParams.cellSizeM}) or by a per-block max area
+ * ({@link AutoGridParams.maxAreaM2}, canonical m² — the caller converts from
+ * the user's preferred area unit). When maxAreaM2 is given the backend derives
+ * and echoes the effective cell_size_m.
+ */
+export interface AutoGridParams {
+  cellSizeM?: number;
+  maxAreaM2?: number;
+}
+
+export async function autoGrid(
+  farmId: string,
+  params: AutoGridParams,
+): Promise<AutoGridResponse> {
+  const body: Record<string, number> = {};
+  if (params.maxAreaM2 != null) body.max_area_m2 = params.maxAreaM2;
+  if (params.cellSizeM != null) body.cell_size_m = params.cellSizeM;
+  const { data } = await apiClient.post<AutoGridResponse>(
+    `/v1/farms/${farmId}/blocks/auto-grid`,
+    body,
+  );
   return data;
 }

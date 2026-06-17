@@ -259,7 +259,9 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
-    async def auto_grid(self, *, farm_id: UUID, cell_size_m: int) -> dict[str, Any]: ...
+    async def auto_grid(
+        self, *, farm_id: UUID, cell_size_m: int, max_area_m2: float | None = None
+    ) -> dict[str, Any]: ...
 
     async def create_pivot_with_sectors(
         self,
@@ -1282,10 +1284,17 @@ class FarmServiceImpl:
 
     # ---- Auto-grid --------------------------------------------------
 
-    async def auto_grid(self, *, farm_id: UUID, cell_size_m: int) -> dict[str, Any]:
+    async def auto_grid(
+        self, *, farm_id: UUID, cell_size_m: int, max_area_m2: float | None = None
+    ) -> dict[str, Any]:
         farm = await self._repo.get_farm_by_id(farm_id, with_boundary=True)
         if farm is None:
             raise FarmNotFoundError(farm_id)
+
+        # A per-block area cap takes precedence: a full interior cell is the
+        # largest block, so the cap maps to a square cell of side √area.
+        if max_area_m2 is not None:
+            cell_size_m = _auto_grid.cell_size_for_max_area_m2(max_area_m2)
 
         candidates = _auto_grid.auto_grid_candidates(farm["boundary"], cell_size_m=cell_size_m)
         return {

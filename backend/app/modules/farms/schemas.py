@@ -531,7 +531,13 @@ class PivotCreateResponse(BaseModel):
 class AutoGridRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # The grid can be driven either by a cell edge (``cell_size_m``) or by a
+    # per-block maximum area (``max_area_m2``, the canonical unit — the client
+    # converts from the user's preferred area unit). When ``max_area_m2`` is
+    # supplied it wins, and the derived (clamped) ``cell_size_m`` is echoed in
+    # the response so the UI can show the effective grid.
     cell_size_m: int = Field(default=500, ge=10, le=5000)
+    max_area_m2: float | None = Field(default=None, gt=0)
 
 
 class AutoGridCandidate(BaseModel):

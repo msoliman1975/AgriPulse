@@ -37,6 +37,7 @@ import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
+import { usePrefs } from "@/prefs/PrefsContext";
 import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
@@ -113,9 +114,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
   const [pendingBlock, setPendingBlock] = useState<{ polygon: Polygon; areaM2: number } | null>(null);
   const [pendingPivot, setPendingPivot] = useState<{ lat: number; lon: number; radiusM: number } | null>(null);
-  // Auto-block panel.
+  // Auto-block panel. The per-block area cap is held canonically in m²; the
+  // panel renders it in the user's preferred area unit. autoCellSizeM is the
+  // grid cell the backend derived on the last compute (for display only).
+  const { unit: areaUnit } = usePrefs();
   const [autoOpen, setAutoOpen] = useState(false);
-  const [cellSize, setCellSize] = useState(200);
+  const [maxAreaM2, setMaxAreaM2] = useState(40_000); // ≈ a 200 m cell
+  const [autoCellSizeM, setAutoCellSizeM] = useState<number | null>(null);
   const [candidates, setCandidates] = useState<AutoGridCandidate[] | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [autoComputing, setAutoComputing] = useState(false);
@@ -347,6 +352,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     setSelectedCandidates(new Set());
     setAutoError(null);
     setAutoCreatedCount(null);
+    setAutoCellSizeM(null);
   };
   const startDrawBlock = () => {
     closeAuto();
@@ -394,7 +400,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     setAutoError(null);
     setAutoCreatedCount(null);
     try {
-      const res = await autoGrid(farmId, cellSize);
+      const res = await autoGrid(farmId, { maxAreaM2 });
+      setAutoCellSizeM(res.cell_size_m);
       setCandidates(res.candidates);
       setSelectedCandidates(new Set(res.candidates.map((c) => c.code)));
     } catch (err) {
@@ -557,11 +564,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             />
           ) : null}
 
-          {/* Auto-block panel (cell size → compute → pick → create) */}
+          {/* Auto-block panel (max area → compute → pick → create) */}
           {autoOpen ? (
             <AutoBlockPanel
-              cellSize={cellSize}
-              onCellSize={setCellSize}
+              maxAreaM2={maxAreaM2}
+              onMaxAreaM2={setMaxAreaM2}
+              unit={areaUnit}
+              effectiveCellSizeM={autoCellSizeM}
               onCompute={() => void computeAutoGrid()}
               computing={autoComputing}
               candidates={candidates}

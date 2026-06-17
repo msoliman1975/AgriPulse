@@ -603,7 +603,9 @@ async def auto_grid(
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
-    return await service.auto_grid(farm_id=farm_id, cell_size_m=payload.cell_size_m)
+    return await service.auto_grid(
+        farm_id=farm_id, cell_size_m=payload.cell_size_m, max_area_m2=payload.max_area_m2
+    )
 
 
 @router.post(

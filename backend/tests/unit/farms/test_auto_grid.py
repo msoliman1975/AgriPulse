@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from app.modules.farms.auto_grid import auto_grid_candidates
+from app.modules.farms.auto_grid import auto_grid_candidates, cell_size_for_max_area_m2
 from app.modules.farms.errors import GeometryInvalidError
 
 
@@ -45,6 +45,24 @@ def test_cell_size_must_be_positive_and_in_range() -> None:
         auto_grid_candidates(farm, cell_size_m=5)
     with pytest.raises(GeometryInvalidError):
         auto_grid_candidates(farm, cell_size_m=10000)
+
+
+def test_cell_size_for_max_area_inverts_to_side_length() -> None:
+    # A 5-feddan cap (≈ 21_004 m²) maps to a ~145 m square cell.
+    assert cell_size_for_max_area_m2(5 * 4200.83) == 145
+    # A perfect square: 40_000 m² → 200 m edge.
+    assert cell_size_for_max_area_m2(40_000) == 200
+
+
+def test_cell_size_for_max_area_clamps_to_supported_range() -> None:
+    # Tiny target clamps up to the 10 m floor, huge target down to the 5000 m ceiling.
+    assert cell_size_for_max_area_m2(1.0) == 10
+    assert cell_size_for_max_area_m2(10_000_000_000) == 5000
+
+
+def test_cell_size_for_max_area_rejects_nonpositive() -> None:
+    with pytest.raises(GeometryInvalidError):
+        cell_size_for_max_area_m2(0)
 
 
 def test_unsupported_geometry_type() -> None:

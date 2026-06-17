@@ -20,7 +20,7 @@ export function BlockAutoGridPage(): JSX.Element {
     setBusy(true);
     setError(null);
     try {
-      const result = await autoGrid(farmId, cellSize);
+      const result = await autoGrid(farmId, { cellSizeM: cellSize });
       setCandidates(result.candidates);
       setSelected(new Set(result.candidates.map((c) => c.code)));
     } catch (err) {
