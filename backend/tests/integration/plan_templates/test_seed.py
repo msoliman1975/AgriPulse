@@ -1,8 +1,10 @@
 """PR-E5: the seeded mango starter template (migration 0035) is usable.
 
-Asserts the published `mango-season-eg` template exists with all three
-anchor kinds, and that its stage-anchored activities resolve to concrete
-dates against the seeded mango phenology.
+Asserts the `mango-season-eg` demonstrator exists with all three anchor
+kinds and that its stage-anchored activities resolve to concrete dates
+against the seeded mango phenology. The template was archived by migration
+0040 in favour of the per-cultivar mango templates, so it is no longer
+``published`` — the resolve mechanics are still exercised here.
 """
 
 from __future__ import annotations
@@ -31,7 +33,8 @@ async def test_seeded_mango_template_resolves(admin_session: AsyncSession) -> No
             text("SELECT status FROM public.plan_templates WHERE id = :id"), {"id": template_id}
         )
     ).scalar_one()
-    assert status == "published"
+    # Archived by 0040 in favour of the per-cultivar mango templates.
+    assert status == "archived"
 
     repo = PlanTemplatesRepository(public_session=admin_session)
     tree = await repo.get_full_tree(template_id=template_id)

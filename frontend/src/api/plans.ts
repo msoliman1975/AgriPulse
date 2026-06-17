@@ -12,7 +12,12 @@ export type ActivityType =
   | "harvesting"
   | "irrigation"
   | "soil_prep"
-  | "observation";
+  | "observation"
+  | "pollination"
+  | "growth_regulator"
+  | "thinning"
+  | "bagging"
+  | "hilling";
 
 export interface Plan {
   id: string;

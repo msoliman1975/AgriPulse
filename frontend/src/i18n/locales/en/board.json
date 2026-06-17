@@ -44,7 +44,12 @@
     "harvesting": "Harvesting",
     "irrigation": "Irrigation",
     "soil_prep": "Soil prep",
-    "observation": "Observation"
+    "observation": "Observation",
+    "pollination": "Pollination",
+    "growth_regulator": "Growth regulator",
+    "thinning": "Thinning",
+    "bagging": "Bagging",
+    "hilling": "Hilling"
   },
   "status": {
     "scheduled": "Scheduled",

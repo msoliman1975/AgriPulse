@@ -18,6 +18,11 @@ const TYPE_TINT: Record<ActivityType, string> = {
   irrigation: "bg-ap-irrig/10 text-ap-irrig border-ap-irrig/30",
   soil_prep: "bg-ap-bg text-ap-ink border-ap-line",
   observation: "bg-ap-accent/10 text-ap-accent border-ap-accent/30",
+  pollination: "bg-ap-accent/10 text-ap-accent border-ap-accent/30",
+  growth_regulator: "bg-ap-spray/10 text-ap-spray border-ap-spray/30",
+  thinning: "bg-ap-prune/10 text-ap-prune border-ap-prune/30",
+  bagging: "bg-ap-harv/10 text-ap-harv border-ap-harv/30",
+  hilling: "bg-ap-bg text-ap-ink border-ap-line",
 };
 
 const TYPE_ICON: Record<ActivityType, string> = {
@@ -29,6 +34,11 @@ const TYPE_ICON: Record<ActivityType, string> = {
   irrigation: "💧",
   soil_prep: "⛏",
   observation: "👁",
+  pollination: "🐝",
+  growth_regulator: "⚗️",
+  thinning: "🍃",
+  bagging: "🛍",
+  hilling: "⛰",
 };
 
 interface ActivityChipProps {

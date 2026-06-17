@@ -29,6 +29,11 @@ const TYPE_LABEL: Record<ActivityType, string> = {
   irrigation: "Irrigation",
   soil_prep: "Soil prep",
   observation: "Observation",
+  pollination: "Pollination",
+  growth_regulator: "Growth regulator",
+  thinning: "Thinning",
+  bagging: "Bagging",
+  hilling: "Hilling",
 };
 
 export function activityTypeLabel(t: ActivityType): string {
@@ -44,6 +49,11 @@ const TYPE_BG: Record<ActivityType, string> = {
   irrigation: "bg-ap-irrig",
   soil_prep: "bg-ap-warn",
   observation: "bg-ap-muted",
+  pollination: "bg-ap-accent",
+  growth_regulator: "bg-ap-spray",
+  thinning: "bg-ap-prune",
+  bagging: "bg-ap-harv",
+  hilling: "bg-ap-warn",
 };
 
 export function activityTypeBgClass(t: ActivityType): string {

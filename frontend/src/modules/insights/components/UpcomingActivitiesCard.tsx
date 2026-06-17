@@ -2,13 +2,31 @@ import { format, parseISO } from "date-fns";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Badge } from "@/components/Badge";
+import type { ActivityType } from "@/api/plans";
+import { Badge, type BadgeKind } from "@/components/Badge";
 import { Skeleton } from "@/components/Skeleton";
 import { useCalendar } from "@/queries/plans";
 import { activityTypeLabel } from "@/rules/formatting";
 
 interface Props {
   farmId: string;
+}
+
+// Short colour badge per activity type. Types without a dedicated badge kind
+// (soil_prep + the extended scientific-plan vocabulary) fall back to neutral.
+const BADGE_KIND: Partial<Record<ActivityType, BadgeKind>> = {
+  planting: "type-plant",
+  fertilizing: "type-fert",
+  spraying: "type-spray",
+  pruning: "type-prune",
+  harvesting: "type-harv",
+  irrigation: "type-irrig",
+  soil_prep: "type-soil_prep",
+  observation: "type-observation",
+};
+
+function badgeKindForActivity(t: ActivityType): BadgeKind {
+  return BADGE_KIND[t] ?? "neutral";
 }
 
 function todayIso(): string {
@@ -79,11 +97,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
                     {a.start_time ? ` · ${a.start_time.slice(0, 5)}` : ""}
                   </div>
                 </div>
-                <Badge
-                  kind={
-                    `type-${a.activity_type === "irrigation" ? "irrig" : a.activity_type === "harvesting" ? "harv" : a.activity_type === "spraying" ? "spray" : a.activity_type === "fertilizing" ? "fert" : a.activity_type === "pruning" ? "prune" : a.activity_type === "planting" ? "plant" : a.activity_type}` as const
-                  }
-                >
+                <Badge kind={badgeKindForActivity(a.activity_type)}>
                   {a.activity_type.slice(0, 4)}
                 </Badge>
               </button>
