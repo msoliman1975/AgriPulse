@@ -181,6 +181,11 @@ class Settings(BaseSettings):
     # land within a Beat cycle of getting their first imagery scenes.
     indices_baseline_recompute_seconds: int = 3600
 
+    # Cadence for `weather.recompute_baselines_sweep` — the farm-scoped
+    # climatology baselines over `weather_index_daily` (Weather-Indices
+    # PR-W3). Same rationale + default as the indices baseline sweep.
+    weather_baseline_recompute_seconds: int = 3600
+
     # Cadence for `alerts.evaluate_alerts_sweep`. Nightly in production;
     # 30 minutes in dev so a freshly-ingested scene flips into alerts
     # within one Beat cycle.

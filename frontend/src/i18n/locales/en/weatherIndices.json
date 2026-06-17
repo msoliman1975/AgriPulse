@@ -1,0 +1,26 @@
+{
+  "strip": {
+    "title": "Weather indices",
+    "subtitle": "Farm-wide · vs. seasonal normal",
+    "loadFailed": "Could not load weather indices.",
+    "empty": "No weather-index data yet for this farm.",
+    "farmWide": "Farm-wide"
+  },
+  "anomaly": {
+    "normal": "Normal",
+    "high": "High",
+    "low": "Low",
+    "aria": "Anomaly vs seasonal normal: {{z}} sigma"
+  },
+  "trend": {
+    "label": "7-day trend"
+  },
+  "chart": {
+    "title": "{{name}} — last 90 days",
+    "band": "Seasonal normal (±1σ)",
+    "normalLine": "Normal",
+    "valueLine": "Observed",
+    "loadFailed": "Could not load the series.",
+    "empty": "No data in this window."
+  }
+}

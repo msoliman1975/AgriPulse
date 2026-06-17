@@ -66,6 +66,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.indices_baseline_recompute_seconds),
         "options": {"queue": "light"},
     },
+    # Weather-index climatology: weekly per-tenant sweep that refreshes
+    # the farm-scoped `weather_index_baselines` from `weather_index_daily`
+    # history and re-derives the z-score on existing rows (Weather-Indices
+    # PR-W3). Light queue — pure aggregation math like the indices sweep.
+    "weather.recompute_baselines_sweep": {
+        "task": "weather.recompute_baselines_sweep",
+        "schedule": float(_settings.weather_baseline_recompute_seconds),
+        "options": {"queue": "light"},
+    },
     # PR-F (sunset rules engine): the rules-based alerts sweep is
     # disabled. Alerts now flow from decision-tree leaves with
     # `kind: alert` via the recommendations engine sweep below; the

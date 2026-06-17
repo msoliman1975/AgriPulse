@@ -1,4 +1,4 @@
-"""Integration test: public migrations 0009 + 0010 land weather catalogs + seeds.
+"""Integration test: public migrations 0009/0010 + 0037 land weather catalogs + seeds.
 
 Public migrations are run once at session start by the conftest's
 `_wire_settings` fixture, so this test only inspects the resulting
@@ -72,6 +72,64 @@ async def test_six_derived_signals_seeded(admin_session: AsyncSession) -> None:
         assert r.name_en
         assert r.name_ar
         assert r.unit
+
+
+@pytest.mark.asyncio
+async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSession) -> None:
+    """Migration 0037 lands public.weather_indices_catalog + the 7 indices."""
+    present = (
+        await admin_session.execute(
+            text("SELECT to_regclass('public.weather_indices_catalog') IS NOT NULL")
+        )
+    ).scalar_one()
+    assert present is True
+
+    expected = [
+        "temperature",
+        "radiation",
+        "wind",
+        "rainfall",
+        "evapotranspiration",
+        "evaporation_coeff",
+        "rain_et_balance",
+    ]
+    # Scope to the seeded codes — the DB is session-shared and other tests
+    # (the endpoint test) commit extra rows into this table.
+    rows = (
+        await admin_session.execute(
+            text(
+                "SELECT code, name_en, name_ar, unit, source_kind, sort_order, is_active "
+                "FROM public.weather_indices_catalog "
+                "WHERE code = ANY(:codes) ORDER BY sort_order"
+            ),
+            {"codes": expected},
+        )
+    ).all()
+    codes = [r.code for r in rows]
+    assert codes == expected
+    by_code = {r.code: r for r in rows}
+    # The two derived indices carry source_kind='derived'; the rest observed.
+    assert by_code["evaporation_coeff"].source_kind == "derived"
+    assert by_code["rain_et_balance"].source_kind == "derived"
+    assert by_code["temperature"].source_kind == "observed"
+    for r in rows:
+        assert r.is_active is True
+        assert r.name_en
+        assert r.name_ar
+        assert r.unit
+
+
+@pytest.mark.asyncio
+async def test_weather_indices_catalog_source_kind_check(admin_session: AsyncSession) -> None:
+    """ck_weather_indices_catalog_source_kind rejects values off the allowlist."""
+    with pytest.raises(IntegrityError, match="ck_weather_indices_catalog_source_kind"):
+        await admin_session.execute(
+            text(
+                "INSERT INTO public.weather_indices_catalog (code, name_en, unit, source_kind) "
+                "VALUES ('bogus_idx', 'Bogus', 'mm', 'not_a_kind')"
+            )
+        )
+    await admin_session.rollback()
 
 
 @pytest.mark.asyncio

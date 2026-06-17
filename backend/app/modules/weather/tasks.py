@@ -32,13 +32,26 @@ from sqlalchemy import text
 from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.audit import get_audit_service
+from app.modules.indices.baselines import (
+    HistoryRow,
+    compute_baseline_deviation,
+    compute_block_baselines,
+)
 from app.modules.integrations_health.error_codes import classify_error as _classify_error
 from app.modules.weather.derivations import (
+    DailyDerived,
     HourlyRow,
     aggregate_one_day,
     bucket_hourly_by_local_date,
     cumulative_gdd_base10_for_season,
     rolling_precip_total,
+)
+from app.modules.weather.index_projection import (
+    IndexHourlyRow,
+    RadiationWindDay,
+    aggregate_radiation_wind_day,
+    bucket_index_hourly_by_local_date,
+    project_indices,
 )
 from app.modules.weather.providers.open_meteo import OpenMeteoProvider
 from app.modules.weather.providers.protocol import WeatherProvider
@@ -277,6 +290,109 @@ async def _fetch_weather_async(
 # --- derive_weather_daily --------------------------------------------------
 
 
+# ±N-day calendar window the weather-index climatology aggregates over
+# (mirrors the indices baseline window). One row per DOY needs ≥3 samples.
+_WEATHER_BASELINE_WINDOW_DAYS = 7
+# How far back `backfill_weather_indices` reprojects history into
+# `weather_index_daily` so the climatology sweep has something to chew on.
+_BACKFILL_WINDOW_DAYS = 400
+
+
+def _aggregate_obs_window(
+    obs_rows: tuple[dict[str, Any], ...], tz: Any
+) -> tuple[dict[Any, DailyDerived], dict[Any, RadiationWindDay]]:
+    """Aggregate a window of hourly observation rows into per-local-date
+    `DailyDerived` (temp/precip/ET₀/GDD) + `RadiationWindDay` (radiation +
+    wind) maps. Pure CPU — no DB. Shared by derive + backfill.
+    """
+    hourly = tuple(
+        HourlyRow(
+            time=r["time"],
+            air_temp_c=r["air_temp_c"],
+            precipitation_mm=r["precipitation_mm"],
+            et0_mm=r["et0_mm"],
+        )
+        for r in obs_rows
+    )
+    daily = {
+        d: aggregate_one_day(rows, d) for d, rows in bucket_hourly_by_local_date(hourly, tz).items()
+    }
+
+    # Radiation + wind aren't carried by DailyDerived (the GDD/ET path).
+    idx_hourly = tuple(
+        IndexHourlyRow(
+            time=r["time"],
+            solar_radiation_w_m2=r["solar_radiation_w_m2"],
+            wind_speed_m_s=r["wind_speed_m_s"],
+            wind_direction_deg=r["wind_direction_deg"],
+            humidity_pct=r["humidity_pct"],
+        )
+        for r in obs_rows
+    )
+    radwind_by_date = {
+        d: aggregate_radiation_wind_day(rows)
+        for d, rows in bucket_index_hourly_by_local_date(idx_hourly, tz).items()
+    }
+    return daily, radwind_by_date
+
+
+async def _persist_day(
+    repo: WeatherRepository,
+    *,
+    farm_id: UUID,
+    daily: dict[Any, DailyDerived],
+    radwind_by_date: dict[Any, RadiationWindDay],
+    day: Any,
+) -> int:
+    """Upsert one day's `weather_derived_daily` row + project its weather
+    indices (with a z-score vs the climatology baseline). Caller guarantees
+    ``daily[day]`` exists. Returns the number of index rows written.
+    """
+    row = daily[day]
+    await repo.upsert_derived_daily(
+        farm_id=farm_id,
+        date=day,
+        temp_min_c=row.temp_min_c,
+        temp_max_c=row.temp_max_c,
+        temp_mean_c=row.temp_mean_c,
+        precip_mm_daily=row.precip_mm_daily,
+        et0_mm_daily=row.et0_mm_daily,
+        gdd_base10=row.gdd_base10,
+        gdd_base15=row.gdd_base15,
+        gdd_cumulative_base10_season=cumulative_gdd_base10_for_season(daily, day),
+        precip_mm_7d=rolling_precip_total(daily, day, window_days=7),
+        precip_mm_30d=rolling_precip_total(daily, day, window_days=30),
+    )
+
+    doy = day.timetuple().tm_yday
+    indices_written = 0
+    for proj in project_indices(day, daily, radwind_by_date.get(day)):
+        baseline = await repo.read_index_baseline(
+            farm_id=farm_id, index_code=proj.index_code, day_of_year=doy
+        )
+        deviation = (
+            compute_baseline_deviation(
+                value=proj.value,
+                baseline_mean=baseline["baseline_mean"],
+                baseline_std=baseline["baseline_std"],
+            )
+            if baseline is not None
+            else None
+        )
+        await repo.upsert_weather_index_daily(
+            farm_id=farm_id,
+            date=day,
+            index_code=proj.index_code,
+            value=proj.value,
+            value_min=proj.value_min,
+            value_max=proj.value_max,
+            value_aux=proj.value_aux,
+            baseline_deviation=deviation,
+        )
+        indices_written += 1
+    return indices_written
+
+
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="weather.derive_weather_daily",
     bind=False,
@@ -322,17 +438,7 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
     # Aggregate per local-date from the in-memory rows. Same DB session
     # pattern as imagery's compute_indices: HTTP/CPU work outside any
     # held transaction, then re-open for writes.
-    hourly = tuple(
-        HourlyRow(
-            time=r["time"],
-            air_temp_c=r["air_temp_c"],
-            precipitation_mm=r["precipitation_mm"],
-            et0_mm=r["et0_mm"],
-        )
-        for r in obs_rows
-    )
-    by_local_date = bucket_hourly_by_local_date(hourly, tz)
-    daily = {d: aggregate_one_day(rows, d) for d, rows in by_local_date.items()}
+    daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
 
     # Recompute today + yesterday in farm-local time. Tomorrow is left
     # alone — the row would be all-NaN until observations land.
@@ -341,26 +447,19 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
     targets = (yesterday_local, today_local)
 
     written = 0
+    indices_written = 0
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         repo = WeatherRepository(session)
         for d in targets:
-            day = daily.get(d)
-            if day is None:
+            if daily.get(d) is None:
                 continue
-            await repo.upsert_derived_daily(
+            indices_written += await _persist_day(
+                repo,
                 farm_id=farm_id,
-                date=d,
-                temp_min_c=day.temp_min_c,
-                temp_max_c=day.temp_max_c,
-                temp_mean_c=day.temp_mean_c,
-                precip_mm_daily=day.precip_mm_daily,
-                et0_mm_daily=day.et0_mm_daily,
-                gdd_base10=day.gdd_base10,
-                gdd_base15=day.gdd_base15,
-                gdd_cumulative_base10_season=cumulative_gdd_base10_for_season(daily, d),
-                precip_mm_7d=rolling_precip_total(daily, d, window_days=7),
-                precip_mm_30d=rolling_precip_total(daily, d, window_days=30),
+                daily=daily,
+                radwind_by_date=radwind_by_date,
+                day=d,
             )
             written += 1
 
@@ -368,7 +467,183 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
         "farm_id": str(farm_id),
         "status": "succeeded",
         "days_written": written,
+        "indices_written": indices_written,
     }
+
+
+# --- backfill_weather_indices ----------------------------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.backfill_weather_indices",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_weather_indices(
+    farm_id: str, tenant_schema: str, days: int = _BACKFILL_WINDOW_DAYS
+) -> dict[str, Any]:
+    """Reproject a wide window of history into `weather_index_daily`.
+
+    The regular ingest only refreshes today + yesterday; this seeds the
+    deeper history the climatology sweep needs (run after a bulk weather
+    backfill has loaded the underlying observations).
+    """
+    return _run_task(_backfill_weather_indices_async(UUID(farm_id), tenant_schema, days))
+
+
+async def _backfill_weather_indices_async(
+    farm_id: UUID, tenant_schema: str, days: int
+) -> dict[str, Any]:
+    factory = AsyncSessionLocal()
+
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        centroid = await repo.get_farm_centroid(farm_id)
+        if centroid is None:
+            return {"farm_id": str(farm_id), "status": "farm_missing"}
+        tz = tz_for_centroid(centroid["latitude"], centroid["longitude"])
+        now_utc = datetime.now(UTC)
+        obs_rows = await repo.read_observations(
+            farm_id=farm_id,
+            provider_code=None,
+            since=now_utc - timedelta(days=days + 1),
+            until=now_utc + timedelta(days=1),
+        )
+
+    daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
+    # Project every complete local day we have data for (skip "tomorrow",
+    # which would be a partial all-None row).
+    today_local = datetime.now(tz).date()
+    targets = sorted(d for d in daily if d <= today_local)
+
+    written = 0
+    indices_written = 0
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        for d in targets:
+            indices_written += await _persist_day(
+                repo,
+                farm_id=farm_id,
+                daily=daily,
+                radwind_by_date=radwind_by_date,
+                day=d,
+            )
+            written += 1
+
+    return {
+        "farm_id": str(farm_id),
+        "status": "succeeded",
+        "days_written": written,
+        "indices_written": indices_written,
+    }
+
+
+# --- weather-index climatology baselines (PR-W3) ---------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.recompute_baselines_for_tenant",
+    bind=False,
+    ignore_result=True,
+)
+def recompute_weather_baselines_for_tenant(tenant_schema: str) -> dict[str, int]:
+    """Recompute every (farm, index) climatology baseline in one tenant."""
+    return _run_task(_recompute_weather_baselines_for_tenant_async(tenant_schema))
+
+
+async def _recompute_weather_baselines_for_tenant_async(tenant_schema: str) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        pairs = await repo.list_distinct_weather_index_pairs()
+
+    baselines_written = 0
+    deviations_updated = 0
+    pairs_processed = 0
+    for farm_id, index_code in pairs:
+        async with factory() as session, session.begin():
+            await _set_tenant_context(session, tenant_schema)
+            repo = WeatherRepository(session)
+            history = await repo.read_weather_index_history(farm_id=farm_id, index_code=index_code)
+            # day → naive datetime for the DOY/year math the pure helper does.
+            rows = compute_block_baselines(
+                (
+                    HistoryRow(
+                        time=datetime(r["date"].year, r["date"].month, r["date"].day),
+                        mean=r["value"],
+                    )
+                    for r in history
+                ),
+                window_days=_WEATHER_BASELINE_WINDOW_DAYS,
+            )
+            for row in rows:
+                await repo.upsert_weather_index_baseline(
+                    farm_id=farm_id,
+                    index_code=index_code,
+                    day_of_year=row.day_of_year,
+                    baseline_mean=row.baseline_mean,
+                    baseline_std=row.baseline_std,
+                    sample_count=row.sample_count,
+                    window_days=_WEATHER_BASELINE_WINDOW_DAYS,
+                    years_observed=row.years_observed,
+                )
+            # Re-derive the z-score on existing index rows so anomalies
+            # light up without waiting for the next ingest of each day.
+            deviations_updated += await repo.recompute_weather_index_deviations(
+                farm_id=farm_id, index_code=index_code
+            )
+            baselines_written += len(rows)
+            pairs_processed += 1
+
+    _log.info(
+        "weather_baselines_recomputed",
+        tenant_schema=tenant_schema,
+        pairs_processed=pairs_processed,
+        baselines_written=baselines_written,
+        deviations_updated=deviations_updated,
+    )
+    return {
+        "pairs_processed": pairs_processed,
+        "baselines_written": baselines_written,
+        "deviations_updated": deviations_updated,
+    }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.recompute_baselines_sweep",
+    bind=False,
+    ignore_result=True,
+)
+def recompute_weather_baselines_sweep() -> dict[str, int]:
+    """Beat sweep: walk every active tenant and queue per-tenant recomputes."""
+    return _run_task(_recompute_weather_baselines_sweep_async())
+
+
+async def _recompute_weather_baselines_sweep_async() -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        recompute_weather_baselines_for_tenant.delay(schema)
+        enqueued += 1
+    return {"tenants_scanned": len(schemas), "enqueued": enqueued}
 
 
 # --- discover_due_subscriptions (Beat sweep) -------------------------------

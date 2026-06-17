@@ -8,6 +8,7 @@ import enFarms from "./locales/en/farms.json";
 import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
 import enWeather from "./locales/en/weather.json";
+import enWeatherIndices from "./locales/en/weatherIndices.json";
 import enRecommendations from "./locales/en/recommendations.json";
 import enSignals from "./locales/en/signals.json";
 import enInsights from "./locales/en/insights.json";
@@ -31,6 +32,7 @@ import arFarms from "./locales/ar/farms.json";
 import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
 import arWeather from "./locales/ar/weather.json";
+import arWeatherIndices from "./locales/ar/weatherIndices.json";
 import arRecommendations from "./locales/ar/recommendations.json";
 import arSignals from "./locales/ar/signals.json";
 import arInsights from "./locales/ar/insights.json";
@@ -65,6 +67,7 @@ const resources = {
     imagery: enImagery,
     indices: enIndices,
     weather: enWeather,
+    weatherIndices: enWeatherIndices,
     recommendations: enRecommendations,
     signals: enSignals,
     insights: enInsights,
@@ -90,6 +93,7 @@ const resources = {
     imagery: arImagery,
     indices: arIndices,
     weather: arWeather,
+    weatherIndices: arWeatherIndices,
     recommendations: arRecommendations,
     signals: arSignals,
     insights: arInsights,
@@ -125,6 +129,7 @@ void i18n
       "imagery",
       "indices",
       "weather",
+      "weatherIndices",
       "recommendations",
       "signals",
       "insights",
