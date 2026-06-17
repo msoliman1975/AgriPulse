@@ -30,7 +30,6 @@ export function SettingsLayout(): ReactNode {
   const { t } = useTranslation("settings");
   const canManageIntegrations = useCapability("tenant.manage_integrations");
   const canReadHealth = useCapability("tenant.read_integration_health");
-  const canRule = useCapability("alert_rule.read");
   const canUser = useCapability("user.read");
   const canTree = useCapability("decision_tree.manage");
   const canResources = useCapability("resource.read");
@@ -56,7 +55,6 @@ export function SettingsLayout(): ReactNode {
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
     { to: "/settings/workers", labelKey: "nav.workers", show: canResources },
     { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
-    { to: "/settings/rules", labelKey: "nav.rules", show: canRule },
     {
       to: "/settings/decision-trees",
       labelKey: "nav.decisionTrees",

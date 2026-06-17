@@ -110,7 +110,11 @@ async def _resolve_tenant_id(*, schema: str, tenant_session: AsyncSession) -> UU
 )
 async def list_definitions(
     include_inactive: bool = Query(default=False),
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    farm_id: UUID | None = Query(default=None),
+    # SMK-RBAC-GAP-02: signal definitions are tenant-wide config, but the
+    # capability is farm-scoped. Gate on the farm in scope so a farm-scoped-only
+    # user can load them (the signals page passes ?farm_id=) to record against.
+    context: RequestContext = Depends(requires_capability("signal.read", farm_id_param="farm_id")),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)

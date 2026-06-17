@@ -129,6 +129,7 @@ class AlertsRepository:
         self,
         *,
         block_id: UUID | None = None,
+        farm_id: UUID | None = None,
         status_filter: tuple[str, ...] = (),
         severity_filter: tuple[str, ...] = (),
         limit: int = 100,
@@ -138,6 +139,10 @@ class AlertsRepository:
         if block_id is not None:
             clauses.append("block_id = :block_id")
             params["block_id"] = block_id
+        if farm_id is not None:
+            # SMK-RBAC-GAP-02: scope a farm's alerts via its blocks.
+            clauses.append("block_id IN (SELECT id FROM blocks WHERE farm_id = :farm_id)")
+            params["farm_id"] = farm_id
         if status_filter:
             clauses.append("status = ANY(:statuses)")
             params["statuses"] = list(status_filter)
@@ -164,6 +169,8 @@ class AlertsRepository:
         stmt = text(sql)
         if block_id is not None:
             stmt = stmt.bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True)))
+        if farm_id is not None:
+            stmt = stmt.bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
         rows = (await self._tenant.execute(stmt, params)).mappings().all()
         return tuple(dict(r) for r in rows)
 

@@ -40,15 +40,7 @@ import {
 import { filterDefinitions } from "../components/catalogFilter";
 
 const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
-const AGGREGATIONS: Aggregation[] = [
-  "latest",
-  "mean",
-  "median",
-  "max",
-  "min",
-  "count",
-  "sum",
-];
+const AGGREGATIONS: Aggregation[] = ["latest", "mean", "median", "max", "min", "count", "sum"];
 
 interface FormState {
   code: string;
@@ -82,7 +74,7 @@ export function SignalsConfigPage(): ReactNode {
   const farmId = useActiveFarmId();
   const { t } = useTranslation("signals");
   const canDefine = useCapability("signal.define");
-  const { data, isLoading, isError } = useSignalDefinitions(true);
+  const { data, isLoading, isError } = useSignalDefinitions(true, farmId ?? undefined);
   const createMut = useCreateSignalDefinition();
   const deleteMut = useDeleteSignalDefinition();
   const updateMut = useUpdateSignalDefinition();
@@ -96,9 +88,10 @@ export function SignalsConfigPage(): ReactNode {
   const [drawer, setDrawer] = useState<{ title: string; references: SignalReferences } | null>(
     null,
   );
-  const [conflict, setConflict] = useState<{ defn: SignalDefinition; references: SignalReferences } | null>(
-    null,
-  );
+  const [conflict, setConflict] = useState<{
+    defn: SignalDefinition;
+    references: SignalReferences;
+  } | null>(null);
 
   const filtered = useMemo(
     () => filterDefinitions(data ?? [], { search, kinds: kindFilter, showArchived }),
@@ -126,10 +119,7 @@ export function SignalsConfigPage(): ReactNode {
 
   const forceArchive = () => {
     if (!conflict) return;
-    deleteMut.mutate(
-      { id: conflict.defn.id, force: true },
-      { onSuccess: () => setConflict(null) },
-    );
+    deleteMut.mutate({ id: conflict.defn.id, force: true }, { onSuccess: () => setConflict(null) });
   };
 
   if (!farmId) {
@@ -273,9 +263,7 @@ export function SignalsConfigPage(): ReactNode {
                     min={1}
                     step={1}
                     value={form.aggregation_window_days}
-                    onChange={(e) =>
-                      setForm({ ...form, aggregation_window_days: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, aggregation_window_days: e.target.value })}
                     placeholder={t("config.form.aggregation.windowHint")}
                     className={inputCls}
                     disabled={form.aggregation === "latest"}
@@ -388,7 +376,10 @@ export function SignalsConfigPage(): ReactNode {
                 canEdit={canDefine}
                 onArchive={() => archiveDefinition(d)}
                 onShowReferences={(references) =>
-                  setDrawer({ title: t("config.references.titleFor", { name: d.name }), references })
+                  setDrawer({
+                    title: t("config.references.titleFor", { name: d.name }),
+                    references,
+                  })
                 }
                 onToggleActive={() =>
                   updateMut.mutate({ id: d.id, payload: { is_active: !d.is_active } })
@@ -444,9 +435,7 @@ function DefinitionRow({
     if (defn.value_kind !== "numeric") return null;
     if (defn.aggregation === "latest") return t("config.form.aggregation.options.latest");
     const rule = t(`config.form.aggregation.options.${defn.aggregation}`);
-    return defn.aggregation_window_days
-      ? `${rule} / ${defn.aggregation_window_days}d`
-      : rule;
+    return defn.aggregation_window_days ? `${rule} / ${defn.aggregation_window_days}d` : rule;
   }, [defn, t]);
   return (
     <li className="flex items-start gap-3 p-4">
@@ -531,9 +520,10 @@ function TemplatesCard({
   const [drawer, setDrawer] = useState<{ title: string; references: SignalReferences } | null>(
     null,
   );
-  const [conflict, setConflict] = useState<{ tpl: SignalTemplate; references: SignalReferences } | null>(
-    null,
-  );
+  const [conflict, setConflict] = useState<{
+    tpl: SignalTemplate;
+    references: SignalReferences;
+  } | null>(null);
 
   const archiveTemplate = (tpl: SignalTemplate) =>
     deleteMut.mutate(
@@ -707,9 +697,7 @@ function TemplateRow({
             {template.is_active ? t("config.row.active") : t("config.row.inactive")}
           </Pill>
           {memberCount !== null ? (
-            <Pill kind="neutral">
-              {t("config.templates.memberCount", { count: memberCount })}
-            </Pill>
+            <Pill kind="neutral">{t("config.templates.memberCount", { count: memberCount })}</Pill>
           ) : null}
           <UsedByBadge
             count={refCount(references)}
@@ -796,9 +784,10 @@ function TemplateEditor({
     for (const d of definitions) map[d.id] = d;
     return map;
   }, [definitions]);
-  const memberIds = useMemo(() => new Set(state.members.map((m) => m.signal_definition_id)), [
-    state.members,
-  ]);
+  const memberIds = useMemo(
+    () => new Set(state.members.map((m) => m.signal_definition_id)),
+    [state.members],
+  );
   const candidates = definitions.filter((d) => d.is_active && !memberIds.has(d.id));
 
   const addMember = (id: string) => {
@@ -901,9 +890,7 @@ function TemplateEditor({
                     <input
                       type="checkbox"
                       checked={m.is_required}
-                      onChange={(e) =>
-                        toggleRequired(m.signal_definition_id, e.target.checked)
-                      }
+                      onChange={(e) => toggleRequired(m.signal_definition_id, e.target.checked)}
                     />
                     {t("config.templates.memberPicker.required")}
                   </label>
@@ -943,7 +930,9 @@ function TemplateEditor({
 
       <div className="flex items-center justify-end gap-2">
         {state.members.length === 0 ? (
-          <span className="text-xs text-ap-crit">{t("config.templates.memberPicker.required_min")}</span>
+          <span className="text-xs text-ap-crit">
+            {t("config.templates.memberPicker.required_min")}
+          </span>
         ) : null}
         {error ? <span className="text-xs text-ap-crit">{error}</span> : null}
         <button
@@ -978,15 +967,11 @@ function MemberAdder({
     const q = query.trim().toLowerCase();
     if (!q) return candidates.slice(0, 8);
     return candidates
-      .filter(
-        (d) => d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q),
-      )
+      .filter((d) => d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q))
       .slice(0, 8);
   }, [candidates, query]);
   if (candidates.length === 0) {
-    return (
-      <p className="text-[11px] text-ap-muted">{t("config.templates.memberPicker.noMore")}</p>
-    );
+    return <p className="text-[11px] text-ap-muted">{t("config.templates.memberPicker.noMore")}</p>;
   }
   return (
     <div className="flex flex-col gap-1">
@@ -998,9 +983,7 @@ function MemberAdder({
         className={inputCls}
       />
       {filtered.length === 0 ? (
-        <p className="text-[11px] text-ap-muted">
-          {t("config.templates.memberPicker.noMatches")}
-        </p>
+        <p className="text-[11px] text-ap-muted">{t("config.templates.memberPicker.noMatches")}</p>
       ) : (
         <ul className="flex max-h-40 flex-col gap-0.5 overflow-auto">
           {filtered.map((d) => (

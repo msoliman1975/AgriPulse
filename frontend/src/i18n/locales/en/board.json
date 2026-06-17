@@ -20,6 +20,15 @@
     "month": "Month",
     "season": "Season"
   },
+  "season": {
+    "label": "Season",
+    "option": "Season {{year}}"
+  },
+  "noPlan": {
+    "title": "No plan for the {{year}} season",
+    "noMatch": "No plan templates match this farm's crops yet. Create a matching template, or add activities manually.",
+    "empty": "No activities scheduled for this season yet. Apply a template or click a cell to add one."
+  },
   "col": {
     "block": "Block"
   },

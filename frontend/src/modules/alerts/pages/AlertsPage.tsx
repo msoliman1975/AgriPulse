@@ -33,7 +33,11 @@ export function AlertsPage(): ReactNode {
   const canAck = useCapability("alert.acknowledge", { farmId });
   const canResolve = useCapability("alert.resolve", { farmId });
 
-  const { data, isLoading, isError } = useAlerts(tab === "all" ? {} : { status: tab });
+  const { data, isLoading, isError } = useAlerts(
+    tab === "all"
+      ? { farm_id: farmId ?? undefined }
+      : { farm_id: farmId ?? undefined, status: tab },
+  );
   const transition = useTransitionAlert();
 
   if (!farmId) {
@@ -167,7 +171,9 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
           type="button"
           onClick={() => {
             if (a.prescription_activity_id) {
-              navigate(`/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
+              navigate(
+                `/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`,
+              );
             } else {
               navigate(`/board/${farmId}?lane=${a.block_id}`);
             }

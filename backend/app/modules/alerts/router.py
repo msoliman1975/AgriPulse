@@ -64,16 +64,21 @@ def _ensure_tenant(context: RequestContext) -> str:
     summary="List alerts in the current tenant.",
 )
 async def list_alerts(
+    farm_id: UUID | None = Query(default=None),
     block_id: UUID | None = Query(default=None),
     status_filter: list[str] | None = Query(default=None, alias="status"),
     severity: list[str] | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(requires_capability("alert.read")),
+    # SMK-RBAC-GAP-02: gate on the farm in scope so a farm-scoped-only user can
+    # read their farm's alerts (the page passes ?farm_id=). Tenant/platform
+    # callers still pass via their tenant role.
+    context: RequestContext = Depends(requires_capability("alert.read", farm_id_param="farm_id")),
     service: AlertsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     rows = await service.list_alerts(
         block_id=block_id,
+        farm_id=farm_id,
         status_filter=tuple(status_filter or ()),
         severity_filter=tuple(severity or ()),
         limit=limit,

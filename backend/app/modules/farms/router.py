@@ -81,7 +81,7 @@ from app.shared.pagination import (
     decode_cursor,
     encode_cursor,
 )
-from app.shared.rbac.check import requires_capability
+from app.shared.rbac.check import PermissionDeniedError, has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["farms"])
 
@@ -175,10 +175,19 @@ async def list_farms(
     governorate: str | None = Query(default=None),
     tag: str | None = Query(default=None),
     include_inactive: bool = Query(default=False),
-    context: RequestContext = Depends(requires_capability("farm.read")),
+    context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
+    # SMK-RBAC-GAP-02: tenant/platform users with tenant-wide `farm.read` see
+    # every farm; a farm-scoped-only user (no tenant role) sees just the farms
+    # they hold a scope on — so their farm switcher is populated instead of
+    # 403-empty. No scope + no tenant capability = denied.
+    farm_ids: list[UUID] | None = None
+    if not has_capability(context, "farm.read"):
+        farm_ids = [scope.farm_id for scope in context.farm_scopes]
+        if not farm_ids:
+            raise PermissionDeniedError("farm.read")
     capped_limit = clamp_limit(limit)
     after = decode_cursor(cursor)
     items = await service.list_farms(
@@ -188,6 +197,7 @@ async def list_farms(
         tag=tag,
         include_inactive=include_inactive,
         preferred_unit=context.preferred_unit,
+        farm_ids=farm_ids,
     )
     next_cursor = encode_cursor(items[-1]["id"]) if len(items) == capped_limit else None
     return {"items": items, "next_cursor": next_cursor}

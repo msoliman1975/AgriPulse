@@ -40,7 +40,7 @@ export function SignalsLogPage(): ReactNode {
   const { t } = useTranslation("signals");
   const canRecord = useCapability("signal.record", { farmId });
   const canDeleteObs = useCapability("signal.delete_observation", { farmId });
-  const { data: defs, isLoading: defsLoading } = useSignalDefinitions();
+  const { data: defs, isLoading: defsLoading } = useSignalDefinitions(false, farmId ?? undefined);
   const { data: templates, isLoading: tplsLoading } = useSignalTemplates();
   const [mode, setMode] = useState<Mode>("single");
   const [selectedDefId, setSelectedDefId] = useState<string | null>(null);
@@ -63,10 +63,7 @@ export function SignalsLogPage(): ReactNode {
     () => defs?.find((d) => d.id === selectedDefId) ?? null,
     [defs, selectedDefId],
   );
-  const activeTemplates = useMemo(
-    () => (templates ?? []).filter((t) => t.is_active),
-    [templates],
-  );
+  const activeTemplates = useMemo(() => (templates ?? []).filter((t) => t.is_active), [templates]);
   const selectedTpl = useMemo(
     () => activeTemplates.find((t) => t.id === selectedTplId) ?? null,
     [activeTemplates, selectedTplId],
@@ -121,7 +118,9 @@ export function SignalsLogPage(): ReactNode {
                       type="button"
                       onClick={() => setSelectedDefId(d.id)}
                       className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-start text-sm hover:bg-ap-line/40 ${
-                        selectedDefId === d.id ? "bg-ap-primary-soft text-ap-primary" : "text-ap-ink"
+                        selectedDefId === d.id
+                          ? "bg-ap-primary-soft text-ap-primary"
+                          : "text-ap-ink"
                       }`}
                     >
                       <span className="font-medium">{d.name}</span>
@@ -144,11 +143,7 @@ export function SignalsLogPage(): ReactNode {
                   </div>
                 )
               ) : null}
-              <ObservationList
-                farmId={farmId}
-                definitions={defs ?? []}
-                canDelete={canDeleteObs}
-              />
+              <ObservationList farmId={farmId} definitions={defs ?? []} canDelete={canDeleteObs} />
             </section>
           </div>
         )
@@ -194,11 +189,7 @@ export function SignalsLogPage(): ReactNode {
                 </div>
               )
             ) : null}
-            <ObservationList
-              farmId={farmId}
-              definitions={defs ?? []}
-              canDelete={canDeleteObs}
-            />
+            <ObservationList farmId={farmId} definitions={defs ?? []} canDelete={canDeleteObs} />
           </section>
         </div>
       )}
@@ -206,13 +197,7 @@ export function SignalsLogPage(): ReactNode {
   );
 }
 
-function EmptyWithCta({
-  message,
-  farmId,
-}: {
-  message: string;
-  farmId: string;
-}): ReactNode {
+function EmptyWithCta({ message, farmId }: { message: string; farmId: string }): ReactNode {
   const { t } = useTranslation("signals");
   return (
     <Card noPadding>
@@ -620,7 +605,7 @@ export function TemplateRecordForm({
         const defn = definitions.find((d) => d.id === m.signal_definition_id);
         return defn ? { member: m, defn } : null;
       })
-      .filter((x): x is { member: typeof detail.members[number]; defn: SignalDefinition } =>
+      .filter((x): x is { member: (typeof detail.members)[number]; defn: SignalDefinition } =>
         Boolean(x),
       );
   }, [detail, definitions]);

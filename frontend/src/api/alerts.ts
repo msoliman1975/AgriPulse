@@ -52,6 +52,7 @@ export interface RuleOverride {
 }
 
 export interface ListAlertsParams {
+  farm_id?: string;
   block_id?: string;
   status?: AlertStatus;
   severity?: AlertSeverity;

@@ -140,6 +140,7 @@ class FarmService(Protocol):
         tag: str | None,
         include_inactive: bool,
         preferred_unit: str,
+        farm_ids: list[UUID] | None = None,
     ) -> list[dict[str, Any]]: ...
 
     async def get_farm(self, *, farm_id: UUID, preferred_unit: str) -> dict[str, Any]: ...
@@ -637,6 +638,7 @@ class FarmServiceImpl:
         tag: str | None,
         include_inactive: bool,
         preferred_unit: str,
+        farm_ids: list[UUID] | None = None,
     ) -> list[dict[str, Any]]:
         rows = await self._repo.list_farms(
             after=after,
@@ -644,6 +646,7 @@ class FarmServiceImpl:
             governorate=governorate,
             tag=tag,
             include_inactive=include_inactive,
+            farm_ids=farm_ids,
         )
         await self._attach_farm_managers(rows)
         return [_stamp_area_unit(r, preferred_unit) for r in rows]

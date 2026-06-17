@@ -41,6 +41,7 @@ class AlertsService(Protocol):
         self,
         *,
         block_id: UUID | None = None,
+        farm_id: UUID | None = None,
         status_filter: tuple[str, ...] = (),
         severity_filter: tuple[str, ...] = (),
         limit: int = 100,
@@ -81,12 +82,14 @@ class AlertsServiceImpl:
         self,
         *,
         block_id: UUID | None = None,
+        farm_id: UUID | None = None,
         status_filter: tuple[str, ...] = (),
         severity_filter: tuple[str, ...] = (),
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_alerts(
             block_id=block_id,
+            farm_id=farm_id,
             status_filter=status_filter,
             severity_filter=severity_filter,
             limit=limit,
