@@ -26,13 +26,18 @@ global:
   # be230ac = #270: farm-scoped list access (SMK-RBAC-GAP-02 — switcher + recs/
   #   alerts/signals), Settings "Rules & thresholds" nav removed, board season
   #   picker + no-matching-plan message. Backend + frontend → all three bumped.
+  # 75023fb = #271 weather indices first-class (PR-W1..W5): public catalog +
+  #   tenant weather_index_daily/baselines + projection + weekly climatology
+  #   sweep + farm-scoped REST timeseries/summary + Insights weather strip.
+  #   Public migration 0037 + tenant 0047 run on PreSync. Backend + frontend →
+  #   all three bumped. tile-server unchanged stays 9d140cc.
   images:
     api:
-      tag: "be230ac"
+      tag: "75023fb"
     workers:
-      tag: "be230ac"
+      tag: "75023fb"
     frontend:
-      tag: "be230ac"
+      tag: "75023fb"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
