@@ -20,8 +20,8 @@ reason as imagery/router.py â€” FastAPI's TypeAdapter cannot resolve
 string annotations on Request injection).
 """
 
+from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.weather.errors import BlockNotVisibleError
-from app.modules.weather.models import WeatherProvider
+from app.modules.weather.models import WeatherIndexCatalog, WeatherProvider
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.schemas import (
     DerivedDailyRead,
@@ -39,13 +39,29 @@ from app.modules.weather.schemas import (
     RefreshResponse,
     SubscriptionCreate,
     SubscriptionRead,
+    WeatherIndexCatalogEntry,
+    WeatherIndexSummaryResponse,
+    WeatherIndexTimeseriesResponse,
     WeatherProviderRead,
 )
 from app.modules.weather.service import WeatherServiceImpl, get_weather_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_db_session
-from app.shared.rbac.check import has_capability
+from app.shared.rbac.check import has_capability, requires_capability
+
+# Canonical order for the summary response (matches the catalog sort_order).
+_WEATHER_INDEX_ORDER: tuple[str, ...] = (
+    "temperature",
+    "radiation",
+    "wind",
+    "rainfall",
+    "evapotranspiration",
+    "evaporation_coeff",
+    "rain_et_balance",
+)
+# Trailing window the farm summary scans for "latest + 7-day trend".
+_SUMMARY_WINDOW_DAYS = 45
 
 router = APIRouter(prefix="/api/v1", tags=["weather"])
 
@@ -138,6 +154,120 @@ async def list_weather_providers(
         .all()
     )
     return [WeatherProviderRead.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/weather/indices/catalog",
+    response_model=list[WeatherIndexCatalogEntry],
+    summary="List the first-class weather indices from public.weather_indices_catalog.",
+)
+async def list_weather_index_catalog(
+    context: RequestContext = Depends(get_current_context),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[WeatherIndexCatalogEntry]:
+    """Catalog endpoint for the SPA's weather-index picker + tooltips.
+
+    Like the provider catalog, a tenant scope is enough — the rows are
+    platform-wide curated data, not per-farm. Active rows only, ordered
+    by `sort_order` for a stable picker.
+    """
+    _ensure_tenant(context)
+    rows = (
+        (
+            await tenant_session.execute(
+                select(WeatherIndexCatalog)
+                .where(WeatherIndexCatalog.is_active.is_(True))
+                .order_by(WeatherIndexCatalog.sort_order.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [WeatherIndexCatalogEntry.model_validate(r) for r in rows]
+
+
+# --- Weather-index read surface (PR-W4) ------------------------------------
+
+
+@router.get(
+    "/farms/{farm_id}/weather-indices/{index_code}/timeseries",
+    response_model=WeatherIndexTimeseriesResponse,
+    summary="Daily weather-index series for a farm, with climatology band.",
+)
+async def get_weather_index_timeseries(
+    farm_id: UUID,
+    index_code: str,
+    from_date: date_type | None = Query(default=None, alias="from"),
+    to_date: date_type | None = Query(default=None, alias="to"),
+    context: RequestContext = Depends(requires_capability("weather.read", farm_id_param="farm_id")),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> WeatherIndexTimeseriesResponse:
+    """One weather index's daily series for a farm over ``[from, to)``.
+
+    Farm-scoped (weather is farm-centroid data); gated on ``weather.read``
+    like the other weather reads. Each point carries the z-score plus the
+    matching day-of-year baseline mean/std for the climatology band. An
+    unknown ``index_code`` or a gap range simply yields no points.
+    """
+    _ensure_tenant(context)
+    repo = WeatherRepository(tenant_session)
+    rows = await repo.read_weather_index_timeseries(
+        farm_id=farm_id, index_code=index_code, since=from_date, until=to_date
+    )
+    return WeatherIndexTimeseriesResponse.model_validate(
+        {"farm_id": farm_id, "index_code": index_code, "points": list(rows)}
+    )
+
+
+@router.get(
+    "/farms/{farm_id}/weather-indices/summary",
+    response_model=WeatherIndexSummaryResponse,
+    summary="Latest value + anomaly + 7-day trend for every weather index.",
+)
+async def get_weather_index_summary(
+    farm_id: UUID,
+    context: RequestContext = Depends(requires_capability("weather.read", farm_id_param="farm_id")),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> WeatherIndexSummaryResponse:
+    """One row per weather index that has recent data for the farm — the
+    map/dashboard "current state" strip. Indices stale beyond the trailing
+    window are omitted (weather updates every few hours).
+    """
+    _ensure_tenant(context)
+    repo = WeatherRepository(tenant_session)
+    since = datetime.now(UTC).date() - timedelta(days=_SUMMARY_WINDOW_DAYS)
+    rows = await repo.read_weather_index_recent(farm_id=farm_id, since=since)
+
+    by_code: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        by_code.setdefault(r["index_code"], []).append(r)
+
+    entries: list[dict[str, Any]] = []
+    for code in _WEATHER_INDEX_ORDER:
+        series = by_code.get(code)
+        if not series:
+            continue
+        latest = series[-1]  # rows are date-ascending
+        ref_date = latest["date"] - timedelta(days=7)
+        ref = next((row for row in reversed(series) if row["date"] <= ref_date), None)
+        trend = (
+            latest["value"] - ref["value"]
+            if ref is not None and latest["value"] is not None and ref["value"] is not None
+            else None
+        )
+        entries.append(
+            {
+                "index_code": code,
+                "latest_date": latest["date"],
+                "value": latest["value"],
+                "zscore": latest["zscore"],
+                "trend_7d_delta": trend,
+            }
+        )
+
+    return WeatherIndexSummaryResponse.model_validate(
+        {"farm_id": farm_id, "as_of": datetime.now(UTC), "indices": list(entries)}
+    )
 
 
 # --- Subscriptions ---------------------------------------------------------

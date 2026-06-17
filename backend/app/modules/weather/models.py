@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     PrimaryKeyConstraint,
+    SmallInteger,
     Text,
     UniqueConstraint,
     text,
@@ -68,6 +69,46 @@ class WeatherDerivedSignalCatalog(Base, TimestampedMixin):
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     unit: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
+class WeatherIndexCatalog(Base, TimestampedMixin):
+    """`public.weather_indices_catalog` — the 7 first-class weather indices.
+
+    Promotes weather to an index family alongside `indices_catalog`.
+    `code` matches the `index_code` PR-W2 writes into `weather_index_daily`.
+    Carries the agronomists' sheet relationship text (other-indices /
+    disease / insect) for "why this matters" tooltips + Phase-2 risk
+    authoring. Migration 0037.
+    """
+
+    __tablename__ = "weather_indices_catalog"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit: Mapped[str] = mapped_column(Text, nullable=False)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_min: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    value_max: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    source_kind: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'observed'")
+    )
+    default_visible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("TRUE")
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    relation_indices_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relation_indices_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relation_disease_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relation_disease_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relation_insect_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relation_insect_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -259,6 +300,74 @@ class WeatherDerivedDaily(Base):
     temp_min_c: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     temp_max_c: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     temp_mean_c: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class WeatherIndexDaily(Base):
+    """`tenant_<id>.weather_index_daily` — per-(farm, day, index) projection.
+
+    The 7 catalog weather indices materialised from observations +
+    `weather_derived_daily`, plus a `baseline_deviation` z-score vs the
+    matching `weather_index_baselines` row (NULL until the climatology
+    sweep runs). Farm-keyed — weather is centroid data. Migration 0047.
+    """
+
+    __tablename__ = "weather_index_daily"
+    __table_args__: tuple[PrimaryKeyConstraint | dict[str, object], ...] = (
+        PrimaryKeyConstraint("farm_id", "date", "index_code", name="pk_weather_index_daily"),
+        {},
+    )
+
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    date: Mapped[date_type] = mapped_column(Date, nullable=False)
+    index_code: Mapped[str] = mapped_column(Text, nullable=False)
+    value: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    value_min: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    value_max: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    value_aux: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    baseline_deviation: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class WeatherIndexBaseline(Base):
+    """`tenant_<id>.weather_index_baselines` — per-(farm, index, day-of-year)
+    rolling mean ± std (farm-scoped port of `block_index_baselines`).
+
+    Recomputed weekly by the PR-W3 climatology sweep; the projection
+    reads it to populate `weather_index_daily.baseline_deviation`.
+    Migration 0047.
+    """
+
+    __tablename__ = "weather_index_baselines"
+    __table_args__: tuple[PrimaryKeyConstraint | dict[str, object], ...] = (
+        PrimaryKeyConstraint(
+            "farm_id", "index_code", "day_of_year", name="pk_weather_index_baselines"
+        ),
+        {},
+    )
+
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    index_code: Mapped[str] = mapped_column(Text, nullable=False)
+    day_of_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    baseline_mean: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
+    baseline_std: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
+    sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    window_days: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("7"))
+    years_observed: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

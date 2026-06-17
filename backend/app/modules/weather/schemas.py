@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date as date_type
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -64,6 +65,78 @@ class WeatherProviderRead(BaseModel):
     code: str
     name: str
     kind: str
+
+
+class WeatherIndexCatalogEntry(BaseModel):
+    """One row of `public.weather_indices_catalog`.
+
+    Surfaced via `GET /api/v1/weather/indices/catalog` so the SPA can
+    build the weather-index picker + "why this matters" tooltips from
+    DB-curated EN/AR metadata rather than hard-coding the list.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    name_en: str
+    name_ar: str | None
+    unit: str
+    description_en: str | None
+    description_ar: str | None
+    value_min: Decimal | None
+    value_max: Decimal | None
+    source_kind: str
+    default_visible: bool
+    sort_order: int
+    relation_indices_en: str | None
+    relation_indices_ar: str | None
+    relation_disease_en: str | None
+    relation_disease_ar: str | None
+    relation_insect_en: str | None
+    relation_insect_ar: str | None
+
+
+class WeatherIndexTimeseriesPoint(BaseModel):
+    """One day of a weather-index series + its climatology context.
+
+    ``zscore`` is the stored ``baseline_deviation``; ``baseline_mean`` /
+    ``baseline_std`` come from the matching day-of-year baseline so the
+    SPA can draw the climatology band. All nullable — a gap day or a DOY
+    without a baseline yet leaves them None.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date_type
+    value: Decimal | None
+    value_min: Decimal | None
+    value_max: Decimal | None
+    value_aux: dict[str, Any]
+    zscore: Decimal | None
+    baseline_mean: Decimal | None
+    baseline_std: Decimal | None
+
+
+class WeatherIndexTimeseriesResponse(BaseModel):
+    farm_id: UUID
+    index_code: str
+    points: list[WeatherIndexTimeseriesPoint]
+
+
+class WeatherIndexSummaryEntry(BaseModel):
+    """Latest value + anomaly + 7-day trend for one weather index."""
+
+    index_code: str
+    latest_date: date_type
+    value: Decimal | None
+    zscore: Decimal | None
+    trend_7d_delta: Decimal | None
+
+
+class WeatherIndexSummaryResponse(BaseModel):
+    farm_id: UUID
+    as_of: datetime
+    indices: list[WeatherIndexSummaryEntry]
 
 
 class HourlyObservationRead(BaseModel):

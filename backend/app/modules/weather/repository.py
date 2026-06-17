@@ -7,15 +7,17 @@ on the unique key so re-fetching the same issuance is idempotent.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import date as date_type
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import and_, bindparam, select, text, update
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.weather.errors import (
@@ -642,6 +644,292 @@ class WeatherRepository:
                 "p30": precip_mm_30d,
             },
         )
+
+    # ---- weather-index projection (PR-W2) -----------------------------
+
+    async def read_index_baseline(
+        self, *, farm_id: UUID, index_code: str, day_of_year: int
+    ) -> dict[str, Any] | None:
+        """The (farm, index, DOY) climatology baseline row, or None.
+
+        Read at projection time to populate
+        ``weather_index_daily.baseline_deviation``. Returns None until the
+        PR-W3 sweep has computed a baseline for this DOY.
+        """
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT baseline_mean, baseline_std, sample_count
+                        FROM weather_index_baselines
+                        WHERE farm_id = :farm_id
+                          AND index_code = :index_code
+                          AND day_of_year = :doy
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id, "index_code": index_code, "doy": day_of_year},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def upsert_weather_index_daily(
+        self,
+        *,
+        farm_id: UUID,
+        date: date_type,
+        index_code: str,
+        value: Decimal | None,
+        value_min: Decimal | None,
+        value_max: Decimal | None,
+        value_aux: dict[str, Any],
+        baseline_deviation: Decimal | None,
+    ) -> None:
+        """Insert-or-replace one (farm_id, date, index_code) projection row.
+
+        ``ON CONFLICT DO UPDATE`` — re-deriving a partial / corrected day
+        overwrites in place, matching ``upsert_derived_daily``.
+        """
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO weather_index_daily (
+                    farm_id, date, index_code,
+                    value, value_min, value_max, value_aux,
+                    baseline_deviation, computed_at
+                ) VALUES (
+                    :farm_id, :date, :index_code,
+                    :value, :value_min, :value_max, CAST(:value_aux AS jsonb),
+                    :baseline_deviation, now()
+                )
+                ON CONFLICT (farm_id, date, index_code) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    value_min = EXCLUDED.value_min,
+                    value_max = EXCLUDED.value_max,
+                    value_aux = EXCLUDED.value_aux,
+                    baseline_deviation = EXCLUDED.baseline_deviation,
+                    computed_at = now()
+                """
+            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+            {
+                "farm_id": farm_id,
+                "date": date,
+                "index_code": index_code,
+                "value": value,
+                "value_min": value_min,
+                "value_max": value_max,
+                "value_aux": json.dumps(value_aux),
+                "baseline_deviation": baseline_deviation,
+            },
+        )
+
+    # ---- weather-index climatology baselines (PR-W3) ------------------
+
+    async def list_distinct_weather_index_pairs(self) -> tuple[tuple[UUID, str], ...]:
+        """Every (farm_id, index_code) pair with at least one valued row.
+
+        Drives the per-tenant baseline sweep — one recompute per pair.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    "SELECT DISTINCT farm_id, index_code FROM weather_index_daily "
+                    "WHERE value IS NOT NULL"
+                )
+            )
+        ).all()
+        return tuple((r[0], r[1]) for r in rows)
+
+    async def read_weather_index_history(
+        self, *, farm_id: UUID, index_code: str
+    ) -> tuple[dict[str, Any], ...]:
+        """All valued (date, value) rows for one (farm, index). Date ascending."""
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT date, value
+                        FROM weather_index_daily
+                        WHERE farm_id = :farm_id
+                          AND index_code = :index_code
+                          AND value IS NOT NULL
+                        ORDER BY date ASC
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id, "index_code": index_code},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def upsert_weather_index_baseline(
+        self,
+        *,
+        farm_id: UUID,
+        index_code: str,
+        day_of_year: int,
+        baseline_mean: Decimal,
+        baseline_std: Decimal,
+        sample_count: int,
+        window_days: int,
+        years_observed: int,
+    ) -> None:
+        """Insert-or-replace one (farm, index, day_of_year) baseline."""
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO weather_index_baselines (
+                    farm_id, index_code, day_of_year,
+                    baseline_mean, baseline_std, sample_count,
+                    window_days, years_observed, computed_at
+                ) VALUES (
+                    :farm_id, :index_code, :doy,
+                    :mean, :std, :sample_count,
+                    :window_days, :years_observed, now()
+                )
+                ON CONFLICT (farm_id, index_code, day_of_year) DO UPDATE SET
+                    baseline_mean = EXCLUDED.baseline_mean,
+                    baseline_std = EXCLUDED.baseline_std,
+                    sample_count = EXCLUDED.sample_count,
+                    window_days = EXCLUDED.window_days,
+                    years_observed = EXCLUDED.years_observed,
+                    computed_at = now()
+                """
+            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+            {
+                "farm_id": farm_id,
+                "index_code": index_code,
+                "doy": day_of_year,
+                "mean": baseline_mean,
+                "std": baseline_std,
+                "sample_count": sample_count,
+                "window_days": window_days,
+                "years_observed": years_observed,
+            },
+        )
+
+    async def recompute_weather_index_deviations(self, *, farm_id: UUID, index_code: str) -> int:
+        """Re-derive `baseline_deviation` on every row of one (farm, index).
+
+        Sets the z-score `(value - baseline_mean) / baseline_std` against
+        the matching day-of-year baseline, or NULL when no baseline exists
+        for that DOY or its std is zero. A LEFT JOIN over the index rows
+        (not the baselines) guarantees rows whose baseline disappeared are
+        reset to NULL rather than left stale. Returns rows touched.
+        """
+        result = await self._session.execute(
+            text(
+                """
+                UPDATE weather_index_daily d
+                SET baseline_deviation = sub.dev
+                FROM (
+                    SELECT r.farm_id, r.date, r.index_code,
+                           CASE
+                               WHEN b.baseline_std IS NOT NULL AND b.baseline_std > 0
+                               THEN round(
+                                   (r.value - b.baseline_mean) / b.baseline_std, 4
+                               )
+                               ELSE NULL
+                           END AS dev
+                    FROM weather_index_daily r
+                    LEFT JOIN weather_index_baselines b
+                        ON b.farm_id = r.farm_id
+                        AND b.index_code = r.index_code
+                        AND b.day_of_year = EXTRACT(DOY FROM r.date)::int
+                    WHERE r.farm_id = :farm_id
+                      AND r.index_code = :index_code
+                      AND r.value IS NOT NULL
+                ) sub
+                WHERE d.farm_id = sub.farm_id
+                  AND d.date = sub.date
+                  AND d.index_code = sub.index_code
+                """
+            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+            {"farm_id": farm_id, "index_code": index_code},
+        )
+        return int(cast("CursorResult[Any]", result).rowcount or 0)
+
+    # ---- weather-index read surface (PR-W4) ---------------------------
+
+    async def read_weather_index_timeseries(
+        self,
+        *,
+        farm_id: UUID,
+        index_code: str,
+        since: date_type | None,
+        until: date_type | None,
+    ) -> tuple[dict[str, Any], ...]:
+        """One (farm, index) series joined to its day-of-year climatology.
+
+        ``[since, until)`` date filter when provided. Each row carries the
+        stored z-score plus the matching baseline mean/std for the band.
+        """
+        clauses = ["d.farm_id = :farm_id", "d.index_code = :index_code"]
+        params: dict[str, Any] = {"farm_id": farm_id, "index_code": index_code}
+        if since is not None:
+            clauses.append("d.date >= :since")
+            params["since"] = since
+        if until is not None:
+            clauses.append("d.date < :until")
+            params["until"] = until
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT d.date, d.value, d.value_min, d.value_max,
+                               d.value_aux,
+                               d.baseline_deviation AS zscore,
+                               b.baseline_mean, b.baseline_std
+                        FROM weather_index_daily d
+                        LEFT JOIN weather_index_baselines b
+                            ON b.farm_id = d.farm_id
+                            AND b.index_code = d.index_code
+                            AND b.day_of_year = EXTRACT(DOY FROM d.date)::int
+                        WHERE {" AND ".join(clauses)}
+                        ORDER BY d.date ASC
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def read_weather_index_recent(
+        self, *, farm_id: UUID, since: date_type
+    ) -> tuple[dict[str, Any], ...]:
+        """Valued rows for all indices on/after ``since`` — drives the
+        farm summary (latest value + 7-day trend). Ordered for grouping.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT date, index_code, value, baseline_deviation AS zscore
+                        FROM weather_index_daily
+                        WHERE farm_id = :farm_id
+                          AND value IS NOT NULL
+                          AND date >= :since
+                        ORDER BY index_code ASC, date ASC
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id, "since": since},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
 
 
 def _d(v: Decimal | None) -> Decimal | None:
