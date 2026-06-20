@@ -5,8 +5,13 @@ from __future__ import annotations
 import math
 
 import pytest
+from shapely.geometry import Polygon as _ShapelyPolygon
 
-from app.modules.farms.auto_grid import auto_grid_candidates, cell_size_for_max_area_m2
+from app.modules.farms.auto_grid import (
+    _ring_area_m2,
+    auto_grid_candidates,
+    cell_size_for_max_area_m2,
+)
 from app.modules.farms.errors import GeometryInvalidError
 
 
@@ -143,6 +148,74 @@ def test_edge_cell_area_is_clipped_not_full() -> None:
     assert any(float(c["area_m2"]) < full * 0.99 for c in cells)
     # No candidate exceeds a full cell (clipping can only shrink).
     assert all(float(c["area_m2"]) <= full + 1.0 for c in cells)
+
+
+def _u_shaped_farm() -> dict[str, object]:
+    """A concave 'U' AoI: two legs joined by a base, open at the top.
+
+    A wide grid cell laid over the two legs (above the base) meets the farm in
+    two *disjoint* pieces — the case the old Sutherland-Hodgman clip fused into
+    a single self-touching ring.
+    """
+    lon0, lat0 = 31.20, 30.00
+    return {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [lon0 + 0.000, lat0 + 0.000],
+                [lon0 + 0.030, lat0 + 0.000],
+                [lon0 + 0.030, lat0 + 0.030],
+                [lon0 + 0.020, lat0 + 0.030],
+                [lon0 + 0.020, lat0 + 0.012],  # down into the gap
+                [lon0 + 0.010, lat0 + 0.012],  # across the gap floor
+                [lon0 + 0.010, lat0 + 0.030],  # back up
+                [lon0 + 0.000, lat0 + 0.030],
+                [lon0 + 0.000, lat0 + 0.000],
+            ]
+        ],
+    }
+
+
+def test_concave_farm_emits_valid_split_candidates() -> None:
+    # A concave AoI forces at least one cell to clip into two disjoint pieces.
+    # The old Sutherland-Hodgman clip fused those into one self-touching ring
+    # that rendered as a spill and stored a wrong area; shapely splits them.
+    farm = _u_shaped_farm()
+    farm_ring = farm["coordinates"][0]  # type: ignore[index]
+
+    # A full-width cell (n_cols == 1) lays one cell across both legs; its top
+    # band sits above the U's base, so the farm meets it in two disjoint pieces.
+    cells = auto_grid_candidates(farm, cell_size_m=3000)
+    assert cells
+
+    for cell in cells:
+        ring = cell["geometry"]["coordinates"][0]  # type: ignore[index]
+        # Every candidate is a valid, simple polygon (no self-touching bridge).
+        assert _ShapelyPolygon(ring).is_valid, f"candidate {cell['code']} is an invalid polygon"
+        # And the clipped region lies inside the AoI (sampled interior points).
+        xs = [p[0] for p in ring]
+        ys = [p[1] for p in ring]
+        for i in range(7):
+            for j in range(7):
+                px = min(xs) + (max(xs) - min(xs)) * (i + 0.5) / 7
+                py = min(ys) + (max(ys) - min(ys)) * (j + 0.5) / 7
+                if _point_in_ring(px, py, ring):
+                    assert _point_in_ring(px, py, farm_ring) or _near_edge(
+                        px, py, farm_ring, 1e-6
+                    ), f"candidate {cell['code']} encloses area outside the AoI"
+
+    # At least one cell split into multiple pieces (a '-P' suffixed code).
+    assert any("-P" in c["code"] for c in cells), "expected a multi-piece split candidate"
+
+    # The candidates tile the whole farm: their areas sum to (approximately)
+    # the farm area measured the same equirectangular way the module measures.
+    farm_open = [(float(x), float(y)) for x, y in farm_ring[:-1]]
+    minx = min(x for x, _ in farm_open)
+    miny = min(y for _, y in farm_open)
+    m_per_deg_lon = 111_320.0 * math.cos(math.radians(30.015))
+    farm_area = _ring_area_m2(farm_open, minx=minx, miny=miny, m_per_deg_lon=m_per_deg_lon)
+    total = sum(float(c["area_m2"]) for c in cells)
+    assert abs(total - farm_area) / farm_area < 0.05
 
 
 def test_interior_cells_stay_whole_rectangles() -> None:
