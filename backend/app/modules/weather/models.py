@@ -133,6 +133,12 @@ class WeatherSubscription(Base, TimestampedMixin):
     provider_code: Mapped[str] = mapped_column(Text, nullable=False)
     cadence_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    # TRUE when a block/farm inactivation cascade turned this sub off, so
+    # reactivation can restore it without touching manually-paused subs
+    # (migration 0049).
+    deactivated_by_cascade: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
     last_successful_ingest_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
