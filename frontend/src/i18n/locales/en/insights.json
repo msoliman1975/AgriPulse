@@ -19,6 +19,19 @@
         "gndvi": "GNDVI"
       }
     },
+    "indexDesc": {
+      "ndvi": "NDVI — overall vegetation vigour and canopy greenness.",
+      "ndwi": "NDWI — canopy and leaf water content.",
+      "evi": "EVI — vegetation vigour, improved over NDVI in dense canopy.",
+      "savi": "SAVI — vegetation vigour, corrected for bare-soil background.",
+      "ndre": "NDRE — chlorophyll and nitrogen status (red-edge), sensitive in dense canopy.",
+      "gndvi": "GNDVI — chlorophyll content using the green band."
+    },
+    "range": {
+      "from": "From",
+      "to": "To",
+      "clear": "Clear"
+    },
     "timespan": {
       "ariaLabel": "Time span",
       "7d": "7d",

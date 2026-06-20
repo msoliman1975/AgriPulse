@@ -92,14 +92,28 @@ export function FarmTrendChart({
     _savePrefs(farmId, { index: indexCode, span: timeSpan });
   }, [farmId, indexCode, timeSpan]);
 
+  // Custom From→To range. When both ends are set it overrides the
+  // preset TimeSpanChips; clearing either end falls back to the chips.
+  const [range, setRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const hasCustomRange = Boolean(range.from && range.to && range.from <= range.to);
+
   const since = useMemo(() => timeSpanToSince(timeSpan), [timeSpan]);
 
+  // Resolve the effective {since, until} the query sends. A custom range
+  // wins; otherwise the chip-derived `since` with an open-ended `until`.
+  const apiRange = useMemo(() => {
+    if (hasCustomRange) {
+      return { since: `${range.from}T00:00:00Z`, until: `${range.to}T23:59:59Z` };
+    }
+    return since ? { since } : {};
+  }, [hasCustomRange, range.from, range.to, since]);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["insights", "trend", farmId, indexCode, timeSpan] as const,
+    queryKey: ["insights", "trend", farmId, indexCode, timeSpan, apiRange] as const,
     queryFn: () =>
       getFarmIndexTimeseries(farmId, {
         index_code: indexCode,
-        ...(since ? { since } : {}),
+        ...apiRange,
       }),
     enabled: Boolean(farmId),
     staleTime: 60_000,
@@ -139,9 +153,48 @@ export function FarmTrendChart({
         </h2>
         <div className="flex flex-wrap items-center gap-3">
           <IndexPicker value={indexCode} onChange={setIndexCode} />
-          <TimeSpanChips value={timeSpan} onChange={setTimeSpan} />
+          <TimeSpanChips
+            // When a custom From→To range is active no preset chip should
+            // read as selected — pass a value outside the option set.
+            value={hasCustomRange ? ("" as TimeSpanKey) : timeSpan}
+            onChange={(next) => {
+              setRange({ from: "", to: "" });
+              setTimeSpan(next);
+            }}
+          />
+          <label className="flex items-center gap-1 text-[11px] text-ap-muted">
+            <span>{t("trend.range.from")}</span>
+            <input
+              type="date"
+              value={range.from}
+              max={range.to || undefined}
+              onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+              className="rounded-md border border-ap-line bg-white px-1.5 py-0.5 text-[11px] text-ap-ink"
+            />
+          </label>
+          <label className="flex items-center gap-1 text-[11px] text-ap-muted">
+            <span>{t("trend.range.to")}</span>
+            <input
+              type="date"
+              value={range.to}
+              min={range.from || undefined}
+              onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+              className="rounded-md border border-ap-line bg-white px-1.5 py-0.5 text-[11px] text-ap-ink"
+            />
+          </label>
+          {hasCustomRange ? (
+            <button
+              type="button"
+              onClick={() => setRange({ from: "", to: "" })}
+              className="text-[11px] font-medium text-ap-primary hover:underline"
+            >
+              {t("trend.range.clear")}
+            </button>
+          ) : null}
         </div>
       </header>
+
+      <p className="mt-1 text-xs text-ap-muted">{t(`trend.indexDesc.${indexCode}`)}</p>
 
       <div className="mt-3 min-h-[260px]">
         {isLoading ? (
