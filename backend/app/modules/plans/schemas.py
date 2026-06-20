@@ -20,6 +20,14 @@ ActivityType = Literal[
     "irrigation",
     "soil_prep",
     "observation",
+    # Extended vocabulary for scientific crop plans (pollination = date palm,
+    # growth_regulator = mango PBZ, thinning = fruit/strand thinning,
+    # bagging = bunch covering, hilling = potato earthing-up).
+    "pollination",
+    "growth_regulator",
+    "thinning",
+    "bagging",
+    "hilling",
 ]
 
 

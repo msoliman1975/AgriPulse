@@ -23,6 +23,11 @@ const ACTIVITY_TYPES: ActivityType[] = [
   "harvesting",
   "pruning",
   "soil_prep",
+  "pollination",
+  "growth_regulator",
+  "thinning",
+  "bagging",
+  "hilling",
 ];
 
 interface QuickAddDialogProps {

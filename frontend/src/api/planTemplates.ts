@@ -14,7 +14,12 @@ export type PlanActivityType =
   | "harvesting"
   | "irrigation"
   | "soil_prep"
-  | "observation";
+  | "observation"
+  | "pollination"
+  | "growth_regulator"
+  | "thinning"
+  | "bagging"
+  | "hilling";
 
 export const ACTIVITY_TYPES: readonly PlanActivityType[] = [
   "planting",
@@ -25,6 +30,11 @@ export const ACTIVITY_TYPES: readonly PlanActivityType[] = [
   "irrigation",
   "soil_prep",
   "observation",
+  "pollination",
+  "growth_regulator",
+  "thinning",
+  "bagging",
+  "hilling",
 ];
 
 export interface PlanTemplateMilestone {

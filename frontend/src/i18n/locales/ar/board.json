@@ -44,7 +44,12 @@
     "harvesting": "حصاد",
     "irrigation": "ري",
     "soil_prep": "إعداد التربة",
-    "observation": "ملاحظة"
+    "observation": "ملاحظة",
+    "pollination": "تلقيح",
+    "growth_regulator": "منظم نمو",
+    "thinning": "خف الثمار",
+    "bagging": "تكييس",
+    "hilling": "ترديم"
   },
   "status": {
     "scheduled": "مجدول",
