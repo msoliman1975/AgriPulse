@@ -39,13 +39,18 @@ global:
   #     cultivar templates. Public migrations 0038-0042 (seed data) + tenant
   #     0048 (activity_type extended vocab) run on PreSync. Backend + frontend.
   #   All three bumped; tile-server unchanged stays 9d140cc.
+  # 3424d65 = #274 weather indices first-class P1 finale (PR-W6/W7):
+  #   weather_index condition source (trees consume the 7 indices + z-score) +
+  #   Weather+GDD report anomaly columns/strip + FE authoring field. No
+  #   migrations (reads weather_index_daily/baselines from #271). Backend + FE
+  #   → api + workers + frontend bumped; tile-server unchanged stays 9d140cc.
   images:
     api:
-      tag: "21635de"
+      tag: "3424d65"
     workers:
-      tag: "21635de"
+      tag: "3424d65"
     frontend:
-      tag: "21635de"
+      tag: "3424d65"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
