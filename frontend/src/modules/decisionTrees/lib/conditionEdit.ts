@@ -34,6 +34,23 @@ export const WEATHER_SCOPES = [
   "derived_today",
   "derived_yesterday",
 ] as const;
+// First-class weather indices (PR-W7). `value` is the farm-level daily
+// value; `baseline_deviation` is its z-score vs the day-of-year
+// climatology. Mirrors WEATHER_INDEX_KEYS in
+// backend/app/shared/conditions/context.py.
+export const WEATHER_INDEX_KEYS = ["value", "baseline_deviation"] as const;
+// The seven catalog codes (public weather_indices_catalog). Kept as a
+// closed list so the author picks from a dropdown rather than guessing
+// a code; mirrors the migration 0037 seed.
+export const WEATHER_INDEX_CODES = [
+  "temperature",
+  "radiation",
+  "wind",
+  "rainfall",
+  "evapotranspiration",
+  "evaporation_coeff",
+  "rain_et_balance",
+] as const;
 // Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
 // backend/app/shared/conditions/context.py.
 export const GRID_FIELDS = [
@@ -56,6 +73,7 @@ export type ValueRefSource =
   | "indices"
   | "block"
   | "weather"
+  | "weather_index"
   | "signals"
   | "grid"
   | "params";
@@ -64,6 +82,11 @@ export type ValueRef =
   | { source: "indices"; index_code: string; key: (typeof INDICES_KEYS)[number] }
   | { source: "block"; field: (typeof BLOCK_FIELDS)[number] }
   | { source: "weather"; scope: (typeof WEATHER_SCOPES)[number]; field: string }
+  | {
+      source: "weather_index";
+      index_code: (typeof WEATHER_INDEX_CODES)[number];
+      key: (typeof WEATHER_INDEX_KEYS)[number];
+    }
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
   | { source: "params"; name: string };
@@ -105,7 +128,7 @@ export function parseConditionTree(raw: unknown): EditableCondition {
   // Boolean group?
   if ("all_of" in raw || "any_of" in raw) {
     const mode: GroupMode = "all_of" in raw ? "all" : "any";
-    const children = (mode === "all" ? raw.all_of : raw.any_of);
+    const children = mode === "all" ? raw.all_of : raw.any_of;
     if (!Array.isArray(children)) {
       return {
         kind: "unsupported",
@@ -191,6 +214,17 @@ function parseValueRef(raw: unknown): ValueRef | null {
       field,
     };
   }
+  if (source === "weather_index") {
+    const index_code = raw.index_code as string;
+    if (!(WEATHER_INDEX_CODES as readonly string[]).includes(index_code)) return null;
+    const key = (raw.key ?? "baseline_deviation") as string;
+    if (!(WEATHER_INDEX_KEYS as readonly string[]).includes(key)) return null;
+    return {
+      source: "weather_index",
+      index_code: index_code as (typeof WEATHER_INDEX_CODES)[number],
+      key: key as (typeof WEATHER_INDEX_KEYS)[number],
+    };
+  }
   if (source === "signals") {
     const code = typeof raw.code === "string" ? raw.code : "";
     const key = (raw.key ?? "value_numeric") as string;
@@ -272,6 +306,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "block", field: ref.field };
     case "weather":
       return { source: "weather", scope: ref.scope, field: ref.field };
+    case "weather_index":
+      return { source: "weather_index", index_code: ref.index_code, key: ref.key };
     case "signals":
       return { source: "signals", code: ref.code, key: ref.key };
     case "grid":
@@ -312,6 +348,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "block", field: "crop_category" };
     case "weather":
       return { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" };
+    case "weather_index":
+      return { source: "weather_index", index_code: "temperature", key: "baseline_deviation" };
     case "signals":
       return { source: "signals", code: "", key: "value_numeric" };
     case "grid":

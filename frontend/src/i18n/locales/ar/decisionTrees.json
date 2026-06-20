@@ -228,6 +228,7 @@
       "operator": "المُعامل",
       "indexCode": "رمز المؤشر",
       "weatherField": "الحقل",
+      "weatherIndexCode": "مؤشر الطقس",
       "signalCode": "رمز الإشارة",
       "gridField": "حقل الشبكة",
       "paramName": "اسم المعامل",
@@ -241,6 +242,7 @@
         "indices": "مؤشر (NDVI, EVI, …)",
         "block": "خاصية الحقل",
         "weather": "الطقس",
+        "weather_index": "مؤشر الطقس (شذوذ)",
         "signals": "إشارة مخصصة",
         "grid": "شذوذ الشبكة",
         "params": "معامل الشجرة"

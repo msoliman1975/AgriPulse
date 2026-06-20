@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  parseConditionTree,
-  serializeCondition,
-  type ComparisonTerm,
-} from "./conditionEdit";
+import { parseConditionTree, serializeCondition, type ComparisonTerm } from "./conditionEdit";
 
 describe("parseConditionTree", () => {
   it("parses a single comparison", () => {
@@ -69,7 +65,11 @@ describe("parseConditionTree", () => {
   it("flags nested groups as unsupported", () => {
     const raw = {
       all_of: [
-        { all_of: [{ op: "lt", left: { source: "indices", index_code: "ndvi", key: "mean" }, right: 0 }] },
+        {
+          all_of: [
+            { op: "lt", left: { source: "indices", index_code: "ndvi", key: "mean" }, right: 0 },
+          ],
+        },
       ],
     };
     const result = parseConditionTree(raw);
@@ -122,6 +122,31 @@ describe("parseConditionTree", () => {
     expect(parseConditionTree(raw).kind).toBe("unsupported");
   });
 
+  it("parses a weather_index anomaly ref (PR-W7)", () => {
+    const raw = {
+      op: "gt",
+      left: { source: "weather_index", index_code: "temperature", key: "baseline_deviation" },
+      right: 2,
+    };
+    const result = parseConditionTree(raw);
+    expect(result.kind).toBe("single");
+    if (result.kind !== "single") return;
+    expect(result.term.left).toEqual({
+      source: "weather_index",
+      index_code: "temperature",
+      key: "baseline_deviation",
+    });
+  });
+
+  it("rejects an unknown weather index code (falls to unsupported)", () => {
+    const raw = {
+      op: "gt",
+      left: { source: "weather_index", index_code: "humidity", key: "value" },
+      right: 2,
+    };
+    expect(parseConditionTree(raw).kind).toBe("unsupported");
+  });
+
   it("parses a params ref on the right operand", () => {
     const raw = {
       op: "lt",
@@ -164,6 +189,17 @@ describe("round-trip", () => {
       op: "ge",
       left: { source: "grid", index_code: "ndvi", field: "flagged_count" },
       right: 5,
+    };
+    const parsed = parseConditionTree(original);
+    const back = serializeCondition(parsed);
+    expect(back).toEqual(original);
+  });
+
+  it("preserves a weather_index anomaly comparison (PR-W7)", () => {
+    const original = {
+      op: "gt",
+      left: { source: "weather_index", index_code: "evapotranspiration", key: "value" },
+      right: 6,
     };
     const parsed = parseConditionTree(original);
     const back = serializeCondition(parsed);

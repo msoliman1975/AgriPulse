@@ -228,6 +228,7 @@
       "operator": "Operator",
       "indexCode": "Index code",
       "weatherField": "Field",
+      "weatherIndexCode": "Weather index",
       "signalCode": "Signal code",
       "gridField": "Grid field",
       "paramName": "Parameter name",
@@ -241,6 +242,7 @@
         "indices": "Index (NDVI, EVI, …)",
         "block": "Block attribute",
         "weather": "Weather",
+        "weather_index": "Weather index (anomaly)",
         "signals": "Custom signal",
         "grid": "Grid anomaly",
         "params": "Tree parameter"

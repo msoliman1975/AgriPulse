@@ -189,6 +189,10 @@ export interface WeatherSummaryStats {
   et0_mm_avg_daily: string | null;
   gdd_base10_total: string | null;
   gdd_cumulative_season: string | null;
+  // Climatology anomaly roll-up (PR-W6); null until baselines exist.
+  days_with_anomaly: number | null;
+  heat_anomaly_days: number | null;
+  et0_anomaly_days: number | null;
 }
 
 export interface WeatherDailyPoint {
@@ -200,6 +204,10 @@ export interface WeatherDailyPoint {
   et0_mm: string | null;
   gdd_base10: string | null;
   gdd_cumulative_season: string | null;
+  // Per-day z-scores vs the seasonal climatology (PR-W6).
+  temp_anomaly_z: string | null;
+  precip_anomaly_z: string | null;
+  et0_anomaly_z: string | null;
 }
 
 export interface WeatherCropContext {

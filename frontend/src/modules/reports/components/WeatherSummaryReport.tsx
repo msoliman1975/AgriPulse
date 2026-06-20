@@ -74,6 +74,9 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
       t("weatherSummary.headers.et0"),
       t("weatherSummary.headers.gdd"),
       t("weatherSummary.headers.gddCum"),
+      t("weatherSummary.headers.tempZ"),
+      t("weatherSummary.headers.precipZ"),
+      t("weatherSummary.headers.et0Z"),
     ];
     const rows: CsvCell[][] = data.daily.map((d) => [
       d.date,
@@ -84,6 +87,9 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
       d.et0_mm ?? "",
       d.gdd_base10 ?? "",
       d.gdd_cumulative_season ?? "",
+      d.temp_anomaly_z ?? "",
+      d.precip_anomaly_z ?? "",
+      d.et0_anomaly_z ?? "",
     ]);
     downloadCsv(
       `weather-summary_${since.slice(0, 10)}_${until.slice(0, 10)}`,
@@ -110,6 +116,7 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
       ) : (
         <>
           <StatCards stats={data.stats} />
+          <AnomalySummary stats={data.stats} />
           {data.crops.length > 0 ? <CropContext crops={data.crops} /> : null}
           <TempPrecipChart data={chart} />
           <GddChart data={chart} />
@@ -141,6 +148,41 @@ function StatCards({ stats }: { stats: WeatherSummaryStats }): ReactNode {
           <div className="mt-1 text-base font-semibold tabular-nums text-ap-ink">{value}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AnomalySummary({ stats }: { stats: WeatherSummaryStats }): ReactNode {
+  const { t } = useTranslation("reports");
+  // Hidden until the climatology baselines cover the window (PR-W6) — a
+  // null `days_with_anomaly` means no z-scores, so 0s would mislead.
+  if (stats.days_with_anomaly === null) return null;
+  const heat = stats.heat_anomaly_days ?? 0;
+  const et0 = stats.et0_anomaly_days ?? 0;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-ap-muted">{t("weatherSummary.anomaly.label")}</span>
+      <span
+        className={`rounded-full border px-2.5 py-1 ${
+          heat > 0
+            ? "border-ap-crit/30 bg-ap-crit-soft text-ap-crit"
+            : "border-ap-line bg-ap-bg/40 text-ap-muted"
+        }`}
+      >
+        {t("weatherSummary.anomaly.heat", { count: heat })}
+      </span>
+      <span
+        className={`rounded-full border px-2.5 py-1 ${
+          et0 > 0
+            ? "border-ap-warn/30 bg-ap-warn-soft text-ap-warn"
+            : "border-ap-line bg-ap-bg/40 text-ap-muted"
+        }`}
+      >
+        {t("weatherSummary.anomaly.et0", { count: et0 })}
+      </span>
+      <span className="text-ap-muted">
+        {t("weatherSummary.anomaly.coverage", { count: stats.days_with_anomaly })}
+      </span>
     </div>
   );
 }

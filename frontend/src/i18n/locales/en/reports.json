@@ -150,7 +150,19 @@
       "precip": "Rain mm",
       "et0": "ET₀ mm",
       "gdd": "GDD",
-      "gddCum": "GDD cumulative"
+      "gddCum": "GDD cumulative",
+      "tempZ": "Temp anomaly (σ)",
+      "precipZ": "Rain anomaly (σ)",
+      "et0Z": "ET₀ anomaly (σ)"
+    },
+    "anomaly": {
+      "label": "Anomalies vs seasonal normal:",
+      "heat": "{{count}} heat day ≥2σ",
+      "heat_other": "{{count}} heat days ≥2σ",
+      "et0": "{{count}} high-ET₀ day",
+      "et0_other": "{{count}} high-ET₀ days",
+      "coverage": "of {{count}} day with baseline",
+      "coverage_other": "of {{count}} days with baseline"
     }
   },
   "opsLog": {

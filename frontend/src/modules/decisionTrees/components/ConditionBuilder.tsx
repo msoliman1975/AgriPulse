@@ -17,6 +17,8 @@ import {
   GRID_FIELDS,
   INDICES_KEYS,
   SIGNAL_KEYS,
+  WEATHER_INDEX_CODES,
+  WEATHER_INDEX_KEYS,
   WEATHER_SCOPES,
   defaultComparisonTerm,
   defaultValueRef,
@@ -70,11 +72,7 @@ export function ConditionBuilder({
   };
 
   const terms: ComparisonTerm[] =
-    value.kind === "group"
-      ? value.terms
-      : value.kind === "single"
-        ? [value.term]
-        : [];
+    value.kind === "group" ? value.terms : value.kind === "single" ? [value.term] : [];
 
   const groupMode: GroupMode = value.kind === "group" ? value.mode : "all";
 
@@ -205,8 +203,8 @@ function ValueRefEditor({
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const sources: ValueRefSource[] = disallowParams
-    ? ["indices", "block", "weather", "signals", "grid"]
-    : ["indices", "block", "weather", "signals", "grid", "params"];
+    ? ["indices", "block", "weather", "weather_index", "signals", "grid"]
+    : ["indices", "block", "weather", "weather_index", "signals", "grid", "params"];
 
   const onSourceChange = (next: ValueRefSource): void => {
     if (next === value.source) return;
@@ -258,7 +256,9 @@ function SourceSpecificFields({
         <select
           disabled={readOnly}
           value={value.key}
-          onChange={(e) => onChange({ ...value, key: e.target.value as (typeof INDICES_KEYS)[number] })}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof INDICES_KEYS)[number] })
+          }
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         >
           {INDICES_KEYS.map((k) => (
@@ -288,7 +288,9 @@ function SourceSpecificFields({
         <select
           disabled={readOnly}
           value={value.scope}
-          onChange={(e) => onChange({ ...value, scope: e.target.value as (typeof WEATHER_SCOPES)[number] })}
+          onChange={(e) =>
+            onChange({ ...value, scope: e.target.value as (typeof WEATHER_SCOPES)[number] })
+          }
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         >
           {WEATHER_SCOPES.map((s) => (
@@ -309,6 +311,44 @@ function SourceSpecificFields({
       </>
     );
   }
+  if (value.source === "weather_index") {
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.index_code}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              index_code: e.target.value as (typeof WEATHER_INDEX_CODES)[number],
+            })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.weatherIndexCode")}
+        >
+          {WEATHER_INDEX_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          disabled={readOnly}
+          value={value.key}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof WEATHER_INDEX_KEYS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+        >
+          {WEATHER_INDEX_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </>
+    );
+  }
   if (value.source === "signals") {
     return (
       <>
@@ -324,7 +364,9 @@ function SourceSpecificFields({
         <select
           disabled={readOnly}
           value={value.key}
-          onChange={(e) => onChange({ ...value, key: e.target.value as (typeof SIGNAL_KEYS)[number] })}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof SIGNAL_KEYS)[number] })
+          }
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         >
           {SIGNAL_KEYS.map((k) => (
