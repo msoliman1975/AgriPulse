@@ -55,6 +55,23 @@ def _lon_meters_per_degree(lat_deg: float) -> float:
     return _M_PER_DEG_LON_AT_EQUATOR * math.cos(math.radians(lat_deg))
 
 
+def cell_size_for_max_area_m2(max_area_m2: float) -> int:
+    """Derive the grid cell edge (m) whose square area is the per-block cap.
+
+    A full interior cell is a ``side`` by ``side`` square and clipping only ever
+    *shrinks* boundary cells, so the square's area is the maximum area any
+    emitted block can have. Invert that: ``side = sqrt(max_area)``.
+
+    The result is clamped to the supported cell-size range so a very small or
+    very large target still produces a usable grid; the caller echoes the
+    effective ``cell_size_m`` back to the UI so the user sees what was applied.
+    """
+    if max_area_m2 <= 0:
+        raise GeometryInvalidError("max_area_m2 must be positive")
+    side = round(math.sqrt(max_area_m2))
+    return max(_MIN_CELL_M, min(_MAX_CELL_M, side))
+
+
 def _outer_rings(geom: dict[str, Any]) -> list[list[tuple[float, float]]]:
     """Return the exterior ring of each polygon as an *open* ring.
 

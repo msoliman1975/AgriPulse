@@ -10,10 +10,13 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.farms.auto_grid import cell_size_for_max_area_m2
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import TenantRole
 
 from .conftest import build_app, make_context
+
+M2_PER_FEDDAN = 4200.83
 
 pytestmark = [pytest.mark.integration]
 
@@ -146,6 +149,100 @@ async def test_create_rejects_out_of_egypt_geometry(admin_session: AsyncSession)
         )
     assert resp.status_code == 422
     assert "Egypt" in resp.json().get("title", "") or "egypt" in resp.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_auto_grid_by_max_area_derives_and_echoes_cell_size(
+    admin_session: AsyncSession,
+) -> None:
+    """The auto-grid endpoint accepts a per-block max area (canonical m²),
+    derives the grid cell from it, and never emits a block larger than that
+    derived cell (clipping only shrinks boundary cells)."""
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="farms-autogrid-area",
+        name="AutoGrid Area",
+        contact_email="ops@farms-autogrid-area.test",
+    )
+    user_id = uuid4()
+    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+    context = make_context(
+        user_id=user_id,
+        tenant_id=tenant.tenant_id,
+        tenant_role=TenantRole.TENANT_ADMIN,
+    )
+    app = build_app(context)
+
+    # ~1.1 km square farm so the grid yields several full interior cells.
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.post(
+            "/api/v1/farms",
+            json={
+                "code": "FARM-AG",
+                "name": "AutoGrid Farm",
+                "boundary": _square(31.2, 30.0, side=0.01),
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        farm_id = resp.json()["id"]
+
+        # 5 feddan cap → ~145 m square cell.
+        max_area_m2 = 5 * M2_PER_FEDDAN
+        resp = await c.post(
+            f"/api/v1/farms/{farm_id}/blocks/auto-grid",
+            json={"max_area_m2": max_area_m2},
+        )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    expected_cell = cell_size_for_max_area_m2(max_area_m2)
+    assert body["cell_size_m"] == expected_cell
+    assert len(body["candidates"]) > 0
+    # No candidate exceeds a full derived cell; clipping can only shrink.
+    full_cell_area = expected_cell * expected_cell
+    assert all(float(c["area_m2"]) <= full_cell_area + 1.0 for c in body["candidates"])
+    # At least one full interior cell hits (approximately) the cap.
+    assert any(float(c["area_m2"]) >= full_cell_area * 0.99 for c in body["candidates"])
+
+
+@pytest.mark.asyncio
+async def test_auto_grid_by_cell_size_still_supported(admin_session: AsyncSession) -> None:
+    """The legacy cell_size_m path keeps working and is echoed verbatim."""
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="farms-autogrid-cell",
+        name="AutoGrid Cell",
+        contact_email="ops@farms-autogrid-cell.test",
+    )
+    user_id = uuid4()
+    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+    context = make_context(
+        user_id=user_id,
+        tenant_id=tenant.tenant_id,
+        tenant_role=TenantRole.TENANT_ADMIN,
+    )
+    app = build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.post(
+            "/api/v1/farms",
+            json={
+                "code": "FARM-AGC",
+                "name": "AutoGrid Cell Farm",
+                "boundary": _square(31.2, 30.0, side=0.01),
+            },
+        )
+        farm_id = resp.json()["id"]
+
+        resp = await c.post(
+            f"/api/v1/farms/{farm_id}/blocks/auto-grid",
+            json={"cell_size_m": 300},
+        )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cell_size_m"] == 300
+    assert len(body["candidates"]) > 0
 
 
 @pytest.mark.asyncio
