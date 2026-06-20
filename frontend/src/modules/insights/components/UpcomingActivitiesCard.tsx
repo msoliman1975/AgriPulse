@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { ActivityType } from "@/api/plans";
@@ -40,6 +41,7 @@ function plusDaysIso(days: number): string {
 }
 
 export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
+  const { t } = useTranslation("insights");
   const navigate = useNavigate();
   const { data, isLoading } = useCalendar(farmId, todayIso(), plusDaysIso(7));
   const activities = data?.activities ?? [];
@@ -54,14 +56,14 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
           id="upcoming-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
-          This week&apos;s activities
+          {t("upcoming.title")}
         </h2>
         <button
           type="button"
           onClick={() => navigate(`/board/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
-          Plan →
+          {t("upcoming.plan")}
         </button>
       </header>
       <div className="mt-3 flex flex-col gap-2">
@@ -71,7 +73,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
             <Skeleton className="h-10 w-full" />
           </>
         ) : activities.length === 0 ? (
-          <p className="py-3 text-center text-sm text-ap-muted">Nothing scheduled this week.</p>
+          <p className="py-3 text-center text-sm text-ap-muted">{t("upcoming.empty")}</p>
         ) : (
           activities.slice(0, 5).map((a) => {
             const d = parseISO(a.scheduled_date);

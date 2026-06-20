@@ -5,6 +5,7 @@
   },
   "trend": {
     "title": "Vegetation index trend",
+    "noBlocks": "No blocks to chart yet.",
     "indexLabel": "{{code}}, all blocks",
     "loadFailed": "Failed to load trend.",
     "empty": "No observations yet. Once Sentinel scenes are ingested for any block, points will appear here.",
@@ -128,5 +129,36 @@
     "logLink": "Log →",
     "loadFailed": "Failed to load signal observations.",
     "empty": "No signal observations on this farm yet."
+  },
+  "alertsFeed": {
+    "title": "Live alerts · sorted by severity",
+    "viewAll": "View all →",
+    "loadFailed": "Failed to load alerts.",
+    "empty": "All clear — nothing needs your attention.",
+    "noPrescription": "No prescription yet",
+    "resolve": "Resolve"
+  },
+  "landUnits": {
+    "title": "Land units",
+    "manage": "Manage →",
+    "loadFailed": "Failed to load blocks.",
+    "empty": "No land units yet — create one to get started.",
+    "plan": "Plan",
+    "col": {
+      "name": "Name",
+      "type": "Type",
+      "area": "Area",
+      "status": "Status",
+      "action": "Action"
+    },
+    "status": {
+      "active": "active",
+      "inactive": "inactive"
+    }
+  },
+  "upcoming": {
+    "title": "This week's activities",
+    "plan": "Plan →",
+    "empty": "Nothing scheduled this week."
   }
 }

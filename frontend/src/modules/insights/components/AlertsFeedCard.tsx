@@ -1,5 +1,6 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { Alert, AlertSeverity } from "@/api/alerts";
@@ -19,6 +20,7 @@ const SEV_KIND: Record<AlertSeverity, "info" | "warn" | "crit"> = {
 };
 
 export function AlertsFeedCard({ farmId }: Props): ReactNode {
+  const { t } = useTranslation("insights");
   const navigate = useNavigate();
   const { data, isLoading, isError } = useAlerts({ status: "open" });
 
@@ -32,14 +34,14 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
           id="alerts-feed-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
-          Live alerts · sorted by severity
+          {t("alertsFeed.title")}
         </h2>
         <button
           type="button"
           onClick={() => navigate(`/alerts/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
-          View all →
+          {t("alertsFeed.viewAll")}
         </button>
       </header>
       <div className="mt-3 flex flex-col divide-y divide-ap-line">
@@ -50,11 +52,9 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : isError ? (
-          <p className="py-3 text-sm text-ap-crit">Failed to load alerts.</p>
+          <p className="py-3 text-sm text-ap-crit">{t("alertsFeed.loadFailed")}</p>
         ) : !data || data.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ap-muted">
-            All clear — nothing needs your attention.
-          </p>
+          <p className="py-6 text-center text-sm text-ap-muted">{t("alertsFeed.empty")}</p>
         ) : (
           data.slice(0, 6).map((a) => <AlertRow key={a.id} alert={a} farmId={farmId} />)
         )}
@@ -64,6 +64,7 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
 }
 
 function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): ReactNode {
+  const { t } = useTranslation("insights");
   const navigate = useNavigate();
   const goResolve = () => {
     if (a.prescription_activity_id) {
@@ -101,7 +102,7 @@ function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): React
           {!a.prescription_activity_id ? (
             <>
               <span>·</span>
-              <DataPendingChip>No prescription yet</DataPendingChip>
+              <DataPendingChip>{t("alertsFeed.noPrescription")}</DataPendingChip>
             </>
           ) : null}
         </div>
@@ -111,7 +112,7 @@ function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): React
         onClick={goResolve}
         className="flex-none rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
       >
-        Resolve
+        {t("alertsFeed.resolve")}
       </button>
     </div>
   );

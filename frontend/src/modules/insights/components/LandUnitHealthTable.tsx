@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { listBlocks, type Block } from "@/api/blocks";
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function LandUnitHealthTable({ farmId }: Props): ReactNode {
+  const { t } = useTranslation("insights");
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["blocks", "list", farmId] as const,
@@ -29,14 +31,14 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
           id="land-unit-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
-          Land units
+          {t("landUnits.title")}
         </h2>
         <button
           type="button"
           onClick={() => navigate(`/farms/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
-          Manage →
+          {t("landUnits.manage")}
         </button>
       </header>
       <div className="overflow-x-auto">
@@ -47,20 +49,18 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
             <Skeleton className="h-8 w-full" />
           </div>
         ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">Failed to load blocks.</p>
+          <p className="p-4 text-sm text-ap-crit">{t("landUnits.loadFailed")}</p>
         ) : blocks.length === 0 ? (
-          <p className="p-6 text-center text-sm text-ap-muted">
-            No land units yet — create one to get started.
-          </p>
+          <p className="p-6 text-center text-sm text-ap-muted">{t("landUnits.empty")}</p>
         ) : (
           <table className="w-full text-start text-sm">
             <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
               <tr>
-                <th className="px-4 py-2 text-start font-semibold">Name</th>
-                <th className="px-4 py-2 text-start font-semibold">Type</th>
-                <th className="px-4 py-2 text-start font-semibold">Area</th>
-                <th className="px-4 py-2 text-start font-semibold">Status</th>
-                <th className="px-4 py-2 text-end font-semibold">Action</th>
+                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.name")}</th>
+                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.type")}</th>
+                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.area")}</th>
+                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.status")}</th>
+                <th className="px-4 py-2 text-end font-semibold">{t("landUnits.col.action")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ap-line">
@@ -76,9 +76,10 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
 }
 
 function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode {
+  const { t } = useTranslation("insights");
   const navigate = useNavigate();
   const status: "ok" | "neutral" = b.is_active ? "ok" : "neutral";
-  const statusLabel = b.is_active ? "active" : "inactive";
+  const statusLabel = b.is_active ? t("landUnits.status.active") : t("landUnits.status.inactive");
   return (
     <tr className="hover:bg-ap-line/20">
       <td className="px-4 py-2">
@@ -101,7 +102,7 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
           onClick={() => navigate(`/board/${farmId}?lane=${b.id}`)}
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
         >
-          Plan
+          {t("landUnits.plan")}
         </button>
       </td>
     </tr>
