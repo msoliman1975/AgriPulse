@@ -35,7 +35,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.conditions import WeatherSnapshot
+from app.shared.conditions import WeatherIndexEntry, WeatherSnapshot
 
 # Provider precedence: when a farm has multiple active providers, prefer
 # the operationally-canonical one. Open-Meteo is the only Slice-4
@@ -82,6 +82,49 @@ async def load_snapshot(
         derived_today=derived_today,
         derived_yesterday=derived_yesterday,
     )
+
+
+async def load_index_snapshot(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+) -> dict[str, WeatherIndexEntry]:
+    """Load the latest projected ``weather_index_daily`` row per index.
+
+    Returns ``{index_code: WeatherIndexEntry}`` carrying the most-recent
+    farm-level value + its z-score (``baseline_deviation``). Used by the
+    conditions evaluator for the ``weather_index`` source (PR-W7).
+
+    ``session`` must already be bound to the tenant schema. Returns an
+    empty dict when the farm has no projected rows yet — every
+    ``{source: weather_index}`` predicate then fails closed.
+    """
+    rows = (
+        (
+            await session.execute(
+                text(
+                    """
+                SELECT DISTINCT ON (index_code)
+                    index_code, date, value, baseline_deviation
+                FROM weather_index_daily
+                WHERE farm_id = :farm_id
+                ORDER BY index_code, date DESC
+                """
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {
+        row["index_code"]: WeatherIndexEntry(
+            date=row["date"],
+            value=_to_decimal(row["value"]),
+            baseline_deviation=_to_decimal(row["baseline_deviation"]),
+        )
+        for row in rows
+    }
 
 
 async def _pick_provider(session: AsyncSession, *, farm_id: UUID) -> str | None:

@@ -43,6 +43,7 @@ from app.shared.conditions.models import (
     ParamsValueRef,
     SignalsValueRef,
     ValueRef,
+    WeatherIndexValueRef,
     WeatherValueRef,
     parse_value_ref,
 )
@@ -152,7 +153,7 @@ def _resolve_literal_or_ref(value: Any, ctx: ConditionContext, snapshot: dict[st
     return value
 
 
-def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
+def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
     ref: ValueRef, ctx: ConditionContext
 ) -> Any:
     if isinstance(ref, IndicesValueRef):
@@ -171,6 +172,11 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
         if scope_dict is None:
             return None
         return scope_dict.get(ref.field)
+    if isinstance(ref, WeatherIndexValueRef):
+        wx_entry = ctx.weather_indices.get(ref.index_code)
+        if wx_entry is None:
+            return None
+        return getattr(wx_entry, ref.key, None)
     if isinstance(ref, SignalsValueRef):
         sig_entry = ctx.signals.get(ref.code)
         if sig_entry is None:
@@ -186,11 +192,13 @@ def _resolve(  # noqa: PLR0911 - dispatch over ValueRef kinds
     return None
 
 
-def _ref_key(ref: ValueRef) -> str:
+def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef kinds
     if isinstance(ref, IndicesValueRef):
         return f"indices.{ref.index_code}.{ref.key}"
     if isinstance(ref, WeatherValueRef):
         return f"weather.{ref.scope}.{ref.field}"
+    if isinstance(ref, WeatherIndexValueRef):
+        return f"weather_index.{ref.index_code}.{ref.key}"
     if isinstance(ref, SignalsValueRef):
         return f"signals.{ref.code}.{ref.key}"
     if isinstance(ref, GridValueRef):

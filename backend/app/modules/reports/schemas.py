@@ -232,6 +232,14 @@ class WeatherSummaryStats(BaseModel):
     et0_mm_avg_daily: Decimal | None
     gdd_base10_total: Decimal | None
     gdd_cumulative_season: Decimal | None
+    # Anomaly roll-up vs the day-of-year climatology baselines (PR-W6).
+    # Counts days in the window whose first-class weather index ran >=2 sigma
+    # from the seasonal normal — None when no baseline data covers the
+    # window yet (climatology needs ≥3 samples/DOY). `days_with_anomaly`
+    # is the denominator (days that had any z-score at all).
+    days_with_anomaly: int | None = None
+    heat_anomaly_days: int | None = None
+    et0_anomaly_days: int | None = None
 
 
 class WeatherDailyPoint(BaseModel):
@@ -247,6 +255,12 @@ class WeatherDailyPoint(BaseModel):
     et0_mm: Decimal | None
     gdd_base10: Decimal | None
     gdd_cumulative_season: Decimal | None
+    # Z-scores vs the seasonal (day-of-year) climatology for the first-class
+    # weather indices (PR-W6). None where no baseline covers that day yet
+    # (or, for rainfall, where the arid-climate std is ~0 so no z is defined).
+    temp_anomaly_z: Decimal | None = None
+    precip_anomaly_z: Decimal | None = None
+    et0_anomaly_z: Decimal | None = None
 
 
 class WeatherCropContext(BaseModel):

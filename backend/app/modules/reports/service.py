@@ -498,6 +498,9 @@ class ReportsService:
                 et0_mm=r["et0_mm_daily"],
                 gdd_base10=r["gdd_base10"],
                 gdd_cumulative_season=r["gdd_cumulative_base10_season"],
+                temp_anomaly_z=r["temp_anomaly_z"],
+                precip_anomaly_z=r["precip_anomaly_z"],
+                et0_anomaly_z=r["et0_anomaly_z"],
             )
             for r in rows
         ]
@@ -919,6 +922,12 @@ def _dsum(values: list[Decimal]) -> Decimal:
     return total
 
 
+# z-score at/above which a day counts as a climatology anomaly (~2 sigma,
+# i.e. outside the 95% seasonal band). Matches the Insights strip's
+# "critical" anomaly chip (|z| >= 2) so report and map tell one story.
+_ANOMALY_Z = Decimal("2")
+
+
 def _weather_stats(rows: list[dict[str, Any]]) -> WeatherSummaryStats:
     """Roll a daily weather series up to window stats. Pure (no I/O) so
     it's cheap to unit-test. Rows are date-ascending."""
@@ -940,6 +949,25 @@ def _weather_stats(rows: list[dict[str, Any]]) -> WeatherSummaryStats:
             gdd_cumulative = r["gdd_cumulative_base10_season"]
             break
 
+    # Anomaly roll-up (PR-W6). `days_with_anomaly` is how many days had any
+    # z-score at all (the climatology covered them); the per-index counts
+    # are days that ran >=2 sigma hot / above-normal ET. All None when the
+    # window predates baselines so the FE hides the row instead of 0s.
+    temp_z = _vals("temp_anomaly_z")
+    et0_z = _vals("et0_anomaly_z")
+    has_any_z = bool(temp_z or et0_z or _vals("precip_anomaly_z"))
+    days_with_anomaly = (
+        sum(
+            1
+            for r in rows
+            if r.get("temp_anomaly_z") is not None
+            or r.get("et0_anomaly_z") is not None
+            or r.get("precip_anomaly_z") is not None
+        )
+        if has_any_z
+        else None
+    )
+
     return WeatherSummaryStats(
         days_with_data=len(rows),
         temp_min_c=min(temp_mins) if temp_mins else None,
@@ -951,6 +979,9 @@ def _weather_stats(rows: list[dict[str, Any]]) -> WeatherSummaryStats:
         et0_mm_avg_daily=(_q2(_dsum(et0) / len(et0)) if et0 else None),
         gdd_base10_total=_q2(_dsum(gdd)) if gdd else None,
         gdd_cumulative_season=_q2(gdd_cumulative),
+        days_with_anomaly=days_with_anomaly,
+        heat_anomaly_days=(sum(1 for z in temp_z if z >= _ANOMALY_Z) if temp_z else None),
+        et0_anomaly_days=(sum(1 for z in et0_z if z >= _ANOMALY_Z) if et0_z else None),
     )
 
 
@@ -962,14 +993,30 @@ async def _select_weather_daily(
     from sqlalchemy import bindparam, text
     from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
+    # LEFT JOIN the first-class weather-index z-scores (PR-W6) per day so
+    # the report can surface anomalies against the seasonal climatology.
+    # Joins stay NULL until the baseline sweep has ≥3 samples/DOY — the
+    # report then just shows blank anomaly cells, never errors.
     sql = text(
         """
-        SELECT date, temp_min_c, temp_max_c, temp_mean_c,
-               precip_mm_daily, et0_mm_daily,
-               gdd_base10, gdd_cumulative_base10_season
-        FROM weather_derived_daily
-        WHERE farm_id = :farm_id AND date >= :since AND date <= :until
-        ORDER BY date ASC
+        SELECT wdd.date, wdd.temp_min_c, wdd.temp_max_c, wdd.temp_mean_c,
+               wdd.precip_mm_daily, wdd.et0_mm_daily,
+               wdd.gdd_base10, wdd.gdd_cumulative_base10_season,
+               t.baseline_deviation AS temp_anomaly_z,
+               r.baseline_deviation AS precip_anomaly_z,
+               e.baseline_deviation AS et0_anomaly_z
+        FROM weather_derived_daily wdd
+        LEFT JOIN weather_index_daily t
+          ON t.farm_id = wdd.farm_id AND t.date = wdd.date
+          AND t.index_code = 'temperature'
+        LEFT JOIN weather_index_daily r
+          ON r.farm_id = wdd.farm_id AND r.date = wdd.date
+          AND r.index_code = 'rainfall'
+        LEFT JOIN weather_index_daily e
+          ON e.farm_id = wdd.farm_id AND e.date = wdd.date
+          AND e.index_code = 'evapotranspiration'
+        WHERE wdd.farm_id = :farm_id AND wdd.date >= :since AND wdd.date <= :until
+        ORDER BY wdd.date ASC
         """
     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
