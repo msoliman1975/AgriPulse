@@ -14,6 +14,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import type { ActivityType, BoardActivity, BoardBlock, BoardResourceChip } from "@/api/plans";
 import { Skeleton } from "@/components/Skeleton";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
 import { useBoard } from "@/queries/board";
@@ -121,6 +122,7 @@ function daysInMonth(monthStart: Date): number {
  */
 export function BoardPage(): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   const { farmId } = useParams<{ farmId: string }>();
   const canManage = useCapability("plan.manage");
   const isMobile = useIsMobile();
@@ -326,12 +328,12 @@ export function BoardPage(): ReactNode {
     const last = range.columns[range.columns.length - 1]?.start;
     if (!first || !last) return "";
     if (viewMode === "week") {
-      return `${format(parseISO(first), "MMM d")} – ${format(parseISO(last), "MMM d, yyyy")}`;
+      return `${format(parseISO(first), "MMM d", { locale: dateLocale })} – ${format(parseISO(last), "MMM d, yyyy", { locale: dateLocale })}`;
     }
     if (viewMode === "month") {
-      return format(parseISO(first), "MMMM yyyy");
+      return format(parseISO(first), "MMMM yyyy", { locale: dateLocale });
     }
-    return `${format(parseISO(first), "MMM")} – ${format(parseISO(last), "MMM yyyy")}`;
+    return `${format(parseISO(first), "MMM", { locale: dateLocale })} – ${format(parseISO(last), "MMM yyyy", { locale: dateLocale })}`;
   })();
 
   return (
@@ -636,6 +638,7 @@ function BoardGrid({
   onRecDrop,
 }: BoardGridProps): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   if (blocks.length === 0) {
     return (
       <p className="rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
@@ -647,9 +650,11 @@ function BoardGrid({
     const d = parseISO(col.start);
     if (col.unit === "day") {
       // "Mon\n12" — two lines so day-of-week label survives narrow cells.
-      return viewMode === "week" ? format(d, "EEE d") : format(d, "d");
+      return viewMode === "week"
+        ? format(d, "EEE d", { locale: dateLocale })
+        : format(d, "d", { locale: dateLocale });
     }
-    return format(d, "MMM");
+    return format(d, "MMM", { locale: dateLocale });
   };
   // Cap visible chips per cell — month-day cells are narrow (~56px),
   // season month-cells are mid-width but cover ~30 days of activity.

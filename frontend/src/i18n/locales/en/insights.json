@@ -160,5 +160,30 @@
     "title": "This week's activities",
     "plan": "Plan →",
     "empty": "Nothing scheduled this week."
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
+  },
+  "unitType": {
+    "block": "Block",
+    "pivot": "Pivot",
+    "pivot_sector": "Pivot sector"
+  },
+  "activityType": {
+    "planting": "Planting",
+    "fertilizing": "Fertilizing",
+    "spraying": "Spraying",
+    "pruning": "Pruning",
+    "harvesting": "Harvesting",
+    "irrigation": "Irrigation",
+    "soil_prep": "Soil prep",
+    "observation": "Observation",
+    "pollination": "Pollination",
+    "growth_regulator": "Growth regulator",
+    "thinning": "Thinning",
+    "bagging": "Bagging",
+    "hilling": "Hilling"
   }
 }

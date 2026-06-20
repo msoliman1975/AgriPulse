@@ -132,5 +132,10 @@
     "start": "Start",
     "skip": "Skip",
     "complete": "Complete"
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
   }
 }

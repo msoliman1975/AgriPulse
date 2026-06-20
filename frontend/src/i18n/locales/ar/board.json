@@ -132,5 +132,10 @@
     "start": "بدء",
     "skip": "تخطّي",
     "complete": "إكمال"
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
   }
 }

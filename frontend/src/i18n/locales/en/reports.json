@@ -186,5 +186,10 @@
       "severity": "Severity",
       "detail": "Notes"
     }
+  },
+  "severity": {
+    "info": "info",
+    "warning": "warning",
+    "critical": "critical"
   }
 }

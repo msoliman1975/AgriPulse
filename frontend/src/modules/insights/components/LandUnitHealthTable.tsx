@@ -89,7 +89,7 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
           {b.irrigation_system ? ` · ${b.irrigation_system}` : ""}
         </div>
       </td>
-      <td className="px-4 py-2 text-ap-muted">{b.unit_type.replace("_", " ")}</td>
+      <td className="px-4 py-2 text-ap-muted">{t(`unitType.${b.unit_type}`)}</td>
       <td className="px-4 py-2 text-ap-muted">
         {b.area_value.toFixed(1)} {b.area_unit}
       </td>

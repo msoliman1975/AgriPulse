@@ -160,5 +160,30 @@
     "title": "أنشطة هذا الأسبوع",
     "plan": "الخطة ←",
     "empty": "لا توجد أنشطة مجدولة هذا الأسبوع."
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "unitType": {
+    "block": "قطعة",
+    "pivot": "محور",
+    "pivot_sector": "قطاع محور"
+  },
+  "activityType": {
+    "planting": "زراعة",
+    "fertilizing": "تسميد",
+    "spraying": "رش",
+    "pruning": "تقليم",
+    "harvesting": "حصاد",
+    "irrigation": "ري",
+    "soil_prep": "تحضير التربة",
+    "observation": "ملاحظة",
+    "pollination": "تلقيح",
+    "growth_regulator": "منظم نمو",
+    "thinning": "خف الثمار",
+    "bagging": "تكييس",
+    "hilling": "ترديم"
   }
 }
