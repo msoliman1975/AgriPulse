@@ -31,13 +31,21 @@ global:
   #   sweep + farm-scoped REST timeseries/summary + Insights weather strip.
   #   Public migration 0037 + tenant 0047 run on PreSync. Backend + frontend →
   #   all three bumped. tile-server unchanged stays 9d140cc.
+  # 21635de = #272 + #273 (tip of main, both squash-merged together):
+  #   #272 auto-grid driven by per-block max area (not cell size) — backend
+  #     farms module + mapnext FE + i18n.
+  #   #273 scientific Egyptian plan templates + extended activity vocabulary —
+  #     seeds date-palm phenology + potato/date varieties + mango/potato/date
+  #     cultivar templates. Public migrations 0038-0042 (seed data) + tenant
+  #     0048 (activity_type extended vocab) run on PreSync. Backend + frontend.
+  #   All three bumped; tile-server unchanged stays 9d140cc.
   images:
     api:
-      tag: "75023fb"
+      tag: "21635de"
     workers:
-      tag: "75023fb"
+      tag: "21635de"
     frontend:
-      tag: "75023fb"
+      tag: "21635de"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
