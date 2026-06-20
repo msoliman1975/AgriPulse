@@ -229,5 +229,29 @@
     "willChange": "will change",
     "applying": "Applying…",
     "confirmApply": "Confirm apply"
+  },
+  "gridPopup": {
+    "title": "Grid cell",
+    "asOf": "as of {{time}}",
+    "min": "Min",
+    "mean": "Mean",
+    "max": "Max",
+    "blockAvg": "Block avg",
+    "aboutAvg": "~ avg",
+    "belowAvg": "{{z}}σ below avg",
+    "aboveAvg": "{{z}}σ above avg",
+    "flagHint": "Flagged when ≥1.5σ below the block average.",
+    "coordinate": "Coordinate",
+    "block": "Block",
+    "comingSoon": "Coming soon",
+    "scout": "Scout this area →",
+    "status": {
+      "normal": "Normal",
+      "low": "Low",
+      "high": "High"
+    }
+  },
+  "sparkline": {
+    "notEnough": "Not enough data for a trend."
   }
 }
