@@ -56,6 +56,8 @@ from app.modules.weather.index_projection import (
 from app.modules.weather.providers.open_meteo import OpenMeteoProvider
 from app.modules.weather.providers.protocol import WeatherProvider
 from app.modules.weather.repository import WeatherRepository
+from app.modules.weather.risk import RiskBlockContext, evaluate_risks
+from app.modules.weather.risk_projection import build_risk_window
 from app.modules.weather.timezone import tz_for_centroid
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
@@ -691,3 +693,133 @@ async def _discover_due_subscriptions_async() -> dict[str, int]:
             fetch_weather.delay(str(farm_id), tenant_schema, provider_code)
             enqueued += 1
     return {"tenants_scanned": len(tenant_schemas), "enqueued": enqueued}
+
+
+# --- compute_weather_risk (Phase 2) ----------------------------------------
+
+# Trailing daily window the risk accumulation models integrate over. Matches
+# the registry's per-model default; one window serves all V1 mango models.
+_RISK_WINDOW_DAYS = 14
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.compute_risk_for_tenant",
+    bind=False,
+    ignore_result=True,
+)
+def compute_weather_risk_for_tenant(tenant_schema: str) -> dict[str, Any]:
+    """Score every active crop block in one tenant and upsert weather_risk_daily."""
+    return _run_task(_compute_weather_risk_for_tenant_async(tenant_schema))
+
+
+async def _compute_weather_risk_for_tenant_async(tenant_schema: str) -> dict[str, Any]:
+    factory = AsyncSessionLocal()
+
+    # Step 1: which blocks have a current crop, grouped by their farm.
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        blocks = await repo.list_active_blocks_with_current_crop()
+
+    by_farm: dict[UUID, list[dict[str, Any]]] = {}
+    for b in blocks:
+        by_farm.setdefault(b["farm_id"], []).append(b)
+
+    rows_written = 0
+    blocks_scored = 0
+    for farm_id, farm_blocks in by_farm.items():
+        # Step 2: one farm-centroid weather window, reused for all its blocks.
+        async with factory() as session, session.begin():
+            await _set_tenant_context(session, tenant_schema)
+            repo = WeatherRepository(session)
+            centroid = await repo.get_farm_centroid(farm_id)
+            if centroid is None:
+                continue
+            tz = tz_for_centroid(centroid["latitude"], centroid["longitude"])
+            now_utc = datetime.now(UTC)
+            obs_rows = await repo.read_observations(
+                farm_id=farm_id,
+                provider_code=None,
+                since=now_utc - timedelta(days=_RISK_WINDOW_DAYS + 1),
+                until=now_utc + timedelta(days=1),
+            )
+
+        daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
+        as_of = datetime.now(tz).date()
+        window = build_risk_window(
+            daily, radwind_by_date, as_of=as_of, window_days=_RISK_WINDOW_DAYS
+        )
+        if not window:
+            continue
+
+        # Step 3: score each block against the shared window + upsert.
+        async with factory() as session, session.begin():
+            await _set_tenant_context(session, tenant_schema)
+            repo = WeatherRepository(session)
+            for b in farm_blocks:
+                ctx = RiskBlockContext(
+                    crop_path=b["crop_path"],
+                    growth_stage=b["growth_stage"],
+                    canopy_size_class=b["canopy_size_class"],
+                )
+                scores = evaluate_risks(window, ctx)
+                if not scores:
+                    continue
+                for s in scores:
+                    await repo.upsert_weather_risk_daily(
+                        block_id=b["block_id"],
+                        date=as_of,
+                        risk_code=s.risk_code,
+                        score=s.score,
+                        level=s.level.value,
+                        inputs=s.inputs,
+                    )
+                    rows_written += 1
+                blocks_scored += 1
+
+    _log.info(
+        "weather_risk_computed",
+        tenant_schema=tenant_schema,
+        farms=len(by_farm),
+        blocks_scored=blocks_scored,
+        rows_written=rows_written,
+    )
+    return {
+        "farms": len(by_farm),
+        "blocks_scored": blocks_scored,
+        "rows_written": rows_written,
+    }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.compute_risk_daily_sweep",
+    bind=False,
+    ignore_result=True,
+)
+def compute_weather_risk_daily_sweep() -> dict[str, int]:
+    """Beat sweep: walk every active tenant and queue per-tenant risk computes."""
+    return _run_task(_compute_weather_risk_daily_sweep_async())
+
+
+async def _compute_weather_risk_daily_sweep_async() -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        compute_weather_risk_for_tenant.delay(schema)
+        enqueued += 1
+    return {"tenants_scanned": len(schemas), "enqueued": enqueued}

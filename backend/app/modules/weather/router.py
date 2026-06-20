@@ -43,6 +43,8 @@ from app.modules.weather.schemas import (
     WeatherIndexSummaryResponse,
     WeatherIndexTimeseriesResponse,
     WeatherProviderRead,
+    WeatherRiskSummaryResponse,
+    WeatherRiskTimeseriesResponse,
 )
 from app.modules.weather.service import WeatherServiceImpl, get_weather_service
 from app.shared.auth.context import RequestContext
@@ -267,6 +269,73 @@ async def get_weather_index_summary(
 
     return WeatherIndexSummaryResponse.model_validate(
         {"farm_id": farm_id, "as_of": datetime.now(UTC), "indices": list(entries)}
+    )
+
+
+# --- Weather risk (Phase 2) ------------------------------------------------
+
+
+@router.get(
+    "/farms/{farm_id}/blocks/{block_id}/weather-risk/{risk_code}/timeseries",
+    response_model=WeatherRiskTimeseriesResponse,
+    summary="Daily disease/pest risk-score series for a block.",
+)
+async def get_weather_risk_timeseries(
+    farm_id: UUID,
+    block_id: UUID,
+    risk_code: str,
+    from_date: date_type | None = Query(default=None, alias="from"),
+    to_date: date_type | None = Query(default=None, alias="to"),
+    context: RequestContext = Depends(
+        requires_capability("weather_risk.read", farm_id_param="farm_id")
+    ),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> WeatherRiskTimeseriesResponse:
+    """One pathogen's daily 0-100 risk series for a block over ``[from, to)``.
+
+    Nested under the farm so RBAC is the farm-scoped ``weather_risk.read``; the
+    repository's ``blocks`` join also enforces the block belongs to ``farm_id``
+    (an empty series otherwise), so a caller cannot read across farm scopes.
+    """
+    _ensure_tenant(context)
+    repo = WeatherRepository(tenant_session)
+    rows = await repo.read_weather_risk_timeseries(
+        farm_id=farm_id,
+        block_id=block_id,
+        risk_code=risk_code,
+        since=from_date,
+        until=to_date,
+    )
+    return WeatherRiskTimeseriesResponse.model_validate(
+        {
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "risk_code": risk_code,
+            "points": list(rows),
+        }
+    )
+
+
+@router.get(
+    "/farms/{farm_id}/weather-risk/summary",
+    response_model=WeatherRiskSummaryResponse,
+    summary="Latest disease/pest risk score per block per pathogen.",
+)
+async def get_weather_risk_summary(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("weather_risk.read", farm_id_param="farm_id")
+    ),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> WeatherRiskSummaryResponse:
+    """Map-overlay data: the most recent score per block per pathogen across
+    the farm. Blocks with no risk rows yet simply do not appear.
+    """
+    _ensure_tenant(context)
+    repo = WeatherRepository(tenant_session)
+    rows = await repo.read_weather_risk_summary(farm_id=farm_id)
+    return WeatherRiskSummaryResponse.model_validate(
+        {"farm_id": farm_id, "as_of": datetime.now(UTC), "risks": list(rows)}
     )
 
 

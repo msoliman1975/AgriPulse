@@ -75,6 +75,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.weather_baseline_recompute_seconds),
         "options": {"queue": "light"},
     },
+    # Daily disease/pest risk: walk active tenants and enqueue a per-tenant
+    # `weather.compute_risk_for_tenant`, which scores each crop block against a
+    # trailing weather window and upserts `weather_risk_daily` (Weather-Indices
+    # PR-R2). Light queue — pure accumulation math.
+    "weather.compute_risk_daily_sweep": {
+        "task": "weather.compute_risk_daily_sweep",
+        "schedule": float(_settings.weather_risk_compute_seconds),
+        "options": {"queue": "light"},
+    },
     # PR-F (sunset rules engine): the rules-based alerts sweep is
     # disabled. Alerts now flow from decision-tree leaves with
     # `kind: alert` via the recommendations engine sweep below; the

@@ -234,6 +234,10 @@ capabilities:
     description: Subscribe a block to a weather provider or revoke a subscription.
     scope: farm
     status: active
+  weather_risk.read:
+    description: View weather-driven disease/pest risk scores per block.
+    scope: farm
+    status: active
 
   # --- Custom signals --------------------------------------------------
   signal.read:

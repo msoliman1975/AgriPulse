@@ -377,3 +377,37 @@ class WeatherIndexBaseline(Base):
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class WeatherRiskDaily(Base):
+    """`tenant_<id>.weather_risk_daily` — per-(block, day, pathogen) risk score.
+
+    Weather's *spatial* expression (Weather-Indices Phase 2): raw indices are
+    farm-uniform, but disease/pest pressure folds in each block's crop +
+    growth stage, so it is block-keyed. Written daily by
+    `weather.compute_risk_daily_sweep` from the pure `weather.risk` registry;
+    `inputs` holds the favourable-condition accumulation that produced the
+    score (the "why"). Migration 0050.
+    """
+
+    __tablename__ = "weather_risk_daily"
+    __table_args__: tuple[PrimaryKeyConstraint | dict[str, object], ...] = (
+        PrimaryKeyConstraint("block_id", "date", "risk_code", name="pk_weather_risk_daily"),
+        {},
+    )
+
+    block_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("blocks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    date: Mapped[date_type] = mapped_column(Date, nullable=False)
+    risk_code: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    level: Mapped[str] = mapped_column(Text, nullable=False)
+    inputs: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

@@ -139,6 +139,47 @@ class WeatherIndexSummaryResponse(BaseModel):
     indices: list[WeatherIndexSummaryEntry]
 
 
+class WeatherRiskTimeseriesPoint(BaseModel):
+    """One day's disease/pest risk score for a block + pathogen.
+
+    ``inputs`` is the favourable-condition accumulation that produced the
+    score (the "why"), Decimals serialised as strings.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date_type
+    risk_code: str
+    score: int
+    level: str
+    inputs: dict[str, Any]
+
+
+class WeatherRiskTimeseriesResponse(BaseModel):
+    farm_id: UUID
+    block_id: UUID
+    risk_code: str
+    points: list[WeatherRiskTimeseriesPoint]
+
+
+class WeatherRiskSummaryEntry(BaseModel):
+    """Latest risk score for one block + pathogen — drives the map overlay."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    block_id: UUID
+    risk_code: str
+    date: date_type
+    score: int
+    level: str
+
+
+class WeatherRiskSummaryResponse(BaseModel):
+    farm_id: UUID
+    as_of: datetime
+    risks: list[WeatherRiskSummaryEntry]
+
+
 class HourlyObservationRead(BaseModel):
     """One row of `weather_observations`. All numeric fields nullable
     because Open-Meteo can return NULL for individual variables on
