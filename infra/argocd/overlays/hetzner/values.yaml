@@ -44,13 +44,22 @@ global:
   #   Weather+GDD report anomaly columns/strip + FE authoring field. No
   #   migrations (reads weather_index_daily/baselines from #271). Backend + FE
   #   → api + workers + frontend bumped; tile-server unchanged stays 9d140cc.
+  # 7c4129f = #276 + #277 (tip of main):
+  #   #276 fix(farms): restore weather+imagery subscriptions on block/farm
+  #     reactivation (asymmetric-cascade bug). Tenant migration 0049 adds
+  #     deactivated_by_cascade — runs on PreSync. Backend.
+  #   #277 feat(insights): clickable Land-units→/labs/map + Upcoming→/board
+  #     tiles, trend-chart index description + From→To date filter. Frontend.
+  #   Also bumps WEATHER_FORECAST_HOURS 120→168 (below) so the Insights weather
+  #   chart's 7-day request isn't clipped to 5. Backend + FE → api + workers +
+  #   frontend bumped; tile-server unchanged stays 9d140cc.
   images:
     api:
-      tag: "3424d65"
+      tag: "7c4129f"
     workers:
-      tag: "3424d65"
+      tag: "7c4129f"
     frontend:
-      tag: "3424d65"
+      tag: "7c4129f"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
@@ -87,6 +96,10 @@ env:
   # No Tempo on Hetzner — disable OTEL so the SDK doesn't retry-storm a
   # non-existent OTLP collector.
   OTEL_SDK_DISABLED: "true"
+  # Forecast horizon stored per fetch. Default is 120h (5d); the Insights
+  # weather chart requests a 7-day horizon, so bump to 168h (7d) — within
+  # Open-Meteo's free-tier forecast range — so "next week" isn't clipped.
+  WEATHER_FORECAST_HOURS: "168"
 # Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
 # single shared overlay applies to every service chart, so api/workers/tile
 # all load both — harmless (same R2 account creds; unused keys are ignored).
