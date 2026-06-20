@@ -60,6 +60,20 @@ class CascadeCounts:
         }
 
 
+@dataclass(frozen=True)
+class RestoreCounts:
+    """Counts re-activated by the reactivation (reverse) cascade."""
+
+    weather_subs_reactivated: int = 0
+    imagery_subs_reactivated: int = 0
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "weather_subs_reactivated": self.weather_subs_reactivated,
+            "imagery_subs_reactivated": self.imagery_subs_reactivated,
+        }
+
+
 def _empty(block_ids: Iterable[UUID]) -> bool:
     return not list(block_ids)
 
@@ -207,12 +221,16 @@ async def apply_block_cascade(
         ),
         {"actor": actor_user_id, "block_ids": ids, "cutoff": cutoff_date},
     )
+    # `deactivated_by_cascade` records that *this* cascade turned the sub
+    # off, so reactivation (restore_block_cascade) can re-enable only these
+    # rows and leave operator-paused subs alone (migration 0049).
     weather_n = await _execute_rowcount(
         session,
         text(
             """
             UPDATE weather_subscriptions
             SET is_active = FALSE,
+                deactivated_by_cascade = TRUE,
                 updated_at = now()
             WHERE block_id = ANY(:block_ids) AND is_active = TRUE
             """
@@ -225,6 +243,7 @@ async def apply_block_cascade(
             """
             UPDATE imagery_aoi_subscriptions
             SET is_active = FALSE,
+                deactivated_by_cascade = TRUE,
                 updated_at = now()
             WHERE block_id = ANY(:block_ids) AND is_active = TRUE
             """
@@ -240,6 +259,63 @@ async def apply_block_cascade(
         plan_activities_skipped=acts_n,
         weather_subs_deactivated=weather_n,
         imagery_subs_deactivated=imagery_n,
+    )
+
+
+async def restore_block_cascade(
+    *,
+    session: AsyncSession,
+    block_ids: Iterable[UUID],
+    actor_user_id: UUID | None,
+) -> RestoreCounts:
+    """Reverse the subscription half of ``apply_block_cascade``.
+
+    Re-activates only the subscriptions a prior cascade turned off
+    (``deactivated_by_cascade = TRUE``) and clears the flag, so a sub the
+    operator had manually paused before the block/farm was inactivated
+    stays paused. Idempotent.
+
+    The alerts / irrigation / plan-activity side effects are deliberately
+    NOT reversed: resolving an alert or skipping a past-due activity is a
+    one-way action, and the records the cascade touched may since have
+    moved on. Only subscriptions — the ongoing data feeds — are restored.
+    """
+    ids = list(block_ids)
+    if not ids:
+        return RestoreCounts()
+    # No `updated_by` column on the subscription tables; actor is captured
+    # in the caller's audit record.
+    del actor_user_id
+
+    weather_n = await _execute_rowcount(
+        session,
+        text(
+            """
+            UPDATE weather_subscriptions
+            SET is_active = TRUE,
+                deactivated_by_cascade = FALSE,
+                updated_at = now()
+            WHERE block_id = ANY(:block_ids) AND deactivated_by_cascade = TRUE
+            """
+        ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+        {"block_ids": ids},
+    )
+    imagery_n = await _execute_rowcount(
+        session,
+        text(
+            """
+            UPDATE imagery_aoi_subscriptions
+            SET is_active = TRUE,
+                deactivated_by_cascade = FALSE,
+                updated_at = now()
+            WHERE block_id = ANY(:block_ids) AND deactivated_by_cascade = TRUE
+            """
+        ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+        {"block_ids": ids},
+    )
+    return RestoreCounts(
+        weather_subs_reactivated=weather_n,
+        imagery_subs_reactivated=imagery_n,
     )
 
 

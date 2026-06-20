@@ -284,6 +284,102 @@ async def test_reactivate_block_clears_active_window(
 
 
 @pytest.mark.asyncio
+async def test_reactivate_block_restores_only_cascade_deactivated_subs(
+    admin_session: AsyncSession,
+) -> None:
+    """Regression (migration 0049): block reactivation re-enables the subs
+    the inactivation cascade turned off, but leaves operator-paused subs
+    alone."""
+    tenant, context = await _bootstrap(admin_session, "life-subs")
+    app = build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm = await c.post(
+            "/api/v1/farms",
+            json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
+        )
+        farm_id = farm.json()["id"]
+        block = await c.post(
+            f"/api/v1/farms/{farm_id}/blocks",
+            json={"code": "B1", "boundary": _square_polygon(31.201, 30.001)},
+        )
+        block_id = block.json()["id"]
+
+    # Seed two weather subs (one ACTIVE — the cascade will turn it off; one
+    # already-paused by the operator — both cascade and reactivation must
+    # leave it alone) + one ACTIVE imagery sub.
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+    await admin_session.execute(
+        text(
+            """
+            INSERT INTO weather_subscriptions
+                (id, block_id, provider_code, is_active, created_at, updated_at)
+            VALUES
+                (gen_random_uuid(), :bid, 'open_meteo', TRUE, now(), now()),
+                (gen_random_uuid(), :bid, 'open_meteo', FALSE, now(), now())
+            """
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": UUID(block_id)},
+    )
+    await admin_session.execute(
+        text(
+            """
+            INSERT INTO imagery_aoi_subscriptions
+                (id, block_id, product_id, is_active, created_at, updated_at)
+            VALUES (gen_random_uuid(), :bid, gen_random_uuid(), TRUE, now(), now())
+            """
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": UUID(block_id)},
+    )
+    await admin_session.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        inact = await c.post(f"/api/v1/blocks/{block_id}/inactivate", json={"reason": "t"})
+        assert inact.status_code == 200, inact.text
+        # Only the ACTIVE subs are counted as deactivated.
+        assert inact.json()["weather_subs_deactivated"] == 1
+        assert inact.json()["imagery_subs_deactivated"] == 1
+
+        react = await c.post(f"/api/v1/blocks/{block_id}/reactivate")
+        assert react.status_code == 200, react.text
+        assert react.json()["weather_subs_reactivated"] == 1
+        assert react.json()["imagery_subs_reactivated"] == 1
+
+    # The cascade-deactivated weather sub is active again (flag cleared); the
+    # operator-paused one stays inactive.
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+    rows = (
+        await admin_session.execute(
+            text(
+                """
+                SELECT is_active, deactivated_by_cascade
+                FROM weather_subscriptions WHERE block_id = :bid
+                """
+            ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+            {"bid": UUID(block_id)},
+        )
+    ).all()
+    actives = [r for r in rows if r.is_active]
+    paused = [r for r in rows if not r.is_active]
+    assert len(actives) == 1
+    assert actives[0].deactivated_by_cascade is False
+    assert len(paused) == 1
+    assert paused[0].deactivated_by_cascade is False
+
+    img = (
+        await admin_session.execute(
+            text(
+                "SELECT is_active, deactivated_by_cascade FROM imagery_aoi_subscriptions "
+                "WHERE block_id = :bid"
+            ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+            {"bid": UUID(block_id)},
+        )
+    ).one()
+    assert img.is_active is True
+    assert img.deactivated_by_cascade is False
+
+
+@pytest.mark.asyncio
 async def test_inactivate_farm_cascades_to_blocks(
     admin_session: AsyncSession,
 ) -> None:

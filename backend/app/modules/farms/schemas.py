@@ -366,6 +366,10 @@ class FarmReactivationRequest(BaseModel):
 class FarmReactivationResponse(BaseModel):
     farm_id: UUID
     restored_block_count: int
+    # Subscriptions re-enabled by reversing the inactivation cascade (only
+    # those the cascade itself had turned off). 0 when restore_blocks=False.
+    weather_subs_reactivated: int = 0
+    imagery_subs_reactivated: int = 0
 
 
 # ---------- Blocks ----------------------------------------------------------
@@ -488,6 +492,10 @@ class BlockInactivationResponse(BlockInactivationPreviewResponse):
 class BlockReactivationResponse(BaseModel):
     block_id: UUID
     farm_id: UUID
+    # Subscriptions re-enabled by reversing the inactivation cascade (only
+    # those the cascade itself had turned off).
+    weather_subs_reactivated: int = 0
+    imagery_subs_reactivated: int = 0
 
 
 # ---------- Pivot + sectors atomic create ---------------------------------

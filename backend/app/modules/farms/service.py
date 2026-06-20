@@ -803,11 +803,18 @@ class FarmServiceImpl:
         """
         await self._repo.reactivate_farm(farm_id=farm_id, actor_user_id=actor_user_id)
         restored = 0
+        counts = _cascade.RestoreCounts()
         if restore_blocks:
             inactive_ids = await self._list_inactive_block_ids_for_farm(farm_id)
             for bid in inactive_ids:
                 await self._repo.reactivate_block(block_id=bid, actor_user_id=actor_user_id)
                 restored += 1
+            # Restore the subs the farm cascade turned off on those blocks.
+            counts = await _cascade.restore_block_cascade(
+                session=self._tenant_session,
+                block_ids=inactive_ids,
+                actor_user_id=actor_user_id,
+            )
         await self._tenant_session.flush()
 
         await self._audit.record(
@@ -817,7 +824,7 @@ class FarmServiceImpl:
             subject_kind="farm",
             subject_id=farm_id,
             farm_id=farm_id,
-            details={"restored_block_count": restored},
+            details={"restored_block_count": restored, **counts.as_dict()},
             correlation_id=correlation_id,
         )
         self._bus.publish(
@@ -827,7 +834,7 @@ class FarmServiceImpl:
                 actor_user_id=actor_user_id,
             )
         )
-        return {"farm_id": farm_id, "restored_block_count": restored}
+        return {"farm_id": farm_id, "restored_block_count": restored, **counts.as_dict()}
 
     async def _list_inactive_block_ids_for_farm(self, farm_id: UUID) -> tuple[UUID, ...]:
         """Block IDs under a farm that currently have ``deleted_at`` stamped."""
@@ -1131,6 +1138,13 @@ class FarmServiceImpl:
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
         farm_id = await self._repo.reactivate_block(block_id=block_id, actor_user_id=actor_user_id)
+        # Reverse the subscription half of the inactivation cascade — restore
+        # only the subs this block's cascade turned off (migration 0049).
+        counts = await _cascade.restore_block_cascade(
+            session=self._tenant_session,
+            block_ids=[block_id],
+            actor_user_id=actor_user_id,
+        )
         await self._tenant_session.flush()
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -1139,13 +1153,13 @@ class FarmServiceImpl:
             subject_kind="block",
             subject_id=block_id,
             farm_id=farm_id,
-            details={},
+            details={**counts.as_dict()},
             correlation_id=correlation_id,
         )
         self._bus.publish(
             BlockReactivatedV1(block_id=block_id, farm_id=farm_id, actor_user_id=actor_user_id)
         )
-        return {"block_id": block_id, "farm_id": farm_id}
+        return {"block_id": block_id, "farm_id": farm_id, **counts.as_dict()}
 
     # ---- Pivots + sectors -------------------------------------------
 
