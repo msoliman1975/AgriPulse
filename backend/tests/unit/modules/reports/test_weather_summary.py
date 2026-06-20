@@ -13,7 +13,20 @@ from app.modules.reports import service as svc_module
 from app.modules.reports.service import ReportsService, _weather_stats
 
 
-def _row(d: int, *, tmin=None, tmax=None, tmean=None, precip=None, et0=None, gdd=None, cum=None):
+def _row(
+    d: int,
+    *,
+    tmin=None,
+    tmax=None,
+    tmean=None,
+    precip=None,
+    et0=None,
+    gdd=None,
+    cum=None,
+    tz=None,
+    pz=None,
+    ez=None,
+):
     return {
         "date": date(2026, 5, d),
         "temp_min_c": tmin,
@@ -23,6 +36,10 @@ def _row(d: int, *, tmin=None, tmax=None, tmean=None, precip=None, et0=None, gdd
         "et0_mm_daily": et0,
         "gdd_base10": gdd,
         "gdd_cumulative_base10_season": cum,
+        # Weather-index z-scores (PR-W6) — mirror the real query columns.
+        "temp_anomaly_z": tz,
+        "precip_anomaly_z": pz,
+        "et0_anomaly_z": ez,
     }
 
 
@@ -76,6 +93,29 @@ def test_weather_stats_rollup() -> None:
     assert s.gdd_cumulative_season == D("110.00")  # latest cumulative
 
 
+def test_weather_stats_anomaly_rollup() -> None:
+    # Two of three days breach +2 sigma on temperature; one breaches on ET0.
+    rows = [
+        _row(1, tmean=D("15"), tz=D("2.4"), pz=None, ez=D("0.5")),
+        _row(2, tmean=D("16"), tz=D("2.0"), pz=D("1.1"), ez=D("2.3")),
+        _row(3, tmean=D("14"), tz=D("0.3"), pz=None, ez=None),
+    ]
+    s = _weather_stats(rows)
+    assert s.days_with_anomaly == 3  # every day had at least one z-score
+    assert s.heat_anomaly_days == 2  # days 1 and 2 (z ≥ 2)
+    assert s.et0_anomaly_days == 1  # day 2 only
+
+
+def test_weather_stats_anomaly_none_without_baselines() -> None:
+    # No z-scores anywhere (climatology not built yet) → counts stay None,
+    # so the FE hides the anomaly row instead of rendering misleading 0s.
+    rows = [_row(1, tmean=D("15")), _row(2, tmean=D("16"))]
+    s = _weather_stats(rows)
+    assert s.days_with_anomaly is None
+    assert s.heat_anomaly_days is None
+    assert s.et0_anomaly_days is None
+
+
 def test_weather_stats_empty_and_nulls() -> None:
     assert _weather_stats([]).days_with_data == 0
     assert _weather_stats([]).temp_min_c is None
@@ -117,6 +157,8 @@ async def test_weather_report_assembles(monkeypatch: pytest.MonkeyPatch) -> None
     out = await s.get_weather_summary_report(farm_id=farm_id, since=None, until=None)
     assert out.farm_name == "F"
     assert len(out.daily) == 1
+    assert out.daily[0].temp_anomaly_z is None  # no baseline → blank anomaly cell
     assert out.stats.days_with_data == 1
+    assert out.stats.heat_anomaly_days is None
     assert out.crops[0].name_en == "Wheat"
     assert out.crops[0].default_growing_season_days == 150

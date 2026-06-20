@@ -16,9 +16,37 @@ Currently wired sources: ``indices`` (NDVI / EVI / etc. aggregates),
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+
+# Allowed keys for a weather-index value-ref. ``value`` is the farm-level
+# daily index value (temperature / radiation / evapotranspiration / …);
+# ``baseline_deviation`` is its z-score against the day-of-year climatology
+# baseline — the anomaly-first key, mirroring ``indices``. Both are None
+# when the farm has no projected ``weather_index_daily`` row yet, so a
+# predicate fails closed.
+WEATHER_INDEX_KEYS: tuple[str, ...] = (
+    "value",
+    "baseline_deviation",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherIndexEntry:
+    """Latest projected ``weather_index_daily`` row for one weather index.
+
+    Weather indices are *farm-level* first-class indices (one ~9km point
+    per farm), so unlike ``IndicesEntry`` (per-block spectral) these are
+    keyed only by index_code. ``baseline_deviation`` is the z-score versus
+    the farm's day-of-year climatology and is ``None`` until baselines have
+    ≥3 samples for that DOY (or for indices like rainfall whose std is ~0 in
+    an arid climate) — anomaly predicates then fail closed.
+    """
+
+    date: date
+    value: Decimal | None = None
+    baseline_deviation: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +194,11 @@ class ConditionContext:
     block_attributes: dict[str, Any] = field(default_factory=dict)
     indices: dict[str, IndicesEntry] = field(default_factory=dict)
     weather: WeatherSnapshot | None = None
+    # Farm-level first-class weather indices keyed by index_code (PR-W7);
+    # each carries the latest value + its z-score against the DOY
+    # climatology. Empty for farms with no projected `weather_index_daily`
+    # rows, so `{source: weather_index}` predicates fail closed.
+    weather_indices: dict[str, WeatherIndexEntry] = field(default_factory=dict)
     signals: dict[str, SignalEntry] = field(default_factory=dict)
     # Sub-block grid spatial-anomaly verdicts keyed by index_code (G-4).
     # Populated by the recommendations driver only when the block has an
@@ -187,6 +220,7 @@ class ConditionContext:
         latest_index_aggregates: dict[str, dict[str, Any]],
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
+        weather_indices: dict[str, WeatherIndexEntry] | None = None,
         signals: dict[str, SignalEntry] | None = None,
         grid: dict[str, GridAnomalyEntry] | None = None,
         params: dict[str, Any] | None = None,
@@ -218,6 +252,7 @@ class ConditionContext:
             block_attributes=dict(block_attributes or {}),
             indices=indices,
             weather=weather,
+            weather_indices=weather_indices or {},
             signals=signals or {},
             grid=grid or {},
             params=dict(params or {}),

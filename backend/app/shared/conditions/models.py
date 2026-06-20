@@ -13,7 +13,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from app.shared.conditions.context import GRID_FIELDS, SIGNAL_KEYS, WEATHER_SCOPES
+from app.shared.conditions.context import (
+    GRID_FIELDS,
+    SIGNAL_KEYS,
+    WEATHER_INDEX_KEYS,
+    WEATHER_SCOPES,
+)
 from app.shared.conditions.errors import ConditionParseError
 
 # ``slope`` / ``delta`` / ``trend_direction`` (KB P2) are precomputed by
@@ -86,6 +91,26 @@ class WeatherValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class WeatherIndexValueRef:
+    """``{"source":"weather_index","index_code":"temperature","key":"baseline_deviation"}``
+
+    Reads a *farm-level* first-class weather index (PR-W7) — the latest
+    ``weather_index_daily`` row for ``index_code``. ``key`` is one of
+    ``WEATHER_INDEX_KEYS`` (``value`` or ``baseline_deviation``); it
+    defaults to ``baseline_deviation`` (the z-score versus the day-of-year
+    climatology) so the common predicate is anomaly-first, mirroring
+    ``indices``. Unlike ``weather`` (raw snapshot fields), this exposes the
+    curated index family with built-in anomaly scoring. Resolves to
+    ``None`` — fail-closed — when the farm has no projected row for that
+    index, matching every other source.
+    """
+
+    source: Literal["weather_index"]
+    index_code: str
+    key: str  # one of WEATHER_INDEX_KEYS
+
+
+@dataclass(frozen=True, slots=True)
 class SignalsValueRef:
     """``{"source":"signals","code":"soil_moisture","key":"value_numeric"}``
 
@@ -138,13 +163,14 @@ ValueRef = (
     IndicesValueRef
     | BlockValueRef
     | WeatherValueRef
+    | WeatherIndexValueRef
     | SignalsValueRef
     | GridValueRef
     | ParamsValueRef
 )
 
 
-def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0912 - dispatch over ref sources
+def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912 - dispatch over ref sources
     """Strict parse of a leaf value-ref dict.
 
     Raises ``ConditionParseError`` on unknown source or missing/invalid
@@ -167,6 +193,16 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0912 - dispatch over ref 
         if field_ not in BLOCK_FIELDS:
             raise ConditionParseError(f"block ref 'field' must be one of {BLOCK_FIELDS}")
         return BlockValueRef(source="block", field=field_)
+    if source == "weather_index":
+        index_code = raw.get("index_code")
+        if not isinstance(index_code, str) or not index_code:
+            raise ConditionParseError("weather_index ref missing 'index_code'")
+        key = raw.get("key", "baseline_deviation")
+        if key not in WEATHER_INDEX_KEYS:
+            raise ConditionParseError(
+                f"weather_index ref 'key' must be one of {WEATHER_INDEX_KEYS}"
+            )
+        return WeatherIndexValueRef(source="weather_index", index_code=index_code, key=key)
     if source == "weather":
         scope = raw.get("scope")
         if scope not in WEATHER_SCOPES:

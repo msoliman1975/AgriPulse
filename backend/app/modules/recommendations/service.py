@@ -45,6 +45,7 @@ from app.modules.recommendations.events import (
 )
 from app.modules.recommendations.repository import RecommendationsRepository
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
+from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches, strain_code
@@ -158,6 +159,7 @@ class RecommendationsServiceImpl:
         # return empty data when the block has no provider/observation
         # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
+        weather_indices = await load_weather_index_snapshot(self._tenant, farm_id=farm_id)
         signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
         # Sub-block grid spatial-anomaly verdicts (G-4). Empty for blocks
         # with no grid / no current anomaly, so `{source: grid}` predicates
@@ -181,6 +183,7 @@ class RecommendationsServiceImpl:
             },
             latest_index_aggregates=latest,
             weather=weather,
+            weather_indices=weather_indices,
             signals=signals,
             grid=grid,
         )
@@ -1086,6 +1089,9 @@ class DecisionTreesAuthorService:
         repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
         from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
         from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
+        from app.modules.weather.snapshot import (
+            load_index_snapshot as load_weather_index_snapshot,
+        )
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
@@ -1102,6 +1108,11 @@ class DecisionTreesAuthorService:
         soil_texture, salinity_class = await repo.get_block_soil(block_id=block_id)
         weather = (
             await load_weather_snapshot(tenant_session, farm_id=farm_id)
+            if farm_id is not None
+            else None
+        )
+        weather_indices = (
+            await load_weather_index_snapshot(tenant_session, farm_id=farm_id)
             if farm_id is not None
             else None
         )
@@ -1133,6 +1144,7 @@ class DecisionTreesAuthorService:
             },
             latest_index_aggregates=latest_indices,
             weather=weather,
+            weather_indices=weather_indices,
             signals=signals,
             grid=grid,
         )

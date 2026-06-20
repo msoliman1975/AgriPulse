@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
 
 from app.shared.conditions import ConditionContext, evaluate
-from app.shared.conditions.context import IndicesEntry
+from app.shared.conditions.context import IndicesEntry, WeatherIndexEntry
 from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
     IndicesValueRef,
+    WeatherIndexValueRef,
     parse_value_ref,
 )
 
@@ -438,3 +439,80 @@ def test_from_block_signals_adapts_alerts_signals_shape() -> None:
     assert ctx.crop_category == "fruit_tree"
     assert "ndvi" in ctx.indices
     assert ctx.indices["ndvi"].baseline_deviation == Decimal("-2.0")
+
+
+# ---- weather_index source (PR-W7) -----------------------------------------
+
+
+def _wx_ctx(
+    index_code: str = "temperature",
+    value: Decimal | None = None,
+    deviation: Decimal | None = None,
+) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        weather_indices={
+            index_code: WeatherIndexEntry(
+                date=date(2026, 6, 20),
+                value=value,
+                baseline_deviation=deviation,
+            )
+        },
+    )
+
+
+def test_parse_weather_index_ref_defaults_to_baseline_deviation() -> None:
+    ref = parse_value_ref({"source": "weather_index", "index_code": "temperature"})
+    assert isinstance(ref, WeatherIndexValueRef)
+    assert ref.index_code == "temperature"
+    assert ref.key == "baseline_deviation"
+
+
+def test_parse_weather_index_ref_explicit_value_key() -> None:
+    ref = parse_value_ref(
+        {"source": "weather_index", "index_code": "evapotranspiration", "key": "value"}
+    )
+    assert isinstance(ref, WeatherIndexValueRef)
+    assert ref.key == "value"
+
+
+def test_parse_weather_index_ref_unknown_key_raises() -> None:
+    with pytest.raises(ConditionParseError):
+        parse_value_ref({"source": "weather_index", "index_code": "temperature", "key": "mean"})
+
+
+def test_parse_weather_index_ref_missing_index_code_raises() -> None:
+    with pytest.raises(ConditionParseError):
+        parse_value_ref({"source": "weather_index", "key": "value"})
+
+
+def test_weather_index_zscore_predicate_fires_and_records_snapshot() -> None:
+    # Heat anomaly: temperature index sitting >2 sigma above the seasonal normal.
+    tree = {
+        "op": "gt",
+        "left": {"source": "weather_index", "index_code": "temperature"},
+        "right": 2,
+    }
+    matched, snap = evaluate(tree, _wx_ctx(deviation=Decimal("2.6")))
+    assert matched is True
+    assert snap["values"]["weather_index.temperature.baseline_deviation"] == "2.6"
+
+
+def test_weather_index_value_key_predicate() -> None:
+    tree = {
+        "op": "ge",
+        "left": {"source": "weather_index", "index_code": "evapotranspiration", "key": "value"},
+        "right": 6,
+    }
+    ctx = _wx_ctx(index_code="evapotranspiration", value=Decimal("7.1"))
+    assert evaluate(tree, ctx)[0] is True
+
+
+def test_weather_index_missing_index_fails_closed() -> None:
+    tree = {
+        "op": "gt",
+        "left": {"source": "weather_index", "index_code": "wind"},
+        "right": 2,
+    }
+    # Context only carries a temperature entry → wind resolves to None → no match.
+    assert evaluate(tree, _wx_ctx(deviation=Decimal("3.0")))[0] is False
