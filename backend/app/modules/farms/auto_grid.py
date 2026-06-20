@@ -1,32 +1,34 @@
-"""Grid-based auto-blocking — pure Python, no GIS libs.
+"""Grid-based auto-blocking.
 
 The endpoint produces *candidates* the user edits or commits; this is a
-preview, not a survey-grade subdivision. We deliberately keep the
-algorithm dependency-free:
+preview, not a survey-grade subdivision. The algorithm:
 
   * Use an equirectangular approximation centered on the farm's bbox to
     convert WGS84 ↔ meters with sub-percent error at Egyptian latitudes.
-  * Generate a uniform metric grid and, for every cell, **clip the farm
-    boundary to the cell rectangle** so the emitted candidate honours the
+  * Generate a uniform metric grid and, for every cell, **intersect the farm
+    boundary with the cell rectangle** so the emitted candidate honours the
     AoI: cells fully inside the farm come out as whole rectangles, cells
     that straddle the boundary come out as the clipped (ragged-edge)
     intersection, and cells entirely outside are dropped. No block ever
     spills past the AoI.
 
-Clipping uses Sutherland-Hodgman. That algorithm is correct only when the
-*clip* window is convex, so we clip the (possibly concave) boundary ring
-**against the cell rectangle** — a rectangle is always convex — which makes
-it robust for any farm shape, not just convex ones.
+Clipping is done with shapely (``Polygon.intersection``). We previously
+hand-rolled a Sutherland-Hodgman clip to stay dependency-free, but that
+algorithm cannot represent a *multi-component* intersection: when a single
+(concave) farm ring meets one cell in two or more disjoint pieces it stitched
+them into a single self-touching ring joined by zero-width bridges. Those
+rings are invalid GeoJSON — they render as if they spill across the AoI and,
+once committed, are stored unrepaired with a wrong ``ST_Area`` (the
+``blocks_geom_compute`` trigger does not call ``ST_MakeValid``). shapely
+returns a valid Polygon/MultiPolygon, so each disjoint piece is emitted as
+its own candidate with a ``-P{n}`` suffix.
 
 Limitations (acceptable for a preview): polygon holes are not subtracted
-(farm boundaries rarely have holes in MVP), and the per-cell ``area_m2`` is
-the equirectangular shoelace area of the clipped piece — a good estimate,
-but the canonical area + UTM transform are recomputed server-side by the
-PostGIS triggers we own when the candidate is committed.
-
-If we later need survey-grade clipping (holes, geodesic area), swap this
-module for a shapely + pyproj implementation; the FarmService API stays the
-same.
+(farm boundaries rarely have holes in MVP — we build the clip subject from
+the exterior rings only), and the per-cell ``area_m2`` is the
+equirectangular shoelace area of the clipped piece — a good estimate, but
+the canonical area + UTM transform are recomputed server-side by the PostGIS
+triggers we own when the candidate is committed.
 """
 
 from __future__ import annotations
@@ -34,6 +36,12 @@ from __future__ import annotations
 import math
 from decimal import Decimal
 from typing import Any
+
+from shapely import make_valid
+from shapely.geometry import Polygon as _ShapelyPolygon
+from shapely.geometry import box as _shapely_box
+from shapely.geometry.base import BaseGeometry
+from shapely.ops import unary_union
 
 from app.modules.farms.errors import GeometryInvalidError
 
@@ -76,8 +84,7 @@ def _outer_rings(geom: dict[str, Any]) -> list[list[tuple[float, float]]]:
     """Return the exterior ring of each polygon as an *open* ring.
 
     Holes (interior rings) are intentionally ignored — see module docstring.
-    Each ring has its closing vertex stripped so the clipper treats it as a
-    cycle without a duplicated point.
+    Each ring has its closing vertex stripped.
     """
     geom_type = geom.get("type")
     if geom_type == "Polygon":
@@ -108,64 +115,36 @@ def _bbox(rings: list[list[tuple[float, float]]]) -> tuple[float, float, float, 
     return minx, miny, maxx, maxy
 
 
-# ---- Sutherland-Hodgman clip of a ring against an axis-aligned cell -------
+def _farm_geometry(rings: list[list[tuple[float, float]]]) -> BaseGeometry:
+    """Build a single valid shapely geometry from the farm's exterior rings.
 
-
-def _intersect_x(p: tuple[float, float], q: tuple[float, float], cx: float) -> tuple[float, float]:
-    t = (cx - p[0]) / (q[0] - p[0])
-    return (cx, p[1] + t * (q[1] - p[1]))
-
-
-def _intersect_y(p: tuple[float, float], q: tuple[float, float], cy: float) -> tuple[float, float]:
-    t = (cy - p[1]) / (q[1] - p[1])
-    return (p[0] + t * (q[0] - p[0]), cy)
-
-
-def _clip_axis(
-    poly: list[tuple[float, float]],
-    *,
-    axis: int,
-    bound: float,
-    keep_ge: bool,
-) -> list[tuple[float, float]]:
-    """Clip an open ring against a single half-plane of the cell rectangle.
-
-    ``axis`` 0 = vertical line x=bound, 1 = horizontal line y=bound.
-    ``keep_ge`` keeps the side where coordinate >= bound (else <= bound).
+    A self-intersecting (bowtie) farm ring is repaired with ``make_valid`` so
+    the per-cell intersection always operates on a valid subject.
     """
-    if not poly:
-        return []
-    out: list[tuple[float, float]] = []
-    intersect = _intersect_x if axis == 0 else _intersect_y
-    n = len(poly)
-    for i in range(n):
-        cur = poly[i]
-        prv = poly[i - 1]
-        cur_in = (cur[axis] >= bound) if keep_ge else (cur[axis] <= bound)
-        prv_in = (prv[axis] >= bound) if keep_ge else (prv[axis] <= bound)
-        if cur_in:
-            if not prv_in:
-                out.append(intersect(prv, cur, bound))
-            out.append(cur)
-        elif prv_in:
-            out.append(intersect(prv, cur, bound))
-    return out
+    polys: list[BaseGeometry] = []
+    for ring in rings:
+        if len(ring) < 3:
+            continue
+        poly: BaseGeometry = _ShapelyPolygon(ring)
+        if not poly.is_valid:
+            poly = make_valid(poly)
+        polys.append(poly)
+    if not polys:
+        raise GeometryInvalidError("auto-grid input has no rings")
+    geom = polys[0] if len(polys) == 1 else unary_union(polys)
+    if geom.is_empty:
+        raise GeometryInvalidError("auto-grid farm geometry is empty")
+    return geom
 
 
-def _clip_ring_to_cell(
-    ring: list[tuple[float, float]],
-    *,
-    left: float,
-    bottom: float,
-    right: float,
-    top: float,
-) -> list[tuple[float, float]]:
-    """Return the portion of ``ring`` inside the cell rectangle (open ring)."""
-    clipped = _clip_axis(ring, axis=0, bound=left, keep_ge=True)
-    clipped = _clip_axis(clipped, axis=0, bound=right, keep_ge=False)
-    clipped = _clip_axis(clipped, axis=1, bound=bottom, keep_ge=True)
-    clipped = _clip_axis(clipped, axis=1, bound=top, keep_ge=False)
-    return clipped
+def _polygon_components(geom: BaseGeometry) -> list[_ShapelyPolygon]:
+    """Flatten any intersection result into its non-empty polygon pieces."""
+    geom_type = geom.geom_type
+    if geom_type == "Polygon":
+        return [] if geom.is_empty else [geom]
+    if geom_type in ("MultiPolygon", "GeometryCollection"):
+        return [g for g in geom.geoms if g.geom_type == "Polygon" and not g.is_empty]
+    return []
 
 
 def _ring_area_m2(
@@ -191,6 +170,14 @@ def _ring_area_m2(
     return abs(s) / 2.0
 
 
+def _exterior_open_ring(poly: _ShapelyPolygon) -> list[tuple[float, float]]:
+    """The exterior ring of a shapely polygon as an open ring (no closing dup)."""
+    coords = [(float(x), float(y)) for x, y in poly.exterior.coords]
+    if len(coords) >= 2 and coords[0] == coords[-1]:
+        coords = coords[:-1]
+    return coords
+
+
 def auto_grid_candidates(
     boundary_geojson: dict[str, Any],
     *,
@@ -202,9 +189,12 @@ def auto_grid_candidates(
         {"code": "AG-R03-C07", "geometry": {<Polygon>}, "area_m2": Decimal}
 
     The geometry is the intersection of the grid cell with the farm boundary,
-    so candidates never spill past the AoI. ``area_m2`` is the (approximate)
-    area of that clipped piece; PostGIS recomputes the canonical value on
-    commit.
+    so candidates never spill past the AoI. A cell that meets the farm in more
+    than one disjoint piece (concave farms, or a MultiPolygon AoI) emits one
+    candidate per piece with a ``-P{n}`` suffix so block codes stay unique and
+    every candidate is a valid, simple polygon. ``area_m2`` is the
+    (approximate) area of that clipped piece; PostGIS recomputes the canonical
+    value on commit.
     """
     if not (_MIN_CELL_M <= cell_size_m <= _MAX_CELL_M):
         raise GeometryInvalidError(f"cell_size_m must be between {_MIN_CELL_M} and {_MAX_CELL_M}")
@@ -218,6 +208,8 @@ def auto_grid_candidates(
     m_per_deg_lon = _lon_meters_per_degree(centre_lat)
     if m_per_deg_lon <= 0:
         raise GeometryInvalidError("farm centroid latitude is degenerate")
+
+    farm_geom = _farm_geometry(rings)
 
     cell_lon = cell_size_m / m_per_deg_lon
     cell_lat = cell_size_m / _M_PER_DEG_LAT
@@ -235,22 +227,21 @@ def auto_grid_candidates(
             cell_left = minx + col * cell_lon
             cell_right = cell_left + cell_lon
 
-            # Clip the farm boundary to this cell. A cell may intersect more
-            # than one polygon of a MultiPolygon farm — emit each disjoint
-            # piece with a suffixed code so block codes stay unique.
+            # Intersect the farm with this cell. The result may be a single
+            # polygon, several disjoint polygons (concave AoI or MultiPolygon),
+            # or empty — emit each disjoint piece as its own candidate.
+            clipped = farm_geom.intersection(
+                _shapely_box(cell_left, cell_bottom, cell_right, cell_top)
+            )
+
             pieces: list[list[tuple[float, float]]] = []
-            for ring in rings:
-                clipped = _clip_ring_to_cell(
-                    ring,
-                    left=cell_left,
-                    bottom=cell_bottom,
-                    right=cell_right,
-                    top=cell_top,
-                )
-                if len(clipped) >= 3:
-                    area = _ring_area_m2(clipped, minx=minx, miny=miny, m_per_deg_lon=m_per_deg_lon)
-                    if area >= min_area:
-                        pieces.append(clipped)
+            for component in _polygon_components(clipped):
+                ring = _exterior_open_ring(component)
+                if len(ring) < 3:
+                    continue
+                area = _ring_area_m2(ring, minx=minx, miny=miny, m_per_deg_lon=m_per_deg_lon)
+                if area >= min_area:
+                    pieces.append(ring)
 
             for piece_idx, piece in enumerate(pieces):
                 area = _ring_area_m2(piece, minx=minx, miny=miny, m_per_deg_lon=m_per_deg_lon)
