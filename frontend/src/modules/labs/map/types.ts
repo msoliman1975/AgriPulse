@@ -112,4 +112,8 @@ export interface UnitFeatureProps {
   // True when active_from is in the future — block exists but not yet
   // operational. Rendered ghosted on the map.
   is_future: boolean;
+  // Worst current weather-driven disease/pest risk level (PR-R4b); "none"
+  // when the block has no scored risk. Read by the map fill expression when
+  // the risk overlay is toggled on.
+  risk_level: "low" | "moderate" | "high" | "none";
 }

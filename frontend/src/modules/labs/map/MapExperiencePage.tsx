@@ -28,6 +28,7 @@ import {
   type FarmUpdatePayload,
 } from "@/api/farms";
 import { loadMapSummary, loadUnitDetail } from "./api";
+import type { UnitFeatureProps } from "./types";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
 import { getGridCells, type GridWorstCell } from "@/api/grid";
@@ -43,7 +44,7 @@ import {
   type SignalDefinition,
 } from "@/api/signals";
 import { BlockCropAssignCard } from "./BlockCropAssignCard";
-import { getWeatherRiskSummary, type RiskLevel } from "@/api/weatherRisk";
+import { getWeatherRiskSummary, worstLevelPerBlock, type RiskLevel } from "@/api/weatherRisk";
 import { useCapability } from "@/rbac/useCapability";
 
 import { DetailPanel, type BlockRisk } from "./DetailPanel";
@@ -251,6 +252,8 @@ function MapForFarm({ farmId }: { farmId: string }) {
   // fetches that signal's observations for the active farm and
   // converts them to a Point FeatureCollection MapCanvas can render.
   const [signalOverlayDefId, setSignalOverlayDefId] = useState<string | null>(null);
+  // PR-R4b: when on, the block fill recolours by worst disease/pest risk.
+  const [showRiskOverlay, setShowRiskOverlay] = useState(false);
 
   // ---- Inactivate flows ---------------------------------------------------
 
@@ -325,6 +328,27 @@ function MapForFarm({ farmId }: { farmId: string }) {
     enabled: Boolean(farmId) && canReadRisk,
     staleTime: 60_000,
   });
+  // Worst risk level per block — the map fill expression reads this.
+  const riskLevelByBlock = useMemo(
+    () => worstLevelPerBlock(riskSummaryQ.data?.risks ?? []),
+    [riskSummaryQ.data],
+  );
+  // Block geojson with `risk_level` injected per block, so the MapCanvas fill
+  // can recolour by risk when the overlay is toggled on. Identical to the base
+  // collection (all "none") when there's no risk data / no capability.
+  const geojsonWithRisk = useMemo<FeatureCollection<GeoPolygon, UnitFeatureProps>>(() => {
+    const base = summaryQ.data?.geojson;
+    if (!base) return { type: "FeatureCollection", features: [] };
+    if (riskLevelByBlock.size === 0) return base;
+    return {
+      type: "FeatureCollection",
+      features: base.features.map((f) => {
+        const level = riskLevelByBlock.get(f.properties.id);
+        return level ? { ...f, properties: { ...f.properties, risk_level: level } } : f;
+      }),
+    };
+  }, [summaryQ.data, riskLevelByBlock]);
+
   // The selected block's pathogens, worst-first, for the drawer section.
   const selectedBlockRisks = useMemo<BlockRisk[]>(() => {
     if (!selectedId) return [];
@@ -864,6 +888,12 @@ function MapForFarm({ farmId }: { farmId: string }) {
         signalDefId={signalOverlayDefId}
         onSignalChange={setSignalOverlayDefId}
         signalObsCount={signalOverlay.observationCount}
+        // PR-R4b risk overlay toggle. Available once the farm has any scored
+        // block (and the user can read risk).
+        riskAvailable={canReadRisk && riskLevelByBlock.size > 0}
+        showRisk={showRiskOverlay}
+        onToggleRisk={setShowRiskOverlay}
+        riskAtRiskCount={[...riskLevelByBlock.values()].filter((l) => l !== "low").length}
       />
 
       {farmDrawerMode ? (
@@ -920,7 +950,8 @@ function MapForFarm({ farmId }: { farmId: string }) {
           </FullState>
         ) : (
           <MapCanvas
-            geojson={summary.geojson}
+            geojson={geojsonWithRisk}
+            riskOverlay={showRiskOverlay}
             farmBoundary={summary.farm.boundary}
             selectedId={selectedId}
             onSelect={(id) => {
@@ -1215,6 +1246,10 @@ function Toolbar({
   signalDefId,
   onSignalChange,
   signalObsCount,
+  riskAvailable,
+  showRisk,
+  onToggleRisk,
+  riskAtRiskCount,
 }: {
   drawTarget: DrawTarget | null;
   onToggleDrawBlock: () => void;
@@ -1242,6 +1277,10 @@ function Toolbar({
   signalDefId: string | null;
   onSignalChange: (id: string | null) => void;
   signalObsCount: number;
+  riskAvailable: boolean;
+  showRisk: boolean;
+  onToggleRisk: (v: boolean) => void;
+  riskAtRiskCount: number;
 }) {
   // The active-farm context (name, area, governorate, status) now lives
   // in the shell header next to the tenant badge — that's why this
@@ -1380,6 +1419,12 @@ function Toolbar({
           selectedDefinitionId={signalDefId}
           onChange={onSignalChange}
           obsCount={signalObsCount}
+        />
+        <RiskToolbarControl
+          available={riskAvailable}
+          show={showRisk}
+          onToggle={onToggleRisk}
+          atRiskCount={riskAtRiskCount}
         />
         <span className="text-slate-300">|</span>
         <Swatch color="#97C459" label="Healthy" />
@@ -1574,6 +1619,29 @@ function SignalToolbarControl({
       </label>
       {selectedDefinitionId ? (
         <span className="text-[10px] text-slate-400">{obsCount} obs</span>
+      ) : null}
+    </>
+  );
+}
+
+function RiskToolbarControl({
+  available,
+  show,
+  onToggle,
+  atRiskCount,
+}: {
+  available: boolean;
+  show: boolean;
+  onToggle: (v: boolean) => void;
+  atRiskCount: number;
+}) {
+  if (!available) return null;
+  return (
+    <>
+      <span className="text-slate-300">|</span>
+      <LayerToggle label="Risk" checked={show} onChange={onToggle} />
+      {show && atRiskCount > 0 ? (
+        <span className="text-[10px] text-slate-400">{atRiskCount} at risk</span>
       ) : null}
     </>
   );
