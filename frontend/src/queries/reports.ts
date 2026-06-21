@@ -4,6 +4,7 @@ import {
   getCropHealthReport,
   getOperationsLogReport,
   getWaterBalanceReport,
+  getWeatherRiskPressureReport,
   getWeatherSummaryReport,
   getZoneAnomalyReport,
   type CropHealthParams,
@@ -11,6 +12,7 @@ import {
   type OperationsLogReportResponse,
   type RangeParams,
   type WaterBalanceReportResponse,
+  type WeatherRiskPressureReportResponse,
   type WeatherSummaryParams,
   type WeatherSummaryReportResponse,
   type ZoneAnomalyReportResponse,
@@ -51,6 +53,19 @@ export function useWaterBalanceReport(
   return useQuery({
     queryKey: ["reports", "water-balance", farmId, params] as const,
     queryFn: () => getWaterBalanceReport(farmId, params),
+    enabled: Boolean(farmId),
+    staleTime: 60_000,
+  });
+}
+
+/** Disease & pest pressure report for a farm over a date range. */
+export function useWeatherRiskPressureReport(
+  farmId: string,
+  params: RangeParams,
+): ReturnType<typeof useQuery<WeatherRiskPressureReportResponse>> {
+  return useQuery({
+    queryKey: ["reports", "weather-risk-pressure", farmId, params] as const,
+    queryFn: () => getWeatherRiskPressureReport(farmId, params),
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });

@@ -333,3 +333,48 @@ class OperationsLogReportResponse(BaseModel):
     period: ReportPeriod
     entries: list[OpsLogEntry]
     summary: OpsLogSummary
+
+
+# --- PR-R5: Disease & Pest Pressure ----------------------------------------
+
+# One row per (block, pathogen) with at least one scored day in the window.
+RiskLevel = Literal["low", "moderate", "high"]
+
+
+class WeatherRiskPressureRow(BaseModel):
+    """One block's pressure for one pathogen over the window.
+
+    Scores are the 0-100 ``weather_risk_daily.score``; ``days_high`` /
+    ``days_moderate`` count days at that banding; ``latest_*`` is the most
+    recent scored day so the FE can show the current state alongside the peak.
+    """
+
+    block_id: UUID
+    block_name: str
+    risk_code: str
+    days_observed: int
+    peak_score: int
+    mean_score: int | None
+    days_high: int
+    days_moderate: int
+    latest_level: RiskLevel
+    latest_score: int
+    latest_date: date
+
+
+class WeatherRiskPressureSummary(BaseModel):
+    """Farm-level roll-up across all (block, pathogen) rows in the window."""
+
+    block_count: int
+    pathogen_count: int
+    blocks_at_risk: int
+    total_high_days: int
+    row_count: int
+
+
+class WeatherRiskPressureReportResponse(BaseModel):
+    farm_id: UUID
+    farm_name: str
+    period: ReportPeriod
+    rows: list[WeatherRiskPressureRow]
+    summary: WeatherRiskPressureSummary

@@ -42,9 +42,31 @@
       "title": "Weather & GDD",
       "description": "Temperature, rainfall, ET₀ and growing-degree-day accumulation."
     },
+    "weather-risk-pressure": {
+      "title": "Disease & Pest Pressure",
+      "description": "Per-block pathogen pressure scores and high-pressure days from weather."
+    },
     "operations-log": {
       "title": "Operations Log",
       "description": "Activities, alerts and recommendations across the period."
+    }
+  },
+  "weatherRiskPressure": {
+    "empty": "No disease or pest pressure scored for this farm in the period.",
+    "cards": {
+      "blocksAtRisk": "Blocks at risk",
+      "pathogens": "Pathogens",
+      "highDays": "High-pressure days",
+      "blocks": "Blocks scored"
+    },
+    "headers": {
+      "block": "Block",
+      "pathogen": "Pathogen / pest",
+      "peak": "Peak",
+      "daysHigh": "Days high",
+      "daysModerate": "Days moderate",
+      "latest": "Latest",
+      "latestDate": "Latest date"
     }
   },
   "cropHealth": {

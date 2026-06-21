@@ -289,3 +289,46 @@ export async function getOperationsLogReport(
   );
   return data;
 }
+
+// ---- PR-R5: Disease & Pest Pressure --------------------------------------
+
+export interface WeatherRiskPressureRow {
+  block_id: string;
+  block_name: string;
+  risk_code: string;
+  days_observed: number;
+  peak_score: number;
+  mean_score: number | null;
+  days_high: number;
+  days_moderate: number;
+  latest_level: "low" | "moderate" | "high";
+  latest_score: number;
+  latest_date: string;
+}
+
+export interface WeatherRiskPressureSummary {
+  block_count: number;
+  pathogen_count: number;
+  blocks_at_risk: number;
+  total_high_days: number;
+  row_count: number;
+}
+
+export interface WeatherRiskPressureReportResponse {
+  farm_id: string;
+  farm_name: string;
+  period: ReportPeriod;
+  rows: WeatherRiskPressureRow[];
+  summary: WeatherRiskPressureSummary;
+}
+
+export async function getWeatherRiskPressureReport(
+  farmId: string,
+  params: RangeParams = {},
+): Promise<WeatherRiskPressureReportResponse> {
+  const { data } = await apiClient.get<WeatherRiskPressureReportResponse>(
+    `/v1/farms/${farmId}/reports/weather-risk-pressure`,
+    { params },
+  );
+  return data;
+}
