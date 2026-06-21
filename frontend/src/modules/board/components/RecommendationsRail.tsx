@@ -85,7 +85,7 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
       <span className="flex items-center justify-between">
         <span className="font-medium">{t(`recAction.${rec.action_type}`)}</span>
         <span className="text-[10px] uppercase text-ap-muted">
-          {rec.severity}
+          {t(`severity.${rec.severity}`)}
         </span>
       </span>
       <span className="truncate text-[11px] opacity-90">{rec.text_en}</span>

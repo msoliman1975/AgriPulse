@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
 import { Skeleton } from "@/components/Skeleton";
@@ -15,6 +16,7 @@ interface Props {
  * `GET /farms/{id}/index-timeseries` exists we'll switch to that.
  */
 export function TrendChartCard({ farmId }: Props): ReactNode {
+  const { t } = useTranslation("insights");
   const { data, isLoading } = useQuery({
     queryKey: ["blocks", "list", farmId] as const,
     queryFn: () => listBlocks(farmId),
@@ -32,7 +34,7 @@ export function TrendChartCard({ farmId }: Props): ReactNode {
           id="trend-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
-          Vegetation index trend
+          {t("trend.title")}
         </h2>
         {firstBlock ? (
           <span className="text-[11px] text-ap-muted">{firstBlock.name ?? firstBlock.code}</span>
@@ -42,7 +44,7 @@ export function TrendChartCard({ farmId }: Props): ReactNode {
         {isLoading ? (
           <Skeleton className="h-56 w-full" />
         ) : !firstBlock ? (
-          <p className="py-12 text-center text-sm text-ap-muted">No blocks to chart yet.</p>
+          <p className="py-12 text-center text-sm text-ap-muted">{t("trend.noBlocks")}</p>
         ) : (
           <IndexTrendChart blockId={firstBlock.id} />
         )}

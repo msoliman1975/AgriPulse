@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import type { ActivityType } from "@/api/plans";
 import type { Resource } from "@/api/resources";
 import { Modal } from "@/components/Modal";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCreateFlatActivity, useAttachResource } from "@/queries/board";
 import { useResources } from "@/queries/resources";
 
@@ -61,6 +62,7 @@ export function QuickAddDialog({
   onClose,
 }: QuickAddDialogProps): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   const colStartDate = parseISO(columnStart);
 
   // Default scheduled date.
@@ -136,7 +138,7 @@ export function QuickAddDialog({
       </h2>
       <p className="mt-1 text-xs text-ap-muted">
         {t("quickAdd.scope", {
-          date: format(parseISO(scheduledDate), "EEE, MMM d"),
+          date: format(parseISO(scheduledDate), "EEE, MMM d", { locale: dateLocale }),
         })}
       </p>
 

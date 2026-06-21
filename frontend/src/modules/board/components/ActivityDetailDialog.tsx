@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { ActivityType, BoardActivity } from "@/api/plans";
 import type { Resource } from "@/api/resources";
 import { Modal } from "@/components/Modal";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { useDeleteActivity, useUpdateActivity } from "@/queries/plans";
 import { useAttachResource, useDetachResource } from "@/queries/board";
@@ -177,10 +178,11 @@ export function ActivityDetailDialog({
 
 function ViewBody({ activity }: { activity: BoardActivity }): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   return (
     <dl className="mt-3 space-y-2 text-sm">
       <Row label={t("detail.date")}>
-        {format(parseISO(activity.scheduled_date), "EEE, MMM d, yyyy")}
+        {format(parseISO(activity.scheduled_date), "EEE, MMM d, yyyy", { locale: dateLocale })}
       </Row>
       <Row label={t("detail.status")}>{t(`status.${activity.status}`)}</Row>
       {activity.product_name ? (
@@ -473,13 +475,14 @@ function ConfirmDeleteBody({
   activity: BoardActivity;
 }): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   return (
     <div className="mt-3 rounded-md border border-ap-crit/30 bg-ap-crit/5 p-3 text-sm">
       <p className="font-medium text-ap-crit">{t("detail.deleteHeading")}</p>
       <p className="mt-1 text-ap-ink">
         {t("detail.deleteBody", {
           type: t(`type.${activity.activity_type}`),
-          date: format(parseISO(activity.scheduled_date), "EEE, MMM d"),
+          date: format(parseISO(activity.scheduled_date), "EEE, MMM d", { locale: dateLocale }),
         })}
       </p>
     </div>

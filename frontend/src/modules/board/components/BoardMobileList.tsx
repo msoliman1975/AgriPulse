@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { BoardActivity, BoardBlock } from "@/api/plans";
+import { useDateLocale } from "@/hooks/useDateLocale";
 
 import { ActivityChip } from "./ActivityChip";
 
@@ -27,6 +28,7 @@ export function BoardMobileList({
   canManage,
 }: BoardMobileListProps): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   const byBlock = new Map<string, BoardActivity[]>();
   for (const a of activities) {
     const arr = byBlock.get(a.block_id) ?? [];
@@ -73,7 +75,7 @@ export function BoardMobileList({
                       dateTime={a.scheduled_date}
                       className="w-20 flex-shrink-0 text-xs text-ap-muted"
                     >
-                      {format(parseISO(a.scheduled_date), "MMM d, EEE")}
+                      {format(parseISO(a.scheduled_date), "MMM d, EEE", { locale: dateLocale })}
                     </time>
                     <ActivityChip
                       activity={a}

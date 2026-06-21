@@ -5,6 +5,7 @@
   },
   "trend": {
     "title": "اتجاه مؤشر الغطاء النباتي",
+    "noBlocks": "لا توجد حقول لعرضها بعد.",
     "indexLabel": "{{code}}، جميع الحقول",
     "loadFailed": "تعذر تحميل الاتجاه.",
     "empty": "لا توجد ملاحظات بعد. ستظهر النقاط هنا عند ابتلاع مشاهد Sentinel لأي حقل.",
@@ -128,5 +129,61 @@
     "logLink": "السجل ←",
     "loadFailed": "فشل تحميل ملاحظات الإشارات.",
     "empty": "لا ملاحظات إشارات في هذه المزرعة بعد."
+  },
+  "alertsFeed": {
+    "title": "تنبيهات مباشرة · مرتَّبة حسب الخطورة",
+    "viewAll": "عرض الكل ←",
+    "loadFailed": "تعذّر تحميل التنبيهات.",
+    "empty": "كل شيء على ما يُرام — لا شيء يتطلب انتباهك.",
+    "noPrescription": "لا توجد توصية بعد",
+    "resolve": "معالجة"
+  },
+  "landUnits": {
+    "title": "الوحدات الأرضية",
+    "manage": "إدارة ←",
+    "loadFailed": "تعذّر تحميل الحقول.",
+    "empty": "لا توجد وحدات أرضية بعد — أنشئ واحدة للبدء.",
+    "plan": "الخطة",
+    "col": {
+      "name": "الاسم",
+      "type": "النوع",
+      "area": "المساحة",
+      "status": "الحالة",
+      "action": "إجراء"
+    },
+    "status": {
+      "active": "نشط",
+      "inactive": "غير نشط"
+    }
+  },
+  "upcoming": {
+    "title": "أنشطة هذا الأسبوع",
+    "plan": "الخطة ←",
+    "empty": "لا توجد أنشطة مجدولة هذا الأسبوع."
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "unitType": {
+    "block": "قطعة",
+    "pivot": "محور",
+    "pivot_sector": "قطاع محور"
+  },
+  "activityType": {
+    "planting": "زراعة",
+    "fertilizing": "تسميد",
+    "spraying": "رش",
+    "pruning": "تقليم",
+    "harvesting": "حصاد",
+    "irrigation": "ري",
+    "soil_prep": "تحضير التربة",
+    "observation": "ملاحظة",
+    "pollination": "تلقيح",
+    "growth_regulator": "منظم نمو",
+    "thinning": "خف الثمار",
+    "bagging": "تكييس",
+    "hilling": "ترديم"
   }
 }

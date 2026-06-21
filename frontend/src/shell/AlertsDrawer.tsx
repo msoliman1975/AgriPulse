@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { type InboxAction, type InboxItem, listInbox, transitionInboxItem } from "@/api/inbox";
 import { Skeleton } from "@/components/Skeleton";
+import { useDateLocale } from "@/hooks/useDateLocale";
 
 import { Drawer } from "./Drawer";
 
@@ -16,6 +17,7 @@ interface Props {
 
 export function AlertsDrawer({ open, onClose }: Props): ReactNode {
   const { t } = useTranslation("common");
+  const dateLocale = useDateLocale();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -83,7 +85,10 @@ export function AlertsDrawer({ open, onClose }: Props): ReactNode {
                   </p>
                   <p className="text-xs text-ap-muted line-clamp-2">{item.body}</p>
                   <p className="mt-0.5 text-[11px] text-ap-muted">
-                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(item.created_at), {
+                      addSuffix: true,
+                      locale: dateLocale,
+                    })}
                   </p>
                 </button>
                 <button

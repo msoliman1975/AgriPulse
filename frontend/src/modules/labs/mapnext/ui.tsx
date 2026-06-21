@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 export function Dot({ color, className }: { color: string; className?: string }): ReactNode {
   return (
@@ -118,9 +119,10 @@ export function Sparkline({
   color?: string;
   height?: number;
 }): ReactNode {
+  const { t } = useTranslation("farmConsole");
   const vals = points.filter((p): p is number => p != null);
   if (vals.length < 2) {
-    return <div className="text-xs text-ap-muted">Not enough data for a trend.</div>;
+    return <div className="text-xs text-ap-muted">{t("sparkline.notEnough")}</div>;
   }
   const min = Math.min(...vals);
   const max = Math.max(...vals);

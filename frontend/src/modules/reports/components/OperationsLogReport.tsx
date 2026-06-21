@@ -154,7 +154,7 @@ function LogTable({ entries }: { entries: OpsLogEntry[] }): ReactNode {
               </td>
               <td className="px-3 py-2 text-[11px] text-ap-muted">
                 {e.status ?? "—"}
-                {e.severity ? ` · ${e.severity}` : ""}
+                {e.severity ? ` · ${t(`severity.${e.severity}`, { defaultValue: e.severity })}` : ""}
               </td>
             </tr>
           ))}

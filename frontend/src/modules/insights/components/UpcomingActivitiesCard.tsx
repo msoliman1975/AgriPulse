@@ -1,12 +1,13 @@
 import { format, parseISO } from "date-fns";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { ActivityType } from "@/api/plans";
 import { Badge, type BadgeKind } from "@/components/Badge";
 import { Skeleton } from "@/components/Skeleton";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCalendar } from "@/queries/plans";
-import { activityTypeLabel } from "@/rules/formatting";
 
 interface Props {
   farmId: string;
@@ -40,6 +41,8 @@ function plusDaysIso(days: number): string {
 }
 
 export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
+  const { t } = useTranslation("insights");
+  const dateLocale = useDateLocale();
   const navigate = useNavigate();
   const { data, isLoading } = useCalendar(farmId, todayIso(), plusDaysIso(7));
   const activities = data?.activities ?? [];
@@ -54,14 +57,14 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
           id="upcoming-heading"
           className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
         >
-          This week&apos;s activities
+          {t("upcoming.title")}
         </h2>
         <button
           type="button"
           onClick={() => navigate(`/board/${farmId}`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
-          Plan →
+          {t("upcoming.plan")}
         </button>
       </header>
       <div className="mt-3 flex flex-col gap-2">
@@ -71,7 +74,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
             <Skeleton className="h-10 w-full" />
           </>
         ) : activities.length === 0 ? (
-          <p className="py-3 text-center text-sm text-ap-muted">Nothing scheduled this week.</p>
+          <p className="py-3 text-center text-sm text-ap-muted">{t("upcoming.empty")}</p>
         ) : (
           activities.slice(0, 5).map((a) => {
             const d = parseISO(a.scheduled_date);
@@ -84,16 +87,18 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
               >
                 <div className="flex w-12 flex-none flex-col items-center text-ap-muted">
                   <span className="text-lg font-semibold leading-none text-ap-ink">
-                    {format(d, "d")}
+                    {format(d, "d", { locale: dateLocale })}
                   </span>
-                  <span className="text-[10px] uppercase tracking-wider">{format(d, "EEE")}</span>
+                  <span className="text-[10px] uppercase tracking-wider">
+                    {format(d, "EEE", { locale: dateLocale })}
+                  </span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-ap-ink">
-                    {a.product_name ?? activityTypeLabel(a.activity_type)}
+                    {a.product_name ?? t(`activityType.${a.activity_type}`)}
                   </div>
                   <div className="text-[11px] text-ap-muted">
-                    {activityTypeLabel(a.activity_type)} · {a.duration_days}d
+                    {t(`activityType.${a.activity_type}`)} · {a.duration_days}d
                     {a.start_time ? ` · ${a.start_time.slice(0, 5)}` : ""}
                   </div>
                 </div>

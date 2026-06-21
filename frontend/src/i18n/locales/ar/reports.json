@@ -186,5 +186,10 @@
       "severity": "الخطورة",
       "detail": "ملاحظات"
     }
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
   }
 }

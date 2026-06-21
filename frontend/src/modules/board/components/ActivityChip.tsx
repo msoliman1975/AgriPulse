@@ -4,6 +4,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardActivity } from "@/api/plans";
+import { useDateLocale } from "@/hooks/useDateLocale";
 
 /** Color hint per activity type, using the design system's ap activity tokens
  *  (soft wash + token text + soft border). Keep keys aligned with backend
@@ -48,9 +49,10 @@ interface ActivityChipProps {
 
 export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNode {
   const { t } = useTranslation("board");
+  const dateLocale = useDateLocale();
   const tint = TYPE_TINT[activity.activity_type] ?? "bg-ap-bg text-ap-ink border-ap-line";
   const icon = TYPE_ICON[activity.activity_type] ?? "•";
-  const dayLabel = format(parseISO(activity.scheduled_date), "EEE");
+  const dayLabel = format(parseISO(activity.scheduled_date), "EEE", { locale: dateLocale });
   const isCompleted = activity.status === "completed";
   const isSkipped = activity.status === "skipped";
   const fromTemplate = activity.source === "template";
