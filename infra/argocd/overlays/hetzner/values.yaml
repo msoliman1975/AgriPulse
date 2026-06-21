@@ -77,13 +77,17 @@ global:
   #   toggle recolours blocks by worst disease/pest level (setPaintProperty swap
   #   on the block fill). No migrations, frontend-only → only frontend bumped;
   #   api + workers stay 50683b5, tile-server 9d140cc.
+  # 3833aed = #284 disease & pest pressure report (PR-R5): 6th standard report
+  #   over weather_risk_daily (peak/days-high per block-pathogen) + registry FE
+  #   entry. No migrations (reads #278's table). Backend + FE → api + workers +
+  #   frontend bumped; tile-server stays 9d140cc. (Completes Phase 2.)
   images:
     api:
-      tag: "50683b5"
+      tag: "3833aed"
     workers:
-      tag: "50683b5"
+      tag: "3833aed"
     frontend:
-      tag: "98fb143"
+      tag: "3833aed"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
