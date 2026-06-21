@@ -5,6 +5,7 @@ import type { Capability } from "@/rbac/capabilities";
 import { CropHealthReport } from "./components/CropHealthReport";
 import { OperationsLogReport } from "./components/OperationsLogReport";
 import { WaterBalanceReport } from "./components/WaterBalanceReport";
+import { WeatherRiskPressureReport } from "./components/WeatherRiskPressureReport";
 import { WeatherSummaryReport } from "./components/WeatherSummaryReport";
 import { ZoneAnomalyReport } from "./components/ZoneAnomalyReport";
 
@@ -41,5 +42,10 @@ export const REPORTS: readonly ReportDef[] = [
     Component: WaterBalanceReport,
   },
   { id: "weather-summary", capability: "weather.read", Component: WeatherSummaryReport },
+  {
+    id: "weather-risk-pressure",
+    capability: "weather_risk.read",
+    Component: WeatherRiskPressureReport,
+  },
   { id: "operations-log", capability: "plan.read", Component: OperationsLogReport },
 ];

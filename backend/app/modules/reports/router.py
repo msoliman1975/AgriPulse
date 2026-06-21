@@ -23,6 +23,7 @@ from .schemas import (
     CropHealthReportResponse,
     OperationsLogReportResponse,
     WaterBalanceReportResponse,
+    WeatherRiskPressureReportResponse,
     WeatherSummaryReportResponse,
     ZoneAnomalyReportResponse,
 )
@@ -118,6 +119,25 @@ async def get_water_balance_report(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     out = await service.get_water_balance_report(farm_id=farm_id, since=since, until=until)
+    return out.model_dump(mode="json")
+
+
+@router.get(
+    "/farms/{farm_id}/reports/weather-risk-pressure",
+    response_model=WeatherRiskPressureReportResponse,
+    summary="Disease & pest pressure — per-block pathogen risk over the window (PR-R5).",
+)
+async def get_weather_risk_pressure_report(
+    farm_id: UUID,
+    since: datetime | None = Query(default=None),
+    until: datetime | None = Query(default=None),
+    context: RequestContext = Depends(
+        requires_capability("weather_risk.read", farm_id_param="farm_id")
+    ),
+    service: ReportsService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    out = await service.get_weather_risk_pressure_report(farm_id=farm_id, since=since, until=until)
     return out.model_dump(mode="json")
 
 

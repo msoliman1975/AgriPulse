@@ -37,6 +37,9 @@ from .schemas import (
     WaterBalanceWeather,
     WeatherCropContext,
     WeatherDailyPoint,
+    WeatherRiskPressureReportResponse,
+    WeatherRiskPressureRow,
+    WeatherRiskPressureSummary,
     WeatherSummaryReportResponse,
     WeatherSummaryStats,
     ZoneAnomalyBlockRow,
@@ -461,6 +464,81 @@ class ReportsService:
             summary=summary,
         )
 
+    # ---- PR-R5: Disease & Pest Pressure -------------------------------
+
+    async def get_weather_risk_pressure_report(
+        self,
+        *,
+        farm_id: UUID,
+        since: datetime | None,
+        until: datetime | None,
+    ) -> WeatherRiskPressureReportResponse:
+        """Per-(block, pathogen) disease/pest pressure over the window.
+
+        One row per block-pathogen that has any scored day, carrying the
+        peak/mean score, the day counts at each banding, and the most recent
+        scored day so the FE shows current state next to the peak. Sorted
+        worst-first (latest level, then peak). Blocks with no scored risk in
+        the window simply do not appear."""
+        farm = await self._load_farm(farm_id)
+        period = resolve_period(since, until)
+        blocks = await self._list_active_blocks(farm_id)
+        name_by_id = {b["id"]: (b.get("name") or b.get("code") or str(b["id"])) for b in blocks}
+
+        data = await _select_weather_risk_pressure(
+            self._session,
+            farm_id=farm_id,
+            since=period.since.date(),
+            until=period.until.date(),
+        )
+
+        rows: list[WeatherRiskPressureRow] = []
+        blocks_at_risk: set[UUID] = set()
+        pathogens: set[str] = set()
+        total_high_days = 0
+        for d in data:
+            block_id = d["block_id"]
+            pathogens.add(d["risk_code"])
+            total_high_days += d["days_high"]
+            if d["latest_level"] in ("moderate", "high") or d["days_high"] > 0:
+                blocks_at_risk.add(block_id)
+            rows.append(
+                WeatherRiskPressureRow(
+                    block_id=block_id,
+                    block_name=name_by_id.get(block_id, str(block_id)),
+                    risk_code=d["risk_code"],
+                    days_observed=d["days_observed"],
+                    peak_score=d["peak_score"],
+                    mean_score=d["mean_score"],
+                    days_high=d["days_high"],
+                    days_moderate=d["days_moderate"],
+                    latest_level=d["latest_level"],
+                    latest_score=d["latest_score"],
+                    latest_date=d["latest_date"],
+                )
+            )
+
+        # Worst-first: current level, then peak score, then block name.
+        _level_rank = {"high": 2, "moderate": 1, "low": 0}
+        rows.sort(
+            key=lambda r: (-_level_rank[r.latest_level], -r.peak_score, r.block_name),
+        )
+
+        summary = WeatherRiskPressureSummary(
+            block_count=len({d["block_id"] for d in data}),
+            pathogen_count=len(pathogens),
+            blocks_at_risk=len(blocks_at_risk),
+            total_high_days=total_high_days,
+            row_count=len(rows),
+        )
+        return WeatherRiskPressureReportResponse(
+            farm_id=farm_id,
+            farm_name=farm["name"],
+            period=period,
+            rows=rows,
+            summary=summary,
+        )
+
     # ---- PR-4: Weather & Growing-Degree-Days Summary -------------------
 
     async def get_weather_summary_report(
@@ -665,6 +743,54 @@ def _q2(value: Decimal | None) -> Decimal | None:
 
 def _q3(value: Decimal | None) -> Decimal | None:
     return value.quantize(Decimal("0.001")) if value is not None else None
+
+
+async def _select_weather_risk_pressure(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: date,
+    until: date,
+) -> list[dict[str, Any]]:
+    """Per-(block, pathogen) pressure aggregates over the window, joined to
+    the latest scored day. Returns one dict per block-pathogen with any
+    scored day; blocks/pathogens absent from the window are simply omitted."""
+    from sqlalchemy import bindparam, text
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+    sql = text(
+        """
+        WITH scoped AS (
+            SELECT r.block_id, r.risk_code, r.date, r.score, r.level
+            FROM weather_risk_daily r
+            JOIN blocks b ON b.id = r.block_id AND b.deleted_at IS NULL
+            WHERE b.farm_id = :farm_id
+              AND r.date >= :since AND r.date <= :until
+        ),
+        agg AS (
+            SELECT block_id, risk_code,
+                   count(*) AS days_observed,
+                   max(score) AS peak_score,
+                   round(avg(score))::int AS mean_score,
+                   count(*) FILTER (WHERE level = 'high') AS days_high,
+                   count(*) FILTER (WHERE level = 'moderate') AS days_moderate
+            FROM scoped GROUP BY block_id, risk_code
+        ),
+        latest AS (
+            SELECT DISTINCT ON (block_id, risk_code)
+                   block_id, risk_code,
+                   level AS latest_level, score AS latest_score, date AS latest_date
+            FROM scoped ORDER BY block_id, risk_code, date DESC
+        )
+        SELECT a.block_id, a.risk_code, a.days_observed, a.peak_score, a.mean_score,
+               a.days_high, a.days_moderate,
+               l.latest_level, l.latest_score, l.latest_date
+        FROM agg a JOIN latest l USING (block_id, risk_code)
+        """
+    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
+
+    result = await session.execute(sql, {"farm_id": farm_id, "since": since, "until": until})
+    return [dict(row) for row in result.mappings().all()]
 
 
 async def _select_crop_health_stats(
