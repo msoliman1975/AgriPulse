@@ -15,6 +15,7 @@ from app.modules.indices.computation import (
     BAND_RED_EDGE_1,
     BAND_SWIR1,
     BAND_SWIR2,
+    S2_SCL_MASKED_CLASSES,
     compute_aggregates,
     compute_all_indices,
     evi,
@@ -24,6 +25,7 @@ from app.modules.indices.computation import (
     ndvi,
     ndwi,
     savi,
+    scl_cloud_mask,
 )
 
 # A 2x2 grid with hand-pickable reflectance values.
@@ -36,6 +38,18 @@ NIR = np.array([[0.50, 0.30], [0.02, 0.0]], dtype=np.float32)
 GREEN = np.array([[0.12, 0.18], [0.10, 0.10]], dtype=np.float32)
 BLUE = np.array([[0.08, 0.12], [0.06, 0.07]], dtype=np.float32)
 RED_EDGE = np.array([[0.20, 0.22], [0.04, 0.05]], dtype=np.float32)
+
+
+def test_scl_cloud_mask_flags_cloud_classes_only() -> None:
+    # One pixel per SCL class 0..11 (float32, as it arrives in the COG).
+    scl = np.arange(12, dtype=np.float32).reshape(3, 4)
+    mask = scl_cloud_mask(scl)
+    flagged = {int(v) for v in scl[mask]}
+    assert flagged == set(S2_SCL_MASKED_CLASSES)
+    # Clear land/water classes must NOT be masked.
+    assert not mask[scl == 4.0]  # vegetation
+    assert not mask[scl == 5.0]  # bare soil
+    assert not mask[scl == 6.0]  # water
 
 
 def test_ndvi_matches_hand_computation() -> None:
