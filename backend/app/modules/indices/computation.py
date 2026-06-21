@@ -66,6 +66,25 @@ STANDARD_INDEX_CODES: tuple[str, ...] = (
 )
 
 
+# Sentinel-2 L2A Scene Classification (SCL) values treated as "not usable"
+# for index aggregation: 0 no-data, 1 saturated/defective, 3 cloud shadow,
+# 8 cloud medium-prob, 9 cloud high-prob, 10 thin cirrus, 11 snow/ice. Kept
+# as clear land/water: 2 dark-area pixels, 4 vegetation, 5 bare soil,
+# 6 water, 7 unclassified. Mirrors the evalscript used to validate against
+# CDSE in docs/reports/index-accuracy-agrosina-2026-06-20.md.
+S2_SCL_MASKED_CLASSES: tuple[int, ...] = (0, 1, 3, 8, 9, 10, 11)
+
+
+def scl_cloud_mask(scl: NDArray[Any]) -> NDArray[np.bool_]:
+    """Boolean mask, True where the SCL pixel is cloud/shadow/cirrus/snow/invalid.
+
+    ``scl`` arrives as FLOAT32 (the multi-band COG is a single dtype), so the
+    categorical codes are rounded back to ints before the membership test.
+    """
+    codes = np.rint(scl).astype(np.int16, copy=False)
+    return np.isin(codes, S2_SCL_MASKED_CLASSES)
+
+
 # --- Aggregate result -----------------------------------------------------
 
 

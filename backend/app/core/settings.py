@@ -261,6 +261,25 @@ class Settings(BaseSettings):
     # tolerates one missed poll.
     imagery_discovery_lookback_hours: int = 48
 
+    # Native ground sample distance (metres) requested from the provider's
+    # Process API per scene. The fetch payload previously omitted output
+    # resolution, so Sentinel Hub defaulted to a fixed 256x256 grid — every
+    # AOI was resampled regardless of true size, inflating pixel counts
+    # 25-55x and biasing the mean on smaller / non-square blocks by up to
+    # ~0.03 NDVI (see docs/reports/index-accuracy-agrosina-2026-06-20.md).
+    # Pinning resx/resy to the product's native GSD makes aggregates match
+    # the provider's own server-side computation. 10 m = Sentinel-2 L2A.
+    imagery_native_resolution_m: float = 10.0
+
+    # Apply the Sentinel-2 SCL scene-classification mask before aggregating:
+    # cloud / shadow / cirrus / snow / saturated pixels become NaN, so they
+    # drop out of `valid_pixel_count` and `valid_pixel_pct` reflects the real
+    # clear-pixel fraction (the cloud-cover gate then has teeth). Requires the
+    # provider to fetch one extra band (SCL) into the raw COG. Off → legacy
+    # behaviour: no mask, every in-AOI pixel counts as valid. Raw COGs written
+    # before this flag (no SCL band) are read unmasked regardless.
+    imagery_cloud_mask_enabled: bool = True
+
     # --- Tile server -----------------------------------------------------
     # Served to the frontend via GET /api/v1/config in PR-C so the SPA
     # never hard-codes the URL. Local dev: TiTiler on host port 8001.

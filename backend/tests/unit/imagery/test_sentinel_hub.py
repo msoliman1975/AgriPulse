@@ -12,6 +12,7 @@ We exercise:
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -170,22 +171,29 @@ async def test_discover_paginates_until_next_is_null(
 
 
 @pytest.mark.asyncio
-async def test_fetch_returns_multiband_cog_bytes(
-    configured_provider: SentinelHubProvider,
-) -> None:
+async def test_fetch_requests_native_res_and_scl_band() -> None:
+    """With cloud masking on, the Process request pins native resolution and
+    appends the SCL band; band_order reflects the trailing quality band."""
+    provider = SentinelHubProvider(
+        client_id="c",
+        client_secret="s",
+        oauth_url=_OAUTH_URL,
+        process_url=_PROCESS_URL,
+        resolution_m=10.0,
+        cloud_mask=True,
+    )
     fake_tiff = b"II*\x00fake-cog-bytes"
+    science = ("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2")
     async with respx.mock(base_url="https://services.sentinel-hub.com") as router:
         router.post("/oauth/token").mock(
             return_value=httpx.Response(200, json={"access_token": "tok-1", "expires_in": 3600})
         )
-        router.post("/api/v1/process").mock(
+        process_route = router.post("/api/v1/process").mock(
             return_value=httpx.Response(
-                200,
-                content=fake_tiff,
-                headers={"content-type": "image/tiff"},
+                200, content=fake_tiff, headers={"content-type": "image/tiff"}
             )
         )
-        result = await configured_provider.fetch(
+        result = await provider.fetch(
             scene_id="2026-01-15T08:30:00Z",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
@@ -195,19 +203,50 @@ async def test_fetch_returns_multiband_cog_bytes(
                     [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
                 ],
             },
-            bands=("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2"),
+            bands=science,
         )
+    body = json.loads(process_route.calls.last.request.content)
+    assert body["output"]["resx"] == 10.0
+    assert body["output"]["resy"] == 10.0
+    # SCL appears as an input band in the evalscript when masking is on.
+    assert '"SCL"' in body["evalscript"]
     assert result.cog_bytes == fake_tiff
-    assert result.band_order == (
-        "blue",
-        "green",
-        "red",
-        "red_edge_1",
-        "nir",
-        "swir1",
-        "swir2",
+    assert result.band_order == (*science, "scl")
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_fetch_omits_scl_when_cloud_mask_disabled() -> None:
+    """Cloud masking off → no SCL band, band_order is science-only (legacy)."""
+    provider = SentinelHubProvider(
+        client_id="c",
+        client_secret="s",
+        oauth_url=_OAUTH_URL,
+        process_url=_PROCESS_URL,
+        resolution_m=10.0,
+        cloud_mask=False,
     )
-    await configured_provider.aclose()
+    science = ("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2")
+    async with respx.mock(base_url="https://services.sentinel-hub.com") as router:
+        router.post("/oauth/token").mock(
+            return_value=httpx.Response(200, json={"access_token": "tok-1", "expires_in": 3600})
+        )
+        process_route = router.post("/api/v1/process").mock(
+            return_value=httpx.Response(
+                200, content=b"II*\x00x", headers={"content-type": "image/tiff"}
+            )
+        )
+        result = await provider.fetch(
+            scene_id="s",
+            scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
+            product_code="s2_l2a",
+            aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
+            bands=science,
+        )
+    body = json.loads(process_route.calls.last.request.content)
+    assert '"SCL"' not in body["evalscript"]
+    assert result.band_order == science
+    await provider.aclose()
 
 
 @pytest.mark.asyncio

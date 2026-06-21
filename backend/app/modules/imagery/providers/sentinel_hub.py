@@ -65,6 +65,12 @@ _SH_BAND_NAMES: dict[str, str] = {
     "swir2": "B12",
 }
 
+# Scene Classification band, fetched as a trailing quality band when cloud
+# masking is enabled so the compute step can drop cloud/shadow pixels. Not
+# a "science" band — kept out of `_S2L2A_BAND_ORDER` and the product catalog.
+_SCL_BAND = "scl"
+_SH_BAND_NAMES[_SCL_BAND] = "SCL"
+
 
 @dataclass(slots=True)
 class _CachedToken:
@@ -90,6 +96,8 @@ class SentinelHubProvider:
         oauth_url: str | None = None,
         catalog_url: str | None = None,
         process_url: str | None = None,
+        resolution_m: float | None = None,
+        cloud_mask: bool | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         settings = get_settings()
@@ -103,6 +111,18 @@ class SentinelHubProvider:
         self._oauth_url = oauth_url or settings.sentinel_hub_oauth_url
         self._catalog_url = catalog_url or settings.sentinel_hub_catalog_url
         self._process_url = process_url or settings.sentinel_hub_process_url
+        # Native GSD pinned into the Process output (was unset → 256x256
+        # default) + whether to fetch the SCL band for cloud masking.
+        self._resolution_m = (
+            float(resolution_m)
+            if resolution_m is not None
+            else float(settings.imagery_native_resolution_m)
+        )
+        self._cloud_mask = (
+            bool(cloud_mask)
+            if cloud_mask is not None
+            else bool(settings.imagery_cloud_mask_enabled)
+        )
 
         self._http = http_client or httpx.AsyncClient(timeout=httpx.Timeout(60.0))
         self._owns_http = http_client is None
@@ -310,7 +330,13 @@ class SentinelHubProvider:
         # caller supplied. Cloud Optimized GeoTIFF output is requested
         # via `responses[].format.type=image/tiff`; the COG profile is
         # applied server-side when enabled in our configuration.
-        sh_band_list = [_SH_BAND_NAMES[b] for b in bands]
+        #
+        # When cloud masking is on we append SCL as a trailing band so the
+        # compute step can drop cloud/shadow pixels. It rides in the same
+        # FLOAT32 stack (categorical codes survive the round-trip) and is
+        # reflected in `band_order` so the reader knows the COG layout.
+        out_bands = (*bands, _SCL_BAND) if self._cloud_mask else bands
+        sh_band_list = [_SH_BAND_NAMES[b] for b in out_bands]
         evalscript = _build_multiband_evalscript(sh_band_list)
 
         # Sentinel Hub Process API requires ISO 8601 timestamps in
@@ -342,6 +368,12 @@ class SentinelHubProvider:
                 ],
             },
             "output": {
+                # resx/resy are in the bounds CRS units (EPSG:32636 → metres),
+                # so this pins the output to the product's native GSD instead
+                # of Sentinel Hub's default 256x256 grid. AOIs are per-block
+                # (sub-km), comfortably under the Process API's 2500px/side cap.
+                "resx": self._resolution_m,
+                "resy": self._resolution_m,
                 "responses": [
                     {
                         "identifier": "default",
@@ -360,7 +392,7 @@ class SentinelHubProvider:
         )
         return FetchResult(
             cog_bytes=response.content,
-            band_order=bands,
+            band_order=out_bands,
             content_type="image/tiff; application=geotiff; profile=cloud-optimized",
         )
 
