@@ -51,6 +51,14 @@ export const WEATHER_INDEX_CODES = [
   "evaporation_coeff",
   "rain_et_balance",
 ] as const;
+// Per-block weather-driven disease/pest risk fields (PR-R3). `score` is the
+// 0-100 pressure; `level` its low|moderate|high banding. Mirrors
+// WEATHER_RISK_FIELDS in backend/app/shared/conditions/context.py.
+export const WEATHER_RISK_FIELDS = ["score", "level"] as const;
+// The mango V1 pathogen/pest codes (weather.risk registry). Closed list so
+// the author picks from a dropdown; mirrors REGISTRY in
+// backend/app/modules/weather/risk/registry.py.
+export const WEATHER_RISK_CODES = ["powdery_mildew", "anthracnose", "fruit_fly"] as const;
 // Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
 // backend/app/shared/conditions/context.py.
 export const GRID_FIELDS = [
@@ -74,6 +82,7 @@ export type ValueRefSource =
   | "block"
   | "weather"
   | "weather_index"
+  | "weather_risk"
   | "signals"
   | "grid"
   | "params";
@@ -86,6 +95,11 @@ export type ValueRef =
       source: "weather_index";
       index_code: (typeof WEATHER_INDEX_CODES)[number];
       key: (typeof WEATHER_INDEX_KEYS)[number];
+    }
+  | {
+      source: "weather_risk";
+      risk_code: (typeof WEATHER_RISK_CODES)[number];
+      field: (typeof WEATHER_RISK_FIELDS)[number];
     }
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
@@ -225,6 +239,17 @@ function parseValueRef(raw: unknown): ValueRef | null {
       key: key as (typeof WEATHER_INDEX_KEYS)[number],
     };
   }
+  if (source === "weather_risk") {
+    const risk_code = raw.risk_code as string;
+    if (!(WEATHER_RISK_CODES as readonly string[]).includes(risk_code)) return null;
+    const field = (raw.field ?? "score") as string;
+    if (!(WEATHER_RISK_FIELDS as readonly string[]).includes(field)) return null;
+    return {
+      source: "weather_risk",
+      risk_code: risk_code as (typeof WEATHER_RISK_CODES)[number],
+      field: field as (typeof WEATHER_RISK_FIELDS)[number],
+    };
+  }
   if (source === "signals") {
     const code = typeof raw.code === "string" ? raw.code : "";
     const key = (raw.key ?? "value_numeric") as string;
@@ -308,6 +333,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "weather", scope: ref.scope, field: ref.field };
     case "weather_index":
       return { source: "weather_index", index_code: ref.index_code, key: ref.key };
+    case "weather_risk":
+      return { source: "weather_risk", risk_code: ref.risk_code, field: ref.field };
     case "signals":
       return { source: "signals", code: ref.code, key: ref.key };
     case "grid":
@@ -350,6 +377,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" };
     case "weather_index":
       return { source: "weather_index", index_code: "temperature", key: "baseline_deviation" };
+    case "weather_risk":
+      return { source: "weather_risk", risk_code: "powdery_mildew", field: "score" };
     case "signals":
       return { source: "signals", code: "", key: "value_numeric" };
     case "grid":

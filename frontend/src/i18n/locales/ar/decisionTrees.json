@@ -229,6 +229,7 @@
       "indexCode": "رمز المؤشر",
       "weatherField": "الحقل",
       "weatherIndexCode": "مؤشر الطقس",
+      "weatherRiskCode": "المُمْرِض / الآفة",
       "signalCode": "رمز الإشارة",
       "gridField": "حقل الشبكة",
       "paramName": "اسم المعامل",
@@ -243,6 +244,7 @@
         "block": "خاصية الحقل",
         "weather": "الطقس",
         "weather_index": "مؤشر الطقس (شذوذ)",
+        "weather_risk": "خطر الأمراض/الآفات",
         "signals": "إشارة مخصصة",
         "grid": "شذوذ الشبكة",
         "params": "معامل الشجرة"

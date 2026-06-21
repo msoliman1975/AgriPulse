@@ -147,6 +147,46 @@ describe("parseConditionTree", () => {
     expect(parseConditionTree(raw).kind).toBe("unsupported");
   });
 
+  it("parses a weather_risk score ref (PR-R3)", () => {
+    const raw = {
+      op: "ge",
+      left: { source: "weather_risk", risk_code: "powdery_mildew", field: "score" },
+      right: 70,
+    };
+    const result = parseConditionTree(raw);
+    expect(result.kind).toBe("single");
+    if (result.kind !== "single") return;
+    expect(result.term.left).toEqual({
+      source: "weather_risk",
+      risk_code: "powdery_mildew",
+      field: "score",
+    });
+  });
+
+  it("defaults a weather_risk ref field to score", () => {
+    const raw = {
+      op: "ge",
+      left: { source: "weather_risk", risk_code: "anthracnose" },
+      right: 40,
+    };
+    const result = parseConditionTree(raw);
+    if (result.kind !== "single") throw new Error("expected single");
+    expect(result.term.left).toEqual({
+      source: "weather_risk",
+      risk_code: "anthracnose",
+      field: "score",
+    });
+  });
+
+  it("rejects an unknown weather_risk code (falls to unsupported)", () => {
+    const raw = {
+      op: "ge",
+      left: { source: "weather_risk", risk_code: "locusts", field: "score" },
+      right: 50,
+    };
+    expect(parseConditionTree(raw).kind).toBe("unsupported");
+  });
+
   it("parses a params ref on the right operand", () => {
     const raw = {
       op: "lt",
@@ -200,6 +240,17 @@ describe("round-trip", () => {
       op: "gt",
       left: { source: "weather_index", index_code: "evapotranspiration", key: "value" },
       right: 6,
+    };
+    const parsed = parseConditionTree(original);
+    const back = serializeCondition(parsed);
+    expect(back).toEqual(original);
+  });
+
+  it("preserves a weather_risk level comparison (PR-R3)", () => {
+    const original = {
+      op: "eq",
+      left: { source: "weather_risk", risk_code: "fruit_fly", field: "level" },
+      right: "high",
     };
     const parsed = parseConditionTree(original);
     const back = serializeCondition(parsed);

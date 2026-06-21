@@ -229,6 +229,7 @@
       "indexCode": "Index code",
       "weatherField": "Field",
       "weatherIndexCode": "Weather index",
+      "weatherRiskCode": "Pathogen / pest",
       "signalCode": "Signal code",
       "gridField": "Grid field",
       "paramName": "Parameter name",
@@ -243,6 +244,7 @@
         "block": "Block attribute",
         "weather": "Weather",
         "weather_index": "Weather index (anomaly)",
+        "weather_risk": "Disease/pest risk",
         "signals": "Custom signal",
         "grid": "Grid anomaly",
         "params": "Tree parameter"
