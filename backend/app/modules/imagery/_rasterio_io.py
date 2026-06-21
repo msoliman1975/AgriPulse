@@ -38,6 +38,7 @@ from app.modules.indices.computation import (
     IndexAggregates,
     compute_aggregates,
     compute_all_indices,
+    scl_cloud_mask,
 )
 from app.shared.storage import StorageClient
 
@@ -89,22 +90,40 @@ def load_raw_bands_and_aggregate(
     *,
     band_names: tuple[str, ...],
     aoi_geojson_utm36n: dict[str, Any],
-) -> tuple[dict[str, NDArray[np.float32]], NDArray[np.bool_], dict[str, Any]]:
-    """Read every band into memory + rasterise the AOI mask.
+) -> tuple[
+    dict[str, NDArray[np.float32]],
+    NDArray[np.bool_],
+    NDArray[np.bool_],
+    dict[str, Any],
+]:
+    """Read every band into memory + rasterise the AOI mask + cloud mask.
 
-    Returns ``(bands_arrays, aoi_mask, profile)`` where ``profile`` is
-    a rasterio profile suitable for re-using as the per-index COG
-    write profile (count=1, dtype=float32).
+    Returns ``(bands_arrays, aoi_mask, cloud_mask, profile)`` where
+    ``profile`` is a rasterio profile suitable for re-using as the per-index
+    COG write profile (count=1, dtype=float32).
+
+    ``band_names`` lists the *science* bands. A raw COG may carry one extra
+    trailing band — the SCL scene-classification band the provider appends
+    when cloud masking is enabled. When present, ``cloud_mask`` is True over
+    cloud/shadow/cirrus/snow/invalid pixels; otherwise it is all-False, so
+    pre-SCL COGs (and masking-disabled fetches) aggregate exactly as before.
     """
+    n_science = len(band_names)
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
-        if ds.count != len(band_names):
+        if ds.count not in (n_science, n_science + 1):
             raise ValueError(
-                f"raw COG has {ds.count} bands; expected {len(band_names)} " f"({band_names!r})"
+                f"raw COG has {ds.count} bands; expected {n_science} or "
+                f"{n_science + 1} (science bands {band_names!r} + optional SCL)"
             )
         bands_arrays = {
             name: ds.read(idx + 1).astype(np.float32, copy=False)
             for idx, name in enumerate(band_names)
         }
+        if ds.count == n_science + 1:
+            scl = ds.read(n_science + 1).astype(np.float32, copy=False)
+            cloud_mask = scl_cloud_mask(scl)
+        else:
+            cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
         geom = shape(aoi_geojson_utm36n)
         aoi_mask = ~geometry_mask(
             [geom],
@@ -130,7 +149,7 @@ def load_raw_bands_and_aggregate(
     }
     # default_gtiff_profile contributes BIGTIFF/INTERLEAVE defaults.
     write_profile = {**default_gtiff_profile, **write_profile}
-    return bands_arrays, aoi_mask, write_profile
+    return bands_arrays, aoi_mask, cloud_mask, write_profile
 
 
 def compute_and_write_indices(
@@ -143,6 +162,7 @@ def compute_and_write_indices(
     product_code: str,
     scene_id: str,
     aoi_hash: str,
+    cloud_mask: NDArray[np.bool_] | None = None,
 ) -> tuple[
     dict[str, IndexAggregates],
     dict[str, str],
@@ -156,18 +176,32 @@ def compute_and_write_indices(
     zonal stats (sub-block grid cells, custom AOIs) without re-reading
     from S3. Outside the AOI is NaN — matches what was written to the
     COG. Order matches the catalog (ndvi → gndvi).
+
+    ``cloud_mask`` (True over cloud/shadow/etc., from the SCL band) turns
+    those pixels into NaN *before* aggregation and writing. They stay inside
+    the AOI footprint (``total_pixel_count``) but drop out of
+    ``valid_pixel_count``, so ``valid_pixel_pct`` reflects the real clear
+    fraction, and per-cell grid stats inherit the masking for free.
     """
     indices = compute_all_indices(bands_arrays)
+    has_cloud = cloud_mask is not None and bool(cloud_mask.any())
     aggregates: dict[str, IndexAggregates] = {}
     written_keys: dict[str, str] = {}
     masked_rasters: dict[str, NDArray[np.float32]] = {}
 
     for index_code, raster in indices.items():
-        aggregates[index_code] = compute_aggregates(raster, aoi_mask)
+        # Cloud/shadow pixels → NaN before any stats so they fall out of
+        # valid_pixel_count (but stay in the AOI footprint total).
+        clouded = (
+            np.where(cloud_mask, np.float32("nan"), raster)
+            if has_cloud and cloud_mask is not None
+            else raster
+        )
+        aggregates[index_code] = compute_aggregates(clouded, aoi_mask)
         # Apply the AOI mask to the raster before writing. NaN outside
         # the AOI keeps tile-server rendering clean and lets downstream
         # zonal stats ignore the off-AOI region without re-masking.
-        out_array = np.where(aoi_mask, raster, np.float32("nan"))
+        out_array = np.where(aoi_mask, clouded, np.float32("nan"))
         masked_rasters[index_code] = out_array
 
         # Write to an in-memory GeoTIFF (COG profile) and upload.

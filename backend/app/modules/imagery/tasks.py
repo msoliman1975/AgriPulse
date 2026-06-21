@@ -678,7 +678,7 @@ async def _compute_indices_async(
     bucket = storage.bucket
     raw_uri = f"s3://{bucket}/{raw_bands_key_str}"
     try:
-        bands_arrays, aoi_mask, profile = load_raw_bands_and_aggregate(
+        bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
             raw_uri,
             band_names=tuple(product["bands"]),
             aoi_geojson_utm36n=block["boundary_utm_geojson"],
@@ -686,6 +686,7 @@ async def _compute_indices_async(
         index_aggregates, index_keys, index_rasters = compute_and_write_indices(
             bands_arrays=bands_arrays,
             aoi_mask=aoi_mask,
+            cloud_mask=cloud_mask,
             profile=profile,
             storage=storage,
             provider_code=product["provider_code"],

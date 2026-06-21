@@ -99,6 +99,33 @@ def _build_synthetic_raw_cog_around(
         return bytes(memfile.read())
 
 
+def _build_synthetic_raw_cog_with_scl(
+    *,
+    west: float,
+    north: float,
+    scl_class: int,
+    height: int = 64,
+    width: int = 64,
+) -> bytes:
+    """7 science bands (as above) + a trailing SCL band filled with one class.
+
+    Mirrors what the provider writes when cloud masking is enabled. With an
+    all-cloud SCL (e.g. class 9) every in-AOI pixel must drop out of
+    ``valid_pixel_count`` while ``total_pixel_count`` (the footprint) stays.
+    """
+    base = _build_synthetic_raw_cog_around(west=west, north=north, height=height, width=width)
+    with MemoryFile(base) as mf, mf.open() as src:
+        science = src.read()  # (7, h, w)
+        profile = src.profile.copy()
+    scl = np.full((1, height, width), float(scl_class), dtype=np.float32)
+    stacked = np.concatenate([science, scl], axis=0)
+    profile.update(count=8)
+    with MemoryFile() as memfile:
+        with memfile.open(**profile) as ds:
+            ds.write(stacked)
+        return bytes(memfile.read())
+
+
 def _utm_aoi_geojson() -> dict[str, Any]:
     """A polygon in UTM 36N inside the synthetic raster's footprint."""
     # The synthetic raster spans (480000, 3340000) - (480000+320, 3340000-320).
@@ -427,6 +454,79 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     ).one()
     assets = item_row.content.get("assets", {})
     assert {"raw_bands", "ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"}.issubset(assets.keys())
+
+
+@pytest.mark.asyncio
+async def test_compute_indices_applies_scl_cloud_mask(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An 8-band raw COG (7 science + SCL) with all-cloud SCL masks every
+    in-AOI pixel: total_pixel_count stays positive, valid_pixel_count → 0."""
+    sub_id, block_id, tenant_schema, _product_id = await _set_up_subscription(
+        admin_session, slug="indices-pipeline-scl"
+    )
+    west, north = await _read_block_utm_origin(
+        admin_session, tenant_schema=tenant_schema, block_id=block_id
+    )
+    # SCL class 9 = cloud high-probability → every pixel masked.
+    cog_bytes = _build_synthetic_raw_cog_with_scl(west=west, north=north, scl_class=9)
+    scenes = (
+        DiscoveredScene(
+            scene_id="S2A_INDICES_SCL",
+            scene_datetime=datetime(2026, 3, 9, 8, 30, tzinfo=UTC),
+            cloud_cover_pct=Decimal("95.00"),
+            geometry_geojson=_wgs_aoi_geojson(),
+        ),
+    )
+    storage = _S3DictStorage()
+    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes, cog_bytes))
+    monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: storage)
+    _patch_rasterio_open_to_in_memory(monkeypatch, storage=storage)
+
+    from app.modules.imagery.tasks import (
+        acquire_scene,
+        compute_indices,
+        register_stac_item,
+    )
+
+    monkeypatch.setattr(acquire_scene, "delay", lambda *a, **k: None)
+    monkeypatch.setattr(register_stac_item, "delay", lambda *a, **k: None)
+    monkeypatch.setattr(compute_indices, "delay", lambda *a, **k: None)
+
+    try:
+        await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
+        job_id_raw = (
+            await admin_session.execute(
+                text(
+                    f'SELECT id FROM "{tenant_schema}".imagery_ingestion_jobs '
+                    "WHERE scene_id = 'S2A_INDICES_SCL'"
+                )
+            )
+        ).scalar_one()
+        job_id = UUID(str(job_id_raw))
+        await imagery_tasks._acquire_scene_async(job_id, tenant_schema)
+        raw_bands_key_uploaded = next(
+            k for k in storage.upload_order if k.endswith("/raw_bands.tif")
+        )
+        await imagery_tasks._register_stac_item_async(
+            job_id, tenant_schema, [raw_bands_key_uploaded]
+        )
+        await imagery_tasks._compute_indices_async(job_id, tenant_schema, raw_bands_key_uploaded)
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+    row = (
+        await admin_session.execute(
+            text(
+                f"SELECT mean, valid_pixel_count, total_pixel_count "
+                f"FROM \"{tenant_schema}\".block_index_aggregates WHERE index_code = 'ndvi'"
+            )
+        )
+    ).one()
+    assert row.total_pixel_count > 0, "AOI footprint should still be counted"
+    assert row.valid_pixel_count == 0, "all-cloud SCL must mask every pixel"
+    assert row.mean is None
 
 
 @pytest.mark.asyncio
