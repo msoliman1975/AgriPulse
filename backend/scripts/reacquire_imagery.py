@@ -107,6 +107,11 @@ def main() -> int:
                 conn, subscription_ids=subscription_ids, since=args.since, limit=args.limit
             )
             logger.info("found %d succeeded jobs to re-acquire", len(jobs))
+            # The SET + SELECT above autobegan a read transaction on this
+            # connection; end it so the per-job `conn.begin()` blocks below
+            # don't raise "already initialized a Transaction". The SET is
+            # session-level, so the tenant search_path survives the commit.
+            conn.commit()
 
             if args.dry_run:
                 for j in jobs:
