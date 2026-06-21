@@ -107,3 +107,33 @@ counts are 1 161 (AG-R01-C02), 1 269 (AG-R02-C02), 2 500 (the two large blocks)
 For a *fully* independent cross-check (validating the imagery itself, not just
 our math), repeat against Google Earth Engine harmonized S2 — needs a GEE
 service-account auth, not yet wired.
+
+---
+
+## Update — fixed, deployed & re-verified live (2026-06-21)
+
+Both recommendations shipped (PR #286, squash `ece5615`), deployed to Hetzner
+(overlay bump #288, ArgoCD-synced api + workers), and all 96 agrosina scenes
+were **re-acquired** at native 10 m + SCL via `backend/scripts/reacquire_imagery.py`
+(reset succeeded→pending + delete stale aggregates, then re-fetch + recompute;
+the upserts are `ON CONFLICT DO NOTHING`, so the delete is required). A script
+transaction bug found mid-run was fixed in #289.
+
+Re-running this exact comparison (4 blocks × 6 dates × 7 indices) against the
+CDSE Statistical API afterwards:
+
+| metric | before | after |
+|---|---|---|
+| Mode-A mean error, all 7 indices (MAE) | 0.004–0.010 | **0.0000** |
+| Mode-A mean error, all 7 indices (max abs) | up to 0.038 | **0.0000** |
+| worst block (`AG-R02-C02`) NDVI bias | −0.030 | **0.0000** |
+| pixel-count ratio ours ÷ native-10 m | 41× (26–56×) | **1.0× (0.9–1.0)** |
+
+Post-fix DB state: 672 rows, **0** inflated (none >60 k px), `max valid_pixel_count`
+= 2500 (native), and 336 rows now carry SCL masking (`valid_pixel_pct < 100`).
+Our stored aggregates now match the provider's own server-side computation to
+4-decimal precision. Raw evidence: `scripts/index-accuracy/agrosina-report-after.json`.
+
+Coverage note: re-acquisition only spans the ~3 months of scenes that existed
+(2026-03-20 → 06-18); there is no full-year history (the discovery floor is
+90 days), so a deeper backfill remains a separate effort.
