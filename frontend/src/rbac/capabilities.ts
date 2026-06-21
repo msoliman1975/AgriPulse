@@ -29,6 +29,7 @@ export type Capability =
   | "index.read"
   | "index.compute_custom"
   | "weather.read"
+  | "weather_risk.read"
   | "weather.refresh"
   | "weather.subscription.manage"
   | "alert.read"
@@ -81,6 +82,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.read",
     "index.read",
     "weather.read",
+    "weather_risk.read",
     "alert.read",
     "alert_rule.read",
     "plan.read",
@@ -115,6 +117,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "index.read",
     "index.compute_custom",
     "weather.read",
+    "weather_risk.read",
     "weather.refresh",
     "weather.subscription.manage",
     "alert.read",
@@ -146,6 +149,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "index.read",
     "index.compute_custom",
     "weather.read",
+    "weather_risk.read",
     "weather.refresh",
     "alert.read",
     "alert.acknowledge",
@@ -174,6 +178,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.read",
     "index.read",
     "weather.read",
+    "weather_risk.read",
     "alert.read",
     "plan.read",
     "plan_activity.complete",
@@ -191,6 +196,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.read",
     "index.read",
     "weather.read",
+    "weather_risk.read",
     "alert.read",
     "plan.read",
     "resource.read",
@@ -206,6 +212,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.read",
     "index.read",
     "weather.read",
+    "weather_risk.read",
     "alert.read",
     "plan.read",
     "resource.read",
@@ -241,6 +248,7 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "index.read",
     "index.compute_custom",
     "weather.read",
+    "weather_risk.read",
     "weather.refresh",
     "weather.subscription.manage",
     "alert.read",

@@ -1,0 +1,31 @@
+{
+  "pathogen": {
+    "powdery_mildew": "Powdery mildew",
+    "anthracnose": "Anthracnose",
+    "fruit_fly": "Fruit fly"
+  },
+  "level": {
+    "low": "Low",
+    "moderate": "Moderate",
+    "high": "High"
+  },
+  "overlay": {
+    "label": "Disease/pest risk",
+    "toggle": "Risk",
+    "atRisk": "{{count}} at risk"
+  },
+  "panel": {
+    "title": "Disease & pest risk",
+    "empty": "No active disease or pest risk for this block.",
+    "score": "Pressure",
+    "loadFailed": "Couldn't load risk data."
+  },
+  "widget": {
+    "title": "Disease & pest risk",
+    "subtitle": "Blocks at moderate or high pressure",
+    "blocksAtRisk_one": "{{count}} block at risk",
+    "blocksAtRisk_other": "{{count}} blocks at risk",
+    "none": "No blocks at risk",
+    "viewMap": "View on map"
+  }
+}
