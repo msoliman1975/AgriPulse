@@ -69,13 +69,17 @@ global:
   #   anthracnose / fruit fly) + the FE authoring field. No migrations (reads
   #   weather_risk_daily from #278; trees auto-published by sync_from_disk).
   #   Backend + FE → api + workers + frontend bumped; tile-server stays 9d140cc.
+  # 5efbf4c = #282 weather-risk map drawer + Insights widget (PR-R4a): per-block
+  #   disease/pest risk in the /labs/map DetailPanel + an Insights active-risks
+  #   widget + weatherRisk API client/i18n/cap. No migrations, frontend-only →
+  #   only frontend bumped; api + workers stay 50683b5, tile-server 9d140cc.
   images:
     api:
       tag: "50683b5"
     workers:
       tag: "50683b5"
     frontend:
-      tag: "50683b5"
+      tag: "5efbf4c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
