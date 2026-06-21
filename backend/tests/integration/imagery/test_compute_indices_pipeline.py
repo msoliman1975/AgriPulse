@@ -469,13 +469,16 @@ async def test_compute_indices_applies_scl_cloud_mask(
     west, north = await _read_block_utm_origin(
         admin_session, tenant_schema=tenant_schema, block_id=block_id
     )
-    # SCL class 9 = cloud high-probability → every pixel masked.
+    # SCL class 9 = cloud high-probability → every pixel masked. The scene's
+    # catalog cloud_cover_pct is deliberately LOW (under the discovery cap, so
+    # the scene is acquired, not skipped_cloud) — the masking under test comes
+    # from the per-pixel SCL band, not the scene-level cloud metadata.
     cog_bytes = _build_synthetic_raw_cog_with_scl(west=west, north=north, scl_class=9)
     scenes = (
         DiscoveredScene(
             scene_id="S2A_INDICES_SCL",
             scene_datetime=datetime(2026, 3, 9, 8, 30, tzinfo=UTC),
-            cloud_cover_pct=Decimal("95.00"),
+            cloud_cover_pct=Decimal("5.00"),
             geometry_geojson=_wgs_aoi_geojson(),
         ),
     )
