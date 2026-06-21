@@ -73,13 +73,17 @@ global:
   #   disease/pest risk in the /labs/map DetailPanel + an Insights active-risks
   #   widget + weatherRisk API client/i18n/cap. No migrations, frontend-only →
   #   only frontend bumped; api + workers stay 50683b5, tile-server 9d140cc.
+  # 98fb143 = #283 weather-risk map overlay (PR-R4b): a "Risk" /labs/map toolbar
+  #   toggle recolours blocks by worst disease/pest level (setPaintProperty swap
+  #   on the block fill). No migrations, frontend-only → only frontend bumped;
+  #   api + workers stay 50683b5, tile-server 9d140cc.
   images:
     api:
       tag: "50683b5"
     workers:
       tag: "50683b5"
     frontend:
-      tag: "5efbf4c"
+      tag: "98fb143"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
