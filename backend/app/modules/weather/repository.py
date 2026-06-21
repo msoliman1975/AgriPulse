@@ -931,6 +931,157 @@ class WeatherRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    # ---- Weather risk (Phase 2) ---------------------------------------
+
+    async def list_active_blocks_with_current_crop(self) -> tuple[dict[str, Any], ...]:
+        """``(block_id, farm_id, crop_path, growth_stage, canopy_size_class)``
+        for every current, live ``block_crops`` row with a crop assigned.
+
+        Raw SQL over the tenant tables on purpose: the weather module may not
+        import ``farms.repository``/``farms.models`` (import-linter), and this
+        avoids it. Mirrors the eligibility filter of farms' phenology-advance
+        query, minus the stage lock — a manually-set ``growth_stage`` is still
+        a valid risk input, only auto-advance honours the lock.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT bc.block_id, b.farm_id, bc.crop_path,
+                               bc.growth_stage, bc.canopy_size_class
+                        FROM block_crops bc
+                        JOIN blocks b ON b.id = bc.block_id
+                        WHERE bc.is_current = TRUE
+                          AND bc.deleted_at IS NULL
+                          AND bc.crop_path <> ''
+                          AND bc.status NOT IN ('completed', 'aborted')
+                        """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def upsert_weather_risk_daily(
+        self,
+        *,
+        block_id: UUID,
+        date: date_type,
+        risk_code: str,
+        score: int,
+        level: str,
+        inputs: dict[str, Any],
+    ) -> None:
+        """Insert-or-replace one ``(block_id, date, risk_code)`` risk row."""
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO weather_risk_daily (
+                    block_id, date, risk_code, score, level, inputs, computed_at
+                ) VALUES (
+                    :block_id, :date, :risk_code, :score, :level,
+                    CAST(:inputs AS jsonb), now()
+                )
+                ON CONFLICT (block_id, date, risk_code) DO UPDATE SET
+                    score = EXCLUDED.score,
+                    level = EXCLUDED.level,
+                    inputs = EXCLUDED.inputs,
+                    computed_at = now()
+                """
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            {
+                "block_id": block_id,
+                "date": date,
+                "risk_code": risk_code,
+                "score": score,
+                "level": level,
+                "inputs": json.dumps(inputs),
+            },
+        )
+
+    async def read_weather_risk_timeseries(
+        self,
+        *,
+        farm_id: UUID,
+        block_id: UUID,
+        risk_code: str,
+        since: date_type | None,
+        until: date_type | None,
+    ) -> tuple[dict[str, Any], ...]:
+        """One ``(block, risk_code)`` score series, scoped to its farm.
+
+        The ``blocks`` join enforces farm ownership so a caller authorised on
+        ``farm_id`` cannot read a block in another farm (an empty series if the
+        block is not in the farm). ``[since, until)`` when provided.
+        """
+        clauses = [
+            "r.block_id = :block_id",
+            "r.risk_code = :risk_code",
+            "b.farm_id = :farm_id",
+        ]
+        params: dict[str, Any] = {
+            "block_id": block_id,
+            "risk_code": risk_code,
+            "farm_id": farm_id,
+        }
+        if since is not None:
+            clauses.append("r.date >= :since")
+            params["since"] = since
+        if until is not None:
+            clauses.append("r.date < :until")
+            params["until"] = until
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT r.date, r.risk_code, r.score, r.level, r.inputs
+                        FROM weather_risk_daily r
+                        JOIN blocks b ON b.id = r.block_id
+                        WHERE {" AND ".join(clauses)}
+                        ORDER BY r.date ASC
+                        """
+                    ).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def read_weather_risk_summary(self, *, farm_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Latest score per ``(block, risk_code)`` across a farm — map overlay.
+
+        ``DISTINCT ON`` keeps the most recent row per block+pathogen.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT DISTINCT ON (r.block_id, r.risk_code)
+                               r.block_id, r.risk_code, r.date, r.score, r.level
+                        FROM weather_risk_daily r
+                        JOIN blocks b ON b.id = r.block_id
+                        WHERE b.farm_id = :farm_id
+                        ORDER BY r.block_id, r.risk_code, r.date DESC
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
 
 def _d(v: Decimal | None) -> Decimal | None:
     """No-op coercion; here so the asyncpg → Decimal binding is explicit."""

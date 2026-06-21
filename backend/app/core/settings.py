@@ -186,6 +186,11 @@ class Settings(BaseSettings):
     # PR-W3). Same rationale + default as the indices baseline sweep.
     weather_baseline_recompute_seconds: int = 3600
 
+    # Cadence for `weather.compute_risk_daily_sweep` — the per-block disease/
+    # pest risk scores over a trailing weather window (Weather-Indices PR-R2).
+    # 86400 = once per day; pure accumulation math, light queue.
+    weather_risk_compute_seconds: int = 86400
+
     # Cadence for `alerts.evaluate_alerts_sweep`. Nightly in production;
     # 30 minutes in dev so a freshly-ingested scene flips into alerts
     # within one Beat cycle.

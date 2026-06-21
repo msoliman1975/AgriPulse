@@ -33,6 +33,7 @@ roles:
       - imagery.read
       - index.read
       - weather.read
+      - weather_risk.read
       - signal.read
       - alert.read
       - alert_rule.read
@@ -85,6 +86,7 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather_risk.read
       - weather.refresh
       - weather.subscription.manage
       - signal.read
@@ -161,6 +163,7 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather_risk.read
       - weather.refresh
       - weather.subscription.manage
       - signal.read
@@ -235,6 +238,7 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather_risk.read
       - weather.refresh
       - weather.subscription.manage
       - signal.read
@@ -276,6 +280,7 @@ roles:
       - index.read
       - index.compute_custom
       - weather.read
+      - weather_risk.read
       - weather.refresh
       - signal.read
       - signal.record
@@ -312,6 +317,7 @@ roles:
       - imagery.read
       - index.read
       - weather.read
+      - weather_risk.read
       - signal.read
       - signal.record
       - alert.read
@@ -339,6 +345,7 @@ roles:
       - imagery.read
       - index.read
       - weather.read
+      - weather_risk.read
       - signal.read
       - signal.record
       - alert.read
@@ -361,6 +368,7 @@ roles:
       - imagery.read
       - index.read
       - weather.read
+      - weather_risk.read
       - signal.read
       - alert.read
       - plan.read

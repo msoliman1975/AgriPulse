@@ -15,6 +15,13 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
+
+# The farm centroid (31.2, 30.0) resolves to Africa/Cairo. Anchor test
+# forecasts on the REAL zone (DST-aware, UTC+3 in summer) instead of a
+# hardcoded offset, so "today" matches the endpoint's bucketing even when the
+# suite runs near the local-midnight boundary.
+_CAIRO = ZoneInfo("Africa/Cairo")
 
 import pytest
 from sqlalchemy import text
@@ -229,16 +236,10 @@ async def test_forecast_endpoint_aggregates_in_farm_tz(admin_session: AsyncSessi
     """Forecast endpoint returns one row per local-tz day with high/low/precip."""
     tenant, farm_id, block_id = await _bootstrap_tenant_with_block(admin_session, "wx-forecast-tz")
 
-    # Build hourly forecasts spanning today + tomorrow Cairo time.
-    cairo_offset = timedelta(hours=2)
-    today_local_midnight_utc = (
-        datetime.now(UTC).replace(minute=0, second=0, microsecond=0).astimezone(UTC)
-    )
-    # Anchor on Cairo "today 00:00".
-    now_cairo = datetime.now(UTC) + cairo_offset
+    # Anchor on Cairo "today 00:00" using the real (DST-aware) zone.
+    now_cairo = datetime.now(_CAIRO)
     today_local_midnight_cairo = now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_midnight_utc = today_local_midnight_cairo.astimezone(UTC).replace(tzinfo=UTC)
-    del today_local_midnight_utc  # silence unused — kept for readability
+    today_midnight_utc = today_local_midnight_cairo.astimezone(UTC)
 
     # Two hours today (cairo), high 30 / low 25, with one rainy hour
     # (probability 80%, precip 5mm). Tomorrow has nothing — that day's
@@ -297,9 +298,9 @@ async def test_forecast_returns_only_latest_issuance(admin_session: AsyncSession
         admin_session, "wx-forecast-latest"
     )
 
-    now_cairo = datetime.now(UTC) + timedelta(hours=2)
+    now_cairo = datetime.now(_CAIRO)
     today_midnight_cairo = now_cairo.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_midnight_utc = today_midnight_cairo.astimezone(UTC).replace(tzinfo=UTC)
+    today_midnight_utc = today_midnight_cairo.astimezone(UTC)
     target_time = today_midnight_utc + timedelta(hours=12)
 
     issuance_a = today_midnight_utc
