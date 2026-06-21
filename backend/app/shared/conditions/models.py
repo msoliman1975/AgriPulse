@@ -191,7 +191,7 @@ ValueRef = (
 )
 
 
-def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - dispatch over ref sources
+def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - dispatch
     """Strict parse of a leaf value-ref dict.
 
     Raises ``ConditionParseError`` on unknown source or missing/invalid
