@@ -1,0 +1,156 @@
+# mango_anthracnose_risk_v1 — surface a scouting/protection recommendation
+# when the weather-driven anthracnose (Colletotrichum gloeosporioides)
+# pressure on a mango block is high. Reads the PR-R2 `weather_risk` index
+# (warm + WET days through flowering and fruit development).
+
+code: mango_anthracnose_risk_v1
+name_en: Mango — anthracnose risk
+name_ar: المانجو — خطر الأنثراكنوز
+description_en: >-
+  When the anthracnose pressure index is high for a mango block (warm, wet
+  days through flowering and fruit development), queue a scouting visit and a
+  protective spray decision. Critical at very high pressure, warning at
+  moderate pressure.
+description_ar: >-
+  عند ارتفاع مؤشر ضغط الأنثراكنوز لقطعة مانجو (أيام دافئة رطبة خلال التزهير
+  وتطور الثمار)، حدّد زيارة فحص وقرار رشّ وقائي. حرجة عند الضغط المرتفع جدًا
+  وتحذيرية عند الضغط المتوسط.
+
+crop_path: mango
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Anthracnose (Colletotrichum gloeosporioides) needs warm temperatures
+    (~24-30 C) AND prolonged leaf wetness (rain or near-saturated air);
+    heavy rain markedly increases blossom blight and latent fruit
+    infections. The risk score is a rule-of-thumb accumulation of warm-wet
+    days (PR-R1), not a validated infection model, so the rule recommends
+    scouting + a protective-spray decision (copper / strobilurin) timed
+    around wet spells rather than a blind application. Thresholds are tunable.
+  citations:
+    - source_type: research_institution
+      title: CABI Crop Protection Compendium — Colletotrichum gloeosporioides (anthracnose)
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: Anthracnose pressure score at/above which a warning is raised.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: Pressure score at/above which the risk is treated as critical.
+
+root: root
+nodes:
+  root:
+    label_en: Is anthracnose pressure elevated?
+    label_ar: هل ضغط الأنثراكنوز مرتفع؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: anthracnose
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the pressure high (critical)?
+    label_ar: هل الضغط مرتفع (حرج)؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: anthracnose
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_critical
+    on_miss: leaf_warning
+
+  leaf_critical:
+    label_en: High anthracnose pressure — scout and protect now
+    label_ar: ضغط مرتفع للأنثراكنوز — افحص واحمِ الآن
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.75
+      valid_for_hours: 120
+      parameters:
+        priority: high
+        within_hours: 24
+        pathogen: anthracnose
+      text_en: >-
+        Warm, wet weather favours anthracnose on this mango block. Heavy rain
+        increases anthracnose on blossoms and developing fruit. Scout
+        panicles and fruit within 24 hours and apply a protective fungicide
+        (copper or strobilurin) timed around the wet spell.
+      text_ar: >-
+        الطقس الدافئ الرطب مهيّئ للأنثراكنوز على قطعة المانجو هذه. الأمطار
+        الغزيرة تزيد الأنثراكنوز على الأزهار والثمار النامية. افحص النورات
+        والثمار خلال 24 ساعة وطبّق مبيدًا فطريًا وقائيًا (نحاسي أو
+        ستروبيلورين) بتوقيت يرتبط بموجة الأمطار.
+      actions:
+        immediate:
+          - text_en: Scout blossoms and developing fruit for dark sunken lesions within 24h.
+            text_ar: افحص الأزهار والثمار النامية بحثًا عن بُقع غائرة داكنة خلال 24 ساعة.
+        short_term:
+          - text_en: >-
+              Apply a protective fungicide (copper / strobilurin) before or
+              right after rain; maintain cover through the wet period.
+            text_ar: >-
+              طبّق مبيدًا فطريًا وقائيًا (نحاسي / ستروبيلورين) قبل المطر أو
+              بعده مباشرة؛ وحافظ على التغطية خلال الفترة الرطبة.
+        monitoring:
+          - text_en: Re-scout after rain and remove mummified fruit and dead wood.
+            text_ar: أعد الفحص بعد المطر وأزل الثمار المتحجّرة والأخشاب الميتة.
+
+  leaf_warning:
+    label_en: Moderate anthracnose pressure — add to scouting round
+    label_ar: ضغط متوسط للأنثراكنوز — أضِف لجولة الفحص
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        within_hours: 72
+        pathogen: anthracnose
+      text_en: >-
+        Anthracnose pressure is building on this mango block. Add it to your
+        next routine scouting round (within 72 hours) and have protective
+        fungicide ready ahead of the next wet spell.
+      text_ar: >-
+        ضغط الأنثراكنوز يتزايد على قطعة المانجو هذه. أضِفها إلى جولة الفحص
+        الروتينية التالية (خلال 72 ساعة) وجهّز مبيدًا فطريًا وقائيًا قبل موجة
+        الأمطار التالية.
+
+  leaf_no_action:
+    label_en: No action — anthracnose pressure low
+    label_ar: لا إجراء — ضغط الأنثراكنوز منخفض
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Weather is not currently favourable for anthracnose on this block.
+      text_ar: الطقس غير مهيّئ حاليًا للأنثراكنوز على هذه القطعة.
