@@ -41,7 +41,30 @@ interface Props {
   // drawer only). Null for units that can't take a crop / users lacking
   // the capability.
   cropAssign?: React.ReactNode;
+  // Weather-driven disease/pest risk for this block (PR-R4), worst-first.
+  // Empty/undefined hides the section; gated on weather_risk.read by parent.
+  risks?: BlockRisk[];
 }
+
+export interface BlockRisk {
+  risk_code: string;
+  level: "low" | "moderate" | "high";
+  score: number;
+}
+
+// Pathogen display names (the map drawer is English-labelled like the rest of
+// this module; the Insights widget + map overlay carry the localized strings).
+const RISK_LABEL: Record<string, string> = {
+  powdery_mildew: "Powdery mildew",
+  anthracnose: "Anthracnose",
+  fruit_fly: "Fruit fly",
+};
+
+const RISK_STYLE: Record<BlockRisk["level"], { border: string; bg: string; text: string }> = {
+  high: { border: "#A32D2D", bg: "#fcebeb", text: "#501313" },
+  moderate: { border: "#854F0B", bg: "#faeeda", text: "#412402" },
+  low: { border: "#3B6D11", bg: "#eaf3de", text: "#173404" },
+};
 
 const HEALTH_LABEL = {
   healthy: "Healthy",
@@ -84,6 +107,7 @@ export function DetailPanel({
   reshapeSaving,
   gridConfig,
   cropAssign,
+  risks,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<IndexCode | null>(null);
   const editing = Boolean(editableBlock);
@@ -278,6 +302,26 @@ export function DetailPanel({
               {a.message}
             </div>
           ))}
+        </Section>
+      ) : null}
+
+      {risks && risks.length > 0 ? (
+        <Section title={`Disease & pest risk (${risks.length})`}>
+          {risks.map((r) => {
+            const s = RISK_STYLE[r.level];
+            return (
+              <div
+                key={r.risk_code}
+                className="mt-1 flex items-center justify-between rounded border-s-4 px-2 py-1 text-[11px]"
+                style={{ borderColor: s.border, background: s.bg, color: s.text }}
+              >
+                <span className="font-medium">{RISK_LABEL[r.risk_code] ?? r.risk_code}</span>
+                <span className="tabular-nums">
+                  {r.level} · {r.score}
+                </span>
+              </div>
+            );
+          })}
         </Section>
       ) : null}
 

@@ -43,7 +43,10 @@ import {
   type SignalDefinition,
 } from "@/api/signals";
 import { BlockCropAssignCard } from "./BlockCropAssignCard";
-import { DetailPanel } from "./DetailPanel";
+import { getWeatherRiskSummary, type RiskLevel } from "@/api/weatherRisk";
+import { useCapability } from "@/rbac/useCapability";
+
+import { DetailPanel, type BlockRisk } from "./DetailPanel";
 import { DrawBlockModal, type DrawBlockFormValues } from "./DrawBlockModal";
 import { CreatePivotModal } from "./CreatePivotModal";
 import { DrawReadout } from "./DrawReadout";
@@ -312,6 +315,25 @@ function MapForFarm({ farmId }: { farmId: string }) {
     for (const b of summaryQ.data?.blocks ?? []) m.set(b.id, b);
     return m;
   }, [summaryQ.data]);
+
+  // Per-block weather-driven disease/pest risk (PR-R4). Gated on
+  // weather_risk.read; drives the risk overlay fill + the drawer section.
+  const canReadRisk = useCapability("weather_risk.read", { farmId });
+  const riskSummaryQ = useQuery({
+    queryKey: ["labs/map/riskSummary", farmId],
+    queryFn: () => getWeatherRiskSummary(farmId),
+    enabled: Boolean(farmId) && canReadRisk,
+    staleTime: 60_000,
+  });
+  // The selected block's pathogens, worst-first, for the drawer section.
+  const selectedBlockRisks = useMemo<BlockRisk[]>(() => {
+    if (!selectedId) return [];
+    const rank: Record<RiskLevel, number> = { low: 0, moderate: 1, high: 2 };
+    return (riskSummaryQ.data?.risks ?? [])
+      .filter((r) => r.block_id === selectedId)
+      .map((r) => ({ risk_code: r.risk_code, level: r.level, score: r.score }))
+      .sort((a, b) => rank[b.level] - rank[a.level] || b.score - a.score);
+  }, [riskSummaryQ.data, selectedId]);
 
   const detailQ = useQuery({
     queryKey: ["labs/map/detail", farmId, selectedId],
@@ -1029,6 +1051,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
           <DetailPanel
             detail={detailQ.data ?? null}
             isLoading={detailQ.isLoading}
+            risks={selectedBlockRisks}
             onClose={closePanel}
             width={drawerWidth}
             onResizeMouseDown={onResizeMouseDown}

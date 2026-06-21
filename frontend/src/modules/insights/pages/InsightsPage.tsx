@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
+import { ActiveRisksWidget } from "../components/ActiveRisksWidget";
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
 import { FarmWeatherChart } from "../components/FarmWeatherChart";
@@ -44,6 +45,7 @@ export function InsightsPage(): ReactNode {
     enabled: Boolean(farmId),
   });
   const canReadWeather = useCapability("weather.read", { farmId });
+  const canReadRisk = useCapability("weather_risk.read", { farmId });
 
   // FarmWeatherChart keys on block_id but resolves to the farm
   // centroid internally; pulling the first block is the existing
@@ -116,6 +118,8 @@ export function InsightsPage(): ReactNode {
       {canReadWeather && firstBlock ? <FarmWeatherChart blockId={firstBlock.id} /> : null}
 
       {canReadWeather ? <WeatherIndicesStrip farmId={farmId} /> : null}
+
+      {canReadRisk ? <ActiveRisksWidget farmId={farmId} /> : null}
 
       <BlockHealthScorecard farmId={farmId} />
     </div>
