@@ -49,6 +49,32 @@ class WeatherIndexEntry:
     baseline_deviation: Decimal | None = None
 
 
+# Allowed fields for a weather-risk value-ref (PR-R3). ``score`` is the 0-100
+# disease/pest pressure; ``level`` its low|moderate|high banding (a categorical,
+# compared with eq/ne). Both None when the block has no ``weather_risk_daily``
+# row for that pathogen yet, so a predicate fails closed.
+WEATHER_RISK_FIELDS: tuple[str, ...] = (
+    "score",
+    "level",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherRiskEntry:
+    """Latest ``weather_risk_daily`` row for one pathogen on a block (PR-R3).
+
+    Block-keyed (unlike the farm-level ``WeatherIndexEntry``): risk folds in the
+    block's crop + growth stage, so it varies block to block even though the
+    weather driver is the farm centroid. ``score`` is the 0-100 accumulation;
+    ``level`` its banding. Empty for blocks the daily risk sweep hasn't scored,
+    so ``{source: weather_risk}`` predicates fail closed.
+    """
+
+    date: date
+    score: int | None = None
+    level: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class IndicesEntry:
     """One row pulled from ``block_index_aggregates`` (latest per index),
@@ -199,6 +225,11 @@ class ConditionContext:
     # climatology. Empty for farms with no projected `weather_index_daily`
     # rows, so `{source: weather_index}` predicates fail closed.
     weather_indices: dict[str, WeatherIndexEntry] = field(default_factory=dict)
+    # Per-block weather-driven disease/pest risk scores keyed by risk_code
+    # (PR-R3); each carries the latest 0-100 score + low|moderate|high level.
+    # Empty for blocks the daily risk sweep hasn't scored, so
+    # `{source: weather_risk}` predicates fail closed.
+    weather_risks: dict[str, WeatherRiskEntry] = field(default_factory=dict)
     signals: dict[str, SignalEntry] = field(default_factory=dict)
     # Sub-block grid spatial-anomaly verdicts keyed by index_code (G-4).
     # Populated by the recommendations driver only when the block has an
@@ -221,6 +252,7 @@ class ConditionContext:
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
         weather_indices: dict[str, WeatherIndexEntry] | None = None,
+        weather_risks: dict[str, WeatherRiskEntry] | None = None,
         signals: dict[str, SignalEntry] | None = None,
         grid: dict[str, GridAnomalyEntry] | None = None,
         params: dict[str, Any] | None = None,
@@ -253,6 +285,7 @@ class ConditionContext:
             indices=indices,
             weather=weather,
             weather_indices=weather_indices or {},
+            weather_risks=weather_risks or {},
             signals=signals or {},
             grid=grid or {},
             params=dict(params or {}),

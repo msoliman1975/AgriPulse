@@ -1,0 +1,157 @@
+# mango_powdery_mildew_risk_v1 — surface a scouting recommendation when the
+# weather-driven powdery-mildew (Oidium mangiferae) pressure on a mango block
+# is high. Reads the PR-R2 `weather_risk` index (warm-humid-dry accumulation
+# through the panicle/flowering window); the tree decides the action, the
+# index does the science (proposal: risk = index, tree = policy).
+
+code: mango_powdery_mildew_risk_v1
+name_en: Mango — powdery mildew risk
+name_ar: المانجو — خطر البياض الدقيقي
+description_en: >-
+  When the powdery-mildew pressure index is high for a mango block (warm,
+  humid, rain-free days through flowering), queue a scouting visit and a
+  protective spray decision. Critical at very high pressure, warning at
+  moderate pressure.
+description_ar: >-
+  عند ارتفاع مؤشر ضغط البياض الدقيقي لقطعة مانجو (أيام دافئة رطبة بلا مطر خلال
+  التزهير)، حدّد زيارة فحص وقرار رشّ وقائي. حرجة عند الضغط المرتفع جدًا
+  وتحذيرية عند الضغط المتوسط.
+
+crop_path: mango
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Powdery mildew (Oidium mangiferae) is favoured by moderate-warm
+    temperatures (~20-27 C) and high humidity but suppressed by free water
+    on the leaf; pressure is worst on panicles and flowers. The risk score
+    is a rule-of-thumb accumulation of favourable days (PR-R1), not a
+    validated infection model, so the rule recommends scouting + a
+    protective-spray decision rather than prescribing a blind application.
+    Thresholds are tunable per tenant.
+  citations:
+    - source_type: research_institution
+      title: CABI Crop Protection Compendium — Oidium mangiferae (mango powdery mildew)
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: Powdery-mildew pressure score at/above which a warning is raised.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: Pressure score at/above which the risk is treated as critical.
+
+root: root
+nodes:
+  root:
+    label_en: Is powdery-mildew pressure elevated?
+    label_ar: هل ضغط البياض الدقيقي مرتفع؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: powdery_mildew
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the pressure high (critical)?
+    label_ar: هل الضغط مرتفع (حرج)؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: powdery_mildew
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_critical
+    on_miss: leaf_warning
+
+  leaf_critical:
+    label_en: High powdery-mildew pressure — scout and protect now
+    label_ar: ضغط مرتفع للبياض الدقيقي — افحص واحمِ الآن
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.75
+      valid_for_hours: 120
+      parameters:
+        priority: high
+        within_hours: 24
+        pathogen: powdery_mildew
+      text_en: >-
+        Weather favours powdery mildew on this mango block. Heat and humidity
+        stress predispose flowering mango to powdery mildew. Scout panicles
+        and young flowers within 24 hours and apply a protective fungicide
+        (e.g. wettable sulphur) if white powdery growth is found.
+      text_ar: >-
+        الطقس مهيّئ للبياض الدقيقي على قطعة المانجو هذه. الإجهاد الحراري
+        والرطوبة يزيدان احتمالية إصابة المانجو المُزهر بالبياض الدقيقي. افحص
+        النورات والأزهار الصغيرة خلال 24 ساعة وطبّق مبيدًا فطريًا وقائيًا (مثل
+        الكبريت القابل للبلل) عند وجود نموّ دقيقي أبيض.
+      actions:
+        immediate:
+          - text_en: Scout panicles/flowers for white powdery growth within 24 hours.
+            text_ar: افحص النورات والأزهار بحثًا عن نموّ دقيقي أبيض خلال 24 ساعة.
+        short_term:
+          - text_en: >-
+              Apply a protective fungicide (wettable sulphur) if mildew is
+              confirmed; avoid spraying during open bloom at midday.
+            text_ar: >-
+              طبّق مبيدًا فطريًا وقائيًا (كبريت قابل للبلل) عند تأكّد الإصابة؛
+              وتجنّب الرشّ خلال التزهير الكامل وقت الظهيرة.
+        monitoring:
+          - text_en: Re-scout after the next humid-dry spell.
+            text_ar: أعد الفحص بعد الموجة الرطبة الجافة التالية.
+
+  leaf_warning:
+    label_en: Moderate powdery-mildew pressure — add to scouting round
+    label_ar: ضغط متوسط للبياض الدقيقي — أضِف لجولة الفحص
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        within_hours: 72
+        pathogen: powdery_mildew
+      text_en: >-
+        Powdery-mildew pressure is building on this mango block. Add it to
+        your next routine scouting round (within 72 hours) and have protective
+        fungicide ready in case pressure keeps rising through flowering.
+      text_ar: >-
+        ضغط البياض الدقيقي يتزايد على قطعة المانجو هذه. أضِفها إلى جولة الفحص
+        الروتينية التالية (خلال 72 ساعة) وجهّز مبيدًا فطريًا وقائيًا تحسبًا
+        لاستمرار ارتفاع الضغط خلال التزهير.
+
+  leaf_no_action:
+    label_en: No action — powdery-mildew pressure low
+    label_ar: لا إجراء — ضغط البياض الدقيقي منخفض
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Weather is not currently favourable for powdery mildew on this block.
+      text_ar: الطقس غير مهيّئ حاليًا للبياض الدقيقي على هذه القطعة.

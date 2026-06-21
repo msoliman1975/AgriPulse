@@ -46,6 +46,7 @@ from app.modules.recommendations.events import (
 from app.modules.recommendations.repository import RecommendationsRepository
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
+from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches, strain_code
@@ -112,7 +113,7 @@ class RecommendationsServiceImpl:
 
     # ---- Engine driver ------------------------------------------------
 
-    async def evaluate_block(
+    async def evaluate_block(  # noqa: PLR0915 - linear per-source snapshot loads + eval
         self,
         *,
         block_id: UUID,
@@ -160,6 +161,9 @@ class RecommendationsServiceImpl:
         # rows yet, so predicates fail closed instead of spuriously firing.
         weather = await load_weather_snapshot(self._tenant, farm_id=farm_id)
         weather_indices = await load_weather_index_snapshot(self._tenant, farm_id=farm_id)
+        # Per-block disease/pest risk scores (PR-R3); empty until the daily
+        # risk sweep scores this block, so `{source: weather_risk}` fails closed.
+        weather_risks = await load_weather_risk_snapshot(self._tenant, block_id=block_id)
         signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
         # Sub-block grid spatial-anomaly verdicts (G-4). Empty for blocks
         # with no grid / no current anomaly, so `{source: grid}` predicates
@@ -184,6 +188,7 @@ class RecommendationsServiceImpl:
             latest_index_aggregates=latest,
             weather=weather,
             weather_indices=weather_indices,
+            weather_risks=weather_risks,
             signals=signals,
             grid=grid,
         )
@@ -1092,6 +1097,9 @@ class DecisionTreesAuthorService:
         from app.modules.weather.snapshot import (
             load_index_snapshot as load_weather_index_snapshot,
         )
+        from app.modules.weather.snapshot import (
+            load_risk_snapshot as load_weather_risk_snapshot,
+        )
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
@@ -1116,6 +1124,8 @@ class DecisionTreesAuthorService:
             if farm_id is not None
             else None
         )
+        # Block-keyed, so it loads regardless of farm resolution.
+        weather_risks = await load_weather_risk_snapshot(tenant_session, block_id=block_id)
         signals = (
             await load_signals_snapshot(tenant_session, block_id=block_id, farm_id=farm_id)
             if farm_id is not None
@@ -1145,6 +1155,7 @@ class DecisionTreesAuthorService:
             latest_index_aggregates=latest_indices,
             weather=weather,
             weather_indices=weather_indices,
+            weather_risks=weather_risks,
             signals=signals,
             grid=grid,
         )

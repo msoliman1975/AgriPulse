@@ -44,6 +44,7 @@ from app.shared.conditions.models import (
     SignalsValueRef,
     ValueRef,
     WeatherIndexValueRef,
+    WeatherRiskValueRef,
     WeatherValueRef,
     parse_value_ref,
 )
@@ -177,6 +178,11 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
         if wx_entry is None:
             return None
         return getattr(wx_entry, ref.key, None)
+    if isinstance(ref, WeatherRiskValueRef):
+        wr_entry = ctx.weather_risks.get(ref.risk_code)
+        if wr_entry is None:
+            return None
+        return getattr(wr_entry, ref.field, None)
     if isinstance(ref, SignalsValueRef):
         sig_entry = ctx.signals.get(ref.code)
         if sig_entry is None:
@@ -199,6 +205,8 @@ def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef ki
         return f"weather.{ref.scope}.{ref.field}"
     if isinstance(ref, WeatherIndexValueRef):
         return f"weather_index.{ref.index_code}.{ref.key}"
+    if isinstance(ref, WeatherRiskValueRef):
+        return f"weather_risk.{ref.risk_code}.{ref.field}"
     if isinstance(ref, SignalsValueRef):
         return f"signals.{ref.code}.{ref.key}"
     if isinstance(ref, GridValueRef):

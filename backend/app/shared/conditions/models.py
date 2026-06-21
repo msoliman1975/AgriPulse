@@ -17,6 +17,7 @@ from app.shared.conditions.context import (
     GRID_FIELDS,
     SIGNAL_KEYS,
     WEATHER_INDEX_KEYS,
+    WEATHER_RISK_FIELDS,
     WEATHER_SCOPES,
 )
 from app.shared.conditions.errors import ConditionParseError
@@ -111,6 +112,25 @@ class WeatherIndexValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class WeatherRiskValueRef:
+    """``{"source":"weather_risk","risk_code":"powdery_mildew","field":"score"}``
+
+    Reads a *per-block* weather-driven disease/pest risk (PR-R3) — the latest
+    ``weather_risk_daily`` row for ``risk_code``. ``field`` is one of
+    ``WEATHER_RISK_FIELDS``: ``score`` (the 0-100 pressure, the default) or
+    ``level`` (``low``/``moderate``/``high``, compared with eq/ne). Unlike
+    ``weather_index`` (farm-level), risk folds in the block's crop + growth
+    stage, so it is the spatial source. Resolves to ``None`` — fail-closed —
+    when the block has no scored row for that pathogen, matching every other
+    source.
+    """
+
+    source: Literal["weather_risk"]
+    risk_code: str
+    field: str  # one of WEATHER_RISK_FIELDS
+
+
+@dataclass(frozen=True, slots=True)
 class SignalsValueRef:
     """``{"source":"signals","code":"soil_moisture","key":"value_numeric"}``
 
@@ -164,13 +184,14 @@ ValueRef = (
     | BlockValueRef
     | WeatherValueRef
     | WeatherIndexValueRef
+    | WeatherRiskValueRef
     | SignalsValueRef
     | GridValueRef
     | ParamsValueRef
 )
 
 
-def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912 - dispatch over ref sources
+def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - dispatch
     """Strict parse of a leaf value-ref dict.
 
     Raises ``ConditionParseError`` on unknown source or missing/invalid
@@ -203,6 +224,16 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912 - dispatch 
                 f"weather_index ref 'key' must be one of {WEATHER_INDEX_KEYS}"
             )
         return WeatherIndexValueRef(source="weather_index", index_code=index_code, key=key)
+    if source == "weather_risk":
+        risk_code = raw.get("risk_code")
+        if not isinstance(risk_code, str) or not risk_code:
+            raise ConditionParseError("weather_risk ref missing 'risk_code'")
+        field_ = raw.get("field", "score")
+        if field_ not in WEATHER_RISK_FIELDS:
+            raise ConditionParseError(
+                f"weather_risk ref 'field' must be one of {WEATHER_RISK_FIELDS}"
+            )
+        return WeatherRiskValueRef(source="weather_risk", risk_code=risk_code, field=field_)
     if source == "weather":
         scope = raw.get("scope")
         if scope not in WEATHER_SCOPES:

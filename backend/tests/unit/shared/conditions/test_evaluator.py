@@ -8,12 +8,13 @@ from decimal import Decimal
 import pytest
 
 from app.shared.conditions import ConditionContext, evaluate
-from app.shared.conditions.context import IndicesEntry, WeatherIndexEntry
+from app.shared.conditions.context import IndicesEntry, WeatherIndexEntry, WeatherRiskEntry
 from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
     IndicesValueRef,
     WeatherIndexValueRef,
+    WeatherRiskValueRef,
     parse_value_ref,
 )
 
@@ -516,3 +517,66 @@ def test_weather_index_missing_index_fails_closed() -> None:
     }
     # Context only carries a temperature entry → wind resolves to None → no match.
     assert evaluate(tree, _wx_ctx(deviation=Decimal("3.0")))[0] is False
+
+
+def _wr_ctx(
+    risk_code: str = "powdery_mildew",
+    score: int | None = None,
+    level: str | None = None,
+) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        weather_risks={
+            risk_code: WeatherRiskEntry(date=date(2026, 6, 20), score=score, level=level),
+        },
+    )
+
+
+def test_parse_weather_risk_ref_defaults_to_score() -> None:
+    ref = parse_value_ref({"source": "weather_risk", "risk_code": "powdery_mildew"})
+    assert isinstance(ref, WeatherRiskValueRef)
+    assert ref.risk_code == "powdery_mildew"
+    assert ref.field == "score"
+
+
+def test_parse_weather_risk_ref_rejects_unknown_field() -> None:
+    with pytest.raises(ConditionParseError, match="weather_risk ref 'field'"):
+        parse_value_ref({"source": "weather_risk", "risk_code": "anthracnose", "field": "nope"})
+
+
+def test_parse_weather_risk_ref_requires_risk_code() -> None:
+    with pytest.raises(ConditionParseError, match="weather_risk ref missing 'risk_code'"):
+        parse_value_ref({"source": "weather_risk", "field": "score"})
+
+
+def test_weather_risk_score_predicate_fires_and_records_snapshot() -> None:
+    # High powdery-mildew pressure: score over the alert threshold.
+    tree = {
+        "op": "ge",
+        "left": {"source": "weather_risk", "risk_code": "powdery_mildew"},
+        "right": 70,
+    }
+    matched, snap = evaluate(tree, _wr_ctx(score=82))
+    assert matched is True
+    # Ints are recorded raw in the snapshot (only Decimals are stringified).
+    assert snap["values"]["weather_risk.powdery_mildew.score"] == 82
+
+
+def test_weather_risk_level_predicate_matches_categorical() -> None:
+    tree = {
+        "op": "eq",
+        "left": {"source": "weather_risk", "risk_code": "anthracnose", "field": "level"},
+        "right": "high",
+    }
+    ctx = _wr_ctx(risk_code="anthracnose", level="high")
+    assert evaluate(tree, ctx)[0] is True
+
+
+def test_weather_risk_missing_pathogen_fails_closed() -> None:
+    tree = {
+        "op": "ge",
+        "left": {"source": "weather_risk", "risk_code": "fruit_fly"},
+        "right": 50,
+    }
+    # Context only carries a powdery_mildew entry → fruit_fly is None → no match.
+    assert evaluate(tree, _wr_ctx(score=90))[0] is False

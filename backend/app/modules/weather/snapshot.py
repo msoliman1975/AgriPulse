@@ -35,7 +35,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.conditions import WeatherIndexEntry, WeatherSnapshot
+from app.shared.conditions import WeatherIndexEntry, WeatherRiskEntry, WeatherSnapshot
 
 # Provider precedence: when a farm has multiple active providers, prefer
 # the operationally-canonical one. Open-Meteo is the only Slice-4
@@ -122,6 +122,50 @@ async def load_index_snapshot(
             date=row["date"],
             value=_to_decimal(row["value"]),
             baseline_deviation=_to_decimal(row["baseline_deviation"]),
+        )
+        for row in rows
+    }
+
+
+async def load_risk_snapshot(
+    session: AsyncSession,
+    *,
+    block_id: UUID,
+) -> dict[str, WeatherRiskEntry]:
+    """Load the latest ``weather_risk_daily`` row per pathogen for one block.
+
+    Returns ``{risk_code: WeatherRiskEntry}`` carrying the most-recent 0-100
+    ``score`` + ``level`` banding. Used by the conditions evaluator for the
+    ``weather_risk`` source (PR-R3) — block-keyed, since risk folds in the
+    block's crop + growth stage.
+
+    ``session`` must already be bound to the tenant schema. Returns an empty
+    dict when the block has no scored rows yet — every
+    ``{source: weather_risk}`` predicate then fails closed.
+    """
+    rows = (
+        (
+            await session.execute(
+                text(
+                    """
+                SELECT DISTINCT ON (risk_code)
+                    risk_code, date, score, level
+                FROM weather_risk_daily
+                WHERE block_id = :block_id
+                ORDER BY risk_code, date DESC
+                """
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                {"block_id": block_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {
+        row["risk_code"]: WeatherRiskEntry(
+            date=row["date"],
+            score=row["score"],
+            level=row["level"],
         )
         for row in rows
     }

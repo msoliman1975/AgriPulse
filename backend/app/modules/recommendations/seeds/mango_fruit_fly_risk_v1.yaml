@@ -1,0 +1,156 @@
+# mango_fruit_fly_risk_v1 — surface a monitoring/control recommendation when
+# the weather-driven fruit-fly (Bactrocera zonata / Ceratitis capitata)
+# pressure on a mango block is high. Reads the PR-R2 `weather_risk` index
+# (humid warm degree-day accumulation, gated to the fruiting window).
+
+code: mango_fruit_fly_risk_v1
+name_en: Mango — fruit fly risk
+name_ar: المانجو — خطر ذبابة الفاكهة
+description_en: >-
+  When the fruit-fly pressure index is high for a mango block (humid, warm
+  degree-day accumulation while fruit is on the tree), queue trap checks and
+  a control decision. Critical at very high pressure, warning at moderate
+  pressure.
+description_ar: >-
+  عند ارتفاع مؤشر ضغط ذبابة الفاكهة لقطعة مانجو (تراكم حراري رطب دافئ أثناء
+  وجود الثمار على الشجرة)، حدّد فحص المصائد وقرار مكافحة. حرجة عند الضغط
+  المرتفع جدًا وتحذيرية عند الضغط المتوسط.
+
+crop_path: mango
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Fruit-fly (Bactrocera zonata, Ceratitis capitata) population pressure
+    tracks warm humid degree-day accumulation and matters only while
+    susceptible fruit is on the tree; a humid microclimate favours the
+    flies. The risk score is a rule-of-thumb accumulation (PR-R1) gated to
+    the fruiting stage, not a validated trap-catch model, so the rule
+    recommends trap monitoring + a control decision (bait spray, sanitation,
+    bagging) rather than a blanket cover spray. Thresholds are tunable.
+  citations:
+    - source_type: research_institution
+      title: CABI Crop Protection Compendium — Bactrocera zonata (peach fruit fly)
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: Fruit-fly pressure score at/above which a warning is raised.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: Pressure score at/above which the risk is treated as critical.
+
+root: root
+nodes:
+  root:
+    label_en: Is fruit-fly pressure elevated?
+    label_ar: هل ضغط ذبابة الفاكهة مرتفع؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: fruit_fly
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the pressure high (critical)?
+    label_ar: هل الضغط مرتفع (حرج)؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: fruit_fly
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_critical
+    on_miss: leaf_warning
+
+  leaf_critical:
+    label_en: High fruit-fly pressure — check traps and control now
+    label_ar: ضغط مرتفع لذبابة الفاكهة — افحص المصائد وكافح الآن
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.75
+      valid_for_hours: 120
+      parameters:
+        priority: high
+        within_hours: 24
+        pest: fruit_fly
+      text_en: >-
+        Warm, humid weather favours fruit flies on this fruiting mango block.
+        A humid microclimate encourages fruit flies. Check pheromone/bait
+        traps within 24 hours; if catches are rising, start bait spraying and
+        remove fallen/infested fruit.
+      text_ar: >-
+        الطقس الدافئ الرطب مهيّئ لذبابة الفاكهة على قطعة المانجو المُثمرة هذه.
+        المناخ الرطب يشجّع ذباب الفاكهة. افحص مصائد الفرمون/الطُعم خلال 24
+        ساعة؛ وإذا تزايدت الأعداد، ابدأ الرشّ بالطُعم وأزل الثمار المتساقطة
+        والمصابة.
+      actions:
+        immediate:
+          - text_en: Inspect pheromone/bait traps and record catches within 24 hours.
+            text_ar: افحص مصائد الفرمون/الطُعم وسجّل الأعداد خلال 24 ساعة.
+        short_term:
+          - text_en: >-
+              Start protein-bait spot spraying and collect/destroy fallen and
+              infested fruit (sanitation); consider fruit bagging.
+            text_ar: >-
+              ابدأ الرشّ النقطي بالطُعم البروتيني واجمع وأتلِف الثمار المتساقطة
+              والمصابة (الصرف الصحي)؛ وفكّر في تكييس الثمار.
+        monitoring:
+          - text_en: Keep trapping through harvest and watch the daily catch trend.
+            text_ar: استمر في المصائد حتى الحصاد وراقب اتجاه الأعداد اليومي.
+
+  leaf_warning:
+    label_en: Moderate fruit-fly pressure — step up trap monitoring
+    label_ar: ضغط متوسط لذبابة الفاكهة — كثّف مراقبة المصائد
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        within_hours: 72
+        pest: fruit_fly
+      text_en: >-
+        Fruit-fly pressure is building on this mango block. Step up trap
+        monitoring (within 72 hours) and prepare bait and sanitation measures
+        in case catches keep rising toward harvest.
+      text_ar: >-
+        ضغط ذبابة الفاكهة يتزايد على قطعة المانجو هذه. كثّف مراقبة المصائد
+        (خلال 72 ساعة) وجهّز الطُعم وإجراءات الصرف الصحي تحسبًا لاستمرار ارتفاع
+        الأعداد قرب الحصاد.
+
+  leaf_no_action:
+    label_en: No action — fruit-fly pressure low
+    label_ar: لا إجراء — ضغط ذبابة الفاكهة منخفض
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Weather is not currently favourable for fruit flies on this block.
+      text_ar: الطقس غير مهيّئ حاليًا لذبابة الفاكهة على هذه القطعة.

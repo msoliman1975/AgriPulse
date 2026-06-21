@@ -27,6 +27,7 @@ from app.shared.conditions.context import (
     GridAnomalyEntry,
     SignalEntry,
     WeatherIndexEntry,
+    WeatherRiskEntry,
     WeatherSnapshot,
 )
 from app.shared.conditions.errors import ConditionParseError
@@ -38,6 +39,7 @@ __all__ = [
     "GridAnomalyEntry",
     "SignalEntry",
     "WeatherIndexEntry",
+    "WeatherRiskEntry",
     "WeatherSnapshot",
     "evaluate",
 ]

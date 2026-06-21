@@ -19,6 +19,8 @@ import {
   SIGNAL_KEYS,
   WEATHER_INDEX_CODES,
   WEATHER_INDEX_KEYS,
+  WEATHER_RISK_CODES,
+  WEATHER_RISK_FIELDS,
   WEATHER_SCOPES,
   defaultComparisonTerm,
   defaultValueRef,
@@ -203,8 +205,8 @@ function ValueRefEditor({
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const sources: ValueRefSource[] = disallowParams
-    ? ["indices", "block", "weather", "weather_index", "signals", "grid"]
-    : ["indices", "block", "weather", "weather_index", "signals", "grid", "params"];
+    ? ["indices", "block", "weather", "weather_index", "weather_risk", "signals", "grid"]
+    : ["indices", "block", "weather", "weather_index", "weather_risk", "signals", "grid", "params"];
 
   const onSourceChange = (next: ValueRefSource): void => {
     if (next === value.source) return;
@@ -343,6 +345,44 @@ function SourceSpecificFields({
           {WEATHER_INDEX_KEYS.map((k) => (
             <option key={k} value={k}>
               {k}
+            </option>
+          ))}
+        </select>
+      </>
+    );
+  }
+  if (value.source === "weather_risk") {
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.risk_code}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              risk_code: e.target.value as (typeof WEATHER_RISK_CODES)[number],
+            })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.weatherRiskCode")}
+        >
+          {WEATHER_RISK_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) =>
+            onChange({ ...value, field: e.target.value as (typeof WEATHER_RISK_FIELDS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+        >
+          {WEATHER_RISK_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
             </option>
           ))}
         </select>
