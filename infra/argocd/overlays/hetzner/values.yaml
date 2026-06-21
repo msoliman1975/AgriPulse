@@ -81,13 +81,17 @@ global:
   #   over weather_risk_daily (peak/days-high per block-pathogen) + registry FE
   #   entry. No migrations (reads #278's table). Backend + FE → api + workers +
   #   frontend bumped; tile-server stays 9d140cc. (Completes Phase 2.)
+  # d93eac7 = #287 Arabic i18n cleanup: grid-popup flag hint uses Latin digits
+  #   (1.5 not ١٫٥, per ARCHITECTURE.md § 11) + drop dead src/rules/formatting.ts.
+  #   Frontend-only, no migrations → only frontend bumped; api + workers stay
+  #   ece5615, tile-server stays 9d140cc.
   images:
     api:
       tag: "ece5615"
     workers:
       tag: "ece5615"
     frontend:
-      tag: "3833aed"
+      tag: "d93eac7"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
