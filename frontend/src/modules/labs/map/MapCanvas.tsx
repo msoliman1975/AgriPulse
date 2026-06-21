@@ -90,6 +90,10 @@ interface Props {
   // clipped candidate polygons paints them translucent over the map so the
   // operator sees exactly what auto-blocking will create before committing.
   autoBlockPreview?: FeatureCollection<Polygon> | null;
+  // PR-R4b: when true, the block fill recolours by `risk_level` (worst
+  // disease/pest pressure) instead of health. The features must carry
+  // `risk_level`; blocks with "none" render unfilled so the base map shows.
+  riskOverlay?: boolean;
 }
 
 export interface GridCellProps {
@@ -133,6 +137,22 @@ const AOI_FILL = "#0ea5e9";
 // because the existing alert palette uses red/orange and we want the
 // overlay to read as informational, not warning-level.
 const SIGNAL_OVERLAY_COLOR = "#f59e0b";
+
+// PR-R4b risk-overlay fill. Mirrors the health palette (green/amber/red) so
+// the map reads consistently; "none" is transparent so unscored blocks fall
+// back to the bare satellite base while the overlay is on.
+const RISK_FILL: Record<string, string> = {
+  low: "#97C459",
+  moderate: "#EF9F27",
+  high: "#E24B4A",
+  none: "#000000",
+};
+const RISK_FILL_OPACITY: Record<string, number> = {
+  low: 0.55,
+  moderate: 0.6,
+  high: 0.65,
+  none: 0,
+};
 
 const STYLE: StyleSpecification = {
   version: 8,
@@ -193,6 +213,7 @@ export function MapCanvas({
   highlightedCellIds = [],
   selectedGridCellId = null,
   autoBlockPreview = null,
+  riskOverlay = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -229,7 +250,7 @@ export function MapCanvas({
     mapRef.current = map;
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
 
     // maplibre's trackResize only listens to WINDOW resizes, so when a side
     // panel (the inspector) opens/closes and resizes this container — not the
@@ -633,6 +654,38 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [geojson, fitBoundsKey, farmBoundary]);
+
+  // PR-R4b: recolour the block fill by risk_level when the risk overlay is on,
+  // else by health. Toggling swaps the FILL_LAYER paint in place (the features
+  // already carry both `health` and `risk_level`), so no extra source/layer.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(FILL_LAYER)) return;
+      map.setPaintProperty(
+        FILL_LAYER,
+        "fill-color",
+        riskOverlay
+          ? healthMatch("risk_level", RISK_FILL, RISK_FILL.none)
+          : healthMatch("health", HEALTH_FILL, HEALTH_FILL.unknown),
+      );
+      map.setPaintProperty(
+        FILL_LAYER,
+        "fill-opacity",
+        riskOverlay
+          ? healthMatch("risk_level", RISK_FILL_OPACITY, RISK_FILL_OPACITY.none)
+          : ([
+              "case",
+              ["==", ["get", "is_future"], true],
+              0.25,
+              healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown),
+            ] as ExpressionSpecification),
+      );
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [riskOverlay]);
 
   // Push AOI data whenever the farm boundary changes.
   useEffect(() => {

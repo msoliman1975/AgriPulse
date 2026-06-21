@@ -160,6 +160,10 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
         has_alert: summary.has_alert,
         alert_severity: summary.alert_severity ?? "none",
         is_future: isFuture,
+        // Overwritten per-block by the page from the weather-risk summary
+        // (PR-R4b); "none" is the no-risk default the fill expression treats
+        // as transparent.
+        risk_level: "none",
       },
     });
   }
