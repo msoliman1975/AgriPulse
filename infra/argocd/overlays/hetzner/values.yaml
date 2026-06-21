@@ -53,11 +53,16 @@ global:
   #   Also bumps WEATHER_FORECAST_HOURS 120→168 (below) so the Insights weather
   #   chart's 7-day request isn't clipped to 5. Backend + FE → api + workers +
   #   frontend bumped; tile-server unchanged stays 9d140cc.
+  # c8174e2 = #278 weather-driven disease/pest risk (PR-R1/R2): per-block risk
+  #   models (powdery mildew/anthracnose/fruit fly) + daily compute Beat sweep +
+  #   /weather-risk REST + weather_risk.read cap. Tenant migration 0050
+  #   (weather_risk_daily) runs on PreSync. Backend-only → api + workers bumped;
+  #   frontend stays 7c4129f, tile-server stays 9d140cc.
   images:
     api:
-      tag: "7c4129f"
+      tag: "c8174e2"
     workers:
-      tag: "7c4129f"
+      tag: "c8174e2"
     frontend:
       tag: "7c4129f"
     tileServer:
