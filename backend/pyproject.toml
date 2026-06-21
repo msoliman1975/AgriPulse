@@ -148,6 +148,7 @@ ignore = [
 "app/modules/integrations_health/service.py" = ["S608"]
 "app/modules/signals/repository.py" = ["S608"]
 "app/modules/weather/repository.py" = ["S608"]
+"scripts/reacquire_imagery.py" = ["S608"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "workers"]
