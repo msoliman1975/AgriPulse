@@ -58,13 +58,19 @@ global:
   #   /weather-risk REST + weather_risk.read cap. Tenant migration 0050
   #   (weather_risk_daily) runs on PreSync. Backend-only → api + workers bumped;
   #   frontend stays 7c4129f, tile-server stays 9d140cc.
+  # b7541c1 = #280 Arabic i18n hardening + insights tiles/trend range:
+  #   localize the Insights cards, Farm Console grid-cell popup, and board /
+  #   alerts dates + enum values (severity / unit_type / activity type) via
+  #   useDateLocale, plus clickable KPI tiles and trend index help + date range.
+  #   No migrations. Frontend-only → only frontend bumped; api + workers stay
+  #   c8174e2, tile-server stays 9d140cc.
   images:
     api:
       tag: "c8174e2"
     workers:
       tag: "c8174e2"
     frontend:
-      tag: "7c4129f"
+      tag: "b7541c1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
