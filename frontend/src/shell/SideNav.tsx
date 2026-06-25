@@ -173,15 +173,12 @@ export function SideNav(): ReactNode {
           icon={<LandUnitsIcon className="h-4 w-4" />}
           activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         />
-        <SideNavItem
-          to={hasFarm ? `/labs/map-legacy/${farmSegment}` : "/labs/map-legacy"}
-          label={t("common:workspaceNav.farmManagementLegacy")}
-          icon={<LandUnitsIcon className="h-4 w-4" />}
-          activePathPrefix="/labs/map-legacy"
-        />
-        {/* TODO(nuke-legacy-farms): /labs/map is the single Farm-management
-            surface; the legacy /farms form view stays routed as a fallback
-            until /labs/map reaches parity. */}
+        {/* /labs/map is the single Farm-management surface in nav. The
+            legacy map experience (/labs/map-legacy) is delisted but still
+            routed — the new console's "Edit AoI" deep-links into it until
+            AoI/polygon editing reaches parity there. TODO(nuke-legacy-farms):
+            drop /labs/map-legacy + /farms/* routes once AoI-edit lands in
+            the console. */}
         <SideNavItem
           to={hasFarm ? `/board/${farmSegment}` : "#"}
           label={t("common:workspaceNav.plan")}
