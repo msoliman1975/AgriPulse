@@ -39,6 +39,7 @@ from app.modules.recommendations.schemas import (
     DecisionTreeVersionCreateRequest,
     DecisionTreeVersionPublishResponse,
     DecisionTreeVersionResponse,
+    DryRunCandidateBlock,
     EvaluateBlockResponse,
     RecommendationResponse,
     RecommendationScheduleRequest,
@@ -547,6 +548,27 @@ async def publish_decision_tree_version(
             version=version,
             actor_user_id=context.user_id,
         )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.get(
+    "/decision-trees/{code}/candidate-blocks",
+    response_model=list[DryRunCandidateBlock],
+    summary="Active blocks this tree would target (dry-run picker).",
+)
+async def list_dry_run_candidate_blocks(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    try:
+        return await service.candidate_blocks(code=code, tenant_session=tenant_session)
     except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:

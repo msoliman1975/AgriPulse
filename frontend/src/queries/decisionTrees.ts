@@ -11,6 +11,7 @@ import {
   createDecisionTree,
   dryRunDecisionTree,
   getDecisionTree,
+  getDecisionTreeCandidateBlocks,
   listDecisionTrees,
   publishDecisionTreeVersion,
 } from "@/api/decisionTrees";
@@ -75,6 +76,18 @@ export function usePublishDecisionTreeVersion() {
 export function useDryRunDecisionTree() {
   return useMutation<DryRunResponse, Error, { code: string; payload: DryRunPayload }>({
     mutationFn: ({ code, payload }) => dryRunDecisionTree(code, payload),
+  });
+}
+
+// Blocks the tree's targeting admits — populates the dry-run picker. Keyed
+// off the published targeting (not the live draft), so it refetches when the
+// detail is invalidated after a publish.
+export function useDecisionTreeCandidateBlocks(code: string | undefined) {
+  return useQuery({
+    queryKey: ["decision_trees", "candidate_blocks", code] as const,
+    queryFn: () => getDecisionTreeCandidateBlocks(code!),
+    enabled: Boolean(code),
+    staleTime: 30_000,
   });
 }
 

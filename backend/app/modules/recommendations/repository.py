@@ -977,3 +977,40 @@ class RecommendationsRepository:
             )
         ).all()
         return tuple(r.id for r in rows)
+
+    async def list_blocks_for_targeting(self) -> list[dict[str, Any]]:
+        """Every active block with the attributes the targeting matcher reads
+        (crop path/id, parent-farm country, soil) plus display labels.
+
+        Drives the dry-run candidate-block picker: the author service filters
+        these through ``tree_targets_block`` so the dropdown only offers blocks
+        the tree would actually fire on.
+        """
+        rows = (
+            await self._tenant.execute(
+                text(
+                    """
+                    SELECT b.id          AS block_id,
+                           b.name        AS block_name,
+                           b.code        AS block_code,
+                           b.soil_texture,
+                           f.name        AS farm_name,
+                           f.country_code,
+                           bc.crop_id,
+                           bc.crop_path
+                    FROM blocks b
+                    JOIN farms f
+                      ON f.id = b.farm_id AND f.deleted_at IS NULL
+                    LEFT JOIN block_crops bc
+                      ON bc.block_id = b.id
+                     AND bc.is_current = TRUE
+                     AND bc.deleted_at IS NULL
+                    WHERE b.deleted_at IS NULL
+                      AND b.active_from <= current_date
+                      AND (b.active_to IS NULL OR b.active_to > current_date)
+                    ORDER BY f.name, b.code
+                    """
+                )
+            )
+        ).mappings().all()
+        return [dict(r) for r in rows]

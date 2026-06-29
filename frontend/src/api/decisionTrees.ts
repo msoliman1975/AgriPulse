@@ -88,7 +88,17 @@ export interface DecisionTreeVersion {
 }
 
 export interface DecisionTreeDetail extends DecisionTree {
+  // Multi-axis targeting sets (DT targeting PR-2). Empty set = matches any.
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
   versions: DecisionTreeVersion[];
+}
+
+// One block the tree would target (dry-run picker, PR-4).
+export interface DryRunCandidateBlock {
+  block_id: string;
+  label: string;
 }
 
 export interface DecisionTreeCreatePayload {
@@ -187,6 +197,17 @@ export async function dryRunDecisionTree(
   const { data } = await apiClient.post<DryRunResponse>(
     `/v1/decision-trees/${code}:dry-run`,
     payload,
+  );
+  return data;
+}
+
+// Blocks the tree would actually fire on (filtered by its crop/country/soil
+// targeting) — populates the dry-run block picker.
+export async function getDecisionTreeCandidateBlocks(
+  code: string,
+): Promise<DryRunCandidateBlock[]> {
+  const { data } = await apiClient.get<DryRunCandidateBlock[]>(
+    `/v1/decision-trees/${code}/candidate-blocks`,
   );
   return data;
 }

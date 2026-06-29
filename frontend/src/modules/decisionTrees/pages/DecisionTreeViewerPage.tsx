@@ -31,6 +31,7 @@ import { readTreeProvenance, type DryRunResponse } from "@/api/decisionTrees";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
+  useDecisionTreeCandidateBlocks,
   useDryRunDecisionTree,
   usePublishDecisionTreeVersion,
 } from "@/queries/decisionTrees";
@@ -85,6 +86,7 @@ export function DecisionTreeViewerPage(): ReactNode {
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
   const dryRun = useDryRunDecisionTree();
+  const candidateBlocks = useDecisionTreeCandidateBlocks(code);
 
   // PR-D2: edit buffer + selection. Selection survives across re-renders
   // even when the tree refetches because the node id is stable.
@@ -570,6 +572,8 @@ export function DecisionTreeViewerPage(): ReactNode {
           <CanvasDryRunPanel
             blockId={dryRunBlockId}
             onBlockIdChange={setDryRunBlockId}
+            candidateBlocks={candidateBlocks.data ?? []}
+            candidatesLoading={candidateBlocks.isLoading}
             mode={dryRunMode}
             onModeChange={setDryRunMode}
             canUseCurrent={tree.current_version != null}

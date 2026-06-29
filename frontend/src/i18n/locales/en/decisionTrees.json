@@ -186,6 +186,9 @@
     },
     "dryRun": {
       "heading": "Dry-run on a block",
+      "selectBlock": "Select a block…",
+      "loadingBlocks": "Loading blocks…",
+      "noCandidateBlocks": "No blocks match this tree's crop / country / soil targeting.",
       "mode": "Test against",
       "useDraft": "In-editor draft",
       "useCurrent": "Published version",

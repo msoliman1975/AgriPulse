@@ -236,6 +236,14 @@ class DecisionTreeDryRunRequest(BaseModel):
     tree_yaml: str | None = None
 
 
+class DryRunCandidateBlock(BaseModel):
+    """One block the tree would target — drives the dry-run block picker."""
+
+    block_id: UUID
+    # "Farm / Block" display label (block name, or code when unnamed).
+    label: str
+
+
 class DecisionTreeDryRunResponse(BaseModel):
     """Result of a dry-run. Mirrors `EvaluationResult` shape."""
 

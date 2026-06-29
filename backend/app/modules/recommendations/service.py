@@ -1230,6 +1230,44 @@ class DecisionTreesAuthorService:
             "error": result.error,
         }
 
+    async def candidate_blocks(
+        self, *, code: str, tenant_session: AsyncSession
+    ) -> list[dict[str, Any]]:
+        """Active blocks this tree would target (dry-run picker, PR-4).
+
+        Filters every active block through the same ``tree_targets_block``
+        matcher the sweep uses, so the dropdown offers only blocks whose
+        crop / country / soil admit the tree. Returns ``[]`` when nothing
+        matches — the UI shows a "no blocks match this tree's targeting"
+        message rather than a free-text UUID box.
+        """
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=self._tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        blocks = await repo.list_blocks_for_targeting()
+        out: list[dict[str, Any]] = []
+        for b in blocks:
+            if not tree_targets_block(
+                tree,
+                crop_path=b["crop_path"],
+                crop_id=b["crop_id"],
+                country_code=b["country_code"],
+                soil_texture=b["soil_texture"],
+            ):
+                continue
+            farm = b["farm_name"] or ""
+            block_label = b["block_name"] or b["block_code"]
+            out.append(
+                {
+                    "block_id": b["block_id"],
+                    "label": f"{farm} / {block_label}" if farm else block_label,
+                }
+            )
+        return out
+
     # ---- Internals ----------------------------------------------------
 
     async def _tree_with_version(self, *, code: str, version: int) -> dict[str, Any]:
