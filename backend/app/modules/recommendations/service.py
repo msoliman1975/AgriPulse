@@ -113,7 +113,7 @@ class RecommendationsServiceImpl:
 
     # ---- Engine driver ------------------------------------------------
 
-    async def evaluate_block(  # noqa: PLR0915 - linear per-source snapshot loads + eval
+    async def evaluate_block(
         self,
         *,
         block_id: UUID,
@@ -155,6 +155,9 @@ class RecommendationsServiceImpl:
                 "trees_skipped_crop": 0,
                 "recommendations_opened": 0,
             }
+
+        # Country axis for targeting — inherited from the parent farm (PR-3).
+        country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
 
         # Pull weather + signals once per evaluation pass. Both loaders
         # return empty data when the block has no provider/observation
@@ -204,18 +207,16 @@ class RecommendationsServiceImpl:
         trees_skipped_crop = 0
         recommendations_opened = 0
         for tree in trees:
-            # Targeting precedence:
-            #   * crop_path set  → match by hierarchical path prefix, so a
-            #     tree can target a whole crop (``mango``), a variety
-            #     (``mango.alphonso``) or an exact strain.
-            #   * else crop_id set → legacy exact-crop match.
-            #   * else            → crop-agnostic, always applies.
-            tree_path = tree.get("crop_path")
-            if tree_path:
-                if not path_matches(tree_path, crop_path):
-                    trees_skipped_crop += 1
-                    continue
-            elif tree["crop_id"] is not None and tree["crop_id"] != crop_id:
+            # Multi-axis targeting (PR-3): a tree fires on this block only if
+            # its crop / country / soil sets all admit the block (AND across
+            # axes, OR within; empty set = matches any). See tree_targets_block.
+            if not tree_targets_block(
+                tree,
+                crop_path=crop_path,
+                crop_id=crop_id,
+                country_code=country_code,
+                soil_texture=soil_texture,
+            ):
                 trees_skipped_crop += 1
                 continue
             trees_evaluated += 1
@@ -717,6 +718,49 @@ def _merge_index_trends(
     for code, trend in trends.items():
         if code in latest:
             latest[code].update(trend)
+
+
+def tree_targets_block(
+    tree: dict[str, Any],
+    *,
+    crop_path: str | None,
+    crop_id: UUID | None,
+    country_code: str | None,
+    soil_texture: str | None,
+) -> bool:
+    """Multi-axis targeting match (DT targeting PR-3).
+
+    A tree matches a block iff **every** axis passes (AND across axes). An
+    axis with an empty set matches any block; otherwise the block's value
+    must be in the set (OR within an axis):
+
+      * crop     — any of ``crop_paths`` prefix-matches the block's crop
+                   path. Back-compat: when ``crop_paths`` is empty but the
+                   legacy ``crop_id`` is set, fall back to the exact-crop
+                   match; empty + no crop_id = crop-agnostic.
+      * country  — block's farm country is one of ``country_codes``.
+      * soil     — block's ``soil_texture`` is one of ``soil_textures``.
+
+    A block whose value on a constrained axis is unknown (None) never
+    matches that axis — e.g. a tree filtered by country won't fire on a
+    farm with no country set. This is the coverage guardrail: country is
+    net-new, so farms are backfilled to a country before such trees ship.
+    """
+    crop_paths: list[str] = tree.get("crop_paths") or []
+    if crop_paths:
+        if not any(path_matches(p, crop_path) for p in crop_paths):
+            return False
+    else:
+        legacy_crop_id = tree.get("crop_id")
+        if legacy_crop_id is not None and legacy_crop_id != crop_id:
+            return False
+
+    country_codes: list[str] = tree.get("country_codes") or []
+    if country_codes and (country_code is None or country_code not in country_codes):
+        return False
+
+    soil_textures: list[str] = tree.get("soil_textures") or []
+    return not (soil_textures and (soil_texture is None or soil_texture not in soil_textures))
 
 
 def get_recommendations_service(

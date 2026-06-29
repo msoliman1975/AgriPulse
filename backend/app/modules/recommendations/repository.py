@@ -70,6 +70,9 @@ class RecommendationsRepository:
                            t.name_en, t.name_ar,
                            t.crop_id,
                            t.crop_path,
+                           t.crop_paths,
+                           t.country_codes,
+                           t.soil_textures,
                            t.applicable_regions,
                            v.id    AS version_id,
                            v.version,
@@ -881,6 +884,19 @@ class RecommendationsRepository:
             )
         ).first()
         return row.farm_id if row is not None else None
+
+    async def get_farm_country_code(self, *, farm_id: UUID) -> str | None:
+        """Return the farm's ``country_code`` (PR-1) — a block inherits its
+        country from its parent farm for decision-tree country targeting."""
+        row = (
+            await self._tenant.execute(
+                text(
+                    "SELECT country_code FROM farms WHERE id = :farm_id AND deleted_at IS NULL"
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
+            )
+        ).first()
+        return row.country_code if row is not None else None
 
     async def get_block_soil(self, *, block_id: UUID) -> tuple[str | None, str | None]:
         """Return (soil_texture, salinity_class) for the block — block-source
