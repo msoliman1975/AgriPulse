@@ -186,7 +186,8 @@ class RecommendationsRepository:
                     SELECT t.id, t.code, t.tenant_id,
                            t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
-                           t.crop_id, t.applicable_regions, t.is_active,
+                           t.crop_id, t.crop_paths, t.country_codes,
+                           t.soil_textures, t.applicable_regions, t.is_active,
                            v.version AS current_version
                     FROM public.decision_trees t
                     LEFT JOIN public.decision_tree_versions v

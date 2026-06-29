@@ -871,6 +871,9 @@ class DecisionTreesAuthorService:
         code: str,
         crop_code: str | None,
         tree_yaml: str,
+        crop_paths: list[str] | None = None,
+        country_codes: list[str] | None = None,
+        soil_textures: list[str] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         """Create a new tree + its v1 draft. Validates the YAML via
@@ -896,6 +899,16 @@ class DecisionTreesAuthorService:
             raise _DecisionTreeCodeAlreadyExistsError(code)
 
         spec = _yaml.safe_load(tree_yaml)
+        # Structured targeting from the authoring pickers (PR-5) overrides
+        # whatever the YAML body declares, so the form is the source of truth
+        # for crop/country/soil and the author needn't hand-edit the YAML.
+        if isinstance(spec, dict):
+            if crop_paths is not None:
+                spec["crop_paths"] = crop_paths
+            if country_codes is not None:
+                spec["country_codes"] = country_codes
+            if soil_textures is not None:
+                spec["soil_textures"] = soil_textures
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         # The compiled body's `code` field must match the URL — protect
         # against a typo where the YAML says one thing and the URL another.

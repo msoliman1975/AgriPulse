@@ -490,6 +490,9 @@ async def create_decision_tree(
             code=payload.code,
             crop_code=payload.crop_code,
             tree_yaml=payload.tree_yaml,
+            crop_paths=payload.crop_paths,
+            country_codes=payload.country_codes,
+            soil_textures=payload.soil_textures,
             actor_user_id=context.user_id,
         )
     except DecisionTreeParseError:

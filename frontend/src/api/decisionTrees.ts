@@ -10,6 +10,10 @@ export interface DecisionTree {
   description_en: string | null;
   description_ar: string | null;
   crop_id: string | null;
+  // Multi-axis targeting sets (DT targeting PR-2/PR-5). Empty = matches any.
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
   applicable_regions: string[];
   is_active: boolean;
   current_version: number | null;
@@ -104,6 +108,11 @@ export interface DryRunCandidateBlock {
 export interface DecisionTreeCreatePayload {
   code: string;
   crop_code?: string | null;
+  // Multi-axis targeting from the authoring pickers (PR-5). Injected into the
+  // compiled spec server-side; omit to leave whatever the YAML declares.
+  crop_paths?: string[];
+  country_codes?: string[];
+  soil_textures?: string[];
   tree_yaml: string;
 }
 

@@ -6,6 +6,7 @@ import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
 import { STARTER_TREE_YAML } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
+import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
 
 // Default for the YAML textarea when the page first loads. Authors who
 // want to start clean can pick "Empty" from the template picker and
@@ -58,7 +59,9 @@ export function DecisionTreeCreatePage(): ReactNode {
   const canManage = useCapability("decision_tree.manage");
 
   const [code, setCode] = useState("");
-  const [cropCode, setCropCode] = useState("");
+  const [cropPaths, setCropPaths] = useState<string[]>([]);
+  const [countryCodes, setCountryCodes] = useState<string[]>([]);
+  const [soilTextures, setSoilTextures] = useState<string[]>([]);
   const [yamlBody, setYamlBody] = useState(DEFAULT_YAML);
   // PR-D8: tracking the selected template id lets the dropdown stay
   // in sync after a swap, and powers the "Start from scratch" button
@@ -84,14 +87,22 @@ export function DecisionTreeCreatePage(): ReactNode {
     setTemplateId("custom");
   };
 
+  // Crop targeting is required (the tree must declare at least one crop).
+  const targetingReady = cropPaths.length > 0;
+  const targeting = {
+    crop_paths: cropPaths,
+    country_codes: countryCodes,
+    soil_textures: soilTextures,
+  };
+
   const onStartFromScratch = (): void => {
-    if (!code.trim()) return;
+    if (!code.trim() || !targetingReady) return;
     const yaml = STARTER_TREE_YAML.replace("REPLACE_ME", code.trim());
     create.mutate(
       {
         code: code.trim(),
-        crop_code: cropCode.trim() || null,
         tree_yaml: yaml,
+        ...targeting,
       },
       {
         onSuccess: (tree) => {
@@ -103,6 +114,7 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
+    if (!targetingReady) return;
     // If a template is selected (other than "custom"), make sure the
     // code in the YAML matches the form field — otherwise the
     // backend stores the wrong code on the tree row.
@@ -110,8 +122,8 @@ export function DecisionTreeCreatePage(): ReactNode {
     create.mutate(
       {
         code: code.trim(),
-        crop_code: cropCode.trim() || null,
         tree_yaml: yaml,
+        ...targeting,
       },
       {
         onSuccess: (tree) => {
@@ -128,7 +140,7 @@ export function DecisionTreeCreatePage(): ReactNode {
         <p className="mt-1 text-sm text-ap-muted">{t("create.subtitle")}</p>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
         <Field label={t("create.fields.code")} hint={t("create.fields.codeHint")}>
           <input
             required
@@ -136,17 +148,24 @@ export function DecisionTreeCreatePage(): ReactNode {
             onChange={(e) => setCode(e.target.value)}
             placeholder={t("create.fields.codePlaceholder")}
             pattern="^[a-z0-9][a-z0-9_-]*$"
-            className={inputCls}
+            className={`${inputCls} sm:max-w-sm`}
           />
         </Field>
-        <Field label={t("create.fields.cropCode")} hint={t("create.fields.cropCodeHint")}>
-          <input
-            value={cropCode}
-            onChange={(e) => setCropCode(e.target.value)}
-            placeholder="citrus"
-            className={inputCls}
-          />
-        </Field>
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
+        <div>
+          <h2 className="text-sm font-semibold text-ap-ink">{t("targeting.heading")}</h2>
+          <p className="text-xs text-ap-muted">{t("targeting.subtitle")}</p>
+        </div>
+        <TreeTargetingPicker
+          cropPaths={cropPaths}
+          countryCodes={countryCodes}
+          soilTextures={soilTextures}
+          onCropPathsChange={setCropPaths}
+          onCountryCodesChange={setCountryCodes}
+          onSoilTexturesChange={setSoilTextures}
+        />
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
@@ -200,14 +219,14 @@ export function DecisionTreeCreatePage(): ReactNode {
         <button
           type="button"
           onClick={onStartFromScratch}
-          disabled={create.isPending || !code.trim()}
+          disabled={create.isPending || !code.trim() || !targetingReady}
           className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/5 disabled:opacity-60"
         >
           {create.isPending ? t("create.saving") : t("create.startFromScratch")}
         </button>
         <button
           type="submit"
-          disabled={create.isPending || !code.trim() || !yamlBody.trim()}
+          disabled={create.isPending || !code.trim() || !yamlBody.trim() || !targetingReady}
           className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
         >
           {create.isPending ? t("create.saving") : t("create.save")}
