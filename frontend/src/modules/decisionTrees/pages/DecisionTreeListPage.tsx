@@ -8,7 +8,8 @@ import { useCapability } from "@/rbac/useCapability";
 import { useDecisionTrees } from "@/queries/decisionTrees";
 
 export function DecisionTreeListPage(): ReactNode {
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
+  const isAr = i18n.language === "ar";
   const canManage = useCapability("decision_tree.manage");
 
   const { data, isLoading, isError } = useDecisionTrees();
@@ -68,7 +69,9 @@ export function DecisionTreeListPage(): ReactNode {
                       {tree.code}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-ap-ink">{tree.name_en}</td>
+                  <td className="px-4 py-2 text-ap-ink">
+                    {isAr && tree.name_ar ? tree.name_ar : tree.name_en}
+                  </td>
                   <td className="px-4 py-2 text-xs text-ap-muted">
                     {tree.crop_paths.length > 0 || tree.country_codes.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
