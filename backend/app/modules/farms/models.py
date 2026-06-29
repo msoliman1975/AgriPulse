@@ -30,6 +30,25 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
 
+class Country(Base, TimestampedMixin):
+    """Curated country catalog in `public`. Read-mostly; tenants only read.
+
+    Referenced logically (no DB FK) by ``farms.country_code`` and by Decision
+    Tree ``country_codes`` targeting. ``code`` is ISO 3166-1 alpha-2, immutable.
+    """
+
+    __tablename__ = "countries"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
 class Crop(Base, TimestampedMixin):
     """Curated crop catalog in `public`. Read-mostly; tenants only read."""
 
@@ -166,6 +185,9 @@ class Farm(Base, TimestampedMixin):
     )
     area_m2: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     elevation_m: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
+    # Logical cross-schema ref to public.countries.code (no DB FK; validated in
+    # the service). Drives Decision-Tree country targeting; blocks inherit it.
+    country_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     governorate: Mapped[str | None] = mapped_column(Text, nullable=True)
     district: Mapped[str | None] = mapped_column(Text, nullable=True)
     nearest_city: Mapped[str | None] = mapped_column(Text, nullable=True)

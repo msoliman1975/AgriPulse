@@ -27,6 +27,8 @@ from app.modules.farms.crop_thresholds import (
 )
 from app.modules.farms.errors import (
     BlockNotFoundError,
+    CountryCodeConflictError,
+    CountryNotFoundError,
     CropAssignmentNotFoundError,
     CropCatalogConflictError,
     CropCatalogValidationError,
@@ -35,6 +37,7 @@ from app.modules.farms.errors import (
     CropVarietyNotFoundError,
     FarmNotFoundError,
     InvalidUnitTypeError,
+    UnknownCountryCodeError,
 )
 from app.modules.farms.events import (
     BlockAttachmentDeletedV1,
@@ -115,6 +118,7 @@ class FarmService(Protocol):
         description: str | None,
         boundary: dict[str, Any],
         elevation_m: Decimal | None,
+        country_code: str | None,
         governorate: str | None,
         district: str | None,
         nearest_city: str | None,
@@ -437,6 +441,18 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> None: ...
 
+    async def list_countries(self) -> list[dict[str, Any]]: ...
+
+    async def list_countries_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]: ...
+
+    async def create_country(
+        self, *, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
+    async def update_country(
+        self, *, country_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
     async def list_crops(self, *, category: str | None = None) -> list[dict[str, Any]]: ...
 
     async def list_crop_varieties(self, *, crop_id: UUID) -> list[dict[str, Any]]: ...
@@ -562,6 +578,7 @@ class FarmServiceImpl:
         description: str | None,
         boundary: dict[str, Any],
         elevation_m: Decimal | None,
+        country_code: str | None,
         governorate: str | None,
         district: str | None,
         nearest_city: str | None,
@@ -579,6 +596,7 @@ class FarmServiceImpl:
     ) -> dict[str, Any]:
         _geometry.validate_multipolygon_geojson(boundary)
         ewkt = _geometry.geojson_to_ewkt_multipolygon(boundary)
+        await self._ensure_country_code(country_code)
 
         farm_id = uuid7()
         await self._repo.insert_farm(
@@ -588,6 +606,7 @@ class FarmServiceImpl:
             description=description,
             boundary_ewkt=ewkt,
             elevation_m=elevation_m,
+            country_code=country_code,
             governorate=governorate,
             district=district,
             nearest_city=nearest_city,
@@ -675,6 +694,8 @@ class FarmServiceImpl:
         if new_boundary is not None:
             _geometry.validate_multipolygon_geojson(new_boundary)
             ewkt = _geometry.geojson_to_ewkt_multipolygon(new_boundary)
+        if "country_code" in changes:
+            await self._ensure_country_code(changes["country_code"])
 
         farm = await self._repo.update_farm(
             farm_id=farm_id,
@@ -2066,6 +2087,57 @@ class FarmServiceImpl:
         out = dict(row)
         out["download_url"] = presigned.url
         out["download_url_expires_at"] = presigned.expires_at
+        return out
+
+    # ---- Country catalog ----------------------------------------------
+
+    async def _ensure_country_code(self, code: str | None) -> None:
+        """Validate a farm's ``country_code`` against the active catalog.
+
+        ``None`` is allowed (a farm need not declare a country). A non-null
+        code must resolve to an active ``public.countries`` row, else 422.
+        """
+        if code is None:
+            return
+        if not await self._repo.country_code_exists(code=code, active_only=True):
+            raise UnknownCountryCodeError(code)
+
+    async def list_countries(self) -> list[dict[str, Any]]:
+        return await self._repo.list_countries()
+
+    async def list_countries_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]:
+        return await self._repo.list_countries(include_inactive=include_inactive)
+
+    async def create_country(
+        self, *, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        code = fields["code"]
+        if await self._repo.country_code_exists(code=code):
+            raise CountryCodeConflictError(code)
+        out = await self._repo.create_country(fields=fields)
+        await self._audit_catalog(
+            event_type="farms.country_created",
+            subject_kind="country",
+            subject_id=out["id"],
+            actor_user_id=actor_user_id,
+            details={"code": code},
+        )
+        return out
+
+    async def update_country(
+        self, *, country_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        country = await self._repo.get_country(country_id=country_id)
+        if country is None:
+            raise CountryNotFoundError(country_id)
+        out = await self._repo.update_country(country=country, fields=fields)
+        await self._audit_catalog(
+            event_type="farms.country_updated",
+            subject_kind="country",
+            subject_id=country_id,
+            actor_user_id=actor_user_id,
+            details={"fields": sorted(fields.keys())},
+        )
         return out
 
     async def list_crops(self, *, category: str | None = None) -> list[dict[str, Any]]:

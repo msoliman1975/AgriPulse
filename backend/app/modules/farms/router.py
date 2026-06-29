@@ -45,6 +45,9 @@ from app.modules.farms.schemas import (
     BlockReactivationResponse,
     BlockResponse,
     BlockUpdateRequest,
+    CountryCreateRequest,
+    CountryResponse,
+    CountryUpdateRequest,
     CropCreateRequest,
     CropResponse,
     CropStrainCreateRequest,
@@ -147,6 +150,7 @@ async def create_farm(
         description=payload.description,
         boundary=payload.boundary,
         elevation_m=payload.elevation_m,
+        country_code=payload.country_code,
         governorate=payload.governorate,
         district=payload.district,
         nearest_city=payload.nearest_city,
@@ -1130,6 +1134,77 @@ async def _peek_block_attachment(
     if repo is None:
         return None
     return await repo.get_block_attachment(attachment_id=attachment_id)
+
+
+# ---------- Country catalog (read-only) ------------------------------------
+
+
+@router.get(
+    "/countries",
+    response_model=list[CountryResponse],
+    summary="List active countries in the public catalog.",
+)
+async def list_countries(
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_countries()
+
+
+# ---------- Country catalog authoring (platform-only) ----------------------
+#
+# Mirrors the crop catalog admin surface: reads need platform.read (and may
+# include retired rows); writes need platform.manage_countries. Codes are
+# immutable; "delete" is a soft retire via is_active=false on update.
+
+
+@router.get(
+    "/admin/countries",
+    response_model=list[CountryResponse],
+    summary="List countries in the catalog (platform; optionally include retired).",
+)
+async def admin_list_countries(
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_countries_admin(include_inactive=include_inactive)
+
+
+@router.post(
+    "/admin/countries",
+    response_model=CountryResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a country in the catalog (platform).",
+)
+async def admin_create_country(
+    payload: CountryCreateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_countries")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.create_country(
+        fields=payload.model_dump(), actor_user_id=context.user_id
+    )
+
+
+@router.patch(
+    "/admin/countries/{country_id}",
+    response_model=CountryResponse,
+    summary="Update a country (platform). Code is immutable; is_active toggles retire.",
+)
+async def admin_update_country(
+    country_id: UUID,
+    payload: CountryUpdateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_countries")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.update_country(
+        country_id=country_id,
+        fields=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+    )
 
 
 # ---------- Crop catalog (read-only) ---------------------------------------

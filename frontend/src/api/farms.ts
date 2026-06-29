@@ -26,6 +26,7 @@ export interface Farm {
   area_value: number;
   area_unit: AreaUnitName;
   elevation_m: number | null;
+  country_code: string | null;
   governorate: string | null;
   district: string | null;
   nearest_city: string | null;
@@ -54,6 +55,7 @@ export interface FarmCreatePayload {
   description?: string | null;
   boundary: MultiPolygon;
   elevation_m?: number | null;
+  country_code?: string | null;
   governorate?: string | null;
   district?: string | null;
   nearest_city?: string | null;
@@ -71,6 +73,7 @@ export interface FarmUpdatePayload {
   description?: string | null;
   boundary?: MultiPolygon;
   elevation_m?: number | null;
+  country_code?: string | null;
   governorate?: string | null;
   district?: string | null;
   nearest_city?: string | null;
