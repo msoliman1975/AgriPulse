@@ -87,6 +87,59 @@ def test_crop_path_rejects_non_string() -> None:
         compile_tree(_minimal_leaf_spec(crop_path=123), source_path="x")
 
 
+# --- multi-axis targeting (PR-2: crop_paths / country_codes / soil_textures) --
+
+
+def test_targeting_axes_default_empty() -> None:
+    compiled = compile_tree(_minimal_leaf_spec(), source_path="x")
+    assert compiled["crop_paths"] == []
+    assert compiled["country_codes"] == []
+    assert compiled["soil_textures"] == []
+
+
+def test_crop_paths_list_compiles() -> None:
+    compiled = compile_tree(
+        _minimal_leaf_spec(crop_paths=["mango", "citrus.valencia"]), source_path="x"
+    )
+    assert compiled["crop_paths"] == ["mango", "citrus.valencia"]
+    # Legacy single column is the first targeted path.
+    assert compiled["crop_path"] == "mango"
+
+
+def test_legacy_crop_path_folds_into_crop_paths() -> None:
+    compiled = compile_tree(_minimal_leaf_spec(crop_path="mango"), source_path="x")
+    assert compiled["crop_paths"] == ["mango"]
+
+
+def test_crop_paths_and_legacy_merge_and_dedupe() -> None:
+    compiled = compile_tree(
+        _minimal_leaf_spec(crop_paths=["mango"], crop_path="mango"), source_path="x"
+    )
+    assert compiled["crop_paths"] == ["mango"]
+
+
+def test_country_codes_normalise_to_upper() -> None:
+    compiled = compile_tree(_minimal_leaf_spec(country_codes=["eg", "JO"]), source_path="x")
+    assert compiled["country_codes"] == ["EG", "JO"]
+
+
+def test_country_codes_reject_non_alpha2() -> None:
+    with pytest.raises(Exception, match="country code"):
+        compile_tree(_minimal_leaf_spec(country_codes=["EGY"]), source_path="x")
+
+
+def test_soil_textures_accept_enum_values() -> None:
+    compiled = compile_tree(
+        _minimal_leaf_spec(soil_textures=["sandy", "clay_loam"]), source_path="x"
+    )
+    assert compiled["soil_textures"] == ["sandy", "clay_loam"]
+
+
+def test_soil_textures_reject_unknown_value() -> None:
+    with pytest.raises(Exception, match="soil texture"):
+        compile_tree(_minimal_leaf_spec(soil_textures=["mud"]), source_path="x")
+
+
 # --- evidence / transferability provenance blocks (KB P1-A) -----------
 
 

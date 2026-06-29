@@ -49,6 +49,90 @@ def _seed_files() -> Iterable[Path]:
     return sorted(_SEEDS_DIR.glob("*.yaml"))
 
 
+# The closed block soil-texture vocabulary (mirrors farms.schemas.SoilTexture
+# / the blocks.soil_texture CHECK). Tree targeting may only reference these.
+_SOIL_TEXTURES: frozenset[str] = frozenset(
+    {"sandy", "sandy_loam", "loam", "clay_loam", "clay", "silty_loam", "silty_clay"}
+)
+
+
+def _as_str_list(value: Any, *, key: str, source_path: str) -> list[str]:
+    """Coerce a YAML targeting axis to a list of non-empty strings.
+
+    Accepts a single string (convenience for one-element axes) or a list.
+    ``None`` / missing → empty list (= matches any).
+    """
+    if value is None:
+        return []
+    items = [value] if isinstance(value, str) else value
+    if not isinstance(items, list):
+        raise DecisionTreeParseError(
+            path=source_path, detail=f"{key!r} must be a string or a list of strings"
+        )
+    out: list[str] = []
+    for item in items:
+        if not isinstance(item, str) or not item:
+            raise DecisionTreeParseError(
+                path=source_path, detail=f"{key!r} entries must be non-empty strings"
+            )
+        if item not in out:  # dedupe, preserve order
+            out.append(item)
+    return out
+
+
+def _validate_targeting(
+    spec: dict[str, Any], source_path: str
+) -> tuple[list[str], list[str], list[str]]:
+    """Parse + validate the three targeting axes from a tree spec.
+
+    Returns ``(crop_paths, country_codes, soil_textures)``. ``crop_paths``
+    accepts the new plural key and/or the legacy singular ``crop_path``;
+    country codes are normalized to upper-case ISO-3166 alpha-2; soil
+    textures must belong to the closed block vocabulary. An axis that is
+    absent / empty means "matches any" (enforced by the engine matcher).
+    """
+    crop_paths = _as_str_list(spec.get("crop_paths"), key="crop_paths", source_path=source_path)
+    for legacy in _as_str_list(spec.get("crop_path"), key="crop_path", source_path=source_path):
+        if legacy not in crop_paths:
+            crop_paths.append(legacy)
+    for path in crop_paths:
+        # Dot-joined catalog codes; reject empty segments so a typo like
+        # ``mango..short`` can't silently widen the match.
+        if any(seg == "" for seg in path.split(".")):
+            raise DecisionTreeParseError(
+                path=source_path, detail=f"crop path {path!r} has an empty segment"
+            )
+
+    raw_countries = _as_str_list(
+        spec.get("country_codes"), key="country_codes", source_path=source_path
+    )
+    country_codes: list[str] = []
+    for code in raw_countries:
+        upper = code.upper()
+        if len(upper) != 2 or not upper.isalpha():
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=f"country code {code!r} must be two letters (ISO 3166-1 alpha-2)",
+            )
+        if upper not in country_codes:
+            country_codes.append(upper)
+
+    soil_textures = _as_str_list(
+        spec.get("soil_textures"), key="soil_textures", source_path=source_path
+    )
+    for soil in soil_textures:
+        if soil not in _SOIL_TEXTURES:
+            raise DecisionTreeParseError(
+                path=source_path,
+                detail=(
+                    f"soil texture {soil!r} is not a valid block soil texture "
+                    f"({', '.join(sorted(_SOIL_TEXTURES))})"
+                ),
+            )
+
+    return crop_paths, country_codes, soil_textures
+
+
 def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     """Validate + normalize an authored YAML spec into the compiled JSON
     shape consumed by ``engine.evaluate_tree``.
@@ -64,18 +148,10 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     if not isinstance(code, str) or not code:
         raise DecisionTreeParseError(path=source_path, detail="missing 'code'")
 
-    crop_path = spec.get("crop_path")
-    if crop_path is not None:
-        if not isinstance(crop_path, str) or not crop_path:
-            raise DecisionTreeParseError(
-                path=source_path, detail="'crop_path' must be a non-empty string"
-            )
-        # The path is dot-joined catalog codes; reject empty segments so a
-        # typo like ``mango..short`` can't silently widen the match.
-        if any(seg == "" for seg in crop_path.split(".")):
-            raise DecisionTreeParseError(
-                path=source_path, detail=f"'crop_path' {crop_path!r} has an empty segment"
-            )
+    crop_paths, country_codes, soil_textures = _validate_targeting(spec, source_path)
+    # Legacy single-value column: the first targeted path (or None). Kept so
+    # crop_id resolution + crop-scoped reads/display keep working unchanged.
+    crop_path = crop_paths[0] if crop_paths else None
 
     name_en = spec.get("name_en")
     if not isinstance(name_en, str) or not name_en:
@@ -120,6 +196,9 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
         "description_ar": spec.get("description_ar"),
         "crop_code": spec.get("crop_code"),
         "crop_path": crop_path,
+        "crop_paths": crop_paths,
+        "country_codes": country_codes,
+        "soil_textures": soil_textures,
         "applicable_regions": list(spec.get("applicable_regions") or []),
         "parameters": parameters_decl,
         "evidence": evidence,
@@ -592,6 +671,9 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
         compiled = compile_tree(raw, source_path=str(path))
         compiled_hash = _hash_compiled(compiled)
         crop_path = compiled.get("crop_path")
+        crop_paths = compiled.get("crop_paths") or []
+        country_codes = compiled.get("country_codes") or []
+        soil_textures = compiled.get("soil_textures") or []
         # When a tree targets by path, derive crop_code from the path's first
         # segment so crop_id stays populated for display + crop-scoped reads.
         crop_code = compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
@@ -626,6 +708,9 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                 description_ar=compiled.get("description_ar"),
                 crop_id=crop_id,
                 crop_path=crop_path,
+                crop_paths=crop_paths,
+                country_codes=country_codes,
+                soil_textures=soil_textures,
                 applicable_regions=compiled.get("applicable_regions") or [],
             )
             latest_version: int | None = None
@@ -643,6 +728,9 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                            description_ar = :description_ar,
                            crop_id = :crop_id,
                            crop_path = :crop_path,
+                           crop_paths = :crop_paths,
+                           country_codes = :country_codes,
+                           soil_textures = :soil_textures,
                            applicable_regions = :applicable_regions,
                            is_active = TRUE,
                            updated_at = now()
@@ -656,6 +744,9 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                     "description_ar": compiled.get("description_ar"),
                     "crop_id": crop_id,
                     "crop_path": crop_path,
+                    "crop_paths": crop_paths,
+                    "country_codes": country_codes,
+                    "soil_textures": soil_textures,
                     "applicable_regions": compiled.get("applicable_regions") or [],
                     "id": tree_id,
                 },
@@ -705,6 +796,9 @@ async def _insert_tree(
     description_ar: str | None,
     crop_id: Any,
     crop_path: str | None = None,
+    crop_paths: list[str] | None = None,
+    country_codes: list[str] | None = None,
+    soil_textures: list[str] | None = None,
     applicable_regions: list[str],
 ) -> Any:
     row = (
@@ -713,9 +807,11 @@ async def _insert_tree(
                 """
                 INSERT INTO public.decision_trees
                     (code, name_en, name_ar, description_en, description_ar,
-                     crop_id, crop_path, applicable_regions, is_active)
+                     crop_id, crop_path, crop_paths, country_codes, soil_textures,
+                     applicable_regions, is_active)
                 VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
-                        :crop_id, :crop_path, :applicable_regions, TRUE)
+                        :crop_id, :crop_path, :crop_paths, :country_codes, :soil_textures,
+                        :applicable_regions, TRUE)
                 RETURNING id
                 """
             ),
@@ -727,6 +823,9 @@ async def _insert_tree(
                 "description_ar": description_ar,
                 "crop_id": crop_id,
                 "crop_path": crop_path,
+                "crop_paths": crop_paths or [],
+                "country_codes": country_codes or [],
+                "soil_textures": soil_textures or [],
                 "applicable_regions": applicable_regions,
             },
         )

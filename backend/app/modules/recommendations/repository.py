@@ -135,6 +135,9 @@ class RecommendationsRepository:
             "description_en": row.description_en,
             "description_ar": row.description_ar,
             "crop_id": row.crop_id,
+            "crop_paths": list(row.crop_paths or []),
+            "country_codes": list(row.country_codes or []),
+            "soil_textures": list(row.soil_textures or []),
             "applicable_regions": list(row.applicable_regions or []),
             "is_active": row.is_active,
             "current_version_id": row.current_version_id,
@@ -268,6 +271,9 @@ class RecommendationsRepository:
         applicable_regions: list[str],
         actor_user_id: UUID | None,
         crop_path: str | None = None,
+        crop_paths: list[str] | None = None,
+        country_codes: list[str] | None = None,
+        soil_textures: list[str] | None = None,
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
         version + current_version_id update in one transaction.
@@ -283,11 +289,13 @@ class RecommendationsRepository:
                     INSERT INTO public.decision_trees
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
-                         crop_id, crop_path, applicable_regions, is_active,
+                         crop_id, crop_path, crop_paths, country_codes,
+                         soil_textures, applicable_regions, is_active,
                          created_by, updated_by)
                     VALUES (:code, :tenant_id, :name_en, :name_ar,
                             :description_en, :description_ar,
-                            :crop_id, :crop_path, :applicable_regions, TRUE,
+                            :crop_id, :crop_path, :crop_paths, :country_codes,
+                            :soil_textures, :applicable_regions, TRUE,
                             :actor, :actor)
                     RETURNING id
                     """
@@ -305,6 +313,9 @@ class RecommendationsRepository:
                     "description_ar": description_ar,
                     "crop_id": crop_id,
                     "crop_path": crop_path,
+                    "crop_paths": crop_paths or [],
+                    "country_codes": country_codes or [],
+                    "soil_textures": soil_textures or [],
                     "applicable_regions": applicable_regions,
                     "actor": actor_user_id,
                 },

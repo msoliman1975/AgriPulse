@@ -181,6 +181,10 @@ class DecisionTreeDetailResponse(BaseModel):
     description_en: str | None
     description_ar: str | None
     crop_id: UUID | None
+    # Multi-axis targeting sets (PR-2). Empty set on an axis = matches any.
+    crop_paths: list[str] = Field(default_factory=list)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
