@@ -90,9 +90,13 @@ global:
   #   catalog) + 0044 (decision_trees crop_paths/country_codes/soil_textures),
   #   tenant 0051 (farms.country_code, backfilled to 'EG'). Backend + FE → api +
   #   workers + frontend bumped; tile-server stays 9d140cc.
+  # a88cd5d = #297 fix: include crop_paths/country_codes/soil_textures in the
+  #   GET /v1/decision-trees catalog-list SELECT (caught in #296 live smoke).
+  #   No migrations, api request-path only → only api bumped; workers stay
+  #   7035b22, frontend 7035b22, tile-server 9d140cc.
   images:
     api:
-      tag: "7035b22"
+      tag: "a88cd5d"
     workers:
       tag: "7035b22"
     frontend:
