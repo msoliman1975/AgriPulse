@@ -1,0 +1,101 @@
+# demo_cell_low_ndvi_v1 — DEMONSTRATOR for per-cell execution scope.
+#
+# This is the first `scope: cell` tree: instead of one evaluation per block,
+# it runs once per sub-block grid cell, so it can flag the specific low-vigour
+# zones inside a block rather than the block as a whole.
+#
+# It conditions on the cell's own NDVI *mean* (the per-cell value the engine
+# swaps into the cell context — `baseline_deviation` inherits the block, so a
+# cell tree that wants per-cell behaviour must read `key: mean`). When a cell's
+# NDVI mean falls below an absolute low-vigour threshold, it recommends
+# scouting that specific zone; the resulting recommendation carries the
+# cell_id, and the map / recommendations page surface it as a zone (P2).
+#
+# Targets mango (the gridded demo blocks are mango); country/soil unconstrained.
+# Threshold is intentionally low (bare/severely-stressed vigour) so it fires on
+# the weakest zones only, demonstrating per-cell selectivity rather than a
+# block-wide trigger.
+
+code: demo_cell_low_ndvi_v1
+name_en: "Demo — per-cell low-NDVI zone scout"
+name_ar: "عرض توضيحي — استكشاف المناطق منخفضة NDVI لكل خلية"
+description_en: >-
+  Demonstrator for per-cell execution scope: evaluates each sub-block grid
+  cell and recommends scouting the cells whose NDVI mean is in the
+  low-vigour range, attributing the recommendation to that specific zone.
+description_ar: >-
+  عرض توضيحي لنطاق التنفيذ لكل خلية: يقيّم كل خلية شبكية داخل القطعة ويوصي
+  باستكشاف الخلايا التي يقع متوسط NDVI بها في نطاق الحيوية المنخفضة، مع نسب
+  التوصية إلى تلك المنطقة تحديدًا.
+
+crop_paths:
+  - mango
+scope: cell
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    A persistently low absolute NDVI mean over a grid cell indicates a
+    low-vigour / near-bare zone worth inspecting on foot; this demonstrator
+    uses an absolute cut on the per-cell mean (not a baseline z-score) because
+    the per-cell context carries the cell's own mean while the seasonal
+    baseline is a block-level value.
+  citations:
+    - source_type: fao
+      title: >-
+        FAO GIEWS — Earth Observation: NDVI for crop-condition monitoring
+      url: https://www.fao.org/giews/earthobservation/
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: medium
+
+root: root
+nodes:
+  root:
+    label_en: Is this cell's NDVI mean in the low-vigour range?
+    label_ar: هل متوسط NDVI لهذه الخلية في نطاق الحيوية المنخفضة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: mean
+        right: 0.15
+    on_match: leaf_scout_zone
+    on_miss: leaf_no_action
+
+  leaf_scout_zone:
+    label_en: Low-vigour zone — scout this cell
+    label_ar: منطقة منخفضة الحيوية — افحص هذه الخلية
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        This zone's NDVI is in the low-vigour range. Scout this specific
+        cell to identify the cause (bare patch, water, pest, establishment).
+      text_ar: >-
+        متوسط NDVI لهذه المنطقة في نطاق الحيوية المنخفضة. افحص هذه الخلية
+        تحديدًا لتحديد السبب (بقعة عارية، ري، آفات، تأسيس).
+      actions:
+        immediate:
+          - text_en: Scout this specific zone on your next round.
+            text_ar: افحص هذه المنطقة تحديدًا في جولتك القادمة.
+
+  leaf_no_action:
+    label_en: No action — cell NDVI above the low-vigour cut
+    label_ar: لا إجراء — NDVI الخلية أعلى من حد الحيوية المنخفضة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: This cell's NDVI is above the low-vigour threshold; no action.
+      text_ar: متوسط NDVI لهذه الخلية أعلى من الحد؛ لا إجراء.
