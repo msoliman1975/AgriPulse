@@ -158,7 +158,10 @@ class AlertsRepository:
         # interpolation is into a closed allow-list of literals.
         where_sql = " AND ".join(clauses)
         sql = (
-            "SELECT id, block_id, rule_code, severity, status, "
+            "SELECT id, block_id, cell_id, "  # noqa: S608
+            "       (SELECT row_idx FROM grid_cells WHERE id = alerts.cell_id) AS cell_row, "
+            "       (SELECT col_idx FROM grid_cells WHERE id = alerts.cell_id) AS cell_col, "
+            "       rule_code, severity, status, "
             "       diagnosis_en, diagnosis_ar, prescription_en, prescription_ar, "
             "       prescription_activity_id, "
             "       signal_snapshot, created_at, updated_at, "
@@ -222,6 +225,7 @@ def _alert_to_dict(row: Alert) -> dict[str, Any]:
     return {
         "id": row.id,
         "block_id": row.block_id,
+        "cell_id": row.cell_id,
         "rule_code": row.rule_code,
         "severity": row.severity,
         "status": row.status,

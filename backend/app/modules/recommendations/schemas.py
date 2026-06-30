@@ -40,6 +40,11 @@ class RecommendationResponse(BaseModel):
 
     id: UUID
     block_id: UUID
+    # Sub-block grid cell for cell-scoped recommendations (per-cell P2); NULL
+    # for block-scoped. cell_row/cell_col give a readable zone label.
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
     farm_id: UUID
     tree_id: UUID
     tree_code: str

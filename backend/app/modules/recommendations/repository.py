@@ -662,7 +662,12 @@ class RecommendationsRepository:
                 await self._tenant.execute(
                     text(
                         """
-                    SELECT id, block_id, farm_id, tree_id, tree_code, tree_version,
+                    SELECT id, block_id, cell_id,
+                           (SELECT row_idx FROM grid_cells WHERE id = recommendations.cell_id)
+                               AS cell_row,
+                           (SELECT col_idx FROM grid_cells WHERE id = recommendations.cell_id)
+                               AS cell_col,
+                           farm_id, tree_id, tree_code, tree_version,
                            block_crop_id, action_type, severity, parameters,
                            confidence, tree_path, text_en, text_ar,
                            valid_until, state, applied_at, applied_by,
@@ -705,8 +710,15 @@ class RecommendationsRepository:
             clauses.append("action_type = ANY(:actions)")
             params["actions"] = list(action_type_filter)
         where_sql = " AND ".join(clauses)
+        # S608: values flow through bind params; `where_sql` is built only from
+        # the closed allow-list of literal fragments above.
         sql = (
-            "SELECT id, block_id, farm_id, tree_id, tree_code, tree_version, "
+            "SELECT id, block_id, cell_id, "  # noqa: S608
+            "       (SELECT row_idx FROM grid_cells WHERE id = recommendations.cell_id) "
+            "           AS cell_row, "
+            "       (SELECT col_idx FROM grid_cells WHERE id = recommendations.cell_id) "
+            "           AS cell_col, "
+            "       farm_id, tree_id, tree_code, tree_version, "
             "       block_crop_id, action_type, severity, parameters, "
             "       confidence, tree_path, text_en, text_ar, "
             "       valid_until, state, applied_at, applied_by, "

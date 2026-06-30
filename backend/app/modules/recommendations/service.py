@@ -407,6 +407,7 @@ class RecommendationsServiceImpl:
             RecommendationOpenedV1(
                 recommendation_id=recommendation_id,
                 block_id=block_id,
+                cell_id=cell_id,
                 farm_id=farm_id,
                 tree_id=tree["tree_id"],
                 tree_code=tree["tree_code"],
@@ -500,6 +501,7 @@ class RecommendationsServiceImpl:
             AlertOpenedV1(
                 alert_id=alert_id,
                 block_id=block_id,
+                cell_id=cell_id,
                 rule_code=rule_code,
                 severity=outcome.severity,
                 created_at=datetime.now(UTC),

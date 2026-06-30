@@ -8,6 +8,11 @@ export type AlertStatus = "open" | "acknowledged" | "resolved" | "snoozed";
 export interface Alert {
   id: string;
   block_id: string;
+  // Sub-block grid cell for cell-scoped tree alerts (per-cell P2); null for
+  // block-scoped. cell_row/cell_col give a readable zone label.
+  cell_id: string | null;
+  cell_row: number | null;
+  cell_col: number | null;
   rule_code: string;
   severity: AlertSeverity;
   status: AlertStatus;

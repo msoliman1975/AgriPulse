@@ -23,6 +23,11 @@ class AlertResponse(BaseModel):
 
     id: UUID
     block_id: UUID
+    # Sub-block grid cell for cell-scoped tree alerts (per-cell P2); NULL for
+    # block-scoped. cell_row/cell_col give a readable zone label (list reads).
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
     rule_code: str
     severity: AlertSeverity
     status: AlertStatus

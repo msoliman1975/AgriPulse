@@ -40,6 +40,11 @@ export type RecommendationActions = Partial<
 export interface Recommendation {
   id: string;
   block_id: string;
+  // Sub-block grid cell for cell-scoped recommendations (per-cell P2); null
+  // for block-scoped. cell_row/cell_col give a readable zone label.
+  cell_id: string | null;
+  cell_row: number | null;
+  cell_col: number | null;
   farm_id: string;
   tree_id: string;
   tree_code: string;

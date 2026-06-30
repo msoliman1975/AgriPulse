@@ -12,6 +12,7 @@ import type {
   TreePathStepDTO,
 } from "@/api/recommendations";
 import { Pill } from "@/components/Pill";
+import { cellLabel } from "@/lib/cellLabel";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -157,6 +158,9 @@ function Row({ rec, farmId, canAct, onApply, onDismiss, onDefer }: RowProps): Re
           <Pill kind={SEV_KIND[rec.severity]}>{t(`severity.${rec.severity}`)}</Pill>
           <Pill kind={stateKind(rec.state)}>{t(`state.${rec.state}`)}</Pill>
           <Pill kind="neutral">{rec.action_type}</Pill>
+          {cellLabel(rec.cell_row, rec.cell_col) ? (
+            <Pill kind="neutral">{t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}</Pill>
+          ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">

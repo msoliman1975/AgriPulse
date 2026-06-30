@@ -18,6 +18,7 @@
     "expiresIn": "expires {{when}}",
     "deferredUntil": "deferred until {{when}}",
     "confidence": "confidence {{percent}}%",
+    "zone": "zone {{zone}}",
     "explainShow": "Why this?",
     "explainHide": "Hide reasoning"
   },
