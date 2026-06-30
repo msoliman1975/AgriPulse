@@ -73,6 +73,7 @@ class RecommendationsRepository:
                            t.crop_paths,
                            t.country_codes,
                            t.soil_textures,
+                           t.scope,
                            t.applicable_regions,
                            v.id    AS version_id,
                            v.version,
@@ -141,6 +142,7 @@ class RecommendationsRepository:
             "crop_paths": list(row.crop_paths or []),
             "country_codes": list(row.country_codes or []),
             "soil_textures": list(row.soil_textures or []),
+            "scope": row.scope,
             "applicable_regions": list(row.applicable_regions or []),
             "is_active": row.is_active,
             "current_version_id": row.current_version_id,
@@ -187,7 +189,7 @@ class RecommendationsRepository:
                            t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
                            t.crop_id, t.crop_paths, t.country_codes,
-                           t.soil_textures, t.applicable_regions, t.is_active,
+                           t.soil_textures, t.scope, t.applicable_regions, t.is_active,
                            v.version AS current_version
                     FROM public.decision_trees t
                     LEFT JOIN public.decision_tree_versions v
@@ -278,6 +280,7 @@ class RecommendationsRepository:
         crop_paths: list[str] | None = None,
         country_codes: list[str] | None = None,
         soil_textures: list[str] | None = None,
+        scope: str = "block",
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
         version + current_version_id update in one transaction.
@@ -294,12 +297,12 @@ class RecommendationsRepository:
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
                          crop_id, crop_path, crop_paths, country_codes,
-                         soil_textures, applicable_regions, is_active,
+                         soil_textures, scope, applicable_regions, is_active,
                          created_by, updated_by)
                     VALUES (:code, :tenant_id, :name_en, :name_ar,
                             :description_en, :description_ar,
                             :crop_id, :crop_path, :crop_paths, :country_codes,
-                            :soil_textures, :applicable_regions, TRUE,
+                            :soil_textures, :scope, :applicable_regions, TRUE,
                             :actor, :actor)
                     RETURNING id
                     """
@@ -320,6 +323,7 @@ class RecommendationsRepository:
                     "crop_paths": crop_paths or [],
                     "country_codes": country_codes or [],
                     "soil_textures": soil_textures or [],
+                    "scope": scope,
                     "applicable_regions": applicable_regions,
                     "actor": actor_user_id,
                 },
@@ -565,6 +569,7 @@ class RecommendationsRepository:
         *,
         recommendation_id: UUID,
         block_id: UUID,
+        cell_id: UUID | None = None,
         farm_id: UUID,
         tree_id: UUID,
         tree_code: str,
@@ -590,13 +595,15 @@ class RecommendationsRepository:
                 text(
                     """
                     INSERT INTO recommendations (
-                        id, block_id, farm_id, tree_id, tree_code, tree_version,
+                        id, block_id, cell_id, farm_id, tree_id, tree_code,
+                        tree_version,
                         block_crop_id, action_type, severity, parameters, actions,
                         confidence, tree_path, text_en, text_ar,
                         valid_until, evaluation_snapshot, state,
                         created_by, updated_by
                     ) VALUES (
-                        :id, :block_id, :farm_id, :tree_id, :tree_code, :tree_version,
+                        :id, :block_id, :cell_id, :farm_id, :tree_id, :tree_code,
+                        :tree_version,
                         :block_crop_id, :action_type, :severity,
                         CAST(:parameters AS jsonb), CAST(:actions AS jsonb),
                         :confidence,
@@ -608,6 +615,7 @@ class RecommendationsRepository:
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_crop_id", type_=PG_UUID(as_uuid=True)),
@@ -616,6 +624,7 @@ class RecommendationsRepository:
                 {
                     "id": recommendation_id,
                     "block_id": block_id,
+                    "cell_id": cell_id,
                     "farm_id": farm_id,
                     "tree_id": tree_id,
                     "tree_code": tree_code,
@@ -635,7 +644,13 @@ class RecommendationsRepository:
                 },
             )
         except IntegrityError as exc:
-            if "uq_recommendations_block_tree_open" in str(exc):
+            # Either the block-scoped or the cell-scoped open-state dedup
+            # blocked it — an open rec already exists for this (block[/cell], tree).
+            msg = str(exc)
+            if (
+                "uq_recommendations_block_tree_open" in msg
+                or "uq_recommendations_cell_tree_open" in msg
+            ):
                 return False
             raise
         await self._tenant.flush()
@@ -647,7 +662,12 @@ class RecommendationsRepository:
                 await self._tenant.execute(
                     text(
                         """
-                    SELECT id, block_id, farm_id, tree_id, tree_code, tree_version,
+                    SELECT id, block_id, cell_id,
+                           (SELECT row_idx FROM grid_cells WHERE id = recommendations.cell_id)
+                               AS cell_row,
+                           (SELECT col_idx FROM grid_cells WHERE id = recommendations.cell_id)
+                               AS cell_col,
+                           farm_id, tree_id, tree_code, tree_version,
                            block_crop_id, action_type, severity, parameters,
                            confidence, tree_path, text_en, text_ar,
                            valid_until, state, applied_at, applied_by,
@@ -690,8 +710,15 @@ class RecommendationsRepository:
             clauses.append("action_type = ANY(:actions)")
             params["actions"] = list(action_type_filter)
         where_sql = " AND ".join(clauses)
+        # S608: values flow through bind params; `where_sql` is built only from
+        # the closed allow-list of literal fragments above.
         sql = (
-            "SELECT id, block_id, farm_id, tree_id, tree_code, tree_version, "
+            "SELECT id, block_id, cell_id, "  # noqa: S608
+            "       (SELECT row_idx FROM grid_cells WHERE id = recommendations.cell_id) "
+            "           AS cell_row, "
+            "       (SELECT col_idx FROM grid_cells WHERE id = recommendations.cell_id) "
+            "           AS cell_col, "
+            "       farm_id, tree_id, tree_code, tree_version, "
             "       block_crop_id, action_type, severity, parameters, "
             "       confidence, tree_path, text_en, text_ar, "
             "       valid_until, state, applied_at, applied_by, "
@@ -762,6 +789,7 @@ class RecommendationsRepository:
         *,
         recommendation_id: UUID,
         block_id: UUID,
+        cell_id: UUID | None = None,
         farm_id: UUID,
         from_state: str | None,
         to_state: str,
@@ -772,20 +800,22 @@ class RecommendationsRepository:
             text(
                 """
                 INSERT INTO recommendations_history
-                    (recommendation_id, block_id, farm_id, from_state, to_state,
-                     actor_user_id, details)
-                VALUES (:rec, :block, :farm, :from_state, :to_state,
+                    (recommendation_id, block_id, cell_id, farm_id, from_state,
+                     to_state, actor_user_id, details)
+                VALUES (:rec, :block, :cell, :farm, :from_state, :to_state,
                         :actor, CAST(:details AS jsonb))
                 """
             ).bindparams(
                 bindparam("rec", type_=PG_UUID(as_uuid=True)),
                 bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("cell", type_=PG_UUID(as_uuid=True)),
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "rec": recommendation_id,
                 "block": block_id,
+                "cell": cell_id,
                 "farm": farm_id,
                 "from_state": from_state,
                 "to_state": to_state,
@@ -826,6 +856,49 @@ class RecommendationsRepository:
             }
             for row in rows
         }
+
+    async def get_latest_cell_aggregates(
+        self, *, block_id: UUID
+    ) -> dict[UUID, dict[str, dict[str, Any]]]:
+        """Latest per-cell mean per index for the block's active grid(s).
+
+        Shape ``{cell_id: {index_code: {time, mean}}}`` — the per-cell analogue
+        of :meth:`get_latest_aggregate_per_index`, read from
+        ``block_grid_aggregates`` (the grid module's cell-grain hypertable).
+        Only cells of a non-retired grid config are included. Drives the
+        per-cell evaluation path for ``scope='cell'`` trees (PR-C3); empty when
+        the block has no grid, so cell-scoped trees simply don't fire there.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT DISTINCT ON (obs.cell_id, obs.index_code)
+                               obs.cell_id, obs.index_code, obs.time, obs.mean
+                        FROM block_grid_aggregates obs
+                        JOIN grid_cells gc ON gc.id = obs.cell_id
+                        JOIN grid_configs cfg
+                          ON cfg.id = gc.grid_config_id
+                         AND cfg.retired_at IS NULL
+                         AND cfg.deleted_at IS NULL
+                        WHERE obs.block_id = :block_id
+                        ORDER BY obs.cell_id, obs.index_code, obs.time DESC
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        out: dict[UUID, dict[str, dict[str, Any]]] = {}
+        for row in rows:
+            out.setdefault(row["cell_id"], {})[row["index_code"]] = {
+                "time": row["time"],
+                "mean": row["mean"],
+            }
+        return out
 
     async def get_index_trends(
         self, *, block_id: UUID, window_days: int = 30

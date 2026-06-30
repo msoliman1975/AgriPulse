@@ -14,6 +14,8 @@ export interface DecisionTree {
   crop_paths: string[];
   country_codes: string[];
   soil_textures: string[];
+  // Execution granularity (PR-C1): "block" (default) or "cell".
+  scope: "block" | "cell";
   applicable_regions: string[];
   is_active: boolean;
   current_version: number | null;
@@ -113,6 +115,7 @@ export interface DecisionTreeCreatePayload {
   crop_paths?: string[];
   country_codes?: string[];
   soil_textures?: string[];
+  scope?: "block" | "cell";
   tree_yaml: string;
 }
 

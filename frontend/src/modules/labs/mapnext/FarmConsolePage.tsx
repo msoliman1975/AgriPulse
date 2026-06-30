@@ -31,7 +31,9 @@ import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { loadMapSummary, loadUnitDetail } from "../map/api";
 import { MapCanvas, type GridCellProps, type DrawProgress } from "../map/MapCanvas";
-import { GridCellPopup } from "@/modules/grid/GridCellPopup";
+import { GridCellPopup, type CellItem } from "@/modules/grid/GridCellPopup";
+import { useRecommendations } from "@/queries/recommendations";
+import { useAlerts } from "@/queries/alerts";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
 import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
@@ -78,7 +80,7 @@ function FarmRedirect(): ReactNode {
 }
 
 function Console({ farmId }: { farmId: string }): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
   const [search, setSearch] = useSearchParams();
   const selectedId = search.get("unit");
 
@@ -255,6 +257,33 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     const std = Math.sqrt(variance);
     return { blockMean: mean, z: std > 0 ? (mean - meta.value) / std : 0 };
   }, [selectedCellId, cellMeta, farmGridQ.data]);
+
+  // Cell-scoped outputs (per-cell P2): open recs + alerts for the farm, grouped
+  // by the cell they were attributed to, so the grid popup can surface "what's
+  // happening in this zone".
+  const isAr = i18n.language === "ar";
+  const cellRecsQ = useRecommendations({ farm_id: farmId, state: "open", limit: 500 });
+  const cellAlertsQ = useAlerts({ farm_id: farmId, status: "open", limit: 500 });
+  const cellItemsByCell = useMemo(() => {
+    const map = new Map<string, CellItem[]>();
+    for (const r of cellRecsQ.data ?? []) {
+      if (!r.cell_id) continue;
+      const text = (isAr && r.text_ar) || r.text_en;
+      map.set(r.cell_id, [
+        ...(map.get(r.cell_id) ?? []),
+        { id: r.id, kind: "rec", severity: r.severity, text },
+      ]);
+    }
+    for (const a of cellAlertsQ.data ?? []) {
+      if (!a.cell_id) continue;
+      const text = ((isAr && a.diagnosis_ar) || a.diagnosis_en) ?? a.rule_code;
+      map.set(a.cell_id, [
+        ...(map.get(a.cell_id) ?? []),
+        { id: a.id, kind: "alert", severity: a.severity, text },
+      ]);
+    }
+    return map;
+  }, [cellRecsQ.data, cellAlertsQ.data, isAr]);
 
   // Signal overlay: definitions for the picker + observations for the active one.
   const signalDefsQ = useQuery({
@@ -633,6 +662,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               time={cellMeta.get(selectedCellId)?.time ?? null}
               baselineMean={selectedCellBaseline?.blockMean ?? null}
               z={selectedCellBaseline?.z ?? null}
+              cellItems={cellItemsByCell.get(selectedCellId) ?? []}
               onClose={() => {
                 setSelectedCellId(null);
                 setCellClickPoint(null);

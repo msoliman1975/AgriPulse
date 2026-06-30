@@ -27,7 +27,17 @@ interface Props {
   // plus the cell's deviation in std-devs (positive = BELOW the block avg).
   baselineMean: number | null;
   z: number | null;
+  // Open cell-scoped recommendations/alerts attributed to this cell (per-cell
+  // P2). Empty/omitted when the cell has none.
+  cellItems?: CellItem[];
   onClose: () => void;
+}
+
+export interface CellItem {
+  id: string;
+  kind: "rec" | "alert";
+  severity: string;
+  text: string;
 }
 
 function formatSceneTime(iso: string): string {
@@ -65,6 +75,7 @@ export function GridCellPopup({
   time,
   baselineMean,
   z,
+  cellItems,
   onClose,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
@@ -173,6 +184,29 @@ export function GridCellPopup({
           </span>
         </div>
       </div>
+
+      {cellItems && cellItems.length > 0 ? (
+        <div className="mt-2 space-y-1 border-t border-ap-line pt-2">
+          <p className="text-[10px] font-medium uppercase text-ap-muted">
+            {t("gridPopup.zoneActions")}
+          </p>
+          {cellItems.map((item) => (
+            <div key={item.id} className="flex items-start gap-1.5 text-[11px]">
+              <span
+                className={clsx(
+                  "mt-0.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full",
+                  item.severity === "critical"
+                    ? "bg-ap-crit"
+                    : item.severity === "warning"
+                      ? "bg-ap-warn"
+                      : "bg-ap-primary",
+                )}
+              />
+              <span className="text-ap-ink">{item.text}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {/* Placeholder for a future "send a scout task" action — wiring up
           the scouting workflow is out of scope here, so this is a no-op. */}

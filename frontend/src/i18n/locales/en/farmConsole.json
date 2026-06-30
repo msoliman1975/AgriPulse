@@ -243,6 +243,7 @@
     "flagHint": "Flagged when ≥1.5σ below the block average.",
     "coordinate": "Coordinate",
     "block": "Block",
+    "zoneActions": "For this zone",
     "comingSoon": "Coming soon",
     "scout": "Scout this area →",
     "status": {

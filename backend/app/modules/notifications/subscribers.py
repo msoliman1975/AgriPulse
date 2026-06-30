@@ -502,6 +502,8 @@ def _send_webhook_channel(
         "tenant_id": ctx.get("tenant_id"),
         "alert_id": str(event.alert_id),
         "block_id": str(event.block_id),
+        # Sub-block grid cell for cell-scoped tree alerts (per-cell P2).
+        "cell_id": str(event.cell_id) if event.cell_id else None,
         "farm_id": ctx.get("farm_id"),
         "rule_code": event.rule_code,
         "severity": event.severity,
@@ -1200,6 +1202,8 @@ def _dispatch_rec_webhook_once(
         "tenant_id": ctx.get("tenant_id"),
         "recommendation_id": str(event.recommendation_id),
         "block_id": str(event.block_id),
+        # Sub-block grid cell for cell-scoped recs (per-cell P2).
+        "cell_id": str(event.cell_id) if event.cell_id else None,
         "farm_id": str(event.farm_id),
         "tree_code": event.tree_code,
         "tree_version": event.tree_version,

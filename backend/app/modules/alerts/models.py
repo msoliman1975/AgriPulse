@@ -39,6 +39,10 @@ class Alert(Base, TimestampedMixin):
         ForeignKey("blocks.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # Sub-block grid cell for cell-scoped tree alerts (PR-C2); NULL = block.
+    # The synthesised rule_code embeds the cell id, so the existing
+    # (block_id, rule_code) dedup separates cells without an index change.
+    cell_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     rule_code: Mapped[str] = mapped_column(Text, nullable=False)
     severity: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'open'"))

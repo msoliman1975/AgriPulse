@@ -18,6 +18,7 @@
     "expiresIn": "تنتهي {{when}}",
     "deferredUntil": "مؤجَّلة حتى {{when}}",
     "confidence": "الثقة {{percent}}%",
+    "zone": "المنطقة {{zone}}",
     "explainShow": "لماذا هذا؟",
     "explainHide": "إخفاء السبب"
   },

@@ -40,6 +40,11 @@ class RecommendationResponse(BaseModel):
 
     id: UUID
     block_id: UUID
+    # Sub-block grid cell for cell-scoped recommendations (per-cell P2); NULL
+    # for block-scoped. cell_row/cell_col give a readable zone label.
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
     farm_id: UUID
     tree_id: UUID
     tree_code: str
@@ -133,6 +138,8 @@ class DecisionTreeResponse(BaseModel):
     crop_paths: list[str] = Field(default_factory=list)
     country_codes: list[str] = Field(default_factory=list)
     soil_textures: list[str] = Field(default_factory=list)
+    # Execution granularity: 'block' (default) or 'cell' (PR-C1).
+    scope: str = "block"
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -190,6 +197,7 @@ class DecisionTreeDetailResponse(BaseModel):
     crop_paths: list[str] = Field(default_factory=list)
     country_codes: list[str] = Field(default_factory=list)
     soil_textures: list[str] = Field(default_factory=list)
+    scope: str = "block"
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -213,6 +221,8 @@ class DecisionTreeCreateRequest(BaseModel):
     crop_paths: list[str] | None = None
     country_codes: list[str] | None = None
     soil_textures: list[str] | None = None
+    # Execution granularity (PR-C1): 'block' (default) or 'cell'.
+    scope: Literal["block", "cell"] | None = None
     tree_yaml: str = Field(min_length=1)
 
 

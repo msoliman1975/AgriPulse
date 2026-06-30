@@ -17,6 +17,8 @@ class AlertOpenedV1(Event):
 
     alert_id: UUID
     block_id: UUID
+    # Sub-block grid cell for cell-scoped tree alerts (per-cell P2); None = block.
+    cell_id: UUID | None = None
     rule_code: str
     severity: str
     created_at: datetime

@@ -24,6 +24,8 @@ class RecommendationOpenedV1(Event):
 
     recommendation_id: UUID
     block_id: UUID
+    # Sub-block grid cell for cell-scoped recs (per-cell P2); None = block.
+    cell_id: UUID | None = None
     farm_id: UUID
     tree_id: UUID
     tree_code: str
