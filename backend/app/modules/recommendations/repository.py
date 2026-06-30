@@ -590,6 +590,11 @@ class RecommendationsRepository:
         """Open one recommendation. Returns True if a row was inserted,
         False if the partial UNIQUE on (block_id, tree_id) blocked it
         (an open recommendation already exists)."""
+        # Savepoint so an idempotent conflict (an open rec already exists for
+        # this block[/cell] + tree) rolls back just this insert instead of
+        # poisoning the surrounding sweep transaction — the cell-scoped sweep
+        # does many inserts that conflict on re-evaluation.
+        savepoint = await self._tenant.begin_nested()
         try:
             await self._tenant.execute(
                 text(
@@ -643,7 +648,9 @@ class RecommendationsRepository:
                     "actor": actor_user_id,
                 },
             )
+            await savepoint.commit()
         except IntegrityError as exc:
+            await savepoint.rollback()
             # Either the block-scoped or the cell-scoped open-state dedup
             # blocked it — an open rec already exists for this (block[/cell], tree).
             msg = str(exc)
