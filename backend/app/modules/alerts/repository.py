@@ -73,6 +73,10 @@ class AlertsRepository:
         on ``(block_id, rule_code) WHERE status IN open/ack/snoozed``
         keeps re-evaluation idempotent without needing schema changes.
         """
+        # Savepoint so an idempotent conflict (an active alert already exists
+        # for this block[/cell] + rule_code) rolls back just this insert instead
+        # of poisoning the surrounding sweep transaction.
+        savepoint = await self._tenant.begin_nested()
         try:
             await self._tenant.execute(
                 text(
@@ -113,7 +117,9 @@ class AlertsRepository:
                     "actor": actor_user_id,
                 },
             )
+            await savepoint.commit()
         except IntegrityError as exc:
+            await savepoint.rollback()
             # Partial UNIQUE on (block_id, rule_code) WHERE status IN
             # open/ack/snoozed — re-firing while a prior alert is
             # active is a no-op by design.
