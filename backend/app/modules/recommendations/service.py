@@ -203,9 +203,12 @@ class RecommendationsServiceImpl:
             tree_ids=tuple(t["tree_id"] for t in trees)
         )
 
-        trees_evaluated = 0
+        # Split matched trees by execution scope (PR-C3). Block-scoped trees
+        # evaluate once against the block context; cell-scoped trees fan out
+        # over the block's grid cells (cell imagery, inherit everything else).
+        block_trees: list[dict[str, Any]] = []
+        cell_trees: list[dict[str, Any]] = []
         trees_skipped_crop = 0
-        recommendations_opened = 0
         for tree in trees:
             # Multi-axis targeting (PR-3): a tree fires on this block only if
             # its crop / country / soil sets all admit the block (AND across
@@ -219,124 +222,67 @@ class RecommendationsServiceImpl:
             ):
                 trees_skipped_crop += 1
                 continue
-            trees_evaluated += 1
+            (cell_trees if tree.get("scope") == "cell" else block_trees).append(tree)
 
+        trees_evaluated = len(block_trees) + len(cell_trees)
+        recommendations_opened = 0
+
+        # Block-scoped path.
+        for tree in block_trees:
             overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            result = evaluate_tree(tree["tree_compiled"], ctx, param_overrides=overrides)
-            if result.error is not None:
-                self._log.warning(
-                    "decision_tree_walk_error",
-                    tree_code=tree["tree_code"],
-                    block_id=str(block_id),
-                    error=result.error,
-                )
-                continue
-            if result.outcome is None or result.outcome.action_type == "no_action":
-                # Either malformed leaf or an explicit "no action" leaf —
-                # we record nothing, the daily evaluator will re-walk
-                # tomorrow when signals change.
-                continue
-
-            # PR-E: dispatch on leaf kind. "alert" leaves write to
-            # tenant.alerts via the alerts repo (rule_code synthesised
-            # from tree + leaf id so the existing partial-UNIQUE
-            # dedup keeps working); "recommendation" leaves take the
-            # existing path below.
-            if result.outcome.kind == "alert":
-                opened = await self._open_alert_from_tree(
-                    block_id=block_id,
-                    farm_id=farm_id,
-                    tree=tree,
-                    result=result,
-                    actor_user_id=actor_user_id,
-                    tenant_schema=tenant_schema,
-                )
-                if opened:
-                    recommendations_opened += 1  # counter is generic; rename in PR-F
-                continue
-
-            recommendation_id = uuid7()
-            valid_until: datetime | None = None
-            if result.outcome.valid_for_hours is not None:
-                valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
-
-            inserted = await self._repo.insert_recommendation(
-                recommendation_id=recommendation_id,
+            if await self._evaluate_and_record(
+                tree=tree,
+                eval_ctx=ctx,
+                overrides=overrides,
                 block_id=block_id,
+                cell_id=None,
                 farm_id=farm_id,
-                tree_id=tree["tree_id"],
-                tree_code=tree["tree_code"],
-                tree_version=tree["version"],
                 block_crop_id=block_crop_id,
-                action_type=result.outcome.action_type,
-                severity=result.outcome.severity,
-                parameters=result.outcome.parameters,
-                actions=result.outcome.actions,
-                confidence=result.outcome.confidence,
-                tree_path=_serialize_path(result.path),
-                text_en=result.outcome.text_en,
-                text_ar=result.outcome.text_ar,
-                valid_until=valid_until,
-                # Snapshot the block's crop path alongside the evaluated
-                # signals so the recommendation stays self-describing even
-                # if the block's crop is reassigned later.
-                evaluation_snapshot={**result.evaluation_snapshot, "crop_path": crop_path},
+                crop_path=crop_path,
                 actor_user_id=actor_user_id,
-            )
-            if not inserted:
-                # An open recommendation for (block, tree) already exists.
-                # Re-evaluation is intentionally idempotent.
-                continue
-            recommendations_opened += 1
-
-            await self._repo.insert_history(
-                recommendation_id=recommendation_id,
-                block_id=block_id,
-                farm_id=farm_id,
-                from_state=None,
-                to_state="open",
-                actor_user_id=actor_user_id,
-                details={
-                    "tree_code": tree["tree_code"],
-                    "tree_version": tree["version"],
-                    "action_type": result.outcome.action_type,
-                },
-            )
-            await self._audit.record(
                 tenant_schema=tenant_schema,
-                event_type="recommendations.recommendation_opened",
-                actor_user_id=actor_user_id,
-                actor_kind="system" if actor_user_id is None else "user",
-                subject_kind="recommendation",
-                subject_id=recommendation_id,
-                farm_id=farm_id,
-                details={
-                    "block_id": str(block_id),
-                    "tree_code": tree["tree_code"],
-                    "tree_version": tree["version"],
-                    "action_type": result.outcome.action_type,
-                    "severity": result.outcome.severity,
-                },
-            )
-            self._bus.publish(
-                RecommendationOpenedV1(
-                    recommendation_id=recommendation_id,
-                    block_id=block_id,
-                    farm_id=farm_id,
-                    tree_id=tree["tree_id"],
-                    tree_code=tree["tree_code"],
-                    tree_version=tree["version"],
-                    action_type=result.outcome.action_type,
-                    severity=result.outcome.severity,
-                    confidence=result.outcome.confidence,
-                    created_at=datetime.now(UTC),
-                    tenant_schema=tenant_schema,
-                    text_en=result.outcome.text_en,
-                    text_ar=result.outcome.text_ar,
-                    parameters=result.outcome.parameters,
-                    evaluation_snapshot=result.evaluation_snapshot,
+            ):
+                recommendations_opened += 1
+
+        # Cell-scoped path (PR-C3): one evaluation per grid cell, with the
+        # cell's own imagery means swapped into an otherwise block-level
+        # context. Empty when the block has no grid, so cell trees no-op there.
+        if cell_trees:
+            cell_aggs = await self._repo.get_latest_cell_aggregates(block_id=block_id)
+            for cid, cell_means in cell_aggs.items():
+                cell_ctx = ConditionContext.from_block_signals(
+                    block_id=str(block_id),
+                    crop_category=crop_category,
+                    block_attributes={
+                        "growth_stage": growth_stage,
+                        "crop_path": crop_path,
+                        "crop_strain": strain_code(crop_path),
+                        "soil_texture": soil_texture,
+                        "salinity_class": salinity_class,
+                        "canopy_size_class": canopy_size_class,
+                    },
+                    latest_index_aggregates=_merge_cell_means(latest, cell_means),
+                    weather=weather,
+                    weather_indices=weather_indices,
+                    weather_risks=weather_risks,
+                    signals=signals,
+                    grid=grid,
                 )
-            )
+                for tree in cell_trees:
+                    overrides = param_overrides_per_tree.get(tree["tree_id"], {})
+                    if await self._evaluate_and_record(
+                        tree=tree,
+                        eval_ctx=cell_ctx,
+                        overrides=overrides,
+                        block_id=block_id,
+                        cell_id=cid,
+                        farm_id=farm_id,
+                        block_crop_id=block_crop_id,
+                        crop_path=crop_path,
+                        actor_user_id=actor_user_id,
+                        tenant_schema=tenant_schema,
+                    ):
+                        recommendations_opened += 1
 
         return {
             "trees_evaluated": trees_evaluated,
@@ -344,10 +290,145 @@ class RecommendationsServiceImpl:
             "recommendations_opened": recommendations_opened,
         }
 
+    async def _evaluate_and_record(
+        self,
+        *,
+        tree: dict[str, Any],
+        eval_ctx: ConditionContext,
+        overrides: dict[str, Any],
+        block_id: UUID,
+        cell_id: UUID | None,
+        farm_id: UUID,
+        block_crop_id: UUID | None,
+        crop_path: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> bool:
+        """Evaluate one tree against one context (block or cell) and persist its
+        output. Returns True iff a new rec/alert was opened. Shared by the
+        block-scoped and cell-scoped (PR-C3) evaluation paths; ``cell_id`` is
+        None for block-scoped output and the grid cell for cell-scoped."""
+        result = evaluate_tree(tree["tree_compiled"], eval_ctx, param_overrides=overrides)
+        if result.error is not None:
+            self._log.warning(
+                "decision_tree_walk_error",
+                tree_code=tree["tree_code"],
+                block_id=str(block_id),
+                cell_id=str(cell_id) if cell_id else None,
+                error=result.error,
+            )
+            return False
+        if result.outcome is None or result.outcome.action_type == "no_action":
+            # Either a malformed leaf or an explicit "no action" leaf — record
+            # nothing; the daily evaluator re-walks tomorrow as signals change.
+            return False
+
+        # PR-E: dispatch on leaf kind. "alert" leaves write to tenant.alerts;
+        # "recommendation" leaves take the path below.
+        if result.outcome.kind == "alert":
+            return await self._open_alert_from_tree(
+                block_id=block_id,
+                cell_id=cell_id,
+                farm_id=farm_id,
+                tree=tree,
+                result=result,
+                actor_user_id=actor_user_id,
+                tenant_schema=tenant_schema,
+            )
+
+        recommendation_id = uuid7()
+        valid_until: datetime | None = None
+        if result.outcome.valid_for_hours is not None:
+            valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
+
+        # Snapshot the block's crop path (+ cell id when cell-scoped) alongside
+        # the evaluated signals so the recommendation stays self-describing.
+        snapshot: dict[str, Any] = {**result.evaluation_snapshot, "crop_path": crop_path}
+        if cell_id is not None:
+            snapshot["cell_id"] = str(cell_id)
+
+        inserted = await self._repo.insert_recommendation(
+            recommendation_id=recommendation_id,
+            block_id=block_id,
+            cell_id=cell_id,
+            farm_id=farm_id,
+            tree_id=tree["tree_id"],
+            tree_code=tree["tree_code"],
+            tree_version=tree["version"],
+            block_crop_id=block_crop_id,
+            action_type=result.outcome.action_type,
+            severity=result.outcome.severity,
+            parameters=result.outcome.parameters,
+            actions=result.outcome.actions,
+            confidence=result.outcome.confidence,
+            tree_path=_serialize_path(result.path),
+            text_en=result.outcome.text_en,
+            text_ar=result.outcome.text_ar,
+            valid_until=valid_until,
+            evaluation_snapshot=snapshot,
+            actor_user_id=actor_user_id,
+        )
+        if not inserted:
+            # An open recommendation for (block[/cell], tree) already exists.
+            return False
+
+        await self._repo.insert_history(
+            recommendation_id=recommendation_id,
+            block_id=block_id,
+            cell_id=cell_id,
+            farm_id=farm_id,
+            from_state=None,
+            to_state="open",
+            actor_user_id=actor_user_id,
+            details={
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "action_type": result.outcome.action_type,
+            },
+        )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="recommendations.recommendation_opened",
+            actor_user_id=actor_user_id,
+            actor_kind="system" if actor_user_id is None else "user",
+            subject_kind="recommendation",
+            subject_id=recommendation_id,
+            farm_id=farm_id,
+            details={
+                "block_id": str(block_id),
+                "cell_id": str(cell_id) if cell_id else None,
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "action_type": result.outcome.action_type,
+                "severity": result.outcome.severity,
+            },
+        )
+        self._bus.publish(
+            RecommendationOpenedV1(
+                recommendation_id=recommendation_id,
+                block_id=block_id,
+                farm_id=farm_id,
+                tree_id=tree["tree_id"],
+                tree_code=tree["tree_code"],
+                tree_version=tree["version"],
+                action_type=result.outcome.action_type,
+                severity=result.outcome.severity,
+                confidence=result.outcome.confidence,
+                created_at=datetime.now(UTC),
+                tenant_schema=tenant_schema,
+                text_en=result.outcome.text_en,
+                text_ar=result.outcome.text_ar,
+                parameters=result.outcome.parameters,
+                evaluation_snapshot=result.evaluation_snapshot,
+            )
+        )
+        return True
+
     async def _open_alert_from_tree(
         self,
         *,
         block_id: UUID,
+        cell_id: UUID | None = None,
         farm_id: UUID,
         tree: dict[str, Any],
         result: Any,
@@ -374,11 +455,16 @@ class RecommendationsServiceImpl:
         outcome = result.outcome
         leaf_node_id = outcome.leaf_node_id or "leaf"
         rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
+        # Cell-scoped alerts embed the cell id so the existing
+        # (block_id, rule_code) dedup keeps each cell's alert distinct (PR-C3).
+        if cell_id is not None:
+            rule_code = f"{rule_code}:cell:{cell_id}"
         alert_id = uuid7()
         alert_repo = AlertsRepository(tenant_session=self._tenant, public_session=self._public)
         inserted = await alert_repo.insert_alert(
             alert_id=alert_id,
             block_id=block_id,
+            cell_id=cell_id,
             rule_code=rule_code,
             severity=outcome.severity,
             diagnosis_en=outcome.text_en,
@@ -402,6 +488,7 @@ class RecommendationsServiceImpl:
             farm_id=farm_id,
             details={
                 "block_id": str(block_id),
+                "cell_id": str(cell_id) if cell_id else None,
                 "rule_code": rule_code,
                 "severity": outcome.severity,
                 "tree_code": tree["tree_code"],
@@ -718,6 +805,32 @@ def _merge_index_trends(
     for code, trend in trends.items():
         if code in latest:
             latest[code].update(trend)
+
+
+def _merge_cell_means(
+    block_latest: dict[str, dict[str, Any]],
+    cell_means: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Build a cell's ``indices`` context from the block's latest aggregates
+    with the cell's own per-index ``mean`` swapped in (PR-C3, input fidelity:
+    cell imagery, inherit the rest).
+
+    ``baseline_deviation`` and trend features stay the block's — they're
+    per-block z-scores with no per-cell equivalent in ``block_grid_aggregates``,
+    so a cell predicate on ``{key: baseline_deviation}`` reads the block value
+    while ``{key: mean}`` reads the cell's own mean. Indices the cell has no
+    observation for keep the block's row unchanged."""
+    merged: dict[str, dict[str, Any]] = {code: dict(vals) for code, vals in block_latest.items()}
+    for code, cvals in cell_means.items():
+        if code in merged:
+            merged[code] = {**merged[code], "mean": cvals["mean"]}
+        else:
+            merged[code] = {
+                "time": cvals["time"],
+                "mean": cvals["mean"],
+                "baseline_deviation": None,
+            }
+    return merged
 
 
 def tree_targets_block(

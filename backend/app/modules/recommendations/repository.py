@@ -845,6 +845,49 @@ class RecommendationsRepository:
             for row in rows
         }
 
+    async def get_latest_cell_aggregates(
+        self, *, block_id: UUID
+    ) -> dict[UUID, dict[str, dict[str, Any]]]:
+        """Latest per-cell mean per index for the block's active grid(s).
+
+        Shape ``{cell_id: {index_code: {time, mean}}}`` — the per-cell analogue
+        of :meth:`get_latest_aggregate_per_index`, read from
+        ``block_grid_aggregates`` (the grid module's cell-grain hypertable).
+        Only cells of a non-retired grid config are included. Drives the
+        per-cell evaluation path for ``scope='cell'`` trees (PR-C3); empty when
+        the block has no grid, so cell-scoped trees simply don't fire there.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT DISTINCT ON (obs.cell_id, obs.index_code)
+                               obs.cell_id, obs.index_code, obs.time, obs.mean
+                        FROM block_grid_aggregates obs
+                        JOIN grid_cells gc ON gc.id = obs.cell_id
+                        JOIN grid_configs cfg
+                          ON cfg.id = gc.grid_config_id
+                         AND cfg.retired_at IS NULL
+                         AND cfg.deleted_at IS NULL
+                        WHERE obs.block_id = :block_id
+                        ORDER BY obs.cell_id, obs.index_code, obs.time DESC
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        out: dict[UUID, dict[str, dict[str, Any]]] = {}
+        for row in rows:
+            out.setdefault(row["cell_id"], {})[row["index_code"]] = {
+                "time": row["time"],
+                "mean": row["mean"],
+            }
+        return out
+
     async def get_index_trends(
         self, *, block_id: UUID, window_days: int = 30
     ) -> dict[str, dict[str, Any]]:
