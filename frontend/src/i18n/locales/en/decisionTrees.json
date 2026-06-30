@@ -8,6 +8,12 @@
     "country": "Countries",
     "soil": "Soil textures",
     "anyHint": "Leave empty to match any.",
+    "scope": "Execution scope",
+    "scopeHint": "Block = one evaluation per block (default). Cell = one per sub-block grid cell, for spatially-targeted actions (requires a grid on the block).",
+    "scopeValues": {
+      "block": "Per block",
+      "cell": "Per grid cell"
+    },
     "soilValues": {
       "sandy": "Sandy",
       "sandy_loam": "Sandy loam",

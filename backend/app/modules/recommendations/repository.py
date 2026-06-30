@@ -73,6 +73,7 @@ class RecommendationsRepository:
                            t.crop_paths,
                            t.country_codes,
                            t.soil_textures,
+                           t.scope,
                            t.applicable_regions,
                            v.id    AS version_id,
                            v.version,
@@ -141,6 +142,7 @@ class RecommendationsRepository:
             "crop_paths": list(row.crop_paths or []),
             "country_codes": list(row.country_codes or []),
             "soil_textures": list(row.soil_textures or []),
+            "scope": row.scope,
             "applicable_regions": list(row.applicable_regions or []),
             "is_active": row.is_active,
             "current_version_id": row.current_version_id,
@@ -187,7 +189,7 @@ class RecommendationsRepository:
                            t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
                            t.crop_id, t.crop_paths, t.country_codes,
-                           t.soil_textures, t.applicable_regions, t.is_active,
+                           t.soil_textures, t.scope, t.applicable_regions, t.is_active,
                            v.version AS current_version
                     FROM public.decision_trees t
                     LEFT JOIN public.decision_tree_versions v
@@ -278,6 +280,7 @@ class RecommendationsRepository:
         crop_paths: list[str] | None = None,
         country_codes: list[str] | None = None,
         soil_textures: list[str] | None = None,
+        scope: str = "block",
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
         version + current_version_id update in one transaction.
@@ -294,12 +297,12 @@ class RecommendationsRepository:
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
                          crop_id, crop_path, crop_paths, country_codes,
-                         soil_textures, applicable_regions, is_active,
+                         soil_textures, scope, applicable_regions, is_active,
                          created_by, updated_by)
                     VALUES (:code, :tenant_id, :name_en, :name_ar,
                             :description_en, :description_ar,
                             :crop_id, :crop_path, :crop_paths, :country_codes,
-                            :soil_textures, :applicable_regions, TRUE,
+                            :soil_textures, :scope, :applicable_regions, TRUE,
                             :actor, :actor)
                     RETURNING id
                     """
@@ -320,6 +323,7 @@ class RecommendationsRepository:
                     "crop_paths": crop_paths or [],
                     "country_codes": country_codes or [],
                     "soil_textures": soil_textures or [],
+                    "scope": scope,
                     "applicable_regions": applicable_regions,
                     "actor": actor_user_id,
                 },

@@ -133,6 +133,8 @@ class DecisionTreeResponse(BaseModel):
     crop_paths: list[str] = Field(default_factory=list)
     country_codes: list[str] = Field(default_factory=list)
     soil_textures: list[str] = Field(default_factory=list)
+    # Execution granularity: 'block' (default) or 'cell' (PR-C1).
+    scope: str = "block"
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -190,6 +192,7 @@ class DecisionTreeDetailResponse(BaseModel):
     crop_paths: list[str] = Field(default_factory=list)
     country_codes: list[str] = Field(default_factory=list)
     soil_textures: list[str] = Field(default_factory=list)
+    scope: str = "block"
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -213,6 +216,8 @@ class DecisionTreeCreateRequest(BaseModel):
     crop_paths: list[str] | None = None
     country_codes: list[str] | None = None
     soil_textures: list[str] | None = None
+    # Execution granularity (PR-C1): 'block' (default) or 'cell'.
+    scope: Literal["block", "cell"] | None = None
     tree_yaml: str = Field(min_length=1)
 
 

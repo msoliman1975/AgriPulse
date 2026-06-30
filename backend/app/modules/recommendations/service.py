@@ -857,6 +857,7 @@ class DecisionTreesAuthorService:
             "crop_paths": tree["crop_paths"],
             "country_codes": tree["country_codes"],
             "soil_textures": tree["soil_textures"],
+            "scope": tree["scope"],
             "applicable_regions": tree["applicable_regions"],
             "is_active": tree["is_active"],
             "current_version": current_version_number,
@@ -874,6 +875,7 @@ class DecisionTreesAuthorService:
         crop_paths: list[str] | None = None,
         country_codes: list[str] | None = None,
         soil_textures: list[str] | None = None,
+        scope: str | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         """Create a new tree + its v1 draft. Validates the YAML via
@@ -909,6 +911,8 @@ class DecisionTreesAuthorService:
                 spec["country_codes"] = country_codes
             if soil_textures is not None:
                 spec["soil_textures"] = soil_textures
+            if scope is not None:
+                spec["scope"] = scope
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         # The compiled body's `code` field must match the URL — protect
         # against a typo where the YAML says one thing and the URL another.
@@ -934,6 +938,7 @@ class DecisionTreesAuthorService:
             crop_paths=compiled.get("crop_paths") or [],
             country_codes=compiled.get("country_codes") or [],
             soil_textures=compiled.get("soil_textures") or [],
+            scope=compiled.get("scope") or "block",
             applicable_regions=compiled.get("applicable_regions") or [],
             actor_user_id=actor_user_id,
         )

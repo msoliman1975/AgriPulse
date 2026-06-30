@@ -153,6 +153,12 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     # crop_id resolution + crop-scoped reads/display keep working unchanged.
     crop_path = crop_paths[0] if crop_paths else None
 
+    scope = spec.get("scope", "block")
+    if scope not in ("block", "cell"):
+        raise DecisionTreeParseError(
+            path=source_path, detail=f"'scope' must be 'block' or 'cell', got {scope!r}"
+        )
+
     name_en = spec.get("name_en")
     if not isinstance(name_en, str) or not name_en:
         raise DecisionTreeParseError(path=source_path, detail="missing 'name_en'")
@@ -199,6 +205,7 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
         "crop_paths": crop_paths,
         "country_codes": country_codes,
         "soil_textures": soil_textures,
+        "scope": scope,
         "applicable_regions": list(spec.get("applicable_regions") or []),
         "parameters": parameters_decl,
         "evidence": evidence,
@@ -674,6 +681,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
         crop_paths = compiled.get("crop_paths") or []
         country_codes = compiled.get("country_codes") or []
         soil_textures = compiled.get("soil_textures") or []
+        scope = compiled.get("scope") or "block"
         # When a tree targets by path, derive crop_code from the path's first
         # segment so crop_id stays populated for display + crop-scoped reads.
         crop_code = compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
@@ -711,6 +719,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                 crop_paths=crop_paths,
                 country_codes=country_codes,
                 soil_textures=soil_textures,
+                scope=scope,
                 applicable_regions=compiled.get("applicable_regions") or [],
             )
             latest_version: int | None = None
@@ -731,6 +740,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                            crop_paths = :crop_paths,
                            country_codes = :country_codes,
                            soil_textures = :soil_textures,
+                           scope = :scope,
                            applicable_regions = :applicable_regions,
                            is_active = TRUE,
                            updated_at = now()
@@ -747,6 +757,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                     "crop_paths": crop_paths,
                     "country_codes": country_codes,
                     "soil_textures": soil_textures,
+                    "scope": scope,
                     "applicable_regions": compiled.get("applicable_regions") or [],
                     "id": tree_id,
                 },
@@ -799,6 +810,7 @@ async def _insert_tree(
     crop_paths: list[str] | None = None,
     country_codes: list[str] | None = None,
     soil_textures: list[str] | None = None,
+    scope: str = "block",
     applicable_regions: list[str],
 ) -> Any:
     row = (
@@ -808,10 +820,10 @@ async def _insert_tree(
                 INSERT INTO public.decision_trees
                     (code, name_en, name_ar, description_en, description_ar,
                      crop_id, crop_path, crop_paths, country_codes, soil_textures,
-                     applicable_regions, is_active)
+                     scope, applicable_regions, is_active)
                 VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
                         :crop_id, :crop_path, :crop_paths, :country_codes, :soil_textures,
-                        :applicable_regions, TRUE)
+                        :scope, :applicable_regions, TRUE)
                 RETURNING id
                 """
             ),
@@ -826,6 +838,7 @@ async def _insert_tree(
                 "crop_paths": crop_paths or [],
                 "country_codes": country_codes or [],
                 "soil_textures": soil_textures or [],
+                "scope": scope,
                 "applicable_regions": applicable_regions,
             },
         )

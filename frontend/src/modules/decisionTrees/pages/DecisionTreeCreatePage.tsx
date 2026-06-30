@@ -62,6 +62,7 @@ export function DecisionTreeCreatePage(): ReactNode {
   const [cropPaths, setCropPaths] = useState<string[]>([]);
   const [countryCodes, setCountryCodes] = useState<string[]>([]);
   const [soilTextures, setSoilTextures] = useState<string[]>([]);
+  const [scope, setScope] = useState<"block" | "cell">("block");
   const [yamlBody, setYamlBody] = useState(DEFAULT_YAML);
   // PR-D8: tracking the selected template id lets the dropdown stay
   // in sync after a swap, and powers the "Start from scratch" button
@@ -93,6 +94,7 @@ export function DecisionTreeCreatePage(): ReactNode {
     crop_paths: cropPaths,
     country_codes: countryCodes,
     soil_textures: soilTextures,
+    scope,
   };
 
   const onStartFromScratch = (): void => {
@@ -166,6 +168,24 @@ export function DecisionTreeCreatePage(): ReactNode {
           onCountryCodesChange={setCountryCodes}
           onSoilTexturesChange={setSoilTextures}
         />
+        <div className="mt-2 flex flex-col gap-1.5 border-t border-ap-line pt-3">
+          <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {(["block", "cell"] as const).map((s) => (
+              <label key={s} className="flex items-center gap-1.5 text-xs text-ap-ink">
+                <input
+                  type="radio"
+                  name="tree-scope"
+                  value={s}
+                  checked={scope === s}
+                  onChange={() => setScope(s)}
+                />
+                {t(`targeting.scopeValues.${s}`)}
+              </label>
+            ))}
+          </div>
+          <span className="text-[11px] text-ap-muted">{t("targeting.scopeHint")}</span>
+        </div>
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">

@@ -63,6 +63,9 @@ class DecisionTree(Base, TimestampedMixin):
     soil_textures: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
     )
+    # Execution granularity: 'block' (one eval per block, default) or 'cell'
+    # (one eval per sub-block grid cell). PR-C1.
+    scope: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'block'"))
     applicable_regions: Mapped[list[str]] = mapped_column(
         ARRAY(Text),
         nullable=False,

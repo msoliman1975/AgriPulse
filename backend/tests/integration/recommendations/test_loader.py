@@ -140,6 +140,22 @@ def test_soil_textures_reject_unknown_value() -> None:
         compile_tree(_minimal_leaf_spec(soil_textures=["mud"]), source_path="x")
 
 
+# --- execution scope (PR-C1: block | cell) ---------------------------------
+
+
+def test_scope_defaults_to_block() -> None:
+    assert compile_tree(_minimal_leaf_spec(), source_path="x")["scope"] == "block"
+
+
+def test_scope_cell_compiles() -> None:
+    assert compile_tree(_minimal_leaf_spec(scope="cell"), source_path="x")["scope"] == "cell"
+
+
+def test_scope_rejects_unknown_value() -> None:
+    with pytest.raises(Exception, match="scope"):
+        compile_tree(_minimal_leaf_spec(scope="pixel"), source_path="x")
+
+
 # --- evidence / transferability provenance blocks (KB P1-A) -----------
 
 
