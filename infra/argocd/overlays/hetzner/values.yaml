@@ -94,13 +94,18 @@ global:
   #   GET /v1/decision-trees catalog-list SELECT (caught in #296 live smoke).
   #   No migrations, api request-path only → only api bumped; workers stay
   #   7035b22, frontend 7035b22, tile-server 9d140cc.
+  # 2b8705c = #298 per-cell decision-tree execution scope (P1 PR-C1..C3 + P2
+  #   map/notification surfacing). MIGRATIONS: public 0045 (decision_trees.scope
+  #   block|cell) + tenant 0052 (cell_id on recommendations/_history/alerts +
+  #   split open-state idempotency). Backend (engine + events/subscribers) + FE
+  #   → api + workers + frontend bumped; tile-server stays 9d140cc.
   images:
     api:
-      tag: "a88cd5d"
+      tag: "2b8705c"
     workers:
-      tag: "7035b22"
+      tag: "2b8705c"
     frontend:
-      tag: "7035b22"
+      tag: "2b8705c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
