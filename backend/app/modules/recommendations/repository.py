@@ -569,6 +569,7 @@ class RecommendationsRepository:
         *,
         recommendation_id: UUID,
         block_id: UUID,
+        cell_id: UUID | None = None,
         farm_id: UUID,
         tree_id: UUID,
         tree_code: str,
@@ -594,13 +595,15 @@ class RecommendationsRepository:
                 text(
                     """
                     INSERT INTO recommendations (
-                        id, block_id, farm_id, tree_id, tree_code, tree_version,
+                        id, block_id, cell_id, farm_id, tree_id, tree_code,
+                        tree_version,
                         block_crop_id, action_type, severity, parameters, actions,
                         confidence, tree_path, text_en, text_ar,
                         valid_until, evaluation_snapshot, state,
                         created_by, updated_by
                     ) VALUES (
-                        :id, :block_id, :farm_id, :tree_id, :tree_code, :tree_version,
+                        :id, :block_id, :cell_id, :farm_id, :tree_id, :tree_code,
+                        :tree_version,
                         :block_crop_id, :action_type, :severity,
                         CAST(:parameters AS jsonb), CAST(:actions AS jsonb),
                         :confidence,
@@ -612,6 +615,7 @@ class RecommendationsRepository:
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_crop_id", type_=PG_UUID(as_uuid=True)),
@@ -620,6 +624,7 @@ class RecommendationsRepository:
                 {
                     "id": recommendation_id,
                     "block_id": block_id,
+                    "cell_id": cell_id,
                     "farm_id": farm_id,
                     "tree_id": tree_id,
                     "tree_code": tree_code,
@@ -639,7 +644,13 @@ class RecommendationsRepository:
                 },
             )
         except IntegrityError as exc:
-            if "uq_recommendations_block_tree_open" in str(exc):
+            # Either the block-scoped or the cell-scoped open-state dedup
+            # blocked it — an open rec already exists for this (block[/cell], tree).
+            msg = str(exc)
+            if (
+                "uq_recommendations_block_tree_open" in msg
+                or "uq_recommendations_cell_tree_open" in msg
+            ):
                 return False
             raise
         await self._tenant.flush()
@@ -766,6 +777,7 @@ class RecommendationsRepository:
         *,
         recommendation_id: UUID,
         block_id: UUID,
+        cell_id: UUID | None = None,
         farm_id: UUID,
         from_state: str | None,
         to_state: str,
@@ -776,20 +788,22 @@ class RecommendationsRepository:
             text(
                 """
                 INSERT INTO recommendations_history
-                    (recommendation_id, block_id, farm_id, from_state, to_state,
-                     actor_user_id, details)
-                VALUES (:rec, :block, :farm, :from_state, :to_state,
+                    (recommendation_id, block_id, cell_id, farm_id, from_state,
+                     to_state, actor_user_id, details)
+                VALUES (:rec, :block, :cell, :farm, :from_state, :to_state,
                         :actor, CAST(:details AS jsonb))
                 """
             ).bindparams(
                 bindparam("rec", type_=PG_UUID(as_uuid=True)),
                 bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("cell", type_=PG_UUID(as_uuid=True)),
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "rec": recommendation_id,
                 "block": block_id,
+                "cell": cell_id,
                 "farm": farm_id,
                 "from_state": from_state,
                 "to_state": to_state,

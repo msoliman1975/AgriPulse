@@ -53,6 +53,7 @@ class AlertsRepository:
         *,
         alert_id: UUID,
         block_id: UUID,
+        cell_id: UUID | None = None,
         rule_code: str,
         severity: str,
         diagnosis_en: str | None,
@@ -77,13 +78,13 @@ class AlertsRepository:
                 text(
                     """
                     INSERT INTO alerts (
-                        id, block_id, rule_code, severity, status,
+                        id, block_id, cell_id, rule_code, severity, status,
                         diagnosis_en, diagnosis_ar,
                         prescription_en, prescription_ar,
                         prescription_activity_id,
                         signal_snapshot, created_by, updated_by
                     ) VALUES (
-                        :id, :block_id, :rule_code, :severity, 'open',
+                        :id, :block_id, :cell_id, :rule_code, :severity, 'open',
                         :diag_en, :diag_ar,
                         :pre_en, :pre_ar,
                         :prescription_activity_id,
@@ -93,12 +94,14 @@ class AlertsRepository:
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("prescription_activity_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
                 ),
                 {
                     "id": alert_id,
                     "block_id": block_id,
+                    "cell_id": cell_id,
                     "rule_code": rule_code,
                     "severity": severity,
                     "diag_en": diagnosis_en,

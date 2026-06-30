@@ -121,6 +121,9 @@ class Recommendation(Base, TimestampedMixin):
         ForeignKey("blocks.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # Sub-block grid cell for cell-scoped trees (PR-C2); NULL = block-scoped.
+    # Logical ref to grid_cells.id (no FK, so a rezone doesn't block on recs).
+    cell_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     tree_code: Mapped[str] = mapped_column(Text, nullable=False)
@@ -183,6 +186,7 @@ class RecommendationHistoryEntry(Base):
     )
     recommendation_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    cell_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     from_state: Mapped[str | None] = mapped_column(Text, nullable=True)
     to_state: Mapped[str] = mapped_column(Text, nullable=False)
