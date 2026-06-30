@@ -85,13 +85,18 @@ global:
   #   (1.5 not ١٫٥, per ARCHITECTURE.md § 11) + drop dead src/rules/formatting.ts.
   #   Frontend-only, no migrations → only frontend bumped; api + workers stay
   #   ece5615, tile-server stays 9d140cc.
+  # 7035b22 = #296 Decision Tree multi-axis targeting (crop/country/soil) +
+  #   authoring improvements (PR-1..9). MIGRATIONS: public 0043 (countries
+  #   catalog) + 0044 (decision_trees crop_paths/country_codes/soil_textures),
+  #   tenant 0051 (farms.country_code, backfilled to 'EG'). Backend + FE → api +
+  #   workers + frontend bumped; tile-server stays 9d140cc.
   images:
     api:
-      tag: "ece5615"
+      tag: "7035b22"
     workers:
-      tag: "ece5615"
+      tag: "7035b22"
     frontend:
-      tag: "d93eac7"
+      tag: "7035b22"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
