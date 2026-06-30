@@ -99,11 +99,15 @@ global:
   #   block|cell) + tenant 0052 (cell_id on recommendations/_history/alerts +
   #   split open-state idempotency). Backend (engine + events/subscribers) + FE
   #   → api + workers + frontend bumped; tile-server stays 9d140cc.
+  # 874c847 = #299 seed the first scope:cell demonstrator tree
+  #   (demo_cell_low_ndvi_v1). No migration; api runs sync_from_disk on startup
+  #   to create+publish it, workers-beat sweep evaluates it per cell → api +
+  #   workers bumped; frontend stays 2b8705c, tile-server 9d140cc.
   images:
     api:
-      tag: "2b8705c"
+      tag: "874c847"
     workers:
-      tag: "2b8705c"
+      tag: "874c847"
     frontend:
       tag: "2b8705c"
     tileServer:
