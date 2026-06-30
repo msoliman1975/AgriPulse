@@ -51,6 +51,50 @@ def _validate_code(value: str) -> str:
     return value
 
 
+# ---------- Countries -------------------------------------------------------
+
+# ISO 3166-1 alpha-2: exactly two ASCII letters.
+_COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
+
+
+def _validate_country_code(value: str) -> str:
+    if not _COUNTRY_CODE_RE.fullmatch(value):
+        raise ValueError("country code must be two letters (ISO 3166-1 alpha-2)")
+    return value.upper()
+
+
+class CountryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    code: str
+    name_en: str
+    name_ar: str
+    is_active: bool = True
+
+
+class CountryCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str = Field(min_length=1, max_length=255)
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_country_code(value)
+
+
+class CountryUpdateRequest(BaseModel):
+    # ``code`` is immutable — it anchors the logical farm + tree references.
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, min_length=1, max_length=255)
+    is_active: bool | None = None
+
+
 # ---------- Crops -----------------------------------------------------------
 
 
@@ -236,6 +280,7 @@ class FarmCreateRequest(BaseModel):
     description: str | None = None
     boundary: dict[str, Any] = Field(description="GeoJSON MultiPolygon (SRID 4326).")
     elevation_m: Decimal | None = None
+    country_code: str | None = None
     governorate: str | None = None
     district: str | None = None
     nearest_city: str | None = None
@@ -254,6 +299,11 @@ class FarmCreateRequest(BaseModel):
     def _code_pattern(cls, value: str) -> str:
         return _validate_code(value)
 
+    @field_validator("country_code")
+    @classmethod
+    def _country_code_pattern(cls, value: str | None) -> str | None:
+        return _validate_country_code(value) if value is not None else None
+
 
 class FarmUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -262,6 +312,7 @@ class FarmUpdateRequest(BaseModel):
     description: str | None = None
     boundary: dict[str, Any] | None = None
     elevation_m: Decimal | None = None
+    country_code: str | None = None
     governorate: str | None = None
     district: str | None = None
     nearest_city: str | None = None
@@ -271,6 +322,11 @@ class FarmUpdateRequest(BaseModel):
     primary_water_source: WaterSource | None = None
     established_date: date | None = None
     tags: list[str] | None = None
+
+    @field_validator("country_code")
+    @classmethod
+    def _country_code_pattern(cls, value: str | None) -> str | None:
+        return _validate_country_code(value) if value is not None else None
 
 
 class FarmManagerRef(BaseModel):
@@ -297,6 +353,7 @@ class FarmResponse(BaseModel):
     area_value: Decimal
     area_unit: UnitName
     elevation_m: Decimal | None
+    country_code: str | None = None
     governorate: str | None
     district: str | None
     nearest_city: str | None

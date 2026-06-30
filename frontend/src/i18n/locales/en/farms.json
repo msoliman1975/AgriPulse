@@ -40,6 +40,8 @@
     "codeHelp": "Short reference, unique within tenant. Letters, digits, dashes, underscores.",
     "name": "Name",
     "description": "Description",
+    "country": "Country",
+    "countryNone": "— None —",
     "governorate": "Governorate",
     "district": "District",
     "nearestCity": "Nearest city",

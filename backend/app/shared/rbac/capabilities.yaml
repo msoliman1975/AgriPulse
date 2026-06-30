@@ -105,6 +105,10 @@ capabilities:
     description: Create, edit, or retire crops, varieties, and strains in the catalog.
     scope: platform
     status: active
+  platform.manage_countries:
+    description: Create, edit, or retire countries in the catalog.
+    scope: platform
+    status: active
   plan_template.manage:
     description: Author platform-curated plan templates (create, edit, publish, archive).
     scope: platform

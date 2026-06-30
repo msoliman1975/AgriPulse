@@ -82,6 +82,43 @@ class CropStrainNotFoundError(APIError):
         )
 
 
+class CountryNotFoundError(APIError):
+    def __init__(self, country_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Country not found",
+            detail=f"No country with id {country_id} in the catalog.",
+            type_=f"{_TYPE_BASE}/country-not-found",
+            extras={"country_id": str(country_id)},
+        )
+
+
+class UnknownCountryCodeError(APIError):
+    """A farm write referenced a ``country_code`` not in the active catalog. 422."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Unknown country code",
+            detail=f"Country code {code!r} is not an active country in the catalog.",
+            type_=f"{_TYPE_BASE}/unknown-country-code",
+            extras={"country_code": code},
+        )
+
+
+class CountryCodeConflictError(APIError):
+    """A new country's code collides with an existing one (codes are unique). 409."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Country code already in use",
+            detail=f"Another country already uses code {code!r}.",
+            type_=f"{_TYPE_BASE}/country-code-conflict",
+            extras={"code": code},
+        )
+
+
 class CropCatalogConflictError(APIError):
     """A crop / variety / strain code collides with an existing sibling
     (the catalog enforces unique codes per level). Surfaces as 409."""

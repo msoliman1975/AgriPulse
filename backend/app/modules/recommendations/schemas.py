@@ -128,6 +128,11 @@ class DecisionTreeResponse(BaseModel):
     description_en: str | None
     description_ar: str | None
     crop_id: UUID | None
+    # Multi-axis targeting sets (PR-2) — surfaced so the list shows readable
+    # crop/country targeting instead of a raw crop_id UUID.
+    crop_paths: list[str] = Field(default_factory=list)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -181,6 +186,10 @@ class DecisionTreeDetailResponse(BaseModel):
     description_en: str | None
     description_ar: str | None
     crop_id: UUID | None
+    # Multi-axis targeting sets (PR-2). Empty set on an axis = matches any.
+    crop_paths: list[str] = Field(default_factory=list)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
@@ -198,6 +207,12 @@ class DecisionTreeCreateRequest(BaseModel):
 
     code: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     crop_code: str | None = None
+    # Multi-axis targeting (PR-5). When provided, these are injected into the
+    # YAML spec before compilation (so the structured pickers don't have to
+    # edit the YAML body). None = leave whatever the YAML declares.
+    crop_paths: list[str] | None = None
+    country_codes: list[str] | None = None
+    soil_textures: list[str] | None = None
     tree_yaml: str = Field(min_length=1)
 
 
@@ -230,6 +245,14 @@ class DecisionTreeDryRunRequest(BaseModel):
     # (so the editor can test before saving).
     version: int | None = None
     tree_yaml: str | None = None
+
+
+class DryRunCandidateBlock(BaseModel):
+    """One block the tree would target — drives the dry-run block picker."""
+
+    block_id: UUID
+    # "Farm / Block" display label (block name, or code when unnamed).
+    label: str
 
 
 class DecisionTreeDryRunResponse(BaseModel):

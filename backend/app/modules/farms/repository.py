@@ -36,6 +36,7 @@ from app.modules.farms.models import (
     Block,
     BlockAttachment,
     BlockCrop,
+    Country,
     Crop,
     CropVariety,
     CropVarietyStrain,
@@ -53,6 +54,7 @@ _FARM_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
         "name",
         "description",
         "elevation_m",
+        "country_code",
         "governorate",
         "district",
         "nearest_city",
@@ -118,6 +120,7 @@ def _row_geom_select_for_farm(*, with_boundary: bool) -> tuple[Any, ...]:
         Farm.description,
         Farm.area_m2,
         Farm.elevation_m,
+        Farm.country_code,
         Farm.governorate,
         Farm.district,
         Farm.nearest_city,
@@ -207,6 +210,7 @@ class FarmsRepository:
         description: str | None,
         boundary_ewkt: str,
         elevation_m: Decimal | None,
+        country_code: str | None,
         governorate: str | None,
         district: str | None,
         nearest_city: str | None,
@@ -224,7 +228,8 @@ class FarmsRepository:
             INSERT INTO farms (
                 id, code, name, description, boundary,
                 boundary_utm, centroid, area_m2,
-                elevation_m, governorate, district, nearest_city, address_line,
+                elevation_m, country_code, governorate, district, nearest_city,
+                address_line,
                 farm_type, ownership_type, primary_water_source, established_date,
                 tags, active_from, created_by, updated_by
             )
@@ -233,7 +238,8 @@ class FarmsRepository:
                 'SRID=32636;MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'::geometry,
                 'SRID=4326;POINT(0 0)'::geometry,
                 0,
-                :elevation_m, :governorate, :district, :nearest_city, :address_line,
+                :elevation_m, :country_code, :governorate, :district, :nearest_city,
+                :address_line,
                 :farm_type, :ownership_type, :primary_water_source, :established_date,
                 :tags, COALESCE(:active_from, current_date), :actor, :actor
             )
@@ -256,6 +262,7 @@ class FarmsRepository:
                     "description": description,
                     "boundary": boundary_ewkt,
                     "elevation_m": elevation_m,
+                    "country_code": country_code,
                     "governorate": governorate,
                     "district": district,
                     "nearest_city": nearest_city,
@@ -807,6 +814,41 @@ class FarmsRepository:
         self._tenant.add(bc)
         await self._tenant.flush()
         return _block_crop_to_dict(bc)
+
+    # ---- Country catalog (public) --------------------------------------
+
+    async def list_countries(self, *, include_inactive: bool = False) -> list[dict[str, Any]]:
+        stmt = select(Country)
+        if not include_inactive:
+            stmt = stmt.where(Country.is_active.is_(True))
+        stmt = stmt.order_by(Country.name_en)
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [_country_dict(r) for r in rows]
+
+    async def get_country(self, *, country_id: UUID) -> Country | None:
+        return (
+            await self._public.execute(select(Country).where(Country.id == country_id))
+        ).scalar_one_or_none()
+
+    async def country_code_exists(self, *, code: str, active_only: bool = False) -> bool:
+        stmt = select(Country.id).where(Country.code == code)
+        if active_only:
+            stmt = stmt.where(Country.is_active.is_(True))
+        return (await self._public.execute(stmt)).first() is not None
+
+    async def create_country(self, *, fields: dict[str, Any]) -> dict[str, Any]:
+        row = Country(**fields)
+        self._public.add(row)
+        await self._public.flush()
+        await self._public.refresh(row)
+        return _country_dict(row)
+
+    async def update_country(self, *, country: Country, fields: dict[str, Any]) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(country, key, value)
+        await self._public.flush()
+        await self._public.refresh(country)
+        return _country_dict(country)
 
     async def list_crops(
         self, *, category: str | None = None, include_inactive: bool = False
@@ -1610,6 +1652,7 @@ def _farm_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "centroid": _decode_geojson(row.centroid_geojson),
         "area_m2": row.area_m2,
         "elevation_m": row.elevation_m,
+        "country_code": row.country_code,
         "governorate": row.governorate,
         "district": row.district,
         "nearest_city": row.nearest_city,
@@ -1749,6 +1792,16 @@ def _attachment_row_to_dict(row: Any, *, owner_kind: str, owner_id: UUID) -> dic
         "geo_point": _decode_geojson(row.geo_point_geojson),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
+    }
+
+
+def _country_dict(r: Country) -> dict[str, Any]:
+    return {
+        "id": r.id,
+        "code": r.code,
+        "name_en": r.name_en,
+        "name_ar": r.name_ar,
+        "is_active": r.is_active,
     }
 
 

@@ -113,7 +113,7 @@ class RecommendationsServiceImpl:
 
     # ---- Engine driver ------------------------------------------------
 
-    async def evaluate_block(  # noqa: PLR0915 - linear per-source snapshot loads + eval
+    async def evaluate_block(
         self,
         *,
         block_id: UUID,
@@ -155,6 +155,9 @@ class RecommendationsServiceImpl:
                 "trees_skipped_crop": 0,
                 "recommendations_opened": 0,
             }
+
+        # Country axis for targeting — inherited from the parent farm (PR-3).
+        country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
 
         # Pull weather + signals once per evaluation pass. Both loaders
         # return empty data when the block has no provider/observation
@@ -204,18 +207,16 @@ class RecommendationsServiceImpl:
         trees_skipped_crop = 0
         recommendations_opened = 0
         for tree in trees:
-            # Targeting precedence:
-            #   * crop_path set  → match by hierarchical path prefix, so a
-            #     tree can target a whole crop (``mango``), a variety
-            #     (``mango.alphonso``) or an exact strain.
-            #   * else crop_id set → legacy exact-crop match.
-            #   * else            → crop-agnostic, always applies.
-            tree_path = tree.get("crop_path")
-            if tree_path:
-                if not path_matches(tree_path, crop_path):
-                    trees_skipped_crop += 1
-                    continue
-            elif tree["crop_id"] is not None and tree["crop_id"] != crop_id:
+            # Multi-axis targeting (PR-3): a tree fires on this block only if
+            # its crop / country / soil sets all admit the block (AND across
+            # axes, OR within; empty set = matches any). See tree_targets_block.
+            if not tree_targets_block(
+                tree,
+                crop_path=crop_path,
+                crop_id=crop_id,
+                country_code=country_code,
+                soil_texture=soil_texture,
+            ):
                 trees_skipped_crop += 1
                 continue
             trees_evaluated += 1
@@ -719,6 +720,49 @@ def _merge_index_trends(
             latest[code].update(trend)
 
 
+def tree_targets_block(
+    tree: dict[str, Any],
+    *,
+    crop_path: str | None,
+    crop_id: UUID | None,
+    country_code: str | None,
+    soil_texture: str | None,
+) -> bool:
+    """Multi-axis targeting match (DT targeting PR-3).
+
+    A tree matches a block iff **every** axis passes (AND across axes). An
+    axis with an empty set matches any block; otherwise the block's value
+    must be in the set (OR within an axis):
+
+      * crop     — any of ``crop_paths`` prefix-matches the block's crop
+                   path. Back-compat: when ``crop_paths`` is empty but the
+                   legacy ``crop_id`` is set, fall back to the exact-crop
+                   match; empty + no crop_id = crop-agnostic.
+      * country  — block's farm country is one of ``country_codes``.
+      * soil     — block's ``soil_texture`` is one of ``soil_textures``.
+
+    A block whose value on a constrained axis is unknown (None) never
+    matches that axis — e.g. a tree filtered by country won't fire on a
+    farm with no country set. This is the coverage guardrail: country is
+    net-new, so farms are backfilled to a country before such trees ship.
+    """
+    crop_paths: list[str] = tree.get("crop_paths") or []
+    if crop_paths:
+        if not any(path_matches(p, crop_path) for p in crop_paths):
+            return False
+    else:
+        legacy_crop_id = tree.get("crop_id")
+        if legacy_crop_id is not None and legacy_crop_id != crop_id:
+            return False
+
+    country_codes: list[str] = tree.get("country_codes") or []
+    if country_codes and (country_code is None or country_code not in country_codes):
+        return False
+
+    soil_textures: list[str] = tree.get("soil_textures") or []
+    return not (soil_textures and (soil_texture is None or soil_texture not in soil_textures))
+
+
 def get_recommendations_service(
     *, tenant_session: AsyncSession, public_session: AsyncSession
 ) -> RecommendationsServiceImpl:
@@ -810,6 +854,9 @@ class DecisionTreesAuthorService:
             "description_en": tree["description_en"],
             "description_ar": tree["description_ar"],
             "crop_id": tree["crop_id"],
+            "crop_paths": tree["crop_paths"],
+            "country_codes": tree["country_codes"],
+            "soil_textures": tree["soil_textures"],
             "applicable_regions": tree["applicable_regions"],
             "is_active": tree["is_active"],
             "current_version": current_version_number,
@@ -824,6 +871,9 @@ class DecisionTreesAuthorService:
         code: str,
         crop_code: str | None,
         tree_yaml: str,
+        crop_paths: list[str] | None = None,
+        country_codes: list[str] | None = None,
+        soil_textures: list[str] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         """Create a new tree + its v1 draft. Validates the YAML via
@@ -849,6 +899,16 @@ class DecisionTreesAuthorService:
             raise _DecisionTreeCodeAlreadyExistsError(code)
 
         spec = _yaml.safe_load(tree_yaml)
+        # Structured targeting from the authoring pickers (PR-5) overrides
+        # whatever the YAML body declares, so the form is the source of truth
+        # for crop/country/soil and the author needn't hand-edit the YAML.
+        if isinstance(spec, dict):
+            if crop_paths is not None:
+                spec["crop_paths"] = crop_paths
+            if country_codes is not None:
+                spec["country_codes"] = country_codes
+            if soil_textures is not None:
+                spec["soil_textures"] = soil_textures
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         # The compiled body's `code` field must match the URL — protect
         # against a typo where the YAML says one thing and the URL another.
@@ -871,6 +931,9 @@ class DecisionTreesAuthorService:
             description_ar=compiled.get("description_ar"),
             crop_id=crop_id,
             crop_path=crop_path,
+            crop_paths=compiled.get("crop_paths") or [],
+            country_codes=compiled.get("country_codes") or [],
+            soil_textures=compiled.get("soil_textures") or [],
             applicable_regions=compiled.get("applicable_regions") or [],
             actor_user_id=actor_user_id,
         )
@@ -1179,6 +1242,44 @@ class DecisionTreesAuthorService:
             "evaluation_snapshot": result.evaluation_snapshot,
             "error": result.error,
         }
+
+    async def candidate_blocks(
+        self, *, code: str, tenant_session: AsyncSession
+    ) -> list[dict[str, Any]]:
+        """Active blocks this tree would target (dry-run picker, PR-4).
+
+        Filters every active block through the same ``tree_targets_block``
+        matcher the sweep uses, so the dropdown offers only blocks whose
+        crop / country / soil admit the tree. Returns ``[]`` when nothing
+        matches — the UI shows a "no blocks match this tree's targeting"
+        message rather than a free-text UUID box.
+        """
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=self._tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        blocks = await repo.list_blocks_for_targeting()
+        out: list[dict[str, Any]] = []
+        for b in blocks:
+            if not tree_targets_block(
+                tree,
+                crop_path=b["crop_path"],
+                crop_id=b["crop_id"],
+                country_code=b["country_code"],
+                soil_texture=b["soil_texture"],
+            ):
+                continue
+            farm = b["farm_name"] or ""
+            block_label = b["block_name"] or b["block_code"]
+            out.append(
+                {
+                    "block_id": b["block_id"],
+                    "label": f"{farm} / {block_label}" if farm else block_label,
+                }
+            )
+        return out
 
     # ---- Internals ----------------------------------------------------
 

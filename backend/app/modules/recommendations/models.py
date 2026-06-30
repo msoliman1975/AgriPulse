@@ -50,6 +50,19 @@ class DecisionTree(Base, TimestampedMixin):
     # block's ``block_crops.crop_path`` (e.g. ``mango`` / ``mango.alphonso``
     # / ``mango.alphonso.short``). NULL → fall back to ``crop_id`` match.
     crop_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Multi-axis targeting (PR-2). Each axis is a set; an empty set means
+    # "matches any" on that axis. ``crop_paths`` supersedes the single
+    # ``crop_path`` (kept for legacy display); ``country_codes`` references
+    # public.countries; ``soil_textures`` are block soil-texture enum values.
+    crop_paths: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
+    )
+    country_codes: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
+    )
+    soil_textures: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]")
+    )
     applicable_regions: Mapped[list[str]] = mapped_column(
         ARRAY(Text),
         nullable=False,

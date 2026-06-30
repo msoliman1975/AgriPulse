@@ -48,21 +48,31 @@ export function ProvenancePanel({
 
   if (!evidence && !transferability) return null;
 
+  // Collapsed disclosure: the full evidence/transferability detail used to
+  // sit as a full-width band above the canvas and ate a lot of vertical
+  // space (PR-7). It's now a one-line trigger that expands on demand —
+  // a popover rather than an always-on panel — so the canvas gets the room.
   return (
-    <section className="rounded-md border border-ap-line bg-ap-panel p-4 text-sm">
-      <h2 className="mb-3 text-sm font-semibold text-ap-ink">
-        {t("viewer.provenance.title")}
-      </h2>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <details className="group rounded-md border border-ap-line bg-ap-panel text-sm">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2">
+        <span className="text-xs text-ap-muted group-open:hidden">▸</span>
+        <span className="hidden text-xs text-ap-muted group-open:inline">▾</span>
+        <span className="text-sm font-semibold text-ap-ink">
+          {t("viewer.provenance.title")}
+        </span>
         {evidence ? (
-          <EvidenceSection evidence={evidence} />
+          <Pill kind={GRADE_KIND[evidence.confidence] ?? "neutral"}>
+            {t(`viewer.provenance.grade.${evidence.confidence}`)}
+          </Pill>
         ) : null}
+      </summary>
+      <div className="grid grid-cols-1 gap-4 border-t border-ap-line p-4 md:grid-cols-2">
+        {evidence ? <EvidenceSection evidence={evidence} /> : null}
         {transferability ? (
           <TransferabilitySection transferability={transferability} />
         ) : null}
       </div>
-    </section>
+    </details>
   );
 }
 

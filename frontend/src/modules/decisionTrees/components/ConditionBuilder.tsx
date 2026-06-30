@@ -11,10 +11,13 @@
 
 import { useTranslation } from "react-i18next";
 import { type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 
+import { listSignalDefinitions } from "@/api/signals";
 import {
   COMPARISON_OPS,
   GRID_FIELDS,
+  INDEX_CODES,
   INDICES_KEYS,
   SIGNAL_KEYS,
   WEATHER_INDEX_CODES,
@@ -243,18 +246,30 @@ function SourceSpecificFields({
   onChange: (next: ValueRef) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  // Tenant signal definitions for the signals-source code dropdown. Loaded
+  // once and shared across every condition row via react-query dedupe.
+  const signalDefs = useQuery({
+    queryKey: ["signal_definitions", "list"] as const,
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 60_000,
+  });
   if (value.source === "indices") {
     return (
       <>
-        <input
-          type="text"
+        <select
           disabled={readOnly}
-          placeholder="ndvi"
           value={value.index_code}
           onChange={(e) => onChange({ ...value, index_code: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
           aria-label={t("editor.condition.indexCode")}
-        />
+        >
+          <option value="">—</option>
+          {INDEX_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <select
           disabled={readOnly}
           value={value.key}
@@ -390,17 +405,27 @@ function SourceSpecificFields({
     );
   }
   if (value.source === "signals") {
+    const knownCodes = (signalDefs.data ?? []).map((d) => d.code);
+    // Keep an out-of-catalog code (e.g. authored in YAML) selectable so
+    // switching to the dropdown never silently drops it.
+    const codeOptions =
+      value.code && !knownCodes.includes(value.code) ? [value.code, ...knownCodes] : knownCodes;
     return (
       <>
-        <input
-          type="text"
+        <select
           disabled={readOnly}
-          placeholder="soil_moisture"
           value={value.code}
           onChange={(e) => onChange({ ...value, code: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
           aria-label={t("editor.condition.signalCode")}
-        />
+        >
+          <option value="">—</option>
+          {codeOptions.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <select
           disabled={readOnly}
           value={value.key}
@@ -421,15 +446,20 @@ function SourceSpecificFields({
   if (value.source === "grid") {
     return (
       <>
-        <input
-          type="text"
+        <select
           disabled={readOnly}
-          placeholder="ndvi"
           value={value.index_code}
           onChange={(e) => onChange({ ...value, index_code: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
           aria-label={t("editor.condition.indexCode")}
-        />
+        >
+          <option value="">—</option>
+          {INDEX_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <select
           disabled={readOnly}
           value={value.field}

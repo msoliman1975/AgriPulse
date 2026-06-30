@@ -20,6 +20,11 @@
 // Mirrors backend constants in `backend/app/shared/conditions/{models,context}.py`.
 // Keep in lock-step.
 export const INDICES_KEYS = ["mean", "baseline_deviation"] as const;
+// The canonical imagery index codes (block_index_aggregates / grid
+// aggregates). Closed list so the author picks from a dropdown rather than
+// guessing; mirrors STANDARD_INDEX_CODES in
+// backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
+export const INDEX_CODES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"] as const;
 export const BLOCK_FIELDS = ["crop_category"] as const;
 export const SIGNAL_KEYS = [
   "value_numeric",

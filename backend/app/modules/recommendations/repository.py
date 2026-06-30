@@ -70,6 +70,9 @@ class RecommendationsRepository:
                            t.name_en, t.name_ar,
                            t.crop_id,
                            t.crop_path,
+                           t.crop_paths,
+                           t.country_codes,
+                           t.soil_textures,
                            t.applicable_regions,
                            v.id    AS version_id,
                            v.version,
@@ -135,6 +138,9 @@ class RecommendationsRepository:
             "description_en": row.description_en,
             "description_ar": row.description_ar,
             "crop_id": row.crop_id,
+            "crop_paths": list(row.crop_paths or []),
+            "country_codes": list(row.country_codes or []),
+            "soil_textures": list(row.soil_textures or []),
             "applicable_regions": list(row.applicable_regions or []),
             "is_active": row.is_active,
             "current_version_id": row.current_version_id,
@@ -180,7 +186,8 @@ class RecommendationsRepository:
                     SELECT t.id, t.code, t.tenant_id,
                            t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
-                           t.crop_id, t.applicable_regions, t.is_active,
+                           t.crop_id, t.crop_paths, t.country_codes,
+                           t.soil_textures, t.applicable_regions, t.is_active,
                            v.version AS current_version
                     FROM public.decision_trees t
                     LEFT JOIN public.decision_tree_versions v
@@ -268,6 +275,9 @@ class RecommendationsRepository:
         applicable_regions: list[str],
         actor_user_id: UUID | None,
         crop_path: str | None = None,
+        crop_paths: list[str] | None = None,
+        country_codes: list[str] | None = None,
+        soil_textures: list[str] | None = None,
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
         version + current_version_id update in one transaction.
@@ -283,11 +293,13 @@ class RecommendationsRepository:
                     INSERT INTO public.decision_trees
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
-                         crop_id, crop_path, applicable_regions, is_active,
+                         crop_id, crop_path, crop_paths, country_codes,
+                         soil_textures, applicable_regions, is_active,
                          created_by, updated_by)
                     VALUES (:code, :tenant_id, :name_en, :name_ar,
                             :description_en, :description_ar,
-                            :crop_id, :crop_path, :applicable_regions, TRUE,
+                            :crop_id, :crop_path, :crop_paths, :country_codes,
+                            :soil_textures, :applicable_regions, TRUE,
                             :actor, :actor)
                     RETURNING id
                     """
@@ -305,6 +317,9 @@ class RecommendationsRepository:
                     "description_ar": description_ar,
                     "crop_id": crop_id,
                     "crop_path": crop_path,
+                    "crop_paths": crop_paths or [],
+                    "country_codes": country_codes or [],
+                    "soil_textures": soil_textures or [],
                     "applicable_regions": applicable_regions,
                     "actor": actor_user_id,
                 },
@@ -871,6 +886,19 @@ class RecommendationsRepository:
         ).first()
         return row.farm_id if row is not None else None
 
+    async def get_farm_country_code(self, *, farm_id: UUID) -> str | None:
+        """Return the farm's ``country_code`` (PR-1) — a block inherits its
+        country from its parent farm for decision-tree country targeting."""
+        row = (
+            await self._tenant.execute(
+                text(
+                    "SELECT country_code FROM farms WHERE id = :farm_id AND deleted_at IS NULL"
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
+            )
+        ).first()
+        return row.country_code if row is not None else None
+
     async def get_block_soil(self, *, block_id: UUID) -> tuple[str | None, str | None]:
         """Return (soil_texture, salinity_class) for the block — block-source
         fields read by the recommendation engine (e.g. sandy -> SAVI path)."""
@@ -950,3 +978,44 @@ class RecommendationsRepository:
             )
         ).all()
         return tuple(r.id for r in rows)
+
+    async def list_blocks_for_targeting(self) -> list[dict[str, Any]]:
+        """Every active block with the attributes the targeting matcher reads
+        (crop path/id, parent-farm country, soil) plus display labels.
+
+        Drives the dry-run candidate-block picker: the author service filters
+        these through ``tree_targets_block`` so the dropdown only offers blocks
+        the tree would actually fire on.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                    SELECT b.id          AS block_id,
+                           b.name        AS block_name,
+                           b.code        AS block_code,
+                           b.soil_texture,
+                           f.name        AS farm_name,
+                           f.country_code,
+                           bc.crop_id,
+                           bc.crop_path
+                    FROM blocks b
+                    JOIN farms f
+                      ON f.id = b.farm_id AND f.deleted_at IS NULL
+                    LEFT JOIN block_crops bc
+                      ON bc.block_id = b.id
+                     AND bc.is_current = TRUE
+                     AND bc.deleted_at IS NULL
+                    WHERE b.deleted_at IS NULL
+                      AND b.active_from <= current_date
+                      AND (b.active_to IS NULL OR b.active_to > current_date)
+                    ORDER BY f.name, b.code
+                    """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]

@@ -1,4 +1,23 @@
 {
+  "targeting": {
+    "heading": "Targeting",
+    "subtitle": "Which blocks this tree runs on. A crop is required; country and soil are optional (leave empty to match any). The tree fires on a block only when every set admits it.",
+    "crop": "Crops",
+    "add": "Add",
+    "cropRequired": "Pick at least one crop.",
+    "country": "Countries",
+    "soil": "Soil textures",
+    "anyHint": "Leave empty to match any.",
+    "soilValues": {
+      "sandy": "Sandy",
+      "sandy_loam": "Sandy loam",
+      "loam": "Loam",
+      "clay_loam": "Clay loam",
+      "clay": "Clay",
+      "silty_loam": "Silty loam",
+      "silty_clay": "Silty clay"
+    }
+  },
   "list": {
     "title": "Decision trees",
     "subtitle": "Author and version the recommendation engine's decision trees. Each save lands as a draft; publish to make it the active version.",
@@ -186,6 +205,9 @@
     },
     "dryRun": {
       "heading": "Dry-run on a block",
+      "selectBlock": "Select a block…",
+      "loadingBlocks": "Loading blocks…",
+      "noCandidateBlocks": "No blocks match this tree's crop / country / soil targeting.",
       "mode": "Test against",
       "useDraft": "In-editor draft",
       "useCurrent": "Published version",

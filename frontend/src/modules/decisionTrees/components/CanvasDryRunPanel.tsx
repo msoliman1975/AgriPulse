@@ -8,12 +8,14 @@
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DryRunResponse } from "@/api/decisionTrees";
+import type { DryRunCandidateBlock, DryRunResponse } from "@/api/decisionTrees";
 import { Pill } from "@/components/Pill";
 
 interface CanvasDryRunPanelProps {
   blockId: string;
   onBlockIdChange: (next: string) => void;
+  candidateBlocks: DryRunCandidateBlock[];
+  candidatesLoading: boolean;
   mode: "draft" | "current";
   onModeChange: (next: "draft" | "current") => void;
   canUseCurrent: boolean;
@@ -27,6 +29,8 @@ interface CanvasDryRunPanelProps {
 export function CanvasDryRunPanel({
   blockId,
   onBlockIdChange,
+  candidateBlocks,
+  candidatesLoading,
   mode,
   onModeChange,
   canUseCurrent,
@@ -38,6 +42,7 @@ export function CanvasDryRunPanel({
 }: CanvasDryRunPanelProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const matched = result?.matched ?? false;
+  const noCandidates = !candidatesLoading && candidateBlocks.length === 0;
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-3">
       <header className="flex flex-wrap items-end gap-3">
@@ -45,13 +50,27 @@ export function CanvasDryRunPanel({
           <span className="text-xs font-medium text-ap-muted">
             {t("editor.dryRun.heading")}
           </span>
-          <input
-            type="text"
-            value={blockId}
-            onChange={(e) => onBlockIdChange(e.target.value)}
-            placeholder={t("edit.dryRun.blockIdPlaceholder")}
-            className="rounded-md border border-ap-line bg-white px-2 py-1 font-mono text-xs shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
-          />
+          {noCandidates ? (
+            <p className="text-xs text-ap-muted">{t("editor.dryRun.noCandidateBlocks")}</p>
+          ) : (
+            <select
+              value={blockId}
+              onChange={(e) => onBlockIdChange(e.target.value)}
+              disabled={candidatesLoading}
+              className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
+            >
+              <option value="">
+                {candidatesLoading
+                  ? t("editor.dryRun.loadingBlocks")
+                  : t("editor.dryRun.selectBlock")}
+              </option>
+              {candidateBlocks.map((b) => (
+                <option key={b.block_id} value={b.block_id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <fieldset className="flex flex-col gap-1 text-xs">
           <legend className="font-medium text-ap-muted">

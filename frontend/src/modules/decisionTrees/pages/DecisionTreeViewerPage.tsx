@@ -31,6 +31,7 @@ import { readTreeProvenance, type DryRunResponse } from "@/api/decisionTrees";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
+  useDecisionTreeCandidateBlocks,
   useDryRunDecisionTree,
   usePublishDecisionTreeVersion,
 } from "@/queries/decisionTrees";
@@ -79,12 +80,14 @@ interface PendingAddChild {
 
 export function DecisionTreeViewerPage(): ReactNode {
   const { code = "" } = useParams<{ code: string }>();
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
+  const isAr = i18n.language === "ar";
   const canManage = useCapability("decision_tree.manage");
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
   const dryRun = useDryRunDecisionTree();
+  const candidateBlocks = useDecisionTreeCandidateBlocks(code);
 
   // PR-D2: edit buffer + selection. Selection survives across re-renders
   // even when the tree refetches because the node id is stable.
@@ -445,11 +448,15 @@ export function DecisionTreeViewerPage(): ReactNode {
   })();
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-4">
+    // PR-8: give the canvas the full page width (capped on ultra-wide) so wide
+    // trees render with minimal horizontal scroll.
+    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-2">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-ap-ink">{tree.name_en}</h1>
+            <h1 className="text-2xl font-semibold text-ap-ink">
+              {isAr && tree.name_ar ? tree.name_ar : tree.name_en}
+            </h1>
             {isDraftOnly ? (
               <Pill kind="neutral">{t("viewer.header.draftOnly")}</Pill>
             ) : (
@@ -463,8 +470,10 @@ export function DecisionTreeViewerPage(): ReactNode {
             ) : null}
           </div>
           <p className="mt-1 font-mono text-xs text-ap-muted">{tree.code}</p>
-          {tree.description_en ? (
-            <p className="mt-2 max-w-prose text-sm text-ap-muted">{tree.description_en}</p>
+          {(isAr && tree.description_ar) || tree.description_en ? (
+            <p className="mt-2 max-w-prose text-sm text-ap-muted">
+              {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
+            </p>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
@@ -570,6 +579,8 @@ export function DecisionTreeViewerPage(): ReactNode {
           <CanvasDryRunPanel
             blockId={dryRunBlockId}
             onBlockIdChange={setDryRunBlockId}
+            candidateBlocks={candidateBlocks.data ?? []}
+            candidatesLoading={candidateBlocks.isLoading}
             mode={dryRunMode}
             onModeChange={setDryRunMode}
             canUseCurrent={tree.current_version != null}

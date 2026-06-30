@@ -8,7 +8,8 @@ import { useCapability } from "@/rbac/useCapability";
 import { useDecisionTrees } from "@/queries/decisionTrees";
 
 export function DecisionTreeListPage(): ReactNode {
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
+  const isAr = i18n.language === "ar";
   const canManage = useCapability("decision_tree.manage");
 
   const { data, isLoading, isError } = useDecisionTrees();
@@ -68,10 +69,29 @@ export function DecisionTreeListPage(): ReactNode {
                       {tree.code}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-ap-ink">{tree.name_en}</td>
+                  <td className="px-4 py-2 text-ap-ink">
+                    {isAr && tree.name_ar ? tree.name_ar : tree.name_en}
+                  </td>
                   <td className="px-4 py-2 text-xs text-ap-muted">
-                    {tree.crop_id ? (
-                      <span className="font-mono">{tree.crop_id.slice(0, 8)}…</span>
+                    {tree.crop_paths.length > 0 || tree.country_codes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {tree.crop_paths.map((p) => (
+                          <span
+                            key={p}
+                            className="rounded bg-ap-primary/10 px-1.5 py-0.5 font-mono text-[11px] text-ap-primary"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                        {tree.country_codes.map((c) => (
+                          <span
+                            key={c}
+                            className="rounded bg-ap-bg px-1.5 py-0.5 font-mono text-[11px] text-ap-muted"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
                     ) : (
                       <span>{t("list.table.anyCrop")}</span>
                     )}

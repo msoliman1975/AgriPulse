@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { MultiPolygon, Polygon } from "geojson";
 
@@ -13,6 +13,7 @@ import {
   type OwnershipType,
   type WaterSource,
 } from "@/api/farms";
+import { listCountries, type Country } from "@/api/countries";
 import { singleBoundary } from "@/lib/aoi";
 import { MapDraw } from "./MapDraw";
 import { AoiUploader } from "./AoiUploader";
@@ -42,10 +43,13 @@ export function FarmForm({
   busy,
   error,
 }: Props): ReactNode {
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
+  const isAr = i18n.language === "ar";
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [country, setCountry] = useState(initial?.country_code ?? "");
+  const [countries, setCountries] = useState<Country[]>([]);
   const [governorate, setGovernorate] = useState(initial?.governorate ?? "");
   const [district, setDistrict] = useState(initial?.district ?? "");
   const [nearestCity, setNearestCity] = useState(initial?.nearest_city ?? "");
@@ -62,6 +66,20 @@ export function FarmForm({
   const [drawnPolygon, setDrawnPolygon] = useState<Polygon | null>(null);
   const [uploadedBoundary, setUploadedBoundary] = useState<MultiPolygon | Polygon | null>(null);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    listCountries()
+      .then((rows) => {
+        if (active) setCountries(rows);
+      })
+      .catch(() => {
+        // Catalog read is best-effort; the field just stays empty on failure.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -100,6 +118,7 @@ export function FarmForm({
       name,
       description: description || null,
       boundary,
+      country_code: country || null,
       governorate: governorate || null,
       district: district || null,
       nearest_city: nearestCity || null,
@@ -157,6 +176,24 @@ export function FarmForm({
             value={description ?? ""}
             onChange={(e) => setDescription(e.target.value)}
           />
+        </div>
+        <div>
+          <label className="label" htmlFor="farm-country">
+            {t("form.country")}
+          </label>
+          <select
+            id="farm-country"
+            className="input"
+            value={country ?? ""}
+            onChange={(e) => setCountry(e.target.value)}
+          >
+            <option value="">{t("form.countryNone")}</option>
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>
+                {isAr ? c.name_ar : c.name_en}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="label" htmlFor="farm-gov">

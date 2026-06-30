@@ -10,6 +10,10 @@ export interface DecisionTree {
   description_en: string | null;
   description_ar: string | null;
   crop_id: string | null;
+  // Multi-axis targeting sets (DT targeting PR-2/PR-5). Empty = matches any.
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
   applicable_regions: string[];
   is_active: boolean;
   current_version: number | null;
@@ -88,12 +92,27 @@ export interface DecisionTreeVersion {
 }
 
 export interface DecisionTreeDetail extends DecisionTree {
+  // Multi-axis targeting sets (DT targeting PR-2). Empty set = matches any.
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
   versions: DecisionTreeVersion[];
+}
+
+// One block the tree would target (dry-run picker, PR-4).
+export interface DryRunCandidateBlock {
+  block_id: string;
+  label: string;
 }
 
 export interface DecisionTreeCreatePayload {
   code: string;
   crop_code?: string | null;
+  // Multi-axis targeting from the authoring pickers (PR-5). Injected into the
+  // compiled spec server-side; omit to leave whatever the YAML declares.
+  crop_paths?: string[];
+  country_codes?: string[];
+  soil_textures?: string[];
   tree_yaml: string;
 }
 
@@ -187,6 +206,17 @@ export async function dryRunDecisionTree(
   const { data } = await apiClient.post<DryRunResponse>(
     `/v1/decision-trees/${code}:dry-run`,
     payload,
+  );
+  return data;
+}
+
+// Blocks the tree would actually fire on (filtered by its crop/country/soil
+// targeting) — populates the dry-run block picker.
+export async function getDecisionTreeCandidateBlocks(
+  code: string,
+): Promise<DryRunCandidateBlock[]> {
+  const { data } = await apiClient.get<DryRunCandidateBlock[]>(
+    `/v1/decision-trees/${code}/candidate-blocks`,
   );
   return data;
 }
