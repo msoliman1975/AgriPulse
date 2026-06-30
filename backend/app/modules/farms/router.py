@@ -1184,9 +1184,7 @@ async def admin_create_country(
     context: RequestContext = Depends(requires_capability("platform.manage_countries")),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
-    return await service.create_country(
-        fields=payload.model_dump(), actor_user_id=context.user_id
-    )
+    return await service.create_country(fields=payload.model_dump(), actor_user_id=context.user_id)
 
 
 @router.patch(

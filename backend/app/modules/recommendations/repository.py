@@ -988,9 +988,10 @@ class RecommendationsRepository:
         the tree would actually fire on.
         """
         rows = (
-            await self._tenant.execute(
-                text(
-                    """
+            (
+                await self._tenant.execute(
+                    text(
+                        """
                     SELECT b.id          AS block_id,
                            b.name        AS block_name,
                            b.code        AS block_code,
@@ -1011,7 +1012,10 @@ class RecommendationsRepository:
                       AND (b.active_to IS NULL OR b.active_to > current_date)
                     ORDER BY f.name, b.code
                     """
+                    )
                 )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
