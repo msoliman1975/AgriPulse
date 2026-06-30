@@ -103,11 +103,14 @@ global:
   #   (demo_cell_low_ndvi_v1). No migration; api runs sync_from_disk on startup
   #   to create+publish it, workers-beat sweep evaluates it per cell → api +
   #   workers bumped; frontend stays 2b8705c, tile-server 9d140cc.
+  # 5dc113c = #300 fix: savepoint around idempotent rec/alert insert conflicts
+  #   (re-evaluation no longer 500s; found in #299 cell demonstrator smoke). No
+  #   migration; backend repos only → api + workers bumped; frontend 2b8705c.
   images:
     api:
-      tag: "874c847"
+      tag: "5dc113c"
     workers:
-      tag: "874c847"
+      tag: "5dc113c"
     frontend:
       tag: "2b8705c"
     tileServer:
