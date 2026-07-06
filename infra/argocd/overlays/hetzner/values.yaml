@@ -111,11 +111,16 @@ global:
   #   "N zones flagged" notification (sweep emits a synthetic block-level event,
   #   handler suppresses per-cell). No migration; backend + FE → api + workers +
   #   frontend bumped; tile-server stays 9d140cc.
+  # 6d95dd3 = #303 one-shot historical imagery+weather backfill (raw-only). New
+  #   Celery tasks (imagery.backfill_scenes/backfill_farm_scenes,
+  #   weather.backfill_weather + Open-Meteo archive fetch) register at worker
+  #   startup; no migration. Backend only → api + workers bumped; frontend
+  #   b22151c, tile-server 9d140cc.
   images:
     api:
-      tag: "b22151c"
+      tag: "6d95dd3"
     workers:
-      tag: "b22151c"
+      tag: "6d95dd3"
     frontend:
       tag: "b22151c"
     tileServer:
