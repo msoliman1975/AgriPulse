@@ -261,6 +261,13 @@ class Settings(BaseSettings):
     # tolerates one missed poll.
     imagery_discovery_lookback_hours: int = 48
 
+    # Cold-start floor: how far back a *fresh* subscription's discovery reaches
+    # when it has no `last_successful_ingest_at` watermark yet. Normal daily
+    # discovery is watermark-driven, so this only bounds the very first poll.
+    # The one-shot historical backfill task (`imagery.backfill_scenes`)
+    # overrides the discovery window explicitly and ignores this floor.
+    imagery_backfill_floor_days: int = 90
+
     # Native ground sample distance (metres) requested from the provider's
     # Process API per scene. The fetch payload previously omitted output
     # resolution, so Sentinel Hub defaulted to a fixed 256x256 grid — every
