@@ -1,8 +1,40 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
 import { listRecommendations, type Recommendation } from "@/api/recommendations";
+
+// A cell-scoped tree fires one rec per grid cell, so a single sweep can put
+// dozens of near-identical "scout this zone" recs on the rail. Collapse the
+// cell-scoped ones into a single summary chip per (tree, action, block); the
+// block-scoped recs (one per block already) stay as individual drag chips.
+type RailEntry =
+  | { kind: "single"; rec: Recommendation }
+  | { kind: "group"; key: string; recs: Recommendation[]; worst: Recommendation };
+
+const SEVERITY_RANK: Record<string, number> = { info: 0, warning: 1, critical: 2 };
+
+function buildRailEntries(recs: Recommendation[]): RailEntry[] {
+  const singles: RailEntry[] = [];
+  const groups = new Map<string, Recommendation[]>();
+  for (const rec of recs) {
+    if (rec.cell_id == null) {
+      singles.push({ kind: "single", rec });
+      continue;
+    }
+    const key = `${rec.tree_code}|${rec.action_type}|${rec.block_id}`;
+    groups.set(key, [...(groups.get(key) ?? []), rec]);
+  }
+  const grouped: RailEntry[] = [...groups.entries()].map(([key, recs]) => {
+    // A group of one is really a single — keep it draggable.
+    if (recs.length === 1) return { kind: "single" as const, rec: recs[0] };
+    const worst = recs.reduce((a, b) =>
+      (SEVERITY_RANK[b.severity] ?? 0) > (SEVERITY_RANK[a.severity] ?? 0) ? b : a,
+    );
+    return { kind: "group" as const, key, recs, worst };
+  });
+  return [...singles, ...grouped];
+}
 
 interface RecommendationsRailProps {
   farmId: string;
@@ -25,9 +57,10 @@ export function RecommendationsRail({
   const recsQ = useQuery<Recommendation[]>({
     queryKey: ["recommendations", "open", farmId],
     queryFn: () =>
-      listRecommendations({ farm_id: farmId, state: "open", limit: 50 }),
+      listRecommendations({ farm_id: farmId, state: "open", limit: 200 }),
     staleTime: 30_000,
   });
+  const entries = useMemo(() => buildRailEntries(recsQ.data ?? []), [recsQ.data]);
 
   return (
     <aside className="min-w-0 flex-[1]">
@@ -39,12 +72,16 @@ export function RecommendationsRail({
           <p className="px-2 py-3 text-xs text-ap-muted">…</p>
         ) : recsQ.isError ? (
           <p className="px-2 py-3 text-xs text-ap-crit">{t("rail.loadFailed")}</p>
-        ) : (recsQ.data ?? []).length === 0 ? (
+        ) : entries.length === 0 ? (
           <p className="px-2 py-3 text-xs text-ap-muted">{t("rail.empty")}</p>
         ) : (
-          (recsQ.data ?? []).map((r) => (
-            <RecChip key={r.id} rec={r} draggable={draggable} />
-          ))
+          entries.map((entry) =>
+            entry.kind === "single" ? (
+              <RecChip key={entry.rec.id} rec={entry.rec} draggable={draggable} />
+            ) : (
+              <GroupChip key={entry.key} recs={entry.recs} worst={entry.worst} />
+            ),
+          )
         )}
       </div>
     </aside>
@@ -89,6 +126,39 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
         </span>
       </span>
       <span className="truncate text-[11px] opacity-90">{rec.text_en}</span>
+    </div>
+  );
+}
+
+// Summary chip for a set of cell-scoped recs (one tree/action, many zones).
+// Not draggable — dropping a whole zone-set onto one calendar cell is
+// ambiguous; the author acts on individual zones from the map / recs page.
+function GroupChip({
+  recs,
+  worst,
+}: {
+  recs: Recommendation[];
+  worst: Recommendation;
+}): ReactNode {
+  const { t } = useTranslation("board");
+  const severityColor =
+    worst.severity === "critical"
+      ? "border-ap-crit/30 bg-ap-crit-soft text-ap-crit"
+      : worst.severity === "warning"
+        ? "border-ap-warn/30 bg-ap-warn-soft text-ap-warn"
+        : "border-sky-300 bg-sky-50 text-sky-900";
+  return (
+    <div
+      className={"flex flex-col gap-0.5 rounded border px-2 py-1.5 text-xs " + severityColor}
+      title={t("rail.zonesHint")}
+    >
+      <span className="flex items-center justify-between">
+        <span className="font-medium">{t(`recAction.${worst.action_type}`)}</span>
+        <span className="rounded-full bg-black/5 px-1.5 text-[10px] font-medium">
+          {t("rail.zonesCount", { count: recs.length })}
+        </span>
+      </span>
+      <span className="truncate text-[11px] opacity-90">{worst.text_en}</span>
     </div>
   );
 }

@@ -94,7 +94,9 @@
     "title": "Suggested actions",
     "empty": "No open recommendations.",
     "loadFailed": "Couldn't load recommendations.",
-    "dragHint": "Drag onto a cell to schedule"
+    "dragHint": "Drag onto a cell to schedule",
+    "zonesCount": "{{count}} zones",
+    "zonesHint": "Per-zone recommendations — open the map or recommendations page to act on individual zones."
   },
   "recAction": {
     "irrigate": "Irrigate",
