@@ -106,13 +106,18 @@ global:
   # 5dc113c = #300 fix: savepoint around idempotent rec/alert insert conflicts
   #   (re-evaluation no longer 500s; found in #299 cell demonstrator smoke). No
   #   migration; backend repos only → api + workers bumped; frontend 2b8705c.
+  # b22151c = #302 per-cell rollup: board rail aggregates cell recs into one
+  #   zone-count chip (F1); notifications digest cell-scoped recs into one
+  #   "N zones flagged" notification (sweep emits a synthetic block-level event,
+  #   handler suppresses per-cell). No migration; backend + FE → api + workers +
+  #   frontend bumped; tile-server stays 9d140cc.
   images:
     api:
-      tag: "5dc113c"
+      tag: "b22151c"
     workers:
-      tag: "5dc113c"
+      tag: "b22151c"
     frontend:
-      tag: "2b8705c"
+      tag: "b22151c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
