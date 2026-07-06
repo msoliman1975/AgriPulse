@@ -14,7 +14,7 @@ per IP, not per call cost, so collapsing to one fetch is also cheaper.
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -42,6 +42,21 @@ _HOURLY_VARS: tuple[str, ...] = (
     "relative_humidity_2m",
     "precipitation",
     "precipitation_probability",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "pressure_msl",
+    "shortwave_radiation",
+    "cloud_cover",
+    "et0_fao_evapotranspiration",
+)
+
+# Archive (ERA5) hourly variables. Same set as `_HOURLY_VARS` minus
+# `precipitation_probability`, which is a forecast-only field the archive
+# endpoint doesn't serve (and observations don't carry it anyway).
+_ARCHIVE_HOURLY_VARS: tuple[str, ...] = (
+    "temperature_2m",
+    "relative_humidity_2m",
+    "precipitation",
     "wind_speed_10m",
     "wind_direction_10m",
     "pressure_msl",
@@ -224,6 +239,68 @@ class OpenMeteoProvider:
             observations=tuple(observations),
             forecasts=tuple(forecasts),
         )
+
+    async def fetch_archive(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        start_date: date,
+        end_date: date,
+    ) -> tuple[HourlyObservation, ...]:
+        """Fetch historical hourly observations from the ERA5 archive.
+
+        The archive endpoint takes an explicit ``start_date``/``end_date``
+        (inclusive) and returns past hourly data only. All returned rows are
+        observations — there is no forecast split.
+        """
+        params: dict[str, Any] = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "hourly": ",".join(_ARCHIVE_HOURLY_VARS),
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "timezone": "UTC",
+        }
+        body = await self._get_with_retry(self._archive_url, params=params)
+
+        hourly = body.get("hourly", {}) or {}
+        times: list[str] = list(hourly.get("time", []) or [])
+        if not times:
+            return ()
+
+        parsed_times = [datetime.fromisoformat(t).replace(tzinfo=UTC) for t in times]
+        air_temp = _decimal_col(hourly.get("temperature_2m"))
+        humidity = _decimal_col(hourly.get("relative_humidity_2m"))
+        precip = _decimal_col(hourly.get("precipitation"))
+        wind_speed = _decimal_col(hourly.get("wind_speed_10m"))
+        wind_dir = _decimal_col(hourly.get("wind_direction_10m"))
+        pressure = _decimal_col(hourly.get("pressure_msl"))
+        radiation = _decimal_col(hourly.get("shortwave_radiation"))
+        cloud_cover = _decimal_col(hourly.get("cloud_cover"))
+        et0 = _decimal_col(hourly.get("et0_fao_evapotranspiration"))
+
+        def at(col: list[Decimal | None], idx: int) -> Decimal | None:
+            # A variable can be absent or shorter than `time` if upstream
+            # dropped it; tolerate by yielding None rather than IndexError.
+            return col[idx] if idx < len(col) else None
+
+        observations = tuple(
+            HourlyObservation(
+                time=t,
+                air_temp_c=at(air_temp, idx),
+                humidity_pct=at(humidity, idx),
+                precipitation_mm=at(precip, idx),
+                wind_speed_m_s=at(wind_speed, idx),
+                wind_direction_deg=at(wind_dir, idx),
+                pressure_hpa=at(pressure, idx),
+                solar_radiation_w_m2=at(radiation, idx),
+                cloud_cover_pct=at(cloud_cover, idx),
+                et0_mm=at(et0, idx),
+            )
+            for idx, t in enumerate(parsed_times)
+        )
+        return observations
 
     # -- internals ------------------------------------------------------
 

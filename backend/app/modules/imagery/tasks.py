@@ -190,6 +190,50 @@ async def _record_audit(
     )
 
 
+def _resolve_discovery_window(
+    *,
+    subscription: dict[str, Any],
+    settings: Any,
+    now: datetime,
+    window_start_override: datetime | None,
+    window_end_override: datetime | None,
+) -> tuple[datetime, datetime]:
+    """Compute the [start, end] catalogue-search window for one discovery.
+
+    A one-shot backfill passes an explicit ``window_start_override`` and the
+    watermark/floor is ignored. Otherwise the window runs from the
+    subscription's watermark (or the cold-start floor when it has none),
+    pulled back by the publication-lag lookback buffer, up to ``now``.
+    """
+    if window_start_override is not None:
+        return window_start_override, (window_end_override or now)
+    start = (
+        subscription["last_successful_ingest_at"]
+        or (now - timedelta(days=settings.imagery_backfill_floor_days))
+    ) - timedelta(hours=settings.imagery_discovery_lookback_hours)
+    return start, now
+
+
+async def _touch_if_live(
+    repo: ImageryRepository,
+    *,
+    subscription_id: UUID,
+    now: datetime,
+    ingested: bool,
+    bump_watermark: bool,
+) -> None:
+    """Record the subscription attempt for a live poll only.
+
+    A backfill (``bump_watermark=False``) must never move the live
+    watermark — it ingests old scenes and would otherwise bury recent
+    publication-lagged ones.
+    """
+    if bump_watermark:
+        await repo.touch_subscription_attempt(
+            subscription_id=subscription_id, attempted_at=now, ingested=ingested
+        )
+
+
 # --- discover_scenes --------------------------------------------------------
 
 
@@ -203,7 +247,15 @@ def discover_scenes(subscription_id: str, tenant_schema: str) -> dict[str, int]:
     return _run_task(_discover_scenes_async(UUID(subscription_id), tenant_schema))
 
 
-async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> dict[str, int]:
+async def _discover_scenes_async(
+    subscription_id: UUID,
+    tenant_schema: str,
+    *,
+    window_start_override: datetime | None = None,
+    window_end_override: datetime | None = None,
+    run_compute_indices: bool = True,
+    bump_watermark: bool = True,
+) -> dict[str, int]:
     settings = get_settings()
     bus = get_default_bus()
 
@@ -233,9 +285,13 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
         # `upsert_pending_ingestion_job` is idempotent (already-seen scenes
         # return created=False and are skipped without re-acquisition).
         now = datetime.now(UTC)
-        window_start = (
-            subscription["last_successful_ingest_at"] or _ninety_days_ago(now)
-        ) - timedelta(hours=settings.imagery_discovery_lookback_hours)
+        window_start, window_end = _resolve_discovery_window(
+            subscription=subscription,
+            settings=settings,
+            now=now,
+            window_start_override=window_start_override,
+            window_end_override=window_end_override,
+        )
 
         cloud_cap = (
             subscription["cloud_cover_max_pct"]
@@ -256,7 +312,7 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
                     aoi_geojson=block["boundary_geojson"],
                     product_code=product["code"],
                     from_datetime=window_start,
-                    to_datetime=now,
+                    to_datetime=window_end,
                     max_cloud_cover_pct=cloud_cap,
                 )
             except SentinelHubNotConfiguredError:
@@ -287,8 +343,12 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
                         "err": "sentinel_hub_not_configured",
                     },
                 )
-                await repo.touch_subscription_attempt(
-                    subscription_id=subscription_id, attempted_at=now, ingested=False
+                await _touch_if_live(
+                    repo,
+                    subscription_id=subscription_id,
+                    now=now,
+                    ingested=False,
+                    bump_watermark=bump_watermark,
                 )
                 bus.publish(
                     IngestionFailedV1(job_id=marker_id, error="sentinel_hub_not_configured")
@@ -370,8 +430,17 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
         # otherwise it would lie about staleness and bury publication-lagged
         # scenes (the original bug). Already-ingested scenes re-seen via the
         # lookback are created=False and don't count toward `queued`.
-        await repo.touch_subscription_attempt(
-            subscription_id=subscription_id, attempted_at=now, ingested=bool(queued)
+        #
+        # A one-shot backfill (`bump_watermark=False`) is ingesting *old*
+        # scenes, so it must not touch the live watermark at all — otherwise it
+        # would fast-forward `last_successful_ingest_at` to `now` and make the
+        # daily poll skip recent publication-lagged scenes.
+        await _touch_if_live(
+            repo,
+            subscription_id=subscription_id,
+            now=now,
+            ingested=bool(queued),
+            bump_watermark=bump_watermark,
         )
 
     # Enqueue acquisition for every queued job. We do this OUTSIDE the
@@ -390,13 +459,110 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
                 )
             ).all()
         for (job_id,) in rows:
-            acquire_scene.delay(str(job_id), tenant_schema)
+            acquire_scene.delay(str(job_id), tenant_schema, run_compute_indices)
 
     return {
         "discovered": len(scenes),
         "queued": queued,
         "skipped_cloud": skipped_cloud,
     }
+
+
+# --- backfill (one-shot historical) -----------------------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.backfill_farm_scenes",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_farm_scenes(
+    farm_id: str,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+    run_compute_indices: bool = False,
+) -> dict[str, int]:
+    """Fan out `backfill_scenes` to every active imagery subscription on a farm.
+
+    One-shot historical backfill entry point. ``from_iso``/``to_iso`` are
+    ISO-8601 datetimes (naive is treated as UTC). ``run_compute_indices``
+    defaults to False so the backfill lands raw bands + STAC only — indices
+    can be computed later.
+    """
+    return _run_task(
+        _backfill_farm_scenes_async(
+            UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices
+        )
+    )
+
+
+async def _backfill_farm_scenes_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+    run_compute_indices: bool,
+) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT s.id FROM imagery_aoi_subscriptions s "
+                    "JOIN blocks b ON b.id = s.block_id "
+                    "WHERE b.farm_id = :farm AND s.is_active = TRUE"
+                ),
+                {"farm": farm_id},
+            )
+        ).all()
+    sub_ids = [r[0] for r in rows]
+    for sid in sub_ids:
+        backfill_scenes.delay(str(sid), tenant_schema, from_iso, to_iso, run_compute_indices)
+    _log.info(
+        "imagery_backfill_farm_enqueued",
+        farm_id=str(farm_id),
+        subscriptions=len(sub_ids),
+    )
+    return {"subscriptions_enqueued": len(sub_ids)}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.backfill_scenes",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_scenes(
+    subscription_id: str,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+    run_compute_indices: bool = False,
+) -> dict[str, int]:
+    """Discover + acquire scenes for one subscription over an explicit window.
+
+    Bypasses the cold-start floor and the live watermark, and does NOT
+    advance the watermark (so the daily poll's publication-lag safety is
+    preserved). Cloud-over-cap scenes are still skipped. Idempotent via the
+    (subscription_id, scene_id) UNIQUE — re-running is safe.
+    """
+    start = datetime.fromisoformat(from_iso)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=UTC)
+    end = datetime.fromisoformat(to_iso)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=UTC)
+    return _run_task(
+        _discover_scenes_async(
+            UUID(subscription_id),
+            tenant_schema,
+            window_start_override=start,
+            window_end_override=end,
+            run_compute_indices=run_compute_indices,
+            bump_watermark=False,
+        )
+    )
 
 
 # --- acquire_scene ----------------------------------------------------------
@@ -408,11 +574,15 @@ async def _discover_scenes_async(subscription_id: UUID, tenant_schema: str) -> d
     ignore_result=True,
     queue="heavy",
 )
-def acquire_scene(job_id: str, tenant_schema: str) -> dict[str, Any]:
-    return _run_task(_acquire_scene_async(UUID(job_id), tenant_schema))
+def acquire_scene(
+    job_id: str, tenant_schema: str, run_compute_indices: bool = True
+) -> dict[str, Any]:
+    return _run_task(_acquire_scene_async(UUID(job_id), tenant_schema, run_compute_indices))
 
 
-async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, Any]:
+async def _acquire_scene_async(
+    job_id: UUID, tenant_schema: str, run_compute_indices: bool = True
+) -> dict[str, Any]:
     bus = get_default_bus()
     storage = _get_storage()
     factory = AsyncSessionLocal()
@@ -488,7 +658,7 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
         return {"job_id": str(job_id), "status": "failed"}
 
     # Step 4: chain register_stac_item with the assets we just wrote.
-    register_stac_item.delay(str(job_id), tenant_schema, [s3_key])
+    register_stac_item.delay(str(job_id), tenant_schema, [s3_key], run_compute_indices)
     return {"job_id": str(job_id), "status": "running", "asset_key": s3_key}
 
 
@@ -501,15 +671,21 @@ async def _acquire_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, An
     ignore_result=True,
 )
 def register_stac_item(
-    job_id: str, tenant_schema: str, assets_written: list[str]
+    job_id: str,
+    tenant_schema: str,
+    assets_written: list[str],
+    run_compute_indices: bool = True,
 ) -> dict[str, Any]:
-    return _run_task(_register_stac_item_async(UUID(job_id), tenant_schema, assets_written))
+    return _run_task(
+        _register_stac_item_async(UUID(job_id), tenant_schema, assets_written, run_compute_indices)
+    )
 
 
 async def _register_stac_item_async(
     job_id: UUID,
     tenant_schema: str,
     assets_written: list[str],
+    run_compute_indices: bool = True,
 ) -> dict[str, Any]:
     bus = get_default_bus()
     settings = get_settings()
@@ -618,8 +794,10 @@ async def _register_stac_item_async(
     # Chain compute_indices â€” runs on the heavy queue (rasterio reads
     # are CPU + IO heavy). Failure here doesn't roll back the
     # registration; the job stays `succeeded` and a separate retry
-    # tool can re-trigger compute on demand (P2).
-    compute_indices.delay(str(job_id), tenant_schema, assets_written[0])
+    # tool can re-trigger compute on demand (P2). A raw-only backfill
+    # passes run_compute_indices=False to land bands + STAC only.
+    if run_compute_indices:
+        compute_indices.delay(str(job_id), tenant_schema, assets_written[0])
 
     return {"job_id": str(job_id), "status": "succeeded", "stac_item_id": item_id}
 
@@ -914,10 +1092,6 @@ async def _fail_job(
         farm_id=farm_id,
         details={"error": error},
     )
-
-
-def _ninety_days_ago(now: datetime) -> datetime:
-    return now - timedelta(days=90)
 
 
 def _iso(dt: datetime) -> str:

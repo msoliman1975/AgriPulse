@@ -9,7 +9,7 @@ data the model has settled on) and forecasts (future hourly).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
 
@@ -103,6 +103,23 @@ class WeatherProvider(Protocol):
         anchored on the current UTC hour. The orchestrator sets
         ``forecast_issued_at`` from the response — we don't trust the
         wall clock for it.
+        """
+        ...
+
+    async def fetch_archive(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        start_date: date,
+        end_date: date,
+    ) -> tuple[HourlyObservation, ...]:
+        """Fetch historical hourly observations for a closed date range.
+
+        Used for one-shot backfill of raw weather history. Unlike
+        :meth:`fetch`, this returns observations only (no forecast) and
+        reaches years back via the provider's archive endpoint. Dates are
+        interpreted in UTC and inclusive on both ends.
         """
         ...
 

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -539,6 +539,108 @@ async def _backfill_weather_indices_async(
         "status": "succeeded",
         "days_written": written,
         "indices_written": indices_written,
+    }
+
+
+# --- backfill_weather (one-shot raw history) -------------------------------
+
+# Chunk the archive fetch so one request + transaction stays bounded
+# (~1 month of hourly rows) and progress is observable in logs.
+_WEATHER_BACKFILL_CHUNK_DAYS = 31
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.backfill_weather",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_weather(
+    farm_id: str,
+    tenant_schema: str,
+    provider_code: str,
+    start_iso: str,
+    end_iso: str,
+) -> dict[str, Any]:
+    """Backfill raw hourly observations for [start, end] from the archive.
+
+    ``start_iso``/``end_iso`` are ``YYYY-MM-DD`` (inclusive). Raw only — this
+    does NOT chain derivations or index projection. Idempotent via the
+    ``(time, farm_id, provider_code)`` unique constraint, so re-running is
+    safe. Run ``weather.backfill_weather_indices`` afterwards to reproject
+    the loaded history into ``weather_index_daily``.
+    """
+    return _run_task(
+        _backfill_weather_async(
+            UUID(farm_id),
+            tenant_schema,
+            provider_code,
+            date.fromisoformat(start_iso),
+            date.fromisoformat(end_iso),
+        )
+    )
+
+
+async def _backfill_weather_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    provider_code: str,
+    start_date: date,
+    end_date: date,
+) -> dict[str, Any]:
+    factory = AsyncSessionLocal()
+
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        centroid = await repo.get_farm_centroid(farm_id)
+    if centroid is None:
+        return {"farm_id": str(farm_id), "status": "farm_missing"}
+
+    provider = _provider_factory(provider_code)
+    total_inserted = 0
+    total_fetched = 0
+    chunks = 0
+    try:
+        chunk_start = start_date
+        while chunk_start <= end_date:
+            chunk_end = min(
+                chunk_start + timedelta(days=_WEATHER_BACKFILL_CHUNK_DAYS - 1), end_date
+            )
+            observations = await provider.fetch_archive(
+                latitude=centroid["latitude"],
+                longitude=centroid["longitude"],
+                start_date=chunk_start,
+                end_date=chunk_end,
+            )
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, tenant_schema)
+                repo = WeatherRepository(session)
+                inserted = await repo.upsert_observations(
+                    farm_id=farm_id,
+                    provider_code=provider_code,
+                    observations=observations,
+                )
+            total_inserted += inserted
+            total_fetched += len(observations)
+            chunks += 1
+            _log.info(
+                "weather_backfill_chunk",
+                farm_id=str(farm_id),
+                start=chunk_start.isoformat(),
+                end=chunk_end.isoformat(),
+                fetched=len(observations),
+                inserted=inserted,
+            )
+            chunk_start = chunk_end + timedelta(days=1)
+    finally:
+        await provider.aclose()
+
+    return {
+        "farm_id": str(farm_id),
+        "status": "succeeded",
+        "chunks": chunks,
+        "observations_fetched": total_fetched,
+        "observations_inserted": total_inserted,
     }
 
 
