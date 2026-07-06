@@ -20,6 +20,7 @@ through this service.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -230,23 +231,29 @@ class RecommendationsServiceImpl:
         # Block-scoped path.
         for tree in block_trees:
             overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            if await self._evaluate_and_record(
-                tree=tree,
-                eval_ctx=ctx,
-                overrides=overrides,
-                block_id=block_id,
-                cell_id=None,
-                farm_id=farm_id,
-                block_crop_id=block_crop_id,
-                crop_path=crop_path,
-                actor_user_id=actor_user_id,
-                tenant_schema=tenant_schema,
+            if (
+                await self._evaluate_and_record(
+                    tree=tree,
+                    eval_ctx=ctx,
+                    overrides=overrides,
+                    block_id=block_id,
+                    cell_id=None,
+                    farm_id=farm_id,
+                    block_crop_id=block_crop_id,
+                    crop_path=crop_path,
+                    actor_user_id=actor_user_id,
+                    tenant_schema=tenant_schema,
+                )
+                is not None
             ):
                 recommendations_opened += 1
 
         # Cell-scoped path (PR-C3): one evaluation per grid cell, with the
         # cell's own imagery means swapped into an otherwise block-level
         # context. Empty when the block has no grid, so cell trees no-op there.
+        # Per (cell-scoped tree) tally of opened recommendations, so we can emit
+        # one digest notification per (tree, block) instead of one per cell.
+        cell_rec_digest: dict[UUID, dict[str, Any]] = {}
         if cell_trees:
             cell_aggs = await self._repo.get_latest_cell_aggregates(block_id=block_id)
             for cid, cell_means in cell_aggs.items():
@@ -270,7 +277,7 @@ class RecommendationsServiceImpl:
                 )
                 for tree in cell_trees:
                     overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-                    if await self._evaluate_and_record(
+                    opened = await self._evaluate_and_record(
                         tree=tree,
                         eval_ctx=cell_ctx,
                         overrides=overrides,
@@ -281,8 +288,57 @@ class RecommendationsServiceImpl:
                         crop_path=crop_path,
                         actor_user_id=actor_user_id,
                         tenant_schema=tenant_schema,
-                    ):
-                        recommendations_opened += 1
+                    )
+                    if opened is None:
+                        continue
+                    recommendations_opened += 1
+                    if opened["kind"] == "recommendation":
+                        # First opened rec per tree is the digest's representative
+                        # (notification links to it); track count + worst severity.
+                        agg = cell_rec_digest.setdefault(
+                            tree["tree_id"],
+                            {"tree": tree, "count": 0, "first": opened},
+                        )
+                        agg["count"] += 1
+                        if _SEVERITY_RANK.get(opened["severity"], 0) > _SEVERITY_RANK.get(
+                            agg["first"]["severity"], 0
+                        ):
+                            agg["first"] = {**agg["first"], "severity": opened["severity"]}
+
+        # One aggregated notification per cell-scoped tree that opened ≥1 rec on
+        # this block: publish a single synthetic *block-level* (cell_id=None)
+        # RecommendationOpenedV1 with digest text. The notifications module
+        # suppresses the per-cell events and fans this out through the normal
+        # rec pipeline — one "N zones flagged" notification instead of N.
+        for agg in cell_rec_digest.values():
+            tree = agg["tree"]
+            first = agg["first"]
+            count = agg["count"]
+            self._bus.publish(
+                RecommendationOpenedV1(
+                    recommendation_id=first["recommendation_id"],
+                    block_id=block_id,
+                    cell_id=None,
+                    farm_id=farm_id,
+                    tree_id=tree["tree_id"],
+                    tree_code=tree["tree_code"],
+                    tree_version=tree["version"],
+                    action_type=first["action_type"],
+                    severity=first["severity"],
+                    confidence=Decimal("1.0"),
+                    created_at=datetime.now(UTC),
+                    tenant_schema=tenant_schema,
+                    text_en=(
+                        f"{count} zones flagged in this block — "
+                        "review per-zone recommendations on the map."
+                    ),
+                    text_ar=(
+                        f"تم وضع علامة على {count} منطقة في هذا الحقل — "
+                        "راجع التوصيات لكل منطقة على الخريطة."
+                    ),
+                    zone_count=count,
+                )
+            )
 
         return {
             "trees_evaluated": trees_evaluated,
@@ -303,9 +359,10 @@ class RecommendationsServiceImpl:
         crop_path: str | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
-    ) -> bool:
+    ) -> dict[str, Any] | None:
         """Evaluate one tree against one context (block or cell) and persist its
-        output. Returns True iff a new rec/alert was opened. Shared by the
+        output. Returns ``{"kind", "action_type", "severity"}`` for the opened
+        rec/alert, or ``None`` when nothing was opened. Shared by the
         block-scoped and cell-scoped (PR-C3) evaluation paths; ``cell_id`` is
         None for block-scoped output and the grid cell for cell-scoped."""
         result = evaluate_tree(tree["tree_compiled"], eval_ctx, param_overrides=overrides)
@@ -317,16 +374,16 @@ class RecommendationsServiceImpl:
                 cell_id=str(cell_id) if cell_id else None,
                 error=result.error,
             )
-            return False
+            return None
         if result.outcome is None or result.outcome.action_type == "no_action":
             # Either a malformed leaf or an explicit "no action" leaf — record
             # nothing; the daily evaluator re-walks tomorrow as signals change.
-            return False
+            return None
 
         # PR-E: dispatch on leaf kind. "alert" leaves write to tenant.alerts;
         # "recommendation" leaves take the path below.
         if result.outcome.kind == "alert":
-            return await self._open_alert_from_tree(
+            opened = await self._open_alert_from_tree(
                 block_id=block_id,
                 cell_id=cell_id,
                 farm_id=farm_id,
@@ -335,6 +392,13 @@ class RecommendationsServiceImpl:
                 actor_user_id=actor_user_id,
                 tenant_schema=tenant_schema,
             )
+            if not opened:
+                return None
+            return {
+                "kind": "alert",
+                "action_type": "alert",
+                "severity": result.outcome.severity,
+            }
 
         recommendation_id = uuid7()
         valid_until: datetime | None = None
@@ -370,7 +434,7 @@ class RecommendationsServiceImpl:
         )
         if not inserted:
             # An open recommendation for (block[/cell], tree) already exists.
-            return False
+            return None
 
         await self._repo.insert_history(
             recommendation_id=recommendation_id,
@@ -423,7 +487,14 @@ class RecommendationsServiceImpl:
                 evaluation_snapshot=result.evaluation_snapshot,
             )
         )
-        return True
+        return {
+            "kind": "recommendation",
+            "recommendation_id": recommendation_id,
+            "action_type": result.outcome.action_type,
+            "severity": result.outcome.severity,
+            "text_en": result.outcome.text_en,
+            "text_ar": result.outcome.text_ar,
+        }
 
     async def _open_alert_from_tree(
         self,
@@ -807,6 +878,10 @@ def _merge_index_trends(
     for code, trend in trends.items():
         if code in latest:
             latest[code].update(trend)
+
+
+# Severity ordering for picking the worst across a cell-scoped tree's zones.
+_SEVERITY_RANK: dict[str, int] = {"info": 0, "warning": 1, "critical": 2}
 
 
 def _merge_cell_means(
