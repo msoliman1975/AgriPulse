@@ -44,6 +44,12 @@ class RecommendationOpenedV1(Event):
     text_ar: str | None = None
     parameters: dict[str, Any] | None = None
     evaluation_snapshot: dict[str, Any] | None = None
+    # Per-cell P2 digest: a cell-scoped tree opens one rec per grid cell, which
+    # would flood notifications. The sweep suppresses the per-cell events for
+    # notifications (they still drive the map / recs page) and publishes ONE
+    # synthetic block-level RecommendationOpenedV1 (cell_id=None) whose text_en/
+    # text_ar summarise "N zones flagged"; ``zone_count`` marks it as a digest.
+    zone_count: int | None = None
 
 
 class RecommendationAppliedV1(Event):

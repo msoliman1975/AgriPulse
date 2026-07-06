@@ -1261,6 +1261,14 @@ def _dispatch_rec_webhook_once(
 def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
     """Fan out an opened recommendation to every (user, channel) pair
     the tenant has subscribed to. Mirrors ``_on_alert_opened``."""
+    # Per-cell P2: a cell-scoped tree opens one rec per grid cell. Suppress the
+    # per-cell events here to avoid an N-notification flood — the sweep emits a
+    # single block-level digest event (cell_id=None, zone_count set) that this
+    # same handler fans out as one "N zones flagged" notification. The per-cell
+    # events still reach the map / recs page via their own reads.
+    if event.cell_id is not None:
+        return
+
     schema = event.tenant_schema
     if schema is None:
         _log.warning(
