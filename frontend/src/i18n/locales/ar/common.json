@@ -67,7 +67,8 @@
     "createFirstFarm": "أنشئ مزرعتك الأولى"
   },
   "farmSwitcher": {
-    "newFarm": "+ مزرعة جديدة"
+    "newFarm": "+ مزرعة جديدة",
+    "placeholder": "اختر مزرعة"
   },
   "errors": {
     "generic": "حدث خطأ ما. حاول مرة أخرى.",

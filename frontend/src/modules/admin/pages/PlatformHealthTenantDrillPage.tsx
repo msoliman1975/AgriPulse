@@ -15,7 +15,7 @@ import { IntegrationsHealthPage } from "@/modules/integrationsHealth";
  */
 export function PlatformHealthTenantDrillPage(): ReactNode {
   const { tenantId } = useParams<{ tenantId: string }>();
-  const { t } = useTranslation("admin");
+  const { t, i18n } = useTranslation("admin");
 
   if (!tenantId) {
     return (
@@ -31,7 +31,7 @@ export function PlatformHealthTenantDrillPage(): ReactNode {
     <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
       <div className="text-sm">
         <Link to="/platform/integrations/health" className="text-ap-muted hover:text-ap-primary">
-          ← {t("platformHealth.drill.back")}
+          {i18n.dir() === "rtl" ? "→" : "←"} {t("platformHealth.drill.back")}
         </Link>
       </div>
       <IntegrationsHealthPage basePath={basePath} platformProviderScope={true} />

@@ -8,6 +8,7 @@ import { DataPendingChip } from "@/components/DataPendingChip";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedField } from "@/lib/localizedField";
 import { useAlerts } from "@/queries/alerts";
 
 interface Props {
@@ -65,9 +66,11 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
 }
 
 function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): ReactNode {
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
   const dateLocale = useDateLocale();
   const navigate = useNavigate();
+  const diagnosis = localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar);
+  const prescription = localizedField(i18n.language, a.prescription_en, a.prescription_ar);
   const goResolve = () => {
     if (a.prescription_activity_id) {
       navigate(`/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`);
@@ -90,12 +93,12 @@ function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): React
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-ap-ink">
-            {a.diagnosis_en ?? a.rule_code}
+            {diagnosis ?? a.rule_code}
           </span>
           <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
         </div>
-        {a.prescription_en ? (
-          <p className="line-clamp-2 text-xs text-ap-muted">{a.prescription_en}</p>
+        {prescription ? (
+          <p className="line-clamp-2 text-xs text-ap-muted">{prescription}</p>
         ) : null}
         <div className="mt-1 flex items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">{a.rule_code}</span>

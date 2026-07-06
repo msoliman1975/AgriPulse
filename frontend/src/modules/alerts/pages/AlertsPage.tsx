@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { useAlerts, useTransitionAlert } from "@/queries/alerts";
 
@@ -103,9 +104,11 @@ interface RowProps {
 
 function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProps): ReactNode {
   const navigate = useNavigate();
-  const { t } = useTranslation("alerts");
+  const { t, i18n } = useTranslation("alerts");
   const dateLocale = useDateLocale();
   const isTerminal = a.status === "resolved";
+  const diagnosis = localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar);
+  const prescription = localizedField(i18n.language, a.prescription_en, a.prescription_ar);
   return (
     <li className="flex items-start gap-3 p-4">
       <div
@@ -120,14 +123,14 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">{a.diagnosis_en ?? a.rule_code}</span>
+          <span className="text-sm font-medium text-ap-ink">{diagnosis ?? a.rule_code}</span>
           <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
           <Pill kind={a.status === "resolved" ? "ok" : a.status === "open" ? "crit" : "neutral"}>
             {t(`status.${a.status}`)}
           </Pill>
         </div>
-        {a.prescription_en ? (
-          <p className="mt-1 text-sm text-ap-muted">{a.prescription_en}</p>
+        {prescription ? (
+          <p className="mt-1 text-sm text-ap-muted">{prescription}</p>
         ) : null}
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">{a.rule_code}</span>

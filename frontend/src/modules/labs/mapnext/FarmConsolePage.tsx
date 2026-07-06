@@ -179,7 +179,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   }, [summaryQ.data]);
 
   const detailQ = useQuery({
-    queryKey: ["labs/mapnext/detail", farmId, selectedId],
+    // Language is part of the key: loadUnitDetail bakes localized alert text
+    // into the detail, so switching locale must refetch to re-localize.
+    queryKey: ["labs/mapnext/detail", farmId, selectedId, i18n.language],
     queryFn: () =>
       loadUnitDetail({
         farmId,

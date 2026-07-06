@@ -16,6 +16,7 @@ import {
 
 import { getDerivedDaily, getForecast } from "@/api/weather";
 import { Skeleton } from "@/components/Skeleton";
+import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
 import { TimeSpanChips, type TimeSpanKey } from "./TimeSpanChips";
 
@@ -47,7 +48,9 @@ const PAST_SPAN_OPTIONS: readonly TimeSpanKey[] = ["7d", "30d", "90d"];
  * "first block" is the existing convention (see InsightsPage).
  */
 export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNode {
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
+  const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
   const [pastSpan, setPastSpan] = useState<TimeSpanKey>("30d");
 
   const { since, until } = useMemo(() => {
@@ -137,7 +140,11 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 16, left: 0 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
-              <XAxis dataKey="date" tickFormatter={_fmtDateTick} fontSize={11} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
+                fontSize={11}
+              />
               {/* Left axis: precipitation mm. Right axis: temperature °C. */}
               <YAxis
                 yAxisId="precip"
@@ -164,7 +171,7 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
                 }}
               />
               <Tooltip
-                labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+                labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
                 formatter={(value: number, name: string) => {
                   if (value === null || Number.isNaN(value)) return ["—", name];
                   if (name === t("weather.precip")) return [`${value.toFixed(1)} mm`, name];
@@ -226,9 +233,4 @@ function _toNum(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function _fmtDateTick(value: string): string {
-  const d = new Date(value);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }

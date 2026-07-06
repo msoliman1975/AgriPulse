@@ -7,8 +7,10 @@
 
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
+import i18n from "@/i18n";
 import { getBlock, listBlocks, type Block, type BlockDetail } from "@/api/blocks";
 import { getBlocksSummary } from "@/api/blocksSummary";
+import { localizedField } from "@/lib/localizedField";
 import { listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
 import {
   listCrops,
@@ -248,7 +250,10 @@ export async function loadUnitDetail(args: {
       id: a.id,
       severity: sev,
       code: a.rule_code,
-      message: a.diagnosis_en ?? a.prescription_en ?? a.rule_code,
+      message:
+        localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar) ??
+        localizedField(i18n.language, a.prescription_en, a.prescription_ar) ??
+        a.rule_code,
       raised_at: a.created_at,
     };
     if (sev === "critical") return ua;
@@ -307,7 +312,10 @@ export async function loadUnitDetail(args: {
           id: a.id,
           severity: sev,
           code: a.rule_code,
-          message: a.diagnosis_en ?? a.prescription_en ?? a.rule_code,
+          message:
+            localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar) ??
+            localizedField(i18n.language, a.prescription_en, a.prescription_ar) ??
+            a.rule_code,
           raised_at: a.created_at,
         };
       })

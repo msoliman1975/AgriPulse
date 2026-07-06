@@ -102,7 +102,7 @@ export function GridOverlayPanel({
                   <button
                     type="button"
                     onClick={() => onSelectCell(cell.cell_id)}
-                    className="flex w-full items-center justify-between gap-3 rounded px-1.5 py-1 text-left hover:bg-ap-line/50"
+                    className="flex w-full items-center justify-between gap-3 rounded px-1.5 py-1 text-start hover:bg-ap-line/50"
                   >
                     <span className="text-ap-muted">
                       {t("subblockGrid.worstRank", {

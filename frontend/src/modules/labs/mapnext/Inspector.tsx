@@ -67,7 +67,10 @@ export function Inspector({
   onInactivate,
   resetKey,
 }: Props): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
+  // Directional glyphs (back chevron, rec bullet) point toward the inline
+  // start, which flips under RTL.
+  const rtl = i18n.dir() === "rtl";
   const manageRef = useRef<HTMLButtonElement>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const [manageMode, setManageMode] = useState<ManageMode | null>(null);
@@ -115,7 +118,7 @@ export function Inspector({
         eyebrow={t("inspector.manageHeading")}
         title={
           <button type="button" onClick={() => setManageMode(null)} className="flex items-center gap-2 text-start">
-            <span className="text-ap-muted">‹</span> {titles[manageMode]}
+            <span className="text-ap-muted">{rtl ? "›" : "‹"}</span> {titles[manageMode]}
           </button>
         }
       >
@@ -233,7 +236,7 @@ export function Inspector({
           <div className="space-y-1">
             {detail.recommendations.map((r, i) => (
               <div key={i} className="flex gap-2 text-sm">
-                <span className="font-extrabold text-ap-primary">›</span>
+                <span className="font-extrabold text-ap-primary">{rtl ? "‹" : "›"}</span>
                 <span>{r}</span>
               </div>
             ))}

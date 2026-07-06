@@ -15,6 +15,7 @@ import {
 
 import { getWeatherIndexTimeseries } from "@/api/weatherIndices";
 import { Skeleton } from "@/components/Skeleton";
+import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
 interface Props {
   farmId: string;
@@ -38,7 +39,9 @@ interface ChartPoint {
  * temporal chart — not a per-cell map overlay.
  */
 export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): ReactNode {
-  const { t } = useTranslation("weatherIndices");
+  const { t, i18n } = useTranslation("weatherIndices");
+  const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
 
   const { from, to } = useMemo(() => {
     const now = new Date();
@@ -83,10 +86,15 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
-          <XAxis dataKey="date" tickFormatter={_fmtDateTick} fontSize={11} minTickGap={28} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
+            fontSize={11}
+            minTickGap={28}
+          />
           <YAxis fontSize={11} width={44} />
           <Tooltip
-            labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+            labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
             formatter={(value: number | number[], rawName: string) => {
               if (Array.isArray(value)) {
                 return [`${value[0].toFixed(1)} – ${value[1].toFixed(1)} ${unit}`, rawName];
@@ -136,9 +144,4 @@ function _toNum(v: string | null | undefined): number | null {
   if (v === null || v === undefined) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function _fmtDateTick(value: string): string {
-  const d = new Date(value);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }

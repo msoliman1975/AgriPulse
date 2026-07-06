@@ -89,7 +89,7 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
                     <HealthBadge health={b.current_health} t={t} />
                   </td>
                   <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
-                    {b.current_value ?? "—"}
+                    {formatIndexValue(b.current_value)}
                   </td>
                   <td className="px-3 py-2 text-end tabular-nums">
                     <TrendPct value={b.trend_30d_pct} />
@@ -150,6 +150,17 @@ function HealthBadge({
       {t(`scorecard.health.${health}`)}
     </span>
   );
+}
+
+/**
+ * The API returns the index value as a raw numeric string (e.g.
+ * "0.2060000000000000000"). Show it at the same 2-decimal precision the
+ * Farm Console units rail uses so the two surfaces agree.
+ */
+function formatIndexValue(value: string | null): string {
+  if (value === null) return "—";
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : value;
 }
 
 function TrendPct({ value }: { value: string | null }): ReactNode {

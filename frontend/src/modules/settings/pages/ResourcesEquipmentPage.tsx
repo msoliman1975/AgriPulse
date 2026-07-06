@@ -131,9 +131,9 @@ function EquipmentTable({
       <table className="w-full text-sm">
         <thead className="bg-ap-bg/50 text-xs uppercase tracking-wider text-ap-muted">
           <tr>
-            <th className="px-3 py-2 text-left">{t("col.name")}</th>
-            <th className="px-3 py-2 text-left">{t("col.type")}</th>
-            <th className="px-3 py-2 text-left">{t("col.status")}</th>
+            <th className="px-3 py-2 text-start">{t("col.name")}</th>
+            <th className="px-3 py-2 text-start">{t("col.type")}</th>
+            <th className="px-3 py-2 text-start">{t("col.status")}</th>
             {canManage ? <th className="w-32" /> : null}
           </tr>
         </thead>
@@ -204,11 +204,11 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
         <td className="px-3 py-2 text-ap-muted">
           {row.archived_at ? t("status.archived") : t("status.active")}
         </td>
-        <td className="px-3 py-2 text-right">
+        <td className="px-3 py-2 text-end">
           <button
             type="button"
             disabled={update.isPending}
-            className="mr-2 text-sm text-ap-primary hover:underline"
+            className="me-2 text-sm text-ap-primary hover:underline"
             onClick={() =>
               update.mutate(
                 {
@@ -243,10 +243,10 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
         {row.archived_at ? t("status.archived") : t("status.active")}
       </td>
       {canManage ? (
-        <td className="px-3 py-2 text-right">
+        <td className="px-3 py-2 text-end">
           <button
             type="button"
-            className="mr-3 text-sm text-ap-primary hover:underline"
+            className="me-3 text-sm text-ap-primary hover:underline"
             onClick={() => setEditing(true)}
           >
             {t("action.edit")}
@@ -305,11 +305,11 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
         </select>
       </td>
       <td className="px-3 py-2 text-ap-muted">{t("status.active")}</td>
-      <td className="px-3 py-2 text-right">
+      <td className="px-3 py-2 text-end">
         <button
           type="button"
           disabled={!name.trim() || create.isPending}
-          className="mr-2 text-sm text-ap-primary hover:underline disabled:opacity-50"
+          className="me-2 text-sm text-ap-primary hover:underline disabled:opacity-50"
           onClick={() =>
             create.mutate(
               {

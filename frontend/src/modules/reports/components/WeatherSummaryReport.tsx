@@ -15,6 +15,7 @@ import {
 
 import type { WeatherCropContext, WeatherSummaryStats } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherSummaryReport } from "@/queries/reports";
 
@@ -209,13 +210,11 @@ function CropContext({ crops }: { crops: WeatherCropContext[] }): ReactNode {
   );
 }
 
-function tick(value: string): string {
-  const d = new Date(value);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 function TempPrecipChart({ data }: { data: ChartPoint[] }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
+  const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
   return (
     <div className="mb-2">
       <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ap-muted">
@@ -224,10 +223,14 @@ function TempPrecipChart({ data }: { data: ChartPoint[] }): ReactNode {
       <ResponsiveContainer width="100%" height={240}>
         <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
-          <XAxis dataKey="date" tickFormatter={tick} fontSize={11} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
+            fontSize={11}
+          />
           <YAxis yAxisId="precip" orientation="left" fontSize={11} />
           <YAxis yAxisId="temp" orientation="right" fontSize={11} />
-          <Tooltip labelFormatter={(l: string) => new Date(l).toLocaleDateString()} />
+          <Tooltip labelFormatter={(l: string) => dateLabelFmt.format(new Date(l))} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Bar
             yAxisId="precip"
@@ -264,7 +267,9 @@ function TempPrecipChart({ data }: { data: ChartPoint[] }): ReactNode {
 }
 
 function GddChart({ data }: { data: ChartPoint[] }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
+  const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
   return (
     <div>
       <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ap-muted">
@@ -273,9 +278,13 @@ function GddChart({ data }: { data: ChartPoint[] }): ReactNode {
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
-          <XAxis dataKey="date" tickFormatter={tick} fontSize={11} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
+            fontSize={11}
+          />
           <YAxis fontSize={11} />
-          <Tooltip labelFormatter={(l: string) => new Date(l).toLocaleDateString()} />
+          <Tooltip labelFormatter={(l: string) => dateLabelFmt.format(new Date(l))} />
           <Line
             type="monotone"
             dataKey="gddCum"

@@ -575,7 +575,12 @@ interface RangeNavigatorProps {
 }
 
 function RangeNavigator({ label, onShift, onToday }: RangeNavigatorProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
+  // The calendar reads right-to-left in RTL (earlier dates on the right),
+  // so the "previous" chevron must point toward the start edge and "next"
+  // toward the end edge. Hardcoded angle-quotes don't mirror, so pick the
+  // glyph from the active direction.
+  const rtl = i18n.dir() === "rtl";
   return (
     <div className="flex items-center gap-2 text-sm">
       <button
@@ -583,7 +588,7 @@ function RangeNavigator({ label, onShift, onToday }: RangeNavigatorProps): React
         className="rounded-md border border-ap-line bg-white px-2 py-1"
         onClick={() => onShift(-1)}
       >
-        ‹ {t("nav.prev")}
+        {rtl ? "›" : "‹"} {t("nav.prev")}
       </button>
       <span className="px-2 text-ap-muted">{label}</span>
       <button
@@ -591,7 +596,7 @@ function RangeNavigator({ label, onShift, onToday }: RangeNavigatorProps): React
         className="rounded-md border border-ap-line bg-white px-2 py-1"
         onClick={() => onShift(1)}
       >
-        {t("nav.next")} ›
+        {t("nav.next")} {rtl ? "‹" : "›"}
       </button>
       <button
         type="button"

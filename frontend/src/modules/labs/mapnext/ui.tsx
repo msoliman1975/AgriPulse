@@ -102,6 +102,9 @@ export function Expander({
   children: ReactNode;
 }): ReactNode {
   const [open, setOpen] = useState(defaultOpen);
+  // Closed caret points toward the inline end (right in LTR, left in RTL);
+  // opening rotates it to point down — so the rotation direction flips too.
+  const rtl = document.documentElement.dir === "rtl";
   return (
     <div className="mx-4 my-2 overflow-hidden rounded-xl border border-ap-line">
       <button
@@ -112,8 +115,14 @@ export function Expander({
         {icon ? <span className="leading-none">{icon}</span> : null}
         <span>{title}</span>
         {badge != null ? <span className="ms-auto">{badge}</span> : null}
-        <span className={clsx("text-ap-muted transition-transform", badge == null && "ms-auto", open && "rotate-90")}>
-          ›
+        <span
+          className={clsx(
+            "text-ap-muted transition-transform",
+            badge == null && "ms-auto",
+            open && (rtl ? "-rotate-90" : "rotate-90"),
+          )}
+        >
+          {rtl ? "‹" : "›"}
         </span>
       </button>
       {open ? <div className="border-t border-ap-line px-3 py-2.5 text-sm">{children}</div> : null}

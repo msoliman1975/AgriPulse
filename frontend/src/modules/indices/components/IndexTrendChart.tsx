@@ -17,6 +17,7 @@ import {
   type IndexTimeseriesPoint,
   type TimeseriesGranularity,
 } from "@/api/indices";
+import { chartDateLocale } from "@/lib/chartFormat";
 
 interface Props {
   blockId: string;
@@ -36,7 +37,7 @@ interface ChartPoint {
  * Renders Latin numerals regardless of UI language (ARCHITECTURE § 11).
  */
 export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.Element {
-  const { t } = useTranslation("indices");
+  const { t, i18n } = useTranslation("indices");
   const [indexCode, setIndexCode] = useState<IndexCode>(initialIndex);
   const [granularity, setGranularity] = useState<TimeseriesGranularity>("daily");
   const [points, setPoints] = useState<IndexTimeseriesPoint[]>([]);
@@ -73,10 +74,16 @@ export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.
     [points],
   );
 
-  // Latin numerals + ISO-style date even in Arabic UI per ARCH § 11.
+  // Dates localize their month name + ordering to the UI language; numerals
+  // stay Western (0–9) per ARCHITECTURE.md § 11 — hence `ar-u-nu-latn`, not
+  // `ar`. Value numbers stay en-US (Western) to match tables/KPIs app-wide.
   const dateFmt = useMemo(
-    () => new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }),
-    [],
+    () =>
+      new Intl.DateTimeFormat(chartDateLocale(i18n.language), {
+        month: "short",
+        day: "2-digit",
+      }),
+    [i18n.language],
   );
   const numFmt = useMemo(() => new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }), []);
 
