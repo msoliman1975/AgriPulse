@@ -730,21 +730,22 @@ class FarmsRepository:
         ).first()
         return bool(row.eq) if row is not None else False
 
-    # Every tenant-schema table that carries a block_id and would represent
-    # real data/config attached to a block. If a block appears in ANY of
+    # Every tenant-schema table that carries a real block_id COLUMN and would
+    # represent data/config attached to a block. If a block appears in ANY of
     # these it is NOT pristine and the bulk reconcile inactivates (reversible)
     # rather than hard-deletes it. Kept deliberately broad so hard-delete only
     # ever touches a block with zero footprint (no orphan rows possible).
+    #
+    # Note: the weather observation/forecast/derived/index-daily tables are
+    # keyed by subscription (no block_id column), so they are covered
+    # transitively by weather_subscriptions — a block with any weather data
+    # necessarily has a subscription row here.
     _BLOCK_DEPENDENT_TABLES: tuple[str, ...] = (
         "block_crops",
         "growth_stage_logs",
         "block_attachments",
         "weather_subscriptions",
         "weather_ingestion_attempts",
-        "weather_observations",
-        "weather_forecasts",
-        "weather_derived_daily",
-        "weather_index_daily",
         "weather_risk_daily",
         "imagery_aoi_subscriptions",
         "imagery_ingestion_jobs",
