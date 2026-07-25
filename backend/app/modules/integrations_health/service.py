@@ -27,12 +27,16 @@ _FARM_COLUMNS = (
     "weather_failed_24h, weather_running_count, imagery_running_count, "
     "weather_overdue_count, imagery_overdue_count"
 )
+# `v.block_name` is `blocks.name`, which is NULLABLE — bulk-created blocks
+# routinely have none. Fall back to the code the way every other module that
+# labels a block does (insights/service.py, reports/service.py); returning
+# NULL here failed response validation and 500'd the whole endpoint.
 _BLOCK_COLUMNS = (
-    "block_id, farm_id, block_name, "
-    "weather_active_subs, weather_last_sync_at, weather_last_failed_at, "
-    "imagery_active_subs, imagery_last_sync_at, imagery_failed_24h, "
-    "weather_failed_24h, weather_running_count, imagery_running_count, "
-    "weather_overdue_count, imagery_overdue_count"
+    "v.block_id, v.farm_id, COALESCE(v.block_name, b.code) AS block_name, "
+    "v.weather_active_subs, v.weather_last_sync_at, v.weather_last_failed_at, "
+    "v.imagery_active_subs, v.imagery_last_sync_at, v.imagery_failed_24h, "
+    "v.weather_failed_24h, v.weather_running_count, v.imagery_running_count, "
+    "v.weather_overdue_count, v.imagery_overdue_count"
 )
 _ATTEMPT_COLUMNS = (
     "attempt_id, kind, subscription_id, block_id, farm_id, provider_code, "
@@ -71,8 +75,9 @@ class IntegrationsHealthService:
                     text(
                         f"""
                     SELECT {_BLOCK_COLUMNS}
-                    FROM v_block_integration_health
-                    WHERE farm_id = :fid
+                    FROM v_block_integration_health v
+                    JOIN blocks b ON b.id = v.block_id
+                    WHERE v.farm_id = :fid
                     ORDER BY block_name
                     """
                     ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
