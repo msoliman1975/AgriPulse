@@ -125,13 +125,20 @@ global:
   #   banner). Endpoints already existed and are unchanged; no migration.
   #   FE only → frontend bumped; api + workers stay 698fcc1, tile-server
   #   9d140cc.
+  # c8391e6 = #311 map loads block boundaries in ONE request. A farm with N
+  #   blocks used to cost N extra GET /blocks/{id}; at 37 blocks (bulk AOI
+  #   upload) that burst exhausted the api DB pool (QueuePool 5+10) and the
+  #   console failed with "Couldn't load this farm". Adds
+  #   ?include_boundary=true on the blocks list + stops echoing all prod SQL
+  #   (sqlalchemy.engine was pinned to INFO). No migration; backend + FE →
+  #   api + workers + frontend bumped; tile-server 9d140cc.
   images:
     api:
-      tag: "698fcc1"
+      tag: "c8391e6"
     workers:
-      tag: "698fcc1"
+      tag: "c8391e6"
     frontend:
-      tag: "d6defe2"
+      tag: "c8391e6"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
