@@ -99,8 +99,18 @@ def configure_logging() -> None:
     root.setLevel(log_level)
 
     # Tame the noisy ones.
-    for name in ("uvicorn.access", "uvicorn.error", "sqlalchemy.engine", "asyncio"):
+    for name in ("uvicorn.access", "uvicorn.error", "asyncio"):
         logging.getLogger(name).setLevel(max(log_level, logging.INFO))
+
+    # SQLAlchemy emits every statement AND its bound parameters at INFO on
+    # `sqlalchemy.engine` — the `echo=` flag is just a level setter. Leaving
+    # this at INFO (which APP_LOG_LEVEL=INFO does) full-on echoes prod SQL:
+    # a JSON log record per statement, on the request's own event loop, plus
+    # the parameter values in plaintext. Keep it at WARNING unless the
+    # operator explicitly asked for echo via DATABASE_ECHO.
+    logging.getLogger("sqlalchemy.engine").setLevel(
+        logging.INFO if settings.database_echo else logging.WARNING
+    )
 
 
 def get_logger(name: str | None = None) -> BoundLogger:

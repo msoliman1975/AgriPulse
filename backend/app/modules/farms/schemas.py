@@ -526,6 +526,20 @@ class BlockDetailResponse(BlockResponse):
     boundary: dict[str, Any]
 
 
+class BlockListItemResponse(BlockResponse):
+    """List row, optionally carrying the boundary.
+
+    `GET /farms/{id}/blocks?include_boundary=true` lets a map client fetch
+    every polygon in ONE request. Without it the map had to follow the list
+    with one `GET /blocks/{id}` per block, which at a few dozen blocks
+    exhausts the API's DB connection pool and fails the whole page load.
+    Defaults to null so existing list consumers see an unchanged payload
+    shape apart from the extra key.
+    """
+
+    boundary: dict[str, Any] | None = None
+
+
 class BlockInactivationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

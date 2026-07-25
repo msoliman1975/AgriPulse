@@ -502,3 +502,44 @@ async def test_list_blocks_excludes_inactive_by_default(
         assert codes_all == ["K", "Z"]
 
         del keep  # silence unused-variable lint
+
+
+@pytest.mark.asyncio
+async def test_list_blocks_include_boundary(
+    admin_session: AsyncSession,
+) -> None:
+    """?include_boundary=true carries each polygon on the list row.
+
+    The map used to follow the list with one GET /blocks/{id} per block;
+    at a few dozen blocks that burst exhausted the API's DB pool and the
+    page failed to load. Boundaries now ride along on the single list call.
+    """
+    _, context = await _bootstrap(admin_session, "life-bnd")
+    app = build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm = await c.post(
+            "/api/v1/farms",
+            json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
+        )
+        farm_id = farm.json()["id"]
+        await c.post(
+            f"/api/v1/farms/{farm_id}/blocks",
+            json={"code": "B1", "boundary": _square_polygon(31.201, 30.001)},
+        )
+
+        # Default: no boundary payload (unchanged for non-map consumers).
+        plain = await c.get(f"/api/v1/farms/{farm_id}/blocks")
+        assert plain.status_code == 200
+        assert plain.json()["items"][0]["boundary"] is None
+
+        withb = await c.get(f"/api/v1/farms/{farm_id}/blocks?include_boundary=true")
+        assert withb.status_code == 200
+        item = withb.json()["items"][0]
+        assert item["boundary"]["type"] == "Polygon"
+        assert len(item["boundary"]["coordinates"][0]) >= 4
+
+        # Same geometry the per-block detail endpoint returns.
+        detail = await c.get(f"/api/v1/blocks/{item['id']}")
+        assert detail.status_code == 200
+        assert detail.json()["boundary"] == item["boundary"]

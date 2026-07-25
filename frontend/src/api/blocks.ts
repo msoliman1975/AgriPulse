@@ -93,6 +93,14 @@ export interface BlockListParams {
   limit?: number;
   irrigation_system?: IrrigationSystem;
   include_inactive?: boolean;
+  // Map clients: get every polygon in this one call instead of following up
+  // with a GET /blocks/{id} per row.
+  include_boundary?: boolean;
+}
+
+/** List row with the optional boundary the map asks for. */
+export interface BlockListItem extends Block {
+  boundary?: Polygon | null;
 }
 
 export interface AutoGridCandidate {
@@ -132,8 +140,10 @@ function normalizeBlock<T extends { area_m2: unknown; area_value: unknown }>(b: 
 export async function listBlocks(
   farmId: string,
   params: BlockListParams = {},
-): Promise<CursorPage<Block>> {
-  const { data } = await apiClient.get<CursorPage<Block>>(`/v1/farms/${farmId}/blocks`, { params });
+): Promise<CursorPage<BlockListItem>> {
+  const { data } = await apiClient.get<CursorPage<BlockListItem>>(`/v1/farms/${farmId}/blocks`, {
+    params,
+  });
   return { ...data, items: data.items.map(normalizeBlock) };
 }
 

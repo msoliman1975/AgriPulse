@@ -97,7 +97,7 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
   // active plan + (best-effort) block health.
   const [farm, blocksPage, summaryResp, plans, healthRows] = await Promise.all([
     getFarm(farmId),
-    listBlocks(farmId, { limit: 200 }),
+    listBlocks(farmId, { limit: 200, include_boundary: true }),
     getBlocksSummary(farmId),
     safePlans(farmId),
     safeBlockHealth(farmId),
@@ -109,9 +109,18 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
 
   const summaryByBlock = new Map(summaryResp.units.map((u) => [u.id, u]));
 
-  // Per-block boundary fetch — N parallel calls, the only fan-out left.
-  const details = await Promise.all(blocks.map((b) => getBlock(b.id)));
-  const detailById = new Map<string, BlockDetail>(details.map((d) => [d.id, d]));
+  // Boundaries ride along on the list call (include_boundary). A farm with
+  // N blocks used to cost N extra GET /blocks/{id} requests here; at a few
+  // dozen blocks that burst exhausted the API's DB connection pool and the
+  // whole page failed with "Couldn't load this farm". Only blocks the list
+  // did not carry a boundary for are fetched, and then a few at a time.
+  const boundaryById = new Map<string, Polygon>();
+  for (const b of blocks) if (b.boundary) boundaryById.set(b.id, b.boundary);
+  const missing = blocks.filter((b) => !boundaryById.has(b.id));
+  if (missing.length > 0) {
+    const fetched = await mapWithConcurrency(missing, 4, (b) => safeBlock(b.id));
+    for (const d of fetched) if (d) boundaryById.set(d.id, d.boundary);
+  }
 
   const summaries: Record<string, UnitSummary> = {};
   const features: Feature<Polygon, UnitFeatureProps>[] = [];
@@ -127,8 +136,8 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
   }
 
   for (const b of blocks) {
-    const detail = detailById.get(b.id);
-    if (!detail) continue;
+    const boundary = boundaryById.get(b.id);
+    if (!boundary) continue;
     const isLogicalPivot = b.unit_type === "pivot" && (pivotChildren.get(b.id)?.length ?? 0) > 0;
 
     const apiSummary = summaryByBlock.get(b.id);
@@ -149,7 +158,7 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
     features.push({
       type: "Feature",
       id: b.id,
-      geometry: detail.boundary,
+      geometry: boundary,
       properties: {
         id: b.id,
         type: isLogicalPivot ? "pivot_logical_group" : specUnitType(b),
@@ -410,6 +419,34 @@ async function safePlans(farmId: string): Promise<Plan[]> {
     return [];
   }
 }
+async function safeBlock(blockId: string): Promise<BlockDetail | null> {
+  try {
+    return await getBlock(blockId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Run `fn` over `items` with at most `limit` requests in flight.
+ *
+ * Guards the fallback path above: an unbounded Promise.all over every block
+ * is what took the API's connection pool down in the first place.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i]);
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 async function safeBlockHealth(farmId: string): Promise<BlockIntegrationHealth[]> {
   try {
     return await listBlockHealth(farmId);

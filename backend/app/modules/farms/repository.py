@@ -561,8 +561,9 @@ class FarmsRepository:
         limit: int,
         irrigation_system: str | None,
         include_inactive: bool,
+        with_boundary: bool = False,
     ) -> list[dict[str, Any]]:
-        stmt = select(*_row_geom_select_for_block(with_boundary=False)).where(
+        stmt = select(*_row_geom_select_for_block(with_boundary=with_boundary)).where(
             Block.farm_id == farm_id
         )
         if not include_inactive:
@@ -576,7 +577,7 @@ class FarmsRepository:
             stmt = stmt.where(Block.id > after)
         stmt = stmt.order_by(Block.id.asc()).limit(limit)
         rows = (await self._tenant.execute(stmt)).all()
-        return [_block_row_to_dict(r, with_boundary=False) for r in rows]
+        return [_block_row_to_dict(r, with_boundary=with_boundary) for r in rows]
 
     async def update_block(
         self,
