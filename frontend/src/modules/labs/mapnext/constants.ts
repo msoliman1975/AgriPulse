@@ -3,6 +3,10 @@
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import type { Health, IndexCode } from "../map/types";
 
+// Last farm the user looked at, so /labs/map with no :farmId can restore it.
+// Shared by the console and the create-farm flow (which writes it on success).
+export const LAST_FARM_KEY = "labs/map/lastFarm";
+
 // Mirror the map's health palette so the rail dot, the inspector badge and
 // the polygon fill all agree at a glance.
 export const HEALTH_DOT: Record<Health, string> = {

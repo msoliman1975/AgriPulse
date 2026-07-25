@@ -11,6 +11,18 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+// ---- form primitives -----------------------------------------------------
+// Shared by every console panel (create flows, manage, settings) so the
+// panels can't drift apart the way the legacy /farms forms did. Import
+// these instead of re-declaring local class strings.
+export const inputCls =
+  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
+export const primaryBtn =
+  "h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-50 hover:bg-ap-primary/90";
+export const ghostBtn =
+  "h-9 rounded-lg border border-ap-line bg-ap-panel px-3 text-sm font-semibold text-ap-ink hover:bg-ap-primary-soft disabled:opacity-50";
+export const fieldLabel = "mb-1 block text-xs font-semibold text-ap-muted";
+
 export function Dot({ color, className }: { color: string; className?: string }): ReactNode {
   return (
     <span

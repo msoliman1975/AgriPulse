@@ -13,7 +13,6 @@ import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { TenantDetailPage } from "@/pages/TenantDetailPage";
 import { FarmListPage } from "@/modules/farms/pages/FarmListPage";
-import { FarmCreatePage } from "@/modules/farms/pages/FarmCreatePage";
 import { FarmDetailPage } from "@/modules/farms/pages/FarmDetailPage";
 import { FarmEditPage } from "@/modules/farms/pages/FarmEditPage";
 import { FarmMembersPage } from "@/modules/farms/pages/FarmMembersPage";
@@ -121,7 +120,9 @@ export function App(): ReactNode {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
                 <Route path="/farms" element={<FarmListPage />} />
-                <Route path="/farms/new" element={<FarmCreatePage />} />
+                {/* Farm creation moved into the Farm Console; the old form
+                    route redirects so existing links and bookmarks survive. */}
+                <Route path="/farms/new" element={<Navigate to="/labs/map?create=farm" replace />} />
                 <Route path="/farms/:farmId" element={<FarmDetailPage />} />
                 <Route path="/farms/:farmId/edit" element={<FarmEditPage />} />
                 <Route path="/farms/:farmId/members" element={<FarmMembersPage />} />

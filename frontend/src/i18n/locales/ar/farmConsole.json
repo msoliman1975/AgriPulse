@@ -36,7 +36,8 @@
     "newFarm": "مزرعة جديدة…",
     "vegIndex": "مؤشر الغطاء النباتي",
     "mapLayers": "طبقات الخريطة",
-    "addToFarm": "إضافة إلى المزرعة"
+    "addToFarm": "إضافة إلى المزرعة",
+    "addNew": "إضافة جديدة"
   },
   "layers": {
     "aoi": "نطاق المزرعة",
@@ -56,9 +57,11 @@
     "autoGrid": "شبكة قطع تلقائية",
     "pivot": "رسم محور",
     "bulkUpload": "رفع ملفات AOI…",
+    "farm": "مزرعة جديدة…",
     "viaForm": "نموذج",
     "viaMap": "على الخريطة",
     "viaDraw": "ارسم على الخريطة",
+    "viaDrawOrUpload": "ارسم أو ارفع ملفًا",
     "viaGrid": "شبكة",
     "viaUpload": "عدة ملفات"
   },
@@ -224,7 +227,22 @@
     "createPivot": "إنشاء محور",
     "blockCreated": "تم إنشاء القطعة",
     "pivotCreated": "تم إنشاء المحور",
-    "createFailed": "تعذّر الإنشاء — تأكد من أن الرمز فريد وحاول مجددًا."
+    "createFailed": "تعذّر الإنشاء — تأكد من أن الرمز فريد وحاول مجددًا.",
+    "farmTitle": "مزرعة جديدة",
+    "stepBoundary": "الخطوة ١ من ٢ · الحدود",
+    "stepDetails": "الخطوة ٢ من ٢ · البيانات",
+    "boundaryHint": "ارسم الحدود الخارجية على الخريطة، أو ارفع ملف KML أو GeoJSON أو Shapefile مضغوط.",
+    "drawBoundary": "رسم الحدود",
+    "uploadBoundary": "رفع ملف",
+    "parsing": "جارٍ قراءة الملف…",
+    "farmDrawing": "انقر لإضافة نقاط، وانقر مرتين للإنهاء",
+    "farmEditLater": "يمكن تعديل بقية البيانات لاحقًا من إعدادات المزرعة",
+    "farmCodePlaceholder": "مثال: SUEZ-02",
+    "farmNamePlaceholder": "مثال: السويس الشرقية",
+    "moreDetails": "بيانات إضافية",
+    "redrawBoundary": "الحدود",
+    "createFarm": "إنشاء مزرعة",
+    "noPermission": "ليست لديك صلاحية إنشاء المزارع."
   },
   "autoBlock": {
     "title": "تقطيع تلقائي بالشبكة",

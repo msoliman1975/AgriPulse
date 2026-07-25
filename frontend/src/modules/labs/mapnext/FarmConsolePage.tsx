@@ -50,7 +50,9 @@ import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
 import { usePrefs } from "@/prefs/PrefsContext";
 import { useCapability } from "@/rbac/useCapability";
+import { LAST_FARM_KEY } from "./constants";
 import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
+import { CreateFarmFlow } from "./CreateFarmFlow";
 import { BulkAoiUploadPanel } from "./BulkAoiUploadPanel";
 import type { BulkPreviewProps } from "../map/MapCanvas";
 import type { ExistingBlock } from "@/lib/aoi/bulk";
@@ -58,10 +60,12 @@ import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
 
-const LAST_FARM_KEY = "labs/map/lastFarm";
-
 export function FarmConsolePage(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
+  const [search] = useSearchParams();
+  // Creating a farm is a tenant-level flow, not a farm-scoped one: a brand-new
+  // tenant has no farm to scope to, so it branches ahead of the console.
+  if (search.get("create") === "farm") return <CreateFarmFlow contextFarmId={farmId} />;
   if (!farmId) return <FarmRedirect />;
   return <Console farmId={farmId} />;
 }
@@ -98,6 +102,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const selectedId = search.get("unit");
 
   const qc = useQueryClient();
+  const canCreateFarm = useCapability("farm.create");
   // One index drives both the map grid overlay and the inspector featured card.
   const [activeIndex, setActiveIndex] = useState<ApiIndexCode>("ndvi");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -464,6 +469,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     closeAuto();
     setBulkOpen(true);
   };
+  // Farm creation lives in its own (non farm-scoped) view — flip the flag in
+  // the URL so it survives a reload and the browser Back button leaves it.
+  const startCreateFarm = () => {
+    const next = new URLSearchParams(search);
+    next.set("create", "farm");
+    next.delete("unit");
+    setSearch(next);
+  };
 
   // Existing blocks (code + boundary) for the bulk-upload client classifier.
   const existingBlocks = useMemo<ExistingBlock[]>(() => {
@@ -589,6 +602,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         onAddPivot={startDrawPivot}
         onAutoBlock={startAutoBlock}
         onBulkUpload={startBulkUpload}
+        onAddFarm={canCreateFarm ? startCreateFarm : undefined}
       />
 
       <div className="flex min-h-0 flex-1">
