@@ -132,11 +132,16 @@ global:
   #   ?include_boundary=true on the blocks list + stops echoing all prod SQL
   #   (sqlalchemy.engine was pinned to INFO). No migration; backend + FE →
   #   api + workers + frontend bumped; tile-server 9d140cc.
+  # 5b97660 = #312 per-block integration health 500'd on any farm holding a
+  #   block with no name (block_name declared str, blocks.name nullable) —
+  #   surfaced as a phantom CORS error because the 500 escapes after
+  #   CORSMiddleware. Now COALESCE(name, code). No migration; backend only →
+  #   api + workers bumped; frontend c8391e6, tile-server 9d140cc.
   images:
     api:
-      tag: "c8391e6"
+      tag: "5b97660"
     workers:
-      tag: "c8391e6"
+      tag: "5b97660"
     frontend:
       tag: "c8391e6"
     tileServer:
