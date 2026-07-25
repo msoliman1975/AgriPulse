@@ -21,6 +21,17 @@ replicaCount: 2
 # Image is read-only at runtime; the venv was assembled at build time.
 revisionHistoryLimit: 5
 
+# Graceful drain on rollout. When a pod is rolled (esp. the single Hetzner
+# replica), it gets SIGTERM and uvicorn stops accepting connections almost
+# immediately — but kube-proxy/ingress endpoint removal is eventually
+# consistent, so a few in-flight requests can still be routed to the dying
+# pod and get connection-refused (browser: net::ERR_FAILED). A preStop sleep
+# keeps the pod serving for a few seconds after SIGTERM so the endpoint is
+# removed first, giving zero-downtime rollouts. Set to 0 to disable.
+# terminationGracePeriodSeconds MUST exceed gracefulDrainSeconds.
+gracefulDrainSeconds: 5
+terminationGracePeriodSeconds: 30
+
 serviceAccount:
   # irsa: required-from-overlay              # api hits SM via ExternalSecret + S3 via boto3.
   create: true # Per-env IRSA ARN is in

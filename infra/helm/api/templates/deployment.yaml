@@ -28,6 +28,7 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "agripulse-api.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -66,6 +67,14 @@ spec:
                 secretKeyRef:
                   name: {{ .name | quote }}
                   key: {{ .key | quote }}
+          {{- end }}
+          {{- if gt (int .Values.gracefulDrainSeconds) 0 }}
+          # Drain window: keep serving after SIGTERM until the Service
+          # endpoint is removed, so rollouts don't drop in-flight requests.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ .Values.gracefulDrainSeconds }}"]
           {{- end }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}
