@@ -120,13 +120,18 @@ global:
   #   +Add → "Upload AOI files": POST /farms/{id}/blocks:bulk reconcile
   #   (new/reuse/replace by code) + color-coded map preview. No migration;
   #   backend + FE → api + workers + frontend bumped; tile-server 9d140cc.
+  # d6defe2 = #307 farm inactivate/reactivate surfaced in the Farm Console
+  #   settings drawer (danger zone + cascade-preview modal + inactive-farm
+  #   banner). Endpoints already existed and are unchanged; no migration.
+  #   FE only → frontend bumped; api + workers stay 698fcc1, tile-server
+  #   9d140cc.
   images:
     api:
       tag: "698fcc1"
     workers:
       tag: "698fcc1"
     frontend:
-      tag: "698fcc1"
+      tag: "d6defe2"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
