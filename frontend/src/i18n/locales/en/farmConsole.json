@@ -64,7 +64,8 @@
   },
   "bulk": {
     "title": "Upload AOI files",
-    "drop": "Drop AOI files here, or click to browse",
+    "drop": "Drop AOI files here",
+    "selectFiles": "Select files…",
     "parsing": "Reading files…",
     "hint": "Accepts .geojson, .json, .zip (shapefile), .kml — one block per polygon.",
     "code": "Code",

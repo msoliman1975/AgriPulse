@@ -118,8 +118,19 @@ export function BulkAoiUploadPanel({
     }
   };
 
+  // Editing the code carries the name along while the name is still the
+  // default (name === code); once the user types their own name it sticks.
   const updateRow = (id: string, patch: Partial<BulkRow>): void =>
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const next = { ...r, ...patch };
+        if (patch.code !== undefined && patch.name === undefined && r.name === r.code) {
+          next.name = patch.code;
+        }
+        return next;
+      }),
+    );
   const removeRow = (id: string): void => setRows((prev) => prev.filter((r) => r.id !== id));
 
   const submit = async (): Promise<void> => {
@@ -159,10 +170,10 @@ export function BulkAoiUploadPanel({
         <ResultsView results={results} onClose={onClose} t={t} />
       ) : (
         <>
-          {/* Dropzone (always available to add more files). */}
+          {/* Dropzone (always available to add more files). Drag-and-drop is
+              not discoverable on its own, so the picker also has a button. */}
           <div className="border-b border-ap-line p-3">
-            <label
-              htmlFor="bulk-aoi-file"
+            <div
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOver(true);
@@ -174,12 +185,20 @@ export function BulkAoiUploadPanel({
                 void addFiles(e.dataTransfer.files);
               }}
               className={
-                "block cursor-pointer rounded-lg border border-dashed p-3 text-center text-sm " +
-                (dragOver ? "border-ap-primary bg-ap-primary-soft" : "border-ap-line text-ap-muted hover:border-ap-primary")
+                "flex flex-col items-center gap-2 rounded-lg border border-dashed p-3 text-center text-sm " +
+                (dragOver ? "border-ap-primary bg-ap-primary-soft" : "border-ap-line text-ap-muted")
               }
             >
-              {parsing ? t("bulk.parsing") : t("bulk.drop")}
-            </label>
+              <span>{parsing ? t("bulk.parsing") : t("bulk.drop")}</span>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={parsing}
+                className={ghostBtn}
+              >
+                {t("bulk.selectFiles")}
+              </button>
+            </div>
             <input
               id="bulk-aoi-file"
               ref={fileRef}

@@ -71,6 +71,9 @@ function polygonsOf(geom: Polygon | GeoJSON.MultiPolygon): Polygon[] {
  * file yielding a single polygon gets the filename code; a file yielding N
  * polygons expands to N rows with `-1, -2, …` suffixes. Files that fail to
  * parse (or contain no polygon) become a single error row.
+ *
+ * The name defaults to the code so a bulk upload never lands unnamed blocks;
+ * every row stays editable in the review table.
  */
 export async function deriveRowsFromFiles(files: File[]): Promise<BulkRow[]> {
   const rows: BulkRow[] = [];
@@ -80,19 +83,19 @@ export async function deriveRowsFromFiles(files: File[]): Promise<BulkRow[]> {
       const parsed = await parseAoiFile(file);
       const polys = pickPolygonalFeatures(parsed.collection).flatMap((f) => polygonsOf(f.geometry));
       if (polys.length === 0) {
-        rows.push({ id: nextId(), fileName: file.name, code: baseCode, name: "", geometry: null, clientError: "empty" });
+        rows.push({ id: nextId(), fileName: file.name, code: baseCode, name: baseCode, geometry: null, clientError: "empty" });
         continue;
       }
       polys.forEach((geometry, i) => {
         const code = polys.length === 1 ? baseCode : `${baseCode}-${i + 1}`.slice(0, CODE_MAX);
-        rows.push({ id: nextId(), fileName: file.name, code, name: "", geometry, clientError: null });
+        rows.push({ id: nextId(), fileName: file.name, code, name: code, geometry, clientError: null });
       });
     } catch (err) {
       rows.push({
         id: nextId(),
         fileName: file.name,
         code: baseCode,
-        name: "",
+        name: baseCode,
         geometry: null,
         clientError: errorCodeFor(err),
       });

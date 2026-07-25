@@ -245,6 +245,7 @@ class FarmService(Protocol):
         irrigation_system: str | None,
         include_inactive: bool,
         preferred_unit: str,
+        include_boundary: bool = False,
     ) -> list[dict[str, Any]]: ...
 
     async def get_block(self, *, block_id: UUID, preferred_unit: str) -> dict[str, Any]: ...
@@ -1295,6 +1296,7 @@ class FarmServiceImpl:
         irrigation_system: str | None,
         include_inactive: bool,
         preferred_unit: str,
+        include_boundary: bool = False,
     ) -> list[dict[str, Any]]:
         # Confirm farm exists; cross-tenant calls return 404 here.
         if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
@@ -1306,6 +1308,7 @@ class FarmServiceImpl:
             limit=limit,
             irrigation_system=irrigation_system,
             include_inactive=include_inactive,
+            with_boundary=include_boundary,
         )
         return [_stamp_area_unit(r, preferred_unit) for r in rows]
 

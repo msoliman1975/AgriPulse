@@ -42,8 +42,8 @@ from app.modules.farms.schemas import (
     BlockInactivationPreviewResponse,
     BlockInactivationRequest,
     BlockInactivationResponse,
+    BlockListItemResponse,
     BlockReactivationResponse,
-    BlockResponse,
     BlockUpdateRequest,
     BulkBlockCreateRequest,
     BulkBlockCreateResponse,
@@ -399,7 +399,7 @@ async def bulk_create_blocks(
 
 @router.get(
     "/farms/{farm_id}/blocks",
-    response_model=CursorPage[BlockResponse],
+    response_model=CursorPage[BlockListItemResponse],
     summary="List blocks in a farm.",
 )
 async def list_blocks(
@@ -408,6 +408,10 @@ async def list_blocks(
     limit: int | None = Query(default=None, ge=1, le=200),
     irrigation_system: str | None = Query(default=None),
     include_inactive: bool = Query(default=False),
+    include_boundary: bool = Query(
+        default=False,
+        description="Include each block's GeoJSON boundary (map clients — saves one request per block).",
+    ),
     context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
     service: FarmService = Depends(_service),
 ) -> dict[str, Any]:
@@ -420,6 +424,7 @@ async def list_blocks(
         irrigation_system=irrigation_system,
         include_inactive=include_inactive,
         preferred_unit=context.preferred_unit,
+        include_boundary=include_boundary,
     )
     next_cursor = encode_cursor(items[-1]["id"]) if len(items) == capped_limit else None
     return {"items": items, "next_cursor": next_cursor}
