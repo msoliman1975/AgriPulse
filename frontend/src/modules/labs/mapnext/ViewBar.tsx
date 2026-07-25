@@ -31,6 +31,7 @@ interface Props {
   onAddBlock: () => void;
   onAddPivot: () => void;
   onAutoBlock: () => void;
+  onBulkUpload: () => void;
 }
 
 function Chip({
@@ -82,6 +83,7 @@ export function ViewBar({
   onAddBlock,
   onAddPivot,
   onAutoBlock,
+  onBulkUpload,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const indexRef = useRef<HTMLButtonElement>(null);
@@ -170,6 +172,10 @@ export function ViewBar({
         </PopItem>
         <PopItem icon="▩" onClick={() => { close(); onAutoBlock(); }} hint={t("add.viaGrid")}>
           {t("add.autoGrid")}
+        </PopItem>
+        <PopDivider />
+        <PopItem icon="⬆" onClick={() => { close(); onBulkUpload(); }} hint={t("add.viaUpload")}>
+          {t("add.bulkUpload")}
         </PopItem>
       </Popover>
     </header>

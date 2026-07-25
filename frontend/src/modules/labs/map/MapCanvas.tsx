@@ -90,6 +90,9 @@ interface Props {
   // clipped candidate polygons paints them translucent over the map so the
   // operator sees exactly what auto-blocking will create before committing.
   autoBlockPreview?: FeatureCollection<Polygon> | null;
+  // Bulk AOI-upload preview — polygons color-coded by reconcile status
+  // ("new" | "reuse" | "replace" | "error") via a `status` feature property.
+  bulkPreview?: FeatureCollection<Polygon, BulkPreviewProps> | null;
   // PR-R4b: when true, the block fill recolours by `risk_level` (worst
   // disease/pest pressure) instead of health. The features must carry
   // `risk_level`; blocks with "none" render unfilled so the base map shows.
@@ -102,6 +105,13 @@ export interface GridCellProps {
   // expression. Callers should encode null observations as -1 when
   // building the FeatureCollection.
   value: number;
+}
+
+export type BulkPreviewStatus = "new" | "reuse" | "replace" | "error";
+
+export interface BulkPreviewProps {
+  code: string;
+  status: BulkPreviewStatus;
 }
 
 const SOURCE_ID = "units";
@@ -130,6 +140,31 @@ const GRID_SELECTED_LAYER = "subblock-grid-selected";
 const PREVIEW_SOURCE_ID = "autoblock-preview";
 const PREVIEW_FILL_LAYER = "autoblock-preview-fill";
 const PREVIEW_LINE_LAYER = "autoblock-preview-line";
+// Bulk AOI-upload preview (Farm Console) — color-coded by reconcile status.
+const BULK_SOURCE_ID = "bulk-aoi-preview";
+const BULK_FILL_LAYER = "bulk-aoi-preview-fill";
+const BULK_LINE_LAYER = "bulk-aoi-preview-line";
+// status -> fill/line color. Matches the review-table + legend palette
+// (ap-good / ap-muted / ap-warn / ap-crit).
+const BULK_STATUS_COLOR: Record<BulkPreviewStatus, string> = {
+  new: "#4f8e4a", // ap-good
+  reuse: "#6c7268", // ap-muted (a no-op)
+  replace: "#c98a18", // ap-warn
+  error: "#b24430", // ap-crit
+};
+const BULK_COLOR_EXPR: ExpressionSpecification = [
+  "match",
+  ["get", "status"],
+  "new",
+  BULK_STATUS_COLOR.new,
+  "reuse",
+  BULK_STATUS_COLOR.reuse,
+  "replace",
+  BULK_STATUS_COLOR.replace,
+  "error",
+  BULK_STATUS_COLOR.error,
+  "#6b7280", // gray-500 fallback
+];
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -213,6 +248,7 @@ export function MapCanvas({
   highlightedCellIds = [],
   selectedGridCellId = null,
   autoBlockPreview = null,
+  bulkPreview = null,
   riskOverlay = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -547,6 +583,26 @@ export function MapCanvas({
         source: PREVIEW_SOURCE_ID,
         paint: { "line-color": "#0891b2", "line-width": 1.2, "line-dasharray": [2, 1] },
       });
+      // Bulk AOI-upload preview — translucent fills color-coded by reconcile
+      // status (new/reuse/replace/error) so the operator sees, before commit,
+      // which uploaded boundaries create, match, or replace existing blocks.
+      // Starts empty; the bulkPreview effect swaps the data + visibility.
+      map.addSource(BULK_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: BULK_FILL_LAYER,
+        type: "fill",
+        source: BULK_SOURCE_ID,
+        paint: { "fill-color": BULK_COLOR_EXPR, "fill-opacity": 0.32 },
+      });
+      map.addLayer({
+        id: BULK_LINE_LAYER,
+        type: "line",
+        source: BULK_SOURCE_ID,
+        paint: { "line-color": BULK_COLOR_EXPR, "line-width": 1.6 },
+      });
 
       // Keep block name labels above the grid heatmap so they stay legible
       // (and clickable as the block-open affordance) when the overlay is on.
@@ -782,6 +838,25 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [autoBlockPreview]);
+
+  // Bulk AOI-upload preview — same null = hide / FC = show pattern.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const src = map.getSource(BULK_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+      const visible = bulkPreview != null;
+      src.setData(bulkPreview ?? { type: "FeatureCollection", features: [] });
+      for (const layerId of [BULK_FILL_LAYER, BULK_LINE_LAYER]) {
+        if (!map.getLayer(layerId)) continue;
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [bulkPreview]);
 
   // G-2: outline the cited cells (worst-N / alert) via a filter swap on
   // the highlight layer — same lightweight pattern as the block selection

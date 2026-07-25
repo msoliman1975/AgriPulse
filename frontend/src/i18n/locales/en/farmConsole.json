@@ -55,10 +55,58 @@
     "block": "Draw block",
     "autoGrid": "Auto-block grid",
     "pivot": "Draw pivot",
+    "bulkUpload": "Upload AOI files…",
     "viaForm": "form",
     "viaMap": "on map",
     "viaDraw": "draw on map",
-    "viaGrid": "grid"
+    "viaGrid": "grid",
+    "viaUpload": "many files"
+  },
+  "bulk": {
+    "title": "Upload AOI files",
+    "drop": "Drop AOI files here, or click to browse",
+    "parsing": "Reading files…",
+    "hint": "Accepts .geojson, .json, .zip (shapefile), .kml — one block per polygon.",
+    "code": "Code",
+    "name": "Name",
+    "namePlaceholder": "Name (optional)",
+    "remove": "Remove row",
+    "replaceNote": "replaces existing block",
+    "reuseNote": "matches existing block",
+    "confirmReplace": "I understand {{n}} existing block(s) will be replaced (deleted if empty, otherwise deactivated).",
+    "replaceForbidden": "{{n}} row(s) match existing blocks but you lack permission to replace them — they'll be skipped.",
+    "create": "Create {{n}} block(s)",
+    "creating": "Creating…",
+    "committed": "Created {{created}} · replaced {{replaced}} · reused {{reused}} · errors {{errors}}",
+    "done": "Done",
+    "status": {
+      "new": "New",
+      "reuse": "Reuse",
+      "replace": "Replace",
+      "error": "Error"
+    },
+    "result": {
+      "created": "Created",
+      "reused": "Reused (unchanged)",
+      "replaced_deleted": "Replaced (old deleted)",
+      "replaced_inactivated": "Replaced (old deactivated)",
+      "error": "Error"
+    },
+    "err": {
+      "invalid": "Could not read file",
+      "unsupported": "Unsupported file type",
+      "empty": "No polygon found",
+      "tooLarge": "File too large",
+      "invalid_code": "Invalid block code",
+      "invalid_geometry": "Invalid geometry",
+      "out_of_egypt": "Outside Egypt",
+      "duplicate": "Duplicate code in upload",
+      "duplicate_in_batch": "Duplicate code in upload",
+      "replace_not_confirmed": "Replace not confirmed",
+      "replace_forbidden": "Not permitted to replace",
+      "create_failed": "Could not create",
+      "replace_failed": "Could not replace"
+    }
   },
   "rail": {
     "title": "Land units",
@@ -144,6 +192,17 @@
     "water": "Water source",
     "saved": "Saved",
     "editAoi": "Edit AOI on the legacy map →"
+  },
+  "dangerZone": {
+    "title": "Danger zone",
+    "inactivateHint": "Inactivating a farm is a soft delete: history is kept, but every active block inactivates with it and new alerts, schedules and integrations stop. You can reactivate later.",
+    "inactivateFarm": "Inactivate farm…",
+    "inactiveSince": "Farm inactive since {{date}}.",
+    "reactivate": "Reactivate (with blocks)",
+    "reactivating": "Reactivating…",
+    "reactivateError": "Couldn't reactivate — please retry.",
+    "inactivated": "Farm inactivated",
+    "reactivated": "Farm reactivated"
   },
   "create": {
     "blockDrawing": "Drawing block — click to add points, double-click to finish",

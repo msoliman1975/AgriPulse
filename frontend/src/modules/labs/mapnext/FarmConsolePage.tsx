@@ -40,7 +40,11 @@ import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOver
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
 import { usePrefs } from "@/prefs/PrefsContext";
+import { useCapability } from "@/rbac/useCapability";
 import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
+import { BulkAoiUploadPanel } from "./BulkAoiUploadPanel";
+import type { BulkPreviewProps } from "../map/MapCanvas";
+import type { ExistingBlock } from "@/lib/aoi/bulk";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
@@ -129,6 +133,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [autoCreating, setAutoCreating] = useState(false);
   const [autoCreatedCount, setAutoCreatedCount] = useState<number | null>(null);
   const [autoError, setAutoError] = useState<string | null>(null);
+  // Bulk AOI upload panel (+Add → Upload AOI files…).
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkPreviewFc, setBulkPreviewFc] = useState<FeatureCollection<Polygon, BulkPreviewProps> | null>(null);
+  const canBulkReplace = useCapability("block.delete", { farmId });
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(LAST_FARM_KEY, farmId);
@@ -383,8 +391,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     setAutoCreatedCount(null);
     setAutoCellSizeM(null);
   };
+  const closeBulk = () => {
+    setBulkOpen(false);
+    setBulkPreviewFc(null);
+  };
   const startDrawBlock = () => {
     closeAuto();
+    closeBulk();
     setReshapeTarget(null);
     setPendingPivot(null);
     setPendingBlock(null);
@@ -392,6 +405,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   };
   const startDrawPivot = () => {
     closeAuto();
+    closeBulk();
     setReshapeTarget(null);
     setPendingBlock(null);
     setPendingPivot(null);
@@ -400,8 +414,25 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const startAutoBlock = () => {
     resetCreate();
     setReshapeTarget(null);
+    closeBulk();
     setAutoOpen(true);
   };
+  const startBulkUpload = () => {
+    resetCreate();
+    setReshapeTarget(null);
+    closeAuto();
+    setBulkOpen(true);
+  };
+
+  // Existing blocks (code + boundary) for the bulk-upload client classifier.
+  const existingBlocks = useMemo<ExistingBlock[]>(() => {
+    const out: ExistingBlock[] = [];
+    for (const f of summaryQ.data?.geojson.features ?? []) {
+      const code = blocksById.get(f.properties.id)?.code;
+      if (code) out.push({ code, geometry: f.geometry });
+    }
+    return out;
+  }, [summaryQ.data, blocksById]);
 
   const createBlockMut = useMutation({
     mutationFn: ({ polygon, code, name }: { polygon: Polygon; code: string; name: string }) =>
@@ -516,6 +547,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         onAddBlock={startDrawBlock}
         onAddPivot={startDrawPivot}
         onAutoBlock={startAutoBlock}
+        onBulkUpload={startBulkUpload}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -560,6 +592,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             }}
             onPivotDrawn={(r) => setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })}
             autoBlockPreview={autoBlockPreviewFc}
+            bulkPreview={bulkPreviewFc}
           />
 
           {/* Draw-in-progress hint (before a shape is completed) */}
@@ -618,6 +651,21 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               error={autoError}
               onCreate={() => void commitAutoBlock()}
               onClose={closeAuto}
+            />
+          ) : null}
+
+          {/* Bulk AOI upload panel (drop many files → review → reconcile) */}
+          {bulkOpen ? (
+            <BulkAoiUploadPanel
+              farmId={farmId}
+              existing={existingBlocks}
+              canReplace={canBulkReplace}
+              onPreviewChange={setBulkPreviewFc}
+              onCommitted={({ created, replaced, reused, errors }) => {
+                void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+                flash(t("bulk.committed", { created, replaced, reused, errors }));
+              }}
+              onClose={closeBulk}
             />
           ) : null}
 

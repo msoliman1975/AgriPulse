@@ -45,6 +45,8 @@ from app.modules.farms.schemas import (
     BlockReactivationResponse,
     BlockResponse,
     BlockUpdateRequest,
+    BulkBlockCreateRequest,
+    BulkBlockCreateResponse,
     CountryCreateRequest,
     CountryResponse,
     CountryUpdateRequest,
@@ -363,6 +365,34 @@ async def create_block(
         tenant_schema=schema,
         preferred_unit=context.preferred_unit,
         active_from=payload.active_from,
+        correlation_id=_correlation_id(request),
+    )
+
+
+@router.post(
+    "/farms/{farm_id}/blocks:bulk",
+    response_model=BulkBlockCreateResponse,
+    summary="Bulk-create blocks from uploaded AOI files (reconcile by code).",
+)
+async def bulk_create_blocks(
+    farm_id: UUID,
+    payload: BulkBlockCreateRequest,
+    request: Request,
+    context: RequestContext = Depends(requires_capability("block.create", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    # A destructive replace (delete/inactivate an existing block) additionally
+    # requires the delete capability; without it, replace rows come back as
+    # errors rather than executing.
+    can_replace = has_capability(context, "block.delete", farm_id=farm_id)
+    return await service.reconcile_blocks_bulk(
+        farm_id=farm_id,
+        items=[item.model_dump() for item in payload.items],
+        allow_replace=payload.allow_replace,
+        can_replace=can_replace,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
         correlation_id=_correlation_id(request),
     )
 
