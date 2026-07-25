@@ -116,13 +116,17 @@ global:
   #   weather.backfill_weather + Open-Meteo archive fetch) register at worker
   #   startup; no migration. Backend only → api + workers bumped; frontend
   #   b22151c, tile-server 9d140cc.
+  # 698fcc1 = #308 bulk-create blocks from uploaded AOI files. Farm Console
+  #   +Add → "Upload AOI files": POST /farms/{id}/blocks:bulk reconcile
+  #   (new/reuse/replace by code) + color-coded map preview. No migration;
+  #   backend + FE → api + workers + frontend bumped; tile-server 9d140cc.
   images:
     api:
-      tag: "6d95dd3"
+      tag: "698fcc1"
     workers:
-      tag: "6d95dd3"
+      tag: "698fcc1"
     frontend:
-      tag: "b22151c"
+      tag: "698fcc1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
