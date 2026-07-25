@@ -191,6 +191,58 @@ export async function archiveBlock(blockId: string): Promise<BlockInactivationRe
   return data;
 }
 
+// ---- Bulk block create from uploaded AOI files --------------------------
+
+export interface BulkBlockItem {
+  code: string;
+  name?: string | null;
+  boundary: Polygon;
+}
+
+export type BulkBlockStatus =
+  | "created"
+  | "reused"
+  | "replaced_deleted"
+  | "replaced_inactivated"
+  | "error";
+
+export interface BulkBlockResultRow {
+  index: number;
+  code: string;
+  status: BulkBlockStatus;
+  block_id: string | null;
+  replaced_block_id: string | null;
+  error_code: string | null;
+  message: string | null;
+}
+
+export interface BulkBlockCreateResult {
+  results: BulkBlockResultRow[];
+  created: number;
+  reused: number;
+  replaced: number;
+  errors: number;
+}
+
+/**
+ * Reconcile many AOI-derived candidate blocks against a farm. Identity is the
+ * block `code`: new → created, same code + identical geometry → reused, same
+ * code + changed geometry → replaced (delete-if-pristine else inactivate).
+ * A destructive replace only runs when `allowReplace` is true AND the caller
+ * holds the delete capability; otherwise those rows come back as errors.
+ */
+export async function bulkCreateBlocks(
+  farmId: string,
+  items: BulkBlockItem[],
+  allowReplace: boolean,
+): Promise<BulkBlockCreateResult> {
+  const { data } = await apiClient.post<BulkBlockCreateResult>(
+    `/v1/farms/${farmId}/blocks:bulk`,
+    { items, allow_replace: allowReplace },
+  );
+  return data;
+}
+
 export interface PivotCreatePayload {
   code: string;
   name?: string | null;

@@ -695,6 +695,102 @@ class FarmsRepository:
         ).all()
         return tuple(r.id for r in rows)
 
+    async def find_active_block_by_code(self, *, farm_id: UUID, code: str) -> UUID | None:
+        """Return the id of the active (non-archived) block with this code, if any.
+
+        Identity key for the bulk-AOI reconcile: a matching code means "this is
+        the same block" (re-uploaded), distinct from a geometry-only overlap.
+        """
+        row = (
+            await self._tenant.execute(
+                select(Block.id).where(
+                    Block.farm_id == farm_id,
+                    Block.code == code,
+                    Block.deleted_at.is_(None),
+                )
+            )
+        ).first()
+        return row.id if row else None
+
+    async def block_boundary_equals(self, *, block_id: UUID, boundary_ewkt: str) -> bool:
+        """True when the stored boundary is spatially identical to the given EWKT.
+
+        Uses ``ST_Equals`` — order-independent geometric equality — so a
+        re-exported copy of the same AOI (same points, same area) matches even
+        if vertex order or ring winding differs slightly.
+        """
+        row = (
+            await self._tenant.execute(
+                text(
+                    "SELECT ST_Equals(boundary, ST_GeomFromEWKT(:ewkt)) AS eq "
+                    "FROM blocks WHERE id = :id AND deleted_at IS NULL"
+                ).bindparams(_bind_uuid("id")),
+                {"id": block_id, "ewkt": boundary_ewkt},
+            )
+        ).first()
+        return bool(row.eq) if row is not None else False
+
+    # Every tenant-schema table that carries a block_id and would represent
+    # real data/config attached to a block. If a block appears in ANY of
+    # these it is NOT pristine and the bulk reconcile inactivates (reversible)
+    # rather than hard-deletes it. Kept deliberately broad so hard-delete only
+    # ever touches a block with zero footprint (no orphan rows possible).
+    _BLOCK_DEPENDENT_TABLES: tuple[str, ...] = (
+        "block_crops",
+        "growth_stage_logs",
+        "block_attachments",
+        "weather_subscriptions",
+        "weather_ingestion_attempts",
+        "weather_observations",
+        "weather_forecasts",
+        "weather_derived_daily",
+        "weather_index_daily",
+        "weather_risk_daily",
+        "imagery_aoi_subscriptions",
+        "imagery_ingestion_jobs",
+        "grid_configs",
+        "block_grid_aggregates",
+        "signal_assignments",
+        "signal_observations",
+        "plan_activities",
+        "irrigation_schedules",
+        "alerts",
+        "recommendations",
+        "recommendations_history",
+    )
+
+    async def block_has_dependents(self, *, block_id: UUID) -> bool:
+        """True if the block owns any data/config or has child pivot-sectors.
+
+        Drives the delete-vs-inactivate branch of the bulk reconcile. A block
+        with no dependents is safe to hard-delete; otherwise inactivate.
+        """
+        # Table names come only from the hardcoded _BLOCK_DEPENDENT_TABLES
+        # allowlist (never user input); the block_id is a bound parameter.
+        clauses = [
+            f"EXISTS(SELECT 1 FROM {t} WHERE block_id = :id)"  # noqa: S608
+            for t in self._BLOCK_DEPENDENT_TABLES
+        ]
+        # Child pivot-sectors reference the parent via blocks.parent_unit_id.
+        clauses.append(
+            "EXISTS(SELECT 1 FROM blocks c "
+            "WHERE c.parent_unit_id = :id AND c.deleted_at IS NULL)"
+        )
+        sql = "SELECT (" + " OR ".join(clauses) + ") AS has_deps"
+        row = (
+            await self._tenant.execute(text(sql).bindparams(_bind_uuid("id")), {"id": block_id})
+        ).first()
+        return bool(row.has_deps) if row is not None else True
+
+    async def hard_delete_block(self, *, block_id: UUID) -> None:
+        """Permanently remove a block row (ON DELETE CASCADE clears the few
+        child rows a pristine block could have). Only called by the bulk
+        reconcile after ``block_has_dependents`` returns False."""
+        await self._tenant.execute(
+            text("DELETE FROM blocks WHERE id = :id").bindparams(_bind_uuid("id")),
+            {"id": block_id},
+        )
+
     # ---- Block crops ----------------------------------------------
 
     async def insert_block_crop(

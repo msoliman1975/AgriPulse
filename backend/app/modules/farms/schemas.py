@@ -555,6 +555,74 @@ class BlockReactivationResponse(BaseModel):
     imagery_subs_reactivated: int = 0
 
 
+# ---------- Bulk block create from uploaded AOI files ---------------------
+
+# Per-row outcome of a bulk reconcile. Identity is the block *code*:
+#   created               — new code, block inserted
+#   reused                — code exists with an identical boundary; existing
+#                           block kept as-is, nothing written
+#   replaced_deleted      — code exists with a changed boundary and the old
+#                           block was pristine (no dependents) → hard-deleted,
+#                           new block inserted
+#   replaced_inactivated  — code exists with a changed boundary and the old
+#                           block owned data → soft-inactivated (cascade), new
+#                           block inserted
+#   error                 — row could not be processed (see error_code)
+BulkBlockStatus = Literal[
+    "created",
+    "reused",
+    "replaced_deleted",
+    "replaced_inactivated",
+    "error",
+]
+
+
+class BulkBlockItem(BaseModel):
+    """One AOI-derived candidate block. Code/geometry are validated per-row
+    in the service (not via a raising field-validator) so one malformed row
+    yields an ``error`` outcome instead of failing the whole batch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name: str | None = Field(default=None, max_length=255)
+    boundary: dict[str, Any] = Field(description="GeoJSON Polygon (SRID 4326).")
+
+
+class BulkBlockCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BulkBlockItem] = Field(min_length=1, max_length=200)
+    # The client shows a destructive-action summary and the user confirms
+    # before this is set. When False, any row that would delete/inactivate an
+    # existing block is returned as an ``error`` (``replace_not_confirmed``)
+    # instead of executing — so a destructive replace never happens silently.
+    allow_replace: bool = False
+
+
+class BulkBlockResultRow(BaseModel):
+    # Echoes the submitted index so the client can map results back to rows.
+    index: int
+    code: str
+    status: BulkBlockStatus
+    # New block id for created/replaced_*, existing id for reused, null on error.
+    block_id: UUID | None = None
+    # For replaced_*: the id of the old block that was deleted/inactivated.
+    replaced_block_id: UUID | None = None
+    # Machine-readable reason when status == "error".
+    error_code: str | None = None
+    # Human-facing note (translated client-side by error_code where relevant).
+    message: str | None = None
+
+
+class BulkBlockCreateResponse(BaseModel):
+    results: list[BulkBlockResultRow]
+    created: int
+    reused: int
+    replaced: int
+    errors: int
+
+
 # ---------- Pivot + sectors atomic create ---------------------------------
 
 

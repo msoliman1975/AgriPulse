@@ -97,6 +97,17 @@ def _stamp_area_unit(item: dict[str, Any], preferred_unit: str) -> dict[str, Any
     return item
 
 
+def _bulk_err(index: int, code: str, error_code: str, message: str) -> dict[str, Any]:
+    """Build an error result row for the bulk-block reconcile."""
+    return {
+        "index": index,
+        "code": code,
+        "status": "error",
+        "error_code": error_code,
+        "message": message,
+    }
+
+
 def _centroid_lat_lon(centroid_geojson: dict[str, Any] | None) -> tuple[float, float]:
     if centroid_geojson and centroid_geojson.get("type") == "Point":
         coords = centroid_geojson.get("coordinates") or [0.0, 0.0]
@@ -210,6 +221,18 @@ class FarmService(Protocol):
         parent_unit_id: UUID | None = None,
         irrigation_geometry: dict[str, Any] | None = None,
         active_from: _date | None = None,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def reconcile_blocks_bulk(
+        self,
+        *,
+        farm_id: UUID,
+        items: list[dict[str, Any]],
+        allow_replace: bool,
+        can_replace: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -958,6 +981,254 @@ class FarmServiceImpl:
             )
         )
         return _stamp_area_unit(block, preferred_unit)
+
+    async def reconcile_blocks_bulk(
+        self,
+        *,
+        farm_id: UUID,
+        items: list[dict[str, Any]],
+        allow_replace: bool,
+        can_replace: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Reconcile many AOI-derived candidate blocks against a farm.
+
+        Best-effort and per-row: each item is validated and processed
+        independently, so one bad row never fails the batch. Identity is the
+        block *code*:
+
+          * new code                       -> create
+          * code exists, geometry equal    -> reuse (no write)
+          * code exists, geometry changed  -> replace the old block: hard-delete
+            it when pristine, else soft-inactivate (cascade), then create new.
+
+        A destructive replace only runs when the caller confirmed it
+        (``allow_replace``) AND holds the delete capability (``can_replace``);
+        otherwise that row is returned as an error, never executed silently.
+        Each write is wrapped in a SAVEPOINT so an unexpected DB failure rolls
+        back just that row and leaves the batch transaction usable.
+        """
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        results: list[dict[str, Any]] = []
+        seen_codes: set[str] = set()
+        for index, item in enumerate(items):
+            results.append(
+                await self._reconcile_one_block(
+                    farm_id=farm_id,
+                    index=index,
+                    item=item,
+                    seen_codes=seen_codes,
+                    allow_replace=allow_replace,
+                    can_replace=can_replace,
+                    actor_user_id=actor_user_id,
+                    tenant_schema=tenant_schema,
+                    correlation_id=correlation_id,
+                )
+            )
+
+        statuses = [r["status"] for r in results]
+        return {
+            "results": results,
+            "created": statuses.count("created"),
+            "reused": statuses.count("reused"),
+            "replaced": statuses.count("replaced_deleted") + statuses.count("replaced_inactivated"),
+            "errors": statuses.count("error"),
+        }
+
+    async def _reconcile_one_block(
+        self,
+        *,
+        farm_id: UUID,
+        index: int,
+        item: dict[str, Any],
+        seen_codes: set[str],
+        allow_replace: bool,
+        can_replace: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Process one bulk row → a single result dict. See reconcile_blocks_bulk."""
+        # 1) + 2) Validate code and geometry; returns an error row or the EWKT.
+        valid = self._validate_bulk_row(index=index, item=item, seen_codes=seen_codes)
+        if valid["status"] == "error":
+            return valid
+        code = valid["code"]
+        name = item.get("name")
+        boundary = item["boundary"]
+        ewkt = valid["ewkt"]
+
+        # 3) Classify by code.
+        existing_id = await self._repo.find_active_block_by_code(farm_id=farm_id, code=code)
+
+        # 3a) New code → create.
+        if existing_id is None:
+            try:
+                async with self._tenant_session.begin_nested():
+                    block = await self._create_plain_block(
+                        farm_id=farm_id,
+                        code=code,
+                        name=name,
+                        boundary=boundary,
+                        actor_user_id=actor_user_id,
+                        tenant_schema=tenant_schema,
+                        correlation_id=correlation_id,
+                    )
+            except Exception:
+                self._log.exception("bulk_block_create_failed", code=code, farm_id=str(farm_id))
+                return _bulk_err(index, code, "create_failed", "Could not create block.")
+            return {"index": index, "code": code, "status": "created", "block_id": block["id"]}
+
+        # 3b) Code exists with an identical boundary → reuse.
+        if await self._repo.block_boundary_equals(block_id=existing_id, boundary_ewkt=ewkt):
+            return {
+                "index": index,
+                "code": code,
+                "status": "reused",
+                "block_id": existing_id,
+                "message": "Matched existing block; unchanged.",
+            }
+
+        # 3c) Code exists, geometry changed → destructive replace (gated).
+        return await self._replace_existing_block(
+            farm_id=farm_id,
+            index=index,
+            code=code,
+            name=name,
+            boundary=boundary,
+            existing_id=existing_id,
+            allow_replace=allow_replace,
+            can_replace=can_replace,
+            actor_user_id=actor_user_id,
+            tenant_schema=tenant_schema,
+            correlation_id=correlation_id,
+        )
+
+    def _validate_bulk_row(
+        self, *, index: int, item: dict[str, Any], seen_codes: set[str]
+    ) -> dict[str, Any]:
+        """Validate a bulk row's code + geometry.
+
+        Returns ``{"status": "ok", "code", "ewkt"}`` on success, or an error
+        result row (``status == "error"``) that flows straight back to the
+        client. Mutates ``seen_codes`` to detect duplicates within the batch.
+        """
+        from app.modules.farms.errors import GeometryInvalidError, GeometryOutOfEgyptError
+        from app.modules.farms.schemas import _validate_code
+
+        code = str(item.get("code") or "").strip()
+        boundary = item.get("boundary")
+        try:
+            _validate_code(code)
+        except ValueError:
+            return _bulk_err(index, code, "invalid_code", "Invalid block code.")
+        if code in seen_codes:
+            return _bulk_err(index, code, "duplicate_in_batch", "Duplicate code in upload.")
+        seen_codes.add(code)
+
+        if not isinstance(boundary, dict):
+            return _bulk_err(index, code, "invalid_geometry", "Missing geometry.")
+        try:
+            _geometry.validate_polygon_geojson(boundary)
+            ewkt = _geometry.geojson_to_ewkt_polygon(boundary)
+        except GeometryOutOfEgyptError:
+            return _bulk_err(index, code, "out_of_egypt", "Geometry is outside Egypt.")
+        except (GeometryInvalidError, ValueError, TypeError, KeyError):
+            return _bulk_err(index, code, "invalid_geometry", "Invalid geometry.")
+        return {"status": "ok", "code": code, "ewkt": ewkt}
+
+    async def _create_plain_block(
+        self,
+        *,
+        farm_id: UUID,
+        code: str,
+        name: str | None,
+        boundary: dict[str, Any],
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None,
+    ) -> dict[str, Any]:
+        """create_block with all optional block metadata left unset — the shape
+        a bulk AOI import produces (geometry + code + optional name only)."""
+        return await self.create_block(
+            farm_id=farm_id,
+            code=code,
+            name=name,
+            boundary=boundary,
+            elevation_m=None,
+            irrigation_system=None,
+            irrigation_source=None,
+            soil_texture=None,
+            salinity_class=None,
+            soil_ph=None,
+            agronomist_membership_id=None,
+            notes=None,
+            tags=[],
+            actor_user_id=actor_user_id,
+            tenant_schema=tenant_schema,
+            preferred_unit="hectare",
+            correlation_id=correlation_id,
+        )
+
+    async def _replace_existing_block(
+        self,
+        *,
+        farm_id: UUID,
+        index: int,
+        code: str,
+        name: str | None,
+        boundary: dict[str, Any],
+        existing_id: UUID,
+        allow_replace: bool,
+        can_replace: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Replace a same-code block whose geometry changed. Hard-delete the old
+        block when pristine, else soft-inactivate (cascade), then create new.
+        Gated on caller confirmation + delete capability."""
+        if not can_replace:
+            return _bulk_err(index, code, "replace_forbidden", "Not permitted to replace blocks.")
+        if not allow_replace:
+            return _bulk_err(index, code, "replace_not_confirmed", "Replace not confirmed.")
+        try:
+            async with self._tenant_session.begin_nested():
+                if await self._repo.block_has_dependents(block_id=existing_id):
+                    await self.inactivate_block(
+                        block_id=existing_id,
+                        actor_user_id=actor_user_id,
+                        tenant_schema=tenant_schema,
+                        reason="Replaced by AOI bulk upload",
+                        correlation_id=correlation_id,
+                    )
+                    status = "replaced_inactivated"
+                else:
+                    await self._repo.hard_delete_block(block_id=existing_id)
+                    status = "replaced_deleted"
+                block = await self._create_plain_block(
+                    farm_id=farm_id,
+                    code=code,
+                    name=name,
+                    boundary=boundary,
+                    actor_user_id=actor_user_id,
+                    tenant_schema=tenant_schema,
+                    correlation_id=correlation_id,
+                )
+        except Exception:
+            self._log.exception("bulk_block_replace_failed", code=code, farm_id=str(farm_id))
+            return _bulk_err(index, code, "replace_failed", "Could not replace block.")
+        return {
+            "index": index,
+            "code": code,
+            "status": status,
+            "block_id": block["id"],
+            "replaced_block_id": existing_id,
+        }
 
     async def _validate_unit_type_and_parent(
         self,
