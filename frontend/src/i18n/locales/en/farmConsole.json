@@ -145,6 +145,17 @@
     "saved": "Saved",
     "editAoi": "Edit AOI on the legacy map →"
   },
+  "dangerZone": {
+    "title": "Danger zone",
+    "inactivateHint": "Inactivating a farm is a soft delete: history is kept, but every active block inactivates with it and new alerts, schedules and integrations stop. You can reactivate later.",
+    "inactivateFarm": "Inactivate farm…",
+    "inactiveSince": "Farm inactive since {{date}}.",
+    "reactivate": "Reactivate (with blocks)",
+    "reactivating": "Reactivating…",
+    "reactivateError": "Couldn't reactivate — please retry.",
+    "inactivated": "Farm inactivated",
+    "reactivated": "Farm reactivated"
+  },
   "create": {
     "blockDrawing": "Drawing block — click to add points, double-click to finish",
     "pivotDrawing": "Drawing pivot — click the centre, then click to set the radius",

@@ -12,7 +12,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
 
-import { getFarm, listFarms, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
+import {
+  getFarm,
+  getFarmInactivationPreview,
+  inactivateFarm,
+  listFarms,
+  reactivateFarm,
+  updateFarm,
+  type FarmUpdatePayload,
+  type WaterSource,
+} from "@/api/farms";
 import {
   autoGrid,
   createBlock,
@@ -40,6 +49,7 @@ import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOver
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
 import { usePrefs } from "@/prefs/PrefsContext";
+import { useCapability } from "@/rbac/useCapability";
 import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
 import { Inspector } from "./Inspector";
 import { UnitsRail } from "./UnitsRail";
@@ -109,6 +119,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [reshapeTarget, setReshapeTarget] = useState<BlockDetail | null>(null);
   const [reshapeCandidate, setReshapeCandidate] = useState<Polygon | null>(null);
   const [inactivateOpen, setInactivateOpen] = useState(false);
+  // Farm-level inactivate/reactivate (rare, manager-only): triggered from the
+  // settings drawer's danger zone, confirmed by a page-level modal.
+  const [inactivateFarmOpen, setInactivateFarmOpen] = useState(false);
+  const canInactivateFarm = useCapability("farm.delete", { farmId });
   const [resetKey, setResetKey] = useState(0);
 
   // Native +Add create flows (draw on the console map; no navigation).
@@ -365,6 +379,34 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
       setInactivateOpen(false);
       deselect();
+    },
+  });
+
+  // Farm-level inactivate (cascades to every active block) + reactivate.
+  const invalidateFarm = () => {
+    void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+    void qc.invalidateQueries({ queryKey: ["labs/mapnext/farm", farmId] });
+    void qc.invalidateQueries({ queryKey: ["labs/mapnext/farmsList"] });
+  };
+  const farmInactivatePreviewQ = useQuery({
+    queryKey: ["labs/mapnext/farmInactivatePreview", farmId],
+    queryFn: () => getFarmInactivationPreview(farmId),
+    enabled: inactivateFarmOpen,
+  });
+  const inactivateFarmMut = useMutation({
+    mutationFn: (reason: string) => inactivateFarm(farmId, { reason }),
+    onSuccess: () => {
+      invalidateFarm();
+      setInactivateFarmOpen(false);
+      deselect();
+      flash(t("dangerZone.inactivated"));
+    },
+  });
+  const reactivateFarmMut = useMutation({
+    mutationFn: () => reactivateFarm(farmId, { restore_blocks: true }),
+    onSuccess: () => {
+      invalidateFarm();
+      flash(t("dangerZone.reactivated"));
     },
   });
 
@@ -692,6 +734,23 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               {toast}
             </div>
           ) : null}
+
+          {/* Inactive-farm banner — the way back from a farm inactivation. */}
+          {!summary.farm.is_active ? (
+            <div className="absolute bottom-4 end-4 z-20 flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2 text-xs text-amber-900 shadow-card">
+              <span>{t("dangerZone.inactiveSince", { date: summary.farm.active_to ?? "—" })}</span>
+              {canInactivateFarm ? (
+                <button
+                  type="button"
+                  onClick={() => reactivateFarmMut.mutate()}
+                  disabled={reactivateFarmMut.isPending}
+                  className="rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                >
+                  {reactivateFarmMut.isPending ? t("dangerZone.reactivating") : t("dangerZone.reactivate")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </main>
 
         {selectedId ? (
@@ -713,7 +772,22 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         ) : null}
       </div>
 
-      {settingsOpen ? <SettingsDrawer farmId={farmId} farmName={farmName} onClose={() => setSettingsOpen(false)} /> : null}
+      {settingsOpen ? (
+        <SettingsDrawer
+          farmId={farmId}
+          farmName={farmName}
+          canInactivate={canInactivateFarm}
+          onInactivateFarm={() => {
+            // The drawer sits above the modal — close it before confirming.
+            setSettingsOpen(false);
+            setInactivateFarmOpen(true);
+          }}
+          onReactivateFarm={() => reactivateFarmMut.mutate()}
+          reactivating={reactivateFarmMut.isPending}
+          reactivateError={reactivateFarmMut.isError ? t("dangerZone.reactivateError") : null}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
 
       {inactivateOpen && selectedId ? (
         <InactivateConfirmModal
@@ -727,6 +801,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           onSubmit={(reason) => inactivateMut.mutate({ blockId: selectedId, reason })}
         />
       ) : null}
+
+      {inactivateFarmOpen ? (
+        <InactivateConfirmModal
+          confirmKeyword={summary.farm.code}
+          entityLabel="farm"
+          preview={farmInactivatePreviewQ.data ?? null}
+          previewError={farmInactivatePreviewQ.isError ? t("page.previewError") : null}
+          submitting={inactivateFarmMut.isPending}
+          submitError={inactivateFarmMut.isError ? t("manage.saveError") : null}
+          onCancel={() => setInactivateFarmOpen(false)}
+          onSubmit={(reason) => inactivateFarmMut.mutate(reason)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -736,15 +823,27 @@ function Console({ farmId }: { farmId: string }): ReactNode {
 // One quiet entry point off the daily surface.
 type SettingsTab = "defaults" | "members" | "farm";
 
+interface SettingsDrawerProps {
+  farmId: string;
+  farmName: string;
+  canInactivate: boolean;
+  onInactivateFarm: () => void;
+  onReactivateFarm: () => void;
+  reactivating: boolean;
+  reactivateError: string | null;
+  onClose: () => void;
+}
+
 function SettingsDrawer({
   farmId,
   farmName,
+  canInactivate,
+  onInactivateFarm,
+  onReactivateFarm,
+  reactivating,
+  reactivateError,
   onClose,
-}: {
-  farmId: string;
-  farmName: string;
-  onClose: () => void;
-}): ReactNode {
+}: SettingsDrawerProps): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [tab, setTab] = useState<SettingsTab>("farm");
   const tabs: { id: SettingsTab; label: string }[] = [
@@ -787,7 +886,16 @@ function SettingsDrawer({
           ))}
         </div>
         <div className="flex-1 overflow-auto p-5">
-          {tab === "farm" ? <FarmEditTab farmId={farmId} /> : null}
+          {tab === "farm" ? (
+            <FarmEditTab
+              farmId={farmId}
+              canInactivate={canInactivate}
+              onInactivateFarm={onInactivateFarm}
+              onReactivateFarm={onReactivateFarm}
+              reactivating={reactivating}
+              reactivateError={reactivateError}
+            />
+          ) : null}
           {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} /> : null}
           {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
         </div>
@@ -800,7 +908,21 @@ const settingsInput =
   "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
 
-function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
+function FarmEditTab({
+  farmId,
+  canInactivate,
+  onInactivateFarm,
+  onReactivateFarm,
+  reactivating,
+  reactivateError,
+}: {
+  farmId: string;
+  canInactivate: boolean;
+  onInactivateFarm: () => void;
+  onReactivateFarm: () => void;
+  reactivating: boolean;
+  reactivateError: string | null;
+}): ReactNode {
   const { t } = useTranslation("farmConsole");
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -880,6 +1002,40 @@ function FarmEditTab({ farmId }: { farmId: string }): ReactNode {
           {t("settingsFarm.editAoi")}
         </button>
       </div>
+
+      {/* Danger zone — soft inactivation (no hard delete exists by design), and
+          the way back for an already-inactive farm. Buttons are type="button",
+          so they never submit the edit form above. */}
+      {canInactivate ? (
+        <section className="mt-7 rounded-xl border border-ap-crit/40 bg-ap-crit/5 p-4">
+          <h3 className="text-sm font-bold text-ap-crit">{t("dangerZone.title")}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ap-muted">{t("dangerZone.inactivateHint")}</p>
+          {f.is_active ? (
+            <button
+              type="button"
+              onClick={onInactivateFarm}
+              className="mt-3 h-9 rounded-lg border border-ap-crit px-3.5 text-sm font-semibold text-ap-crit hover:bg-ap-crit hover:text-white"
+            >
+              {t("dangerZone.inactivateFarm")}
+            </button>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-ap-ink">
+                {t("dangerZone.inactiveSince", { date: f.active_to ?? "—" })}
+              </span>
+              <button
+                type="button"
+                onClick={onReactivateFarm}
+                disabled={reactivating}
+                className="h-9 rounded-lg bg-ap-primary px-3.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {reactivating ? t("dangerZone.reactivating") : t("dangerZone.reactivate")}
+              </button>
+            </div>
+          )}
+          {reactivateError ? <div className="mt-2 text-xs text-ap-crit">{reactivateError}</div> : null}
+        </section>
+      ) : null}
     </form>
   );
 }
