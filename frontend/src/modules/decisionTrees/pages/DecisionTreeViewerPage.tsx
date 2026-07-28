@@ -18,22 +18,33 @@
 //      → applyParameterEditsToYaml (top-level params block)
 //      → POST decision-trees/{code}/versions
 
-import type { ReactNode } from "react";
+import clsx from "clsx";
+import type { ComponentProps, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
 import { Modal } from "@/components/Modal";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
-import { readTreeProvenance, type DryRunResponse } from "@/api/decisionTrees";
+import { listSignalDefinitions } from "@/api/signals";
+import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
+import {
+  readTreeProvenance,
+  type DecisionTreeVersion,
+  type DryRunResponse,
+} from "@/api/decisionTrees";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
   useDecisionTreeCandidateBlocks,
   useDryRunDecisionTree,
   usePublishDecisionTreeVersion,
+  useUpdateDecisionTree,
 } from "@/queries/decisionTrees";
 
 import { AddChildDialog } from "../components/AddChildDialog";
@@ -43,6 +54,12 @@ import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
 import { ParametersPanel } from "../components/ParametersPanel";
 import { ProvenancePanel } from "../components/ProvenancePanel";
 import { TreeCanvas } from "../components/TreeCanvas";
+import { TreeMetadataPanel } from "../components/TreeMetadataPanel";
+import {
+  applyTreeMetaToYaml,
+  readTreeMeta,
+  type TreeMetaFields,
+} from "../lib/metadataEdit";
 import { layoutTree, type CompiledTree } from "../layout/treeLayout";
 import {
   applyParameterEditsToYaml,
@@ -78,6 +95,20 @@ interface PendingAddChild {
   suggestedId: string;
 }
 
+interface TargetingBuffer {
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
+  scope: "block" | "cell";
+}
+
+/** Order-insensitive equality for the small targeting string arrays. */
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sb = new Set(b);
+  return a.every((v) => sb.has(v));
+}
+
 export function DecisionTreeViewerPage(): ReactNode {
   const { code = "" } = useParams<{ code: string }>();
   const { t, i18n } = useTranslation("decisionTrees");
@@ -88,6 +119,23 @@ export function DecisionTreeViewerPage(): ReactNode {
   const publish = usePublishDecisionTreeVersion();
   const dryRun = useDryRunDecisionTree();
   const candidateBlocks = useDecisionTreeCandidateBlocks(code);
+  const update = useUpdateDecisionTree();
+  const dateLocale = useDateLocale();
+
+  // Experience redesign: one workspace hosts a Visual | YAML toggle over the
+  // same draft. `metaBuffer` holds name/description edits (applied to the
+  // draft YAML at save); `targetingBuffer` holds crop/country/soil/scope
+  // edits (persisted via PATCH at save).
+  const [viewMode, setViewMode] = useState<"visual" | "yaml">("visual");
+  const [metaBuffer, setMetaBuffer] = useState<Partial<TreeMetaFields>>({});
+  const [targetingBuffer, setTargetingBuffer] = useState<TargetingBuffer | null>(null);
+  const [targetingHydratedId, setTargetingHydratedId] = useState<string | null>(null);
+  // Signal definitions power the YAML-mode SignalRefPicker helper.
+  const signalDefsQ = useQuery({
+    queryKey: ["dtree-workspace/signalDefinitions"],
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 5 * 60_000,
+  });
 
   // PR-D2: edit buffer + selection. Selection survives across re-renders
   // even when the tree refetches because the node id is stable.
@@ -148,6 +196,22 @@ export function DecisionTreeViewerPage(): ReactNode {
       setHydratedFromVersionId(sourceVersion.id);
     }
   }, [sourceVersion, hydratedFromVersionId, draft]);
+
+  // Hydrate the targeting buffer from the persisted tree row. Re-fires
+  // after a save (onSave clears `targetingHydratedId`) so the buffer
+  // re-syncs with the freshly-PATCHed row.
+  useEffect(() => {
+    const d = detail.data;
+    if (d && d.id !== targetingHydratedId) {
+      setTargetingBuffer({
+        crop_paths: d.crop_paths,
+        country_codes: d.country_codes,
+        soil_textures: d.soil_textures,
+        scope: d.scope,
+      });
+      setTargetingHydratedId(d.id);
+    }
+  }, [detail.data, targetingHydratedId]);
 
   // Parse the draft into a CompiledTree-shaped object for layout.
   // The YAML schema already matches CompiledTree (root + nodes +
@@ -250,10 +314,32 @@ export function DecisionTreeViewerPage(): ReactNode {
   const isDraftOnly = tree.current_version == null;
   const structuralDirty =
     draftYaml !== null && sourceYaml !== null && draftYaml !== sourceYaml;
-  const dirty =
-    hasEdits(editBuffer) ||
-    hasParameterEdits(paramsBuffer) ||
-    structuralDirty;
+
+  // Name/description are two projections of the draft YAML: the persisted
+  // values parsed out of it, overlaid with any in-panel edits.
+  const persistedMeta = readTreeMeta(draftYaml);
+  const effectiveMeta: TreeMetaFields = { ...persistedMeta, ...metaBuffer };
+  const metaDirty = (Object.keys(metaBuffer) as (keyof TreeMetaFields)[]).some(
+    (k) => metaBuffer[k] !== undefined && metaBuffer[k] !== persistedMeta[k],
+  );
+
+  // Targeting comes from the buffer (falls back to the row before hydration).
+  const targeting: TargetingBuffer = targetingBuffer ?? {
+    crop_paths: tree.crop_paths,
+    country_codes: tree.country_codes,
+    soil_textures: tree.soil_textures,
+    scope: tree.scope,
+  };
+  const targetingDirty =
+    !sameSet(targeting.crop_paths, tree.crop_paths) ||
+    !sameSet(targeting.country_codes, tree.country_codes) ||
+    !sameSet(targeting.soil_textures, tree.soil_textures) ||
+    targeting.scope !== tree.scope;
+
+  // Anything that rewrites the YAML body → append a new draft version.
+  const yamlDirty =
+    hasEdits(editBuffer) || hasParameterEdits(paramsBuffer) || structuralDirty || metaDirty;
+  const dirty = yamlDirty || targetingDirty;
   const declaredParams: Record<string, ParameterDeclaration> =
     (draftCompiled?.parameters as Record<string, ParameterDeclaration> | undefined) ?? {};
   const latestVersion = tree.versions[0];
@@ -280,8 +366,21 @@ export function DecisionTreeViewerPage(): ReactNode {
   const onDiscardAll = (): void => {
     setEditBuffer({});
     setParamsBuffer({});
+    setMetaBuffer({});
+    setTargetingHydratedId(null); // re-hydrate targeting from the row
     if (sourceYaml) draft.replace(sourceYaml);
     setStructuralError(null);
+    setSelectedNodeId(null);
+    setDryRunResult(null);
+  };
+
+  // Load a historical version's YAML into the draft (from the version panel).
+  const onLoadVersionIntoDraft = (v: DecisionTreeVersion): void => {
+    draft.replace(v.tree_yaml);
+    setHydratedFromVersionId(v.id);
+    setEditBuffer({});
+    setParamsBuffer({});
+    setMetaBuffer({});
     setSelectedNodeId(null);
     setDryRunResult(null);
   };
@@ -399,20 +498,49 @@ export function DecisionTreeViewerPage(): ReactNode {
     }
   };
 
+  // Saving targeting requires a crop (backend enforces min-1 crop_paths).
+  const metaBlocksSave = targetingDirty && targeting.crop_paths.length === 0;
   const canSave =
-    dirty && structuralErrors.length === 0 && !append.isPending;
+    dirty &&
+    structuralErrors.length === 0 &&
+    !append.isPending &&
+    !update.isPending &&
+    !metaBlocksSave;
 
   const onSave = async (): Promise<void> => {
     if (!draftYaml) return;
-    let nextYaml = applyEditsToYaml(draftYaml, editBuffer);
-    nextYaml = applyParameterEditsToYaml(nextYaml, paramsBuffer);
-    await append.mutateAsync({ code, payload: { tree_yaml: nextYaml } });
+    // Structural + name/description edits land as a new draft version.
+    if (yamlDirty) {
+      let nextYaml = applyEditsToYaml(draftYaml, editBuffer);
+      nextYaml = applyParameterEditsToYaml(nextYaml, paramsBuffer);
+      nextYaml = applyTreeMetaToYaml(nextYaml, metaBuffer);
+      await append.mutateAsync({ code, payload: { tree_yaml: nextYaml } });
+    }
+    // Targeting persists via PATCH (not versioned). name/description come
+    // from the effective meta so the row stays consistent with the YAML.
+    if (targetingDirty) {
+      await update.mutateAsync({
+        code,
+        payload: {
+          name_en: effectiveMeta.name_en,
+          name_ar: effectiveMeta.name_ar || null,
+          description_en: effectiveMeta.description_en || null,
+          description_ar: effectiveMeta.description_ar || null,
+          crop_paths: targeting.crop_paths,
+          country_codes: targeting.country_codes,
+          soil_textures: targeting.soil_textures,
+          scope: targeting.scope,
+        },
+      });
+    }
     setEditBuffer({});
     setParamsBuffer({});
-    // Force re-hydration from the new latest version. Clearing the
-    // hydrated-from id triggers the useEffect above on the next render
+    setMetaBuffer({});
+    // Force re-hydration from the new latest version + row. Clearing the
+    // hydrated-from ids triggers the useEffects above on the next render
     // once the detail query refetches.
     setHydratedFromVersionId(null);
+    setTargetingHydratedId(null);
     setSelectedNodeId(null);
   };
   const onPublishLatest = async (): Promise<void> => {
@@ -542,12 +670,29 @@ export function DecisionTreeViewerPage(): ReactNode {
                 : t("editor.header.publish", { n: latestVersion.version })}
             </button>
           ) : null}
-          <Link
-            to={`/settings/decision-trees/${tree.code}`}
-            className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60"
+          <div
+            role="tablist"
+            aria-label={t("workspace.metadata.heading")}
+            className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5"
           >
-            {t("viewer.header.openYamlEditor")}
-          </Link>
+            {(["visual", "yaml"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={viewMode === m}
+                onClick={() => setViewMode(m)}
+                className={clsx(
+                  "rounded px-3 py-1 text-sm font-medium transition-colors",
+                  viewMode === m
+                    ? "bg-ap-primary text-white"
+                    : "text-ap-ink hover:bg-ap-bg/60",
+                )}
+              >
+                {t(`workspace.tab.${m}`)}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -566,15 +711,52 @@ export function DecisionTreeViewerPage(): ReactNode {
           {structuralError}
         </p>
       ) : null}
+      {update.isError ? (
+        <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
+          {t("workspace.metadata.saveFailed")}
+        </p>
+      ) : null}
 
-      <Legend />
-
-      <ProvenancePanel
-        evidence={provenance.evidence}
-        transferability={provenance.transferability}
+      <TreeMetadataPanel
+        meta={effectiveMeta}
+        onMetaChange={(patch) => setMetaBuffer((b) => ({ ...b, ...patch }))}
+        cropPaths={targeting.crop_paths}
+        countryCodes={targeting.country_codes}
+        soilTextures={targeting.soil_textures}
+        scope={targeting.scope}
+        onCropPathsChange={(n) =>
+          setTargetingBuffer((b) => ({ ...(b ?? targeting), crop_paths: n }))
+        }
+        onCountryCodesChange={(n) =>
+          setTargetingBuffer((b) => ({ ...(b ?? targeting), country_codes: n }))
+        }
+        onSoilTexturesChange={(n) =>
+          setTargetingBuffer((b) => ({ ...(b ?? targeting), soil_textures: n }))
+        }
+        onScopeChange={(s) => setTargetingBuffer((b) => ({ ...(b ?? targeting), scope: s }))}
+        canEdit={canManage}
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+      {viewMode === "yaml" ? (
+        <YamlMode
+          draftYaml={draftYaml ?? ""}
+          onChange={setDraftYaml}
+          canManage={canManage}
+          signalDefs={signalDefsQ.data ?? []}
+          signalDefsLoading={signalDefsQ.isLoading}
+          signalDefsError={signalDefsQ.isError}
+          structuralErrors={structuralErrors}
+        />
+      ) : (
+        <>
+          <Legend />
+
+          <ProvenancePanel
+            evidence={provenance.evidence}
+            transferability={provenance.transferability}
+          />
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <div className="flex flex-col gap-4">
           <CanvasDryRunPanel
             blockId={dryRunBlockId}
@@ -674,11 +856,23 @@ export function DecisionTreeViewerPage(): ReactNode {
             ) : null}
           </aside>
         )}
-      </div>
+          </div>
 
-      {draftCompiled === null && !isDraftOnly ? (
-        <p className="text-xs text-ap-crit">{t("viewer.compiledMissing")}</p>
-      ) : null}
+          {draftCompiled === null && !isDraftOnly ? (
+            <p className="text-xs text-ap-crit">{t("viewer.compiledMissing")}</p>
+          ) : null}
+        </>
+      )}
+
+      <VersionHistorySection
+        versions={tree.versions}
+        currentVersion={tree.current_version}
+        canManage={canManage}
+        publishing={publish.isPending}
+        dateLocale={dateLocale}
+        onLoad={onLoadVersionIntoDraft}
+        onPublish={(v) => publish.mutate({ code, version: v })}
+      />
 
       {addChildPending ? (
         <AddChildDialog
@@ -747,6 +941,177 @@ function DeleteConfirmDialog({
         </button>
       </div>
     </Modal>
+  );
+}
+
+// YAML editing mode — the same draft the canvas renders, as raw text.
+// Kept structurally parallel to the visual mode (shared header/metadata/
+// version history) so the two are just different bodies over one draft.
+function YamlMode({
+  draftYaml,
+  onChange,
+  canManage,
+  signalDefs,
+  signalDefsLoading,
+  signalDefsError,
+  structuralErrors,
+}: {
+  draftYaml: string;
+  onChange: (next: string) => void;
+  canManage: boolean;
+  signalDefs: ComponentProps<typeof SignalRefPicker>["definitions"];
+  signalDefsLoading: boolean;
+  signalDefsError: boolean;
+  structuralErrors: ReturnType<typeof validateTreeStructure>;
+}): JSX.Element {
+  const { t } = useTranslation("decisionTrees");
+  return (
+    <section className="rounded-xl border border-ap-line bg-ap-panel">
+      <header className="border-b border-ap-line px-4 py-3">
+        <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.yaml.heading")}</h2>
+        <p className="text-xs text-ap-muted">{t("workspace.yaml.subtitle")}</p>
+      </header>
+      <div className="p-4">
+        {canManage ? (
+          <div className="mb-3">
+            <SignalRefPicker
+              definitions={signalDefs}
+              isLoading={signalDefsLoading}
+              isError={signalDefsError}
+              format="yaml"
+            />
+          </div>
+        ) : null}
+        <textarea
+          value={draftYaml}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={!canManage}
+          rows={30}
+          spellCheck={false}
+          aria-label={t("workspace.yaml.ariaLabel")}
+          className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-3 py-2 font-mono text-xs text-ap-ink shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
+        />
+        {structuralErrors.length > 0 ? (
+          <div className="mt-3 rounded-md border border-ap-crit/40 bg-ap-crit/5 p-3 text-xs">
+            <p className="mb-1 font-semibold text-ap-crit">{t("editor.errors.heading")}</p>
+            <ul className="space-y-0.5 text-ap-ink">
+              {structuralErrors.map((e, i) => (
+                <li key={i}>
+                  {e.nodeId ? (
+                    <span className="font-mono text-ap-muted">[{e.nodeId}] </span>
+                  ) : null}
+                  {e.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+// Version history — shared across both modes; collapsed by default to keep
+// the workspace focused. Load-into-draft + publish, ported from the old
+// standalone YAML editor page.
+function VersionHistorySection({
+  versions,
+  currentVersion,
+  canManage,
+  publishing,
+  dateLocale,
+  onLoad,
+  onPublish,
+}: {
+  versions: DecisionTreeVersion[];
+  currentVersion: number | null;
+  canManage: boolean;
+  publishing: boolean;
+  dateLocale: Locale;
+  onLoad: (v: DecisionTreeVersion) => void;
+  onPublish: (version: number) => void;
+}): JSX.Element {
+  const { t } = useTranslation("decisionTrees");
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="rounded-xl border border-ap-line bg-ap-panel">
+      <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-ap-ink">
+            {t("workspace.versions.heading")}
+          </h2>
+          <span className="text-xs text-ap-muted">{versions.length}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs font-medium text-ap-primary hover:underline"
+          aria-expanded={open}
+        >
+          {open ? t("workspace.metadata.collapse") : t("workspace.metadata.expand")}
+        </button>
+      </header>
+      {open ? (
+        <ul className="divide-y divide-ap-line">
+          {versions.map((v) => {
+            const isCurrent = v.version === currentVersion;
+            return (
+              <li key={v.id} className="flex flex-col gap-1 px-4 py-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-ap-ink">v{v.version}</span>
+                  {isCurrent ? (
+                    <Pill kind="ok">{t("edit.versions.currentBadge")}</Pill>
+                  ) : v.published_at ? (
+                    <Pill kind="info">published</Pill>
+                  ) : (
+                    <Pill kind="neutral">{t("edit.versions.draftBadge")}</Pill>
+                  )}
+                  {v.notes ? (
+                    <span className="text-[11px] italic text-ap-muted">{v.notes}</span>
+                  ) : null}
+                </div>
+                <div className="text-[11px] text-ap-muted">
+                  {v.published_at
+                    ? t("edit.versions.publishedAt", {
+                        when: formatDistanceToNow(parseISO(v.published_at), {
+                          addSuffix: true,
+                          locale: dateLocale,
+                        }),
+                      })
+                    : t("edit.versions.createdAt", {
+                        when: formatDistanceToNow(parseISO(v.created_at), {
+                          addSuffix: true,
+                          locale: dateLocale,
+                        }),
+                      })}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onLoad(v)}
+                    className="rounded-md border border-ap-line bg-ap-panel px-2 py-0.5 text-[11px] font-medium text-ap-ink hover:bg-ap-line/40"
+                  >
+                    {t("edit.versions.load")}
+                  </button>
+                  {canManage && !isCurrent ? (
+                    <button
+                      type="button"
+                      onClick={() => onPublish(v.version)}
+                      disabled={publishing}
+                      className="rounded-md bg-ap-primary px-2 py-0.5 text-[11px] font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+                    >
+                      {publishing
+                        ? t("edit.versions.publishing")
+                        : t("edit.versions.publish")}
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 

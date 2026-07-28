@@ -71,7 +71,7 @@ export function NodeDetailsPanel({
     !isLeaf && canEdit && onAddChild !== undefined && !(node.data as { on_miss?: string }).on_miss;
 
   return (
-    <aside className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+    <aside className="flex flex-col gap-3 overflow-hidden rounded-xl border border-ap-line bg-ap-panel p-4">
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-xs text-ap-muted">{t("editor.panel.nodeId")}</p>

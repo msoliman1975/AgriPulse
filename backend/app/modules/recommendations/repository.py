@@ -102,6 +102,7 @@ class RecommendationsRepository:
         *,
         scope_tenant_id: UUID | None,
         include_platform: bool = False,
+        include_deleted: bool = False,
     ) -> dict[str, Any] | None:
         """Look up one tree by code (PR-A).
 
@@ -114,11 +115,14 @@ class RecommendationsRepository:
         sites where a tenant should see "platform OR my own"; the
         create_tree path rejects tenant codes that collide with
         platform codes, so the result is unambiguous.
+
+        ``include_deleted``: when True, also match soft-archived rows
+        (``deleted_at IS NOT NULL``). Only the restore path needs this —
+        every other caller wants the archived tree to read as absent.
         """
-        stmt = select(DecisionTree).where(
-            DecisionTree.code == tree_code,
-            DecisionTree.deleted_at.is_(None),
-        )
+        stmt = select(DecisionTree).where(DecisionTree.code == tree_code)
+        if not include_deleted:
+            stmt = stmt.where(DecisionTree.deleted_at.is_(None))
         if scope_tenant_id is None:
             stmt = stmt.where(DecisionTree.tenant_id.is_(None))
         elif include_platform:
@@ -441,6 +445,99 @@ class RecommendationsRepository:
                 "applicable_regions": applicable_regions,
                 "actor": actor_user_id,
             },
+        )
+
+    async def update_tree_targeting_metadata(
+        self,
+        *,
+        tree_id: UUID,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        crop_id: UUID | None,
+        crop_path: str | None,
+        crop_paths: list[str],
+        country_codes: list[str],
+        soil_textures: list[str],
+        scope: str,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Full-replace of the editable tree-level metadata from the
+        authoring metadata panel (PATCH path). Unlike
+        ``update_tree_metadata`` (which only syncs name/description/crop
+        from a freshly compiled version's YAML), this also writes the
+        multi-axis targeting sets + execution scope so the structured
+        pickers are the source of truth for crop/country/soil/scope."""
+        await self._public.execute(
+            text(
+                """
+                UPDATE public.decision_trees
+                   SET name_en = :name_en,
+                       name_ar = :name_ar,
+                       description_en = :description_en,
+                       description_ar = :description_ar,
+                       crop_id = :crop_id,
+                       crop_path = :crop_path,
+                       crop_paths = :crop_paths,
+                       country_codes = :country_codes,
+                       soil_textures = :soil_textures,
+                       scope = :scope,
+                       updated_by = :actor,
+                       updated_at = now()
+                 WHERE id = :tid
+                """
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "tid": tree_id,
+                "name_en": name_en,
+                "name_ar": name_ar,
+                "description_en": description_en,
+                "description_ar": description_ar,
+                "crop_id": crop_id,
+                "crop_path": crop_path,
+                "crop_paths": crop_paths,
+                "country_codes": country_codes,
+                "soil_textures": soil_textures,
+                "scope": scope,
+                "actor": actor_user_id,
+            },
+        )
+
+    async def set_tree_archived(
+        self,
+        *,
+        tree_id: UUID,
+        archived: bool,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Soft-archive (``deleted_at = now()``) or restore
+        (``deleted_at = NULL``) one tree. Archived trees drop out of the
+        catalog + are never evaluated (every read filters
+        ``deleted_at IS NULL``) but the row + its version history stay
+        intact, so a restore is loss-free."""
+        # Two static statements rather than interpolating the deleted_at
+        # expression into the SQL — keeps the query free of f-string
+        # construction (and the linter happy).
+        sql = (
+            "UPDATE public.decision_trees "
+            "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+            "WHERE id = :tid"
+            if archived
+            else "UPDATE public.decision_trees "
+            "SET deleted_at = NULL, updated_by = :actor, updated_at = now() "
+            "WHERE id = :tid"
+        )
+        await self._public.execute(
+            text(sql).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"tid": tree_id, "actor": actor_user_id},
         )
 
     async def get_tenant_id_by_schema(self, schema_name: str) -> UUID | None:

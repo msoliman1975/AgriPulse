@@ -72,7 +72,7 @@ export function DecisionTreeCreatePage(): ReactNode {
   const create = useCreateDecisionTree();
 
   if (!canManage) {
-    return <Navigate to="/settings/decision-trees" replace />;
+    return <Navigate to="/decision-trees" replace />;
   }
 
   // Swap the YAML body when the user picks a different template. We
@@ -108,7 +108,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       },
       {
         onSuccess: (tree) => {
-          navigate(`/settings/decision-trees/${tree.code}/view`);
+          navigate(`/decision-trees/${tree.code}`);
         },
       },
     );
@@ -129,7 +129,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       },
       {
         onSuccess: (tree) => {
-          navigate(`/settings/decision-trees/${tree.code}`);
+          navigate(`/decision-trees/${tree.code}`);
         },
       },
     );
@@ -231,7 +231,7 @@ export function DecisionTreeCreatePage(): ReactNode {
         ) : null}
         <button
           type="button"
-          onClick={() => navigate("/settings/decision-trees")}
+          onClick={() => navigate("/decision-trees")}
           className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
         >
           {t("create.cancel")}

@@ -5,6 +5,9 @@ import { apiClient } from "./client";
 export interface DecisionTree {
   id: string;
   code: string;
+  // NULL = platform-shipped tree (read-only to tenants); non-NULL = the
+  // caller's own tenant-authored tree (editable / archivable).
+  tenant_id: string | null;
   name_en: string;
   name_ar: string | null;
   description_en: string | null;
@@ -19,7 +22,13 @@ export interface DecisionTree {
   applicable_regions: string[];
   is_active: boolean;
   current_version: number | null;
+  // Soft-delete flag (experience redesign). Archived trees are hidden from
+  // the default catalog + never evaluated, but stay restorable.
+  archived: boolean;
 }
+
+// Catalog filter for the list endpoint's `status` query param.
+export type DecisionTreeListStatus = "active" | "archived" | "all";
 
 // Scientific-provenance metadata (KB P1-A). Lives inside `tree_compiled`
 // (the backend folds it in at compile time); these mirror the shapes
@@ -124,6 +133,19 @@ export interface DecisionTreeVersionCreatePayload {
   notes?: string | null;
 }
 
+// Editable tree-level metadata (experience redesign). Full-replace: the
+// metadata panel always sends the complete set. Crop targeting is required.
+export interface DecisionTreeUpdatePayload {
+  name_en: string;
+  name_ar?: string | null;
+  description_en?: string | null;
+  description_ar?: string | null;
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
+  scope: "block" | "cell";
+}
+
 export interface DryRunPayload {
   block_id: string;
   // Either evaluate the persisted version OR an unsaved YAML body.
@@ -155,8 +177,12 @@ export interface DryRunResponse {
   error: string | null;
 }
 
-export async function listDecisionTrees(): Promise<DecisionTree[]> {
-  const { data } = await apiClient.get<DecisionTree[]>("/v1/decision-trees");
+export async function listDecisionTrees(
+  status: DecisionTreeListStatus = "active",
+): Promise<DecisionTree[]> {
+  const { data } = await apiClient.get<DecisionTree[]>("/v1/decision-trees", {
+    params: { status },
+  });
   return data;
 }
 
@@ -176,6 +202,28 @@ export async function createDecisionTree(
   payload: DecisionTreeCreatePayload,
 ): Promise<DecisionTreeDetail> {
   const { data } = await apiClient.post<DecisionTreeDetail>("/v1/decision-trees", payload);
+  return data;
+}
+
+export async function updateDecisionTree(
+  code: string,
+  payload: DecisionTreeUpdatePayload,
+): Promise<DecisionTreeDetail> {
+  const { data } = await apiClient.patch<DecisionTreeDetail>(
+    `/v1/decision-trees/${code}`,
+    payload,
+  );
+  return data;
+}
+
+export async function archiveDecisionTree(code: string): Promise<void> {
+  await apiClient.delete(`/v1/decision-trees/${code}`);
+}
+
+export async function restoreDecisionTree(code: string): Promise<DecisionTreeDetail> {
+  const { data } = await apiClient.post<DecisionTreeDetail>(
+    `/v1/decision-trees/${code}:restore`,
+  );
   return data;
 }
 

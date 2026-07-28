@@ -4,22 +4,27 @@ import {
   type DecisionTree,
   type DecisionTreeCreatePayload,
   type DecisionTreeDetail,
+  type DecisionTreeListStatus,
+  type DecisionTreeUpdatePayload,
   type DecisionTreeVersionCreatePayload,
   type DryRunPayload,
   type DryRunResponse,
   appendDecisionTreeVersion,
+  archiveDecisionTree,
   createDecisionTree,
   dryRunDecisionTree,
   getDecisionTree,
   getDecisionTreeCandidateBlocks,
   listDecisionTrees,
   publishDecisionTreeVersion,
+  restoreDecisionTree,
+  updateDecisionTree,
 } from "@/api/decisionTrees";
 
-export function useDecisionTrees() {
+export function useDecisionTrees(status: DecisionTreeListStatus = "active") {
   return useQuery({
-    queryKey: ["decision_trees", "list"] as const,
-    queryFn: listDecisionTrees,
+    queryKey: ["decision_trees", "list", status] as const,
+    queryFn: () => listDecisionTrees(status),
     staleTime: 30_000,
   });
 }
@@ -37,6 +42,41 @@ export function useCreateDecisionTree() {
   const qc = useQueryClient();
   return useMutation<DecisionTreeDetail, Error, DecisionTreeCreatePayload>({
     mutationFn: createDecisionTree,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees"] });
+    },
+  });
+}
+
+export function useUpdateDecisionTree() {
+  const qc = useQueryClient();
+  return useMutation<
+    DecisionTreeDetail,
+    Error,
+    { code: string; payload: DecisionTreeUpdatePayload }
+  >({
+    mutationFn: ({ code, payload }) => updateDecisionTree(code, payload),
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "detail", vars.code] });
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "list"] });
+    },
+  });
+}
+
+export function useArchiveDecisionTree() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { code: string }>({
+    mutationFn: ({ code }) => archiveDecisionTree(code),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees"] });
+    },
+  });
+}
+
+export function useRestoreDecisionTree() {
+  const qc = useQueryClient();
+  return useMutation<DecisionTreeDetail, Error, { code: string }>({
+    mutationFn: ({ code }) => restoreDecisionTree(code),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["decision_trees"] });
     },

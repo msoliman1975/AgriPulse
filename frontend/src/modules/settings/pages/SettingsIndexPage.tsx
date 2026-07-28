@@ -14,13 +14,11 @@ export function SettingsIndexPage(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
   const canResources = useCapability("resource.read");
-  const canTree = useCapability("decision_tree.manage");
 
   if (canManageIntegrations) return <Navigate to="/settings/org" replace />;
   if (canReadHealth) return <Navigate to="/settings/integrations/health" replace />;
   if (canUser) return <Navigate to="/settings/users" replace />;
   if (canResources) return <Navigate to="/settings/workers" replace />;
-  if (canTree) return <Navigate to="/settings/decision-trees" replace />;
   return (
     <div className="mx-auto max-w-3xl py-12 text-center">
       <h1 className="text-xl font-semibold text-ap-ink">{t("noAccess.title")}</h1>
