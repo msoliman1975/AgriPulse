@@ -32,6 +32,9 @@ interface Props {
   onAddPivot: () => void;
   onAutoBlock: () => void;
   onBulkUpload: () => void;
+  // Tenant-level create: a new farm, not a unit inside this one. Undefined
+  // when the user lacks farm.create, which hides the menu entry entirely.
+  onAddFarm?: () => void;
 }
 
 function Chip({
@@ -84,6 +87,7 @@ export function ViewBar({
   onAddPivot,
   onAutoBlock,
   onBulkUpload,
+  onAddFarm,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const indexRef = useRef<HTMLButtonElement>(null);
@@ -161,8 +165,19 @@ export function ViewBar({
         ))}
       </Popover>
 
-      {/* Add menu — native in-console create flows (draw on the map). */}
+      {/* Add menu — native in-console create flows (draw on the map). Farm
+          sits in its own group: it creates a sibling of this farm, not a unit
+          inside it. */}
       <Popover open={open === "add"} onClose={close} anchorRef={addRef} align="end">
+        {onAddFarm ? (
+          <>
+            <PopHeading>{t("viewbar.addNew")}</PopHeading>
+            <PopItem icon="🌾" onClick={() => { close(); onAddFarm(); }} hint={t("add.viaDrawOrUpload")}>
+              {t("add.farm")}
+            </PopItem>
+            <PopDivider />
+          </>
+        ) : null}
         <PopHeading>{t("viewbar.addToFarm")}</PopHeading>
         <PopItem icon="▦" onClick={() => { close(); onAddBlock(); }} hint={t("add.viaDraw")}>
           {t("add.block")}

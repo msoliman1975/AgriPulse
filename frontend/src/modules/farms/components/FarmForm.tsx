@@ -14,6 +14,7 @@ import {
   type WaterSource,
 } from "@/api/farms";
 import { listCountries, type Country } from "@/api/countries";
+import { CODE_RE } from "@/lib/codes";
 import { singleBoundary } from "@/lib/aoi";
 import { MapDraw } from "./MapDraw";
 import { AoiUploader } from "./AoiUploader";
@@ -22,7 +23,6 @@ const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
 const OWNERSHIP_TYPES: OwnershipType[] = ["owned", "leased", "partnership", "other"];
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
 
-const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
 
 export type FarmFormValues = FarmCreatePayload;
 

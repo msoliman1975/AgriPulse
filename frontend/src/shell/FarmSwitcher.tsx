@@ -7,6 +7,12 @@ import { listFarms } from "@/api/farms";
 import { useCapability } from "@/rbac/useCapability";
 import { ChevronIcon } from "./icons";
 
+// Farm creation happens inside the Farm Console (map-native draw/upload), not
+// on the legacy /farms/new form. Query param rather than a path segment: goTo()
+// below rewrites the LAST path segment on a farm switch, which would mangle a
+// /labs/map/new route. See docs/proposals/farm-creation-in-console.md.
+const NEW_FARM_PATH = "/labs/map?create=farm";
+
 const PINNED_PREFIXES = [
   "/insights/",
   "/board/",
@@ -87,7 +93,7 @@ export function FarmSwitcher(): ReactNode {
       return (
         <button
           type="button"
-          onClick={() => navigate("/farms/new")}
+          onClick={() => navigate(NEW_FARM_PATH)}
           className="rounded-md bg-ap-primary px-2 py-1 text-sm font-medium text-white hover:bg-ap-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
         >
           {t("home.createFirstFarm")}
@@ -141,7 +147,7 @@ export function FarmSwitcher(): ReactNode {
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  navigate("/farms/new");
+                  navigate(NEW_FARM_PATH);
                 }}
                 className="flex w-full items-center rounded-md px-3 py-2 text-start text-sm font-medium text-ap-primary hover:bg-ap-line/40"
               >

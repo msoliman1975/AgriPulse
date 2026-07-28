@@ -36,7 +36,8 @@
     "newFarm": "New farm…",
     "vegIndex": "Vegetation index",
     "mapLayers": "Map layers",
-    "addToFarm": "Add to farm"
+    "addToFarm": "Add to farm",
+    "addNew": "Add new"
   },
   "layers": {
     "aoi": "Farm AOI",
@@ -56,9 +57,11 @@
     "autoGrid": "Auto-block grid",
     "pivot": "Draw pivot",
     "bulkUpload": "Upload AOI files…",
+    "farm": "New farm…",
     "viaForm": "form",
     "viaMap": "on map",
     "viaDraw": "draw on map",
+    "viaDrawOrUpload": "draw or upload",
     "viaGrid": "grid",
     "viaUpload": "many files"
   },
@@ -225,7 +228,22 @@
     "createPivot": "Create pivot",
     "blockCreated": "Block created",
     "pivotCreated": "Pivot created",
-    "createFailed": "Couldn’t create — check the code is unique and try again."
+    "createFailed": "Couldn’t create — check the code is unique and try again.",
+    "farmTitle": "New farm",
+    "stepBoundary": "Step 1 of 2 · boundary",
+    "stepDetails": "Step 2 of 2 · details",
+    "boundaryHint": "Draw the outer boundary on the map, or upload a KML, GeoJSON or zipped Shapefile.",
+    "drawBoundary": "Draw boundary",
+    "uploadBoundary": "Upload file",
+    "parsing": "Reading file…",
+    "farmDrawing": "Click to add points, double-click to finish",
+    "farmEditLater": "Everything else is editable later in Farm settings",
+    "farmCodePlaceholder": "e.g. SUEZ-02",
+    "farmNamePlaceholder": "e.g. Suez East",
+    "moreDetails": "More details",
+    "redrawBoundary": "Boundary",
+    "createFarm": "Create farm",
+    "noPermission": "You don’t have permission to create farms."
   },
   "autoBlock": {
     "title": "Auto-block grid",

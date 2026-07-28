@@ -9,20 +9,22 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AutoGridCandidate } from "@/api/blocks";
+import type { Country } from "@/api/countries";
+import type { FarmType, OwnershipType, WaterSource } from "@/api/farms";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
+import { CODE_RE } from "@/lib/codes";
 import { m2ToUnit, unitToM2 } from "@/lib/units";
 import type { AreaUnit } from "@/prefs/PrefsContext";
+import { fieldLabel, ghostBtn, inputCls, primaryBtn } from "./ui";
 
-const inputCls =
-  "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
-const primaryBtn =
-  "h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-50 hover:bg-ap-primary/90";
-const ghostBtn =
-  "h-9 rounded-lg border border-ap-line bg-ap-panel px-3 text-sm font-semibold text-ap-ink hover:bg-ap-primary-soft disabled:opacity-50";
-
-function FloatingCard({ children }: { children: ReactNode }): ReactNode {
+function FloatingCard({ children, className }: { children: ReactNode; className?: string }): ReactNode {
   return (
-    <div className="absolute left-1/2 top-4 z-30 w-[340px] max-w-[92vw] -translate-x-1/2 rounded-2xl border border-ap-line bg-ap-panel p-4 shadow-card">
+    <div
+      className={
+        "absolute left-1/2 top-4 z-30 w-[340px] max-w-[92vw] -translate-x-1/2 rounded-2xl border border-ap-line bg-ap-panel p-4 shadow-card " +
+        (className ?? "")
+      }
+    >
       {children}
     </div>
   );
@@ -36,7 +38,7 @@ export function DrawHintBar({
   areaM2,
   onCancel,
 }: {
-  kind: "block" | "pivot";
+  kind: "block" | "pivot" | "farm";
   vertices?: number;
   areaM2?: number;
   onCancel: () => void;
@@ -44,8 +46,10 @@ export function DrawHintBar({
   const { t } = useTranslation("farmConsole");
   return (
     <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ap-ink/85 px-4 py-2 text-xs text-white shadow-card">
-      <span className="font-semibold">{kind === "pivot" ? t("create.pivotDrawing") : t("create.blockDrawing")}</span>
-      {kind === "block" && vertices != null && vertices > 0 ? (
+      <span className="font-semibold">
+        {kind === "pivot" ? t("create.pivotDrawing") : kind === "farm" ? t("create.farmDrawing") : t("create.blockDrawing")}
+      </span>
+      {kind !== "pivot" && vertices != null && vertices > 0 ? (
         <span className="text-white/80">
           {t("create.points", { n: vertices })}
           {areaM2 && areaM2 > 0 ? (
@@ -202,6 +206,309 @@ export function CreatePivotPanel({
           </button>
           <button type="submit" disabled={submitting || codeError != null} className={primaryBtn}>
             {submitting ? t("manage.saving") : t("create.createPivot")}
+          </button>
+        </div>
+      </form>
+    </FloatingCard>
+  );
+}
+
+// ---- Create farm: step 1, capture the boundary -----------------------------
+// A farm cannot exist without a boundary (the backend requires it), so the
+// flow leads with the map: draw the outline, or upload a KML / GeoJSON /
+// zipped Shapefile. Parsing happens at the page level; this bar only emits
+// the picked File.
+
+export function FarmBoundaryBar({
+  drawing,
+  vertices,
+  areaM2,
+  parsing,
+  error,
+  onStartDraw,
+  onFile,
+  onCancel,
+}: {
+  drawing: boolean;
+  vertices?: number;
+  areaM2?: number;
+  parsing: boolean;
+  error: string | null;
+  onStartDraw: () => void;
+  onFile: (file: File) => void;
+  onCancel: () => void;
+}): ReactNode {
+  const { t } = useTranslation("farmConsole");
+  return (
+    <FloatingCard className="!w-[380px]">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-ap-ink">{t("create.farmTitle")}</h3>
+          <p className="mt-0.5 text-xs text-ap-muted">{t("create.boundaryHint")}</p>
+        </div>
+        <button type="button" onClick={onCancel} className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ap-muted hover:bg-ap-line/50" aria-label={t("manage.cancel")}>
+          ✕
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button type="button" onClick={onStartDraw} disabled={parsing} className={(drawing ? primaryBtn : ghostBtn) + " flex-1"}>
+          ✏ {t("create.drawBoundary")}
+        </button>
+        <label className={ghostBtn + " flex-1 cursor-pointer text-center leading-9"}>
+          ⬆ {parsing ? t("create.parsing") : t("create.uploadBoundary")}
+          <input
+            type="file"
+            accept=".geojson,.json,.zip,.kml,application/geo+json,application/json,application/zip,application/vnd.google-earth.kml+xml"
+            className="sr-only"
+            disabled={parsing}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              // Reset the input so re-picking the same file fires onChange again.
+              e.target.value = "";
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+      </div>
+
+      {drawing ? (
+        <p className="mt-2 text-xs text-ap-muted">
+          {t("create.farmDrawing")}
+          {vertices != null && vertices > 0 ? (
+            <>
+              {" · "}
+              {t("create.points", { n: vertices })}
+              {areaM2 && areaM2 > 0 ? (
+                <>
+                  {" · "}
+                  <AreaDisplay areaM2={areaM2} />
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {error ? <div className="mt-2 rounded-lg bg-ap-crit/10 px-3 py-1.5 text-xs text-ap-crit">{error}</div> : null}
+    </FloatingCard>
+  );
+}
+
+// ---- Create farm: step 2, name it ------------------------------------------
+// Asks for the three fields that matter at creation time; everything else is
+// behind "More details" because it is all editable afterwards in
+// ⚙ Farm settings → Farm. Field labels reuse the `farms` namespace so the
+// wording stays identical to the (legacy) farm edit form.
+
+export interface FarmDraft {
+  code: string;
+  name: string;
+  country_code: string | null;
+  description: string | null;
+  governorate: string | null;
+  district: string | null;
+  nearest_city: string | null;
+  address_line: string | null;
+  farm_type: FarmType;
+  ownership_type: OwnershipType | null;
+  primary_water_source: WaterSource | null;
+  established_date: string | null;
+  tags: string[];
+}
+
+const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
+const OWNERSHIP_TYPES: OwnershipType[] = ["owned", "leased", "partnership", "other"];
+const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
+
+export function CreateFarmPanel({
+  areaM2,
+  countries,
+  submitting,
+  error,
+  onSubmit,
+  onBack,
+  onCancel,
+}: {
+  areaM2: number;
+  countries: Country[];
+  submitting: boolean;
+  error: string | null;
+  onSubmit: (draft: FarmDraft) => void;
+  onBack: () => void;
+  onCancel: () => void;
+}): ReactNode {
+  const { t, i18n } = useTranslation("farmConsole");
+  const { t: tf } = useTranslation("farms");
+  const isAr = i18n.language === "ar";
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [country, setCountry] = useState("");
+  const [more, setMore] = useState(false);
+  const [description, setDescription] = useState("");
+  const [governorate, setGovernorate] = useState("");
+  const [district, setDistrict] = useState("");
+  const [nearestCity, setNearestCity] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [farmType, setFarmType] = useState<FarmType>("commercial");
+  const [ownership, setOwnership] = useState<OwnershipType | "">("");
+  const [water, setWater] = useState<WaterSource | "">("");
+  const [established, setEstablished] = useState("");
+  const [tags, setTags] = useState("");
+
+  // Same contract as the legacy farm form: code must match the API pattern,
+  // name is required. Everything else is optional at creation time.
+  const codeError = code.trim().length === 0 ? t("create.codeRequired") : !CODE_RE.test(code.trim()) ? tf("form.errors.codePattern") : null;
+  const nameError = name.trim().length === 0 ? tf("form.errors.nameRequired") : null;
+  const invalid = codeError != null || nameError != null;
+
+  return (
+    <FloatingCard className="!w-[400px] max-h-[calc(100%-2rem)] overflow-auto">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-ap-ink">{t("create.farmTitle")}</h3>
+          <p className="mt-0.5 text-xs text-ap-muted">
+            <AreaDisplay areaM2={areaM2} /> · {t("create.farmEditLater")}
+          </p>
+        </div>
+        <button type="button" onClick={onCancel} className="grid h-7 w-7 flex-none place-items-center rounded-lg text-ap-muted hover:bg-ap-line/50" aria-label={t("manage.cancel")}>
+          ✕
+        </button>
+      </div>
+
+      <form
+        className="mt-3 space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (invalid) return;
+          onSubmit({
+            code: code.trim(),
+            name: name.trim(),
+            country_code: country || null,
+            description: description.trim() || null,
+            governorate: governorate.trim() || null,
+            district: district.trim() || null,
+            nearest_city: nearestCity.trim() || null,
+            address_line: addressLine.trim() || null,
+            farm_type: farmType,
+            ownership_type: ownership || null,
+            primary_water_source: water || null,
+            established_date: established || null,
+            tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
+          });
+        }}
+      >
+        {/* Help and error text sit OUTSIDE the label so they don't end up in
+            the field's accessible name. */}
+        <div>
+          <label className="block">
+            <span className={fieldLabel}>{tf("form.code")}</span>
+            <input className={inputCls} value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("create.farmCodePlaceholder")} disabled={submitting} />
+          </label>
+          {code.trim().length > 0 && codeError ? <p className="mt-1 text-xs text-ap-crit">{codeError}</p> : null}
+        </div>
+        <label className="block">
+          <span className={fieldLabel}>{tf("form.name")}</span>
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("create.farmNamePlaceholder")} disabled={submitting} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>{tf("form.country")}</span>
+          <select className={inputCls} value={country} onChange={(e) => setCountry(e.target.value)} disabled={submitting}>
+            <option value="">{tf("form.countryNone")}</option>
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>
+                {isAr ? c.name_ar : c.name_en}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          className="flex w-full items-center gap-1.5 rounded-lg px-1 py-1 text-start text-xs font-semibold text-ap-primary hover:bg-ap-primary-soft"
+        >
+          <span className={"transition-transform " + (more ? "rotate-90" : "")}>›</span>
+          {t("create.moreDetails")}
+        </button>
+
+        {more ? (
+          <div className="space-y-3 rounded-xl border border-ap-line p-3">
+            <label className="block">
+              <span className={fieldLabel}>{tf("form.description")}</span>
+              <textarea className={inputCls} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.governorate")}</span>
+                <input className={inputCls} value={governorate} onChange={(e) => setGovernorate(e.target.value)} disabled={submitting} />
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.district")}</span>
+                <input className={inputCls} value={district} onChange={(e) => setDistrict(e.target.value)} disabled={submitting} />
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.nearestCity")}</span>
+                <input className={inputCls} value={nearestCity} onChange={(e) => setNearestCity(e.target.value)} disabled={submitting} />
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.addressLine")}</span>
+                <input className={inputCls} value={addressLine} onChange={(e) => setAddressLine(e.target.value)} disabled={submitting} />
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.farmType")}</span>
+                <select className={inputCls} value={farmType} onChange={(e) => setFarmType(e.target.value as FarmType)} disabled={submitting}>
+                  {FARM_TYPES.map((v) => (
+                    <option key={v} value={v}>
+                      {tf(`farmType.${v}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.ownershipType")}</span>
+                <select className={inputCls} value={ownership} onChange={(e) => setOwnership(e.target.value as OwnershipType | "")} disabled={submitting}>
+                  <option value="">—</option>
+                  {OWNERSHIP_TYPES.map((v) => (
+                    <option key={v} value={v}>
+                      {tf(`ownershipType.${v}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.primaryWaterSource")}</span>
+                <select className={inputCls} value={water} onChange={(e) => setWater(e.target.value as WaterSource | "")} disabled={submitting}>
+                  <option value="">—</option>
+                  {WATER_SOURCES.map((v) => (
+                    <option key={v} value={v}>
+                      {tf(`waterSource.${v}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.establishedDate")}</span>
+                <input type="date" className={inputCls} value={established} onChange={(e) => setEstablished(e.target.value)} disabled={submitting} />
+              </label>
+            </div>
+            <div>
+              <label className="block">
+                <span className={fieldLabel}>{tf("form.tags")}</span>
+                <input className={inputCls} value={tags} onChange={(e) => setTags(e.target.value)} disabled={submitting} />
+              </label>
+              <p className="mt-1 text-xs text-ap-muted">{tf("form.tagsHelp")}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {error ? <div className="rounded-lg bg-ap-crit/10 px-3 py-1.5 text-xs text-ap-crit">{error}</div> : null}
+
+        <div className="flex items-center gap-2 pt-1">
+          <button type="button" onClick={onBack} disabled={submitting} className={ghostBtn}>
+            ↩ {t("create.redrawBoundary")}
+          </button>
+          <button type="submit" disabled={submitting || invalid} className={primaryBtn + " ms-auto"}>
+            {submitting ? t("manage.saving") : t("create.createFarm")}
           </button>
         </div>
       </form>

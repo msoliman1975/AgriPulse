@@ -38,7 +38,7 @@ export function HomePage(): ReactNode {
       </p>
       {canCreateFarm ? (
         <Link
-          to="/farms/new"
+          to="/labs/map?create=farm"
           className="mt-4 inline-flex items-center rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
         >
           {t("home.createFirstFarm")}
