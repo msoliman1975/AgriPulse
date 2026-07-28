@@ -137,13 +137,19 @@ global:
   #   surfaced as a phantom CORS error because the 500 escapes after
   #   CORSMiddleware. Now COALESCE(name, code). No migration; backend only →
   #   api + workers bumped; frontend c8391e6, tile-server 9d140cc.
+  # f71945d = #310 farm creation moved into the Farm Console. /labs/map
+  #   ?create=farm draws or uploads the boundary then asks only code/name/
+  #   country; farm switcher, home CTA and /farms/new (now a redirect) all
+  #   converge there, and "+ Add" gained a Farm item gated on farm.create.
+  #   No migration; FE only → frontend bumped; api + workers stay 5b97660,
+  #   tile-server 9d140cc.
   images:
     api:
       tag: "5b97660"
     workers:
       tag: "5b97660"
     frontend:
-      tag: "c8391e6"
+      tag: "f71945d"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
