@@ -143,13 +143,21 @@ global:
   #   converge there, and "+ Add" gained a Farm item gated on farm.create.
   #   No migration; FE only → frontend bumped; api + workers stay 5b97660,
   #   tile-server 9d140cc.
+  # bee0c06 = #315 decision-tree authoring unified onto a top-level
+  #   /decision-trees surface (Visual|YAML in one workspace, editable
+  #   metadata panel, list search/filters, archive/restore) + #316 the
+  #   Arabic/RTL batch (alert-text i18n, direction-aware mirrored glyphs,
+  #   logical CSS properties, locale-aware chart formatting). Archive is a
+  #   soft-delete over the EXISTING public.decision_trees.deleted_at
+  #   (migration 0015) — verified present in the live DB, so NO migration.
+  #   backend + FE → api + workers + frontend bumped; tile-server 9d140cc.
   images:
     api:
-      tag: "5b97660"
+      tag: "bee0c06"
     workers:
-      tag: "5b97660"
+      tag: "bee0c06"
     frontend:
-      tag: "f71945d"
+      tag: "bee0c06"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
