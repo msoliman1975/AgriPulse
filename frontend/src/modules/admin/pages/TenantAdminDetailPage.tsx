@@ -64,7 +64,7 @@ export function TenantAdminDetailPage(): ReactNode {
         to="/platform/tenants"
         className="inline-flex items-center text-sm text-ap-muted hover:text-ap-ink"
       >
-        ← {t("tenants.detail.back")}
+        {i18n.dir() === "rtl" ? "→" : "←"} {t("tenants.detail.back")}
       </Link>
       <header className="border-b border-ap-line pb-4">
         <div className="flex items-center justify-between gap-3">

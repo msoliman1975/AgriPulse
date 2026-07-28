@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { getFarmAlertTrend } from "@/api/insights";
+import { makeDateLabelFmt } from "@/lib/chartFormat";
 
 interface Props {
   farmId: string;
@@ -25,6 +27,8 @@ interface Props {
  * add a daily-rollup CAGG.
  */
 export function AlertsSparkline({ farmId, days = 7 }: Props): ReactNode {
+  const { i18n } = useTranslation();
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
   const { data, isLoading } = useQuery({
     queryKey: ["insights", "alert-trend", farmId, days] as const,
     queryFn: () => getFarmAlertTrend(farmId, days),
@@ -46,7 +50,7 @@ export function AlertsSparkline({ farmId, days = 7 }: Props): ReactNode {
         <LineChart data={data.points} margin={{ top: 1, right: 1, bottom: 1, left: 1 }}>
           <Tooltip
             contentStyle={{ padding: "2px 6px", fontSize: 10 }}
-            labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+            labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
             formatter={(value: number) => [value, "open"]}
           />
           <Line

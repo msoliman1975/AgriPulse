@@ -51,5 +51,15 @@
     "short_term": "Short-term",
     "long_term": "Long-term",
     "monitoring": "Monitoring"
+  },
+  "recAction": {
+    "irrigate": "Irrigate",
+    "fertilize": "Fertilize",
+    "spray": "Spray",
+    "scout": "Scout",
+    "harvest_window": "Harvest window",
+    "prune": "Prune",
+    "no_action": "No action",
+    "other": "Other"
   }
 }

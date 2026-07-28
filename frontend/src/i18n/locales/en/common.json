@@ -68,7 +68,8 @@
     "createFirstFarm": "Create your first farm"
   },
   "farmSwitcher": {
-    "newFarm": "+ New farm"
+    "newFarm": "+ New farm",
+    "placeholder": "Pick a farm"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

@@ -157,7 +157,7 @@ function Row({ rec, farmId, canAct, onApply, onDismiss, onDefer }: RowProps): Re
           <span className="text-sm font-medium text-ap-ink">{localizedText}</span>
           <Pill kind={SEV_KIND[rec.severity]}>{t(`severity.${rec.severity}`)}</Pill>
           <Pill kind={stateKind(rec.state)}>{t(`state.${rec.state}`)}</Pill>
-          <Pill kind="neutral">{rec.action_type}</Pill>
+          <Pill kind="neutral">{t(`recAction.${rec.action_type}`)}</Pill>
           {cellLabel(rec.cell_row, rec.cell_col) ? (
             <Pill kind="neutral">{t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}</Pill>
           ) : null}
@@ -279,7 +279,7 @@ function ActionsList({ actions }: { actions: RecommendationActions }): ReactNode
             {t(`actionHorizon.${horizon}`)}
           </dt>
           <dd>
-            <ul className="ml-3 list-disc text-ap-muted">
+            <ul className="ms-3 list-disc text-ap-muted">
               {(actions[horizon] ?? []).map((item, i) => (
                 <li key={i}>{isAr ? (item.text_ar ?? item.text_en) : item.text_en}</li>
               ))}

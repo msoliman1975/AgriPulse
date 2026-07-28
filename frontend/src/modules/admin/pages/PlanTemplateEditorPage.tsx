@@ -204,7 +204,7 @@ export function PlanTemplateEditorPage(): ReactNode {
             onClick={() => navigate("/platform/plan-templates")}
             className="text-sm text-ap-muted hover:text-ap-ink"
           >
-            ← {t("editor.back")}
+            {i18n.dir() === "rtl" ? "→" : "←"} {t("editor.back")}
           </button>
           <h1 className="text-xl font-semibold text-ap-ink">
             {isNew ? t("editor.titleNew") : t("editor.titleEdit")}

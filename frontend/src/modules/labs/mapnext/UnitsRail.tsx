@@ -19,8 +19,11 @@ interface Props {
 }
 
 export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
   const [collapsed, setCollapsed] = useState(false);
+  // The rail sits on the inline-start edge (border-e), so the collapse chevron
+  // points toward that edge — which flips under RTL.
+  const rtl = i18n.dir() === "rtl";
 
   // Only operational, summarisable units (logical pivots have no summary).
   const units = blocks.filter((b) => summaries[b.id]);
@@ -46,7 +49,7 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
           className="grid h-6 w-6 place-items-center rounded-md text-ap-muted hover:bg-ap-primary-soft"
           title={collapsed ? t("rail.expand") : t("rail.collapse")}
         >
-          {collapsed ? "›" : "‹"}
+          {collapsed ? (rtl ? "‹" : "›") : rtl ? "›" : "‹"}
         </button>
       </div>
       {!collapsed ? (

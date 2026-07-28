@@ -75,7 +75,7 @@ export function BoardCell({
     <td
       className={clsx(
         compact ? "min-w-[56px] p-1" : "min-w-[140px] p-1.5",
-        "border-b border-r align-top",
+        "border-b border-e align-top",
         selected
           ? "border-ap-primary bg-ap-primary-soft/50"
           : dragOver

@@ -118,7 +118,7 @@ function CitationRow({ citation }: { citation: TreeCitation }): ReactNode {
     : (citation.url ?? null);
   return (
     <li className="text-xs text-ap-ink">
-      <Pill kind="neutral" className="mr-1.5 align-middle">
+      <Pill kind="neutral" className="me-1.5 align-middle">
         {t(`viewer.provenance.sourceType.${citation.source_type}`)}
       </Pill>
       {href ? (
@@ -134,7 +134,7 @@ function CitationRow({ citation }: { citation: TreeCitation }): ReactNode {
         <span>{citation.title}</span>
       )}
       {citation.year ? (
-        <span className="ml-1 text-ap-muted">({citation.year})</span>
+        <span className="ms-1 text-ap-muted">({citation.year})</span>
       ) : null}
     </li>
   );

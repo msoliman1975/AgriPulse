@@ -113,7 +113,7 @@ export function FarmSwitcher(): ReactNode {
         aria-expanded={open}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-ap-ink hover:bg-ap-line/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
       >
-        <span className="truncate">{active?.name ?? "Pick a farm"}</span>
+        <span className="truncate">{active?.name ?? t("farmSwitcher.placeholder")}</span>
         <ChevronIcon className="h-3 w-3 rotate-90" />
       </button>
       {open ? (

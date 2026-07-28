@@ -94,7 +94,11 @@ interface RecChipProps {
 }
 
 function RecChip({ rec, draggable }: RecChipProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
+  // Mirror the Recommendations page: prefer the decision-tree's localized
+  // Arabic text, falling back to English when it wasn't authored.
+  const isAr = i18n.language === "ar";
+  const localizedText = isAr ? (rec.text_ar ?? rec.text_en) : rec.text_en;
   const severityColor =
     rec.severity === "critical"
       ? "border-ap-crit/30 bg-ap-crit-soft text-ap-crit"
@@ -125,7 +129,7 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
           {t(`severity.${rec.severity}`)}
         </span>
       </span>
-      <span className="truncate text-[11px] opacity-90">{rec.text_en}</span>
+      <span className="truncate text-[11px] opacity-90">{localizedText}</span>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   type FarmIndexTimeseriesPoint,
 } from "@/api/insights";
 import { Skeleton } from "@/components/Skeleton";
+import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
 import { IndexPicker, SUPPORTED_INDICES, type IndexCode } from "./IndexPicker";
 import { TimeSpanChips, timeSpanToSince, type TimeSpanKey } from "./TimeSpanChips";
@@ -73,7 +74,9 @@ export function FarmTrendChart({
   indexCode: indexCodeProp,
   timeSpan: timeSpanProp,
 }: Props): ReactNode {
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
+  const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
+  const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
 
   const stored = useMemo(() => _loadPrefs(farmId), [farmId]);
   const [indexCode, setIndexCode] = useState<IndexCode>(indexCodeProp ?? stored?.index ?? "ndvi");
@@ -207,10 +210,14 @@ export function FarmTrendChart({
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 16, left: 0 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
-              <XAxis dataKey="time" tickFormatter={_fmtDateTick} fontSize={11} />
+              <XAxis
+                dataKey="time"
+                tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
+                fontSize={11}
+              />
               <YAxis fontSize={11} />
               <Tooltip
-                labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+                labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
                 formatter={(value: number) => value.toFixed(3)}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -276,11 +283,6 @@ function _annotationColor(severity: AnnotationSeverity): string {
   return "#9C9C9C";
 }
 
-function _fmtDateTick(value: string): string {
-  const d = new Date(value);
-  // M/d — terse for the x-axis. Tooltip carries the full date.
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 interface ReshapedRow {
   time: string;

@@ -63,7 +63,7 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
       type="button"
       onClick={onClick}
       className={clsx(
-        "flex flex-col gap-0.5 rounded border px-2 py-1 text-left text-xs transition-colors",
+        "flex flex-col gap-0.5 rounded border px-2 py-1 text-start text-xs transition-colors",
         tint,
         isCompleted && "opacity-60 line-through",
         isSkipped && "opacity-40 line-through",

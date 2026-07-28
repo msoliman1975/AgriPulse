@@ -168,11 +168,11 @@ function WorkersTable({ rows, farmId, canManage, members, canLink }: WorkersTabl
       <table className="w-full text-sm">
         <thead className="bg-ap-bg/50 text-xs uppercase tracking-wider text-ap-muted">
           <tr>
-            <th className="px-3 py-2 text-left">{t("col.name")}</th>
-            <th className="px-3 py-2 text-left">{t("col.role")}</th>
-            {canLink ? <th className="px-3 py-2 text-left">{t("col.member")}</th> : null}
-            <th className="px-3 py-2 text-left">{t("col.phone")}</th>
-            <th className="px-3 py-2 text-left">{t("col.status")}</th>
+            <th className="px-3 py-2 text-start">{t("col.name")}</th>
+            <th className="px-3 py-2 text-start">{t("col.role")}</th>
+            {canLink ? <th className="px-3 py-2 text-start">{t("col.member")}</th> : null}
+            <th className="px-3 py-2 text-start">{t("col.phone")}</th>
+            <th className="px-3 py-2 text-start">{t("col.status")}</th>
             {canManage ? <th className="w-32" /> : null}
           </tr>
         </thead>
@@ -263,11 +263,11 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
         <td className="px-3 py-2 text-ap-muted">
           {row.archived_at ? t("status.archived") : t("status.active")}
         </td>
-        <td className="px-3 py-2 text-right">
+        <td className="px-3 py-2 text-end">
           <button
             type="button"
             disabled={update.isPending}
-            className="mr-2 text-sm text-ap-primary hover:underline"
+            className="me-2 text-sm text-ap-primary hover:underline"
             onClick={() =>
               update.mutate(
                 {
@@ -304,10 +304,10 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
         {row.archived_at ? t("status.archived") : t("status.active")}
       </td>
       {canManage ? (
-        <td className="px-3 py-2 text-right">
+        <td className="px-3 py-2 text-end">
           <button
             type="button"
-            className="mr-3 text-sm text-ap-primary hover:underline"
+            className="me-3 text-sm text-ap-primary hover:underline"
             onClick={() => setEditing(true)}
           >
             {t("action.edit")}
@@ -383,11 +383,11 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
         />
       </td>
       <td className="px-3 py-2 text-ap-muted">{t("status.active")}</td>
-      <td className="px-3 py-2 text-right">
+      <td className="px-3 py-2 text-end">
         <button
           type="button"
           disabled={!name.trim() || create.isPending}
-          className="mr-2 text-sm text-ap-primary hover:underline disabled:opacity-50"
+          className="me-2 text-sm text-ap-primary hover:underline disabled:opacity-50"
           onClick={() =>
             create.mutate(
               {
