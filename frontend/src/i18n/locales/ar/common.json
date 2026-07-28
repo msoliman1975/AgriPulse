@@ -40,6 +40,7 @@
     "userProfileTitle": "الملف الشخصي",
     "configsTitle": "التهيئة",
     "configTenantSettings": "إعدادات المستأجر",
+    "configDecisionTrees": "أشجار القرار",
     "preferences": "التفضيلات",
     "alertsTitle": "التنبيهات",
     "alertsEmpty": "لا توجد تنبيهات بعد. ستظهر هنا بمجرد ربط خدمة التنبيهات.",

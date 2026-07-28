@@ -29,20 +29,52 @@
     "subtitle": "Author and version the recommendation engine's decision trees. Each save lands as a draft; publish to make it the active version.",
     "loadFailed": "Failed to load decision trees.",
     "empty": "No decision trees defined yet.",
+    "noResults": "No trees match your search and filters.",
     "newButton": "New tree",
     "missingCapability": "You need the {{capability}} capability to author trees.",
+    "search": "Search by name or code…",
+    "searchAria": "Search decision trees",
+    "filters": {
+      "location": "Location",
+      "soil": "Soil",
+      "scope": "Scope",
+      "status": "Status",
+      "all": "All"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived",
+      "all": "All"
+    },
     "table": {
       "code": "Code",
       "name": "Name",
       "crop": "Crop",
+      "soil": "Soil",
+      "locations": "Locations",
+      "scope": "Scope",
       "version": "Version",
       "actions": "",
-      "anyCrop": "any"
+      "anyCrop": "any",
+      "anyLocation": "Any",
+      "anySoil": "Any"
     },
     "row": {
       "draft": "draft only",
       "v": "v{{n}}",
-      "view": "View →"
+      "view": "View →",
+      "open": "Open",
+      "archive": "Archive",
+      "restore": "Restore",
+      "restoring": "Restoring…",
+      "archivedBadge": "archived"
+    },
+    "archiveConfirm": {
+      "title": "Archive this tree?",
+      "body": "\"{{name}}\" will be hidden from the catalog and will stop producing recommendations. You can restore it later from the Archived filter.",
+      "confirm": "Archive",
+      "cancel": "Cancel",
+      "failed": "Archive failed."
     }
   },
   "create": {
@@ -122,6 +154,35 @@
       "path": "Path walked",
       "snapshot": "Values resolved",
       "error": "Error"
+    }
+  },
+  "workspace": {
+    "tab": {
+      "visual": "Visual",
+      "yaml": "YAML"
+    },
+    "yaml": {
+      "heading": "Tree YAML",
+      "subtitle": "The structural source. Edits here update the canvas live; Save lands a new draft version.",
+      "ariaLabel": "Tree YAML source"
+    },
+    "metadata": {
+      "heading": "Tree details",
+      "expand": "Expand details",
+      "collapse": "Collapse details",
+      "nameEn": "Name (EN)",
+      "nameAr": "Name (AR)",
+      "descriptionEn": "Description (EN)",
+      "descriptionAr": "Description (AR)",
+      "nameRequired": "A name is required.",
+      "save": "Save details",
+      "saving": "Saving…",
+      "saveFailed": "Couldn't save tree details.",
+      "readOnly": "Read-only (you don't have the manage capability).",
+      "namesSyncNote": "Name and description are kept in sync with the YAML."
+    },
+    "versions": {
+      "heading": "Version history"
     }
   },
   "viewer": {

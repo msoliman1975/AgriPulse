@@ -152,9 +152,16 @@ interface ComparisonRowProps {
 
 function ComparisonRow({ term, readOnly, onChange, onRemove }: ComparisonRowProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  // The node details panel is a fixed, narrow (~360px) column, so the
+  // comparison fields stack vertically. A previous `sm:grid-cols-[…]`
+  // 4-column layout keyed off the *viewport* width (≥640px), not the
+  // panel width, so it activated inside the narrow panel and the
+  // selects/inputs spilled outside the panel border. `min-w-0` on each
+  // child keeps long option text (e.g. "baseline_deviation") from
+  // forcing the column wider than the panel.
   return (
     <div className="rounded-md border border-ap-line bg-ap-bg/40 p-2">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr_auto]">
+      <div className="grid grid-cols-1 gap-2 [&>*]:min-w-0">
         <ValueRefEditor
           label={t("editor.condition.left")}
           value={term.left}
@@ -177,7 +184,7 @@ function ComparisonRow({ term, readOnly, onChange, onRemove }: ComparisonRowProp
             type="button"
             onClick={onRemove}
             aria-label={t("editor.condition.removeTerm")}
-            className="self-end justify-self-end rounded-md border border-ap-line bg-white px-2 py-0.5 text-[11px] text-ap-crit hover:bg-ap-crit/10"
+            className="justify-self-start rounded-md border border-ap-line bg-white px-2 py-0.5 text-[11px] text-ap-crit hover:bg-ap-crit/10"
           >
             ✕
           </button>

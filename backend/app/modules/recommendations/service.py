@@ -1298,6 +1298,112 @@ class DecisionTreesAuthorService:
         )
         return {"code": code, "version": version, "published_at": published_at}
 
+    # ---- Metadata + lifecycle ----------------------------------------
+
+    async def update_tree(
+        self,
+        *,
+        code: str,
+        name_en: str,
+        name_ar: str | None,
+        description_en: str | None,
+        description_ar: str | None,
+        crop_paths: list[str],
+        country_codes: list[str],
+        soil_textures: list[str],
+        scope: str,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Full-replace the editable tree-level metadata (name,
+        description, multi-axis targeting, scope) from the authoring
+        metadata panel. Scoped strictly to the caller's own tenant — a
+        tenant cannot edit a platform tree's metadata (those are
+        YAML-managed)."""
+        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        # Keep the legacy single-prefix `crop_path` + denormalised
+        # `crop_id` populated from the first crop path so the engine's
+        # crop resolution and existing reads stay consistent.
+        crop_path = crop_paths[0] if crop_paths else None
+        crop_id = await self._repo.resolve_crop_id(crop_path.split(".")[0] if crop_path else None)
+        await self._repo.update_tree_targeting_metadata(
+            tree_id=tree["id"],
+            name_en=name_en,
+            name_ar=name_ar,
+            description_en=description_en,
+            description_ar=description_ar,
+            crop_id=crop_id,
+            crop_path=crop_path,
+            crop_paths=crop_paths,
+            country_codes=country_codes,
+            soil_textures=soil_textures,
+            scope=scope,
+            actor_user_id=actor_user_id,
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_metadata_updated",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code},
+        )
+        detail = await self.get_tree_detail(code=code)
+        if detail is None:
+            raise _DecisionTreeNotFoundError(code)
+        return detail
+
+    async def archive_tree(self, *, code: str, actor_user_id: UUID | None) -> None:
+        """Soft-archive one of the caller's own trees. Idempotent-ish:
+        the tree must currently be visible (non-archived) — restoring an
+        already-archived tree goes through ``restore_tree``."""
+        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        await self._repo.set_tree_archived(
+            tree_id=tree["id"], archived=True, actor_user_id=actor_user_id
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_archived",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code},
+        )
+
+    async def restore_tree(self, *, code: str, actor_user_id: UUID | None) -> dict[str, Any]:
+        """Restore a previously archived tree. Looks the row up
+        ``include_deleted`` since an archived tree reads as absent
+        everywhere else."""
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=self._tenant_id, include_deleted=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        await self._repo.set_tree_archived(
+            tree_id=tree["id"], archived=False, actor_user_id=actor_user_id
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_restored",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code},
+        )
+        detail = await self.get_tree_detail(code=code)
+        if detail is None:
+            raise _DecisionTreeNotFoundError(code)
+        return detail
+
     # ---- Dry-run ------------------------------------------------------
 
     async def dry_run(

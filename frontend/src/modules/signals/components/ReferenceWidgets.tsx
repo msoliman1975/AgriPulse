@@ -64,7 +64,7 @@ function ReferenceItem({ reference }: { reference: SignalReference }): ReactNode
   if (reference.kind === "decision_tree") {
     return (
       <Link
-        to={`/settings/decision-trees/${reference.code}`}
+        to={`/decision-trees/${reference.code}`}
         className="block rounded-md px-2 py-1.5 text-sm hover:bg-ap-line/30"
       >
         {label}

@@ -13,7 +13,9 @@ import { useCapability } from "@/rbac/useCapability";
  *   /settings/integrations/*   — weather/imagery/email/webhook (placeholder)
  *   /settings/users            — tenant user mgmt (PR-Auth6)
  *   /settings/rules            — alert rules (PR-Auth4)
- *   /settings/decision-trees   — recommendation tree authoring (platform-only)
+ *
+ * (Decision-tree authoring was promoted out of this hub to the top-level
+ *  /decision-trees surface — reached from the gear/Configs menu.)
  *
  * Each tab is independently capability-gated; the side-nav hides entries
  * the caller can't reach. The page-level gates stay in place so a deep
@@ -31,7 +33,6 @@ export function SettingsLayout(): ReactNode {
   const canManageIntegrations = useCapability("tenant.manage_integrations");
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
-  const canTree = useCapability("decision_tree.manage");
   const canResources = useCapability("resource.read");
   // Org / notifications placeholder pages — gate on the same caps as the
   // V1 settings they will hold.
@@ -55,12 +56,8 @@ export function SettingsLayout(): ReactNode {
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
     { to: "/settings/workers", labelKey: "nav.workers", show: canResources },
     { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
-    {
-      to: "/settings/decision-trees",
-      labelKey: "nav.decisionTrees",
-      show: canTree,
-      prefix: "/settings/decision-trees",
-    },
+    // Decision Trees promoted to the top-level /decision-trees surface
+    // (reached from the gear/Configs menu), no longer a Settings tab.
   ];
 
   return (

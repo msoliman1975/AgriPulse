@@ -32,7 +32,6 @@ import { ImageryWeatherConfigPage } from "@/modules/config/pages/ImageryWeatherC
 import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
 import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
-import { DecisionTreeEditorPage } from "@/modules/decisionTrees/pages/DecisionTreeEditorPage";
 import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
@@ -62,7 +61,16 @@ import { queryClient } from "@/queries/client";
 
 function RedirectDecisionTreeDetail(): ReactNode {
   const { code = "" } = useParams<{ farmId: string; code: string }>();
-  return <Navigate to={`/settings/decision-trees/${code}`} replace />;
+  return <Navigate to={`/decision-trees/${code}`} replace />;
+}
+
+// Decision Trees were promoted out of the Settings hub to a top-level
+// /decision-trees surface (experience redesign). Old /settings/decision-trees
+// deep links (incl. the legacy /view suffix) collapse onto the single
+// workspace entry.
+function RedirectSettingsDecisionTree(): ReactNode {
+  const { code = "" } = useParams<{ code: string }>();
+  return <Navigate to={`/decision-trees/${code}`} replace />;
 }
 
 function RedirectLegacyAdminTenant(): ReactNode {
@@ -167,21 +175,28 @@ export function App(): ReactNode {
                   path="/config/users/:farmId"
                   element={<Navigate to="/settings/users" replace />}
                 />
-                {/* Legacy /config/decision-trees/:farmId paths redirect to
-                  /settings/decision-trees (settings are tenant-wide). */}
+                {/* Legacy /config/decision-trees/:farmId paths redirect to the
+                  top-level /decision-trees surface (tenant-wide). */}
                 <Route
                   path="/config/decision-trees/:farmId"
-                  element={<Navigate to="/settings/decision-trees" replace />}
+                  element={<Navigate to="/decision-trees" replace />}
                 />
                 <Route
                   path="/config/decision-trees/:farmId/new"
-                  element={<Navigate to="/settings/decision-trees/new" replace />}
+                  element={<Navigate to="/decision-trees/new" replace />}
                 />
-                {/* /config/decision-trees/:farmId/:code â†’ /settings/decision-trees/:code */}
+                {/* /config/decision-trees/:farmId/:code â†’ /decision-trees/:code */}
                 <Route
                   path="/config/decision-trees/:farmId/:code"
                   element={<RedirectDecisionTreeDetail />}
                 />
+                {/* Decision Trees — top-level tenant surface (promoted out of
+                  the Settings hub). Single entry per tree: the visual
+                  workspace, with an in-page YAML toggle. Capability checks
+                  live on each page so deep links with the wrong role 403. */}
+                <Route path="/decision-trees" element={<DecisionTreeListPage />} />
+                <Route path="/decision-trees/new" element={<DecisionTreeCreatePage />} />
+                <Route path="/decision-trees/:code" element={<DecisionTreeViewerPage />} />
                 {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
                 <Route path="/settings" element={<SettingsLayout />}>
@@ -244,14 +259,21 @@ export function App(): ReactNode {
                   <Route path="workers" element={<ResourcesWorkersPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />
-                  <Route path="decision-trees" element={<DecisionTreeListPage />} />
-                  <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />
-                  <Route path="decision-trees/:code" element={<DecisionTreeEditorPage />} />
-                  {/* PR-D1: read-only visual viewer. The /view suffix
-                      keeps it cleanly separate from the editor route so
-                      a user navigating from the list can switch views
-                      without losing editor state. */}
-                  <Route path="decision-trees/:code/view" element={<DecisionTreeViewerPage />} />
+                  {/* Decision Trees moved to the top-level /decision-trees
+                      surface — keep old Settings deep links working. */}
+                  <Route
+                    path="decision-trees"
+                    element={<Navigate to="/decision-trees" replace />}
+                  />
+                  <Route
+                    path="decision-trees/new"
+                    element={<Navigate to="/decision-trees/new" replace />}
+                  />
+                  <Route path="decision-trees/:code" element={<RedirectSettingsDecisionTree />} />
+                  <Route
+                    path="decision-trees/:code/view"
+                    element={<RedirectSettingsDecisionTree />}
+                  />
                 </Route>
               </Route>
               {/* Platform Management Portal â€” capability gate sits

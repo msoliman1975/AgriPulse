@@ -143,6 +143,9 @@ class DecisionTreeResponse(BaseModel):
     applicable_regions: list[str]
     is_active: bool
     current_version: int | None
+    # Soft-delete flag (deleted_at IS NOT NULL). Archived trees are hidden
+    # from the default catalog + never evaluated, but stay restorable.
+    archived: bool = False
 
 
 class EvaluateBlockResponse(BaseModel):
@@ -224,6 +227,28 @@ class DecisionTreeCreateRequest(BaseModel):
     # Execution granularity (PR-C1): 'block' (default) or 'cell'.
     scope: Literal["block", "cell"] | None = None
     tree_yaml: str = Field(min_length=1)
+
+
+class DecisionTreeUpdateRequest(BaseModel):
+    """PATCH /api/v1/decision-trees/{code} — update editable tree-level
+    metadata (name, description, multi-axis targeting, execution scope)
+    without appending a structural version. The node structure is edited
+    separately through the versions endpoint; this keeps the metadata
+    panel in the authoring UI a direct, full-replace form."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name_en: str = Field(min_length=1, max_length=200)
+    name_ar: str | None = Field(default=None, max_length=200)
+    description_en: str | None = Field(default=None, max_length=4000)
+    description_ar: str | None = Field(default=None, max_length=4000)
+    # Crop targeting is required — every tree declares at least one crop
+    # path. Country + soil sets may be empty (empty = "matches any" on
+    # that axis), matching the create-time semantics.
+    crop_paths: list[str] = Field(min_length=1)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
+    scope: Literal["block", "cell"] = "block"
 
 
 class DecisionTreeVersionCreateRequest(BaseModel):

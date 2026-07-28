@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
-import { GearIcon, ImageryIcon, RulesIcon, SignalsIcon } from "./icons";
+import { useCapability } from "@/rbac/useCapability";
+
+import { GearIcon, ImageryIcon, RecommendationsIcon, RulesIcon, SignalsIcon } from "./icons";
 
 /*
  * Configuration entry point in the top bar (UX feedback: config moved out of
@@ -14,6 +16,7 @@ import { GearIcon, ImageryIcon, RulesIcon, SignalsIcon } from "./icons";
 export function ConfigsMenu(): ReactNode {
   const { t } = useTranslation("common");
   const { farmId } = useParams<{ farmId?: string }>();
+  const canDecisionTrees = useCapability("decision_tree.manage");
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +72,17 @@ export function ConfigsMenu(): ReactNode {
             itemClass={itemClass}
             onNavigate={() => setOpen(false)}
           />
+          {canDecisionTrees ? (
+            <Link
+              to="/decision-trees"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className={itemClass}
+            >
+              <RecommendationsIcon className="h-4 w-4" />
+              {t("shell.configDecisionTrees")}
+            </Link>
+          ) : null}
           <Link
             to="/settings"
             role="menuitem"

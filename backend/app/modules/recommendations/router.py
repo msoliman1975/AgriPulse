@@ -19,7 +19,7 @@ RBAC:
 from __future__ import annotations
 
 from datetime import date as date_type
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -36,6 +36,7 @@ from app.modules.recommendations.schemas import (
     DecisionTreeDryRunRequest,
     DecisionTreeDryRunResponse,
     DecisionTreeResponse,
+    DecisionTreeUpdateRequest,
     DecisionTreeVersionCreateRequest,
     DecisionTreeVersionPublishResponse,
     DecisionTreeVersionResponse,
@@ -301,31 +302,46 @@ async def schedule_recommendation(
 @router.get(
     "/decision-trees",
     response_model=list[DecisionTreeResponse],
-    summary="Active decision-tree catalog.",
+    summary="Decision-tree catalog (active by default).",
 )
 async def list_decision_trees(
+    status_filter: Literal["active", "archived", "all"] = Query(
+        "active",
+        alias="status",
+        description="active = non-archived (default); archived = soft-deleted only; all = both.",
+    ),
     context: RequestContext = Depends(requires_capability("decision_tree.read")),
     public_session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     assert context.tenant_id is not None  # _ensure_tenant guarantees
+    # The archived filter drives the soft-delete clause; the engine +
+    # every other read still filter deleted_at IS NULL unconditionally,
+    # so archived trees only ever surface here behind an explicit status.
+    if status_filter == "active":
+        archived_clause = "t.deleted_at IS NULL"
+    elif status_filter == "archived":
+        archived_clause = "t.deleted_at IS NOT NULL"
+    else:
+        archived_clause = "TRUE"
     # Scope to platform + own-tenant trees; tenant_id was added by
     # migration 0024 (PR-A).
     rows = (
         (
             await public_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id, t.code, t.tenant_id,
                        t.name_en, t.name_ar,
                        t.description_en, t.description_ar,
                        t.crop_id, t.crop_paths, t.country_codes,
                        t.soil_textures, t.scope, t.applicable_regions, t.is_active,
+                       (t.deleted_at IS NOT NULL) AS archived,
                        v.version AS current_version
                 FROM public.decision_trees t
                 LEFT JOIN public.decision_tree_versions v
                   ON v.id = t.current_version_id
-                WHERE t.deleted_at IS NULL
+                WHERE {archived_clause}
                   AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                 ORDER BY t.tenant_id NULLS FIRST, t.code
                 """
@@ -553,6 +569,79 @@ async def publish_decision_tree_version(
             version=version,
             actor_user_id=context.user_id,
         )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.patch(
+    "/decision-trees/{code}",
+    response_model=DecisionTreeDetailResponse,
+    summary="Update a tree's editable metadata (name, description, targeting, scope).",
+)
+async def update_decision_tree(
+    code: str,
+    payload: DecisionTreeUpdateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.update_tree(
+            code=code,
+            name_en=payload.name_en,
+            name_ar=payload.name_ar,
+            description_en=payload.description_en,
+            description_ar=payload.description_ar,
+            crop_paths=payload.crop_paths,
+            country_codes=payload.country_codes,
+            soil_textures=payload.soil_textures,
+            scope=payload.scope,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/decision-trees/{code}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Archive (soft-delete) a decision tree.",
+)
+async def archive_decision_tree(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> Response:
+    _ensure_tenant(context)
+    try:
+        await service.archive_tree(code=code, actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/decision-trees/{code}:restore",
+    response_model=DecisionTreeDetailResponse,
+    summary="Restore a previously archived decision tree.",
+)
+async def restore_decision_tree(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.restore_tree(code=code, actor_user_id=context.user_id)
     except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
