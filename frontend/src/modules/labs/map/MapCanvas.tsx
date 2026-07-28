@@ -189,26 +189,55 @@ const RISK_FILL_OPACITY: Record<string, number> = {
   none: 0,
 };
 
-const STYLE: StyleSpecification = {
-  version: 8,
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources: {
-    satellite: {
-      type: "raster",
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-      attribution:
-        "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-      maxzoom: 19,
+// Esri publishes World Imagery as a 256px pyramid. MapLibre picks which
+// pyramid level to fetch from the DECLARED tileSize — coveringZoomLevel is
+// `floor(zoom + log2(512 / tileSize))` — so declaring 128 makes it fetch one
+// level deeper for the same screen area. On a hi-DPI display that lands one
+// source pixel on one *device* pixel instead of stretching it over four, which
+// is much of the "why is this blurrier than Google Maps" gap at the zooms
+// people actually work at (whole-farm and multi-block views).
+//
+// It costs 4x the tile requests and buys nothing on a 1x display, so only opt
+// in where it pays. Read at map construction rather than module load so a
+// window opened on an external retina screen still gets it right.
+function satelliteTileSize(): number {
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  return dpr >= 1.5 ? 128 : 256;
+}
+
+// Esri genuinely has no imagery above pyramid level 19 over Egypt — verified
+// against the service's own /tilemap endpoint, which reports z19 over the Nile
+// Delta and Cairo and only z18 around Suez/Ismailia. Raising this buys blank
+// tiles, not detail; getting past ~0.26 m/px needs a different provider.
+const SATELLITE_MAXZOOM = 19;
+
+function buildStyle(): StyleSpecification {
+  return {
+    version: 8,
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      satellite: {
+        type: "raster",
+        tiles: [
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        ],
+        tileSize: satelliteTileSize(),
+        attribution:
+          "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        maxzoom: SATELLITE_MAXZOOM,
+      },
     },
-  },
-  layers: [
-    { id: "background", type: "background", paint: { "background-color": "#b5ad8e" } },
-    { id: "satellite", type: "raster", source: "satellite", paint: { "raster-opacity": 1 } },
-  ],
-};
+    layers: [
+      { id: "background", type: "background", paint: { "background-color": "#b5ad8e" } },
+      {
+        id: "satellite",
+        type: "raster",
+        source: "satellite",
+        paint: { "raster-opacity": 1, "raster-resampling": "linear" },
+      },
+    ],
+  };
+}
 
 // `["match", get-prop, val, expr, val, expr, ..., default]`
 function healthMatch<T>(
@@ -278,7 +307,7 @@ export function MapCanvas({
     if (!containerRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE,
+      style: buildStyle(),
       center: [31.0, 30.5],
       zoom: 14,
       attributionControl: { compact: true },
