@@ -83,15 +83,3 @@ updates:
     schedule:
       interval: weekly
     labels: [dependencies, docker]
-
-  # Terraform: tracks required_providers in versions.tf and pinned module
-  # versions in our .tf files (terraform-aws-modules/{vpc,eks,iam}/aws).
-  - package-ecosystem: terraform
-    directory: /infra/terraform
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Africa/Cairo
-    labels: [dependencies, terraform]
-    open-pull-requests-limit: 5
