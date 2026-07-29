@@ -158,13 +158,24 @@ global:
   #   endpoint at map zoom <= 17. maxzoom stays 19 — Esri has no deeper
   #   imagery over Egypt. No migration; FE only → frontend bumped; api +
   #   workers stay bee0c06, tile-server 9d140cc.
+  # 066ffdf = #326 platform backfill console at /platform/backfill: trigger
+  #   historical imagery/weather backfill and index computation from the UI
+  #   instead of a manual pod exec, behind a new platform.run_backfill cap.
+  #   MIGRATION: public 0046 (backfill_runs) runs on PreSync — additive, new
+  #   table + indexes only, including a partial unique index that enforces
+  #   one active run per farm in the database rather than in app code.
+  #   Also threads an optional run_id through the imagery/weather backfill
+  #   tasks so they report progress, and adds imagery.backfill_farm_indices
+  #   (compute_indices is per-job, so the console needed a farm fan-out) —
+  #   hence workers must be bumped too, not just api. Backend + FE → api +
+  #   workers + frontend bumped; tile-server stays 9d140cc.
   images:
     api:
-      tag: "bee0c06"
+      tag: "066ffdf"
     workers:
-      tag: "bee0c06"
+      tag: "066ffdf"
     frontend:
-      tag: "fe8006f"
+      tag: "066ffdf"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
