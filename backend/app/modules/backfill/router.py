@@ -27,6 +27,7 @@ from app.modules.backfill.service import (
     BackfillConflictError,
     BackfillService,
     FarmNotFoundError,
+    NoIntegrationConfigError,
     get_backfill_service,
 )
 from app.shared.auth.context import RequestContext
@@ -103,6 +104,10 @@ class EstimateResponse(BaseModel):
     # present the number as an approximation.
     units_estimated: bool
     weather_hours: int
+    # Lets the console warn before submitting that a source has nothing
+    # configured to fetch from.
+    weather_subscriptions: int
+    weather_providers: list[str]
 
 
 class RunRow(BaseModel):
@@ -194,6 +199,21 @@ async def create_run(
         )
     except FarmNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "farm not found in this tenant") from exc
+    except NoIntegrationConfigError as exc:
+        # 422, not 409: the request is well-formed but the farm is not
+        # configured for what it asks. Name the sources so the operator
+        # knows to go set up subscriptions rather than retrying.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {
+                "detail": (
+                    "this farm has no active subscriptions for: "
+                    + ", ".join(exc.missing)
+                    + ". Configure them on the farm before backfilling."
+                ),
+                "missing_sources": exc.missing,
+            },
+        ) from exc
     except BackfillConflictError as exc:
         # One run per farm: idempotency makes a concurrent run safe but not
         # free — it would re-fetch scenes the first run is already pulling.

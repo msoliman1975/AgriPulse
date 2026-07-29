@@ -454,6 +454,19 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
               {t("backfill.estimate.units", { units: estimate.estimated_units })}
             </div>
           ) : null}
+          {/* A source with no subscription would fetch nothing. Say so here,
+              even though the API also refuses the run, so the operator is
+              never surprised by a rejection after filling in the form. */}
+          {form.imagery && estimate.subscriptions === 0 ? (
+            <div className="mt-1.5 font-semibold text-ap-crit">
+              {t("backfill.estimate.noImagerySubs")}
+            </div>
+          ) : null}
+          {form.weather && estimate.weather_subscriptions === 0 ? (
+            <div className="mt-1.5 font-semibold text-ap-crit">
+              {t("backfill.estimate.noWeatherSubs")}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

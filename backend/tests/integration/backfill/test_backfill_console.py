@@ -187,3 +187,85 @@ async def test_indices_run_dispatches_the_free_tasks(
             "imagery.backfill_farm_indices",
             "weather.backfill_weather_indices",
         }
+
+
+@pytest.mark.asyncio
+async def test_rejects_a_source_the_farm_has_no_subscriptions_for(
+    sent_tasks: list[dict[str, Any]],
+) -> None:
+    """A farm with no active subscriptions must be refused, not silently no-op.
+
+    Both providers are driven entirely by the farm's per-block
+    subscriptions, so dispatching for an unconfigured source would fetch
+    nothing and report success -- the worst outcome for an operator who
+    believes they just loaded a year of history.
+    """
+    async with _platform_client() as client:
+        tenants = (await client.get("/api/v1/admin/backfill/tenants")).json()
+        target: tuple[str, str] | None = None
+        for t in tenants:
+            farms = (await client.get(f"/api/v1/admin/backfill/tenants/{t['id']}/farms")).json()
+            for f in farms:
+                if f.get("active_run_id"):
+                    continue
+                est = await client.post(
+                    f"/api/v1/admin/backfill/tenants/{t['id']}:estimate",
+                    json={
+                        "farm_id": f["id"],
+                        "window_from": date.today().isoformat(),
+                        "window_to": date.today().isoformat(),
+                        "imagery": True,
+                        "weather": True,
+                    },
+                )
+                if est.status_code == 200 and est.json()["subscriptions"] == 0:
+                    target = (t["id"], f["id"])
+                    break
+            if target:
+                break
+        if target is None:
+            pytest.skip("every farm in this fixture DB has imagery subscriptions")
+
+        tenant_id, farm_id = target
+        r = await client.post(
+            f"/api/v1/admin/backfill/tenants/{tenant_id}/runs",
+            json={
+                "farm_id": farm_id,
+                "window_from": date.today().isoformat(),
+                "window_to": date.today().isoformat(),
+                "imagery": True,
+                "weather": False,
+            },
+        )
+        assert r.status_code == 422, r.text
+        assert "imagery" in r.text
+        # Nothing may be queued for a rejected run.
+        assert sent_tasks == []
+
+
+@pytest.mark.asyncio
+async def test_estimate_reports_the_farms_weather_integration() -> None:
+    """The estimate must expose what the farm is actually wired up for."""
+    async with _platform_client() as client:
+        picked = await _first_tenant_and_farm(client)
+        if picked is None:
+            pytest.skip("no tenant with an unoccupied farm in this fixture DB")
+        tenant_id, farm_id = picked
+        r = await client.post(
+            f"/api/v1/admin/backfill/tenants/{tenant_id}:estimate",
+            json={
+                "farm_id": farm_id,
+                "window_from": date.today().isoformat(),
+                "window_to": date.today().isoformat(),
+                "imagery": True,
+                "weather": True,
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "weather_subscriptions" in body
+        assert isinstance(body["weather_providers"], list)
+        # Providers must be real subscription codes, never a guessed literal:
+        # the worker's _make_provider raises on anything unrecognised.
+        for code in body["weather_providers"]:
+            assert code != "open-meteo", "hyphenated code would fail _make_provider"

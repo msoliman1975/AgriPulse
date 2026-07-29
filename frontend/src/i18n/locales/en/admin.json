@@ -387,7 +387,9 @@
     "estimate": {
       "title": "Before you run this",
       "body": "{{days}} days · {{blocks}} blocks · {{subscriptions}} subscriptions · about {{scenes}} scenes",
-      "units": "Roughly {{units}} processing units. This is an estimate, not a quota reading."
+      "units": "Roughly {{units}} processing units. This is an estimate, not a quota reading.",
+      "noImagerySubs": "This farm has no active imagery subscriptions — an imagery backfill would fetch nothing. Configure them on the farm first.",
+      "noWeatherSubs": "This farm has no active weather subscriptions — a weather backfill would fetch nothing. Configure them on the farm first."
     },
     "actions": {
       "start": "Start backfill",

@@ -29,6 +29,10 @@ export interface BackfillEstimate {
   /** Always true today: there is no CDSE metering, so this is an approximation. */
   units_estimated: boolean;
   weather_hours: number;
+  /** Active weather subscriptions on the farm. Zero means nothing to fetch. */
+  weather_subscriptions: number;
+  /** Provider codes the farm is actually subscribed to, e.g. ["open_meteo"]. */
+  weather_providers: string[];
 }
 
 export type RunStatus = "queued" | "running" | "succeeded" | "partial" | "failed";
