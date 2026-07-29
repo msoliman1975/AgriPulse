@@ -169,13 +169,23 @@ global:
   #   (compute_indices is per-job, so the console needed a farm fan-out) —
   #   hence workers must be bumped too, not just api. Backend + FE → api +
   #   workers + frontend bumped; tile-server stays 9d140cc.
+  # f9f038a = #327 fix on top of #326: the console's weather dispatch
+  #   hardcoded provider_code "open-meteo", but the worker's _make_provider
+  #   only matches "open_meteo" and raises otherwise -- so every weather
+  #   backfill started from the UI would have died at execution. Providers
+  #   now resolve from the farm's own active weather_subscriptions (distinct
+  #   provider_code across its blocks), one task per provider. Also refuses
+  #   a run (422) when a requested source has no active subscription on the
+  #   farm, instead of dispatching a task that fetches nothing and reads as
+  #   success. No migration; backend + FE -> api + workers + frontend
+  #   bumped; tile-server stays 9d140cc.
   images:
     api:
-      tag: "066ffdf"
+      tag: "f9f038a"
     workers:
-      tag: "066ffdf"
+      tag: "f9f038a"
     frontend:
-      tag: "066ffdf"
+      tag: "f9f038a"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
