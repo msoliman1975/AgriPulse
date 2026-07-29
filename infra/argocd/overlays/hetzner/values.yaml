@@ -179,9 +179,14 @@ global:
   #   farm, instead of dispatching a task that fetches nothing and reads as
   #   success. No migration; backend + FE -> api + workers + frontend
   #   bumped; tile-server stays 9d140cc.
+  # b369773 = #328 the backfill 409/422 handlers passed a dict as the
+  #   HTTPException detail, which problem+json stringifies -- so the operator
+  #   read a Python repr instead of a sentence. Plain sentences now. No
+  #   migration; api request-path only -> api bumped; workers stay f9f038a,
+  #   frontend f9f038a, tile-server 9d140cc.
   images:
     api:
-      tag: "f9f038a"
+      tag: "b369773"
     workers:
       tag: "f9f038a"
     frontend:
