@@ -239,6 +239,8 @@ async def test_rejects_a_source_the_farm_has_no_subscriptions_for(
         )
         assert r.status_code == 422, r.text
         assert "imagery" in r.text
+        # Plain sentence, not a stringified dict -- the operator reads this.
+        assert "{" not in r.json()["detail"]
         # Nothing may be queued for a rejected run.
         assert sent_tasks == []
 
