@@ -1,0 +1,754 @@
+<title>Backfill Console — proposal</title>
+
+<style>
+  :root {
+    --bg: #f7f6f1;
+    --panel: #ffffff;
+    --panel-2: #fbfaf6;
+    --line: #e8e5db;
+    --line-2: #d8d4c6;
+    --ink: #1f2420;
+    --muted: #6c7268;
+    --primary: #356b30;
+    --primary-soft: #dceadb;
+    --good: #4f8e4a;
+    --accent: #1f6f9a;
+    --accent-soft: #dceaf3;
+    --warn: #c98a18;
+    --warn-soft: #f7e7c2;
+    --crit: #b24430;
+    --crit-soft: #f3d2c9;
+    --teal: #2a8a9c;
+    --teal-soft: #d5eaee;
+    --shadow: 0 1px 2px rgba(31, 36, 32, .06), 0 4px 12px rgba(31, 36, 32, .04);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161815;
+      --panel: #1e211d;
+      --panel-2: #23261f;
+      --line: #2f332c;
+      --line-2: #3d423a;
+      --ink: #e8e6de;
+      --muted: #9aa094;
+      --primary: #6ea865;
+      --primary-soft: #24331f;
+      --good: #74b86c;
+      --accent: #5aa8d0;
+      --accent-soft: #16303d;
+      --warn: #e0aa45;
+      --warn-soft: #362a11;
+      --crit: #d97a64;
+      --crit-soft: #3a1f18;
+      --teal: #5cb8c6;
+      --teal-soft: #122f33;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.28);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #161815; --panel: #1e211d; --panel-2: #23261f; --line: #2f332c; --line-2: #3d423a;
+    --ink: #e8e6de; --muted: #9aa094; --primary: #6ea865; --primary-soft: #24331f;
+    --good: #74b86c; --accent: #5aa8d0; --accent-soft: #16303d; --warn: #e0aa45;
+    --warn-soft: #362a11; --crit: #d97a64; --crit-soft: #3a1f18; --teal: #5cb8c6; --teal-soft: #122f33;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.28);
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f7f6f1; --panel: #ffffff; --panel-2: #fbfaf6; --line: #e8e5db; --line-2: #d8d4c6;
+    --ink: #1f2420; --muted: #6c7268; --primary: #356b30; --primary-soft: #dceadb;
+    --good: #4f8e4a; --accent: #1f6f9a; --accent-soft: #dceaf3; --warn: #c98a18;
+    --warn-soft: #f7e7c2; --crit: #b24430; --crit-soft: #f3d2c9; --teal: #2a8a9c; --teal-soft: #d5eaee;
+    --shadow: 0 1px 2px rgba(31,36,32,.06), 0 4px 12px rgba(31,36,32,.04);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; }
+
+  .doc-head { max-width: 68ch; margin-bottom: 14px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--primary); margin-bottom: 10px;
+  }
+  h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.12; font-weight: 680; letter-spacing: -.02em; text-wrap: balance; margin-bottom: 12px; }
+  .lede { font-size: 16px; color: var(--muted); text-wrap: pretty; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-size: 13px; font-weight: 640; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); margin: 52px 0 16px; padding-bottom: 9px; border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 16px; font-weight: 640; letter-spacing: -.01em; margin-bottom: 7px; }
+  p { text-wrap: pretty; }
+
+  /* ---------- app mockup chrome ---------- */
+  .app {
+    display: grid; grid-template-columns: 176px 1fr;
+    border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden;
+    background: var(--panel); box-shadow: var(--shadow); margin-top: 22px;
+  }
+  @media (max-width: 720px) { .app { grid-template-columns: 1fr; } .nav { display: none; } }
+
+  .nav { background: var(--panel-2); border-inline-end: 1px solid var(--line); padding: 14px 0; }
+  .nav-h {
+    font-size: 10px; font-weight: 660; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: 0 16px; margin-bottom: 9px;
+  }
+  .nav-i {
+    display: flex; align-items: center; gap: 9px; padding: 7px 16px;
+    font-size: 13px; color: var(--muted);
+  }
+  .nav-i.on { color: var(--ink); font-weight: 600; background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+  .dot { width: 6px; height: 6px; border-radius: 2px; background: currentColor; opacity: .5; flex: none; }
+  .nav-i.on .dot { opacity: 1; background: var(--primary); }
+
+  .main { padding: 20px 22px 26px; min-width: 0; }
+  .main-h { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .main-t { font-size: 19px; font-weight: 660; letter-spacing: -.015em; }
+  .main-s { font-size: 12.5px; color: var(--muted); margin-bottom: 20px; }
+  .scoped {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+    color: var(--primary); background: var(--primary-soft); padding: 3px 9px; border-radius: 999px;
+  }
+
+  /* ---------- composer ---------- */
+  .card { border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+  .card-h {
+    padding: 11px 15px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 640;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2);
+    border-radius: 9px 9px 0 0;
+  }
+  .card-b { padding: 15px; }
+
+  .composer { display: grid; grid-template-columns: 1fr 300px; gap: 0; }
+  @media (max-width: 900px) { .composer { grid-template-columns: 1fr; } .est { border-inline-start: 0 !important; border-top: 1px solid var(--line); } }
+
+  .fields { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+
+  .f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  label.lbl { font-size: 11px; font-weight: 640; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .ctl {
+    border: 1px solid var(--line-2); background: var(--panel); border-radius: 6px;
+    padding: 7px 10px; font-size: 13px; color: var(--ink); font-family: var(--sans);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .ctl.mono { font-family: var(--mono); font-size: 12px; }
+  .ctl .chev { color: var(--muted); font-size: 10px; flex: none; }
+  .ctl.ghost { color: var(--muted); }
+  .hint { font-size: 11.5px; color: var(--muted); }
+
+  .checks { display: flex; flex-direction: column; gap: 8px; }
+  .chk {
+    display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line-2);
+    border-radius: 7px; padding: 10px 11px; background: var(--panel);
+  }
+  .chk.on { border-color: var(--accent); background: var(--accent-soft); }
+  .chk.on.teal { border-color: var(--teal); background: var(--teal-soft); }
+  .box {
+    width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--line-2);
+    flex: none; margin-top: 2px; display: grid; place-items: center;
+    font-size: 10px; color: var(--panel); font-weight: 700;
+  }
+  .chk.on .box { background: var(--accent); border-color: var(--accent); }
+  .chk.on.teal .box { background: var(--teal); border-color: var(--teal); }
+  .chk-t { font-size: 13px; font-weight: 600; }
+  .chk-d { font-size: 11.5px; color: var(--muted); }
+
+  /* estimate rail */
+  .est { border-inline-start: 1px solid var(--line); background: var(--panel-2); padding: 15px; border-radius: 0 9px 9px 0; }
+  .est-h { font-size: 11px; font-weight: 660; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .est-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 12.5px; }
+  .est-row + .est-row { border-top: 1px solid var(--line); }
+  .est-k { color: var(--muted); }
+  .est-v { font-variant-numeric: tabular-nums; font-weight: 620; }
+  .est-big { font-size: 25px; font-weight: 680; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .quota {
+    margin-top: 13px; border: 1px solid var(--warn); background: var(--warn-soft);
+    border-radius: 7px; padding: 10px 11px; font-size: 12px;
+  }
+  .quota-t { font-weight: 660; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+  .bar { height: 5px; border-radius: 3px; background: var(--line-2); overflow: hidden; margin: 8px 0 5px; }
+  .bar > i { display: block; height: 100%; background: var(--warn); }
+
+  .actions { display: flex; gap: 9px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .btn {
+    border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 620;
+    border: 1px solid transparent; background: var(--primary); color: #fff;
+  }
+  .btn.sec { background: var(--panel); color: var(--ink); border-color: var(--line-2); }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  /* ---------- runs table ---------- */
+  .tscroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 760px; }
+  thead th {
+    text-align: start; font-size: 10.5px; font-weight: 660; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .sub { font-size: 11px; color: var(--muted); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 640;
+    padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+  .p-run { color: var(--warn); background: var(--warn-soft); }
+  .p-ok { color: var(--good); background: var(--primary-soft); }
+  .p-fail { color: var(--crit); background: var(--crit-soft); }
+  .p-part { color: var(--accent); background: var(--accent-soft); }
+  .p-q { color: var(--muted); background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); }
+
+  .srcs { display: flex; gap: 5px; }
+  .src {
+    font-size: 10px; font-weight: 660; letter-spacing: .03em; padding: 2px 6px; border-radius: 4px;
+  }
+  .s-img { color: var(--accent); background: var(--accent-soft); }
+  .s-wx { color: var(--teal); background: var(--teal-soft); }
+  .s-idx { color: var(--primary); background: var(--primary-soft); }
+
+  .prog { display: flex; align-items: center; gap: 8px; min-width: 132px; }
+  .track { flex: 1; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .track > i { display: block; height: 100%; }
+  .fill-run { background: var(--warn); }
+  .fill-ok { background: var(--good); }
+  .fill-fail { background: var(--crit); }
+
+  /* expanded detail */
+  .detail { background: var(--panel-2); }
+  .detail-in { padding: 4px 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .detail-in { grid-template-columns: 1fr; } }
+  .task {
+    border: 1px solid var(--line); border-radius: 7px; background: var(--panel); padding: 10px 11px;
+  }
+  .task-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+  .task-n { font-family: var(--mono); font-size: 11px; color: var(--ink); }
+  .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; padding: 2.5px 0; }
+  .kv span:first-child { color: var(--muted); }
+  .kv span:last-child { font-variant-numeric: tabular-nums; }
+  .errline {
+    margin-top: 8px; font-size: 11.5px; color: var(--crit); background: var(--crit-soft);
+    border-radius: 5px; padding: 7px 9px;
+  }
+
+  /* ---------- annotations ---------- */
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 14px; margin-top: 18px; }
+  .note { border: 1px solid var(--line); border-radius: 8px; padding: 14px 15px; background: var(--panel); }
+  .note-k {
+    font-size: 10px; font-weight: 680; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--primary); margin-bottom: 7px;
+  }
+  .note p { font-size: 13px; color: var(--muted); }
+  .note p strong { color: var(--ink); font-weight: 600; }
+
+  .api { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .api-r { display: grid; grid-template-columns: 62px 1fr; gap: 12px; padding: 10px 13px; align-items: baseline; }
+  .api-r + .api-r { border-top: 1px solid var(--line); }
+  .verb { font-family: var(--mono); font-size: 10.5px; font-weight: 700; text-align: end; }
+  .v-get { color: var(--accent); }
+  .v-post { color: var(--good); }
+  .api-p { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .api-d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  ul.clean { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  ul.clean li { padding-inline-start: 15px; position: relative; font-size: 14px; color: var(--muted); }
+  ul.clean li::before {
+    content: ""; position: absolute; inset-inline-start: 0; top: .58em;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--line-2);
+  }
+  ul.clean li strong { color: var(--ink); font-weight: 620; }
+  ul.clean li.q::before { background: var(--warn); }
+
+  /* ---------- nav options ---------- */
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
+  .opt { border: 1px solid var(--line); border-radius: 9px; padding: 15px; background: var(--panel); }
+  .opt.rec { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .opt-n {
+    font-size: 10px; font-weight: 680; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .opt.rec .opt-n { color: var(--primary); }
+  .opt-p { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .opt-p strong { color: var(--ink); font-weight: 620; }
+
+  .wire {
+    display: grid; grid-template-columns: 26px 1fr; gap: 5px; background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px; margin: 11px 0 3px; height: 132px;
+  }
+  .w-nav { display: flex; flex-direction: column; gap: 4px; }
+  .w-nav i { display: block; height: 6px; border-radius: 2px; background: var(--line-2); }
+  .w-nav i.on { background: var(--primary); }
+  .w-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; position: relative; }
+  .w-box {
+    border: 1px dashed var(--line-2); border-radius: 4px; background: var(--panel);
+    font-size: 9px; color: var(--muted); display: grid; place-items: center; flex: none; height: 26px;
+  }
+  .w-box.tall { height: 38px; }
+  .w-box.xtall { flex: 1; }
+  .w-tabs, .w-bar { display: flex; gap: 4px; flex: none; }
+  .w-tabs span, .w-tabs b, .w-bar b {
+    font-size: 8.5px; padding: 3px 6px; border-radius: 3px; font-weight: 600;
+    background: var(--panel); border: 1px solid var(--line-2); color: var(--muted);
+  }
+  .w-tabs b { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .w-bar b { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .w-bar b.alt { background: var(--primary); border-color: var(--primary); }
+  .w-drawer {
+    position: absolute; inset-block: 0; inset-inline-end: 0; width: 46%;
+    background: var(--panel); border: 1px solid var(--primary); border-radius: 4px;
+    font-size: 9px; color: var(--primary); display: grid; place-items: center; font-weight: 600;
+    box-shadow: -6px 0 12px rgba(0,0,0,.10);
+  }
+
+  .foot { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+  <div class="doc-head">
+    <div class="eyebrow">Proposal · Platform admin</div>
+    <h1>Backfill Console</h1>
+    <p class="lede">
+      Historical backfill already runs in production as Celery tasks inside the imagery and weather
+      modules — but the only way to trigger it is <strong>a manual pod exec</strong>. This puts a
+      screen in front of it: pick a tenant and farm, choose a window and sources, see what it will
+      cost <em>before</em> submitting, and watch runs finish.
+    </p>
+  </div>
+
+  <h2>The screen</h2>
+
+  <div class="app">
+    <aside class="nav">
+      <div class="nav-h">Platform</div>
+      <div class="nav-i"><span class="dot"></span>Tenants</div>
+      <div class="nav-i"><span class="dot"></span>Defaults</div>
+      <div class="nav-i"><span class="dot"></span>Crops</div>
+      <div class="nav-i"><span class="dot"></span>Plan templates</div>
+      <div class="nav-i on"><span class="dot"></span>Backfill</div>
+      <div class="nav-i"><span class="dot"></span>Health</div>
+      <div class="nav-i"><span class="dot"></span>Admins</div>
+    </aside>
+
+    <div class="main">
+      <div class="main-h">
+        <div class="main-t">Backfill</div>
+        <span class="scoped">Platform admin only</span>
+      </div>
+      <div class="main-s">Load historical imagery and weather for a farm, and compute indices over data already stored.</div>
+
+      <!-- composer -->
+      <div class="card">
+        <div class="card-h"><span>New backfill</span></div>
+        <div class="composer">
+          <div class="fields">
+            <div class="row">
+              <div class="f">
+                <label class="lbl">Tenant</label>
+                <div class="ctl"><span>Agrosina</span><span class="chev">▾</span></div>
+                <div class="hint mono" style="font-family:var(--mono);font-size:11px">tenant_019eafdc…c67dd</div>
+              </div>
+              <div class="f">
+                <label class="lbl">Farm</label>
+                <div class="ctl"><span>agrosina-suez</span><span class="chev">▾</span></div>
+                <div class="hint">37 blocks · 35 active imagery subscriptions</div>
+                <div class="hint">One run per farm at a time. Farms with a run in progress can't be selected.</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="f">
+                <label class="lbl">From</label>
+                <div class="ctl"><span>2025-07-01</span><span class="chev">▾</span></div>
+              </div>
+              <div class="f">
+                <label class="lbl">To</label>
+                <div class="ctl"><span>2026-07-01</span><span class="chev">▾</span></div>
+              </div>
+            </div>
+
+            <div class="f">
+              <label class="lbl">Sources</label>
+              <div class="checks">
+                <div class="chk on">
+                  <div class="box">✓</div>
+                  <div>
+                    <div class="chk-t">Satellite imagery</div>
+                    <div class="chk-d">Sentinel-2 scenes from CDSE → R2 → STAC. Raw bands only. Consumes processing units.</div>
+                  </div>
+                </div>
+                <div class="chk on teal">
+                  <div class="box">✓</div>
+                  <div>
+                    <div class="chk-t">Weather</div>
+                    <div class="chk-d">Hourly observations from the Open-Meteo archive. Free, no quota.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="hint">Backfill always loads raw data only. Compute indices afterwards from the Indices screen.</div>
+            </div>
+          </div>
+
+          <div class="est">
+            <div class="est-h">Before you run this</div>
+            <div class="est-big">~1,750</div>
+            <div class="hint" style="margin-bottom:12px">processing units, estimated</div>
+
+            <div class="est-row"><span class="est-k">Window</span><span class="est-v">366 days</span></div>
+            <div class="est-row"><span class="est-k">Subscriptions</span><span class="est-v">35</span></div>
+            <div class="est-row"><span class="est-k">Est. clear scenes</span><span class="est-v">~50 each</span></div>
+            <div class="est-row"><span class="est-k">Weather rows</span><span class="est-v">~8,784</span></div>
+
+            <div class="quota">
+              <div class="quota-t">Quota check</div>
+              <div>This would use about <strong>58%</strong> of the CDSE monthly allowance.</div>
+              <div class="bar"><i style="width:58%"></i></div>
+              <div class="sub">1,750 of 3,000 units · 240 already used this month</div>
+            </div>
+
+            <div class="actions">
+              <button class="btn">Start backfill</button>
+              <button class="btn sec">Dry run</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- runs -->
+      <div class="card" style="margin-top:18px">
+        <div class="card-h">
+          <span>Runs</span>
+          <span class="sub">Auto-refreshing · updated 4s ago</span>
+        </div>
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th><th>Tenant / farm</th><th>Window</th><th>Sources</th>
+                <th>Progress</th><th>Started</th><th>By</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="pill p-run"><i></i>Running</span></td>
+                <td>Nile Delta Co<div class="sub">ndc-mansoura</div></td>
+                <td class="num">2025-07-01<div class="sub num">→ 2026-07-01</div></td>
+                <td><div class="srcs"><span class="src s-img">IMG</span><span class="src s-wx">WX</span></div></td>
+                <td>
+                  <div class="prog">
+                    <div class="track"><i class="fill-run" style="width:41%"></i></div>
+                    <span class="num sub">41%</span>
+                  </div>
+                  <div class="sub num">718 / 1,750 scenes</div>
+                </td>
+                <td class="num">14:02<div class="sub num">18m ago</div></td>
+                <td>mohamed<div class="sub">platform</div></td>
+                <td><button class="btn sec sm">View</button></td>
+              </tr>
+
+              <tr class="detail"><td colspan="8" style="padding:0">
+                <div class="detail-in">
+                  <div class="task">
+                    <div class="task-h">
+                      <span class="task-n">imagery.backfill_farm_scenes</span>
+                      <span class="pill p-run"><i></i>Running</span>
+                    </div>
+                    <div class="kv"><span>Scenes registered</span><span>718</span></div>
+                    <div class="kv"><span>Skipped (cloud)</span><span>96</span></div>
+                    <div class="kv"><span>Failed</span><span>3</span></div>
+                    <div class="kv"><span>Units consumed</span><span>712</span></div>
+                    <div class="errline">3 scenes failed on CDSE timeout. They will be retried on the next run — the window is idempotent.</div>
+                  </div>
+                  <div class="task">
+                    <div class="task-h">
+                      <span class="task-n">weather.backfill_weather</span>
+                      <span class="pill p-ok"><i></i>Done</span>
+                    </div>
+                    <div class="kv"><span>Observations upserted</span><span>8,784</span></div>
+                    <div class="kv"><span>Months chunked</span><span>12 / 12</span></div>
+                    <div class="kv"><span>Provider</span><span>open-meteo</span></div>
+                    <div class="kv"><span>Duration</span><span>1m 12s</span></div>
+                  </div>
+                </div>
+              </td></tr>
+
+              <tr>
+                <td><span class="pill p-part"><i></i>Partial</span></td>
+                <td>Agrosina<div class="sub">agrosina-demo-2</div></td>
+                <td class="num">2026-01-01<div class="sub num">→ 2026-06-30</div></td>
+                <td><div class="srcs"><span class="src s-img">IMG</span></div></td>
+                <td>
+                  <div class="prog">
+                    <div class="track"><i class="fill-ok" style="width:100%"></i></div>
+                    <span class="num sub">100%</span>
+                  </div>
+                  <div class="sub num">402 ok · 14 failed</div>
+                </td>
+                <td class="num">Jul 27<div class="sub num">2 days ago</div></td>
+                <td>mohamed<div class="sub">platform</div></td>
+                <td><button class="btn sec sm">Retry failed</button></td>
+              </tr>
+
+              <tr>
+                <td><span class="pill p-ok"><i></i>Succeeded</span></td>
+                <td>Nile Delta Co<div class="sub">ndc-mansoura</div></td>
+                <td class="num">2026-05-01<div class="sub num">→ 2026-07-01</div></td>
+                <td><div class="srcs"><span class="src s-wx">WX</span><span class="src s-idx">IDX</span></div></td>
+                <td>
+                  <div class="prog">
+                    <div class="track"><i class="fill-ok" style="width:100%"></i></div>
+                    <span class="num sub">100%</span>
+                  </div>
+                  <div class="sub num">1,464 observations</div>
+                </td>
+                <td class="num">Jul 26<div class="sub num">3 days ago</div></td>
+                <td>ops-bot<div class="sub">system</div></td>
+                <td><button class="btn sec sm">View</button></td>
+              </tr>
+
+              <tr>
+                <td><span class="pill p-fail"><i></i>Failed</span></td>
+                <td>Nile Delta Co<div class="sub">ndc-tanta</div></td>
+                <td class="num">2024-01-01<div class="sub num">→ 2026-07-01</div></td>
+                <td><div class="srcs"><span class="src s-img">IMG</span></div></td>
+                <td>
+                  <div class="prog">
+                    <div class="track"><i class="fill-fail" style="width:8%"></i></div>
+                    <span class="num sub">8%</span>
+                  </div>
+                  <div class="sub">Quota exhausted</div>
+                </td>
+                <td class="num">Jul 24<div class="sub num">5 days ago</div></td>
+                <td>mohamed<div class="sub">platform</div></td>
+                <td><button class="btn sec sm">View</button></td>
+              </tr>
+
+              <tr>
+                <td><span class="pill p-q"><i></i>Queued</span></td>
+                <td>Nile Delta Co<div class="sub">ndc-tanta</div></td>
+                <td class="num">2025-07-01<div class="sub num">→ 2026-07-01</div></td>
+                <td><div class="srcs"><span class="src s-idx">IDX</span></div></td>
+                <td><span class="sub">Waiting for a worker slot</span></td>
+                <td class="num">14:06<div class="sub num">14m ago</div></td>
+                <td>mohamed<div class="sub">platform</div></td>
+                <td><button class="btn sec sm">View</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- indices -->
+      <div class="card" style="margin-top:18px">
+        <div class="card-h"><span>Compute indices</span></div>
+        <div class="card-b">
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px;max-width:70ch">
+            Runs over data <em>already stored</em> — no new provider calls, no processing units.
+            Use this after a raw backfill, or to reproject history when a formula changes.
+          </p>
+          <div class="row" style="gap:12px">
+            <div class="f">
+              <label class="lbl">Tenant / farm</label>
+              <div class="ctl"><span>Agrosina · agrosina-suez</span><span class="chev">▾</span></div>
+            </div>
+            <div class="f">
+              <label class="lbl">Window</label>
+              <div class="ctl"><span>2025-07-01 → 2026-07-01</span><span class="chev">▾</span></div>
+            </div>
+          </div>
+
+          <div class="f" style="margin-top:15px">
+            <label class="lbl">Compute</label>
+            <div class="checks">
+              <div class="chk on">
+                <div class="box">✓</div>
+                <div style="flex:1;min-width:0">
+                  <div class="chk-t">Imagery indices</div>
+                  <div class="chk-d">NDVI · NDMI · NDRE · SAVI · EVI · NDWI · GNDVI — recomputed per stored scene.</div>
+                  <div class="hint" style="margin-top:6px">1,412 scenes match · 96 already complete and will be skipped</div>
+                </div>
+              </div>
+              <div class="chk on teal">
+                <div class="box">✓</div>
+                <div style="flex:1;min-width:0">
+                  <div class="chk-t">Weather indices</div>
+                  <div class="chk-d">GDD, ET₀ and rainfall accumulations projected into daily weather indices.</div>
+                  <div class="hint" style="margin-top:6px">8,784 hourly observations available for the window</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn">Compute indices</button>
+            <button class="btn sec">Dry run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>How the three capabilities fit together</h2>
+  <p style="font-size:14px;color:var(--muted);max-width:68ch;margin-bottom:6px">
+    There are three things here: <strong style="color:var(--ink)">start a backfill</strong>,
+    <strong style="color:var(--ink)">compute indices</strong>, and
+    <strong style="color:var(--ink)">watch what's running</strong>. The screen above stacks all three,
+    which is the simplest thing that works but makes the page long and buries the run history in the middle.
+    Three ways to arrange them:
+  </p>
+
+  <div class="opts">
+    <div class="opt">
+      <div class="opt-n">Option 1</div>
+      <h3>One screen, stacked</h3>
+      <div class="wire">
+        <div class="w-nav"><i class="on"></i><i></i><i></i></div>
+        <div class="w-body">
+          <div class="w-box tall">New backfill</div>
+          <div class="w-box">Runs</div>
+          <div class="w-box tall">Compute indices</div>
+        </div>
+      </div>
+      <p class="opt-p"><strong>For:</strong> nothing hidden, no navigation, one page to learn. What the mockup shows today.</p>
+      <p class="opt-p"><strong>Against:</strong> long scroll. Runs — the thing you return to most — sits between two forms you use rarely. Gets worse as the table grows.</p>
+    </div>
+
+    <div class="opt">
+      <div class="opt-n">Option 2</div>
+      <h3>One item, three tabs</h3>
+      <div class="wire">
+        <div class="w-nav"><i class="on"></i><i></i><i></i></div>
+        <div class="w-body">
+          <div class="w-tabs"><b>Backfill</b><span>Indices</span><span>Runs</span></div>
+          <div class="w-box tall">Active tab</div>
+        </div>
+      </div>
+      <p class="opt-p"><strong>For:</strong> each capability gets a clean, full-width surface. Familiar pattern, cheap to build.</p>
+      <p class="opt-p"><strong>Against:</strong> you submit on one tab and the result appears on another — the tab switch after every run gets old fast. Status is invisible unless you go looking.</p>
+    </div>
+
+    <div class="opt rec">
+      <div class="opt-n">Option 3 · recommended</div>
+      <h3>Runs is the screen</h3>
+      <div class="wire">
+        <div class="w-nav"><i class="on"></i><i></i><i></i></div>
+        <div class="w-body">
+          <div class="w-bar"><b>+ Backfill</b><b class="alt">+ Indices</b></div>
+          <div class="w-box xtall">Runs</div>
+          <div class="w-drawer">Drawer</div>
+        </div>
+      </div>
+      <p class="opt-p"><strong>For:</strong> matches what the screen is actually <em>for</em> — you check status far more often than you start a job. Both actions open a drawer over the list, so you submit and watch the row appear behind it. One unified history.</p>
+      <p class="opt-p"><strong>Against:</strong> a drawer holds less comfortably than a full page, and the estimate rail needs to fit inside it.</p>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:var(--muted);max-width:68ch;margin-top:16px">
+    I'd take <strong style="color:var(--ink)">Option 3</strong>. The deciding argument is that both actions
+    write into the <em>same</em> run table — splitting them across tabs or pages fragments one operational
+    history for no gain, whereas the job-console shape (list as home, creation as a transient task) is the
+    pattern every ops tool converges on for exactly this reason. Option 2 is the safe fallback if you'd
+    rather not build a drawer.
+  </p>
+
+  <h2>Why it's shaped this way</h2>
+  <div class="notes">
+    <div class="note">
+      <div class="note-k">Tenant first</div>
+      <p>A platform admin has <strong>no farm context</strong> — the nav is persona-separated and there is no farm switcher. So tenant is the first field, and farm cascades from it. This mirrors the existing tenant drill-down in Health.</p>
+    </div>
+    <div class="note">
+      <div class="note-k">Cost before commit</div>
+      <p>The estimate rail is the anchor of the composer, not a footnote. A year across 35 subscriptions is <strong>real money on the CDSE free tier</strong>, and it is the one mistake here that cannot be undone by re-running.</p>
+    </div>
+    <div class="note">
+      <div class="note-k">Indices stay separate</div>
+      <p>Backfill is <strong>always raw-only</strong> — there is no inline "compute as you go". Load raw once, then reproject as often as you like without touching the provider. Imagery and weather indices are independent checkboxes, because they are separate tasks with completely different costs.</p>
+    </div>
+    <div class="note">
+      <div class="note-k">Partial is a real state</div>
+      <p>Backfills routinely half-succeed — cloud skips, provider timeouts, quota exhaustion. With no cancel, <strong>Partial</strong> carries the weight: it is a first-class status whose retry re-runs only the failed window, safe because both tasks are idempotent.</p>
+    </div>
+  </div>
+
+  <h2>API surface</h2>
+  <div class="api">
+    <div class="api-r">
+      <div class="verb v-post">POST</div>
+      <div>
+        <div class="api-p">/v1/admin/tenants/{tenantId}/backfill-runs</div>
+        <div class="api-d">Create a run: farm, window, <code>sources: ["imagery","weather"]</code>. Returns the run id, or 409 if that farm is already running.</div>
+      </div>
+    </div>
+    <div class="api-r">
+      <div class="verb v-post">POST</div>
+      <div>
+        <div class="api-p">/v1/admin/tenants/{tenantId}/backfill-runs:estimate</div>
+        <div class="api-d">Dry run. Returns block/subscription counts, scene and unit estimates, quota headroom. No side effects.</div>
+      </div>
+    </div>
+    <div class="api-r">
+      <div class="verb v-get">GET</div>
+      <div>
+        <div class="api-p">/v1/admin/backfill-runs?status=running</div>
+        <div class="api-d">Cross-tenant list for the table. Polled while any run is active.</div>
+      </div>
+    </div>
+    <div class="api-r">
+      <div class="verb v-get">GET</div>
+      <div>
+        <div class="api-p">/v1/admin/tenants/{tenantId}/backfill-runs/{id}</div>
+        <div class="api-d">One run with its per-task detail rows — the expanded view.</div>
+      </div>
+    </div>
+    <div class="api-r">
+      <div class="verb v-post">POST</div>
+      <div>
+        <div class="api-p">/v1/admin/tenants/{tenantId}/backfill-runs/{id}:retry</div>
+        <div class="api-d">Re-queue only the failed slice of a partial run. Rejected if the farm has a run in progress.</div>
+      </div>
+    </div>
+    <div class="api-r">
+      <div class="verb v-post">POST</div>
+      <div>
+        <div class="api-p">/v1/admin/tenants/{tenantId}/index-runs</div>
+        <div class="api-d">Compute indices over stored data. Body takes <code>sources: ["imagery","weather"]</code>. Writes to the same run table.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What this needs that doesn't exist yet</h2>
+  <ul class="clean">
+    <li><strong>A <code>backfill_runs</code> table.</strong> Both tasks are declared <code>ignore_result=True</code>, so Celery persists nothing and there is no status to read today. This table is the actual new work — the UI is a view onto it. It mirrors the existing <code>imagery_ingestion_jobs</code> shape: status, started_at, completed_at, counters, error.</li>
+    <li><strong>Progress reporting from inside the tasks.</strong> They currently return a dict at the end. They need to write counters as they go, or the bar only ever reads 0% then 100%.</li>
+    <li><strong>A quota reading.</strong> The estimate is honest only if CDSE consumption is actually tracked. Without it the panel should show scene counts and say units are unknown, rather than invent a number.</li>
+    <li><strong>A capability.</strong> Something like <code>platform.run_backfill</code>, gated the same way the nav already gates on <code>platform.manage_tenants</code>.</li>
+  </ul>
+
+  <h2>Decisions</h2>
+  <ul class="clean">
+    <li><strong>No stop or cancel.</strong> Runs go to completion. This removes the awkward part — mid-flight Celery revocation — and costs little, because a run that goes wrong is recoverable by fixing the cause and re-running: both tasks are idempotent, so a repeat only fills gaps.</li>
+    <li><strong>One farm per run.</strong> Matches the existing task signature exactly, keeps progress a single honest number, and avoids a fan-out model the UI would struggle to represent.</li>
+    <li><strong>Concurrency is blocked, not queued.</strong> A farm with a run in progress cannot be selected, and the API rejects a second run for the same farm. Idempotency makes a concurrent run <em>safe</em> but not <em>free</em> — it would burn processing units re-fetching scenes the first run is already pulling.</li>
+    <li><strong>Platform admins only.</strong> No tenant-admin path. That stays closed until per-tenant quota accounting exists, since without it one tenant could exhaust the shared CDSE allowance for everyone.</li>
+  </ul>
+
+  <div class="foot">
+    Mockup only — no code written. Built against the app's own tokens
+    (<code>ap.bg</code>, <code>ap.primary</code>, <code>ap.accent</code>) so it reads in context.
+  </div>
+</div>

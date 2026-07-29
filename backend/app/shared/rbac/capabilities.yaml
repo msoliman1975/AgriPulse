@@ -97,6 +97,13 @@ capabilities:
     description: Add, remove, or transfer-ownership of tenant admins on any tenant.
     scope: platform
     status: active
+  platform.run_backfill:
+    # Deliberately platform-only: backfill spends a shared CDSE processing-unit
+    # allowance, so until per-tenant quota accounting exists one tenant could
+    # exhaust it for everyone.
+    description: Trigger historical imagery/weather backfill and index computation on any tenant.
+    scope: platform
+    status: active
   platform.manage_platform_admins:
     description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
     scope: platform

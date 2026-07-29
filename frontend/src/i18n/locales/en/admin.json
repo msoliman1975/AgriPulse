@@ -6,7 +6,8 @@
     "crops": "Crop catalog",
     "planTemplates": "Plan templates",
     "platformAdmins": "Platform admins",
-    "platformHealth": "Integration health"
+    "platformHealth": "Integration health",
+    "backfill": "Backfill"
   },
   "crops": {
     "title": "Crop catalog",
@@ -83,7 +84,11 @@
     "empty": "No platform admins yet — bootstrap one via env vars.",
     "removeButton": "Revoke",
     "pendingKc": "(pending Keycloak provisioning)",
-    "col": { "user": "User", "role": "Role", "actions": "" },
+    "col": {
+      "user": "User",
+      "role": "Role",
+      "actions": ""
+    },
     "inviteTitle": "Invite a platform admin",
     "inviteHint": "Creates a Keycloak user (or reuses an existing one) and sets the platform_role attribute. They'll receive a password-reset email.",
     "invite": {
@@ -136,7 +141,11 @@
     "ownerHint": "Tenant owner — use Transfer ownership to move this role.",
     "transferToButton": "Transfer ownership →",
     "removeButton": "Revoke admin",
-    "col": { "email": "User", "role": "Role", "actions": "" },
+    "col": {
+      "email": "User",
+      "role": "Role",
+      "actions": ""
+    },
     "inviteHeading": "Invite a new TenantAdmin",
     "invite": {
       "email": "Email",
@@ -340,5 +349,70 @@
     "pending_delete": "Pending delete",
     "pending_provision": "Pending provisioning",
     "archived": "Archived"
+  },
+  "backfill": {
+    "title": "Backfill",
+    "subtitle": "Load historical imagery and weather for a farm, and compute indices over data already stored.",
+    "started": "Run started. Follow it on the Runs tab.",
+    "tabs": {
+      "backfill": "New backfill",
+      "indices": "Compute indices",
+      "runs": "Runs"
+    },
+    "form": {
+      "tenant": "Tenant",
+      "farm": "Farm",
+      "pick": "Select…",
+      "busy": "run in progress",
+      "blocks": "blocks",
+      "from": "From",
+      "to": "To",
+      "sources": "Sources",
+      "compute": "Compute"
+    },
+    "source": {
+      "imagery": "Satellite imagery",
+      "weather": "Weather",
+      "imageryIndices": "Imagery indices",
+      "weatherIndices": "Weather indices"
+    },
+    "hint": {
+      "imagery": "Sentinel-2 scenes from CDSE. Raw bands only. Consumes processing units.",
+      "weather": "Hourly observations from the Open-Meteo archive. Free, no quota.",
+      "imageryIndices": "NDVI, NDMI, NDRE, SAVI, EVI, NDWI and GNDVI, recomputed per stored scene.",
+      "weatherIndices": "GDD, ET₀ and rainfall accumulations projected into daily weather indices.",
+      "rawOnly": "Backfill loads raw data only. Compute indices afterwards from the Indices tab.",
+      "indicesFree": "Runs over data already stored — no provider calls and no processing units."
+    },
+    "estimate": {
+      "title": "Before you run this",
+      "body": "{{days}} days · {{blocks}} blocks · {{subscriptions}} subscriptions · about {{scenes}} scenes",
+      "units": "Roughly {{units}} processing units. This is an estimate, not a quota reading."
+    },
+    "actions": {
+      "start": "Start backfill",
+      "compute": "Compute indices",
+      "dryRun": "Dry run"
+    },
+    "kind": {
+      "backfill": "Backfill",
+      "indices": "Indices"
+    },
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "partial": "Partial",
+      "failed": "Failed"
+    },
+    "runs": {
+      "empty": "No runs yet.",
+      "status": "Status",
+      "target": "Tenant / farm",
+      "window": "Window",
+      "sources": "Sources",
+      "progress": "Progress",
+      "startedBy": "Started by"
+    }
   }
 }
