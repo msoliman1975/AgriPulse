@@ -56,6 +56,21 @@ class BackfillConflictError(Exception):
         self.existing = existing
 
 
+class NoIntegrationConfigError(Exception):
+    """A requested source has no active subscription on this farm.
+
+    Without this guard the run would be accepted, dispatch a task, and do
+    nothing — the provider work is driven entirely by the farm's block
+    subscriptions, so zero subscriptions means zero fetches. That reads as
+    a silent success, which is the worst possible outcome for an operator
+    who thinks they just loaded a year of history.
+    """
+
+    def __init__(self, missing: list[str]) -> None:
+        super().__init__(f"no active subscriptions for: {', '.join(missing)}")
+        self.missing = missing
+
+
 class BackfillService:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -133,7 +148,12 @@ class BackfillService:
                          JOIN blocks b ON b.id = s.block_id
                         WHERE b.farm_id = :fid
                           AND s.is_active = TRUE
-                          AND s.deleted_at IS NULL) AS subscriptions
+                          AND s.deleted_at IS NULL) AS subscriptions,
+                      (SELECT count(*) FROM weather_subscriptions s
+                         JOIN blocks b ON b.id = s.block_id
+                        WHERE b.farm_id = :fid
+                          AND s.is_active = TRUE
+                          AND s.deleted_at IS NULL) AS weather_subscriptions
                     """
                     ),
                     {"fid": str(farm_id)},
@@ -142,10 +162,12 @@ class BackfillService:
             .mappings()
             .one()
         )
+        providers = await self._weather_providers(tenant_schema, farm_id, already_scoped=True)
         await self._reset_search_path()
 
         days = max((window_to - window_from).days + 1, 0)
         subs = int(row["subscriptions"])
+        wx_subs = int(row["weather_subscriptions"])
         scenes = int(round(subs * days * _SCENES_PER_SUB_PER_DAY)) if imagery else 0
         return {
             "days": days,
@@ -157,6 +179,11 @@ class BackfillService:
             # approximation, not a quota reading. The UI labels it as such.
             "units_estimated": True,
             "weather_hours": days * 24 if weather else 0,
+            # Surfaced so the console can warn *before* submitting: a source
+            # with no active subscription would dispatch a task that has
+            # nothing to fetch and reads as a silent no-op.
+            "weather_subscriptions": wx_subs,
+            "weather_providers": providers,
         }
 
     # ---- dispatch -------------------------------------------------------
@@ -184,6 +211,19 @@ class BackfillService:
         if existing is not None:
             raise BackfillConflictError(existing)
 
+        # Validate the farm actually has the integration configs the run
+        # needs, BEFORE accepting it. Both providers are driven purely by
+        # the farm's active per-block subscriptions, so a source with none
+        # would dispatch a task that fetches nothing.
+        weather_providers = await self._weather_providers(tenant_schema, farm_id)
+        missing: list[str] = []
+        if imagery and not await self._has_imagery_subs(tenant_schema, farm_id):
+            missing.append("imagery")
+        if weather and not weather_providers:
+            missing.append("weather")
+        if missing:
+            raise NoIntegrationConfigError(missing)
+
         run = await self._repo.create(
             tenant_id=tenant_id,
             tenant_schema=tenant_schema,
@@ -210,6 +250,7 @@ class BackfillService:
             window_to=window_to,
             imagery=imagery,
             weather=weather,
+            weather_providers=weather_providers,
         )
         return run
 
@@ -224,6 +265,7 @@ class BackfillService:
         window_to: date,
         imagery: bool,
         weather: bool,
+        weather_providers: list[str],
     ) -> None:
         app = celery_current_app
         rid = str(run_id)
@@ -272,18 +314,24 @@ class BackfillService:
                 queue="heavy",
             )
         if weather:
-            app.send_task(
-                TASK_WEATHER_BACKFILL,
-                kwargs={
-                    "farm_id": str(farm_id),
-                    "tenant_schema": tenant_schema,
-                    "provider_code": "open-meteo",
-                    "start_iso": window_from.isoformat(),
-                    "end_iso": window_to.isoformat(),
-                    "run_id": rid,
-                },
-                queue="heavy",
-            )
+            # One task per provider the farm is actually subscribed to.
+            # NEVER hardcode a provider_code here: the worker's
+            # `_make_provider` raises on anything it does not recognise
+            # (it matches "open_meteo", underscore), so a guessed literal
+            # fails the whole run at execution time.
+            for code in weather_providers:
+                app.send_task(
+                    TASK_WEATHER_BACKFILL,
+                    kwargs={
+                        "farm_id": str(farm_id),
+                        "tenant_schema": tenant_schema,
+                        "provider_code": code,
+                        "start_iso": window_from.isoformat(),
+                        "end_iso": window_to.isoformat(),
+                        "run_id": rid,
+                    },
+                    queue="heavy",
+                )
 
     # ---- reads ----------------------------------------------------------
 
@@ -308,6 +356,60 @@ class BackfillService:
         found = row.one_or_none()
         await self._reset_search_path()
         return dict(found) if found else None
+
+    async def _weather_providers(
+        self, tenant_schema: str, farm_id: UUID, *, already_scoped: bool = False
+    ) -> list[str]:
+        """Distinct provider codes this farm actually subscribes to.
+
+        Mirrors how the normal refresh resolves providers
+        (`WeatherService.refresh_block`): weather subscriptions are
+        per-block, so a farm's providers are the distinct codes across its
+        blocks' active subscriptions. Returning [] means the farm has no
+        weather integration configured at all.
+        """
+        if not already_scoped:
+            await self._set_search_path(tenant_schema)
+        rows = (
+            await self._s.execute(
+                text(
+                    """
+                    SELECT DISTINCT s.provider_code
+                      FROM weather_subscriptions s
+                      JOIN blocks b ON b.id = s.block_id
+                     WHERE b.farm_id = :fid
+                       AND s.is_active = TRUE
+                       AND s.deleted_at IS NULL
+                     ORDER BY s.provider_code
+                    """
+                ),
+                {"fid": str(farm_id)},
+            )
+        ).all()
+        if not already_scoped:
+            await self._reset_search_path()
+        return [r[0] for r in rows]
+
+    async def _has_imagery_subs(self, tenant_schema: str, farm_id: UUID) -> bool:
+        await self._set_search_path(tenant_schema)
+        row = (
+            await self._s.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM imagery_aoi_subscriptions s
+                          JOIN blocks b ON b.id = s.block_id
+                         WHERE b.farm_id = :fid
+                           AND s.is_active = TRUE
+                           AND s.deleted_at IS NULL
+                    ) AS present
+                    """
+                ),
+                {"fid": str(farm_id)},
+            )
+        ).one()
+        await self._reset_search_path()
+        return bool(row[0])
 
     async def _set_search_path(self, tenant_schema: str) -> None:
         # Schema names are generated by `schema_name_for` (tenant_<hex>) and

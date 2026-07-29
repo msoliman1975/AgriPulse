@@ -30,6 +30,8 @@ vi.mock("@/api/backfill", async () => {
         estimated_units: 2562,
         units_estimated: true,
         weather_hours: 8784,
+        weather_subscriptions: 4,
+        weather_providers: ["open_meteo"],
       }),
     ),
     createBackfillRun: vi.fn(),
