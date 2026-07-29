@@ -63,6 +63,7 @@ from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.storage import raw_bands_key
 from app.modules.integrations_health.error_codes import classify_error
+from app.shared import backfill_progress
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 from app.shared.eventbus import get_default_bus
@@ -482,6 +483,7 @@ def backfill_farm_scenes(
     from_iso: str,
     to_iso: str,
     run_compute_indices: bool = False,
+    run_id: str | None = None,
 ) -> dict[str, int]:
     """Fan out `backfill_scenes` to every active imagery subscription on a farm.
 
@@ -492,7 +494,7 @@ def backfill_farm_scenes(
     """
     return _run_task(
         _backfill_farm_scenes_async(
-            UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices
+            UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices, run_id
         )
     )
 
@@ -503,6 +505,7 @@ async def _backfill_farm_scenes_async(
     from_iso: str,
     to_iso: str,
     run_compute_indices: bool,
+    run_id: str | None = None,
 ) -> dict[str, int]:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
@@ -518,14 +521,114 @@ async def _backfill_farm_scenes_async(
             )
         ).all()
     sub_ids = [r[0] for r in rows]
+    # This task only fans out — the per-subscription children do the real
+    # work and finish long after it returns. So it reports the shape of the
+    # job rather than a completion, and settles the source immediately;
+    # the console shows scenes landing through the subscription counters.
+    backfill_progress.mark_running(run_id)
     for sid in sub_ids:
         backfill_scenes.delay(str(sid), tenant_schema, from_iso, to_iso, run_compute_indices)
     _log.info(
         "imagery_backfill_farm_enqueued",
         farm_id=str(farm_id),
         subscriptions=len(sub_ids),
+        run_id=run_id,
+    )
+    backfill_progress.finish(
+        run_id,
+        "imagery",
+        counters={"subscriptions": len(sub_ids), "dispatched": True},
+        failed=False,
     )
     return {"subscriptions_enqueued": len(sub_ids)}
+
+
+# --- farm-wide index recomputation (console "Compute indices") ---------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.backfill_farm_indices",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def backfill_farm_indices(
+    farm_id: str,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+    run_id: str | None = None,
+) -> dict[str, int]:
+    """Recompute indices for every stored scene of a farm in a window.
+
+    `compute_indices` works per ingestion job, so the console needs this
+    farm-level fan-out over scenes that are *already* stored. No provider
+    calls and no processing units — it re-reads the raw-bands COG that the
+    original ingest wrote.
+    """
+    return _run_task(
+        _backfill_farm_indices_async(UUID(farm_id), tenant_schema, from_iso, to_iso, run_id)
+    )
+
+
+async def _backfill_farm_indices_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+    run_id: str | None = None,
+) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        # There is no stored raw-bands key — the ingest derives it from
+        # (provider, product, scene, aoi_hash) and writes to that
+        # deterministic path. Reconstruct the same inputs here rather than
+        # guessing at a column that does not exist.
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT j.id, j.scene_id, b.aoi_hash,
+                           p.code AS product_code, pr.code AS provider_code
+                      FROM imagery_ingestion_jobs j
+                      JOIN blocks b ON b.id = j.block_id
+                      JOIN public.imagery_products p ON p.id = j.product_id
+                      JOIN public.imagery_providers pr ON pr.id = p.provider_id
+                     WHERE b.farm_id = :farm
+                       AND j.status = 'succeeded'
+                       AND b.aoi_hash IS NOT NULL
+                       AND j.scene_datetime >= CAST(:from_iso AS timestamptz)
+                       AND j.scene_datetime <  CAST(:to_iso AS timestamptz) + INTERVAL '1 day'
+                     ORDER BY j.scene_datetime ASC
+                    """
+                ),
+                {"farm": farm_id, "from_iso": from_iso, "to_iso": to_iso},
+            )
+        ).all()
+
+    backfill_progress.mark_running(run_id)
+    for job_id, scene_id, aoi_hash, product_code, provider_code in rows:
+        compute_indices.delay(
+            str(job_id),
+            tenant_schema,
+            raw_bands_key(
+                provider_code=provider_code,
+                product_code=product_code,
+                scene_id=scene_id,
+                aoi_hash=aoi_hash,
+            ),
+        )
+    _log.info(
+        "imagery_farm_indices_enqueued",
+        farm_id=str(farm_id),
+        scenes=len(rows),
+        run_id=run_id,
+    )
+    backfill_progress.finish(
+        run_id, "imagery", counters={"scenes": len(rows), "dispatched": True}, failed=False
+    )
+    return {"scenes_enqueued": len(rows)}
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]

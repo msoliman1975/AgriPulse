@@ -131,6 +131,12 @@ export function SideNav(): ReactNode {
             activePathPrefix="/platform/plan-templates"
           />
           <SideNavItem
+            to="/platform/backfill"
+            label={t("nav.backfill")}
+            icon={<PlanIcon className="h-4 w-4" />}
+            activePathPrefix="/platform/backfill"
+          />
+          <SideNavItem
             to="/platform/admins"
             label={t("nav.platformAdmins")}
             icon={<UsersIcon className="h-4 w-4" />}

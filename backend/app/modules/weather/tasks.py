@@ -59,6 +59,7 @@ from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.risk import RiskBlockContext, evaluate_risks
 from app.modules.weather.risk_projection import build_risk_window
 from app.modules.weather.timezone import tz_for_centroid
+from app.shared import backfill_progress
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 
@@ -129,6 +130,13 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
 
 
 # --- fetch_weather ---------------------------------------------------------
+
+
+def _counters(result: Any) -> dict[str, Any]:
+    """Scalar-only view of a task result, safe to store as jsonb."""
+    if not isinstance(result, dict):
+        return {}
+    return {k: v for k, v in result.items() if isinstance(v, int | float | str | bool)}
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -482,7 +490,10 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
     ignore_result=True,
 )
 def backfill_weather_indices(
-    farm_id: str, tenant_schema: str, days: int = _BACKFILL_WINDOW_DAYS
+    farm_id: str,
+    tenant_schema: str,
+    days: int = _BACKFILL_WINDOW_DAYS,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """Reproject a wide window of history into `weather_index_daily`.
 
@@ -490,7 +501,14 @@ def backfill_weather_indices(
     deeper history the climatology sweep needs (run after a bulk weather
     backfill has loaded the underlying observations).
     """
-    return _run_task(_backfill_weather_indices_async(UUID(farm_id), tenant_schema, days))
+    backfill_progress.mark_running(run_id)
+    try:
+        result = _run_task(_backfill_weather_indices_async(UUID(farm_id), tenant_schema, days))
+    except Exception as exc:
+        backfill_progress.finish(run_id, "weather", failed=True, error=str(exc)[:500])
+        raise
+    backfill_progress.finish(run_id, "weather", counters=_counters(result), failed=False)
+    return result
 
 
 async def _backfill_weather_indices_async(
@@ -560,6 +578,7 @@ def backfill_weather(
     provider_code: str,
     start_iso: str,
     end_iso: str,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """Backfill raw hourly observations for [start, end] from the archive.
 
@@ -569,15 +588,24 @@ def backfill_weather(
     safe. Run ``weather.backfill_weather_indices`` afterwards to reproject
     the loaded history into ``weather_index_daily``.
     """
-    return _run_task(
-        _backfill_weather_async(
-            UUID(farm_id),
-            tenant_schema,
-            provider_code,
-            date.fromisoformat(start_iso),
-            date.fromisoformat(end_iso),
+    backfill_progress.mark_running(run_id)
+    try:
+        result = _run_task(
+            _backfill_weather_async(
+                UUID(farm_id),
+                tenant_schema,
+                provider_code,
+                date.fromisoformat(start_iso),
+                date.fromisoformat(end_iso),
+            )
         )
-    )
+    except Exception as exc:
+        # Report before re-raising so the console shows *why* a run failed
+        # rather than leaving it stuck on "running" forever.
+        backfill_progress.finish(run_id, "weather", failed=True, error=str(exc)[:500])
+        raise
+    backfill_progress.finish(run_id, "weather", counters=_counters(result), failed=False)
+    return result
 
 
 async def _backfill_weather_async(

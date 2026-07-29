@@ -136,6 +136,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     full app (e.g., a Celery worker importing only `app.core.settings`).
     """
     from app.modules.alerts.router import router as alerts_router
+    from app.modules.backfill.router import router as backfill_router
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
@@ -184,6 +185,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.weather.router import router as weather_router
     from app.shared.eventbus import get_default_bus
 
+    app.include_router(backfill_router)
     app.include_router(iam_router)
     app.include_router(tenancy_router)
     app.include_router(farms_router)

@@ -52,6 +52,7 @@ import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
+import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
 import { PlatformPlanTemplatesPage } from "@/modules/admin/pages/PlatformPlanTemplatesPage";
 import { PlanTemplateEditorPage } from "@/modules/admin/pages/PlanTemplateEditorPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
@@ -130,7 +131,10 @@ export function App(): ReactNode {
                 <Route path="/farms" element={<FarmListPage />} />
                 {/* Farm creation moved into the Farm Console; the old form
                     route redirects so existing links and bookmarks survive. */}
-                <Route path="/farms/new" element={<Navigate to="/labs/map?create=farm" replace />} />
+                <Route
+                  path="/farms/new"
+                  element={<Navigate to="/labs/map?create=farm" replace />}
+                />
                 <Route path="/farms/:farmId" element={<FarmDetailPage />} />
                 <Route path="/farms/:farmId/edit" element={<FarmEditPage />} />
                 <Route path="/farms/:farmId/members" element={<FarmMembersPage />} />
@@ -288,6 +292,7 @@ export function App(): ReactNode {
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
+                <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
                 <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
