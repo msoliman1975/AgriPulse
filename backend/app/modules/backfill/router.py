@@ -205,24 +205,16 @@ async def create_run(
         # knows to go set up subscriptions rather than retrying.
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            {
-                "detail": (
-                    "this farm has no active subscriptions for: "
-                    + ", ".join(exc.missing)
-                    + ". Configure them on the farm before backfilling."
-                ),
-                "missing_sources": exc.missing,
-            },
+            f"This farm has no active {' or '.join(exc.missing)} subscriptions, "
+            "so there is nothing to fetch. Configure them on the farm first.",
         ) from exc
     except BackfillConflictError as exc:
         # One run per farm: idempotency makes a concurrent run safe but not
         # free — it would re-fetch scenes the first run is already pulling.
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            {
-                "detail": "a backfill run is already in progress for this farm",
-                "run_id": str(exc.existing["id"]),
-            },
+            "A backfill run is already in progress for this farm "
+            f"(run {exc.existing['id']}). Wait for it to finish.",
         ) from exc
 
 
