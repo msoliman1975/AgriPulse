@@ -13,6 +13,7 @@ import type {
   SignalTemplateUpdatePayload,
   ValueKind,
 } from "@/api/signals";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -160,7 +161,7 @@ export function SignalsConfigPage(): ReactNode {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("config.title")}</h1>
@@ -407,7 +408,7 @@ export function SignalsConfigPage(): ReactNode {
           onForce={forceArchive}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 

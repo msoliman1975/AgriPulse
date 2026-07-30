@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
 import { isApiError } from "@/api/errors";
+import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -54,7 +55,7 @@ export function PlatformCropsPage(): ReactNode {
   const { data, isLoading, isError } = useAdminCrops(includeInactive);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+    <Page>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("crops.title")}</h1>
@@ -102,7 +103,7 @@ export function PlatformCropsPage(): ReactNode {
           ))}
         </div>
       )}
-    </div>
+    </Page>
   );
 }
 

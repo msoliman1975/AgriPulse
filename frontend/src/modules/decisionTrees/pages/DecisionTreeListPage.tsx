@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { DecisionTree, DecisionTreeListStatus } from "@/api/decisionTrees";
 import { listCountries } from "@/api/countries";
 import { Modal } from "@/components/Modal";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -78,14 +79,11 @@ export function DecisionTreeListPage(): ReactNode {
 
   const onConfirmArchive = (): void => {
     if (!archiveTarget) return;
-    archive.mutate(
-      { code: archiveTarget.code },
-      { onSettled: () => setArchiveTarget(null) },
-    );
+    archive.mutate({ code: archiveTarget.code }, { onSettled: () => setArchiveTarget(null) });
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("list.title")}</h1>
@@ -241,9 +239,7 @@ export function DecisionTreeListPage(): ReactNode {
                             disabled={restore.isPending}
                             className="text-xs font-medium text-ap-primary hover:underline disabled:opacity-50"
                           >
-                            {restore.isPending
-                              ? t("list.row.restoring")
-                              : t("list.row.restore")}
+                            {restore.isPending ? t("list.row.restoring") : t("list.row.restore")}
                           </button>
                         ) : (
                           <button
@@ -301,7 +297,7 @@ export function DecisionTreeListPage(): ReactNode {
           </div>
         </Modal>
       ) : null}
-    </div>
+    </Page>
   );
 }
 

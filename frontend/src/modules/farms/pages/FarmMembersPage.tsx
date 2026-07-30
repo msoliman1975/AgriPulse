@@ -13,6 +13,7 @@ import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { useTenantUsers } from "@/queries/users";
 import { MembersList } from "../components/MembersList";
+import { Page } from "@/components/Page";
 
 const ROLES: FarmMemberRole[] = ["FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"];
 
@@ -70,7 +71,7 @@ export function FarmMembersPage(): JSX.Element {
   };
 
   return (
-    <div className="space-y-4">
+    <Page>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ap-ink">{t("members.heading")}</h1>
         <Link to={`/farms/${farmId}`} className="btn btn-ghost">
@@ -148,6 +149,6 @@ export function FarmMembersPage(): JSX.Element {
           </button>
         </form>
       ) : null}
-    </div>
+    </Page>
   );
 }

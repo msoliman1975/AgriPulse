@@ -11,6 +11,7 @@ import type {
   RecommendationState,
   TreePathStepDTO,
 } from "@/api/recommendations";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { cellLabel } from "@/lib/cellLabel";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -49,7 +50,7 @@ export function RecommendationsPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
@@ -117,7 +118,7 @@ export function RecommendationsPage(): ReactNode {
           </ul>
         )}
       </div>
-    </div>
+    </Page>
   );
 }
 
@@ -159,7 +160,9 @@ function Row({ rec, farmId, canAct, onApply, onDismiss, onDefer }: RowProps): Re
           <Pill kind={stateKind(rec.state)}>{t(`state.${rec.state}`)}</Pill>
           <Pill kind="neutral">{t(`recAction.${rec.action_type}`)}</Pill>
           {cellLabel(rec.cell_row, rec.cell_col) ? (
-            <Pill kind="neutral">{t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}</Pill>
+            <Pill kind="neutral">
+              {t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}
+            </Pill>
           ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
@@ -275,9 +278,7 @@ function ActionsList({ actions }: { actions: RecommendationActions }): ReactNode
     <dl className="mt-2 flex flex-col gap-2 rounded-md border border-ap-line bg-ap-bg/40 p-3 text-[11px]">
       {present.map((horizon) => (
         <div key={horizon}>
-          <dt className="font-semibold text-ap-ink">
-            {t(`actionHorizon.${horizon}`)}
-          </dt>
+          <dt className="font-semibold text-ap-ink">{t(`actionHorizon.${horizon}`)}</dt>
           <dd>
             <ul className="ms-3 list-disc text-ap-muted">
               {(actions[horizon] ?? []).map((item, i) => (

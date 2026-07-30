@@ -7,6 +7,7 @@ import { useCapability } from "@/rbac/useCapability";
 import { STARTER_TREE_YAML } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
+import { Page } from "@/components/Page";
 
 // Default for the YAML textarea when the page first loads. Authors who
 // want to start clean can pick "Empty" from the template picker and
@@ -136,123 +137,126 @@ export function DecisionTreeCreatePage(): ReactNode {
   };
 
   return (
-    <form onSubmit={submit} className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("create.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("create.subtitle")}</p>
-      </header>
+    <Page>
+      {/* Forms keep their own measure — see the note in Page.tsx. */}
+      <form onSubmit={submit} className="flex max-w-3xl flex-col gap-4">
+        <header>
+          <h1 className="text-2xl font-semibold text-ap-ink">{t("create.title")}</h1>
+          <p className="mt-1 text-sm text-ap-muted">{t("create.subtitle")}</p>
+        </header>
 
-      <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
-        <Field label={t("create.fields.code")} hint={t("create.fields.codeHint")}>
-          <input
-            required
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder={t("create.fields.codePlaceholder")}
-            pattern="^[a-z0-9][a-z0-9_-]*$"
-            className={`${inputCls} sm:max-w-sm`}
-          />
-        </Field>
-      </section>
-
-      <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
-        <div>
-          <h2 className="text-sm font-semibold text-ap-ink">{t("targeting.heading")}</h2>
-          <p className="text-xs text-ap-muted">{t("targeting.subtitle")}</p>
-        </div>
-        <TreeTargetingPicker
-          cropPaths={cropPaths}
-          countryCodes={countryCodes}
-          soilTextures={soilTextures}
-          onCropPathsChange={setCropPaths}
-          onCountryCodesChange={setCountryCodes}
-          onSoilTexturesChange={setSoilTextures}
-        />
-        <div className="mt-2 flex flex-col gap-1.5 border-t border-ap-line pt-3">
-          <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {(["block", "cell"] as const).map((s) => (
-              <label key={s} className="flex items-center gap-1.5 text-xs text-ap-ink">
-                <input
-                  type="radio"
-                  name="tree-scope"
-                  value={s}
-                  checked={scope === s}
-                  onChange={() => setScope(s)}
-                />
-                {t(`targeting.scopeValues.${s}`)}
-              </label>
-            ))}
-          </div>
-          <span className="text-[11px] text-ap-muted">{t("targeting.scopeHint")}</span>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-ap-ink">{t("create.fields.yaml")}</h2>
-            <p className="text-xs text-ap-muted">{t("create.fields.yamlHint")}</p>
-          </div>
-          <Field label={t("create.templates.heading")}>
-            <select
-              value={templateId}
-              onChange={(e) => onTemplateChange(e.target.value)}
-              className={inputCls}
-            >
-              <option value="custom">{t("create.templates.custom")}</option>
-              {TREE_TEMPLATES.map((tpl) => (
-                <option key={tpl.id} value={tpl.id}>
-                  {t(tpl.labelKey)}
-                </option>
-              ))}
-            </select>
+        <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+          <Field label={t("create.fields.code")} hint={t("create.fields.codeHint")}>
+            <input
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={t("create.fields.codePlaceholder")}
+              pattern="^[a-z0-9][a-z0-9_-]*$"
+              className={`${inputCls} sm:max-w-sm`}
+            />
           </Field>
-        </div>
-        {templateId !== "custom" ? (
-          <p className="text-xs text-ap-muted">
-            {t(getTemplate(templateId)?.descKey ?? "create.templates.customDesc")}
-          </p>
-        ) : null}
-        <textarea
-          value={yamlBody}
-          onChange={(e) => onYamlEdit(e.target.value)}
-          rows={28}
-          spellCheck={false}
-          className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-3 py-2 font-mono text-xs text-ap-ink shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
-        />
-      </section>
+        </section>
 
-      <footer className="flex flex-wrap items-center justify-end gap-2">
-        {create.isError ? (
-          <span className="text-xs text-ap-crit">
-            {create.error?.message ?? t("create.saveFailed")}
-          </span>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => navigate("/decision-trees")}
-          className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
-        >
-          {t("create.cancel")}
-        </button>
-        <button
-          type="button"
-          onClick={onStartFromScratch}
-          disabled={create.isPending || !code.trim() || !targetingReady}
-          className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/5 disabled:opacity-60"
-        >
-          {create.isPending ? t("create.saving") : t("create.startFromScratch")}
-        </button>
-        <button
-          type="submit"
-          disabled={create.isPending || !code.trim() || !yamlBody.trim() || !targetingReady}
-          className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
-        >
-          {create.isPending ? t("create.saving") : t("create.save")}
-        </button>
-      </footer>
-    </form>
+        <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ap-ink">{t("targeting.heading")}</h2>
+            <p className="text-xs text-ap-muted">{t("targeting.subtitle")}</p>
+          </div>
+          <TreeTargetingPicker
+            cropPaths={cropPaths}
+            countryCodes={countryCodes}
+            soilTextures={soilTextures}
+            onCropPathsChange={setCropPaths}
+            onCountryCodesChange={setCountryCodes}
+            onSoilTexturesChange={setSoilTextures}
+          />
+          <div className="mt-2 flex flex-col gap-1.5 border-t border-ap-line pt-3">
+            <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {(["block", "cell"] as const).map((s) => (
+                <label key={s} className="flex items-center gap-1.5 text-xs text-ap-ink">
+                  <input
+                    type="radio"
+                    name="tree-scope"
+                    value={s}
+                    checked={scope === s}
+                    onChange={() => setScope(s)}
+                  />
+                  {t(`targeting.scopeValues.${s}`)}
+                </label>
+              ))}
+            </div>
+            <span className="text-[11px] text-ap-muted">{t("targeting.scopeHint")}</span>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-ap-ink">{t("create.fields.yaml")}</h2>
+              <p className="text-xs text-ap-muted">{t("create.fields.yamlHint")}</p>
+            </div>
+            <Field label={t("create.templates.heading")}>
+              <select
+                value={templateId}
+                onChange={(e) => onTemplateChange(e.target.value)}
+                className={inputCls}
+              >
+                <option value="custom">{t("create.templates.custom")}</option>
+                {TREE_TEMPLATES.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id}>
+                    {t(tpl.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {templateId !== "custom" ? (
+            <p className="text-xs text-ap-muted">
+              {t(getTemplate(templateId)?.descKey ?? "create.templates.customDesc")}
+            </p>
+          ) : null}
+          <textarea
+            value={yamlBody}
+            onChange={(e) => onYamlEdit(e.target.value)}
+            rows={28}
+            spellCheck={false}
+            className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-3 py-2 font-mono text-xs text-ap-ink shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
+          />
+        </section>
+
+        <footer className="flex flex-wrap items-center justify-end gap-2">
+          {create.isError ? (
+            <span className="text-xs text-ap-crit">
+              {create.error?.message ?? t("create.saveFailed")}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => navigate("/decision-trees")}
+            className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
+          >
+            {t("create.cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={onStartFromScratch}
+            disabled={create.isPending || !code.trim() || !targetingReady}
+            className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/5 disabled:opacity-60"
+          >
+            {create.isPending ? t("create.saving") : t("create.startFromScratch")}
+          </button>
+          <button
+            type="submit"
+            disabled={create.isPending || !code.trim() || !yamlBody.trim() || !targetingReady}
+            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+          >
+            {create.isPending ? t("create.saving") : t("create.save")}
+          </button>
+        </footer>
+      </form>
+    </Page>
   );
 }
 

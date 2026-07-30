@@ -54,6 +54,7 @@ import { DrawReadout } from "./DrawReadout";
 import { InactivateConfirmModal } from "./InactivateConfirmModal";
 import { FarmDrawer, type FarmDrawerMode, type FarmPanel } from "./FarmDrawer";
 import type { MultiPolygon, Polygon } from "geojson";
+import { Page } from "@/components/Page";
 
 const SUMMARY_POLL_MS = 60_000;
 
@@ -829,391 +830,396 @@ function MapForFarm({ farmId }: { farmId: string }) {
   // with manual work.
   const hasActiveBlocks = summary.blocks.length > 0;
 
+  // The shell no longer pads <main>, so the -mx-4/-my-6 that used to cancel it
+  // are gone. `<Page width="bleed">` is the declared form of "this surface
+  // owns its own inset".
   return (
-    <div className="-mx-4 -my-6 flex flex-col" style={{ height: "calc(100vh - 56px)" }}>
-      <Toolbar
-        drawTarget={drawTarget}
-        onToggleDrawBlock={() => setDrawTarget((cur) => (cur === "block" ? null : "block"))}
-        onToggleDrawPivot={() => setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))}
-        layerPrefs={layerPrefs}
-        onLayerPrefsChange={setLayerPrefs}
-        // Farm-scoped panel buttons. The "active" panel is whichever
-        // sub-view is showing in the drawer right now; clicking the
-        // active one closes the drawer. Sibling panels (defaults /
-        // members) are hidden in edit/create modes to avoid losing
-        // in-flight detail edits.
-        farmDrawerMode={farmDrawerMode}
-        farmPanel={farmPanel}
-        onOpenPanel={(target) => {
-          if (farmDrawerMode !== null && farmPanel === target) {
-            // Clicking the active panel button closes the drawer.
-            setFarmDrawerMode(null);
-            setFarmPanel("details");
-            setPendingFarmAoi(null);
-            setPendingFarmAoiAreaM2(null);
-            setDrawTarget(null);
-            return;
-          }
-          // Open or switch panel.
-          setFarmPanel(target);
-          if (farmDrawerMode === null) setFarmDrawerMode("view");
-        }}
-        onCreateFarm={() => {
-          setPendingFarmAoi(null);
-          setPendingFarmAoiAreaM2(null);
-          setFarmPanel("details");
-          setFarmDrawerMode("create");
-        }}
-        hasActiveBlocks={hasActiveBlocks}
-        onOpenAutoBlock={() => navigate(`/farms/${farmId}/blocks/auto-grid`)}
-        // Farm-wide sub-block grid control (moved here from the floating
-        // panel). Available whenever the farm has blocks.
-        gridAvailable={summary.blocks.length > 0}
-        showGrid={showGrid}
-        onToggleGrid={setShowGrid}
-        gridIndex={gridIndex}
-        gridIndexOptions={GRID_INDEX_OPTIONS}
-        onGridIndexChange={setGridIndex}
-        gridCellCount={showGrid ? totalCellCount : null}
-        gridWorstCells={farmWorstCells}
-        gridWorstLoading={farmGridQ.isLoading}
-        onSelectGridCell={(cellId) => {
-          setSelectedCellId(cellId);
-          closePanel();
-        }}
-        // Signal overlay control (moved here from the floating
-        // SignalOverlayControl). Mirrors the grid control pattern.
-        signalAvailable={(signalDefinitionsQ.data ?? []).length > 0}
-        signalDefinitions={signalDefinitionsQ.data ?? []}
-        signalDefId={signalOverlayDefId}
-        onSignalChange={setSignalOverlayDefId}
-        signalObsCount={signalOverlay.observationCount}
-        // PR-R4b risk overlay toggle. Available once the farm has any scored
-        // block (and the user can read risk).
-        riskAvailable={canReadRisk && riskLevelByBlock.size > 0}
-        showRisk={showRiskOverlay}
-        onToggleRisk={setShowRiskOverlay}
-        riskAtRiskCount={[...riskLevelByBlock.values()].filter((l) => l !== "low").length}
-      />
-
-      {farmDrawerMode ? (
-        <FarmDrawer
-          // Remount when switching between create and view of a
-          // particular farm so the form state (code/name/etc) is
-          // re-seeded from the right source — otherwise create-mode
-          // would inherit the previously-viewed farm's values via
-          // useState initializers and submit a duplicate `code`.
-          key={farmDrawerMode === "create" ? "create" : `view:${summary.farm.id}`}
-          mode={farmDrawerMode}
-          panel={farmPanel}
-          farm={farmDrawerMode === "create" ? null : summary.farm}
-          inactiveBlocks={inactiveBlocks}
-          draftBoundary={pendingFarmAoi}
-          draftAreaM2={pendingFarmAoiAreaM2}
-          drawingAoi={drawTarget === "farm_aoi"}
-          submitting={createFarmMut.isPending || updateFarmMut.isPending}
-          submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
-          onClose={() => {
-            setFarmDrawerMode(null);
-            setFarmPanel("details");
-            setPendingFarmAoi(null);
-            setPendingFarmAoiAreaM2(null);
-            setDrawTarget(null);
-          }}
-          onModeChange={setFarmDrawerMode}
-          onStartDrawAoi={() => setDrawTarget("farm_aoi")}
-          onCancelDrawAoi={() => setDrawTarget(null)}
-          onSubmitCreate={(payload) => createFarmMut.mutate(payload)}
-          onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
-          onInactivateFarm={openInactivateFarm}
-          onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
-          onAoiUploaded={(boundary, areaM2) => {
-            setPendingFarmAoi(boundary);
-            setPendingFarmAoiAreaM2(areaM2);
-            // Uploading replaces any in-progress draw.
-            setDrawTarget(null);
-          }}
-        />
-      ) : null}
-
-      <div className="relative flex-1 overflow-hidden">
-        {noUnits && !drawing ? (
-          <FullState>
-            <p>This farm has no operational units defined yet.</p>
-            <button
-              type="button"
-              onClick={() => setDrawTarget("block")}
-              className="mt-3 rounded bg-slate-900 px-3 py-1 text-xs text-white"
-            >
-              Draw a block to get started
-            </button>
-          </FullState>
-        ) : (
-          <MapCanvas
-            geojson={geojsonWithRisk}
-            riskOverlay={showRiskOverlay}
-            farmBoundary={summary.farm.boundary}
-            selectedId={selectedId}
-            onSelect={(id) => {
-              // Selecting a block (polygon or its label) closes any open
-              // cell drawer so only one drawer shows at a time.
-              setSelectedCellId(null);
-              selectUnit(id);
-            }}
-            fitBoundsKey={farmId}
-            drawEnabled={drawing}
-            drawTarget={drawTarget ?? "block"}
-            onPolygonDrawn={(poly, areaM2, target) => {
-              setDrawProgress(null);
-              if (target === "block") {
-                setPendingBlockPolygon(poly);
-                setPendingBlockArea(areaM2);
-              } else if (target === "farm_aoi") {
-                setPendingFarmAoi({
-                  type: "MultiPolygon",
-                  coordinates: [poly.coordinates],
-                });
-                setPendingFarmAoiAreaM2(areaM2);
-                setDrawTarget(null);
-              }
-            }}
-            onDrawProgress={setDrawProgress}
-            onPivotDrawn={(r) => {
-              setPendingPivot({
-                lat: r.center_lat,
-                lon: r.center_lon,
-                radius_m: r.radius_m,
-              });
-            }}
-            reshapeBlock={
-              reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
+    <Page width="bleed">
+      <div className="flex flex-col" style={{ height: "calc(100vh - 56px)" }}>
+        <Toolbar
+          drawTarget={drawTarget}
+          onToggleDrawBlock={() => setDrawTarget((cur) => (cur === "block" ? null : "block"))}
+          onToggleDrawPivot={() => setDrawTarget((cur) => (cur === "pivot" ? null : "pivot"))}
+          layerPrefs={layerPrefs}
+          onLayerPrefsChange={setLayerPrefs}
+          // Farm-scoped panel buttons. The "active" panel is whichever
+          // sub-view is showing in the drawer right now; clicking the
+          // active one closes the drawer. Sibling panels (defaults /
+          // members) are hidden in edit/create modes to avoid losing
+          // in-flight detail edits.
+          farmDrawerMode={farmDrawerMode}
+          farmPanel={farmPanel}
+          onOpenPanel={(target) => {
+            if (farmDrawerMode !== null && farmPanel === target) {
+              // Clicking the active panel button closes the drawer.
+              setFarmDrawerMode(null);
+              setFarmPanel("details");
+              setPendingFarmAoi(null);
+              setPendingFarmAoiAreaM2(null);
+              setDrawTarget(null);
+              return;
             }
-            onReshape={(poly) => setReshapeCandidate(poly)}
-            showAoi={layerPrefs.aoi}
-            showBlocks={layerPrefs.showBlocks}
-            showBlockBorders={layerPrefs.borders}
-            showBlockLabels={layerPrefs.labels}
-            borderOpacity={layerPrefs.borderOpacity}
-            blockFillOpacity={layerPrefs.blockFillOpacity}
-            gridCells={gridCellsFc}
-            highlightedCellIds={highlightedCellIds}
-            selectedGridCellId={selectedCellId}
-            onGridCellClick={(cellId, point) => {
-              // Per the UX: a cell click shows ONLY the cell-info popup.
-              // Close the block drawer AND the observation popup so only
-              // one popup shows at a time. The click pixel coords anchor
-              // the popup next to the clicked cell.
-              setSelectedCellId(cellId);
-              setCellClickPoint(point);
-              closePanel();
-              const next = new URLSearchParams(search);
-              next.delete("signal_obs");
-              setSearch(next, { replace: true });
+            // Open or switch panel.
+            setFarmPanel(target);
+            if (farmDrawerMode === null) setFarmDrawerMode("view");
+          }}
+          onCreateFarm={() => {
+            setPendingFarmAoi(null);
+            setPendingFarmAoiAreaM2(null);
+            setFarmPanel("details");
+            setFarmDrawerMode("create");
+          }}
+          hasActiveBlocks={hasActiveBlocks}
+          onOpenAutoBlock={() => navigate(`/farms/${farmId}/blocks/auto-grid`)}
+          // Farm-wide sub-block grid control (moved here from the floating
+          // panel). Available whenever the farm has blocks.
+          gridAvailable={summary.blocks.length > 0}
+          showGrid={showGrid}
+          onToggleGrid={setShowGrid}
+          gridIndex={gridIndex}
+          gridIndexOptions={GRID_INDEX_OPTIONS}
+          onGridIndexChange={setGridIndex}
+          gridCellCount={showGrid ? totalCellCount : null}
+          gridWorstCells={farmWorstCells}
+          gridWorstLoading={farmGridQ.isLoading}
+          onSelectGridCell={(cellId) => {
+            setSelectedCellId(cellId);
+            closePanel();
+          }}
+          // Signal overlay control (moved here from the floating
+          // SignalOverlayControl). Mirrors the grid control pattern.
+          signalAvailable={(signalDefinitionsQ.data ?? []).length > 0}
+          signalDefinitions={signalDefinitionsQ.data ?? []}
+          signalDefId={signalOverlayDefId}
+          onSignalChange={setSignalOverlayDefId}
+          signalObsCount={signalOverlay.observationCount}
+          // PR-R4b risk overlay toggle. Available once the farm has any scored
+          // block (and the user can read risk).
+          riskAvailable={canReadRisk && riskLevelByBlock.size > 0}
+          showRisk={showRiskOverlay}
+          onToggleRisk={setShowRiskOverlay}
+          riskAtRiskCount={[...riskLevelByBlock.values()].filter((l) => l !== "low").length}
+        />
+
+        {farmDrawerMode ? (
+          <FarmDrawer
+            // Remount when switching between create and view of a
+            // particular farm so the form state (code/name/etc) is
+            // re-seeded from the right source — otherwise create-mode
+            // would inherit the previously-viewed farm's values via
+            // useState initializers and submit a duplicate `code`.
+            key={farmDrawerMode === "create" ? "create" : `view:${summary.farm.id}`}
+            mode={farmDrawerMode}
+            panel={farmPanel}
+            farm={farmDrawerMode === "create" ? null : summary.farm}
+            inactiveBlocks={inactiveBlocks}
+            draftBoundary={pendingFarmAoi}
+            draftAreaM2={pendingFarmAoiAreaM2}
+            drawingAoi={drawTarget === "farm_aoi"}
+            submitting={createFarmMut.isPending || updateFarmMut.isPending}
+            submitError={createFarmMut.error?.message ?? updateFarmMut.error?.message ?? null}
+            onClose={() => {
+              setFarmDrawerMode(null);
+              setFarmPanel("details");
+              setPendingFarmAoi(null);
+              setPendingFarmAoiAreaM2(null);
+              setDrawTarget(null);
             }}
-            signalOverlay={signalOverlay.fc}
-            onSignalClick={(observationId, point) => {
-              // The URL `?signal_obs=` drives the SignalObservationPanel
-              // (rendered below). Keeping the id in the URL means a
-              // deep-link to a specific observation works on its own.
-              // Opening an observation closes the cell popup so the two
-              // don't stack. The click coords anchor the popup to the dot.
-              const next = new URLSearchParams(search);
-              next.set("signal_obs", observationId);
-              setSearch(next, { replace: true });
-              setObsClickPoint(point);
+            onModeChange={setFarmDrawerMode}
+            onStartDrawAoi={() => setDrawTarget("farm_aoi")}
+            onCancelDrawAoi={() => setDrawTarget(null)}
+            onSubmitCreate={(payload) => createFarmMut.mutate(payload)}
+            onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
+            onInactivateFarm={openInactivateFarm}
+            onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
+            onAoiUploaded={(boundary, areaM2) => {
+              setPendingFarmAoi(boundary);
+              setPendingFarmAoiAreaM2(areaM2);
+              // Uploading replaces any in-progress draw.
+              setDrawTarget(null);
+            }}
+          />
+        ) : null}
+
+        <div className="relative flex-1 overflow-hidden">
+          {noUnits && !drawing ? (
+            <FullState>
+              <p>This farm has no operational units defined yet.</p>
+              <button
+                type="button"
+                onClick={() => setDrawTarget("block")}
+                className="mt-3 rounded bg-slate-900 px-3 py-1 text-xs text-white"
+              >
+                Draw a block to get started
+              </button>
+            </FullState>
+          ) : (
+            <MapCanvas
+              geojson={geojsonWithRisk}
+              riskOverlay={showRiskOverlay}
+              farmBoundary={summary.farm.boundary}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                // Selecting a block (polygon or its label) closes any open
+                // cell drawer so only one drawer shows at a time.
+                setSelectedCellId(null);
+                selectUnit(id);
+              }}
+              fitBoundsKey={farmId}
+              drawEnabled={drawing}
+              drawTarget={drawTarget ?? "block"}
+              onPolygonDrawn={(poly, areaM2, target) => {
+                setDrawProgress(null);
+                if (target === "block") {
+                  setPendingBlockPolygon(poly);
+                  setPendingBlockArea(areaM2);
+                } else if (target === "farm_aoi") {
+                  setPendingFarmAoi({
+                    type: "MultiPolygon",
+                    coordinates: [poly.coordinates],
+                  });
+                  setPendingFarmAoiAreaM2(areaM2);
+                  setDrawTarget(null);
+                }
+              }}
+              onDrawProgress={setDrawProgress}
+              onPivotDrawn={(r) => {
+                setPendingPivot({
+                  lat: r.center_lat,
+                  lon: r.center_lon,
+                  radius_m: r.radius_m,
+                });
+              }}
+              reshapeBlock={
+                reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
+              }
+              onReshape={(poly) => setReshapeCandidate(poly)}
+              showAoi={layerPrefs.aoi}
+              showBlocks={layerPrefs.showBlocks}
+              showBlockBorders={layerPrefs.borders}
+              showBlockLabels={layerPrefs.labels}
+              borderOpacity={layerPrefs.borderOpacity}
+              blockFillOpacity={layerPrefs.blockFillOpacity}
+              gridCells={gridCellsFc}
+              highlightedCellIds={highlightedCellIds}
+              selectedGridCellId={selectedCellId}
+              onGridCellClick={(cellId, point) => {
+                // Per the UX: a cell click shows ONLY the cell-info popup.
+                // Close the block drawer AND the observation popup so only
+                // one popup shows at a time. The click pixel coords anchor
+                // the popup next to the clicked cell.
+                setSelectedCellId(cellId);
+                setCellClickPoint(point);
+                closePanel();
+                const next = new URLSearchParams(search);
+                next.delete("signal_obs");
+                setSearch(next, { replace: true });
+              }}
+              signalOverlay={signalOverlay.fc}
+              onSignalClick={(observationId, point) => {
+                // The URL `?signal_obs=` drives the SignalObservationPanel
+                // (rendered below). Keeping the id in the URL means a
+                // deep-link to a specific observation works on its own.
+                // Opening an observation closes the cell popup so the two
+                // don't stack. The click coords anchor the popup to the dot.
+                const next = new URLSearchParams(search);
+                next.set("signal_obs", observationId);
+                setSearch(next, { replace: true });
+                setObsClickPoint(point);
+                setSelectedCellId(null);
+                setCellClickPoint(null);
+              }}
+            />
+          )}
+
+          <MapNote drawTarget={drawTarget} />
+
+          <DrawReadout
+            progress={drawProgress}
+            onCancel={() => {
+              setDrawTarget(null);
+              setDrawProgress(null);
+            }}
+          />
+
+          {/* The grid show/index/worst control now lives in the top toolbar,
+              and the per-block cell-size + backfill config now lives inside
+              the block drawer (DetailPanel) — see its `gridConfig` slot
+              below — since it's block-level. Nothing grid-related floats. */}
+
+          <GridCellPopup
+            open={selectedCellId !== null}
+            cellId={selectedCellId}
+            productId={selectedCellId ? (cellMeta.get(selectedCellId)?.productId ?? null) : null}
+            indexCode={gridIndex}
+            value={selectedCellId ? (cellMeta.get(selectedCellId)?.value ?? null) : null}
+            lat={selectedCellId ? (cellMeta.get(selectedCellId)?.lat ?? null) : null}
+            lon={selectedCellId ? (cellMeta.get(selectedCellId)?.lon ?? null) : null}
+            blockName={selectedCellId ? (cellMeta.get(selectedCellId)?.blockName ?? null) : null}
+            x={cellClickPoint?.x ?? null}
+            y={cellClickPoint?.y ?? null}
+            time={selectedCellId ? (cellMeta.get(selectedCellId)?.time ?? null) : null}
+            baselineMean={selectedCellBaseline?.blockMean ?? null}
+            z={selectedCellBaseline?.z ?? null}
+            onClose={() => {
               setSelectedCellId(null);
               setCellClickPoint(null);
             }}
           />
-        )}
 
-        <MapNote drawTarget={drawTarget} />
+          {selectedObservationId ? (
+            <SignalObservationPanel
+              observation={selectedObservation}
+              definition={selectedSignalDefinition}
+              isLoading={signalObservationsQ.isLoading}
+              x={obsClickPoint?.x ?? null}
+              y={obsClickPoint?.y ?? null}
+              onClose={() => {
+                const next = new URLSearchParams(search);
+                next.delete("signal_obs");
+                setSearch(next, { replace: true });
+                setObsClickPoint(null);
+              }}
+            />
+          ) : null}
 
-        <DrawReadout
-          progress={drawProgress}
-          onCancel={() => {
-            setDrawTarget(null);
-            setDrawProgress(null);
-          }}
-        />
+          {selectedId && farmDrawerMode === null ? (
+            <DetailPanel
+              detail={detailQ.data ?? null}
+              isLoading={detailQ.isLoading}
+              risks={selectedBlockRisks}
+              onClose={closePanel}
+              width={drawerWidth}
+              onResizeMouseDown={onResizeMouseDown}
+              onInactivate={openInactivateBlock}
+              editableBlock={editingBlock}
+              onStartEdit={openEditBlock}
+              onCancelEdit={() => setEditingBlock(null)}
+              onSaveEdit={(patch) => updateBlockMut.mutate({ blockId: selectedId, patch })}
+              saving={updateBlockMut.isPending}
+              saveError={updateBlockMut.error?.message ?? null}
+              reshaping={reshapeTarget?.id === selectedId}
+              onStartReshape={openReshapeBlock}
+              onSaveReshape={() => {
+                if (!reshapeTarget || !reshapeCandidate) return;
+                updateBlockMut.mutate({
+                  blockId: reshapeTarget.id,
+                  patch: { boundary: reshapeCandidate },
+                });
+              }}
+              onCancelReshape={() => {
+                setReshapeTarget(null);
+                setReshapeCandidate(null);
+              }}
+              reshapeSaving={updateBlockMut.isPending}
+              // Block-level sub-block grid config (cell size + backfill).
+              // Rendered as a section inside the drawer when this block has
+              // an imagery subscription (= a product to grid against).
+              gridConfig={
+                selectedId && gridProductId ? (
+                  <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
+                ) : null
+              }
+              cropAssign={
+                selectedId && detailQ.data ? (
+                  <BlockCropAssignCard
+                    blockId={selectedId}
+                    farmId={farmId}
+                    hasCurrentCrop={detailQ.data.crop_assignment !== null}
+                    onAssigned={() =>
+                      queryClient.invalidateQueries({
+                        queryKey: ["labs/map/detail", farmId, selectedId],
+                      })
+                    }
+                  />
+                ) : null
+              }
+            />
+          ) : null}
 
-        {/* The grid show/index/worst control now lives in the top toolbar,
-            and the per-block cell-size + backfill config now lives inside
-            the block drawer (DetailPanel) — see its `gridConfig` slot
-            below — since it's block-level. Nothing grid-related floats. */}
+          {pendingPivot ? (
+            <CreatePivotModal
+              centerLat={pendingPivot.lat}
+              centerLon={pendingPivot.lon}
+              radiusM={pendingPivot.radius_m}
+              submitting={createPivotMut.isPending}
+              errorMessage={createPivotMut.error?.message ?? null}
+              onCancel={() => setPendingPivot(null)}
+              onSubmit={(vals) =>
+                createPivotMut.mutate({
+                  center: { lat: pendingPivot.lat, lon: pendingPivot.lon },
+                  radius_m: pendingPivot.radius_m,
+                  code: vals.code,
+                  name: vals.name,
+                  sector_count: vals.sector_count,
+                })
+              }
+            />
+          ) : null}
 
-        <GridCellPopup
-          open={selectedCellId !== null}
-          cellId={selectedCellId}
-          productId={selectedCellId ? (cellMeta.get(selectedCellId)?.productId ?? null) : null}
-          indexCode={gridIndex}
-          value={selectedCellId ? (cellMeta.get(selectedCellId)?.value ?? null) : null}
-          lat={selectedCellId ? (cellMeta.get(selectedCellId)?.lat ?? null) : null}
-          lon={selectedCellId ? (cellMeta.get(selectedCellId)?.lon ?? null) : null}
-          blockName={selectedCellId ? (cellMeta.get(selectedCellId)?.blockName ?? null) : null}
-          x={cellClickPoint?.x ?? null}
-          y={cellClickPoint?.y ?? null}
-          time={selectedCellId ? (cellMeta.get(selectedCellId)?.time ?? null) : null}
-          baselineMean={selectedCellBaseline?.blockMean ?? null}
-          z={selectedCellBaseline?.z ?? null}
-          onClose={() => {
-            setSelectedCellId(null);
-            setCellClickPoint(null);
-          }}
-        />
+          {pendingBlockPolygon ? (
+            <DrawBlockModal
+              polygonAreaM2={pendingBlockArea}
+              submitting={createBlockMut.isPending}
+              errorMessage={createBlockMut.error?.message ?? null}
+              onCancel={() => {
+                setPendingBlockPolygon(null);
+                setPendingBlockArea(0);
+              }}
+              onSubmit={(values) => createBlockMut.mutate({ polygon: pendingBlockPolygon, values })}
+            />
+          ) : null}
 
-        {selectedObservationId ? (
-          <SignalObservationPanel
-            observation={selectedObservation}
-            definition={selectedSignalDefinition}
-            isLoading={signalObservationsQ.isLoading}
-            x={obsClickPoint?.x ?? null}
-            y={obsClickPoint?.y ?? null}
-            onClose={() => {
-              const next = new URLSearchParams(search);
-              next.delete("signal_obs");
-              setSearch(next, { replace: true });
-              setObsClickPoint(null);
-            }}
-          />
-        ) : null}
+          {inactivateBlockOpen && selectedId ? (
+            <InactivateConfirmModal
+              confirmKeyword={summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"}
+              entityLabel="block"
+              preview={inactivateBlockPreview}
+              previewError={inactivateBlockPreviewError}
+              submitting={inactivateBlockMut.isPending}
+              submitError={inactivateBlockMut.error?.message ?? null}
+              onCancel={() => {
+                setInactivateBlockOpen(false);
+                setInactivateBlockPreview(null);
+                setInactivateBlockPreviewError(null);
+              }}
+              onSubmit={(reason) => inactivateBlockMut.mutate({ blockId: selectedId, reason })}
+            />
+          ) : null}
 
-        {selectedId && farmDrawerMode === null ? (
-          <DetailPanel
-            detail={detailQ.data ?? null}
-            isLoading={detailQ.isLoading}
-            risks={selectedBlockRisks}
-            onClose={closePanel}
-            width={drawerWidth}
-            onResizeMouseDown={onResizeMouseDown}
-            onInactivate={openInactivateBlock}
-            editableBlock={editingBlock}
-            onStartEdit={openEditBlock}
-            onCancelEdit={() => setEditingBlock(null)}
-            onSaveEdit={(patch) => updateBlockMut.mutate({ blockId: selectedId, patch })}
-            saving={updateBlockMut.isPending}
-            saveError={updateBlockMut.error?.message ?? null}
-            reshaping={reshapeTarget?.id === selectedId}
-            onStartReshape={openReshapeBlock}
-            onSaveReshape={() => {
-              if (!reshapeTarget || !reshapeCandidate) return;
-              updateBlockMut.mutate({
-                blockId: reshapeTarget.id,
-                patch: { boundary: reshapeCandidate },
-              });
-            }}
-            onCancelReshape={() => {
-              setReshapeTarget(null);
-              setReshapeCandidate(null);
-            }}
-            reshapeSaving={updateBlockMut.isPending}
-            // Block-level sub-block grid config (cell size + backfill).
-            // Rendered as a section inside the drawer when this block has
-            // an imagery subscription (= a product to grid against).
-            gridConfig={
-              selectedId && gridProductId ? (
-                <BlockGridConfigCard blockId={selectedId} productId={gridProductId} />
-              ) : null
-            }
-            cropAssign={
-              selectedId && detailQ.data ? (
-                <BlockCropAssignCard
-                  blockId={selectedId}
-                  farmId={farmId}
-                  hasCurrentCrop={detailQ.data.crop_assignment !== null}
-                  onAssigned={() =>
-                    queryClient.invalidateQueries({
-                      queryKey: ["labs/map/detail", farmId, selectedId],
-                    })
-                  }
-                />
-              ) : null
-            }
-          />
-        ) : null}
+          {inactivateFarmOpen ? (
+            <InactivateConfirmModal
+              confirmKeyword={summary.farm.code}
+              entityLabel="farm"
+              preview={inactivateFarmPreview}
+              previewError={inactivateFarmPreviewError}
+              submitting={inactivateFarmMut.isPending}
+              submitError={inactivateFarmMut.error?.message ?? null}
+              onCancel={() => {
+                setInactivateFarmOpen(false);
+                setInactivateFarmPreview(null);
+                setInactivateFarmPreviewError(null);
+              }}
+              onSubmit={(reason) => inactivateFarmMut.mutate(reason)}
+            />
+          ) : null}
 
-        {pendingPivot ? (
-          <CreatePivotModal
-            centerLat={pendingPivot.lat}
-            centerLon={pendingPivot.lon}
-            radiusM={pendingPivot.radius_m}
-            submitting={createPivotMut.isPending}
-            errorMessage={createPivotMut.error?.message ?? null}
-            onCancel={() => setPendingPivot(null)}
-            onSubmit={(vals) =>
-              createPivotMut.mutate({
-                center: { lat: pendingPivot.lat, lon: pendingPivot.lon },
-                radius_m: pendingPivot.radius_m,
-                code: vals.code,
-                name: vals.name,
-                sector_count: vals.sector_count,
-              })
-            }
-          />
-        ) : null}
-
-        {pendingBlockPolygon ? (
-          <DrawBlockModal
-            polygonAreaM2={pendingBlockArea}
-            submitting={createBlockMut.isPending}
-            errorMessage={createBlockMut.error?.message ?? null}
-            onCancel={() => {
-              setPendingBlockPolygon(null);
-              setPendingBlockArea(0);
-            }}
-            onSubmit={(values) => createBlockMut.mutate({ polygon: pendingBlockPolygon, values })}
-          />
-        ) : null}
-
-        {inactivateBlockOpen && selectedId ? (
-          <InactivateConfirmModal
-            confirmKeyword={summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"}
-            entityLabel="block"
-            preview={inactivateBlockPreview}
-            previewError={inactivateBlockPreviewError}
-            submitting={inactivateBlockMut.isPending}
-            submitError={inactivateBlockMut.error?.message ?? null}
-            onCancel={() => {
-              setInactivateBlockOpen(false);
-              setInactivateBlockPreview(null);
-              setInactivateBlockPreviewError(null);
-            }}
-            onSubmit={(reason) => inactivateBlockMut.mutate({ blockId: selectedId, reason })}
-          />
-        ) : null}
-
-        {inactivateFarmOpen ? (
-          <InactivateConfirmModal
-            confirmKeyword={summary.farm.code}
-            entityLabel="farm"
-            preview={inactivateFarmPreview}
-            previewError={inactivateFarmPreviewError}
-            submitting={inactivateFarmMut.isPending}
-            submitError={inactivateFarmMut.error?.message ?? null}
-            onCancel={() => {
-              setInactivateFarmOpen(false);
-              setInactivateFarmPreview(null);
-              setInactivateFarmPreviewError(null);
-            }}
-            onSubmit={(reason) => inactivateFarmMut.mutate(reason)}
-          />
-        ) : null}
-
-        {!summary.farm.is_active ? (
-          <div className="pointer-events-auto absolute bottom-3 right-3 z-10 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-900 shadow">
-            Farm inactive (since {summary.farm.active_to}).
-            <button
-              type="button"
-              onClick={() => reactivateFarmMut.mutate()}
-              disabled={reactivateFarmMut.isPending}
-              className="ms-2 rounded bg-amber-700 px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
-            >
-              Reactivate (with blocks)
-            </button>
-          </div>
-        ) : null}
+          {!summary.farm.is_active ? (
+            <div className="pointer-events-auto absolute bottom-3 right-3 z-10 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-900 shadow">
+              Farm inactive (since {summary.farm.active_to}).
+              <button
+                type="button"
+                onClick={() => reactivateFarmMut.mutate()}
+                disabled={reactivateFarmMut.isPending}
+                className="ms-2 rounded bg-amber-700 px-2 py-0.5 text-[10px] font-medium text-white disabled:opacity-50"
+              >
+                Reactivate (with blocks)
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }
 

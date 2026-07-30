@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { autoGrid, createBlock, type AutoGridCandidate } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
 import { AreaDisplay } from "../components/AreaDisplay";
+import { Page } from "@/components/Page";
 
 export function BlockAutoGridPage(): JSX.Element {
   const { farmId = "" } = useParams<{ farmId: string }>();
@@ -61,7 +62,7 @@ export function BlockAutoGridPage(): JSX.Element {
   };
 
   return (
-    <div className="space-y-4">
+    <Page>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ap-ink">{t("autoGrid.heading")}</h1>
         <Link to={`/farms/${farmId}`} className="btn btn-ghost">
@@ -127,6 +128,6 @@ export function BlockAutoGridPage(): JSX.Element {
       >
         {t("autoGrid.commit")}
       </button>
-    </div>
+    </Page>
   );
 }

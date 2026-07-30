@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import type { ActivityType, BoardActivity, BoardBlock, BoardResourceChip } from "@/api/plans";
+import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -337,7 +338,7 @@ export function BoardPage(): ReactNode {
   })();
 
   return (
-    <div className="flex w-full flex-col gap-4 px-4 py-6">
+    <Page width="full">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("title")}</h1>
@@ -495,7 +496,7 @@ export function BoardPage(): ReactNode {
       {applyTemplateOpen ? (
         <ApplyTemplateDialog farmId={farmId} onClose={() => setApplyTemplateOpen(false)} />
       ) : null}
-    </div>
+    </Page>
   );
 }
 

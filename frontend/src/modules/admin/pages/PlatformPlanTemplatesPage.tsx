@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { TemplateStatus } from "@/api/planTemplates";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { usePlanTemplates } from "@/queries/planTemplates";
@@ -32,7 +33,7 @@ export function PlatformPlanTemplatesPage(): ReactNode {
   const { data, isLoading, isError } = usePlanTemplates(filter === "all" ? undefined : filter);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+    <Page>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("list.title")}</h1>
@@ -106,6 +107,6 @@ export function PlatformPlanTemplatesPage(): ReactNode {
           </table>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

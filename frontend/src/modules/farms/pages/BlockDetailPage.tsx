@@ -8,6 +8,7 @@ import { getFarm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { ImageryPanel } from "@/modules/imagery/components/ImageryPanel";
@@ -113,7 +114,7 @@ export function BlockDetailPage(): JSX.Element {
   const current = history.find((h) => h.is_current);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <PageHeader
         above={
           <Breadcrumb
@@ -265,6 +266,6 @@ export function BlockDetailPage(): JSX.Element {
       {canReadWeather ? <WeatherForecastPanel blockId={block.id} farmId={farmId} /> : null}
 
       {canReadWeather ? <WeatherSubscriptionsTab blockId={block.id} farmId={farmId} /> : null}
-    </div>
+    </Page>
   );
 }

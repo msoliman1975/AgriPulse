@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -33,7 +34,7 @@ export function PlatformHealthPage(): ReactNode {
   const q = useCrossTenantHealth();
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
+    <Page>
       <header>
         <h1 className="text-2xl font-semibold text-ap-ink">{t("platformHealth.title")}</h1>
         <p className="mt-1 text-sm text-ap-muted">{t("platformHealth.subtitle")}</p>
@@ -105,7 +106,7 @@ export function PlatformHealthPage(): ReactNode {
           </table>
         </div>
       )}
-    </div>
+    </Page>
   );
 }
 

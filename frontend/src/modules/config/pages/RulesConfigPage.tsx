@@ -12,6 +12,7 @@ import type {
   TenantRuleUpdatePayload,
 } from "@/api/alerts";
 import { listSignalDefinitions } from "@/api/signals";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
@@ -78,7 +79,7 @@ export function RulesConfigPage(): ReactNode {
   const isAr = i18n.language === "ar";
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
@@ -118,7 +119,7 @@ export function RulesConfigPage(): ReactNode {
       ) : (
         <TenantRulesSection canManage={canManage} isAr={isAr} />
       )}
-    </div>
+    </Page>
   );
 }
 

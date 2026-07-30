@@ -1,3 +1,4 @@
+import { Page } from "@/components/Page";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -152,94 +153,97 @@ export function TenantCreatePage(): ReactNode {
   }
 
   return (
-    <section className="mx-auto max-w-2xl">
-      <header className="border-b border-ap-line pb-4">
-        <h1 className="text-lg font-semibold text-ap-ink">{t("tenants.create.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("tenants.create.subtitle")}</p>
-        <p className="mt-1 text-xs uppercase tracking-wider text-ap-muted">
-          {t("tenants.create.step", {
-            current: STEPS.indexOf(step) + 1,
-            total: STEPS.length,
-          })}
-          {" — "}
-          {t(`tenants.create.steps.${step}`)}
-        </p>
-      </header>
+    <Page>
+      {/* Wizard keeps a narrow measure — see the note in Page.tsx. */}
+      <div className="max-w-3xl">
+        <header className="border-b border-ap-line pb-4">
+          <h1 className="text-lg font-semibold text-ap-ink">{t("tenants.create.title")}</h1>
+          <p className="mt-1 text-sm text-ap-muted">{t("tenants.create.subtitle")}</p>
+          <p className="mt-1 text-xs uppercase tracking-wider text-ap-muted">
+            {t("tenants.create.step", {
+              current: STEPS.indexOf(step) + 1,
+              total: STEPS.length,
+            })}
+            {" — "}
+            {t(`tenants.create.steps.${step}`)}
+          </p>
+        </header>
 
-      {submitError ? (
-        <p
-          role="alert"
-          className="mt-4 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-sm text-ap-crit"
-        >
-          {submitError}
-        </p>
-      ) : null}
+        {submitError ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-sm text-ap-crit"
+          >
+            {submitError}
+          </p>
+        ) : null}
 
-      {step === "profile" ? (
-        <ProfileStep
-          form={form}
-          errors={errors}
-          onChange={set}
-          locales={meta.data?.locales ?? ["en", "ar"]}
-          unitSystems={meta.data?.unit_systems ?? ["feddan", "acre", "hectare"]}
-        />
-      ) : null}
-      {step === "owner" ? (
-        <OwnerStep
-          form={form}
-          errors={errors}
-          onChange={set}
-          tiers={meta.data?.tiers ?? ["free", "standard", "premium", "enterprise"]}
-        />
-      ) : null}
-      {step === "review" ? <ReviewStep form={form} /> : null}
+        {step === "profile" ? (
+          <ProfileStep
+            form={form}
+            errors={errors}
+            onChange={set}
+            locales={meta.data?.locales ?? ["en", "ar"]}
+            unitSystems={meta.data?.unit_systems ?? ["feddan", "acre", "hectare"]}
+          />
+        ) : null}
+        {step === "owner" ? (
+          <OwnerStep
+            form={form}
+            errors={errors}
+            onChange={set}
+            tiers={meta.data?.tiers ?? ["free", "standard", "premium", "enterprise"]}
+          />
+        ) : null}
+        {step === "review" ? <ReviewStep form={form} /> : null}
 
-      <footer className="mt-6 flex justify-between">
-        <button
-          type="button"
-          onClick={() => navigate("/platform/tenants")}
-          className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-muted hover:bg-ap-line/40"
-        >
-          {t("tenants.create.actions.cancel")}
-        </button>
-        <div className="flex gap-2">
-          {step !== "profile" ? (
-            <button
-              type="button"
-              onClick={() => setStep(STEPS[STEPS.indexOf(step) - 1])}
-              disabled={create.isPending}
-              className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
-            >
-              {t("tenants.create.actions.back")}
-            </button>
-          ) : null}
-          {step !== "review" ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (step === "profile" && !validateProfile()) return;
-                if (step === "owner" && !validateOwner()) return;
-                setStep(STEPS[STEPS.indexOf(step) + 1]);
-              }}
-              className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
-            >
-              {t("tenants.create.actions.next")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={create.isPending}
-              className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
-            >
-              {create.isPending
-                ? t("tenants.create.actions.creating")
-                : t("tenants.create.actions.submit")}
-            </button>
-          )}
-        </div>
-      </footer>
-    </section>
+        <footer className="mt-6 flex justify-between">
+          <button
+            type="button"
+            onClick={() => navigate("/platform/tenants")}
+            className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-muted hover:bg-ap-line/40"
+          >
+            {t("tenants.create.actions.cancel")}
+          </button>
+          <div className="flex gap-2">
+            {step !== "profile" ? (
+              <button
+                type="button"
+                onClick={() => setStep(STEPS[STEPS.indexOf(step) - 1])}
+                disabled={create.isPending}
+                className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
+              >
+                {t("tenants.create.actions.back")}
+              </button>
+            ) : null}
+            {step !== "review" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (step === "profile" && !validateProfile()) return;
+                  if (step === "owner" && !validateOwner()) return;
+                  setStep(STEPS[STEPS.indexOf(step) + 1]);
+                }}
+                className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
+              >
+                {t("tenants.create.actions.next")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={create.isPending}
+                className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+              >
+                {create.isPending
+                  ? t("tenants.create.actions.creating")
+                  : t("tenants.create.actions.submit")}
+              </button>
+            )}
+          </div>
+        </footer>
+      </div>
+    </Page>
   );
 }
 

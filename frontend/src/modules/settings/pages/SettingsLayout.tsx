@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { Page } from "@/components/Page";
 import { useCapability } from "@/rbac/useCapability";
 
 /**
@@ -60,13 +61,19 @@ export function SettingsLayout(): ReactNode {
     // (reached from the gear/Configs menu), no longer a Settings tab.
   ];
 
+  // The hub owns the <Page> frame; its child routes render bare fragments so
+  // the inset isn't applied twice. (This layout used to add its own
+  // `px-4 py-6` on top of the shell's, which is what made /settings/* the only
+  // triple-padded surface in the app.)
   return (
-    <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6">
-      <SettingsSideNav entries={entries.filter((e) => e.show)} title={t("title")} />
-      <div className="flex-1 min-w-0">
-        <Outlet />
+    <Page width="wide">
+      <div className="flex gap-6">
+        <SettingsSideNav entries={entries.filter((e) => e.show)} title={t("title")} />
+        <div className="min-w-0 flex-1">
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }
 

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { BackfillRun, RunKind, RunStatus } from "@/api/backfill";
 import { estimateBackfill, type BackfillEstimate } from "@/api/backfill";
 import { isApiError } from "@/api/errors";
+import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import {
   useBackfillFarms,
@@ -310,7 +311,7 @@ export function PlatformBackfillPage(): ReactNode {
   );
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <Page>
       <div>
         <h1 className="text-lg font-semibold">{t("backfill.title")}</h1>
         <p className="text-sm text-ap-muted">{t("backfill.subtitle")}</p>
@@ -342,7 +343,7 @@ export function PlatformBackfillPage(): ReactNode {
           <RunsTable runs={runsQ.data ?? []} />
         )
       ) : null}
-    </div>
+    </Page>
   );
 }
 

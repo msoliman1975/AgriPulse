@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { ErrorState } from "@/components/ErrorState";
 import { FilterChip } from "@/components/FilterChip";
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -58,7 +59,7 @@ export function TenantListPage(): ReactNode {
   }
 
   return (
-    <section className="mx-auto max-w-5xl">
+    <Page>
       <PageHeader
         className="border-b border-ap-line pb-4"
         title={t("tenants.list.title")}
@@ -100,9 +101,7 @@ export function TenantListPage(): ReactNode {
         </div>
       </div>
 
-      {list.isError ? (
-        <ErrorState className="mt-6" message={t("tenants.list.errorTitle")} />
-      ) : null}
+      {list.isError ? <ErrorState className="mt-6" message={t("tenants.list.errorTitle")} /> : null}
 
       <div className="mt-4">
         <Table>
@@ -177,6 +176,6 @@ export function TenantListPage(): ReactNode {
           </div>
         </nav>
       ) : null}
-    </section>
+    </Page>
   );
 }

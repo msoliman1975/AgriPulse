@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TenantUser, UserUpdatePayload } from "@/api/users";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -55,7 +56,7 @@ export function UsersConfigPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
@@ -133,11 +134,14 @@ export function UsersConfigPage(): ReactNode {
         )}
         {suspendMut.isError || reactivateMut.isError || deleteMut.isError || resendMut.isError ? (
           <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
-            {(suspendMut.error || reactivateMut.error || deleteMut.error || resendMut.error)?.message}
+            {
+              (suspendMut.error || reactivateMut.error || deleteMut.error || resendMut.error)
+                ?.message
+            }
           </p>
         ) : null}
       </div>
-    </div>
+    </Page>
   );
 }
 

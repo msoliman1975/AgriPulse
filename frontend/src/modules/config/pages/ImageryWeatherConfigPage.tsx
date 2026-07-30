@@ -13,6 +13,7 @@ import {
   listSubscriptions as listWeatherSubs,
   type Subscription as WeatherSubscription,
 } from "@/api/weather";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useConfig } from "@/config/ConfigContext";
@@ -35,7 +36,7 @@ export function ImageryWeatherConfigPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header>
         <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
         <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
@@ -91,7 +92,7 @@ export function ImageryWeatherConfigPage(): ReactNode {
           <BlocksTable farmId={farmId} blocks={blocksQuery.data.items} />
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 

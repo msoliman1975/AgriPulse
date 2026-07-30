@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Modal } from "@/components/Modal";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -32,7 +33,7 @@ export function PlatformAdminsPage(): ReactNode {
   const [role, setRole] = useState<(typeof ROLES)[number]>("PlatformAdmin");
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("platformAdmins.title")}</h1>
@@ -93,94 +94,96 @@ export function PlatformAdminsPage(): ReactNode {
           labelledBy="invite-admin-title"
           className="max-w-md p-4"
         >
-            <h3 id="invite-admin-title" className="text-sm font-semibold text-ap-ink">{t("platformAdmins.inviteTitle")}</h3>
-            <p className="mt-2 text-xs text-ap-muted">{t("platformAdmins.inviteHint")}</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!email.trim() || !fullName.trim()) return;
-                invite.mutate(
-                  { email: email.trim(), full_name: fullName.trim(), role },
-                  {
-                    onSuccess: () => {
-                      setOpenInvite(false);
-                      setEmail("");
-                      setFullName("");
-                      setRole("PlatformAdmin");
-                    },
-                  },
-                );
-              }}
-              className="mt-3 flex flex-col gap-3"
-            >
-              <label className="flex flex-col text-xs">
-                {t("platformAdmins.invite.email")}
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-                />
-              </label>
-              <label className="flex flex-col text-xs">
-                {t("platformAdmins.invite.fullName")}
-                <input
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-                />
-              </label>
-              <label className="flex flex-col text-xs">
-                {t("platformAdmins.invite.role")}
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
-                  className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-                >
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
+          <h3 id="invite-admin-title" className="text-sm font-semibold text-ap-ink">
+            {t("platformAdmins.inviteTitle")}
+          </h3>
+          <p className="mt-2 text-xs text-ap-muted">{t("platformAdmins.inviteHint")}</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!email.trim() || !fullName.trim()) return;
+              invite.mutate(
+                { email: email.trim(), full_name: fullName.trim(), role },
+                {
+                  onSuccess: () => {
                     setOpenInvite(false);
                     setEmail("");
                     setFullName("");
                     setRole("PlatformAdmin");
-                  }}
-                  className="rounded-md border border-ap-line bg-ap-panel px-3 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-                >
-                  {t("platformAdmins.invite.cancel")}
-                </button>
-                <button
-                  type="submit"
-                  disabled={invite.isPending}
-                  className="rounded-md bg-ap-primary px-3 py-1 text-xs font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
-                >
-                  {invite.isPending
-                    ? t("platformAdmins.invite.submitting")
-                    : t("platformAdmins.invite.submit")}
-                </button>
-              </div>
-              {invite.error ? <p className="text-xs text-ap-crit">{invite.error.message}</p> : null}
-              {invite.data ? (
-                <p className="text-xs text-ap-muted">
-                  {invite.data.keycloak_provisioning === "succeeded"
-                    ? t("platformAdmins.invite.kcOk")
-                    : t("platformAdmins.invite.kcPending")}
-                </p>
-              ) : null}
-            </form>
+                  },
+                },
+              );
+            }}
+            className="mt-3 flex flex-col gap-3"
+          >
+            <label className="flex flex-col text-xs">
+              {t("platformAdmins.invite.email")}
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex flex-col text-xs">
+              {t("platformAdmins.invite.fullName")}
+              <input
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex flex-col text-xs">
+              {t("platformAdmins.invite.role")}
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as (typeof ROLES)[number])}
+                className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              >
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenInvite(false);
+                  setEmail("");
+                  setFullName("");
+                  setRole("PlatformAdmin");
+                }}
+                className="rounded-md border border-ap-line bg-ap-panel px-3 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
+              >
+                {t("platformAdmins.invite.cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={invite.isPending}
+                className="rounded-md bg-ap-primary px-3 py-1 text-xs font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+              >
+                {invite.isPending
+                  ? t("platformAdmins.invite.submitting")
+                  : t("platformAdmins.invite.submit")}
+              </button>
+            </div>
+            {invite.error ? <p className="text-xs text-ap-crit">{invite.error.message}</p> : null}
+            {invite.data ? (
+              <p className="text-xs text-ap-muted">
+                {invite.data.keycloak_provisioning === "succeeded"
+                  ? t("platformAdmins.invite.kcOk")
+                  : t("platformAdmins.invite.kcPending")}
+              </p>
+            ) : null}
+          </form>
         </Modal>
       ) : null}
-    </div>
+    </Page>
   );
 }
 

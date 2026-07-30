@@ -7,6 +7,7 @@ import { Navigate } from "react-router-dom";
 import { getFarm } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -74,14 +75,14 @@ export function InsightsPage(): ReactNode {
   // single error instead of a broken header over empty widgets.
   if (isError) {
     return (
-      <div className="mx-auto max-w-5xl">
+      <Page>
         <ErrorState message={t("page.loadFailed")} />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex items-start gap-3">
         <img
           src="/agripulse-mark.png"
@@ -127,6 +128,6 @@ export function InsightsPage(): ReactNode {
       {canReadRisk ? <ActiveRisksWidget farmId={farmId} /> : null}
 
       <BlockHealthScorecard farmId={farmId} />
-    </div>
+    </Page>
   );
 }

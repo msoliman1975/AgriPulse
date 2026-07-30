@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { listFarms } from "@/api/farms";
+import { Card } from "@/components/Card";
+import { LinkButton } from "@/components/LinkButton";
+import { Page } from "@/components/Page";
 import { useCapability } from "@/rbac/useCapability";
 
 export function HomePage(): ReactNode {
@@ -20,30 +23,31 @@ export function HomePage(): ReactNode {
   });
   if (isLoading) {
     return (
-      <div className="card max-w-2xl" role="status">
-        <p className="text-ap-muted">{t("actions.loading")}</p>
-      </div>
+      <Page width="standard">
+        <Card className="max-w-2xl" role="status">
+          <p className="text-ap-muted">{t("actions.loading")}</p>
+        </Card>
+      </Page>
     );
   }
   if (!isError && data && data.items.length > 0) {
     return <Navigate to={`/insights/${data.items[0].id}`} replace />;
   }
   return (
-    <div className="card max-w-2xl">
-      <h1 className="text-2xl font-semibold text-ap-ink">
-        {canCreateFarm ? t("home.noFarmsTitle") : t("home.welcome")}
-      </h1>
-      <p className="mt-2 text-ap-muted">
-        {canCreateFarm ? t("home.noFarmsBody") : t("home.comingSoon")}
-      </p>
-      {canCreateFarm ? (
-        <Link
-          to="/labs/map?create=farm"
-          className="mt-4 inline-flex items-center rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
-        >
-          {t("home.createFirstFarm")}
-        </Link>
-      ) : null}
-    </div>
+    <Page width="standard">
+      <Card className="max-w-2xl">
+        <h1 className="text-2xl font-semibold text-ap-ink">
+          {canCreateFarm ? t("home.noFarmsTitle") : t("home.welcome")}
+        </h1>
+        <p className="mt-2 text-ap-muted">
+          {canCreateFarm ? t("home.noFarmsBody") : t("home.comingSoon")}
+        </p>
+        {canCreateFarm ? (
+          <LinkButton to="/labs/map?create=farm" className="mt-4">
+            {t("home.createFirstFarm")}
+          </LinkButton>
+        ) : null}
+      </Card>
+    </Page>
   );
 }

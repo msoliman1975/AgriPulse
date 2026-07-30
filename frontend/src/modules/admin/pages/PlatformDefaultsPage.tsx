@@ -8,6 +8,7 @@ import {
   formatValue,
   parseAndValidate,
 } from "@/modules/admin/lib/platformDefaultValue";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -35,7 +36,7 @@ export function PlatformDefaultsPage(): ReactNode {
   }, [data]);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
+    <Page>
       <header>
         <h1 className="text-2xl font-semibold text-ap-ink">{t("defaults.title")}</h1>
         <p className="mt-1 text-sm text-ap-muted">{t("defaults.subtitle")}</p>
@@ -64,7 +65,7 @@ export function PlatformDefaultsPage(): ReactNode {
           </section>
         ))
       )}
-    </div>
+    </Page>
   );
 }
 

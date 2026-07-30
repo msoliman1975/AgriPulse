@@ -6,6 +6,7 @@ import { listFarms, type Farm } from "@/api/farms";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -38,7 +39,7 @@ export function FarmListPage(): JSX.Element {
   }, [includeArchived]);
 
   return (
-    <div className="space-y-4">
+    <Page>
       <PageHeader
         title={t("list.heading")}
         actions={
@@ -100,6 +101,6 @@ export function FarmListPage(): JSX.Element {
           </Tbody>
         </Table>
       )}
-    </div>
+    </Page>
   );
 }

@@ -8,6 +8,7 @@ import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { useCapability } from "@/rbac/useCapability";
@@ -69,15 +70,10 @@ export function FarmDetailPage(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
+    <Page>
       <PageHeader
         above={
-          <Breadcrumb
-            items={[
-              { label: t("list.heading"), to: "/farms" },
-              { label: farm.name },
-            ]}
-          />
+          <Breadcrumb items={[{ label: t("list.heading"), to: "/farms" }, { label: farm.name }]} />
         }
         title={farm.name}
         subtitle={
@@ -144,6 +140,6 @@ export function FarmDetailPage(): JSX.Element {
           {t("detail.membersTab")}
         </Link>
       </Card>
-    </div>
+    </Page>
   );
 }

@@ -9,7 +9,9 @@ import type {
   AdminTenantSettings,
   AdminTenantSubscription,
 } from "@/api/adminTenants";
+import { ErrorState } from "@/components/ErrorState";
 import { KPICard } from "@/components/KPICard";
+import { Page } from "@/components/Page";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useAdminTenant, useAdminTenantMeta, useAdminTenantSidecar } from "@/queries/admin/tenants";
@@ -44,16 +46,17 @@ export function TenantAdminDetailPage(): ReactNode {
   );
 
   if (tenantQuery.isLoading) {
-    return <p className="p-6 text-sm text-ap-muted">{t("tenants.detail.loading")}</p>;
+    return (
+      <Page>
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </Page>
+    );
   }
   if (tenantQuery.isError || !tenantQuery.data) {
     return (
-      <div
-        role="alert"
-        className="mx-auto max-w-lg rounded-md border border-ap-crit/30 bg-ap-crit-soft p-4 text-sm text-ap-crit"
-      >
-        {t("tenants.detail.errorTitle")}
-      </div>
+      <Page>
+        <ErrorState message={t("tenants.detail.errorTitle")} />
+      </Page>
     );
   }
 
@@ -61,7 +64,7 @@ export function TenantAdminDetailPage(): ReactNode {
   const sidecar = sidecarQuery.data;
 
   return (
-    <section className="mx-auto max-w-4xl space-y-6">
+    <Page>
       <Link
         to="/platform/tenants"
         className="inline-flex items-center text-sm text-ap-muted hover:text-ap-ink"
@@ -106,7 +109,7 @@ export function TenantAdminDetailPage(): ReactNode {
         formatter={dateTimeFormatter}
         purgeGraceDays={metaQuery.data?.purge_grace_days ?? 30}
       />
-    </section>
+    </Page>
   );
 }
 

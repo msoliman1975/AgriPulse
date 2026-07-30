@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import type { Alert, AlertSeverity, AlertStatus } from "@/api/alerts";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -46,7 +47,7 @@ export function AlertsPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
@@ -89,7 +90,7 @@ export function AlertsPage(): ReactNode {
           </ul>
         )}
       </div>
-    </div>
+    </Page>
   );
 }
 
@@ -129,9 +130,7 @@ function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProp
             {t(`status.${a.status}`)}
           </Pill>
         </div>
-        {prescription ? (
-          <p className="mt-1 text-sm text-ap-muted">{prescription}</p>
-        ) : null}
+        {prescription ? <p className="mt-1 text-sm text-ap-muted">{prescription}</p> : null}
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">{a.rule_code}</span>
           <span>·</span>

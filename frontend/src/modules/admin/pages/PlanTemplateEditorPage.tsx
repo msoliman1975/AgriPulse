@@ -11,6 +11,7 @@ import {
   type PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import {
@@ -189,14 +190,14 @@ export function PlanTemplateEditorPage(): ReactNode {
 
   if (!isNew && detailQuery.isLoading) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <Page>
         <Skeleton className="h-96 w-full" />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-6">
+    <Page>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -503,7 +504,7 @@ export function PlanTemplateEditorPage(): ReactNode {
           </button>
         </div>
       ) : null}
-    </div>
+    </Page>
   );
 }
 

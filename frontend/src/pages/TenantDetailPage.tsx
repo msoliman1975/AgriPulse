@@ -9,6 +9,7 @@ import { listFarms, type Farm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
 import { decodeJwt } from "@/rbac/jwt";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
+import { Page } from "@/components/Page";
 
 export function TenantDetailPage(): ReactNode {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -75,7 +76,7 @@ export function TenantDetailPage(): ReactNode {
   }
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div>
         <h1 className="text-2xl font-semibold text-ap-ink">{membership.tenant_name}</h1>
         <p className="text-sm text-ap-muted">
@@ -150,7 +151,7 @@ export function TenantDetailPage(): ReactNode {
           </div>
         )}
       </div>
-    </div>
+    </Page>
   );
 }
 
