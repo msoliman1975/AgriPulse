@@ -11,7 +11,9 @@
       "cropPath": "Crop path",
       "status": "Status",
       "updated": "Updated"
-    }
+    },
+    "noResults": "No templates match this status.",
+    "clearFilter": "Show all"
   },
   "status": {
     "all": "All",

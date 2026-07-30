@@ -1,106 +1,99 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listFarms, type Farm } from "@/api/farms";
-import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { DataTable, type Column } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
-import { ErrorState } from "@/components/ErrorState";
+import { FilterChip } from "@/components/FilterChip";
+import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
-import { Skeleton } from "@/components/Skeleton";
-import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { Pill } from "@/components/Pill";
+import { Toolbar } from "@/components/Toolbar";
+import { mapAsyncState, useAsyncData } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
-import { isApiError } from "@/api/errors";
 import { AreaDisplay } from "../components/AreaDisplay";
 
 export function FarmListPage(): JSX.Element {
   const { t } = useTranslation("farms");
   const canCreate = useCapability("farm.create");
-  const [farms, setFarms] = useState<Farm[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [includeArchived, setIncludeArchived] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    listFarms({ include_inactive: includeArchived })
-      .then((page) => {
-        if (!cancelled) setFarms(page.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (isApiError(err)) setError(err.problem.detail ?? err.problem.title);
-        else setError(String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [includeArchived]);
+  const state = useAsyncData(
+    () => listFarms({ include_inactive: includeArchived }),
+    [includeArchived],
+  );
+
+  const columns: Column<Farm>[] = [
+    { key: "code", header: t("list.columns.code"), cell: (f) => f.code },
+    { key: "name", header: t("list.columns.name"), cell: (f) => f.name },
+    {
+      key: "governorate",
+      header: t("list.columns.governorate"),
+      className: "text-ap-muted",
+      cell: (f) => f.governorate ?? "—",
+    },
+    {
+      key: "area",
+      header: t("list.columns.area"),
+      align: "end",
+      cell: (f) => <AreaDisplay areaM2={Number(f.area_m2)} />,
+    },
+    {
+      key: "status",
+      header: t("list.columns.status"),
+      cell: (f) => (
+        <Pill kind={f.is_active ? "ok" : "neutral"}>
+          {f.is_active ? t("status.active") : t("status.archived")}
+        </Pill>
+      ),
+    },
+  ];
 
   return (
     <Page>
       <PageHeader
         title={t("list.heading")}
         actions={
-          canCreate ? (
-            <Link
-              to="/farms/new"
-              className="inline-flex items-center justify-center rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-ap-primary/90"
-            >
-              {t("list.createButton")}
-            </Link>
-          ) : null
+          canCreate ? <LinkButton to="/farms/new">{t("list.createButton")}</LinkButton> : null
         }
       />
 
-      <Card>
-        <label className="inline-flex items-center gap-2 text-sm text-ap-ink">
-          <input
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
+      <Toolbar
+        chips={
+          <FilterChip active={includeArchived} onToggle={() => setIncludeArchived((v) => !v)}>
+            {t("list.filters.includeArchived")}
+          </FilterChip>
+        }
+      />
+
+      <DataTable<Farm>
+        columns={columns}
+        rowKey={(f) => f.id}
+        state={mapAsyncState(state, (p) => p.items)}
+        filtered={includeArchived}
+        rowHref={(f) => `/farms/${f.id}`}
+        caption={t("list.heading")}
+        empty={
+          <EmptyState
+            message={t("list.empty")}
+            action={
+              canCreate ? <LinkButton to="/farms/new">{t("list.createButton")}</LinkButton> : null
+            }
           />
-          {t("list.filters.includeArchived")}
-        </label>
-      </Card>
-
-      {error ? <ErrorState message={error} /> : null}
-
-      {farms === null ? (
-        <Skeleton className="h-40 w-full rounded-xl" />
-      ) : farms.length === 0 ? (
-        <EmptyState message={t("list.empty")} />
-      ) : (
-        <Table>
-          <Thead>
-            <tr>
-              <Th>{t("list.columns.code")}</Th>
-              <Th>{t("list.columns.name")}</Th>
-              <Th>{t("list.columns.governorate")}</Th>
-              <Th>{t("list.columns.area")}</Th>
-              <Th>{t("list.columns.status")}</Th>
-            </tr>
-          </Thead>
-          <Tbody>
-            {farms.map((f) => (
-              <Tr key={f.id}>
-                <Td>
-                  <Link to={`/farms/${f.id}`} className="text-ap-primary underline">
-                    {f.code}
-                  </Link>
-                </Td>
-                <Td>{f.name}</Td>
-                <Td>{f.governorate ?? "—"}</Td>
-                <Td>
-                  <AreaDisplay areaM2={Number(f.area_m2)} />
-                </Td>
-                <Td>{f.is_active ? t("status.active") : t("status.archived")}</Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
-      )}
+        }
+        noResults={
+          <EmptyState
+            message={t("list.empty")}
+            action={
+              <Button variant="secondary" onClick={() => setIncludeArchived(false)}>
+                {t("list.filters.hideArchived")}
+              </Button>
+            }
+          />
+        }
+      />
     </Page>
   );
 }

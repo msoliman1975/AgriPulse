@@ -19,7 +19,8 @@
       "governorate": "Governorate",
       "tag": "Tag",
       "includeArchived": "Include archived",
-      "all": "All"
+      "all": "All",
+      "hideArchived": "Hide archived"
     },
     "loadMore": "Load more"
   },

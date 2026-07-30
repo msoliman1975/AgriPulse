@@ -19,7 +19,8 @@
       "governorate": "المحافظة",
       "tag": "وسم",
       "includeArchived": "إظهار المؤرشفة",
-      "all": "الكل"
+      "all": "الكل",
+      "hideArchived": "إخفاء المؤرشفة"
     },
     "loadMore": "عرض المزيد"
   },

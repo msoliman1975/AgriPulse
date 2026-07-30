@@ -1,10 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
+import { PageHeader } from "@/components/PageHeader";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useInvitePlatformAdmin,
@@ -34,40 +40,46 @@ export function PlatformAdminsPage(): ReactNode {
 
   return (
     <Page>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("platformAdmins.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("platformAdmins.subtitle")}</p>
-        </div>
-        {canManage ? (
-          <button
-            type="button"
-            onClick={() => setOpenInvite(true)}
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
-          >
-            {t("platformAdmins.inviteButton")}
-          </button>
-        ) : null}
-      </header>
+      <PageHeader
+        title={t("platformAdmins.title")}
+        subtitle={t("platformAdmins.subtitle")}
+        actions={
+          canManage ? (
+            <Button onClick={() => setOpenInvite(true)}>{t("platformAdmins.inviteButton")}</Button>
+          ) : null
+        }
+      />
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel">
-        {adminsQ.isLoading ? (
-          <Skeleton className="h-32 w-full" />
-        ) : adminsQ.isError ? (
-          <p className="p-4 text-sm text-ap-crit">{t("platformAdmins.loadFailed")}</p>
-        ) : (adminsQ.data ?? []).length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">{t("platformAdmins.empty")}</p>
-        ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
+      <AsyncBoundary
+        state={queryState(adminsQ)}
+        skeleton="lines"
+        errorMessage={t("platformAdmins.loadFailed")}
+        empty={
+          <Card noPadding>
+            <EmptyState
+              message={t("platformAdmins.empty")}
+              action={
+                canManage ? (
+                  <Button onClick={() => setOpenInvite(true)}>
+                    {t("platformAdmins.inviteButton")}
+                  </Button>
+                ) : null
+              }
+            />
+          </Card>
+        }
+      >
+        {(rows) => (
+          <Table>
+            <Thead>
               <tr>
-                <th className="px-4 py-2 text-start">{t("platformAdmins.col.user")}</th>
-                <th className="px-4 py-2 text-start">{t("platformAdmins.col.role")}</th>
-                <th className="px-4 py-2 text-end">{t("platformAdmins.col.actions")}</th>
+                <Th>{t("platformAdmins.col.user")}</Th>
+                <Th>{t("platformAdmins.col.role")}</Th>
+                <Th className="text-end">{t("platformAdmins.col.actions")}</Th>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
-              {(adminsQ.data ?? []).map((row) => (
+            </Thead>
+            <Tbody>
+              {rows.map((row) => (
                 <Row
                   key={`${row.user_id}-${row.role}`}
                   row={row}
@@ -76,10 +88,10 @@ export function PlatformAdminsPage(): ReactNode {
                   removing={remove.isPending}
                 />
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
         )}
-      </section>
+      </AsyncBoundary>
 
       {/* Invite modal */}
       {openInvite ? (
@@ -200,18 +212,18 @@ function Row({
 }): ReactNode {
   const { t } = useTranslation("admin");
   return (
-    <tr>
-      <td className="px-4 py-2 text-ap-ink">
+    <Tr>
+      <Td className="text-ap-ink">
         {row.full_name ? `${row.full_name} ` : ""}
         <span className="text-ap-muted">&lt;{row.email}&gt;</span>
         {row.keycloak_subject?.startsWith("pending::") ? (
           <span className="ms-2 text-[11px] text-ap-warn">{t("platformAdmins.pendingKc")}</span>
         ) : null}
-      </td>
-      <td className="px-4 py-2">
+      </Td>
+      <Td>
         <Pill kind={row.role === "PlatformAdmin" ? "warn" : "info"}>{row.role}</Pill>
-      </td>
-      <td className="px-4 py-2 text-end">
+      </Td>
+      <Td className="text-end">
         {canManage ? (
           <button
             type="button"
@@ -222,7 +234,7 @@ function Row({
             {t("platformAdmins.removeButton")}
           </button>
         ) : null}
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   );
 }
