@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -492,11 +492,18 @@ def backfill_farm_scenes(
     defaults to False so the backfill lands raw bands + STAC only — indices
     can be computed later.
     """
-    return _run_task(
-        _backfill_farm_scenes_async(
-            UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices, run_id
+    # Same guard as backfill_farm_indices: an unreported crash leaves the
+    # run waiting on this source forever.
+    backfill_progress.mark_running(run_id)
+    try:
+        return _run_task(
+            _backfill_farm_scenes_async(
+                UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices, run_id
+            )
         )
-    )
+    except Exception as exc:
+        backfill_progress.finish(run_id, "imagery", failed=True, error=str(exc)[:500])
+        raise
 
 
 async def _backfill_farm_scenes_async(
@@ -525,7 +532,7 @@ async def _backfill_farm_scenes_async(
     # work and finish long after it returns. So it reports the shape of the
     # job rather than a completion, and settles the source immediately;
     # the console shows scenes landing through the subscription counters.
-    backfill_progress.mark_running(run_id)
+    # (mark_running already fired in the task wrapper, before this ran.)
     for sid in sub_ids:
         backfill_scenes.delay(str(sid), tenant_schema, from_iso, to_iso, run_compute_indices)
     _log.info(
@@ -544,6 +551,16 @@ async def _backfill_farm_scenes_async(
 
 
 # --- farm-wide index recomputation (console "Compute indices") ---------------
+
+
+def _as_date(value: str) -> date:
+    """Parse a window bound that arrives over Celery as a string.
+
+    The console sends ISO dates, but `scripts.backfill_history` and older
+    callers can send a full ISO datetime, so accept both rather than
+    assuming the shorter form.
+    """
+    return datetime.fromisoformat(value).date() if "T" in value else date.fromisoformat(value)
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -566,9 +583,17 @@ def backfill_farm_indices(
     calls and no processing units — it re-reads the raw-bands COG that the
     original ingest wrote.
     """
-    return _run_task(
-        _backfill_farm_indices_async(UUID(farm_id), tenant_schema, from_iso, to_iso, run_id)
-    )
+    # Report a crash against the run, then re-raise. Without this the run's
+    # imagery source never reports terminal, `_settle` waits on it forever
+    # and the console shows "Queued" for a task that died minutes ago.
+    backfill_progress.mark_running(run_id)
+    try:
+        return _run_task(
+            _backfill_farm_indices_async(UUID(farm_id), tenant_schema, from_iso, to_iso, run_id)
+        )
+    except Exception as exc:
+        backfill_progress.finish(run_id, "imagery", failed=True, error=str(exc)[:500])
+        raise
 
 
 async def _backfill_farm_indices_async(
@@ -598,16 +623,23 @@ async def _backfill_farm_indices_async(
                      WHERE b.farm_id = :farm
                        AND j.status = 'succeeded'
                        AND b.aoi_hash IS NOT NULL
-                       AND j.scene_datetime >= CAST(:from_iso AS timestamptz)
-                       AND j.scene_datetime <  CAST(:to_iso AS timestamptz) + INTERVAL '1 day'
+                       AND j.scene_datetime >= CAST(:window_from AS date)
+                       AND j.scene_datetime <  CAST(:window_to AS date) + INTERVAL '1 day'
                      ORDER BY j.scene_datetime ASC
                     """
                 ),
-                {"farm": farm_id, "from_iso": from_iso, "to_iso": to_iso},
+                # Real `date` objects, NOT the raw ISO strings. The CAST makes
+                # asyncpg type these parameters, so a str raised DataError and
+                # killed the task on every run.
+                {
+                    "farm": farm_id,
+                    "window_from": _as_date(from_iso),
+                    "window_to": _as_date(to_iso),
+                },
             )
         ).all()
 
-    backfill_progress.mark_running(run_id)
+    # (mark_running already fired in the task wrapper, before the query.)
     for job_id, scene_id, aoi_hash, product_code, provider_code in rows:
         compute_indices.delay(
             str(job_id),
