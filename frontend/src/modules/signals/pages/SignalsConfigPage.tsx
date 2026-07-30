@@ -13,7 +13,9 @@ import type {
   SignalTemplateUpdatePayload,
   ValueKind,
 } from "@/api/signals";
+import { Button } from "@/components/Button";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -162,21 +164,17 @@ export function SignalsConfigPage(): ReactNode {
 
   return (
     <Page>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("config.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("config.subtitle")}</p>
-        </div>
-        {canDefine ? (
-          <button
-            type="button"
-            onClick={() => setShowForm((s) => !s)}
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
-          >
-            {showForm ? t("config.cancel") : t("config.newDefinition")}
-          </button>
-        ) : null}
-      </header>
+      <PageHeader
+        title={t("config.title")}
+        subtitle={t("config.subtitle")}
+        actions={
+          canDefine ? (
+            <Button onClick={() => setShowForm((s) => !s)}>
+              {showForm ? t("config.cancel") : t("config.newDefinition")}
+            </Button>
+          ) : null
+        }
+      />
 
       {showForm && canDefine ? (
         <form

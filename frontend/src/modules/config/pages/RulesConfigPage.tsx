@@ -14,6 +14,7 @@ import type {
 import { listSignalDefinitions } from "@/api/signals";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
+import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -80,21 +81,21 @@ export function RulesConfigPage(): ReactNode {
 
   return (
     <Page>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
-        </div>
-        <SegmentedControl
-          ariaLabel="Rule source"
-          items={[
-            { value: "platform", label: t("tabs.platform") },
-            { value: "tenant", label: t("tabs.tenant") },
-          ]}
-          value={tab}
-          onChange={(v) => setTab(v)}
-        />
-      </header>
+      <PageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          <SegmentedControl
+            ariaLabel="Rule source"
+            items={[
+              { value: "platform", label: t("tabs.platform") },
+              { value: "tenant", label: t("tabs.tenant") },
+            ]}
+            value={tab}
+            onChange={(v) => setTab(v)}
+          />
+        }
+      />
 
       {tab === "platform" ? (
         <div className="rounded-xl border border-ap-line bg-ap-panel">

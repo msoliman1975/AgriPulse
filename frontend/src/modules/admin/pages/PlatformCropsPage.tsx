@@ -3,8 +3,16 @@ import { useTranslation } from "react-i18next";
 
 import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
 import { isApiError } from "@/api/errors";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { FilterChip } from "@/components/FilterChip";
 import { Page } from "@/components/Page";
-import { Skeleton } from "@/components/Skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import { Pill } from "@/components/Pill";
+import { Toolbar } from "@/components/Toolbar";
+import { queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useAdminCrops,
@@ -52,57 +60,65 @@ export function PlatformCropsPage(): ReactNode {
   const canManage = useCapability("platform.manage_crops");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [adding, setAdding] = useState(false);
-  const { data, isLoading, isError } = useAdminCrops(includeInactive);
+  const crops = useAdminCrops(includeInactive);
 
   return (
     <Page>
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("crops.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("crops.subtitle")}</p>
-          {!canManage ? (
-            <p className="mt-2 text-xs text-ap-warn">{t("crops.readonlyHint")}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-ap-muted">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-            />
+      <PageHeader
+        title={t("crops.title")}
+        subtitle={t("crops.subtitle")}
+        badge={!canManage ? <Pill kind="warn">{t("crops.readonlyHint")}</Pill> : undefined}
+        actions={
+          canManage ? (
+            <Button onClick={() => setAdding((v) => !v)}>{t("crops.addCrop")}</Button>
+          ) : null
+        }
+      />
+
+      <Toolbar
+        chips={
+          <FilterChip active={includeInactive} onToggle={() => setIncludeInactive((v) => !v)}>
             {t("crops.showRetired")}
-          </label>
-          {canManage ? (
-            <button className="btn btn-primary" onClick={() => setAdding((v) => !v)}>
-              {t("crops.addCrop")}
-            </button>
-          ) : null}
-        </div>
-      </header>
+          </FilterChip>
+        }
+      />
 
       {adding && canManage ? (
         <CropForm mode="create" onClose={() => setAdding(false)} onDone={() => setAdding(false)} />
       ) : null}
 
-      {isLoading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : isError ? (
-        <p className="text-sm text-ap-crit">{t("crops.loadFailed")}</p>
-      ) : !data || data.length === 0 ? (
-        <p className="text-sm text-ap-muted">{t("crops.empty")}</p>
-      ) : (
-        <div className="divide-y divide-ap-line rounded-xl border border-ap-line bg-ap-panel">
-          {data.map((crop) => (
-            <CropRow
-              key={crop.id}
-              crop={crop}
-              canManage={canManage}
-              includeInactive={includeInactive}
+      <AsyncBoundary
+        state={queryState(crops)}
+        filtered={includeInactive}
+        errorMessage={t("crops.loadFailed")}
+        empty={
+          <Card noPadding>
+            <EmptyState
+              message={t("crops.empty")}
+              action={
+                canManage ? (
+                  <Button onClick={() => setAdding(true)}>{t("crops.addCrop")}</Button>
+                ) : null
+              }
             />
-          ))}
-        </div>
-      )}
+          </Card>
+        }
+      >
+        {(rows) => (
+          <Card noPadding>
+            <div className="divide-y divide-ap-line">
+              {rows.map((crop) => (
+                <CropRow
+                  key={crop.id}
+                  crop={crop}
+                  canManage={canManage}
+                  includeInactive={includeInactive}
+                />
+              ))}
+            </div>
+          </Card>
+        )}
+      </AsyncBoundary>
     </Page>
   );
 }
@@ -685,12 +701,12 @@ function FormButtons({ busy, onCancel }: { busy: boolean; onCancel: () => void }
   const { t } = useTranslation("admin");
   return (
     <div className="flex gap-2">
-      <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
+      <Button type="submit" size="sm" disabled={busy}>
         {busy ? t("crops.form.saving") : t("crops.form.save")}
-      </button>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
         {t("crops.form.cancel")}
-      </button>
+      </Button>
     </div>
   );
 }
