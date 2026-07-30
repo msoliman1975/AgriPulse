@@ -81,7 +81,11 @@ function DefaultRow({ row, canManage }: { row: PlatformDefault; canManage: boole
   }, [row.value]);
 
   // Clear the pending "Saved" timer if the row unmounts mid-flash.
-  useEffect(() => () => savedTimer.current && clearTimeout(savedTimer.current), []);
+  useEffect(() => {
+    return () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    };
+  }, []);
 
   const dirty = draft !== formatValue(row.value);
 
