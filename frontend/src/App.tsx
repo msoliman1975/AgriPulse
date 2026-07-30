@@ -228,26 +228,10 @@ export function App(): ReactNode {
                     <Route path="health" element={<IntegrationsHealthPage />} />
                     <Route path="weather" element={<IntegrationsWeatherPage />} />
                     <Route path="imagery" element={<IntegrationsImageryPage />} />
-                    <Route
-                      path="email"
-                      element={
-                        <IntegrationsTenantOnlyPage
-                          category="email"
-                          i18nTitleKey="email.title"
-                          i18nSubtitleKey="email.subtitle"
-                        />
-                      }
-                    />
-                    <Route
-                      path="webhook"
-                      element={
-                        <IntegrationsTenantOnlyPage
-                          category="webhook"
-                          i18nTitleKey="webhook.title"
-                          i18nSubtitleKey="webhook.subtitle"
-                        />
-                      }
-                    />
+                    {/* email + webhook removed with public migration 0048 —
+                        their keys were inert; bounce old links to health. */}
+                    <Route path="email" element={<Navigate to="../health" replace />} />
+                    <Route path="webhook" element={<Navigate to="../health" replace />} />
                     <Route
                       path="detection"
                       element={

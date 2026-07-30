@@ -55,10 +55,12 @@ class FarmWeatherOverridePayload(BaseModel):
 
 
 class FarmImageryOverridePayload(BaseModel):
-    """PUT /integrations/imagery/farms/{farm_id} body."""
+    """PUT /integrations/imagery/farms/{farm_id} body.
+
+    `product_code` was dropped with public migration 0048 — nothing read
+    it, and the platform key it inherited from no longer exists."""
 
     model_config = ConfigDict(extra="forbid")
-    product_code: str | None = None
     cloud_cover_threshold_pct: int | None = Field(default=None, ge=0, le=100)
 
 

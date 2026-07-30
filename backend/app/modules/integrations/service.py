@@ -31,27 +31,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.audit import AuditService, get_audit_service
 from app.shared.settings import (
     ResolvedSetting,
+    SettingNotFoundError,
     SettingsRepository,
     SettingsResolver,
+    validate_value,
 )
 
+# Public migration 0048 dropped the email.*, webhook.*, alert.* keys plus
+# `weather.forecast_retention_days` and `imagery.default_product_code`:
+# nothing read them, so the tiers below only ever fed them back to the UI.
+# Outbound mail and webhooks are configured at the platform tier via
+# `app/core/settings.py` (SMTP_*, WEBHOOK_*), not per tenant.
 WEATHER_KEYS = (
     "weather.default_provider_code",
     "weather.default_cadence_hours",
-    "weather.forecast_retention_days",
 )
-IMAGERY_KEYS = (
-    "imagery.default_product_code",
-    "imagery.cloud_cover_threshold_pct",
-)
-EMAIL_KEYS = (
-    "email.from_address",
-    "email.smtp_host",
-)
-WEBHOOK_KEYS = (
-    "webhook.signing_alg",
-    "webhook.timeout_seconds",
-)
+IMAGERY_KEYS = ("imagery.cloud_cover_threshold_pct",)
 # Detection / alerting thresholds (G-3). Tenant-tier override of the
 # platform default; per-block overrides live on grid_configs.
 DETECTION_KEYS = ("grid.anomaly_z_threshold",)
@@ -102,6 +97,14 @@ class IntegrationsService:
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]:
+        # Tenant overrides used to be written straight through json.dumps
+        # with no check at all — a tenant could park a string in a numeric
+        # key. Validate against the same schema + bounds the platform tier
+        # enforces.
+        default = await self._repo.get_default(key=key)
+        if default is None:
+            raise SettingNotFoundError(key)
+        validate_value(key=key, value=value, value_schema=default["value_schema"])
         await self._repo.upsert_tenant_override(
             tenant_id=tenant_id,
             key=key,
@@ -230,12 +233,11 @@ class IntegrationsService:
         *,
         tenant_id: UUID,
         farm_id: UUID,
-        product_code: str | None,
         cloud_cover_threshold_pct: int | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> list[dict[str, Any]]:
-        if product_code is None and cloud_cover_threshold_pct is None:
+        if cloud_cover_threshold_pct is None:
             await self._tenant.execute(
                 text("DELETE FROM farm_imagery_overrides WHERE farm_id = :fid").bindparams(
                     bindparam("fid", type_=PG_UUID(as_uuid=True))
@@ -247,11 +249,10 @@ class IntegrationsService:
                 text(
                     """
                     INSERT INTO farm_imagery_overrides
-                        (farm_id, product_code, cloud_cover_threshold_pct,
+                        (farm_id, cloud_cover_threshold_pct,
                          updated_at, updated_by)
-                    VALUES (:fid, :pc, :cc, now(), :actor)
+                    VALUES (:fid, :cc, now(), :actor)
                     ON CONFLICT (farm_id) DO UPDATE SET
-                        product_code = EXCLUDED.product_code,
                         cloud_cover_threshold_pct = EXCLUDED.cloud_cover_threshold_pct,
                         updated_at = EXCLUDED.updated_at,
                         updated_by = EXCLUDED.updated_by
@@ -262,7 +263,6 @@ class IntegrationsService:
                 ),
                 {
                     "fid": farm_id,
-                    "pc": product_code,
                     "cc": cloud_cover_threshold_pct,
                     "actor": actor_user_id,
                 },
@@ -274,10 +274,7 @@ class IntegrationsService:
             subject_kind="farm",
             subject_id=farm_id,
             farm_id=farm_id,
-            details={
-                "product_code": product_code,
-                "cloud_cover_threshold_pct": cloud_cover_threshold_pct,
-            },
+            details={"cloud_cover_threshold_pct": cloud_cover_threshold_pct},
         )
         return await self.get_farm_imagery(tenant_id=tenant_id, farm_id=farm_id)
 

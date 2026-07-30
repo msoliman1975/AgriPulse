@@ -15,7 +15,7 @@ interface Props {
   tenantId: string;
 }
 
-const CATEGORIES: Category[] = ["weather", "imagery", "email", "webhook"];
+const CATEGORIES: Category[] = ["weather", "imagery", "detection"];
 
 /**
  * /platform/tenants/:id Integrations tab. Per-category sections, each

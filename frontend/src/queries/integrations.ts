@@ -4,7 +4,10 @@ import { integrationsApi } from "@/api/integrations";
 
 const STALE = 30_000;
 
-export function useTenantIntegration(category: "weather" | "imagery" | "email" | "webhook" | "detection") {
+/** Email + webhook categories were dropped with public migration 0048. */
+export type IntegrationCategory = "weather" | "imagery" | "detection";
+
+export function useTenantIntegration(category: IntegrationCategory) {
   return useQuery({
     queryKey: ["integrations", category, "tenant"] as const,
     queryFn: () => integrationsApi[category].getTenant(),
@@ -12,7 +15,7 @@ export function useTenantIntegration(category: "weather" | "imagery" | "email" |
   });
 }
 
-export function usePutTenantIntegration(category: "weather" | "imagery" | "email" | "webhook" | "detection") {
+export function usePutTenantIntegration(category: IntegrationCategory) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
@@ -75,10 +78,7 @@ export function usePutFarmImagery() {
       payload,
     }: {
       farmId: string;
-      payload: {
-        product_code: string | null;
-        cloud_cover_threshold_pct: number | null;
-      };
+      payload: { cloud_cover_threshold_pct: number | null };
     }) => integrationsApi.imagery.putFarm(farmId, payload),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({

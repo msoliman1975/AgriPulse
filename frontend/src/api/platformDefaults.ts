@@ -2,6 +2,15 @@ import { apiClient } from "./client";
 
 export type ValueSchema = "string" | "number" | "boolean" | "object" | "array";
 
+/** Range / choices the backend enforces for a key, mirrored client-side. */
+export interface ValueConstraint {
+  minimum?: number;
+  maximum?: number;
+  choices?: string[];
+  nullable?: boolean;
+  integer_only?: boolean;
+}
+
 export interface PlatformDefault {
   key: string;
   value: unknown;
@@ -10,6 +19,7 @@ export interface PlatformDefault {
   category: string;
   updated_at: string;
   updated_by: string | null;
+  constraint: ValueConstraint | null;
 }
 
 export async function listPlatformDefaults(): Promise<PlatformDefault[]> {

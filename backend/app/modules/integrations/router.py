@@ -10,15 +10,12 @@ Mounted under /api/v1 by the app factory.
   GET    /integrations/imagery/tenant
   PUT    /integrations/imagery/tenant
   GET    /integrations/imagery/farms/{farm_id}
-  PUT    /integrations/imagery/farms/{farm_id}   { product_code, cloud_cover_threshold_pct }
+  PUT    /integrations/imagery/farms/{farm_id}   { cloud_cover_threshold_pct }
   PUT    /integrations/imagery/blocks/{block_id} { cloud_cover_max_pct }
   POST   /integrations/imagery/farms/{farm_id}:apply-to-blocks  { mode }
 
-  GET    /integrations/email/tenant
-  PUT    /integrations/email/tenant
-
-  GET    /integrations/webhook/tenant
-  PUT    /integrations/webhook/tenant
+  GET    /integrations/detection/tenant
+  PUT    /integrations/detection/tenant
 
 All gated on `tenant.manage_integrations` for writes,
 `tenant.read_integration_health` (or its superset
@@ -45,10 +42,8 @@ from app.modules.integrations.schemas import (
 )
 from app.modules.integrations.service import (
     DETECTION_KEYS,
-    EMAIL_KEYS,
     IMAGERY_KEYS,
     WEATHER_KEYS,
-    WEBHOOK_KEYS,
     IntegrationsService,
     get_integrations_service,
 )
@@ -268,7 +263,6 @@ async def put_imagery_farm(
         "settings": await service.upsert_farm_imagery(
             tenant_id=tid,
             farm_id=farm_id,
-            product_code=payload.product_code,
             cloud_cover_threshold_pct=payload.cloud_cover_threshold_pct,
             actor_user_id=context.user_id,
             tenant_schema=schema,
@@ -312,92 +306,11 @@ async def apply_imagery_to_blocks(
     )
 
 
-# ---- Email ----------------------------------------------------------------
-
-
-@router.get(
-    "/integrations/email/tenant",
-    response_model=TenantIntegrationSettingsResponse,
-)
-async def get_email_tenant(
-    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
-    service: IntegrationsService = Depends(_service),
-) -> dict[str, Any]:
-    tid, _ = _ensure_tenant(context)
-    return {"settings": await service.list_tenant(tenant_id=tid, keys=EMAIL_KEYS)}
-
-
-@router.put(
-    "/integrations/email/tenant",
-    response_model=ResolvedIntegrationSetting,
-)
-async def put_email_tenant(
-    payload: TenantSettingUpsertRequest,
-    key: str = Query(...),
-    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
-    service: IntegrationsService = Depends(_service),
-) -> dict[str, Any]:
-    tid, schema = _ensure_tenant(context)
-    if key not in EMAIL_KEYS:
-        from app.core.errors import APIError
-
-        raise APIError(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            title="Invalid key",
-            detail=f"{key!r} is not an email-category key.",
-            type_="https://agripulse.cloud/problems/integrations/invalid-key",
-        )
-    return await service.upsert_tenant_value(
-        tenant_id=tid,
-        key=key,
-        value=payload.value,
-        actor_user_id=context.user_id,
-        tenant_schema=schema,
-    )
-
-
-# ---- Webhook --------------------------------------------------------------
-
-
-@router.get(
-    "/integrations/webhook/tenant",
-    response_model=TenantIntegrationSettingsResponse,
-)
-async def get_webhook_tenant(
-    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
-    service: IntegrationsService = Depends(_service),
-) -> dict[str, Any]:
-    tid, _ = _ensure_tenant(context)
-    return {"settings": await service.list_tenant(tenant_id=tid, keys=WEBHOOK_KEYS)}
-
-
-@router.put(
-    "/integrations/webhook/tenant",
-    response_model=ResolvedIntegrationSetting,
-)
-async def put_webhook_tenant(
-    payload: TenantSettingUpsertRequest,
-    key: str = Query(...),
-    context: RequestContext = Depends(requires_capability("tenant.manage_integrations")),
-    service: IntegrationsService = Depends(_service),
-) -> dict[str, Any]:
-    tid, schema = _ensure_tenant(context)
-    if key not in WEBHOOK_KEYS:
-        from app.core.errors import APIError
-
-        raise APIError(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            title="Invalid key",
-            detail=f"{key!r} is not a webhook-category key.",
-            type_="https://agripulse.cloud/problems/integrations/invalid-key",
-        )
-    return await service.upsert_tenant_value(
-        tenant_id=tid,
-        key=key,
-        value=payload.value,
-        actor_user_id=context.user_id,
-        tenant_schema=schema,
-    )
+# Email + webhook had tenant-tier endpoints here until public migration
+# 0048. Every key they exposed was inert — outbound mail and webhooks read
+# `app/core/settings.py` (SMTP_*, WEBHOOK_*), never the resolver — so the
+# endpoints and their Settings tabs were removed rather than left to imply
+# a tenant override that never took effect.
 
 
 # ---- Detection (alerting thresholds) --------------------------------------

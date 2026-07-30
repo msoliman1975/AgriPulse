@@ -1,7 +1,9 @@
 import { apiClient } from "./client";
 import type { ResolvedSetting } from "./integrations";
 
-export type Category = "weather" | "imagery" | "email" | "webhook";
+/** `email` + `webhook` were dropped with public migration 0048 — their
+ *  keys were inert and the backend no longer accepts those categories. */
+export type Category = "weather" | "imagery" | "detection";
 
 export interface TenantSettingsBag {
   settings: ResolvedSetting[];

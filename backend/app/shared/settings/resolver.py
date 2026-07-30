@@ -152,16 +152,23 @@ class SettingsResolver:
               → tenant_settings_overrides[key]
               → platform_defaults[key]
         """
-        column = _imagery_column_for(key)
-        if self._tenant is not None and column is not None:
-            block_value = await self._fetch_block_imagery_override(block_id=block_id, column=column)
-            if block_value is not None:
-                value, updated_at = block_value
-                return ResolvedSetting(value=value, source="resource", overridden_at=updated_at)
-            farm_value = await self._fetch_farm_imagery_override(farm_id=farm_id, column=column)
-            if farm_value is not None:
-                value, updated_at = farm_value
-                return ResolvedSetting(value=value, source="farm", overridden_at=updated_at)
+        if self._tenant is not None:
+            block_column = _block_imagery_column_for(key)
+            if block_column is not None:
+                block_value = await self._fetch_block_imagery_override(
+                    block_id=block_id, column=block_column
+                )
+                if block_value is not None:
+                    value, updated_at = block_value
+                    return ResolvedSetting(value=value, source="resource", overridden_at=updated_at)
+            farm_column = _farm_imagery_column_for(key)
+            if farm_column is not None:
+                farm_value = await self._fetch_farm_imagery_override(
+                    farm_id=farm_id, column=farm_column
+                )
+                if farm_value is not None:
+                    value, updated_at = farm_value
+                    return ResolvedSetting(value=value, source="farm", overridden_at=updated_at)
         return await self.get_tenant(tenant_id, key)
 
     # ---- Cache plumbing ----------------------------------------------------
@@ -216,10 +223,7 @@ class SettingsResolver:
             f"SELECT {column} AS value, updated_at "  # noqa: S608
             "FROM farm_weather_overrides WHERE farm_id = :fid"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True)))
-        try:
-            row = (await self._tenant.execute(sql, {"fid": farm_id})).mappings().first()
-        except Exception:  # table doesn't exist yet (pre-Set4 migration)
-            return None
+        row = (await self._tenant.execute(sql, {"fid": farm_id})).mappings().first()
         if row is None or row["value"] is None:
             return None
         return row["value"], row["updated_at"]
@@ -233,10 +237,7 @@ class SettingsResolver:
             f"SELECT {column} AS value, updated_at "  # noqa: S608
             "FROM farm_imagery_overrides WHERE farm_id = :fid"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True)))
-        try:
-            row = (await self._tenant.execute(sql, {"fid": farm_id})).mappings().first()
-        except Exception:
-            return None
+        row = (await self._tenant.execute(sql, {"fid": farm_id})).mappings().first()
         if row is None or row["value"] is None:
             return None
         return row["value"], row["updated_at"]
@@ -244,8 +245,8 @@ class SettingsResolver:
     async def _fetch_block_imagery_override(
         self, *, block_id: UUID, column: str
     ) -> tuple[Any, datetime] | None:
-        # imagery_aoi_subscriptions exists since migration 0003 — no
-        # try/except needed. Take the most-recently-updated active row.
+        # imagery_aoi_subscriptions exists since tenant migration 0003.
+        # Take the most-recently-updated active row.
         if self._tenant is None:
             return None
         sql = text(
@@ -256,10 +257,7 @@ class SettingsResolver:
             "ORDER BY COALESCE(updated_at, created_at) DESC "
             "LIMIT 1"
         ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True)))
-        try:
-            row = (await self._tenant.execute(sql, {"bid": block_id})).mappings().first()
-        except Exception:
-            return None
+        row = (await self._tenant.execute(sql, {"bid": block_id})).mappings().first()
         if row is None or row["value"] is None:
             return None
         return row["value"], row["updated_at"]
@@ -276,9 +274,25 @@ _FARM_WEATHER_COLUMNS: dict[str, str] = {
     "weather.default_cadence_hours": "cadence_hours",
 }
 
-_IMAGERY_COLUMNS: dict[str, str] = {
-    "imagery.default_product_code": "product_code",
+# Farm tier lives on `farm_imagery_overrides` (tenant migration 0020).
+# That table also carries a `product_code` column, orphaned when public
+# migration 0048 dropped `imagery.default_product_code`; nothing reads or
+# writes it now.
+_FARM_IMAGERY_COLUMNS: dict[str, str] = {
     "imagery.cloud_cover_threshold_pct": "cloud_cover_threshold_pct",
+}
+
+# Block tier lives on `imagery_aoi_subscriptions` (tenant migration 0003),
+# whose columns are named differently — `cloud_cover_max_pct`, not
+# `cloud_cover_threshold_pct`. Mapping the Farm-tier names onto this table
+# used to raise UndefinedColumn on every read, which a bare `except` then
+# swallowed, so the block tier silently never applied.
+#
+# There is deliberately no block-tier entry for `imagery.default_product_code`:
+# `imagery_aoi_subscriptions` carries `product_id` (a NOT NULL FK identifying
+# the subscription), not an optional per-block override of the default code.
+_BLOCK_IMAGERY_COLUMNS: dict[str, str] = {
+    "imagery.cloud_cover_threshold_pct": "cloud_cover_max_pct",
 }
 
 
@@ -286,5 +300,9 @@ def _farm_weather_column_for(key: str) -> str | None:
     return _FARM_WEATHER_COLUMNS.get(key)
 
 
-def _imagery_column_for(key: str) -> str | None:
-    return _IMAGERY_COLUMNS.get(key)
+def _farm_imagery_column_for(key: str) -> str | None:
+    return _FARM_IMAGERY_COLUMNS.get(key)
+
+
+def _block_imagery_column_for(key: str) -> str | None:
+    return _BLOCK_IMAGERY_COLUMNS.get(key)

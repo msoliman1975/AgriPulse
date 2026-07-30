@@ -122,12 +122,11 @@
   },
   "integrations": {
     "title": "Integration defaults",
-    "subtitle": "Set tenant-tier defaults for weather, imagery, email, and webhook. The tenant owner can override these values inside AgriPulse — Platform's job is to seed sensible starting values.",
+    "subtitle": "Set tenant-tier defaults for weather, imagery, and detection. The tenant owner can override these values inside AgriPulse — Platform's job is to seed sensible starting values.",
     "category": {
       "weather": "Weather",
       "imagery": "Imagery",
-      "email": "Email",
-      "webhook": "Webhook"
+      "detection": "Detection"
     },
     "loadFailed": "Could not load tenant integration values.",
     "save": "Save",
@@ -172,7 +171,14 @@
     "empty": "No defaults defined.",
     "save": "Save",
     "saving": "Saving…",
-    "lastUpdated": "Last updated {{when}}"
+    "saved": "Saved",
+    "lastUpdated": "Last updated {{when}}",
+    "category": {
+      "weather": "Weather",
+      "imagery": "Imagery",
+      "alert": "Alerting & detection",
+      "general": "General"
+    }
   },
   "guard": {
     "forbiddenTitle": "Platform admin only",

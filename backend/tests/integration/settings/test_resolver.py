@@ -36,16 +36,19 @@ def _slug(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex[:8]}"
 
 
-async def _make_tenant(admin_session: AsyncSession) -> str:
+async def _create_tenant(admin_session: AsyncSession):
     fake = FakeKeycloakClient()
     service = get_tenant_service(admin_session, keycloak_client=fake)
-    result = await service.create_tenant(
+    return await service.create_tenant(
         slug=_slug("res"),
         name="Res",
         contact_email="ops@res.test",
         actor_user_id=None,
     )
-    return result.tenant_id
+
+
+async def _make_tenant(admin_session: AsyncSession) -> str:
+    return (await _create_tenant(admin_session)).tenant_id
 
 
 @pytest.fixture(autouse=True)
@@ -98,22 +101,21 @@ async def test_delete_override_falls_back_to_platform(
 ) -> None:
     tenant_id = await _make_tenant(admin_session)
     repo = SettingsRepository(public_session=admin_session)
+    key = "grid.anomaly_z_threshold"  # seeded 1.5 by migration 0026
     await repo.upsert_tenant_override(
         tenant_id=tenant_id,
-        key="alert.rate_limit_per_hour",
-        value_json=json.dumps(120),
+        key=key,
+        value_json=json.dumps(3.0),
         actor_user_id=None,
     )
     resolver = SettingsResolver(public_session=admin_session)
-    assert (await resolver.get_tenant(tenant_id, "alert.rate_limit_per_hour")).value == 120
+    assert (await resolver.get_tenant(tenant_id, key)).value == 3.0
 
-    deleted = await repo.delete_tenant_override(
-        tenant_id=tenant_id, key="alert.rate_limit_per_hour"
-    )
+    deleted = await repo.delete_tenant_override(tenant_id=tenant_id, key=key)
     assert deleted is True
     invalidate_defaults_cache()
-    after = await resolver.get_tenant(tenant_id, "alert.rate_limit_per_hour")
-    assert after.value == 60
+    after = await resolver.get_tenant(tenant_id, key)
+    assert after.value == 1.5
     assert after.source == "platform"
 
 
@@ -126,35 +128,82 @@ async def test_platform_default_change_picked_up_after_invalidate(
     sees the new value without waiting."""
     tenant_id = await _make_tenant(admin_session)
     resolver = SettingsResolver(public_session=admin_session)
+    key = "imagery.cloud_cover_threshold_pct"  # seeded 30 by migration 0020
 
     # Warm the cache with the seed default.
-    initial = await resolver.get_tenant(tenant_id, "webhook.timeout_seconds")
-    assert initial.value == 10
+    initial = await resolver.get_tenant(tenant_id, key)
+    assert initial.value == 30
 
     # Direct DB update bypassing the repo (simulating an out-of-band
     # change — the repo's update_default_value would call invalidate).
     await admin_session.execute(
         text(
             "UPDATE public.platform_defaults "
-            "SET value = '20'::jsonb, updated_at = now() "
-            "WHERE key = 'webhook.timeout_seconds'"
-        )
+            "SET value = '45'::jsonb, updated_at = now() "
+            "WHERE key = :key"
+        ),
+        {"key": key},
     )
     # Cache still serves the old value.
-    cached = await resolver.get_tenant(tenant_id, "webhook.timeout_seconds")
-    assert cached.value == 10
+    cached = await resolver.get_tenant(tenant_id, key)
+    assert cached.value == 30
 
     invalidate_defaults_cache()
-    after = await resolver.get_tenant(tenant_id, "webhook.timeout_seconds")
-    assert after.value == 20
+    after = await resolver.get_tenant(tenant_id, key)
+    assert after.value == 45
 
     # Reset for the next test (autouse flush_cache only clears the
     # in-process cache, not the DB row).
     await admin_session.execute(
-        text(
-            "UPDATE public.platform_defaults "
-            "SET value = '10'::jsonb WHERE key = 'webhook.timeout_seconds'"
-        )
+        text("UPDATE public.platform_defaults SET value = '30'::jsonb WHERE key = :key"),
+        {"key": key},
     )
     # Use the bind param to silence linter about unused PG_UUID import.
     _ = bindparam("x", type_=PG_UUID(as_uuid=True))
+
+
+# ---- Tier column maps ------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_tier_column_maps_reference_real_columns(
+    admin_session: AsyncSession,
+) -> None:
+    """Every column the resolver maps a key onto must exist on its table.
+
+    The block tier used to map `imagery.cloud_cover_threshold_pct` onto a
+    `cloud_cover_threshold_pct` column of `imagery_aoi_subscriptions` —
+    which is actually named `cloud_cover_max_pct`. Postgres raised
+    UndefinedColumn on every read and a bare `except Exception` swallowed
+    it, so the LandUnit tier silently never applied. Assert the mapping
+    against the live schema so a rename can't reintroduce that.
+    """
+    from app.shared.settings.resolver import (
+        _BLOCK_IMAGERY_COLUMNS,
+        _FARM_IMAGERY_COLUMNS,
+        _FARM_WEATHER_COLUMNS,
+    )
+
+    tenant = await _create_tenant(admin_session)
+    schema = tenant.schema_name
+
+    expected: dict[str, set[str]] = {
+        "farm_weather_overrides": set(_FARM_WEATHER_COLUMNS.values()),
+        "farm_imagery_overrides": set(_FARM_IMAGERY_COLUMNS.values()),
+        "imagery_aoi_subscriptions": set(_BLOCK_IMAGERY_COLUMNS.values()),
+    }
+
+    for table, mapped in expected.items():
+        rows = (
+            await admin_session.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema = :schema AND table_name = :table"
+                ),
+                {"schema": schema, "table": table},
+            )
+        ).all()
+        actual = {r.column_name for r in rows}
+        assert actual, f"{schema}.{table} not found — did the tenant migration run?"
+        missing = mapped - actual
+        assert not missing, f"{table} is missing mapped column(s): {sorted(missing)}"
