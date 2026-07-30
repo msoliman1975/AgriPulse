@@ -184,13 +184,22 @@ global:
   #   read a Python repr instead of a sentence. Plain sentences now. No
   #   migration; api request-path only -> api bumped; workers stay f9f038a,
   #   frontend f9f038a, tile-server 9d140cc.
+  # 1bad71a = #329 platform-admin hard delete (purge) for block / farm /
+  #   tenant-data, plus #330's farm-console subscriptions fix. Archive first,
+  #   then purge; new platform.purge_data capability. CARRIES A MIGRATION
+  #   (public 0047: purge_jobs + purge_receipts) -- the api PreSync job runs
+  #   `alembic -n public upgrade head` before the rollout, so api must sync
+  #   before anything reads those tables. Workers gain the purge.run_job task
+  #   (large purges only; small ones run inline in the request), so workers
+  #   must be bumped too. Backend + FE -> api + workers + frontend bumped;
+  #   tile-server stays 9d140cc.
   images:
     api:
-      tag: "b369773"
+      tag: "1bad71a"
     workers:
-      tag: "f9f038a"
+      tag: "1bad71a"
     frontend:
-      tag: "f9f038a"
+      tag: "1bad71a"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
