@@ -182,6 +182,48 @@ async def test_source_without_subscriptions_is_refused_not_accepted(
 
 
 @pytest.mark.asyncio
+async def test_cancelling_a_stuck_run_frees_the_farm(seeded_farm: dict[str, Any]) -> None:
+    """Without this the farm is blocked for good — see the hung-run incident."""
+    tenant_id: UUID = seeded_farm["tenant_id"]
+    body = {
+        "farm_id": str(seeded_farm["farm_id"]),
+        "window_from": date.today().isoformat(),
+        "window_to": date.today().isoformat(),
+        "imagery": False,
+        "weather": True,
+    }
+    async with _platform_client() as client:
+        run = (
+            await client.post(f"/api/v1/admin/backfill/tenants/{tenant_id}/runs", json=body)
+        ).json()
+        # Farm is occupied, so a resubmit is refused.
+        assert (
+            await client.post(f"/api/v1/admin/backfill/tenants/{tenant_id}/runs", json=body)
+        ).status_code == 409
+
+        cancelled = await client.post(f"/api/v1/admin/backfill/runs/{run['id']}:cancel")
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()["status"] == "failed"
+        assert cancelled.json()["completed_at"] is not None
+
+        # Cancelling again is a clean 409, not a second mutation.
+        second = await client.post(f"/api/v1/admin/backfill/runs/{run['id']}:cancel")
+        assert second.status_code == 409, second.text
+
+        # And the farm accepts work again.
+        assert (
+            await client.post(f"/api/v1/admin/backfill/tenants/{tenant_id}/runs", json=body)
+        ).status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_cancelling_an_unknown_run_is_404() -> None:
+    async with _platform_client() as client:
+        r = await client.post(f"/api/v1/admin/backfill/runs/{uuid4()}:cancel")
+        assert r.status_code == 404, r.text
+
+
+@pytest.mark.asyncio
 async def test_second_submit_for_the_same_farm_is_refused(
     seeded_farm: dict[str, Any],
 ) -> None:

@@ -111,6 +111,15 @@ def finish(
         return
     if counters:
         report(run_id, source, counters)
+    # Both casts here are load-bearing, and this statement silently failed
+    # without them (every write in this module swallows its errors, so the
+    # only symptom was runs that never left `running`):
+    #   * jsonb_build_object's value argument is `"any"`, so the driver's
+    #     server-side bind has nothing to infer :state from -> psycopg raises
+    #     IndeterminateDatatype "could not determine data type of parameter".
+    #   * a postfix `:err::text` does not survive SQLAlchemy text() -> the
+    #     colons reach Postgres literally as a syntax error. CAST(... AS ...)
+    #     is the function form that works.
     _execute(
         """
         UPDATE public.backfill_runs
@@ -118,9 +127,9 @@ def finish(
                  COALESCE(progress, '{}'::jsonb),
                  ARRAY[:source],
                  COALESCE(progress -> :source, '{}'::jsonb)
-                   || jsonb_build_object('state', :state)
-                   || CASE WHEN :err::text IS NULL THEN '{}'::jsonb
-                           ELSE jsonb_build_object('error', :err::text) END,
+                   || jsonb_build_object('state', CAST(:state AS text))
+                   || CASE WHEN CAST(:err AS text) IS NULL THEN '{}'::jsonb
+                           ELSE jsonb_build_object('error', CAST(:err AS text)) END,
                  true
                )
          WHERE id = :rid

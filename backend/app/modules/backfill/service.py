@@ -343,6 +343,15 @@ class BackfillService:
     async def get_run(self, run_id: UUID) -> dict[str, Any] | None:
         return await self._repo.get(run_id)
 
+    async def cancel_run(self, *, run_id: UUID, actor_email: str | None) -> dict[str, Any] | None:
+        """Release a stuck run. None when it was already terminal."""
+        row = await self._repo.cancel(
+            run_id, reason=f"cancelled by {actor_email or 'platform admin'}"
+        )
+        if row is not None:
+            await self._s.commit()
+        return row
+
     # ---- helpers --------------------------------------------------------
 
     async def _farm(self, tenant_schema: str, farm_id: UUID) -> dict[str, Any] | None:

@@ -138,6 +138,35 @@ class BackfillRepository:
         found = row.one_or_none()
         return dict(found) if found else None
 
+    async def cancel(self, run_id: UUID, *, reason: str) -> dict[str, Any] | None:
+        """Settle a non-terminal run so it stops occupying its farm.
+
+        The partial unique index allows one queued/running run per farm, so a
+        run that never settles blocks that farm permanently. Progress
+        reporting is best-effort and the worker may already be gone, so an
+        operator needs a way out that does not involve editing the table by
+        hand.
+
+        Returns the updated row, or None when the run does not exist or is
+        already terminal -- the caller distinguishes those.
+        """
+        row = (
+            await self._s.execute(
+                text(
+                    f"""
+                    UPDATE public.backfill_runs
+                       SET status = 'failed', error = :err, completed_at = now()
+                     WHERE id = :rid
+                       AND status IN ('queued', 'running')
+                    RETURNING {_COLS}
+                    """  # noqa: S608
+                ),
+                {"rid": str(run_id), "err": reason[:2000]},
+            )
+        ).mappings()
+        found = row.one_or_none()
+        return dict(found) if found else None
+
     async def fail(self, run_id: UUID, error: str) -> None:
         await self._s.execute(
             text(
