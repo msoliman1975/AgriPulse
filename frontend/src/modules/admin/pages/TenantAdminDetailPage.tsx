@@ -13,6 +13,7 @@ import { KPICard } from "@/components/KPICard";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useAdminTenant, useAdminTenantMeta, useAdminTenantSidecar } from "@/queries/admin/tenants";
+import { useCapability } from "@/rbac/useCapability";
 
 import { TenantActionPanel } from "../components/TenantActionPanel";
 import { TenantAdminsPanel } from "../components/TenantAdminsPanel";
@@ -136,17 +137,22 @@ function DetailTabs({
 }: DetailTabsProps): ReactNode {
   const { t } = useTranslation("admin");
   const [tab, setTab] = useState<Tab>("profile");
+  // The Data tab is purge's only entry point, so it follows the purge
+  // capability rather than tenant-page read access — PlatformSupport can read
+  // this page but must not be shown a tab whose every action would 403.
+  const canPurge = useCapability("platform.purge_data");
+  const items: { value: Tab; label: string }[] = [
+    { value: "profile", label: t("tenants.detail.tabs.profile") },
+    { value: "integrations", label: t("tenants.detail.tabs.integrations") },
+    { value: "owner", label: t("tenants.detail.tabs.owner") },
+    ...(canPurge ? [{ value: "data" as const, label: t("tenants.detail.tabs.data") }] : []),
+    { value: "lifecycle", label: t("tenants.detail.tabs.lifecycle") },
+  ];
   return (
     <div className="flex flex-col gap-4">
       <SegmentedControl
         ariaLabel={t("tenants.detail.tabsLabel")}
-        items={[
-          { value: "profile", label: t("tenants.detail.tabs.profile") },
-          { value: "integrations", label: t("tenants.detail.tabs.integrations") },
-          { value: "owner", label: t("tenants.detail.tabs.owner") },
-          { value: "data", label: t("tenants.detail.tabs.data") },
-          { value: "lifecycle", label: t("tenants.detail.tabs.lifecycle") },
-        ]}
+        items={items}
         value={tab}
         onChange={(v) => setTab(v)}
       />
@@ -167,7 +173,7 @@ function DetailTabs({
         <TenantIntegrationsPanel tenantId={tenant.id} />
       ) : tab === "owner" ? (
         <TenantAdminsPanel tenantId={tenant.id} tenantSlug={tenant.slug} />
-      ) : tab === "data" ? (
+      ) : tab === "data" && canPurge ? (
         <TenantDataPanel tenant={tenant} />
       ) : (
         <TenantActionPanel tenant={tenant} purgeGraceDays={purgeGraceDays} />

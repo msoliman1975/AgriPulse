@@ -62,6 +62,10 @@ export type Capability =
   | "platform.manage_tenant_admins"
   | "platform.manage_platform_admins"
   | "platform.manage_crops"
+  // Separate from platform.manage_tenants on purpose — purge is the only
+  // irreversible delete, so PlatformSupport (read-only) must not see it even
+  // though it can read the tenant page the Data tab lives on.
+  | "platform.purge_data"
   | "tenant.manage_integrations"
   | "tenant.read_integration_health";
 
