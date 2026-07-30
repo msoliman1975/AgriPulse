@@ -39,7 +39,11 @@ export function KPICards({ farmId }: Props): ReactNode {
   });
   const totalBlocks = blocksQuery.data?.items.length ?? 0;
 
-  const alertsQuery = useAlerts({ status: "open" });
+  // farm_id is load-bearing: without it /v1/alerts returns every farm in
+  // the tenant, so the tile counted other farms' alerts and then linked to
+  // a farm-scoped page that showed none. `limit` is raised past the API
+  // default (100) because the count is `data.length`.
+  const alertsQuery = useAlerts({ farm_id: farmId, status: "open", limit: 500 });
   const openAlertCount = alertsQuery.data?.length ?? 0;
 
   const today = todayIso();
