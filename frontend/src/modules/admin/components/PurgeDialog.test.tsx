@@ -153,6 +153,37 @@ describe("<PurgeDialog>", () => {
     expect(screen.getByRole("button", { name: "Dry run" })).toBeEnabled();
   });
 
+  it("says why the button is disabled, next to the button", async () => {
+    // The banner at the top of the dialog is out of view once you have scrolled
+    // to the confirmation field, so a disabled button with no nearby reason
+    // reads as broken. Regression guard for exactly that report.
+    previewMock.mockResolvedValue(
+      preview({
+        archived: false,
+        blocking: [{ reason: "not_archived", detail: "Archive the block first." }],
+      }),
+    );
+    renderDialog();
+
+    const hint = await screen.findByText("Not archived — archive this block first.");
+    expect(hint).toBeInTheDocument();
+
+    // And the disabled control points at it for screen readers.
+    const confirm = screen.getByRole("button", { name: "Delete permanently" });
+    expect(confirm).toHaveAttribute("aria-describedby", "purge-blocked-hint");
+  });
+
+  it("shows no blocked hint once the entity is archived", async () => {
+    previewMock.mockResolvedValue(preview({ archived: true, blocking: [] }));
+    renderDialog();
+
+    await screen.findByText("1,843 rows across 2 tables");
+    expect(screen.queryByText(/Not archived/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete permanently" })).not.toHaveAttribute(
+      "aria-describedby",
+    );
+  });
+
   it("dry run submits with dry_run true and reports that nothing was deleted", async () => {
     previewMock.mockResolvedValue(preview());
     submitMock.mockResolvedValue(
@@ -172,9 +203,7 @@ describe("<PurgeDialog>", () => {
 
     await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(1));
     expect(submitMock.mock.calls[0][0]).toMatchObject({ dry_run: true, confirmation: "B-01" });
-    expect(
-      await screen.findByText("Dry run complete — nothing was deleted"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Dry run complete — nothing was deleted")).toBeInTheDocument();
   });
 
   it("renders a clean receipt when verification finds no orphans", async () => {

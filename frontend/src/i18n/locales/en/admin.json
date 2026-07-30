@@ -444,7 +444,16 @@
       "dryRun": "Dry run",
       "cancel": "Cancel",
       "confirm": "Delete permanently",
-      "working": "Working…"
+      "working": "Working…",
+      "kindNoun": {
+        "block": "block",
+        "farm": "farm",
+        "tenant_data": "tenant"
+      },
+      "blockedShort": {
+        "not_archived": "Not archived — archive this {{kind}} first.",
+        "tenant_not_suspended": "Tenant is active — suspend it first."
+      }
     },
     "result": {
       "dryRunTitle": "Dry run complete — nothing was deleted",

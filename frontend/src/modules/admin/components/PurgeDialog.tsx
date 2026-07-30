@@ -136,7 +136,29 @@ export function PurgeDialog({ target, onClose }: Props): ReactNode {
             </p>
           ) : null}
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          {/* The banner at the top of the dialog scrolls out of view by the time
+              you have typed the confirmation, so a disabled button down here
+              reads as broken. Repeat the reason where the control actually is. */}
+          {data && blocked ? (
+            <p
+              id="purge-blocked-hint"
+              className="mt-4 flex items-start gap-1.5 text-sm text-ap-warn"
+            >
+              <span aria-hidden="true">⚠</span>
+              <span>
+                {data.blocking
+                  .map((b) =>
+                    t(`purge.dialog.blockedShort.${b.reason}`, {
+                      defaultValue: b.detail,
+                      kind: t(`purge.dialog.kindNoun.${data.kind}`),
+                    }),
+                  )
+                  .join(" ")}
+              </span>
+            </p>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => run(true)}
@@ -157,6 +179,7 @@ export function PurgeDialog({ target, onClose }: Props): ReactNode {
                 type="button"
                 onClick={() => run(false)}
                 disabled={!phraseMatches || blocked || submit.isPending}
+                aria-describedby={blocked ? "purge-blocked-hint" : undefined}
                 className="rounded-md bg-ap-crit px-3 py-2 text-sm font-medium text-white hover:bg-ap-crit/90 disabled:opacity-60"
               >
                 {submit.isPending ? t("purge.dialog.working") : t("purge.dialog.confirm")}

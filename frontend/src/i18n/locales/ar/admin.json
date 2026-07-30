@@ -444,7 +444,16 @@
       "dryRun": "تشغيل تجريبي",
       "cancel": "إلغاء",
       "confirm": "حذف نهائي",
-      "working": "جارٍ التنفيذ…"
+      "working": "جارٍ التنفيذ…",
+      "kindNoun": {
+        "block": "القطعة",
+        "farm": "المزرعة",
+        "tenant_data": "المستأجر"
+      },
+      "blockedShort": {
+        "not_archived": "غير مؤرشفة — أرشف {{kind}} أولاً.",
+        "tenant_not_suspended": "المستأجر نشط — علّقه أولاً."
+      }
     },
     "result": {
       "dryRunTitle": "اكتمل التشغيل التجريبي — لم يُحذف شيء",
