@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgriPulse — UI Pattern Inventory &amp; Standard Page Pattern</title>
+<style>
+  :root{
+    --bg:#f7f6f1; --panel:#ffffff; --line:#e8e5db; --ink:#1f2420; --muted:#6c7268;
+    --primary:#356b30; --primary-soft:#e7efe3; --crit:#b24430; --good:#4f8e4a;
+    --accent:#1f6f9a; --warn:#c98a18;
+    --sev-crit:#b24430; --sev-high:#c98a18; --sev-med:#1f6f9a; --sev-low:#6c7268;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+  header.hero{
+    background:linear-gradient(135deg,#2c5a28,#356b30 55%,#4f8e4a);
+    color:#fff;padding:56px 24px 48px;margin-bottom:40px;
+  }
+  header.hero .inner{max-width:1080px;margin:0 auto}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.85;font-weight:600}
+  h1{font-size:34px;line-height:1.15;margin:.3em 0 .2em;font-weight:700}
+  .hero p{max-width:62ch;opacity:.92;margin:.4em 0 0}
+  .meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:10px}
+  .meta span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+    padding:5px 12px;border-radius:999px;font-size:12.5px}
+  h2{font-size:23px;margin:48px 0 6px;font-weight:700;letter-spacing:-.01em}
+  h2 .num{color:var(--primary);font-variant-numeric:tabular-nums}
+  h3{font-size:17px;margin:28px 0 6px;font-weight:650}
+  h4{font-size:14px;margin:20px 0 4px;font-weight:700;letter-spacing:.02em}
+  .lede{color:var(--muted);margin:.2em 0 1.2em;max-width:74ch}
+  section{scroll-margin-top:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(31,36,32,.04)}
+  .grid{display:grid;gap:16px}
+  @media(min-width:720px){.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:repeat(3,1fr)}
+    .grid.four{grid-template-columns:repeat(4,1fr)}}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;text-align:center}
+  .kpi .n{font-size:30px;font-weight:750;line-height:1;color:var(--primary)}
+  .kpi .l{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .kpi.crit .n{color:var(--crit)} .kpi.warn .n{color:var(--warn)} .kpi.acc .n{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;
+    background:#fbfaf6}
+  tbody tr:hover{background:#fbfaf6}
+  code{background:#f0eee6;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#3a3f39;white-space:nowrap}
+  pre{background:#1f2420;color:#e6e4da;border-radius:12px;padding:18px 20px;overflow-x:auto;font-size:12.5px;
+    line-height:1.65;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;margin:14px 0}
+  pre .c{color:#8a9284} pre .k{color:#a8cf9f} pre .s{color:#e0c07a}
+  .path{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--accent);white-space:nowrap}
+  .sev{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .sev.crit{background:#f6e3df;color:var(--sev-crit)}
+  .sev.high{background:#f7ebd4;color:#9a6a12}
+  .sev.med{background:#dceaf2;color:var(--sev-med)}
+  .sev.low{background:#eceae3;color:var(--sev-low)}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--primary-soft);color:var(--primary);white-space:nowrap}
+  .pill.n{background:#eceae3;color:var(--muted)}
+  ul.tight{margin:.4em 0;padding-left:20px} ul.tight li{margin:.3em 0}
+  .toc{columns:2;column-gap:36px;font-size:14.5px}
+  .toc a{color:var(--ink);text-decoration:none;display:block;padding:4px 0;border-bottom:1px solid transparent}
+  .toc a:hover{color:var(--primary);border-color:var(--primary)}
+  @media(max-width:640px){.toc{columns:1}}
+  .note{background:#dceaf2;border:1px solid #b9d4e2;border-radius:10px;padding:14px 18px;font-size:13.5px;color:#244b5c}
+  .good{background:#e3efe0;border:1px solid #c4ddbd;border-radius:10px;padding:14px 18px;font-size:13.5px;color:#2c5226}
+  .bad{background:#f6e3df;border:1px solid #e3c3bb;border-radius:10px;padding:14px 18px;font-size:13.5px;color:#7d2f20}
+  footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:60px;padding-top:24px}
+  /* adoption bars */
+  .adopt{display:grid;grid-template-columns:120px 1fr 92px;gap:14px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .adopt:last-child{border-bottom:0}
+  .adopt .nm{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:600}
+  .adopt .track{height:20px;border-radius:6px;background:#f0eee6;overflow:hidden;display:flex}
+  .adopt .track i{display:block;height:100%}
+  .adopt .track i.used{background:var(--primary)}
+  .adopt .track i.raw{background:repeating-linear-gradient(45deg,#e3c3bb,#e3c3bb 5px,#f0d8d2 5px,#f0d8d2 10px)}
+  .adopt .ratio{text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted)}
+  .adopt .ratio b{color:var(--ink)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:12px 0 0;align-items:center}
+  .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+  /* pattern chips */
+  .pat{display:grid;grid-template-columns:52px 1fr 62px;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+  .pat:last-child{border-bottom:0}
+  .pat .id{font-weight:750;font-size:15px;color:var(--primary);font-variant-numeric:tabular-nums}
+  .pat .nm{font-weight:650;font-size:14.5px}
+  .pat .sh{color:var(--muted);font-size:13px;margin-top:2px}
+  .pat .ct{text-align:right;font-weight:750;font-variant-numeric:tabular-nums;font-size:18px}
+  .pat.exempt .id,.pat.exempt .ct{color:var(--muted)}
+  /* padding stack */
+  .stack{border:1px dashed #c8c4b6;border-radius:10px;padding:14px;background:#fbfaf6;font-size:12.5px}
+  .stack .lvl{border:1px dashed #c8c4b6;border-radius:8px;padding:12px;margin-top:8px;background:#fff}
+  .stack .tag{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--accent)}
+  /* phases */
+  .ph{display:grid;grid-template-columns:56px 1fr 110px;gap:14px;align-items:start;padding:13px 0;border-bottom:1px solid var(--line)}
+  .ph:last-child{border-bottom:0}
+  .ph .n{font-weight:750;color:var(--primary);font-variant-numeric:tabular-nums;font-size:15px}
+  .ph .r{text-align:right;font-size:12px;color:var(--muted)}
+  .q{border-left:4px solid var(--accent);padding:2px 0 2px 16px;margin:18px 0}
+  .q h4{margin:0 0 3px}
+  .q .rec{font-size:13.5px;color:var(--primary);font-weight:600;margin-top:5px}
+  .cta{display:inline-block;background:var(--primary);color:#fff;text-decoration:none;font-weight:600;
+    padding:11px 20px;border-radius:9px;font-size:14.5px;margin-top:6px}
+  .cta:hover{background:#2b5827}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <div class="eyebrow">AgriPulse · Internal Review</div>
+    <h1>UI Pattern Inventory &amp; Standard Page Pattern</h1>
+    <p>Every routed page in the tenant workspace and the Platform Management Portal, grouped by the <em>shape</em> it takes rather than the job it does — so pages that share a shape can be made to share a look, and pages that are genuinely one-of-a-kind can be explicitly exempted.</p>
+    <div class="meta">
+      <span>📅 29 July 2026</span>
+      <span>🌿 <code style="background:rgba(255,255,255,.18);border:0;color:#fff">frontend/src</code></span>
+      <span>🧩 45 routed pages · 8 patterns</span>
+      <span>📐 18 index · 5 detail · 7 exempt</span>
+      <span>🔗 Follows up F-6 / F-7 / F-8 / F-9 / F-11</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="summary">
+    <h2><span class="num">00</span> &nbsp;Executive summary</h2>
+    <p class="lede">The pages look different from each other for one reason, and it is not the one you would expect. <strong>The design system is not missing — it is almost entirely unused.</strong> <code>frontend/src/components/</code> already holds the right eleven primitives, written in June with explicit "new code should prefer this" comments. Adoption then stalled: <code>&lt;Button&gt;</code> has zero importers while 98 surfaces hand-roll a primary button, and <code>&lt;Table&gt;</code> has two importers against 28 raw <code>&lt;table&gt;</code> elements.</p>
+
+    <div class="grid four">
+      <div class="kpi"><div class="n">18</div><div class="l">Index pages sharing one shape</div></div>
+      <div class="kpi acc"><div class="n">5</div><div class="l">Entity-detail pages sharing one shape</div></div>
+      <div class="kpi crit"><div class="n">0</div><div class="l">Files importing <code>&lt;Button&gt;</code></div></div>
+      <div class="kpi warn"><div class="n">9</div><div class="l">Competing page-frame wrappers</div></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:4px">The four axes that produce the visual difference</h3>
+      <table>
+        <thead><tr><th style="width:22%">Axis</th><th>What varies today</th><th style="width:16%">Fix</th></tr></thead>
+        <tbody>
+          <tr><td><b>Page frame</b></td><td>9 wrapper variants. <code>AppShell</code> already applies <code>px-4 py-6</code>, so every <code>p-6</code> platform page is <b>double-padded</b> and every <code>/settings/*</code> page is <b>triple-padded</b>.</td><td><code>&lt;Page&gt;</code></td></tr>
+          <tr><td><b>Header</b></td><td><code>&lt;PageHeader&gt;</code> on 10 pages; 37 raw <code>&lt;h1&gt;</code> across five type scales (<code>2xl</code>/<code>xl</code>/<code>lg</code>/<code>base</code>/<code>sm</code>).</td><td>type tokens</td></tr>
+          <tr><td><b>Async ladder</b></td><td>Every index page re-implements loading → error → empty → no-results. The skeleton sometimes replaces the table, sometimes lives inside it.</td><td><code>&lt;AsyncBoundary&gt;</code></td></tr>
+          <tr><td><b>Data layer</b></td><td>29 pages on react-query, 18 on <code>useEffect</code>+<code>useState</code>+<code>isApiError</code>. <em>This is why the state rendering cannot converge</em> — the two idioms don't produce the same state object.</td><td>one query layer</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bad" style="margin-top:18px">
+      <b>The load-bearing conclusion:</b> convention has already been tried and it failed. The primitives shipped with instructions to use them and got 0–10 adopters each. Any plan that ends at "we agree to use the components" will read exactly like the June plan did — which is why <b>§05 makes lint enforcement a deliverable, not a footnote</b>.
+    </div>
+  </section>
+
+  <section id="toc">
+    <h2><span class="num">01</span> &nbsp;Contents</h2>
+    <div class="card">
+      <div class="toc">
+        <a href="#taxonomy">02 · Pattern taxonomy</a>
+        <a href="#inventory">03 · Full inventory, by pattern</a>
+        <a href="#drift">04 · Measured drift</a>
+        <a href="#standard">05 · Proposed standard</a>
+        <a href="#theme">06 · Theme</a>
+        <a href="#phases">07 · Sequencing</a>
+        <a href="#decisions">08 · Open decisions</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="taxonomy">
+    <h2><span class="num">02</span> &nbsp;Pattern taxonomy</h2>
+    <p class="lede">Eight shapes cover all 45 routed pages. P1–P3 are the "table of things → open one" family the review was aimed at; they are one pattern with three body treatments, not three patterns.</p>
+
+    <div class="card">
+      <div class="pat"><div class="id">P1</div><div><div class="nm">Index — table → detail</div><div class="sh">Header + toolbar (search / filter) + table + optional pagination; row click opens a detail route.</div></div><div class="ct">9</div></div>
+      <div class="pat"><div class="id">P2</div><div><div class="nm">Index — card / row list</div><div class="sh">Same skeleton, but rows are multi-line cards carrying inline actions. No detail route.</div></div><div class="ct">4</div></div>
+      <div class="pat"><div class="id">P3</div><div><div class="nm">Index — edit in place</div><div class="sh">The row <em>is</em> the editor: expand or inline-save. No detail route.</div></div><div class="ct">5</div></div>
+      <div class="pat"><div class="id">P4</div><div><div class="nm">Entity detail</div><div class="sh">Wayfinding + identity header + status + KPI/summary + tabbed or stacked panels + destructive actions.</div></div><div class="ct">5</div></div>
+      <div class="pat"><div class="id">P5</div><div><div class="nm">Entity form</div><div class="sh">Header + single-column field stack + submit / cancel footer.</div></div><div class="ct">5</div></div>
+      <div class="pat"><div class="id">P6</div><div><div class="nm">Settings / config surface</div><div class="sh">Stack of labelled panels, each saving independently.</div></div><div class="ct">7</div></div>
+      <div class="pat"><div class="id">P7</div><div><div class="nm">Tabbed dashboard</div><div class="sh">Header + segmented tabs, each tab an independent data view.</div></div><div class="ct">3</div></div>
+      <div class="pat exempt"><div class="id">P8</div><div><div class="nm">Bespoke canvas &nbsp;<span class="pill n">exempt</span></div><div class="sh">Full-bleed or app-inside-a-page. Owns its own layout and scrolling. Adopts the frame and header only.</div></div><div class="ct">7</div></div>
+    </div>
+  </section>
+
+  <section id="inventory">
+    <h2><span class="num">03</span> &nbsp;Full inventory, by pattern</h2>
+
+    <h3>P1 · Index (table) → detail &nbsp;<span class="pill">9 pages</span></h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:24%">Route</th><th style="width:20%">Component</th><th>Drift from the best-in-class version</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/platform/tenants</td><td><code>TenantListPage</code></td><td><span class="sev low">reference</span> <code>&lt;PageHeader&gt;</code> + <code>&lt;Table&gt;</code> + <code>&lt;FilterChip&gt;</code> + <code>&lt;ErrorState&gt;</code> + pagination. Wrapper <code>section.mx-auto.max-w-5xl</code>.</td></tr>
+        <tr><td class="path">/farms</td><td><code>FarmListPage</code></td><td>Also on primitives, but wrapper is <code>div.space-y-4</code> with no max-width; filter is a bare checkbox in a <code>&lt;Card&gt;</code>; empty state is <code>&lt;EmptyState&gt;</code> rather than an in-table row; navigation is a link in cell 1 rather than <code>&lt;Tr interactive&gt;</code>; no pagination.</td></tr>
+        <tr><td class="path">/decision-trees</td><td><code>DecisionTreeListPage</code></td><td><code>max-w-6xl</code>, raw <code>&lt;h1&gt;</code>, raw <code>&lt;table&gt;</code>, four <code>&lt;select&gt;</code> filters, a four-branch loading/error/empty/no-results ladder, <code>px-4 py-2</code> cells.</td></tr>
+        <tr><td class="path">/platform/plan-templates</td><td><code>PlatformPlanTemplatesPage</code></td><td><code>max-w-5xl p-6</code> (double padding), raw <code>&lt;h1&gt;</code>, raw <code>&lt;table&gt;</code>, <b>hand-rolled pill filters</b> — a third filter idiom — <code>px-4 py-3</code> cells, its own <code>thead</code> border treatment.</td></tr>
+        <tr><td class="path">/platform/admins</td><td><code>PlatformAdminsPage</code></td><td><code>max-w-5xl p-6</code>, raw <code>&lt;h1&gt;</code>, raw <code>&lt;table&gt;</code>, no toolbar; invite happens in a <code>&lt;Modal&gt;</code>.</td></tr>
+        <tr><td class="path">/platform/integrations/health</td><td><code>PlatformHealthPage</code></td><td><code>max-w-6xl p-6</code>, raw <code>&lt;h1&gt;</code>, raw <code>&lt;table&gt;</code>, no toolbar, empty state is a bare <code>&lt;p&gt;</code>.</td></tr>
+        <tr><td class="path">/settings/users</td><td><code>UsersConfigPage</code></td><td><code>max-w-5xl</code> without <code>p-6</code>, raw <code>&lt;h1&gt;</code>, raw <code>&lt;table&gt;</code>.</td></tr>
+        <tr><td class="path">/tenants/:tenantId</td><td><code>TenantDetailPage</code></td><td><code>div.space-y-6</code>, legacy <code>.card</code> class, and a <b>borderless</b> raw table using <code>border-t</code> rows — a fourth table look.</td></tr>
+        <tr><td class="path">/platform/backfill</td><td><code>PlatformBackfillPage</code> <span class="pill n">runs tab</span></td><td><code>p-4</code> wrapper, <code>text-lg</code> <code>&lt;h1&gt;</code> (the only page at that scale), raw <code>&lt;table&gt;</code> with <code>p-2</code> cells and <code>min-w-[720px]</code>.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>P2 · Index (card / row list), inline actions &nbsp;<span class="pill">4 pages</span></h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:24%">Route</th><th style="width:20%">Component</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/alerts/:farmId</td><td><code>AlertsPage</code></td><td><code>&lt;SegmentedControl&gt;</code> in the header acts as the status filter; <code>ul.divide-y</code> inside an inline card surface; severity rail; local <code>Row</code>.</td></tr>
+        <tr><td class="path">/recommendations/:farmId</td><td><code>RecommendationsPage</code></td><td><span class="sev med">near-duplicate</span> Structurally a clone of <code>AlertsPage</code> — same wrapper, same four-branch ladder, same <code>ul.divide-y</code>. Diverges only in row content plus one header link.</td></tr>
+        <tr><td class="path">/signals/:farmId</td><td><code>SignalsLogPage</code></td><td>Same wrapper, but the body is a <code>grid lg:grid-cols-[18rem_1fr]</code> master–detail split — the only index page with that layout.</td></tr>
+        <tr><td class="path">/platform/crops</td><td><code>PlatformCropsPage</code></td><td>Expandable crop → variety → strain tree in a <code>divide-y</code> panel; legacy <code>.btn btn-primary</code>.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>P3 · Index with in-place editing &nbsp;<span class="pill">5 pages</span></h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:24%">Route</th><th style="width:20%">Component</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/settings/workers</td><td><code>ResourcesWorkersPage</code></td><td><code>&lt;PageHeader&gt;</code> ✓, but <code>flex-col gap-6</code> wrapper and a raw <code>&lt;table&gt;</code> under a <code>border-b p-3</code> card header.</td></tr>
+        <tr><td class="path">/settings/equipment</td><td><code>ResourcesEquipmentPage</code></td><td><span class="sev med">near-duplicate</span> Sibling of the above; same shape, independently written.</td></tr>
+        <tr><td class="path">/platform/defaults</td><td><code>PlatformDefaultsPage</code></td><td>Grouped <code>&lt;section&gt;</code> panels of <code>DefaultRow</code> editors; raw <code>&lt;h1&gt;</code>; per-row save.</td></tr>
+        <tr><td class="path">/settings/rules</td><td><code>RulesConfigPage</code></td><td>Tabs + list + inline rule editing.</td></tr>
+        <tr><td class="path">/config/signals/:farmId</td><td><code>SignalsConfigPage</code></td><td>1,030 lines. Template list plus per-template field editor; local <code>Field</code>.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>P4 · Entity detail &nbsp;<span class="pill">5 pages</span></h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:20%">Route</th><th style="width:14%">Wayfinding</th><th style="width:16%">Header</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/platform/tenants/:id</td><td><code>←</code> text link</td><td><code>text-lg</code> + slug + badge</td><td><span class="sev high">shadowing</span> Defines a <b>local <code>Card</code></b> (<code>rounded-lg</code> + <code>shadow-card</code>) that shadows the shared <code>Card</code> (<code>rounded-xl</code>, no shadow). Tabs via <code>&lt;SegmentedControl&gt;</code>, KPI row via <code>&lt;KPICard&gt;</code>.</td></tr>
+        <tr><td class="path">/farms/:farmId</td><td><code>&lt;Breadcrumb&gt;</code></td><td><code>&lt;PageHeader&gt;</code> <code>text-2xl</code></td><td>Stacked <code>&lt;Card&gt;</code>s, no tabs. Actions use legacy <code>.btn btn-ghost</code>; the blocks list is a bare <code>&lt;ul&gt;</code>.</td></tr>
+        <tr><td class="path">/farms/:farmId/blocks/:blockId</td><td><code>&lt;Breadcrumb&gt;</code></td><td><code>&lt;PageHeader&gt;</code></td><td>Sibling of <code>FarmDetailPage</code>; mixes the <code>&lt;Card&gt;</code> primitive and the legacy <code>.card</code> class on one page.</td></tr>
+        <tr><td class="path">/platform/plan-templates/:id</td><td><code>←</code> link</td><td>raw <code>&lt;h1&gt;</code> <code>text-xl</code></td><td><code>max-w-5xl p-6</code>.</td></tr>
+        <tr><td class="path">…/health/tenants/:tenantId</td><td><code>←</code> link</td><td><em>delegated</em></td><td>Wraps <code>IntegrationsHealthPage</code>; contributes a third back-link idiom.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note"><b>F-7 is still open.</b> Three wayfinding idioms for one concept: breadcrumb, arrow link, and nothing at all.</div>
+
+    <h3>P5 · Entity form &nbsp;<span class="pill">5 pages</span></h3>
+    <div class="card">
+      <p style="margin-top:0"><code>FarmEditPage</code>, <code>BlockEditPage</code>, <code>BlockCreatePage</code>, <code>DecisionTreeCreatePage</code>, <code>TenantCreatePage</code> (<span class="path">/platform/tenants/new</span>).</p>
+      <p>The farms trio uses <code>div.space-y-4</code> + raw <code>&lt;h1&gt;</code>; <code>TenantCreatePage</code> is a multi-step <code>section.mx-auto.max-w-2xl</code>. There are <b>four independent local <code>Field</code> components</b> across these pages, plus three more in non-page files.</p>
+      <div class="bad"><b>Dead code:</b> <code>FarmCreatePage.tsx</code> is unrouted — <span class="path">/farms/new</span> redirects to <span class="path">/labs/map?create=farm</span>, and nothing but its own test file imports it.</div>
+    </div>
+
+    <h3>P6 · Settings / config surfaces &nbsp;<span class="pill">7 pages</span></h3>
+    <div class="card">
+      <p style="margin-top:0"><code>SettingsIndexPage</code>, <code>SettingsPlaceholderPage</code>, <code>IntegrationsWeatherPage</code>, <code>IntegrationsImageryPage</code>, <code>IntegrationsTenantOnlyPage</code>, <code>ImageryWeatherConfigPage</code>, <code>FarmMembersPage</code>.</p>
+      <p>The three <code>Integrations*</code> pages are the <b>most internally consistent group in the codebase</b> — <code>flex-col gap-6</code> + <code>&lt;PageHeader&gt;</code> + <code>&lt;EmptyState&gt;</code> throughout. They are also the group that triple-pads:</p>
+      <div class="stack">
+        <span class="tag">AppShell &lt;main&gt;</span> &nbsp;<code>px-4 py-6</code>
+        <div class="lvl">
+          <span class="tag">SettingsLayout</span> &nbsp;<code>mx-auto max-w-6xl px-4 py-6</code>
+          <div class="lvl">
+            <span class="tag">page content</span> &nbsp;<code>flex-col gap-6</code> &nbsp;→ 40px of horizontal padding before a single pixel of content
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>P7 · Tabbed dashboard &nbsp;<span class="pill">3 pages</span></h3>
+    <div class="card">
+      <p style="margin:0"><code>IntegrationsHealthPage</code> (with <code>OverviewTab</code> / <code>RunsTab</code> / <code>QueueTab</code> / <code>ProvidersTab</code>), <code>InsightsPage</code>, <code>PlatformBackfillPage</code>. The first two use <code>&lt;SegmentedControl&gt;</code>; <code>PlatformBackfillPage</code> hand-rolls <code>role="tablist"</code> with its own <code>TabButton</code>.</p>
+    </div>
+
+    <h3>P8 · Bespoke canvas &nbsp;<span class="pill n">exempt — 7 pages</span></h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:22%">Route</th><th style="width:22%">Component</th><th>Why it is genuinely unique</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/labs/map</td><td><code>FarmConsolePage</code></td><td>Full-bleed map with progressive disclosure; owns its own scrolling. <code>AppShell</code> special-cases the route.</td></tr>
+        <tr><td class="path">/labs/map-legacy</td><td><code>MapExperiencePage</code></td><td>Legacy full-bleed map, 1,720 lines.</td></tr>
+        <tr><td class="path">/board/:farmId</td><td><code>BoardPage</code></td><td>Season / week / month activity grid at full width.</td></tr>
+        <tr><td class="path">/decision-trees/:code</td><td><code>DecisionTreeViewerPage</code></td><td>Visual node canvas with a YAML toggle. <code>max-w-[120rem]</code> — the widest page in the app.</td></tr>
+        <tr><td class="path">/reports/:farmId</td><td><code>ReportsPage</code></td><td>Report registry plus print-to-PDF via <code>.report-print-area</code>.</td></tr>
+        <tr><td class="path">/</td><td><code>HomePage</code></td><td>Redirect-or-empty-state card; legacy <code>.card</code>.</td></tr>
+        <tr><td class="path">/login</td><td><code>LoginPage</code></td><td>Unauthenticated split layout; the only surviving <code>sand-*</code> usage.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="good">These seven keep their bespoke bodies. They should still adopt <code>&lt;Page width="full|bleed"&gt;</code> and <code>&lt;PageHeader&gt;</code> so the chrome around them matches — nothing more.</div>
+  </section>
+
+  <section id="drift">
+    <h2><span class="num">04</span> &nbsp;Measured drift</h2>
+    <p class="lede">Census over <code>frontend/src</code>, tests excluded. Solid green is the primitive; hatched red is hand-rolled instances of the same thing.</p>
+
+    <div class="card">
+      <div class="adopt"><div class="nm">&lt;Button&gt;</div><div class="track"><i class="raw" style="width:100%"></i></div><div class="ratio"><b>0</b> / 98</div></div>
+      <div class="adopt"><div class="nm">&lt;Card&gt;</div><div class="track"><i class="used" style="width:2.5%"></i><i class="raw" style="width:97.5%"></i></div><div class="ratio"><b>3</b> / 118</div></div>
+      <div class="adopt"><div class="nm">&lt;Table&gt;</div><div class="track"><i class="used" style="width:6.7%"></i><i class="raw" style="width:93.3%"></i></div><div class="ratio"><b>2</b> / 30</div></div>
+      <div class="adopt"><div class="nm">&lt;PageHeader&gt;</div><div class="track"><i class="used" style="width:21%"></i><i class="raw" style="width:79%"></i></div><div class="ratio"><b>10</b> / 47</div></div>
+      <div class="adopt"><div class="nm">&lt;EmptyState&gt;</div><div class="track"><i class="used" style="width:12.5%"></i><i class="raw" style="width:87.5%"></i></div><div class="ratio"><b>4</b> / 32</div></div>
+      <div class="adopt"><div class="nm">&lt;ErrorState&gt;</div><div class="track"><i class="used" style="width:3.3%"></i><i class="raw" style="width:96.7%"></i></div><div class="ratio"><b>5</b> / 150</div></div>
+      <div class="adopt"><div class="nm">&lt;FilterChip&gt;</div><div class="track"><i class="used" style="width:12%"></i><i class="raw" style="width:88%"></i></div><div class="ratio"><b>1</b> / ~8</div></div>
+      <div class="adopt"><div class="nm">&lt;Breadcrumb&gt;</div><div class="track"><i class="used" style="width:40%"></i><i class="raw" style="width:60%"></i></div><div class="ratio"><b>2</b> / 5</div></div>
+      <div class="adopt"><div class="nm">&lt;Pill&gt;</div><div class="track"><i class="used" style="width:100%"></i></div><div class="ratio"><b>26</b> / 26</div></div>
+      <div class="adopt"><div class="nm">&lt;Skeleton&gt;</div><div class="track"><i class="used" style="width:100%"></i></div><div class="ratio"><b>56</b> / 56</div></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--primary)"></span>primitive used</span>
+        <span><span class="swatch" style="background:repeating-linear-gradient(45deg,#e3c3bb,#e3c3bb 3px,#f0d8d2 3px,#f0d8d2 6px)"></span>hand-rolled equivalent</span>
+      </div>
+    </div>
+
+    <div class="good">
+      <b>The two that worked tell you why the others didn't.</b> <code>&lt;Skeleton&gt;</code> and <code>&lt;Pill&gt;</code> reached full adoption because there was no pre-existing way to do them — no legacy CSS class, no one-line Tailwind idiom. Every primitive that competes with a <code>className</code> string lost. That is a mechanical outcome, not a discipline problem, and it is why §05 leans on lint rather than convention.
+    </div>
+
+    <h3>Legacy layers still in circulation</h3>
+    <div class="card" style="padding:12px 14px">
+      <table>
+        <thead><tr><th style="width:34%">Layer</th><th style="width:14%">Call sites</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Inline <code>rounded-xl border border-ap-line bg-ap-panel</code></td><td>79</td><td>The de-facto card. Should be <code>&lt;Card&gt;</code>.</td></tr>
+          <tr><td>Inline <code>bg-ap-primary px-…</code> button</td><td>64</td><td>The de-facto primary button.</td></tr>
+          <tr><td>Inline <code>text-{sm,xs} text-ap-crit</code></td><td>145</td><td>The de-facto error. Loses <code>role="alert"</code>.</td></tr>
+          <tr><td>Legacy <code>.btn</code> / <code>.btn-primary</code> / <code>.btn-ghost</code></td><td>34</td><td>Bridge in <code>index.css</code>, repointed onto <code>ap.*</code>. Retire.</td></tr>
+          <tr><td>Legacy <code>.card</code></td><td>23</td><td><code>rounded-lg</code> + <code>shadow-card</code> + <code>p-6</code> — visibly different from <code>&lt;Card&gt;</code>. Retire.</td></tr>
+          <tr><td><code>rounded-lg border border-ap-line bg-ap-panel</code></td><td>16</td><td>Third card radius.</td></tr>
+          <tr><td><code>brand-*</code> palette</td><td>2</td><td>Effectively dead. Delete the scale.</td></tr>
+          <tr><td><code>sand-*</code> palette</td><td><code>LoginPage</code> only</td><td>Fold into <code>ap.*</code> or keep deliberately for the unauthenticated shell.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="standard">
+    <h2><span class="num">05</span> &nbsp;Proposed standard</h2>
+
+    <h3>5.1 · One page frame, owned by the shell</h3>
+    <p class="lede">Delete every per-page <code>mx-auto max-w-*</code> and <code>p-*</code>. Width becomes a declared intent, not an accident of which page you copied from.</p>
+<pre><span class="c">// AppShell keeps px-4 py-6. &lt;Page&gt; owns mx-auto, the cap, and vertical rhythm.</span>
+<span class="k">&lt;Page</span> width=<span class="s">"standard"</span><span class="k">&gt;</span>   <span class="c">// max-w-5xl — index, form, detail (default)</span>
+<span class="k">&lt;Page</span> width=<span class="s">"wide"</span><span class="k">&gt;</span>       <span class="c">// max-w-6xl — dense tables, dashboards</span>
+<span class="k">&lt;Page</span> width=<span class="s">"full"</span><span class="k">&gt;</span>       <span class="c">// no cap    — board, canvases</span>
+<span class="k">&lt;Page</span> width=<span class="s">"bleed"</span><span class="k">&gt;</span>      <span class="c">// no padding — map surfaces</span></pre>
+    <p><code>SettingsLayout</code> drops its own <code>px-4 py-6</code> in the same change, which fixes the triple-pad.</p>
+
+    <h3>5.2 · Three page templates</h3>
+    <h4>&lt;IndexPage&gt; — covers all 18 P1/P2/P3 surfaces</h4>
+<pre><span class="k">&lt;Page&gt;</span>
+  <span class="k">&lt;PageHeader</span> title subtitle actions <span class="k">/&gt;</span>        <span class="c">// one type scale, always</span>
+  <span class="k">&lt;Toolbar</span> search filters right={viewToggle} <span class="k">/&gt;</span> <span class="c">// FilterChip only; no bare &lt;select&gt;</span>
+  <span class="k">&lt;AsyncBoundary</span> query={q}                       <span class="c">// one component owns the ladder</span>
+                 empty={<span class="k">&lt;EmptyState</span> message action <span class="k">/&gt;</span>}  <span class="c">// action REQUIRED (F-8)</span>
+                 skeleton=<span class="s">"table" | "rows"</span><span class="k">&gt;</span>
+    <span class="k">&lt;DataTable</span> columns rows onRowClick <span class="k">/&gt;</span>       <span class="c">// or &lt;RowList&gt; for P2</span>
+  <span class="k">&lt;/AsyncBoundary&gt;</span>
+  <span class="k">&lt;Pagination</span> <span class="k">/&gt;</span>                               <span class="c">// rendered iff total &gt; pageSize</span>
+<span class="k">&lt;/Page&gt;</span></pre>
+
+    <h4>&lt;DetailPage&gt; — covers all 5 P4 surfaces</h4>
+<pre><span class="k">&lt;Page&gt;</span>
+  <span class="k">&lt;PageHeader</span> above={<span class="k">&lt;Breadcrumb /&gt;</span>}            <span class="c">// the ONE wayfinding idiom</span>
+              title subtitle badge
+              actions={[edit, …, destructive‑last]} <span class="k">/&gt;</span>
+  <span class="k">&lt;StatusBanner /&gt;</span>                              <span class="c">// optional, role="status"</span>
+  <span class="k">&lt;KPIRow /&gt;</span>                                    <span class="c">// optional</span>
+  <span class="k">&lt;Tabs /&gt;</span> → <span class="k">&lt;Card&gt;</span> panels                     <span class="c">// SegmentedControl, never hand-rolled</span>
+<span class="k">&lt;/Page&gt;</span></pre>
+
+    <h4>&lt;FormPage&gt; — covers all 5 P5 surfaces</h4>
+    <p><code>&lt;Page width="standard"&gt;</code> + <code>&lt;Breadcrumb&gt;</code> + one shared <code>&lt;Field&gt;</code> (label / help / error / required) replacing the seven local copies + a sticky <code>&lt;FormFooter&gt;</code> with cancel-then-submit ordering.</p>
+
+    <h3>5.3 · Primitives to add, fix, retire</h3>
+    <div class="card" style="padding:12px 14px">
+    <table>
+      <thead><tr><th style="width:12%">Action</th><th style="width:26%">Component</th><th>Replaces</th></tr></thead>
+      <tbody>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;Page&gt;</code></td><td>9 wrapper variants; the double- and triple-pad bugs</td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;AsyncBoundary&gt;</code></td><td>~18 hand-written loading/error/empty ladders + 145 inline error strings</td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;DataTable&gt;</code> <span class="pill n">thin, over &lt;Table&gt;</span></td><td>28 raw <code>&lt;table&gt;</code></td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;Toolbar&gt;</code></td><td>4 filter idioms</td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;Field&gt;</code></td><td>7 local <code>Field</code> copies</td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;Pagination&gt;</code></td><td>the single copy inside <code>TenantListPage</code></td></tr>
+        <tr><td><span class="sev med">add</span></td><td><code>&lt;LinkButton&gt;</code></td><td><code>&lt;Link className="btn…"&gt;</code> — the reason <code>&lt;Button&gt;</code> has zero adopters</td></tr>
+        <tr><td><span class="sev high">fix</span></td><td><code>&lt;Card&gt;</code> — add <code>title</code> / <code>footer</code> slots</td><td>the local <code>Card</code> in <code>TenantAdminDetailPage</code> and <code>BlockDefaultsPanel</code>; 79 inline surfaces</td></tr>
+        <tr><td><span class="sev high">enforce</span></td><td><code>&lt;Button&gt;</code></td><td>64 hand-rolled + 34 <code>.btn</code></td></tr>
+        <tr><td><span class="sev crit">retire</span></td><td><code>.btn</code> / <code>.card</code> / <code>.input</code> / <code>.label</code> in <code>index.css</code></td><td>57 call sites</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>5.4 · Enforcement — the part that has failed before</h3>
+    <div class="card">
+      <ul class="tight">
+        <li><b>ESLint <code>no-restricted-syntax</code>:</b> ban raw <code>&lt;table&gt;</code>, raw <code>&lt;h1&gt;</code>, <code>className="btn*"</code>, <code>className="card"</code>, and the literal <code>rounded-xl border border-ap-line bg-ap-panel</code> outside <code>src/components/</code>.</li>
+        <li><b>Import guard</b> (same mechanism as the existing <code>lint-imports</code> whitelist): page modules may not declare a component named <code>Card</code>, <code>Field</code>, or <code>Row</code>.</li>
+        <li><b>A page-template gallery</b> — Storybook or an in-app <span class="path">/labs/patterns</span> route — so "what does an index page look like" has exactly one answer to point at in review.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="theme">
+    <h2><span class="num">06</span> &nbsp;Theme</h2>
+    <p class="lede">The token layer is sound. <code>ap.*</code> in <code>tailwind.config.ts</code> is coherent, and RTL is genuinely handled through <code>tailwindcss-rtl</code> plus logical utilities. It needs three additions, not a redesign.</p>
+    <div class="grid three">
+      <div class="card" style="margin:0">
+        <h4 style="margin-top:0">1 · Type scale as tokens</h4>
+        <p style="font-size:13.5px;color:var(--muted);margin:0"><code>text-page-title</code>, <code>text-section-title</code>, <code>text-body</code>, <code>text-meta</code> — so writing <code>text-2xl</code> on an <code>&lt;h1&gt;</code> becomes unspellable rather than merely discouraged.</p>
+      </div>
+      <div class="card" style="margin:0">
+        <h4 style="margin-top:0">2 · Surface tokens</h4>
+        <p style="font-size:13.5px;color:var(--muted);margin:0">One radius, one border, one elevation. Today <code>rounded-xl</code>-no-shadow and <code>rounded-lg</code>-<code>shadow-card</code> both claim to be "the card", and both appear on the same detail page.</p>
+      </div>
+      <div class="card" style="margin:0">
+        <h4 style="margin-top:0">3 · Delete the dead palettes</h4>
+        <p style="font-size:13.5px;color:var(--muted);margin:0"><code>brand-*</code> is down to 2 uses; <code>sand-*</code> to <code>LoginPage</code>. Fold both into <code>ap.*</code> and remove the scales, or the next new page re-seeds the drift from the config file.</p>
+      </div>
+    </div>
+    <div class="note" style="margin-top:18px"><b>Dark mode is not in scope and nothing currently anticipates it.</b> If it is wanted, the <code>ap.*</code> tokens must move to CSS variables during this pass rather than after it — retrofitting later means touching every file a second time.</div>
+  </section>
+
+  <section id="phases">
+    <h2><span class="num">07</span> &nbsp;Sequencing</h2>
+    <div class="card">
+      <div class="ph"><div class="n">0</div><div><b>Build the primitives.</b> <code>&lt;Page&gt;</code>, <code>&lt;AsyncBoundary&gt;</code>, <code>&lt;DataTable&gt;</code>, <code>&lt;Toolbar&gt;</code>, <code>&lt;Field&gt;</code>, <code>&lt;Pagination&gt;</code>, <code>&lt;LinkButton&gt;</code>; extend <code>&lt;Card&gt;</code>. No page edits.</div><div class="r">additive<br>zero risk</div></div>
+      <div class="ph"><div class="n">1</div><div><b>Three reference conversions</b> — <code>TenantListPage</code> (P1), <code>TenantAdminDetailPage</code> (P4), <code>FarmEditPage</code> (P5). Land the lint rules as <em>warnings</em>.</div><div class="r">3 pages</div></div>
+      <div class="ph"><div class="n">2</div><div><b>The remaining 17 index pages.</b> Highest payoff first: <code>AlertsPage</code> + <code>RecommendationsPage</code> (near-duplicates collapse into one <code>&lt;RowList&gt;</code>), <code>ResourcesWorkersPage</code> + <code>ResourcesEquipmentPage</code> (siblings), then the four raw-table platform pages.</div><div class="r">17 pages<br>parallelizable</div></div>
+      <div class="ph"><div class="n">3</div><div><b>Detail and form pages.</b> Delete the local <code>Card</code> and <code>Field</code> copies; settle on one wayfinding idiom.</div><div class="r">10 pages</div></div>
+      <div class="ph"><div class="n">4</div><div><b>Retire the legacy layers.</b> Drop <code>.btn</code>/<code>.card</code>/<code>.input</code>/<code>.label</code>; delete <code>brand-*</code> and <code>sand-*</code>; lint warnings become errors; delete dead <code>FarmCreatePage</code>.</div><div class="r">cleanup<br><b>do not skip</b></div></div>
+      <div class="ph"><div class="n">5</div><div><b>Tokens.</b> Type scale and surface tokens; the seven P8 canvases adopt <code>&lt;Page&gt;</code> and <code>&lt;PageHeader&gt;</code> only.</div><div class="r">tokens</div></div>
+    </div>
+    <div class="bad"><b>Phase 4 is the one that must not be skipped.</b> Every prior cleanup stalled before it — which is exactly why three generations of button styling coexist in the codebase today.</div>
+  </section>
+
+  <section id="decisions">
+    <h2><span class="num">08</span> &nbsp;Open decisions</h2>
+    <p class="lede">Seven choices need to be made before phase 0 can be specified. The first four have visual consequences and are rendered side by side in the companion mockup deck.</p>
+
+    <div class="card">
+      <div class="q"><h4>1 · Row navigation</h4>
+        Whole-row click (the Platform convention) or a link in the identity cell (the Farms convention)?
+        <div class="rec">Recommend both: <code>&lt;Tr interactive onClick&gt;</code> plus a real <code>&lt;Link&gt;</code> in column 1, so keyboard and middle-click survive while the whole row stays clickable.</div></div>
+
+      <div class="q"><h4>2 · Filter idiom</h4>
+        Chips (<code>TenantListPage</code>) or dropdowns (<code>DecisionTreeListPage</code>)? Chips read better but do not scale past about six values, and <code>DecisionTreeListPage</code> has four axes.
+        <div class="rec">Recommend chips for ≤2 axes and ≤6 values; a filter popover beyond that.</div></div>
+
+      <div class="q"><h4>3 · Skeleton placement</h4>
+        Skeleton replaces the whole table (<code>FarmListPage</code>) or sits inside it, preserving the header row (<code>TenantListPage</code>)?
+        <div class="rec">Recommend inside — the column headers stop shifting on every load.</div></div>
+
+      <div class="q"><h4>4 · Detail-page composition</h4>
+        Tabs + KPI row (Platform) or stacked cards (Farms)? Both are defensible; they cannot both be the standard.
+        <div class="rec">Recommend tabs once a page exceeds three panels, stacked below that — with the same header either way.</div></div>
+
+      <div class="q"><h4>5 · Client vs server filtering</h4>
+        <code>DecisionTreeListPage</code> filters in a <code>useMemo</code>; <code>TenantListPage</code> filters server-side. <code>&lt;Toolbar&gt;</code> has to pick a default.</div>
+
+      <div class="q"><h4>6 · Data layer</h4>
+        Are the 18 <code>useEffect</code> pages in scope for react-query conversion? Without it <code>&lt;AsyncBoundary&gt;</code> needs two shapes and half its value disappears.
+        <div class="rec">Recommend yes, folded into each page's own conversion rather than as a separate sweep.</div></div>
+
+      <div class="q"><h4>7 · Dark mode</h4>
+        In or out? Decide before §06, not after.</div>
+    </div>
+
+    <p style="margin-top:26px"><a class="cta" href="../proposals/ui-standard-mockups.html">Open the decision mockups →</a></p>
+  </section>
+
+  <footer>
+    <p><b>AgriPulse · UI Pattern Inventory &amp; Standard Page Pattern</b> · 29 July 2026<br>
+    Source: <code>frontend/src</code> at branch <code>deploy-purge</code>. Companion documents:
+    <code>docs/proposals/ui-pattern-inventory-and-standard.md</code> (this report in markdown),
+    <code>docs/proposals/ui-standard-mockups.html</code> (interactive option mockups),
+    <code>docs/reports/ux-consistency-assessment-2026-06-08.html</code> (F-1..F-11, the prior assessment).</p>
+    <p>Counts are file-level census figures from ripgrep over <code>*.tsx</code> excluding <code>*.test.tsx</code>. "Hand-rolled equivalent" totals count instances, not files, so a page with three inline buttons contributes three.</p>
+  </footer>
+</div>
+</body>
+</html>
