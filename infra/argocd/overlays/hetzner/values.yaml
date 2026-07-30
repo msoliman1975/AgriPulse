@@ -193,9 +193,17 @@ global:
   #   (large purges only; small ones run inline in the request), so workers
   #   must be bumped too. Backend + FE -> api + workers + frontend bumped;
   #   tile-server stays 9d140cc.
+  # 2cb2740 = #331 starting a backfill run 500'd on every submit, which the
+  #   console showed as a bare "network error". The INSERT bound the window
+  #   through CAST(:window_from AS date) while the caller passed an isoformat
+  #   string, so asyncpg tried to encode a str as a date and raised DataError.
+  #   Now passes real date objects. Broken since the console shipped (#326) --
+  #   5 of 6 tests skipped, so the INSERT never ran in CI; a seeded test that
+  #   cannot skip now covers it. No migration; api request-path only -> api
+  #   bumped; workers + frontend stay 1bad71a, tile-server 9d140cc.
   images:
     api:
-      tag: "1bad71a"
+      tag: "2cb2740"
     workers:
       tag: "1bad71a"
     frontend:
