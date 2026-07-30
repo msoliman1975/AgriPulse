@@ -220,13 +220,24 @@ global:
   #   POST /runs/{id}:cancel as the operator escape hatch (none existed).
   #   No migration. finish() runs in the WORKERS and cancel in the api ->
   #   api + workers bumped; frontend stays 2cb2740, tile-server 9d140cc.
+  # b75a5d8 = #333 the Insights "Active alerts" tile counted every open alert
+  #   in the TENANT, not the farm: KPICards and AlertsFeedCard called
+  #   /v1/alerts with no farm_id, and the repo only applies the farm filter
+  #   when the param is present. So a farm with no integrations showed 28
+  #   alerts, and clicking through to /alerts/:farmId -- which DOES pass
+  #   farm_id -- showed an empty page. The feed also listed other farms'
+  #   alerts, whose Resolve button pointed at a board lane this farm lacks.
+  #   Both now pass farm_id; the KPI also asks limit=500 because the count is
+  #   data.length and the API default page size (100) would cap it silently.
+  #   No migration; FE only -> frontend bumped; api + workers stay 65af132,
+  #   tile-server 9d140cc.
   images:
     api:
       tag: "65af132"
     workers:
       tag: "65af132"
     frontend:
-      tag: "2cb2740"
+      tag: "b75a5d8"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
