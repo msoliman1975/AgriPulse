@@ -18,6 +18,7 @@ import { FarmWeatherChart } from "../components/FarmWeatherChart";
 import { KPICards } from "../components/KPICards";
 import { SeasonContextBar } from "../components/SeasonContextBar";
 import { WeatherIndicesStrip } from "../components/WeatherIndicesStrip";
+import { WeatherTrendsCard } from "../components/WeatherTrendsCard";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -118,6 +119,10 @@ export function InsightsPage(): ReactNode {
       {canReadWeather && firstBlock ? <FarmWeatherChart blockId={firstBlock.id} /> : null}
 
       {canReadWeather ? <WeatherIndicesStrip farmId={farmId} /> : null}
+
+      {/* Sits under the strip: the strip answers "what is it now", this
+          answers "how has it moved", over the same spans as FarmTrendChart. */}
+      {canReadWeather ? <WeatherTrendsCard farmId={farmId} /> : null}
 
       {canReadRisk ? <ActiveRisksWidget farmId={farmId} /> : null}
 

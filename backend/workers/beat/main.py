@@ -75,6 +75,18 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.weather_baseline_recompute_seconds),
         "options": {"queue": "light"},
     },
+    # Materialize the index continuous aggregates. Their refresh policies
+    # use rolling windows (3d daily / 21d weekly), so a historical backfill
+    # writes rows outside them and they are never materialized — and since
+    # the views are real-time aggregates, buckets older than the
+    # materialization threshold come from the materialized store alone, so
+    # that history is invisible to readers until an explicit refresh. Light
+    # queue: a full refresh of both views measured ~2.5s per tenant.
+    "indices.refresh_index_caggs_sweep": {
+        "task": "indices.refresh_index_caggs_sweep",
+        "schedule": float(_settings.indices_cagg_refresh_seconds),
+        "options": {"queue": "light"},
+    },
     # Daily disease/pest risk: walk active tenants and enqueue a per-tenant
     # `weather.compute_risk_for_tenant`, which scores each crop block against a
     # trailing weather window and upserts `weather_risk_daily` (Weather-Indices
