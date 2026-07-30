@@ -8,6 +8,7 @@ console reads it as rows rather than as objects.
 from __future__ import annotations
 
 import json
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -42,8 +43,8 @@ class BackfillRepository:
         farm_name: str | None,
         kind: str,
         sources: dict[str, bool],
-        window_from: str,
-        window_to: str,
+        window_from: date,
+        window_to: date,
         created_by: UUID | None,
         created_by_email: str | None,
     ) -> dict[str, Any]:
@@ -56,8 +57,8 @@ class BackfillRepository:
                         kind, sources, window_from, window_to, created_by, created_by_email
                     ) VALUES (
                         :tenant_id, :tenant_schema, :tenant_name, :farm_id, :farm_name,
-                        :kind, CAST(:sources AS jsonb), CAST(:window_from AS date),
-                        CAST(:window_to AS date), :created_by, :created_by_email
+                        :kind, CAST(:sources AS jsonb), :window_from,
+                        :window_to, :created_by, :created_by_email
                     )
                     RETURNING {_COLS}
                     """
@@ -70,6 +71,10 @@ class BackfillRepository:
                     "farm_name": farm_name,
                     "kind": kind,
                     "sources": json.dumps(sources),
+                    # Real `date` objects, NOT isoformat strings. The target
+                    # columns are `date`, so asyncpg types these parameters as
+                    # dates and encodes them via `toordinal()` -- handing it a
+                    # str raised DataError and 500'd every run submission.
                     "window_from": window_from,
                     "window_to": window_to,
                     # asyncpg needs an explicit cast on nullable uuid binds.

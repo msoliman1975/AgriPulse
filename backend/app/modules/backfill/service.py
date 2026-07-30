@@ -232,8 +232,8 @@ class BackfillService:
             farm_name=farm.get("name") or farm.get("code"),
             kind=kind,
             sources={"imagery": imagery, "weather": weather},
-            window_from=window_from.isoformat(),
-            window_to=window_to.isoformat(),
+            window_from=window_from,
+            window_to=window_to,
             created_by=actor_id,
             created_by_email=actor_email,
         )
