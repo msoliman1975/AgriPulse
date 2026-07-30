@@ -100,7 +100,7 @@ export function FarmMembersPage(): JSX.Element {
       </Card>
 
       {canAssign ? (
-        <Card className="flex items-end gap-3" onSubmit={handleAssign}>
+        <Card as="form" className="flex items-end gap-3" onSubmit={handleAssign}>
           <div className="flex-1">
             <label className="label" htmlFor="membership-id">
               {t("members.membershipId")}

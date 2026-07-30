@@ -15,6 +15,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import {
   useDeleteTreeParameterOverride,
@@ -40,17 +41,17 @@ export function ParameterOverridesPanel({
 
   if (q.isLoading) {
     return (
-      <aside className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="flex flex-col gap-3 p-4">
         <Skeleton className="h-6 w-40" />
         <Skeleton className="h-24 w-full" />
-      </aside>
+      </Card>
     );
   }
   if (q.isError || !q.data) {
     return (
-      <aside className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-crit">
+      <Card noPadding className="p-4 text-sm text-ap-crit">
         {t("overrides.loadFailed")}
-      </aside>
+      </Card>
     );
   }
 
@@ -58,7 +59,7 @@ export function ParameterOverridesPanel({
   const names = Object.keys(declarations);
 
   return (
-    <aside className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="flex flex-col gap-3 p-4">
       <header className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ap-ink">{t("overrides.heading")}</h2>
         {!canManage ? (
@@ -96,7 +97,7 @@ export function ParameterOverridesPanel({
           {t("overrides.saveFailed")}
         </p>
       ) : null}
-    </aside>
+    </Card>
   );
 }
 
@@ -111,9 +112,9 @@ function normalizeDecl(raw: {
   max?: number | null;
   values?: unknown[] | null;
 }): ParameterDeclaration {
-  const type = (["number", "integer", "boolean", "string", "enum"].includes(raw.type)
-    ? raw.type
-    : "string") as ParameterDeclaration["type"];
+  const type = (
+    ["number", "integer", "boolean", "string", "enum"].includes(raw.type) ? raw.type : "string"
+  ) as ParameterDeclaration["type"];
   return {
     type,
     default: raw.default,
@@ -158,15 +159,11 @@ function OverrideRow({
         <span className="break-all font-mono text-sm text-ap-ink">{name}</span>
         <span className="font-mono text-[10px] text-ap-muted">{decl.type}</span>
       </div>
-      {decl.description ? (
-        <p className="text-xs text-ap-muted">{decl.description}</p>
-      ) : null}
+      {decl.description ? <p className="text-xs text-ap-muted">{decl.description}</p> : null}
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div>
           <span className="block text-ap-muted">{t("overrides.fields.default")}</span>
-          <span className="block font-mono text-ap-ink">
-            {JSON.stringify(decl.default)}
-          </span>
+          <span className="block font-mono text-ap-ink">{JSON.stringify(decl.default)}</span>
         </div>
         <div>
           <span className="block text-ap-muted">{t("overrides.fields.current")}</span>

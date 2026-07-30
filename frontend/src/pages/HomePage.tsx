@@ -36,9 +36,9 @@ export function HomePage(): ReactNode {
   return (
     <Page width="standard">
       <Card className="max-w-2xl">
-        <h1 className="text-2xl font-semibold text-ap-ink">
+        <h2 className="text-2xl font-semibold text-ap-ink">
           {canCreateFarm ? t("home.noFarmsTitle") : t("home.welcome")}
-        </h1>
+        </h2>
         <p className="mt-2 text-ap-muted">
           {canCreateFarm ? t("home.noFarmsBody") : t("home.comingSoon")}
         </p>

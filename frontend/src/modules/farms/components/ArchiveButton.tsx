@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/Button";
 
 interface Props {
   label: string;
@@ -13,22 +14,20 @@ export function ArchiveButton({ label, busy, onConfirm }: Props): JSX.Element {
 
   if (!confirming) {
     return (
-      <button
-        type="button"
-        className="btn btn-ghost text-ap-crit"
+      <Button
+        variant="ghost"
+        className="text-ap-crit"
         onClick={() => setConfirming(true)}
         disabled={busy}
       >
         {label}
-      </button>
+      </Button>
     );
   }
   return (
     <span className="flex items-center gap-2" role="dialog" aria-label={label}>
       <span className="text-sm text-ap-ink">{t("actions.confirmArchive")}</span>
-      <button
-        type="button"
-        className="btn btn-primary"
+      <Button
         onClick={() => {
           void onConfirm();
           setConfirming(false);
@@ -36,15 +35,10 @@ export function ArchiveButton({ label, busy, onConfirm }: Props): JSX.Element {
         disabled={busy}
       >
         {t("actions.yes")}
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        onClick={() => setConfirming(false)}
-        disabled={busy}
-      >
+      </Button>
+      <Button variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>
         {t("actions.no")}
-      </button>
+      </Button>
     </span>
   );
 }

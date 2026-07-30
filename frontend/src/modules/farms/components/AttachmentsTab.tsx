@@ -17,6 +17,8 @@ import { isApiError } from "@/api/errors";
 import { uploadToPresignedUrl } from "@/lib/upload";
 import { useCapability } from "@/rbac/useCapability";
 import { ArchiveButton } from "./ArchiveButton";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 const ATTACHMENT_KINDS: AttachmentKind[] = ["photo", "deed", "soil_test_report", "map", "other"];
 
@@ -142,7 +144,7 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
   };
 
   return (
-    <div className="card">
+    <Card>
       <h2 className="text-lg font-semibold text-ap-ink">{t("attachments.heading")}</h2>
 
       {error ? (
@@ -247,12 +249,12 @@ export function AttachmentsTab({ ownerKind, ownerId, farmId }: Props): ReactNode
               onChange={(e) => setCaption(e.target.value)}
             />
           </div>
-          <button type="submit" className="btn btn-primary" disabled={busy || !file}>
+          <Button type="submit" disabled={busy || !file}>
             {busy ? t("attachments.uploading") : t("attachments.submit")}
-          </button>
+          </Button>
         </form>
       ) : null}
-    </div>
+    </Card>
   );
 }
 

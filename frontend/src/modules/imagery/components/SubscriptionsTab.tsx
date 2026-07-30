@@ -10,6 +10,8 @@ import {
 } from "@/api/imagery";
 import { useOptionalConfig } from "@/config/ConfigContext";
 import { useCapability } from "@/rbac/useCapability";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 interface Props {
   blockId: string;
@@ -97,7 +99,7 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
   const dateFmt = useMemo(() => new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }), []);
 
   return (
-    <section className="card space-y-3" aria-label={t("subscriptions.heading")}>
+    <Card className="space-y-3" aria-label={t("subscriptions.heading")}>
       <header>
         <h2 className="text-lg font-semibold text-ap-ink">{t("subscriptions.heading")}</h2>
       </header>
@@ -132,14 +134,9 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
                 </p>
               </div>
               {canManage ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void handleRevoke(sub.id)}
-                  disabled={busy}
-                >
+                <Button variant="ghost" onClick={() => void handleRevoke(sub.id)} disabled={busy}>
                   {busy ? t("subscriptions.revoking") : t("subscriptions.revokeButton")}
-                </button>
+                </Button>
               ) : null}
             </li>
           ))}
@@ -148,17 +145,15 @@ export function SubscriptionsTab({ blockId, farmId }: Props): JSX.Element {
 
       {canManage && s2Product !== null ? (
         <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
             onClick={() => void handleSubscribe()}
             disabled={busy || subscriptions.some((s) => s.product_id === s2Product.product_id)}
           >
             {busy ? t("subscriptions.subscribing") : t("subscriptions.subscribeButton")}
-          </button>
+          </Button>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

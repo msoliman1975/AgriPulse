@@ -7,8 +7,10 @@ import { useCapability } from "@/rbac/useCapability";
 import { STARTER_TREE_YAML } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
+import { Card } from "@/components/Card";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 
 // Default for the YAML textarea when the page first loads. Authors who
 // want to start clean can pick "Empty" from the template picker and
@@ -142,11 +144,10 @@ export function DecisionTreeCreatePage(): ReactNode {
       {/* Forms keep their own measure — see the note in Page.tsx. */}
       <form onSubmit={submit} className="flex max-w-3xl flex-col gap-4">
         <header>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("create.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("create.subtitle")}</p>
+          <PageHeader title={t("create.title")} subtitle={t("create.subtitle")} />
         </header>
 
-        <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+        <Card noPadding className="grid grid-cols-1 gap-3 p-4">
           <Field label={t("create.fields.code")} help={t("create.fields.codeHint")} required>
             {(props) => (
               <input
@@ -160,9 +161,9 @@ export function DecisionTreeCreatePage(): ReactNode {
               />
             )}
           </Field>
-        </section>
+        </Card>
 
-        <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
+        <Card noPadding className="flex flex-col gap-2 p-4">
           <div>
             <h2 className="text-sm font-semibold text-ap-ink">{t("targeting.heading")}</h2>
             <p className="text-xs text-ap-muted">{t("targeting.subtitle")}</p>
@@ -193,9 +194,9 @@ export function DecisionTreeCreatePage(): ReactNode {
             </div>
             <span className="text-[11px] text-ap-muted">{t("targeting.scopeHint")}</span>
           </div>
-        </section>
+        </Card>
 
-        <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-4">
+        <Card noPadding className="flex flex-col gap-2 p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-ap-ink">{t("create.fields.yaml")}</h2>
@@ -231,7 +232,7 @@ export function DecisionTreeCreatePage(): ReactNode {
             spellCheck={false}
             className="w-full rounded-md border border-ap-line bg-ap-bg/40 px-3 py-2 font-mono text-xs text-ap-ink shadow-inner focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary"
           />
-        </section>
+        </Card>
 
         <footer className="flex flex-wrap items-center justify-end gap-2">
           {create.isError ? (

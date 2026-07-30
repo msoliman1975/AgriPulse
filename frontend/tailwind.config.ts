@@ -13,36 +13,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand
-        brand: {
-          50: "#f1f7f3",
-          100: "#dcecdf",
-          200: "#bcd9c2",
-          300: "#92be9c",
-          400: "#629d75",
-          500: "#3f7d57",
-          600: "#2f6243",
-          700: "#274e36",
-          800: "#22402d",
-          900: "#1c3525",
-          950: "#0f1d14",
-        },
-        // Sand surfaces
-        sand: {
-          50: "#fbf8f1",
-          100: "#f5efde",
-          200: "#ebdfbb",
-          300: "#dec78d",
-          400: "#cea95c",
-          500: "#bf913e",
-          600: "#a47832",
-          700: "#825c2c",
-          800: "#6b4a29",
-          900: "#5a3e26",
-        },
-        // AgriPulse semantic tokens (UX_SPEC.md Â§9). Coexist with brand/sand;
-        // pages built against the new IA prefer `ap.*` for surface,
-        // semantic, activity-type, and growth-stage colors.
+        // AgriPulse semantic tokens (UX_SPEC.md §9). The only palette — the
+        // pre-rename `brand.*` and `sand.*` scales were deleted once their
+        // last usages went (DS-8). Re-adding a second scale here is how the
+        // drift restarts, so don't.
         ap: {
           bg: "#f7f6f1",
           panel: "#ffffff",

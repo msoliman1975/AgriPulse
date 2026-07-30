@@ -33,7 +33,7 @@ export function ReportsPage(): ReactNode {
     return (
       <Page width="standard">
         <div className="py-12 text-center">
-          <h1 className="text-xl font-semibold text-ap-ink">{t("title")}</h1>
+          <PageHeader title={t("title")} />
           <p className="mt-2 text-sm text-ap-muted">{t("pickFarm")}</p>
         </div>
       </Page>

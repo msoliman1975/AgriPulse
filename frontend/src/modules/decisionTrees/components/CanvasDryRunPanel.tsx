@@ -9,6 +9,7 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DryRunCandidateBlock, DryRunResponse } from "@/api/decisionTrees";
+import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
 
 interface CanvasDryRunPanelProps {
@@ -44,12 +45,10 @@ export function CanvasDryRunPanel({
   const matched = result?.matched ?? false;
   const noCandidates = !candidatesLoading && candidateBlocks.length === 0;
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-3">
+    <Card noPadding className="flex flex-col gap-3 p-3">
       <header className="flex flex-wrap items-end gap-3">
         <div className="flex flex-1 flex-col gap-1">
-          <span className="text-xs font-medium text-ap-muted">
-            {t("editor.dryRun.heading")}
-          </span>
+          <span className="text-xs font-medium text-ap-muted">{t("editor.dryRun.heading")}</span>
           {noCandidates ? (
             <p className="text-xs text-ap-muted">{t("editor.dryRun.noCandidateBlocks")}</p>
           ) : (
@@ -73,9 +72,7 @@ export function CanvasDryRunPanel({
           )}
         </div>
         <fieldset className="flex flex-col gap-1 text-xs">
-          <legend className="font-medium text-ap-muted">
-            {t("editor.dryRun.mode")}
-          </legend>
+          <legend className="font-medium text-ap-muted">{t("editor.dryRun.mode")}</legend>
           <label className="flex items-center gap-1">
             <input
               type="radio"
@@ -119,9 +116,7 @@ export function CanvasDryRunPanel({
         </div>
       </header>
 
-      {errorMessage ? (
-        <p className="text-xs text-ap-crit">{errorMessage}</p>
-      ) : null}
+      {errorMessage ? <p className="text-xs text-ap-crit">{errorMessage}</p> : null}
 
       {result ? (
         <div className="flex flex-col gap-2 border-t border-ap-line pt-2">
@@ -159,6 +154,6 @@ export function CanvasDryRunPanel({
           ) : null}
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }

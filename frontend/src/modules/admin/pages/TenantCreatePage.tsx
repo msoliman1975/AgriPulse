@@ -1,5 +1,6 @@
 import { Field } from "@/components/Field";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -158,8 +159,7 @@ export function TenantCreatePage(): ReactNode {
       {/* Wizard keeps a narrow measure — see the note in Page.tsx. */}
       <div className="max-w-3xl">
         <header className="border-b border-ap-line pb-4">
-          <h1 className="text-lg font-semibold text-ap-ink">{t("tenants.create.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("tenants.create.subtitle")}</p>
+          <PageHeader title={t("tenants.create.title")} subtitle={t("tenants.create.subtitle")} />
           <p className="mt-1 text-xs uppercase tracking-wider text-ap-muted">
             {t("tenants.create.step", {
               current: STEPS.indexOf(step) + 1,
@@ -468,9 +468,9 @@ function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => vo
       role="status"
       className="mx-auto max-w-lg rounded-md border border-ap-primary/30 bg-ap-primary-soft p-6 shadow-card"
     >
-      <h1 className="text-base font-semibold text-ap-primary">
+      <h2 className="text-base font-semibold text-ap-primary">
         {t("tenants.create.success.title")}
-      </h1>
+      </h2>
       <p className="mt-2 text-sm text-ap-primary">{body}</p>
       <button
         type="button"

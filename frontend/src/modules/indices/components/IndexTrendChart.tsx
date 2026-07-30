@@ -18,6 +18,7 @@ import {
   type TimeseriesGranularity,
 } from "@/api/indices";
 import { chartDateLocale } from "@/lib/chartFormat";
+import { Card } from "@/components/Card";
 
 interface Props {
   blockId: string;
@@ -88,7 +89,7 @@ export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.
   const numFmt = useMemo(() => new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }), []);
 
   return (
-    <section className="card space-y-3" aria-label={t("trend.heading")}>
+    <Card className="space-y-3" aria-label={t("trend.heading")}>
       <header>
         <h2 className="text-lg font-semibold text-ap-ink">{t("trend.heading")}</h2>
       </header>
@@ -172,6 +173,6 @@ export function IndexTrendChart({ blockId, initialIndex = "ndvi" }: Props): JSX.
           </ResponsiveContainer>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { deleteImportBatch, listImportBatches, type ImportBatch } from "@/api/signals";
 import { useCapability } from "@/rbac/useCapability";
+import { Card } from "@/components/Card";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 
 interface Props {
   farmId: string;
@@ -43,41 +45,42 @@ export function ImportHistory({ farmId }: Props): ReactNode {
   }
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <header className="mb-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ap-muted">
           {t("importHistory.title", { defaultValue: "Import history" })}
         </h2>
         <p className="mt-1 text-xs text-ap-muted">
           {t("importHistory.subtitle", {
-            defaultValue: "Past CSV uploads for this farm. Deleting one removes every record it created.",
+            defaultValue:
+              "Past CSV uploads for this farm. Deleting one removes every record it created.",
           })}
         </p>
       </header>
 
-      <table className="min-w-full text-xs">
-        <thead className="text-ap-muted">
-          <tr className="border-b border-ap-line">
-            <th scope="col" className="px-2 py-1 text-start font-semibold">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th scope="col" className="px-2 py-1">
               {t("importHistory.col.importedAt", { defaultValue: "Imported" })}
-            </th>
-            <th scope="col" className="px-2 py-1 text-start font-semibold">
+            </Th>
+            <Th scope="col" className="px-2 py-1">
               {t("importHistory.col.rowCount", { defaultValue: "Records" })}
-            </th>
-            <th scope="col" className="px-2 py-1 text-start font-semibold">
+            </Th>
+            <Th scope="col" className="px-2 py-1">
               {t("importHistory.col.signals", { defaultValue: "Signals" })}
-            </th>
-            {canDelete ? <th scope="col" className="px-2 py-1" /> : null}
-          </tr>
-        </thead>
-        <tbody>
+            </Th>
+            {canDelete ? <Th scope="col" className="px-2 py-1" /> : null}
+          </Tr>
+        </Thead>
+        <Tbody>
           {batches.map((batch: ImportBatch) => (
-            <tr key={batch.import_batch_id} className="border-b border-ap-line/60 align-top">
-              <td className="px-2 py-1 text-ap-ink">{formatImportedAt(batch.imported_at)}</td>
-              <td className="px-2 py-1 tabular-nums text-ap-ink">{batch.row_count}</td>
-              <td className="px-2 py-1 text-ap-muted">{batch.signal_codes.join(", ")}</td>
+            <Tr key={batch.import_batch_id} className="border-ap-line/60 align-top">
+              <Td className="px-2 py-1 text-ap-ink">{formatImportedAt(batch.imported_at)}</Td>
+              <Td className="px-2 py-1 tabular-nums text-ap-ink">{batch.row_count}</Td>
+              <Td className="px-2 py-1">{batch.signal_codes.join(", ")}</Td>
               {canDelete ? (
-                <td className="px-2 py-1 text-end">
+                <Td className="px-2 py-1 text-end">
                   <button
                     type="button"
                     disabled={deleteMutation.isPending}
@@ -98,12 +101,12 @@ export function ImportHistory({ farmId }: Props): ReactNode {
                   >
                     {t("importHistory.delete", { defaultValue: "Delete" })}
                   </button>
-                </td>
+                </Td>
               ) : null}
-            </tr>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
 
       {deleteMutation.isError ? (
         <p
@@ -113,7 +116,7 @@ export function ImportHistory({ farmId }: Props): ReactNode {
           {t("importHistory.deleteError", { defaultValue: "Could not delete this import." })}
         </p>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

@@ -3,6 +3,8 @@ import { useEffect, useRef } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 interface RedirectState {
   from?: { pathname?: string };
@@ -47,17 +49,17 @@ export function LoginPage(): ReactNode {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-sand-50 px-4">
-      <div className="card w-full max-w-md">
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("login.heading")}</h1>
+    <div className="flex min-h-screen items-center justify-center bg-ap-bg px-4">
+      <Card className="w-full max-w-md">
+        <h2 className="text-2xl font-semibold text-ap-ink">{t("login.heading")}</h2>
         <p className="mt-2 text-sm text-ap-muted">{t("login.subheading")}</p>
         <p className="mt-4 text-sm text-ap-muted" aria-live="polite">
           {auth.activeNavigator ? t("login.redirecting") : null}
         </p>
-        <button type="button" onClick={onClick} className="btn-primary mt-6 w-full">
+        <Button className="mt-6 w-full" onClick={onClick}>
           {t("login.signInButton")}
-        </button>
-      </div>
+        </Button>
+      </Card>
     </div>
   );
 }

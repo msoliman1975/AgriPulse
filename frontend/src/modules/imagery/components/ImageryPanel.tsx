@@ -9,6 +9,8 @@ import { useCapability } from "@/rbac/useCapability";
 import { Legend } from "./Legend";
 import { NDVIMap } from "./NDVIMap";
 import { buildTileUrlTemplate, indexAssetKey, visualizationDefaults } from "./tileUrl";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 interface Props {
   blockId: string;
@@ -114,7 +116,7 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
   // thrown error from useConfig.
   if (config === null) {
     return (
-      <section className="card space-y-3" aria-label={t("panel.heading")}>
+      <Card className="space-y-3" aria-label={t("panel.heading")}>
         <h2 className="text-lg font-semibold text-ap-ink">{t("panel.heading")}</h2>
         {configError ? (
           <p role="alert" className="text-sm text-ap-crit">
@@ -125,26 +127,21 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
         ) : (
           <p className="text-sm text-ap-muted">{t("panel.noConfig")}</p>
         )}
-      </section>
+      </Card>
     );
   }
 
   return (
-    <section className="card space-y-3" aria-label={t("panel.heading")}>
+    <Card className="space-y-3" aria-label={t("panel.heading")}>
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-ap-ink">{t("panel.heading")}</h2>
           <p className="text-sm text-ap-muted">{t("panel.description")}</p>
         </div>
         {canRefresh ? (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => void handleRefresh()}
-            disabled={refreshBusy}
-          >
+          <Button variant="ghost" onClick={() => void handleRefresh()} disabled={refreshBusy}>
             {refreshBusy ? t("refresh.busy") : t("refresh.button")}
-          </button>
+          </Button>
         ) : null}
       </header>
 
@@ -192,6 +189,6 @@ export function ImageryPanel({ blockId, farmId, geometry, aoiHash }: Props): JSX
           </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }

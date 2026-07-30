@@ -11,8 +11,10 @@ import {
   type PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
+import { Card } from "@/components/Card";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import {
@@ -208,9 +210,7 @@ export function PlanTemplateEditorPage(): ReactNode {
           >
             {i18n.dir() === "rtl" ? "→" : "←"} {t("editor.back")}
           </button>
-          <h1 className="text-xl font-semibold text-ap-ink">
-            {isNew ? t("editor.titleNew") : t("editor.titleEdit")}
-          </h1>
+          <PageHeader title={isNew ? t("editor.titleNew") : t("editor.titleEdit")} />
           {!isNew ? (
             <Pill kind={status === "published" ? "ok" : "neutral"}>{t(`status.${status}`)}</Pill>
           ) : null}
@@ -258,7 +258,7 @@ export function PlanTemplateEditorPage(): ReactNode {
       ) : null}
 
       {/* Header fields */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <h2 className="mb-3 text-sm font-semibold text-ap-ink">{t("editor.section.header")}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t("editor.field.name")}>
@@ -319,10 +319,10 @@ export function PlanTemplateEditorPage(): ReactNode {
             )}
           </Field>
         </div>
-      </section>
+      </Card>
 
       {/* Milestones */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ap-ink">{t("editor.section.milestones")}</h2>
           <button
@@ -390,10 +390,10 @@ export function PlanTemplateEditorPage(): ReactNode {
             ))}
           </div>
         )}
-      </section>
+      </Card>
 
       {/* Activities */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ap-ink">{t("editor.section.activities")}</h2>
           <button
@@ -509,7 +509,7 @@ export function PlanTemplateEditorPage(): ReactNode {
         {cropPath && stageOptions.length === 0 && !phenology.isLoading ? (
           <p className="mt-2 text-[11px] text-ap-warn">{t("editor.noStages")}</p>
         ) : null}
-      </section>
+      </Card>
 
       {/* Timeline preview */}
       <TimelinePreview milestones={milestones} activities={activities} stageLabel={stageLabel} />
@@ -570,7 +570,7 @@ function TimelinePreview({
   const maxDay = dated.reduce((mx, d) => Math.max(mx, d.day + (Number(d.a.duration_days) || 1)), 1);
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <h2 className="mb-3 text-sm font-semibold text-ap-ink">{t("editor.section.timeline")}</h2>
       {dated.length === 0 && staged.length === 0 ? (
         <p className="text-xs text-ap-muted">{t("editor.timelineEmpty")}</p>
@@ -619,6 +619,6 @@ function TimelinePreview({
           </ul>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }

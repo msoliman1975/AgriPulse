@@ -4,9 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { ResolvedSetting } from "@/api/integrations";
 import { listFarms } from "@/api/farms";
+import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
 import {
   useApplyImageryToBlocks,
@@ -32,7 +34,7 @@ export function IntegrationsImageryPage(): ReactNode {
     <div className="flex flex-col gap-6">
       <PageHeader title={t("imagery.title")} subtitle={t("imagery.subtitle")} />
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <h2 className="text-sm font-semibold text-ap-ink">{t("section.tenant")}</h2>
         {tenantQ.isLoading ? (
           <Skeleton className="mt-3 h-24 w-full" />
@@ -45,9 +47,9 @@ export function IntegrationsImageryPage(): ReactNode {
             isPending={putTenant.isPending}
           />
         )}
-      </section>
+      </Card>
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <h2 className="text-sm font-semibold text-ap-ink">{t("section.farm")}</h2>
         <p className="mt-1 text-xs text-ap-muted">{t("section.farmHint")}</p>
 
@@ -68,7 +70,7 @@ export function IntegrationsImageryPage(): ReactNode {
         </label>
 
         {selectedFarmId ? <FarmImageryForm farmId={selectedFarmId} /> : null}
-      </section>
+      </Card>
     </div>
   );
 }
@@ -167,26 +169,26 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
 
   return (
     <div className="mt-3 flex flex-col gap-3">
-      <table className="text-sm">
-        <thead className="text-xs uppercase text-ap-muted">
-          <tr>
-            <th className="text-start">{t("col.key")}</th>
-            <th className="text-start">{t("col.resolved")}</th>
-            <th className="text-start">{t("col.source")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("col.key")}</Th>
+            <Th>{t("col.resolved")}</Th>
+            <Th>{t("col.source")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {(farmQ.data?.settings ?? []).map((s) => (
-            <tr key={s.key}>
-              <td className="py-2 pe-4 font-mono text-xs">{s.key}</td>
-              <td className="py-2 pe-4 text-ap-ink">{formatValue(s.value)}</td>
-              <td className="py-2">
+            <Tr key={s.key}>
+              <Td className="pe-4 font-mono">{s.key}</Td>
+              <Td className="pe-4 text-ap-ink">{formatValue(s.value)}</Td>
+              <Td>
                 <SourcePill source={s.source} />
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
 
       <form
         onSubmit={(e) => {

@@ -414,10 +414,7 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
   };
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-    >
+    <Card as="form" noPadding className="flex flex-col gap-3 p-4 text-sm" onSubmit={submit}>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
         <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
@@ -488,7 +485,7 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
               : t("log.form.record")}
         </button>
       </div>
-    </form>
+    </Card>
   );
 }
 
@@ -643,10 +640,7 @@ export function TemplateRecordForm({
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-    >
+    <Card as="form" noPadding className="flex flex-col gap-3 p-4 text-sm" onSubmit={submit}>
       <div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-ap-ink">{template.name}</span>
@@ -723,7 +717,7 @@ export function TemplateRecordForm({
           {create.isPending ? t("log.form.recording") : t("log.template.submit")}
         </button>
       </div>
-    </form>
+    </Card>
   );
 }
 

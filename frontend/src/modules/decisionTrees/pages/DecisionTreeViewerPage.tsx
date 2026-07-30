@@ -26,9 +26,11 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
+import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
 import { Modal } from "@/components/Modal";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -550,12 +552,10 @@ export function DecisionTreeViewerPage(): ReactNode {
     // PR-8: give the canvas the full page width (capped on ultra-wide) so wide
     // trees render with minimal horizontal scroll.
     <Page width="full">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-ap-ink">
-              {isAr && tree.name_ar ? tree.name_ar : tree.name_en}
-            </h1>
+      <PageHeader
+        title={isAr && tree.name_ar ? tree.name_ar : tree.name_en}
+        badge={
+          <>
             {isDraftOnly ? (
               <Pill kind="neutral">{t("viewer.header.draftOnly")}</Pill>
             ) : (
@@ -567,97 +567,103 @@ export function DecisionTreeViewerPage(): ReactNode {
                 {t("editor.header.invalidCount", { n: structuralErrors.length })}
               </Pill>
             ) : null}
-          </div>
-          <p className="mt-1 font-mono text-xs text-ap-muted">{tree.code}</p>
-          {(isAr && tree.description_ar) || tree.description_en ? (
-            <p className="mt-2 max-w-prose text-sm text-ap-muted">
-              {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {canManage ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => draft.undo()}
-                disabled={!draft.canUndo}
-                title={t("editor.header.undoTitle")}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
-              >
-                ↶ {t("editor.header.undo")}
-              </button>
-              <button
-                type="button"
-                onClick={() => draft.redo()}
-                disabled={!draft.canRedo}
-                title={t("editor.header.redoTitle")}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
-              >
-                ↷ {t("editor.header.redo")}
-              </button>
-            </div>
-          ) : null}
-          {canManage && dirty ? (
-            <>
-              <button
-                type="button"
-                onClick={onDiscardAll}
-                disabled={append.isPending}
-                className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-50"
-              >
-                {t("editor.header.discardAll")}
-              </button>
+          </>
+        }
+        subtitle={
+          <>
+            <span className="font-mono text-xs">{tree.code}</span>
+            {(isAr && tree.description_ar) || tree.description_en ? (
+              <span className="mt-2 block max-w-prose">
+                {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
+              </span>
+            ) : null}
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {canManage ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => draft.undo()}
+                  disabled={!draft.canUndo}
+                  title={t("editor.header.undoTitle")}
+                  className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
+                >
+                  ↶ {t("editor.header.undo")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => draft.redo()}
+                  disabled={!draft.canRedo}
+                  title={t("editor.header.redoTitle")}
+                  className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
+                >
+                  ↷ {t("editor.header.redo")}
+                </button>
+              </div>
+            ) : null}
+            {canManage && dirty ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onDiscardAll}
+                  disabled={append.isPending}
+                  className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-50"
+                >
+                  {t("editor.header.discardAll")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onSave();
+                  }}
+                  disabled={!canSave}
+                  title={structuralErrors.length > 0 ? t("editor.header.fixErrorsHint") : undefined}
+                  className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-50"
+                >
+                  {append.isPending ? t("editor.header.saving") : t("editor.header.saveDraft")}
+                </button>
+              </>
+            ) : null}
+            {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
               <button
                 type="button"
                 onClick={() => {
-                  void onSave();
+                  void onPublishLatest();
                 }}
-                disabled={!canSave}
-                title={structuralErrors.length > 0 ? t("editor.header.fixErrorsHint") : undefined}
-                className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-50"
+                disabled={publish.isPending}
+                className="rounded-md bg-ap-info px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-info/90 disabled:opacity-50"
               >
-                {append.isPending ? t("editor.header.saving") : t("editor.header.saveDraft")}
+                {publish.isPending
+                  ? t("editor.header.publishing")
+                  : t("editor.header.publish", { n: latestVersion.version })}
               </button>
-            </>
-          ) : null}
-          {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
-            <button
-              type="button"
-              onClick={() => {
-                void onPublishLatest();
-              }}
-              disabled={publish.isPending}
-              className="rounded-md bg-ap-info px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-info/90 disabled:opacity-50"
+            ) : null}
+            <div
+              role="tablist"
+              aria-label={t("workspace.metadata.heading")}
+              className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5"
             >
-              {publish.isPending
-                ? t("editor.header.publishing")
-                : t("editor.header.publish", { n: latestVersion.version })}
-            </button>
-          ) : null}
-          <div
-            role="tablist"
-            aria-label={t("workspace.metadata.heading")}
-            className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5"
-          >
-            {(["visual", "yaml"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="tab"
-                aria-selected={viewMode === m}
-                onClick={() => setViewMode(m)}
-                className={clsx(
-                  "rounded px-3 py-1 text-sm font-medium transition-colors",
-                  viewMode === m ? "bg-ap-primary text-white" : "text-ap-ink hover:bg-ap-bg/60",
-                )}
-              >
-                {t(`workspace.tab.${m}`)}
-              </button>
-            ))}
+              {(["visual", "yaml"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === m}
+                  onClick={() => setViewMode(m)}
+                  className={clsx(
+                    "rounded px-3 py-1 text-sm font-medium transition-colors",
+                    viewMode === m ? "bg-ap-primary text-white" : "text-ap-ink hover:bg-ap-bg/60",
+                  )}
+                >
+                  {t(`workspace.tab.${m}`)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {append.isError ? (
         <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
@@ -923,7 +929,7 @@ function YamlMode({
 }): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="border-b border-ap-line px-4 py-3">
         <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.yaml.heading")}</h2>
         <p className="text-xs text-ap-muted">{t("workspace.yaml.subtitle")}</p>
@@ -962,7 +968,7 @@ function YamlMode({
           </div>
         ) : null}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -989,7 +995,7 @@ function VersionHistorySection({
   const { t } = useTranslation("decisionTrees");
   const [open, setOpen] = useState(false);
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.versions.heading")}</h2>
@@ -1062,7 +1068,7 @@ function VersionHistorySection({
           })}
         </ul>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

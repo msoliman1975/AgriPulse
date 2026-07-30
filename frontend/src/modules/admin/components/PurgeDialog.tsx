@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { PurgeJob, PurgeKind, PurgePreview } from "@/api/purge";
 import { Modal } from "@/components/Modal";
+import { Table, Tbody, Td, Tr } from "@/components/Table";
 import { usePurgePreview, useSubmitPurge } from "@/queries/admin/purge";
 
 export interface PurgeTarget {
@@ -232,18 +233,18 @@ function ImpactTable({ preview }: { preview: PurgePreview }): ReactNode {
 
       {preview.db_rows.length > 0 ? (
         <>
-          <table className="mt-3 w-full text-xs">
-            <tbody>
+          <Table className="mt-3">
+            <Tbody>
               {rows.map((r) => (
-                <tr key={r.table} className="border-t border-ap-line/60">
-                  <td className="py-1 font-mono text-ap-muted">{r.table}</td>
-                  <td className="py-1 text-right tabular-nums text-ap-ink">
+                <Tr key={r.table} className="border-t border-ap-line/60">
+                  <Td className="py-1 font-mono">{r.table}</Td>
+                  <Td className="py-1 text-right tabular-nums text-ap-ink">
                     {r.rows.toLocaleString()}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
           {preview.db_rows.length > 5 ? (
             <button
               type="button"

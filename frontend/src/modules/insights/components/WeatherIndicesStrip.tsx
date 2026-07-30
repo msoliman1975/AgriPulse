@@ -8,6 +8,7 @@ import {
   type WeatherIndexCatalogItem,
   type WeatherIndexSummaryEntry,
 } from "@/api/weatherIndices";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import i18n from "@/i18n";
 
@@ -63,10 +64,7 @@ export function WeatherIndicesStrip({ farmId }: Props): ReactNode {
   const entries = summaryQ.data?.indices ?? [];
 
   return (
-    <section
-      aria-labelledby="weather-indices-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="weather-indices-heading">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2
           id="weather-indices-heading"
@@ -111,7 +109,7 @@ export function WeatherIndicesStrip({ farmId }: Props): ReactNode {
           </>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 

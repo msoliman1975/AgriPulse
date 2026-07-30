@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import type { AdminTenant } from "@/api/adminTenants";
 import { isApiError } from "@/api/errors";
+import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import {
   useCancelDeleteAdminTenant,
@@ -54,7 +55,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
   const canRetry = tenant.status === "pending_provision";
 
   return (
-    <section className="rounded-lg border border-ap-line bg-ap-panel p-4 shadow-card">
+    <Card noPadding className="p-4 shadow-card">
       <h2 className="border-b border-ap-line pb-2 text-sm font-semibold text-ap-ink">
         {t("tenants.detail.actions.title")}
       </h2>
@@ -150,7 +151,7 @@ export function TenantActionPanel({ tenant, purgeGraceDays }: Props): ReactNode 
           )
         }
       />
-    </section>
+    </Card>
   );
 }
 

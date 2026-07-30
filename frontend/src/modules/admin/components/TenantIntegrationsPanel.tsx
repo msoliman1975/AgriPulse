@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ResolvedSetting } from "@/api/integrations";
 import type { Category } from "@/api/platformTenantIntegrations";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
 import {
@@ -51,7 +52,7 @@ function CategorySection({
   const clear = useClearPlatformTenantIntegration(tenantId, category);
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <h3 className="text-sm font-semibold capitalize text-ap-ink">
         {t(`integrations.category.${category}`)}
       </h3>
@@ -72,7 +73,7 @@ function CategorySection({
           ))}
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 

@@ -19,6 +19,7 @@ import {
   type AnnotationSeverity,
   type FarmIndexTimeseriesPoint,
 } from "@/api/insights";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
@@ -143,10 +144,7 @@ export function FarmTrendChart({
   );
 
   return (
-    <section
-      aria-labelledby="farm-trend-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="farm-trend-heading">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="farm-trend-heading"
@@ -250,7 +248,7 @@ export function FarmTrendChart({
           </ResponsiveContainer>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -282,7 +280,6 @@ function _annotationColor(severity: AnnotationSeverity): string {
   if (severity === "warning") return "#854F0B";
   return "#9C9C9C";
 }
-
 
 interface ReshapedRow {
   time: string;

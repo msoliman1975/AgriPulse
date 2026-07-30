@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ResolvedSetting } from "@/api/integrations";
+import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
@@ -38,7 +39,7 @@ export function IntegrationsTenantOnlyPage({
     <div className="flex flex-col gap-4">
       <PageHeader title={t(i18nTitleKey)} subtitle={t(i18nSubtitleKey)} />
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         {tenantQ.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : tenantQ.isError ? (
@@ -57,7 +58,7 @@ export function IntegrationsTenantOnlyPage({
             ))}
           </div>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

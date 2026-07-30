@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CropHealthBlockRow, CropHealthStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useCropHealthReport } from "@/queries/reports";
 
@@ -159,39 +160,35 @@ function CropHealthTable({
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-ap-line text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("cropHealth.headers.block")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("cropHealth.headers.status")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+      <Table>
+        <Thead className="text-[11px]">
+          <Tr>
+            <Th scope="col">{t("cropHealth.headers.block")}</Th>
+            <Th scope="col">{t("cropHealth.headers.status")}</Th>
+            <Th scope="col" className="text-end">
               {indexCode.toUpperCase()}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("cropHealth.headers.z")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("cropHealth.headers.trend")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               p10/p50/p90
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("cropHealth.headers.valid")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("cropHealth.headers.scenes")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((b) => (
-            <tr key={b.block_id} className="hover:bg-ap-bg/40">
-              <td className="px-3 py-2 text-ap-ink">
+            <Tr key={b.block_id} className="hover:bg-ap-bg/40">
+              <Td className="text-ap-ink">
                 <div className="font-medium">{b.block_name}</div>
                 {b.crop_name_en ? (
                   <div className="text-[11px] text-ap-muted">
@@ -201,32 +198,32 @@ function CropHealthTable({
                     ) : null}
                   </div>
                 ) : null}
-              </td>
-              <td className="px-3 py-2">
+              </Td>
+              <Td>
                 <span
                   className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_CHIP[b.status]}`}
                 >
                   {t(`cropHealth.status.${b.status}`)}
                 </span>
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">{fmt(b.last_value)}</td>
-              <td className="px-3 py-2 text-end tabular-nums">
+              </Td>
+              <Td className="text-end tabular-nums text-ap-ink">{fmt(b.last_value)}</Td>
+              <Td className="text-end tabular-nums">
                 <ZScore value={b.baseline_z} />
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums">
+              </Td>
+              <Td className="text-end tabular-nums">
                 <Trend value={b.trend_pct} />
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
+              </Td>
+              <Td className="text-end tabular-nums">
                 {fmt(b.p10, 2)} / {fmt(b.p50, 2)} / {fmt(b.p90, 2)}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
+              </Td>
+              <Td className="text-end tabular-nums">
                 {b.avg_valid_pixel_pct ? `${fmt(b.avg_valid_pixel_pct, 0)}%` : "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">{b.scene_count}</td>
-            </tr>
+              </Td>
+              <Td className="text-end tabular-nums">{b.scene_count}</Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }

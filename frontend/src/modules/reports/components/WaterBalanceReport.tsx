@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { WaterBalanceBlockRow, WaterBalanceSummary, WaterBalanceWeather } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWaterBalanceReport } from "@/queries/reports";
 
@@ -103,58 +104,52 @@ function WaterBalanceTable({ rows }: { rows: WaterBalanceBlockRow[] }): ReactNod
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-ap-line text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("waterBalance.headers.block")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+      <Table>
+        <Thead className="text-[11px]">
+          <Tr>
+            <Th scope="col">{t("waterBalance.headers.block")}</Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.scheduled")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.applied")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.recommended")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.appliedMm")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.adherence")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("waterBalance.headers.last")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((b) => (
-            <tr key={b.block_id} className="hover:bg-ap-bg/40">
-              <td className="px-3 py-2 font-medium text-ap-ink">{b.block_name}</td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
-                {b.scheduled_count || "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
+            <Tr key={b.block_id} className="hover:bg-ap-bg/40">
+              <Td className="font-medium text-ap-ink">{b.block_name}</Td>
+              <Td className="text-end tabular-nums">{b.scheduled_count || "—"}</Td>
+              <Td className="text-end tabular-nums text-ap-ink">
                 {b.scheduled_count ? b.applied_count : "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
+              </Td>
+              <Td className="text-end tabular-nums text-ap-ink">
                 {fmt(b.recommended_mm_total, 1, " mm")}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
+              </Td>
+              <Td className="text-end tabular-nums text-ap-ink">
                 {fmt(b.applied_mm_total, 1, " mm")}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums">
+              </Td>
+              <Td className="text-end tabular-nums">
                 <Adherence value={b.adherence_pct} />
-              </td>
-              <td className="px-3 py-2 text-end text-[11px] text-ap-muted">
-                {b.last_scheduled_for ?? "—"}
-              </td>
-            </tr>
+              </Td>
+              <Td className="text-end text-[11px]">{b.last_scheduled_for ?? "—"}</Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }

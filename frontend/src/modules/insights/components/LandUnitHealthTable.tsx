@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { listBlocks, type Block } from "@/api/blocks";
+import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 
 interface Props {
   farmId: string;
@@ -22,10 +24,7 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
   const blocks = data?.items ?? [];
 
   return (
-    <section
-      aria-labelledby="land-unit-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel"
-    >
+    <Card noPadding aria-labelledby="land-unit-heading">
       <header className="flex items-baseline justify-between p-4 pb-2">
         <h2
           id="land-unit-heading"
@@ -53,25 +52,25 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
         ) : blocks.length === 0 ? (
           <p className="p-6 text-center text-sm text-ap-muted">{t("landUnits.empty")}</p>
         ) : (
-          <table className="w-full text-start text-sm">
-            <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-              <tr>
-                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.name")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.type")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.area")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("landUnits.col.status")}</th>
-                <th className="px-4 py-2 text-end font-semibold">{t("landUnits.col.action")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
+          <Table>
+            <Thead className="text-[11px]">
+              <Tr>
+                <Th>{t("landUnits.col.name")}</Th>
+                <Th>{t("landUnits.col.type")}</Th>
+                <Th>{t("landUnits.col.area")}</Th>
+                <Th>{t("landUnits.col.status")}</Th>
+                <Th className="text-end">{t("landUnits.col.action")}</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {blocks.map((b) => (
                 <Row key={b.id} block={b} farmId={farmId} />
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -81,22 +80,22 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
   const status: "ok" | "neutral" = b.is_active ? "ok" : "neutral";
   const statusLabel = b.is_active ? t("landUnits.status.active") : t("landUnits.status.inactive");
   return (
-    <tr className="hover:bg-ap-line/20">
-      <td className="px-4 py-2">
+    <Tr className="hover:bg-ap-line/20">
+      <Td>
         <div className="text-ap-ink">{b.name ?? b.code}</div>
         <div className="text-[11px] text-ap-muted">
           {b.code}
           {b.irrigation_system ? ` · ${b.irrigation_system}` : ""}
         </div>
-      </td>
-      <td className="px-4 py-2 text-ap-muted">{t(`unitType.${b.unit_type}`)}</td>
-      <td className="px-4 py-2 text-ap-muted">
+      </Td>
+      <Td>{t(`unitType.${b.unit_type}`)}</Td>
+      <Td>
         {b.area_value.toFixed(1)} {b.area_unit}
-      </td>
-      <td className="px-4 py-2">
+      </Td>
+      <Td>
         <Pill kind={status}>{statusLabel}</Pill>
-      </td>
-      <td className="px-4 py-2 text-end">
+      </Td>
+      <Td className="text-end">
         <button
           type="button"
           onClick={() => navigate(`/board/${farmId}?lane=${b.id}`)}
@@ -104,7 +103,7 @@ function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode 
         >
           {t("landUnits.plan")}
         </button>
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   );
 }

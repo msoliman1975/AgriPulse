@@ -5,7 +5,9 @@ import type { BackfillRun, RunKind, RunStatus } from "@/api/backfill";
 import { estimateBackfill, type BackfillEstimate } from "@/api/backfill";
 import { isApiError } from "@/api/errors";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import {
   useBackfillFarms,
   useBackfillRuns,
@@ -250,33 +252,33 @@ function RunsTable({ runs }: { runs: BackfillRun[] }): ReactNode {
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-sm">
-        <thead>
-          <tr className="border-b border-ap-line text-start text-xs uppercase text-ap-muted">
-            <th className="p-2 text-start">{t("backfill.runs.status")}</th>
-            <th className="p-2 text-start">{t("backfill.runs.target")}</th>
-            <th className="p-2 text-start">{t("backfill.runs.window")}</th>
-            <th className="p-2 text-start">{t("backfill.runs.sources")}</th>
-            <th className="p-2 text-start">{t("backfill.runs.progress")}</th>
-            <th className="p-2 text-start">{t("backfill.runs.startedBy")}</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table className="min-w-[720px]">
+        <Thead>
+          <Tr>
+            <Th className="p-2">{t("backfill.runs.status")}</Th>
+            <Th className="p-2">{t("backfill.runs.target")}</Th>
+            <Th className="p-2">{t("backfill.runs.window")}</Th>
+            <Th className="p-2">{t("backfill.runs.sources")}</Th>
+            <Th className="p-2">{t("backfill.runs.progress")}</Th>
+            <Th className="p-2">{t("backfill.runs.startedBy")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {runs.map((r) => (
-            <tr key={r.id} className="border-b border-ap-line align-top">
-              <td className="p-2">
+            <Tr key={r.id} className="align-top">
+              <Td className="p-2">
                 <StatusPill status={r.status} label={t(`backfill.status.${r.status}`)} />
                 {r.error ? <div className="mt-1 text-xs text-ap-crit">{r.error}</div> : null}
-              </td>
-              <td className="p-2">
+              </Td>
+              <Td className="p-2">
                 {r.tenant_name}
                 <div className="text-xs text-ap-muted">{r.farm_name}</div>
-              </td>
-              <td className="p-2 tabular-nums">
+              </Td>
+              <Td className="p-2 tabular-nums">
                 {r.window_from}
                 <div className="text-xs text-ap-muted tabular-nums">→ {r.window_to}</div>
-              </td>
-              <td className="p-2">
+              </Td>
+              <Td className="p-2">
                 <span className="text-xs">
                   {Object.entries(r.sources ?? {})
                     .filter(([, on]) => on)
@@ -284,16 +286,16 @@ function RunsTable({ runs }: { runs: BackfillRun[] }): ReactNode {
                     .join(", ")}
                 </span>
                 <div className="text-xs text-ap-muted">{t(`backfill.kind.${r.kind}`)}</div>
-              </td>
-              <td className="p-2 text-xs text-ap-muted">{summarise(r) || "—"}</td>
-              <td className="p-2 text-xs">
+              </Td>
+              <Td className="p-2">{summarise(r) || "—"}</Td>
+              <Td className="p-2">
                 {r.created_by_email ?? "—"}
                 <div className="text-ap-muted tabular-nums">{r.created_at.slice(0, 16)}</div>
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }
@@ -313,8 +315,7 @@ export function PlatformBackfillPage(): ReactNode {
   return (
     <Page>
       <div>
-        <h1 className="text-lg font-semibold">{t("backfill.title")}</h1>
-        <p className="text-sm text-ap-muted">{t("backfill.subtitle")}</p>
+        <PageHeader title={t("backfill.title")} subtitle={t("backfill.subtitle")} />
       </div>
 
       <div

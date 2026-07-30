@@ -1,7 +1,19 @@
 import clsx from "clsx";
-import type { HTMLAttributes, ReactNode } from "react";
+import { forwardRef } from "react";
+import type { FormEventHandler, HTMLAttributes, ReactNode } from "react";
 
-interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
+type CardElement = "div" | "section" | "aside" | "form";
+
+interface CardProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
+  /**
+   * The element to render. Defaults to `div`.
+   *
+   * `form` matters: a card that wraps a form IS the form. Rendering a div
+   * instead silently drops submission — no error, no type complaint, the
+   * button just stops working.
+   */
+  as?: CardElement;
+  onSubmit?: FormEventHandler<HTMLFormElement>;
   /** Drop the default `p-4` body padding (e.g. when the card wraps a table). */
   noPadding?: boolean;
   /** Renders a bordered header strip. Replaces the local `Card` in
@@ -20,27 +32,35 @@ interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
 // `rounded-xl border border-ap-line bg-ap-panel` existed across the app (F-6),
 // plus a competing `rounded-lg … shadow-card` variant declared locally on the
 // tenant detail page. One radius, one border, no elevation.
-export function Card({
-  noPadding = false,
-  title,
-  actions,
-  footer,
-  bodyClassName,
-  className,
-  children,
-  ...rest
-}: CardProps): ReactNode {
+export const Card = forwardRef<HTMLElement, CardProps>(function Card(
+  {
+    as: Tag = "div",
+    noPadding = false,
+    title,
+    actions,
+    footer,
+    bodyClassName,
+    className,
+    children,
+    ...rest
+  },
+  ref,
+): ReactNode {
   const hasChrome = Boolean(title ?? footer);
   const bodyPadding = noPadding ? null : "p-4";
 
   return (
-    <div
+    // `Tag` is a union of intrinsic elements, so TS can't reconcile the props
+    // bag against any single one of them. The public surface above is the
+    // contract; this cast is where the polymorphism is paid for.
+    <Tag
+      ref={ref as never}
       className={clsx(
         "rounded-xl border border-ap-line bg-ap-panel",
         !hasChrome && bodyPadding,
         className,
       )}
-      {...rest}
+      {...(rest as Record<string, unknown>)}
     >
       {title ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ap-line px-4 py-2.5">
@@ -50,6 +70,6 @@ export function Card({
       ) : null}
       {hasChrome ? <div className={clsx(bodyPadding, bodyClassName)}>{children}</div> : children}
       {footer}
-    </div>
+    </Tag>
   );
-}
+});

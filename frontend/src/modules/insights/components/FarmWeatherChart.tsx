@@ -15,6 +15,7 @@ import {
 } from "recharts";
 
 import { getDerivedDaily, getForecast } from "@/api/weather";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
@@ -107,10 +108,7 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
   const isEmpty = !loading && data.length === 0;
 
   return (
-    <section
-      aria-labelledby="farm-weather-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="farm-weather-heading">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="farm-weather-heading"
@@ -225,7 +223,7 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
           </ResponsiveContainer>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 

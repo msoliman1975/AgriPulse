@@ -9,6 +9,8 @@ import {
   type Subscription,
 } from "@/api/weather";
 import { useCapability } from "@/rbac/useCapability";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 interface Props {
   blockId: string;
@@ -89,7 +91,7 @@ export function WeatherSubscriptionsTab({ blockId, farmId }: Props): JSX.Element
   const alreadySubscribed = subscriptions.some((s) => s.provider_code === PROVIDER_CODE);
 
   return (
-    <section className="card space-y-3" aria-label={t("subscriptions.heading")}>
+    <Card className="space-y-3" aria-label={t("subscriptions.heading")}>
       <header>
         <h2 className="text-lg font-semibold text-ap-ink">{t("subscriptions.heading")}</h2>
       </header>
@@ -127,14 +129,9 @@ export function WeatherSubscriptionsTab({ blockId, farmId }: Props): JSX.Element
                 </p>
               </div>
               {canManage ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void handleRevoke(sub.id)}
-                  disabled={busy}
-                >
+                <Button variant="ghost" onClick={() => void handleRevoke(sub.id)} disabled={busy}>
                   {busy ? t("subscriptions.revoking") : t("subscriptions.revokeButton")}
-                </button>
+                </Button>
               ) : null}
             </li>
           ))}
@@ -143,16 +140,11 @@ export function WeatherSubscriptionsTab({ blockId, farmId }: Props): JSX.Element
 
       {canManage ? (
         <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleSubscribe()}
-            disabled={busy || alreadySubscribed}
-          >
+          <Button onClick={() => void handleSubscribe()} disabled={busy || alreadySubscribed}>
             {busy ? t("subscriptions.subscribing") : t("subscriptions.subscribeButton")}
-          </button>
+          </Button>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }

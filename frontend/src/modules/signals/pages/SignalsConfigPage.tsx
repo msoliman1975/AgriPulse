@@ -14,6 +14,7 @@ import type {
   ValueKind,
 } from "@/api/signals";
 import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
@@ -178,10 +179,7 @@ export function SignalsConfigPage(): ReactNode {
       />
 
       {showForm && canDefine ? (
-        <form
-          onSubmit={submit}
-          className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-        >
+        <Card as="form" noPadding className="p-4 text-sm" onSubmit={submit}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={t("config.form.code")}>
               {(props) => (
@@ -351,7 +349,7 @@ export function SignalsConfigPage(): ReactNode {
               {createMut.isPending ? t("config.form.saving") : t("config.form.save")}
             </button>
           </div>
-        </form>
+        </Card>
       ) : null}
 
       {/* CS-13 toolbar */}
@@ -392,7 +390,7 @@ export function SignalsConfigPage(): ReactNode {
         </label>
       </div>
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
+      <Card noPadding>
         {isLoading ? (
           <div className="flex flex-col gap-2 p-4">
             <Skeleton className="h-12 w-full" />
@@ -425,7 +423,7 @@ export function SignalsConfigPage(): ReactNode {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
       <TemplatesCard canDefine={canDefine} definitions={data ?? []} />
 
@@ -594,7 +592,7 @@ function TemplatesCard({
   };
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-2">
         <div>
           <h2 className="text-sm font-semibold text-ap-ink">{t("config.templates.heading")}</h2>
@@ -703,7 +701,7 @@ function TemplatesCard({
           onForce={forceArchiveTemplate}
         />
       ) : null}
-    </section>
+    </Card>
   );
 }
 

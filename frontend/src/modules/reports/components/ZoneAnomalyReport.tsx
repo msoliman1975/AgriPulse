@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ZoneAnomalyBlockRow, ZoneAnomalyStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useZoneAnomalyReport } from "@/queries/reports";
 
@@ -140,63 +141,55 @@ function ZoneAnomalyTable({ rows }: { rows: ZoneAnomalyBlockRow[] }): ReactNode 
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-ap-line text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("zoneAnomaly.headers.block")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("zoneAnomaly.headers.status")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+      <Table>
+        <Thead className="text-[11px]">
+          <Tr>
+            <Th scope="col">{t("zoneAnomaly.headers.block")}</Th>
+            <Th scope="col">{t("zoneAnomaly.headers.status")}</Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.scene")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.cells")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.flagged")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.area")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.worstZ")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.meanStd")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((b) => (
-            <tr key={b.block_id} className="hover:bg-ap-bg/40">
-              <td className="px-3 py-2 font-medium text-ap-ink">{b.block_name}</td>
-              <td className="px-3 py-2">
+            <Tr key={b.block_id} className="hover:bg-ap-bg/40">
+              <Td className="font-medium text-ap-ink">{b.block_name}</Td>
+              <Td>
                 <span
                   className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_CHIP[b.status]}`}
                 >
                   {t(`zoneAnomaly.status.${b.status}`)}
                 </span>
-              </td>
-              <td className="px-3 py-2 text-end text-[11px] text-ap-muted">
-                {b.scene_time?.slice(0, 10) ?? "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
-                {b.cell_count || "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums">
+              </Td>
+              <Td className="text-end text-[11px]">{b.scene_time?.slice(0, 10) ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{b.cell_count || "—"}</Td>
+              <Td className="text-end tabular-nums">
                 {b.flagged_count > 0 ? (
                   <span className="font-medium text-ap-crit">{b.flagged_count}</span>
                 ) : (
                   <span className="text-ap-muted">{b.cell_count ? 0 : "—"}</span>
                 )}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
+              </Td>
+              <Td className="text-end tabular-nums text-ap-ink">
                 {b.flagged_area_ha ? `${Number(b.flagged_area_ha).toFixed(2)} ha` : "—"}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums">
+              </Td>
+              <Td className="text-end tabular-nums">
                 {b.worst_z !== null ? (
                   <span className={Number(b.worst_z) <= -2 ? "text-ap-crit" : "text-ap-ink"}>
                     {fmt(b.worst_z, 2)}
@@ -204,14 +197,14 @@ function ZoneAnomalyTable({ rows }: { rows: ZoneAnomalyBlockRow[] }): ReactNode 
                 ) : (
                   "—"
                 )}
-              </td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
+              </Td>
+              <Td className="text-end tabular-nums">
                 {b.block_mean !== null ? `${fmt(b.block_mean)} ± ${fmt(b.block_std)}` : "—"}
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }

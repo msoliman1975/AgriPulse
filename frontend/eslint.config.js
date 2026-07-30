@@ -87,6 +87,46 @@ export default tseslint.config(
           message:
             "Use the ap-* design tokens (text-ap-ink, bg-ap-panel, border-ap-line, text-ap-crit, …) instead of the pre-rename palette.",
         },
+        // Design-system guard, part 2 (DS-8). The primitives in
+        // src/components/ existed for two months and got 0-10 adopters each,
+        // because every one of them competed with a className string that was
+        // already there. The two that reached full adoption (<Skeleton>,
+        // <Pill>) are the two with no such rival. Convention was tried and it
+        // lost; these rules are what make it stick. src/components/** is
+        // exempt below — the primitives legitimately contain the raw markup.
+        {
+          selector: "JSXOpeningElement[name.name='table']",
+          message:
+            "Use <DataTable> for data, or the <Table>/<Thead>/<Tbody>/<Tr>/<Th>/<Td> primitives for a bespoke table.",
+        },
+        {
+          selector: "JSXOpeningElement[name.name='h1']",
+          message:
+            "Page titles go through <PageHeader> so the type scale stays single-valued (F-11).",
+        },
+        {
+          selector: "Literal[value=/(?:^|\\s)btn(?:-primary|-ghost|-sm)?(?:\\s|$)/]",
+          message: "The .btn layer was retired in DS-8 — use <Button> or <LinkButton>.",
+        },
+        {
+          selector: "Literal[value=/(?:^|\\s)card(?:\\s|$)/]",
+          message: "The .card layer was retired in DS-8 — use <Card>.",
+        },
+        {
+          selector:
+            "Literal[value=/rounded-(?:xl|lg)\\s+border\\s+border-ap-line\\s+bg-ap-panel/]",
+          message: "This is <Card>. Inlining it is how we ended up with three card styles.",
+        },
+        // Shadowing a shipped primitive re-creates the divergence the
+        // primitive exists to prevent. `Row` is deliberately NOT listed — it
+        // is a reasonable local name for a row renderer and no primitive
+        // claims it.
+        {
+          selector:
+            "FunctionDeclaration[id.name=/^(Card|Field|Page|PageHeader|Pagination|Toolbar|DataTable|RowList|AsyncBoundary)$/]",
+          message:
+            "Import the primitive from @/components instead of declaring a local one that shadows it.",
+        },
       ],
     },
   },
@@ -97,7 +137,7 @@ export default tseslint.config(
     // interaction and add noise without value — these are stable APIs
     // we exercise heavily in production. Keep typed rules on for the
     // rest of src/ where they catch real bugs.
-    files: ["src/modules/labs/map/**/*.{ts,tsx}"],
+    files: ["src/modules/labs/map/**/*.{ts,tsx}", "src/modules/labs/mapnext/**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
@@ -105,6 +145,18 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-argument": "off",
       // Map layers legitimately pass raw color strings to mapbox paint specs,
       // and the surface is WiP — exempt it from the palette guard for now.
+      // `mapnext` (the live Farm Console) joins it under the same reasoning:
+      // its panels are map overlays being actively reshaped, and freezing
+      // their surface markup now would just create churn. Revisit when the
+      // console settles.
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // The primitives are where the raw markup is supposed to live, and where
+    // these component names are supposed to be declared.
+    files: ["src/components/**/*.{ts,tsx}"],
+    rules: {
       "no-restricted-syntax": "off",
     },
   },

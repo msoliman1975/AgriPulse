@@ -21,7 +21,7 @@ export function SettingsIndexPage(): ReactNode {
   if (canResources) return <Navigate to="/settings/workers" replace />;
   return (
     <div className="mx-auto max-w-3xl py-12 text-center">
-      <h1 className="text-xl font-semibold text-ap-ink">{t("noAccess.title")}</h1>
+      <h2 className="text-xl font-semibold text-ap-ink">{t("noAccess.title")}</h2>
       <p className="mt-2 text-sm text-ap-muted">{t("noAccess.body")}</p>
     </div>
   );

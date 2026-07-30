@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
 import { listRecommendations, type Recommendation } from "@/api/recommendations";
+import { Card } from "@/components/Card";
 
 // A cell-scoped tree fires one rec per grid cell, so a single sweep can put
 // dozens of near-identical "scout this zone" recs on the rail. Collapse the
@@ -49,15 +50,11 @@ interface RecommendationsRailProps {
 /** Side rail listing open recs for the current farm. Each chip is
  * drag-source for drop-to-cell scheduling.
  */
-export function RecommendationsRail({
-  farmId,
-  draggable,
-}: RecommendationsRailProps): ReactNode {
+export function RecommendationsRail({ farmId, draggable }: RecommendationsRailProps): ReactNode {
   const { t } = useTranslation("board");
   const recsQ = useQuery<Recommendation[]>({
     queryKey: ["recommendations", "open", farmId],
-    queryFn: () =>
-      listRecommendations({ farm_id: farmId, state: "open", limit: 200 }),
+    queryFn: () => listRecommendations({ farm_id: farmId, state: "open", limit: 200 }),
     staleTime: 30_000,
   });
   const entries = useMemo(() => buildRailEntries(recsQ.data ?? []), [recsQ.data]);
@@ -67,7 +64,7 @@ export function RecommendationsRail({
       <h2 className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-ap-muted">
         {t("rail.title")}
       </h2>
-      <div className="flex flex-col gap-1 rounded-xl border border-ap-line bg-ap-panel p-2">
+      <Card noPadding className="flex flex-col gap-1 p-2">
         {recsQ.isLoading ? (
           <p className="px-2 py-3 text-xs text-ap-muted">…</p>
         ) : recsQ.isError ? (
@@ -83,7 +80,7 @@ export function RecommendationsRail({
             ),
           )
         )}
-      </div>
+      </Card>
     </aside>
   );
 }
@@ -118,16 +115,13 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
         e.dataTransfer.effectAllowed = "copy";
       }}
       className={
-        "flex cursor-grab flex-col gap-0.5 rounded border px-2 py-1.5 text-xs " +
-        severityColor
+        "flex cursor-grab flex-col gap-0.5 rounded border px-2 py-1.5 text-xs " + severityColor
       }
       title={t("rail.dragHint")}
     >
       <span className="flex items-center justify-between">
         <span className="font-medium">{t(`recAction.${rec.action_type}`)}</span>
-        <span className="text-[10px] uppercase text-ap-muted">
-          {t(`severity.${rec.severity}`)}
-        </span>
+        <span className="text-[10px] uppercase text-ap-muted">{t(`severity.${rec.severity}`)}</span>
       </span>
       <span className="truncate text-[11px] opacity-90">{localizedText}</span>
     </div>
@@ -137,13 +131,7 @@ function RecChip({ rec, draggable }: RecChipProps): ReactNode {
 // Summary chip for a set of cell-scoped recs (one tree/action, many zones).
 // Not draggable — dropping a whole zone-set onto one calendar cell is
 // ambiguous; the author acts on individual zones from the map / recs page.
-function GroupChip({
-  recs,
-  worst,
-}: {
-  recs: Recommendation[];
-  worst: Recommendation;
-}): ReactNode {
+function GroupChip({ recs, worst }: { recs: Recommendation[]; worst: Recommendation }): ReactNode {
   const { t } = useTranslation("board");
   const severityColor =
     worst.severity === "critical"

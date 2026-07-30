@@ -12,6 +12,7 @@ import type {
   TenantRuleUpdatePayload,
 } from "@/api/alerts";
 import { listSignalDefinitions } from "@/api/signals";
+import { Card } from "@/components/Card";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { PageHeader } from "@/components/PageHeader";
@@ -98,7 +99,7 @@ export function RulesConfigPage(): ReactNode {
       />
 
       {tab === "platform" ? (
-        <div className="rounded-xl border border-ap-line bg-ap-panel">
+        <Card noPadding>
           {isLoading ? (
             <div className="flex flex-col gap-2 p-4">
               <Skeleton className="h-16 w-full" />
@@ -116,7 +117,7 @@ export function RulesConfigPage(): ReactNode {
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       ) : (
         <TenantRulesSection canManage={canManage} isAr={isAr} />
       )}
@@ -318,17 +319,17 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
 
   if (tenantRules.isLoading) {
     return (
-      <div className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <Skeleton className="h-16 w-full" />
         <Skeleton className="mt-2 h-16 w-full" />
-      </div>
+      </Card>
     );
   }
   if (tenantRules.isError) {
     return (
-      <div className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-crit">
+      <Card noPadding className="p-4 text-sm text-ap-crit">
         {t("page.loadFailed")}
-      </div>
+      </Card>
     );
   }
 
@@ -343,7 +344,7 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
         />
       ) : null}
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
+      <Card noPadding>
         <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
           <h2 className="text-sm font-semibold text-ap-ink">{t("tabs.tenant")}</h2>
           {canManage ? (
@@ -377,7 +378,7 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
             {deleteMut.error?.message}
           </p>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DateRange } from "../dateRange";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 interface Props {
   /** Localised report title, shown as the printout header. */
@@ -30,7 +32,7 @@ export function ReportShell({ title, farmName, period, onExportCsv, children }: 
   const { t } = useTranslation("reports");
 
   return (
-    <section className="report-print-area rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="report-print-area p-4">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ap-line pb-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-ap-ink">{title}</h2>
@@ -42,16 +44,16 @@ export function ReportShell({ title, farmName, period, onExportCsv, children }: 
         </div>
         <div className="print-hide flex items-center gap-2">
           {onExportCsv ? (
-            <button type="button" className="btn btn-ghost text-xs" onClick={onExportCsv}>
+            <Button variant="ghost" className="text-xs" onClick={onExportCsv}>
               {t("shell.exportCsv")}
-            </button>
+            </Button>
           ) : null}
-          <button type="button" className="btn btn-ghost text-xs" onClick={() => window.print()}>
+          <Button variant="ghost" className="text-xs" onClick={() => window.print()}>
             {t("shell.print")}
-          </button>
+          </Button>
         </div>
       </header>
       <div className="mt-4">{children}</div>
-    </section>
+    </Card>
   );
 }

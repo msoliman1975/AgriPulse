@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import type { ActivityType } from "@/api/plans";
 import { Badge, type BadgeKind } from "@/components/Badge";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCalendar } from "@/queries/plans";
@@ -48,10 +49,7 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
   const activities = data?.activities ?? [];
 
   return (
-    <section
-      aria-labelledby="upcoming-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="upcoming-heading">
       <header className="flex items-baseline justify-between">
         <h2
           id="upcoming-heading"
@@ -110,6 +108,6 @@ export function UpcomingActivitiesCard({ farmId }: Props): ReactNode {
           })
         )}
       </div>
-    </section>
+    </Card>
   );
 }

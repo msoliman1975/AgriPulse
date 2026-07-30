@@ -120,6 +120,9 @@ export function FarmSwitcher(): ReactNode {
         <div
           ref={popoverRef}
           role="listbox"
+          /* eslint-disable-next-line no-restricted-syntax --
+             A floating listbox, not a page panel: it needs its own radius,
+             elevation and z-index, none of which <Card> models. */
           className="absolute start-0 top-full z-40 mt-1 max-h-80 w-64 overflow-auto rounded-lg border border-ap-line bg-ap-panel p-1 shadow-card"
         >
           {farms.map((f) => {

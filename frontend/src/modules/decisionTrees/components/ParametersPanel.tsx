@@ -20,6 +20,7 @@ import type {
   ParametersEditBuffer,
 } from "../lib/parametersEdit";
 import { validateParameterDeclaration } from "../lib/parametersEdit";
+import { Card } from "@/components/Card";
 
 interface ParametersPanelProps {
   /** Current declarations from the loaded tree's compiled JSON. */
@@ -68,7 +69,7 @@ export function ParametersPanel({
   const [adding, setAdding] = useState(false);
 
   return (
-    <aside className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="flex flex-col gap-3 p-4">
       <header className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ap-ink">{t("parameters.heading")}</h2>
         {canEdit ? (
@@ -114,7 +115,7 @@ export function ParametersPanel({
             />
           ))}
       </div>
-    </aside>
+    </Card>
   );
 }
 
@@ -154,9 +155,7 @@ function AddParameterForm({
         <p className="text-xs text-ap-crit">{t("parameters.errors.nameTaken")}</p>
       ) : null}
       <DeclarationFields decl={decl} onChange={setDecl} />
-      {validationErr ? (
-        <p className="text-xs text-ap-crit">{validationErr}</p>
-      ) : null}
+      {validationErr ? <p className="text-xs text-ap-crit">{validationErr}</p> : null}
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -232,9 +231,7 @@ function ParameterRow({
       {editing ? (
         <div className="flex flex-col gap-2">
           <DeclarationFields decl={decl} onChange={onChange} />
-          {validationErr ? (
-            <p className="text-xs text-ap-crit">{validationErr}</p>
-          ) : null}
+          {validationErr ? <p className="text-xs text-ap-crit">{validationErr}</p> : null}
         </div>
       ) : (
         <div className="grid grid-cols-[80px_1fr] gap-1 text-xs">

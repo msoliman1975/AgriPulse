@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
 
@@ -25,10 +26,7 @@ export function TrendChartCard({ farmId }: Props): ReactNode {
   const firstBlock = data?.items[0];
 
   return (
-    <section
-      aria-labelledby="trend-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="trend-heading">
       <header className="flex items-baseline justify-between">
         <h2
           id="trend-heading"
@@ -49,6 +47,6 @@ export function TrendChartCard({ farmId }: Props): ReactNode {
           <IndexTrendChart blockId={firstBlock.id} />
         )}
       </div>
-    </section>
+    </Card>
   );
 }
