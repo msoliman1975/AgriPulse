@@ -250,11 +250,22 @@ global:
   #       overrides previously had NO validation at all).
   #   Migration + api + FE -> api, workers and frontend all bumped;
   #   tile-server stays 9d140cc.
+  # ccb8643 = #335 the "Compute indices" run sat on Queued for hours with an
+  #   IDLE worker and empty queues -- imagery.backfill_farm_indices had died 9s
+  #   after dispatch. It bound its window as ISO strings into
+  #   CAST(:from_iso AS timestamptz), so asyncpg rejected the str on every
+  #   invocation (DataError). Now parsed to real dates. It also only called
+  #   finish() on the success path, so the crash was never recorded and the
+  #   run waited on that source forever -- the console shows a source with no
+  #   progress entry as "Queued". Both farm-indices and farm-scenes now report
+  #   failure before re-raising. Third instance of the same CAST-plus-string
+  #   bind family after #331 and #332. Task runs in the WORKERS; api bumped
+  #   only to keep one SHA. No migration; frontend stays 131813b, tile 9d140cc.
   images:
     api:
-      tag: "131813b"
+      tag: "ccb8643"
     workers:
-      tag: "131813b"
+      tag: "ccb8643"
     frontend:
       tag: "131813b"
     tileServer:
