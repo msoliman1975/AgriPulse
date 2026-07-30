@@ -4,22 +4,19 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listFarms } from "@/api/farms";
 import type { EquipmentType } from "@/api/resources";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { FilterChip } from "@/components/FilterChip";
 import { PageHeader } from "@/components/PageHeader";
-import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { Toolbar } from "@/components/Toolbar";
+import { queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
-import {
-  useCreateResource,
-  useResources,
-  useUpdateResource,
-} from "@/queries/resources";
+import { useCreateResource, useResources, useUpdateResource } from "@/queries/resources";
 
-const TYPES: EquipmentType[] = [
-  "tractor",
-  "sprayer",
-  "irrigation_pump",
-  "harvester",
-  "other",
-];
+const TYPES: EquipmentType[] = ["tractor", "sprayer", "irrigation_pump", "harvester", "other"];
 
 /**
  * /settings/equipment — per-farm catalog of machinery. Master file for
@@ -55,44 +52,42 @@ export function ResourcesEquipmentPage(): ReactNode {
     <div className="flex flex-col gap-6">
       <PageHeader title={t("equipment.title")} subtitle={t("equipment.subtitle")} />
 
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ap-muted">{t("pickFarm")}</span>
-          <select
-            className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-            value={effectiveFarmId ?? ""}
-            onChange={(e) => setFarmId(e.target.value || null)}
-          >
-            <option value="">{t("noFarm")}</option>
-            {(farmsQ.data?.items ?? []).map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
-          />
-          <span>{t("showArchived")}</span>
-        </label>
-      </div>
+      <Toolbar
+        right={
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-ap-muted">{t("pickFarm")}</span>
+            <select
+              className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-sm text-ap-ink"
+              value={effectiveFarmId ?? ""}
+              onChange={(e) => setFarmId(e.target.value || null)}
+            >
+              <option value="">{t("noFarm")}</option>
+              {(farmsQ.data?.items ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+        chips={
+          <FilterChip active={includeArchived} onToggle={() => setIncludeArchived((v) => !v)}>
+            {t("showArchived")}
+          </FilterChip>
+        }
+      />
 
       {!effectiveFarmId ? (
-        <p className="text-sm text-ap-muted">{t("equipment.empty")}</p>
-      ) : itemsQ.isLoading ? (
-        <Skeleton className="h-32 w-full" />
-      ) : itemsQ.isError ? (
-        <p className="text-sm text-ap-crit">{t("loadFailed")}</p>
+        <EmptyState message={t("equipment.empty")} action={null} />
       ) : (
-        <EquipmentTable
-          rows={itemsQ.data ?? []}
-          farmId={effectiveFarmId}
-          canManage={canManage}
-        />
+        <AsyncBoundary
+          state={queryState(itemsQ)}
+          errorMessage={t("loadFailed")}
+          isEmpty={() => false}
+          empty={<EmptyState message={t("equipment.emptyList")} action={null} />}
+        >
+          {(rows) => <EquipmentTable rows={rows} farmId={effectiveFarmId} canManage={canManage} />}
+        </AsyncBoundary>
       )}
     </div>
   );
@@ -104,64 +99,46 @@ interface EquipmentTableProps {
   canManage: boolean;
 }
 
-function EquipmentTable({
-  rows,
-  farmId,
-  canManage,
-}: EquipmentTableProps): ReactNode {
+function EquipmentTable({ rows, farmId, canManage }: EquipmentTableProps): ReactNode {
   const { t } = useTranslation("resources");
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel">
-      <div className="flex items-center justify-between border-b border-ap-line p-3">
-        <h2 className="text-sm font-semibold text-ap-ink">
-          {t("equipment.heading")}
-        </h2>
-        {canManage ? (
-          <button
-            type="button"
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary-700"
-            onClick={() => setAdding(true)}
-          >
+    <Card
+      noPadding
+      title={t("equipment.heading")}
+      actions={
+        canManage ? (
+          <Button size="sm" onClick={() => setAdding(true)}>
             {t("equipment.add")}
-          </button>
-        ) : null}
-      </div>
-      <table className="w-full text-sm">
-        <thead className="bg-ap-bg/50 text-xs uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th className="px-3 py-2 text-start">{t("col.name")}</th>
-            <th className="px-3 py-2 text-start">{t("col.type")}</th>
-            <th className="px-3 py-2 text-start">{t("col.status")}</th>
-            {canManage ? <th className="w-32" /> : null}
-          </tr>
-        </thead>
-        <tbody>
+          </Button>
+        ) : null
+      }
+    >
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("col.name")}</Th>
+            <Th>{t("col.type")}</Th>
+            <Th>{t("col.status")}</Th>
+            {canManage ? <Th className="w-32" /> : null}
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.length === 0 && !adding ? (
-            <tr>
-              <td
-                colSpan={canManage ? 4 : 3}
-                className="px-3 py-6 text-center text-ap-muted"
-              >
+            <Tr>
+              <Td colSpan={canManage ? 4 : 3} className="px-3 py-6 text-center text-ap-muted">
                 {t("equipment.emptyList")}
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ) : null}
           {rows.map((r) => (
-            <EquipmentRow
-              key={r.id}
-              row={r}
-              farmId={farmId}
-              canManage={canManage}
-            />
+            <EquipmentRow key={r.id} row={r} farmId={farmId} canManage={canManage} />
           ))}
-          {adding ? (
-            <AddEquipmentRow farmId={farmId} onDone={() => setAdding(false)} />
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+          {adding ? <AddEquipmentRow farmId={farmId} onDone={() => setAdding(false)} /> : null}
+        </Tbody>
+      </Table>
+    </Card>
   );
 }
 
@@ -180,15 +157,15 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
 
   if (editing) {
     return (
-      <tr className="border-t border-ap-line">
-        <td className="px-3 py-2">
+      <Tr className="border-t border-ap-line">
+        <Td>
           <input
             className="w-full rounded border border-ap-line px-2 py-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-        </td>
-        <td className="px-3 py-2">
+        </Td>
+        <Td>
           <select
             className="rounded border border-ap-line px-2 py-1"
             value={type}
@@ -200,11 +177,11 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
               </option>
             ))}
           </select>
-        </td>
-        <td className="px-3 py-2 text-ap-muted">
+        </Td>
+        <Td className="text-ap-muted">
           {row.archived_at ? t("status.archived") : t("status.active")}
-        </td>
-        <td className="px-3 py-2 text-end">
+        </Td>
+        <Td className="text-end">
           <button
             type="button"
             disabled={update.isPending}
@@ -228,22 +205,20 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
           >
             {t("action.cancel")}
           </button>
-        </td>
-      </tr>
+        </Td>
+      </Tr>
     );
   }
 
   return (
-    <tr className="border-t border-ap-line">
-      <td className="px-3 py-2">{row.name}</td>
-      <td className="px-3 py-2 text-ap-muted">
-        {t(`equipmentType.${row.equipment_type}`)}
-      </td>
-      <td className="px-3 py-2 text-ap-muted">
+    <Tr className="border-t border-ap-line">
+      <Td>{row.name}</Td>
+      <Td className="text-ap-muted">{t(`equipmentType.${row.equipment_type}`)}</Td>
+      <Td className="text-ap-muted">
         {row.archived_at ? t("status.archived") : t("status.active")}
-      </td>
+      </Td>
       {canManage ? (
-        <td className="px-3 py-2 text-end">
+        <Td className="text-end">
           <button
             type="button"
             className="me-3 text-sm text-ap-primary hover:underline"
@@ -264,9 +239,9 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
           >
             {row.archived_at ? t("action.restore") : t("action.archive")}
           </button>
-        </td>
+        </Td>
       ) : null}
-    </tr>
+    </Tr>
   );
 }
 
@@ -282,16 +257,16 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
   const create = useCreateResource(farmId);
 
   return (
-    <tr className="border-t border-ap-line bg-ap-bg/30">
-      <td className="px-3 py-2">
+    <Tr className="border-t border-ap-line bg-ap-bg/30">
+      <Td>
         <input
           className="w-full rounded border border-ap-line px-2 py-1"
           placeholder={t("equipment.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-      </td>
-      <td className="px-3 py-2">
+      </Td>
+      <Td>
         <select
           className="rounded border border-ap-line px-2 py-1"
           value={type}
@@ -303,9 +278,9 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
             </option>
           ))}
         </select>
-      </td>
-      <td className="px-3 py-2 text-ap-muted">{t("status.active")}</td>
-      <td className="px-3 py-2 text-end">
+      </Td>
+      <Td className="text-ap-muted">{t("status.active")}</Td>
+      <Td className="text-end">
         <button
           type="button"
           disabled={!name.trim() || create.isPending}
@@ -323,17 +298,11 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
         >
           {t("action.create")}
         </button>
-        <button
-          type="button"
-          className="text-sm text-ap-muted hover:underline"
-          onClick={onDone}
-        >
+        <button type="button" className="text-sm text-ap-muted hover:underline" onClick={onDone}>
           {t("action.cancel")}
         </button>
-        {create.isError ? (
-          <p className="mt-1 text-xs text-ap-crit">{t("createFailed")}</p>
-        ) : null}
-      </td>
-    </tr>
+        {create.isError ? <p className="mt-1 text-xs text-ap-crit">{t("createFailed")}</p> : null}
+      </Td>
+    </Tr>
   );
 }

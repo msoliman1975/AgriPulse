@@ -1,7 +1,7 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import type {
   ActionHorizon,
@@ -11,11 +11,16 @@ import type {
   RecommendationState,
   TreePathStepDTO,
 } from "@/api/recommendations";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { cellLabel } from "@/lib/cellLabel";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { Skeleton } from "@/components/Skeleton";
+import { RowList } from "@/components/RowList";
+import { queryState } from "@/components/asyncState";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
@@ -35,227 +40,187 @@ const SEV_KIND: Record<RecommendationSeverity, "info" | "warn" | "crit"> = {
   critical: "crit",
 };
 
+const SEV_RAIL: Record<RecommendationSeverity, string> = {
+  info: "bg-ap-accent",
+  warning: "bg-ap-warn",
+  critical: "bg-ap-crit",
+};
+
 export function RecommendationsPage(): ReactNode {
   const farmId = useActiveFarmId();
-  const { t } = useTranslation("recommendations");
+  const { t, i18n } = useTranslation("recommendations");
+  const dateLocale = useDateLocale();
   const [tab, setTab] = useState<RecommendationState | "all">("open");
   const canAct = useCapability("recommendation.act", { farmId });
+  const isAr = i18n.language === "ar";
 
   const params = tab === "all" ? { farm_id: farmId } : { farm_id: farmId, state: tab };
-  const { data, isLoading, isError } = useRecommendations(params);
+  const recommendations = useRecommendations(params);
   const transition = useTransitionRecommendation();
 
   if (!farmId) {
     return <Navigate to="/" replace />;
   }
 
+  const ago = (iso: string): string =>
+    formatDistanceToNow(parseISO(iso), { addSuffix: true, locale: dateLocale });
+
   return (
     <Page>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl
-            ariaLabel={t("tabsLabel")}
-            items={STATE_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
-            value={tab}
-            onChange={(v) => setTab(v)}
-          />
-          {/* F-8: give applied/acted-on recommendations a direct path to the
-              board instead of stranding the user after "Apply". */}
-          <Link
-            to={`/board/${farmId}`}
-            className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
-          >
-            {t("actions.openInPlan")}
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          <>
+            <SegmentedControl
+              ariaLabel={t("tabsLabel")}
+              items={STATE_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
+              value={tab}
+              onChange={(v) => setTab(v)}
+            />
+            {/* F-8: give applied recommendations a direct path to the board
+                instead of stranding the user after "Apply". */}
+            <LinkButton variant="secondary" to={`/board/${farmId}`}>
+              {t("actions.openInPlan")}
+            </LinkButton>
+          </>
+        }
+      />
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
-        {isLoading ? (
-          <div className="flex flex-col gap-2 p-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">{t("page.loadFailed")}</p>
-        ) : !data || data.length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">
-            {tab === "open" ? t("page.emptyOpen") : t("page.empty")}
-          </p>
-        ) : (
-          <ul className="divide-y divide-ap-line">
-            {data.map((r) => (
-              <Row
-                key={r.id}
-                rec={r}
-                farmId={farmId}
-                canAct={canAct}
-                onApply={() =>
-                  transition.mutate({
-                    recommendationId: r.id,
-                    payload: { apply: true },
-                  })
-                }
-                onDismiss={() =>
-                  transition.mutate({
-                    recommendationId: r.id,
-                    payload: { dismiss: true },
-                  })
-                }
-                onDefer={(until) =>
-                  transition.mutate({
-                    recommendationId: r.id,
-                    payload: { defer_until: until },
-                  })
-                }
-              />
-            ))}
-          </ul>
+      <RowList<Recommendation>
+        state={queryState(recommendations)}
+        filtered={tab !== "all"}
+        rowKey={(rec) => rec.id}
+        rail={(rec) => SEV_RAIL[rec.severity]}
+        errorMessage={t("page.loadFailed")}
+        title={(rec) => (
+          <>
+            {isAr ? (rec.text_ar ?? rec.text_en) : rec.text_en}
+            <Pill kind={SEV_KIND[rec.severity]}>{t(`severity.${rec.severity}`)}</Pill>
+            <Pill kind={stateKind(rec.state)}>{t(`state.${rec.state}`)}</Pill>
+            <Pill kind="neutral">{t(`recAction.${rec.action_type}`)}</Pill>
+            {cellLabel(rec.cell_row, rec.cell_col) ? (
+              <Pill kind="neutral">
+                {t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}
+              </Pill>
+            ) : null}
+          </>
         )}
-      </div>
+        meta={(rec) => (
+          <>
+            <span className="font-mono">
+              {rec.tree_code}
+              <span className="text-ap-muted/70">·v{rec.tree_version}</span>
+            </span>
+            <span>·</span>
+            <span>{ago(rec.created_at)}</span>
+            <span>·</span>
+            <span>{t("row.confidence", { percent: confidencePercent(rec.confidence) })}</span>
+            {rec.valid_until ? (
+              <>
+                <span>·</span>
+                <span>{t("row.expiresIn", { when: ago(rec.valid_until) })}</span>
+              </>
+            ) : null}
+            {rec.deferred_until && rec.state === "deferred" ? (
+              <>
+                <span>·</span>
+                <span>{t("row.deferredUntil", { when: ago(rec.deferred_until) })}</span>
+              </>
+            ) : null}
+          </>
+        )}
+        extra={(rec) => <Explain rec={rec} />}
+        actions={(rec) => {
+          const isTerminal =
+            rec.state === "applied" || rec.state === "dismissed" || rec.state === "expired";
+          return (
+            <div className="flex flex-col items-end gap-1.5">
+              {!isTerminal && canAct ? (
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      transition.mutate({ recommendationId: rec.id, payload: { dismiss: true } })
+                    }
+                  >
+                    {t("actions.dismiss")}
+                  </Button>
+                  {rec.state === "open" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      title={t("actions.defer24Title")}
+                      onClick={() =>
+                        transition.mutate({
+                          recommendationId: rec.id,
+                          payload: { defer_until: defaultDeferUntil() },
+                        })
+                      }
+                    >
+                      {t("actions.defer24")}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      transition.mutate({ recommendationId: rec.id, payload: { apply: true } })
+                    }
+                  >
+                    {t("actions.apply")}
+                  </Button>
+                </div>
+              ) : null}
+              {rec.state === "applied" ? (
+                <LinkButton size="sm" variant="ghost" to={`/board/${farmId}`}>
+                  {t("actions.openInPlan")}
+                </LinkButton>
+              ) : null}
+            </div>
+          );
+        }}
+        empty={<EmptyState message={t("page.empty")} action={null} />}
+        noResults={
+          <EmptyState
+            message={tab === "open" ? t("page.emptyOpen") : t("page.empty")}
+            action={
+              tab === "all" ? null : (
+                <Button variant="secondary" onClick={() => setTab("all")}>
+                  {t("tabs.all")}
+                </Button>
+              )
+            }
+          />
+        }
+      />
     </Page>
   );
 }
 
-interface RowProps {
-  rec: Recommendation;
-  farmId: string;
-  canAct: boolean;
-  onApply: () => void;
-  onDismiss: () => void;
-  onDefer: (until: string) => void;
-}
-
-function Row({ rec, farmId, canAct, onApply, onDismiss, onDefer }: RowProps): ReactNode {
-  const { t, i18n } = useTranslation("recommendations");
-  const dateLocale = useDateLocale();
+/**
+ * The per-row explainability toggle. Owns its own open state, so it stays a
+ * component rather than an inline render inside the RowList slot.
+ */
+function Explain({ rec }: { rec: Recommendation }): ReactNode {
+  const { t } = useTranslation("recommendations");
   const [expanded, setExpanded] = useState(false);
-  const isTerminal =
-    rec.state === "applied" || rec.state === "dismissed" || rec.state === "expired";
-  const isAr = i18n.language === "ar";
-  // Pick the localized recommendation text written by the decision-tree
-  // YAML at evaluation time. Fall back to text_en when ar is missing.
-  const localizedText = isAr ? (rec.text_ar ?? rec.text_en) : rec.text_en;
   return (
-    <li className="flex items-start gap-3 p-4">
-      <div
-        aria-hidden="true"
-        className={`h-12 w-1 flex-none rounded-full ${
-          rec.severity === "critical"
-            ? "bg-ap-crit"
-            : rec.severity === "warning"
-              ? "bg-ap-warn"
-              : "bg-ap-accent"
-        }`}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">{localizedText}</span>
-          <Pill kind={SEV_KIND[rec.severity]}>{t(`severity.${rec.severity}`)}</Pill>
-          <Pill kind={stateKind(rec.state)}>{t(`state.${rec.state}`)}</Pill>
-          <Pill kind="neutral">{t(`recAction.${rec.action_type}`)}</Pill>
-          {cellLabel(rec.cell_row, rec.cell_col) ? (
-            <Pill kind="neutral">
-              {t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}
-            </Pill>
-          ) : null}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
-          <span className="font-mono">
-            {rec.tree_code}
-            <span className="text-ap-muted/70">·v{rec.tree_version}</span>
-          </span>
-          <span>·</span>
-          <span>
-            {formatDistanceToNow(parseISO(rec.created_at), { addSuffix: true, locale: dateLocale })}
-          </span>
-          <span>·</span>
-          <span>{t("row.confidence", { percent: confidencePercent(rec.confidence) })}</span>
-          {rec.valid_until ? (
-            <>
-              <span>·</span>
-              <span>
-                {t("row.expiresIn", {
-                  when: formatDistanceToNow(parseISO(rec.valid_until), {
-                    addSuffix: true,
-                    locale: dateLocale,
-                  }),
-                })}
-              </span>
-            </>
-          ) : null}
-          {rec.deferred_until && rec.state === "deferred" ? (
-            <>
-              <span>·</span>
-              <span>
-                {t("row.deferredUntil", {
-                  when: formatDistanceToNow(parseISO(rec.deferred_until), {
-                    addSuffix: true,
-                    locale: dateLocale,
-                  }),
-                })}
-              </span>
-            </>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((s) => !s)}
-          className="mt-2 text-[11px] font-medium text-ap-primary hover:underline"
-        >
-          {expanded ? t("row.explainHide") : t("row.explainShow")}
-        </button>
-        {expanded ? (
-          <>
-            <ActionsList actions={rec.actions} />
-            <TreePath path={rec.tree_path} />
-          </>
-        ) : null}
-      </div>
-      <div className="flex flex-none flex-col items-end gap-1.5">
-        {!isTerminal && canAct ? (
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-            >
-              {t("actions.dismiss")}
-            </button>
-            {rec.state === "open" ? (
-              <button
-                type="button"
-                onClick={() => onDefer(defaultDeferUntil())}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-                title={t("actions.defer24Title")}
-              >
-                {t("actions.defer24")}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={onApply}
-              className="rounded-md bg-ap-primary px-2 py-1 text-xs font-medium text-white hover:bg-ap-primary/90"
-            >
-              {t("actions.apply")}
-            </button>
-          </div>
-        ) : null}
-        {rec.state === "applied" ? (
-          <Link
-            to={`/board/${farmId}`}
-            className="text-[11px] font-medium text-ap-primary hover:underline"
-          >
-            {t("actions.openInPlan")}
-          </Link>
-        ) : null}
-      </div>
-    </li>
+    <>
+      <button
+        type="button"
+        onClick={() => setExpanded((s) => !s)}
+        className="mt-2 text-[11px] font-medium text-ap-primary hover:underline"
+      >
+        {expanded ? t("row.explainHide") : t("row.explainShow")}
+      </button>
+      {expanded ? (
+        <>
+          <ActionsList actions={rec.actions} />
+          <TreePath path={rec.tree_path} />
+        </>
+      ) : null}
+    </>
   );
 }
 

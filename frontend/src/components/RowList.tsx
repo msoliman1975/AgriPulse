@@ -17,6 +17,8 @@ interface RowListProps<T> {
   title: (item: T) => ReactNode;
   subtitle?: (item: T) => ReactNode;
   meta?: (item: T) => ReactNode;
+  /** Full-width block below the meta line — expandable detail, nested lists. */
+  extra?: (item: T) => ReactNode;
   actions?: (item: T) => ReactNode;
   href?: (item: T) => string;
   filtered?: boolean;
@@ -44,6 +46,7 @@ export function RowList<T>({
   title,
   subtitle,
   meta,
+  extra,
   actions,
   href,
   filtered,
@@ -129,6 +132,7 @@ export function RowList<T>({
                     {meta(item)}
                   </div>
                 ) : null}
+                {extra ? extra(item) : null}
               </div>
               {actions ? (
                 <div className="flex flex-none items-center gap-2">{actions(item)}</div>
