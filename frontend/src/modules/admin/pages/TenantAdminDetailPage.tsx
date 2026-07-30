@@ -16,10 +16,11 @@ import { useAdminTenant, useAdminTenantMeta, useAdminTenantSidecar } from "@/que
 
 import { TenantActionPanel } from "../components/TenantActionPanel";
 import { TenantAdminsPanel } from "../components/TenantAdminsPanel";
+import { TenantDataPanel } from "../components/TenantDataPanel";
 import { TenantIntegrationsPanel } from "../components/TenantIntegrationsPanel";
 import { TenantStatusBadge } from "../components/TenantStatusBadge";
 
-type Tab = "profile" | "integrations" | "owner" | "lifecycle";
+type Tab = "profile" | "integrations" | "owner" | "data" | "lifecycle";
 
 export function TenantAdminDetailPage(): ReactNode {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -143,6 +144,7 @@ function DetailTabs({
           { value: "profile", label: t("tenants.detail.tabs.profile") },
           { value: "integrations", label: t("tenants.detail.tabs.integrations") },
           { value: "owner", label: t("tenants.detail.tabs.owner") },
+          { value: "data", label: t("tenants.detail.tabs.data") },
           { value: "lifecycle", label: t("tenants.detail.tabs.lifecycle") },
         ]}
         value={tab}
@@ -165,6 +167,8 @@ function DetailTabs({
         <TenantIntegrationsPanel tenantId={tenant.id} />
       ) : tab === "owner" ? (
         <TenantAdminsPanel tenantId={tenant.id} tenantSlug={tenant.slug} />
+      ) : tab === "data" ? (
+        <TenantDataPanel tenant={tenant} />
       ) : (
         <TenantActionPanel tenant={tenant} purgeGraceDays={purgeGraceDays} />
       )}

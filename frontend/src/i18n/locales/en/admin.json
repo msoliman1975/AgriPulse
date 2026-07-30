@@ -265,6 +265,7 @@
         "profile": "Profile",
         "integrations": "Integrations",
         "owner": "Owner",
+        "data": "Data",
         "lifecycle": "Lifecycle"
       },
       "loading": "Loading tenant…",
@@ -415,6 +416,64 @@
       "sources": "Sources",
       "progress": "Progress",
       "startedBy": "Started by"
+    }
+  },
+  "purge": {
+    "dialog": {
+      "title": {
+        "block": "Permanently delete block “{{label}}”?",
+        "farm": "Permanently delete farm “{{label}}”?",
+        "tenant_data": "Wipe all data for “{{label}}”?"
+      },
+      "irreversible": "This cannot be undone. Archiving is reversible — purging is not.",
+      "loading": "Measuring impact…",
+      "previewError": "Could not load the impact report.",
+      "submitError": "The purge could not be started.",
+      "dryRunStillOk": "You can still run a dry run — it changes nothing.",
+      "impactTitle": "What will be deleted",
+      "impact": {
+        "rows": "{{rows}} rows across {{tables}} tables",
+        "objects": "{{count}} storage objects",
+        "keptShared": "({{count}} kept — shared AOI)",
+        "stac": "{{items}} STAC items · {{collections}} collections",
+        "expand": "Show {{count}} more tables",
+        "collapse": "Show fewer"
+      },
+      "confirmLabel": "Type to confirm:",
+      "reasonLabel": "Reason (recorded in the audit log)",
+      "dryRun": "Dry run",
+      "cancel": "Cancel",
+      "confirm": "Delete permanently",
+      "working": "Working…"
+    },
+    "result": {
+      "dryRunTitle": "Dry run complete — nothing was deleted",
+      "doneTitle": "Purged “{{label}}”",
+      "problemTitle": "Purge finished with problems",
+      "rows": "{{rows}} rows",
+      "objects": "{{count}} storage objects",
+      "verification": "Verification: {{orphans}} orphans across {{tables}} tables",
+      "verificationSkipped": "Verification skipped — dry run",
+      "close": "Close"
+    },
+    "data": {
+      "farmsTitle": "Farms ({{count}})",
+      "resetAll": "Reset all tenant data…",
+      "resetAllHint": "Removes every farm and block and all their data. Keeps the tenant, its users, settings and integration keys. Requires the tenant to be suspended first.",
+      "blockCount": "{{count}} blocks",
+      "archived": "Archived",
+      "purge": "Purge…",
+      "noFarms": "This tenant has no farms.",
+      "loadError": "Could not load this tenant's farms."
+    },
+    "orphans": {
+      "title": "Orphaned data",
+      "hint": "Rows and schemas left behind by earlier deletions. Read-only — scanning changes nothing.",
+      "scan": "Scan now",
+      "scanning": "Scanning…",
+      "clean": "No orphans across {{tables}} tables.",
+      "error": "The scan failed.",
+      "straySchemas": "Tenant schemas with no tenant row: {{schemas}}"
     }
   }
 }

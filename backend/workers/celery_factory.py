@@ -46,6 +46,9 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.integrations_health.streak_watcher",
     # Sub-block grid spatial-anomaly alerting sweep.
     "app.modules.grid.tasks",
+    # Platform-admin hard delete. Only large purges reach a worker; small
+    # ones run inline in the request.
+    "app.modules.purge.tasks",
 )
 
 
