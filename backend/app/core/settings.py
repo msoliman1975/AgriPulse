@@ -193,6 +193,14 @@ class Settings(BaseSettings):
     # PR-W3). Same rationale + default as the indices baseline sweep.
     weather_baseline_recompute_seconds: int = 3600
 
+    # Cadence for `indices.refresh_index_caggs_sweep`. The daily/weekly
+    # continuous aggregates have rolling refresh policies (3d / 21d), so a
+    # historical backfill lands outside them and stays unmaterialized —
+    # i.e. invisible to every reader. A full refresh measured ~2.5s per
+    # tenant, so hourly is cheap and bounds "backfilled history is not
+    # visible yet" to one cycle.
+    indices_cagg_refresh_seconds: int = 3600
+
     # Cadence for `weather.compute_risk_daily_sweep` — the per-block disease/
     # pest risk scores over a trailing weather window (Weather-Indices PR-R2).
     # 86400 = once per day; pure accumulation math, light queue.

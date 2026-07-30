@@ -58,3 +58,15 @@ if (typeof window !== "undefined") {
     });
   }
 }
+
+// recharts' <ResponsiveContainer> observes its box, but jsdom ships no
+// ResizeObserver — without this, rendering any chart throws. The stub never
+// fires a callback, so charts settle at their fallback size; that is fine
+// for assertions about structure and labels rather than pixel geometry.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}

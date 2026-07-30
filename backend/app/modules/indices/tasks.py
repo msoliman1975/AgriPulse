@@ -127,3 +127,88 @@ async def _recompute_baselines_sweep_async() -> dict[str, int]:
         recompute_baselines_for_tenant.delay(schema)
         enqueued += 1
     return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+
+# --- continuous-aggregate refresh -------------------------------------------
+#
+# `block_index_daily` / `block_index_weekly` are TimescaleDB continuous
+# aggregates whose refresh policies use a ROLLING window (3 days and 21 days
+# respectively, see tenant migration 0003). That is right for live ingest and
+# wrong for backfill: a historical load writes rows far outside those windows,
+# so their invalidations are never processed and the buckets are never
+# materialized. And because the views are real-time aggregates
+# (`materialized_only=false`, migration 0004), buckets OLDER than the
+# materialization threshold are served from the materialized store alone --
+# so backfilled history is simply invisible to every reader.
+#
+# This sweep closes that gap. A full refresh of both views measured ~2.5s per
+# tenant on production-sized data, which is cheap enough to run unconditionally
+# rather than trying to detect which windows went stale.
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="indices.refresh_index_caggs_for_tenant",
+    bind=False,
+    ignore_result=True,
+)
+def refresh_index_caggs_for_tenant(tenant_schema: str) -> dict[str, Any]:
+    """Materialize both index continuous aggregates for one tenant."""
+    return _run_task(_refresh_index_caggs_for_tenant_async(tenant_schema))
+
+
+async def _refresh_index_caggs_for_tenant_async(tenant_schema: str) -> dict[str, Any]:
+    safe = sanitize_tenant_schema(tenant_schema)
+    refreshed: list[str] = []
+    factory = AsyncSessionLocal()
+    for view in ("block_index_daily", "block_index_weekly"):
+        # refresh_continuous_aggregate cannot run inside a transaction block,
+        # so each call gets its own autocommit connection.
+        async with factory() as session:
+            conn = await session.connection(execution_options={"isolation_level": "AUTOCOMMIT"})
+            try:
+                await conn.execute(
+                    text(f"CALL refresh_continuous_aggregate('{safe}.{view}', NULL, NULL)")
+                )
+                refreshed.append(view)
+            except Exception as exc:  # one bad view must not block the other
+                _log.warning(
+                    "index_cagg_refresh_failed",
+                    tenant_schema=safe,
+                    view=view,
+                    error=str(exc)[:300],
+                )
+    return {"tenant_schema": safe, "refreshed": refreshed}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="indices.refresh_index_caggs_sweep",
+    bind=False,
+    ignore_result=True,
+)
+def refresh_index_caggs_sweep() -> dict[str, int]:
+    """Beat sweep: queue a continuous-aggregate refresh per active tenant."""
+    return _run_task(_refresh_index_caggs_sweep_async())
+
+
+async def _refresh_index_caggs_sweep_async() -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        refresh_index_caggs_for_tenant.delay(schema)
+        enqueued += 1
+    return {"tenants_scanned": len(schemas), "enqueued": enqueued}

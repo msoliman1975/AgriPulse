@@ -22,5 +22,17 @@
     "valueLine": "Observed",
     "loadFailed": "Could not load the series.",
     "empty": "No data in this window."
+  },
+  "trends": {
+    "title": "Weather index trends",
+    "spanAria": "Weather trend time span",
+    "modeAria": "Weather trend scale mode",
+    "mode": {
+      "units": "Units",
+      "anomaly": "Compare"
+    },
+    "hintUnits": "One chart per index, each on its own scale in its real unit. Values are not comparable between rows.",
+    "hintAnomaly": "Every index as a z-score against its seasonal normal. Zero is normal, so all indices share one scale and can be compared directly.",
+    "noData": "No weather index data for this period yet."
   }
 }
