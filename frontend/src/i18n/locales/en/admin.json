@@ -191,7 +191,7 @@
       "newButton": "New tenant",
       "searchPlaceholder": "Search by slug or name…",
       "filterAll": "All",
-      "empty": "No tenants match your filters.",
+      "empty": "No tenants yet. Create the first one to get started.",
       "loading": "Loading tenants…",
       "errorTitle": "Couldn't load tenants",
       "headers": {
@@ -205,7 +205,9 @@
         "showing": "Showing {{first}}–{{last}} of {{total}}",
         "prev": "Previous",
         "next": "Next"
-      }
+      },
+      "noResults": "No tenants match your filters.",
+      "clearFilters": "Clear filters"
     },
     "create": {
       "title": "New tenant",

@@ -54,6 +54,17 @@ export function resolveAsyncSlot<T>(
   return { kind: "data", data: state.data };
 }
 
+/**
+ * Project the success payload without disturbing loading/error.
+ *
+ * List endpoints return an envelope (`{ items, total, … }`) while
+ * `<DataTable>`/`<RowList>` want the rows, so this conversion happens on every
+ * index page.
+ */
+export function mapAsyncState<A, B>(state: AsyncState<A>, fn: (data: A) => B): AsyncState<B> {
+  return state.status === "success" ? { status: "success", data: fn(state.data) } : state;
+}
+
 /** Adapter for react-query. */
 export function queryState<T>(query: UseQueryResult<T>): AsyncState<T> {
   if (query.isError) {

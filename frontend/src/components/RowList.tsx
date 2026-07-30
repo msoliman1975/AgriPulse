@@ -22,6 +22,8 @@ interface RowListProps<T> {
   filtered?: boolean;
   empty: ReactNode;
   noResults?: ReactNode;
+  /** Page-specific failure copy; falls back to the error's own detail. */
+  errorMessage?: ReactNode;
   skeletonRows?: number;
   className?: string;
 }
@@ -47,6 +49,7 @@ export function RowList<T>({
   filtered,
   empty,
   noResults,
+  errorMessage,
   skeletonRows = 3,
   className,
 }: RowListProps<T>): ReactNode {
@@ -70,7 +73,7 @@ export function RowList<T>({
       <Card noPadding className={className}>
         <div role="alert" className="flex flex-col items-center gap-3 p-8 text-center">
           <span className="text-sm text-ap-crit">
-            {resolveErrorMessage(slot.error, t("state.loadFailed"))}
+            {errorMessage ?? resolveErrorMessage(slot.error, t("state.loadFailed"))}
           </span>
           {slot.retry ? (
             <Button variant="secondary" size="sm" onClick={slot.retry}>

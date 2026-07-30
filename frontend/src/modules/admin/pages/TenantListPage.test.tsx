@@ -128,15 +128,50 @@ describe("<TenantListPage>", () => {
     expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ status: "suspended" }));
   });
 
-  it("renders the empty state when the response has zero items", async () => {
+  // "Nothing exists yet" and "nothing matched" are different states. This page
+  // used to render the no-match copy for both, so a fresh platform with zero
+  // tenants was told its filters were too narrow.
+  it("offers the create CTA when no tenants exist at all", async () => {
     listMock.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
     renderList();
+
+    expect(
+      await screen.findByText("No tenants yet. Create the first one to get started."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No tenants match your filters.")).not.toBeInTheDocument();
+  });
+
+  it("offers a clear-filters escape when a search matches nothing", async () => {
+    listMock.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
+    renderList();
+
+    await userEvent.type(await screen.findByRole("searchbox"), "zzz");
+
     expect(await screen.findByText("No tenants match your filters.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
   });
 
   it("surfaces an error banner on failure", async () => {
     listMock.mockRejectedValue(new Error("boom"));
     renderList();
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load tenants");
+  });
+
+  // Decision 1C: the row is clickable, but the identity cell carries a real
+  // link so keyboard, middle-click and "copy link address" keep working.
+  it("links the identity cell and keeps the column headers during load", async () => {
+    listMock.mockResolvedValue({
+      items: [buildTenant({ slug: "acme" })],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
+    renderList();
+
+    const link = await screen.findByRole("link", { name: "acme" });
+    expect(link).toHaveAttribute("href", "/platform/tenants/11111111-1111-1111-1111-111111111111");
+
+    await userEvent.click(link);
+    expect(await screen.findByText("detail-page")).toBeInTheDocument();
   });
 });

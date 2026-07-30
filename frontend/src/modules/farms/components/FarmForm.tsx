@@ -14,6 +14,10 @@ import {
   type WaterSource,
 } from "@/api/farms";
 import { listCountries, type Country } from "@/api/countries";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
+import { FormFooter } from "@/components/FormFooter";
 import { CODE_RE } from "@/lib/codes";
 import { singleBoundary } from "@/lib/aoi";
 import { MapDraw } from "./MapDraw";
@@ -22,7 +26,6 @@ import { AoiUploader } from "./AoiUploader";
 const FARM_TYPES: FarmType[] = ["commercial", "research", "contract"];
 const OWNERSHIP_TYPES: OwnershipType[] = ["owned", "leased", "partnership", "other"];
 const WATER_SOURCES: WaterSource[] = ["well", "canal", "nile", "desalinated", "rainfed", "mixed"];
-
 
 export type FarmFormValues = FarmCreatePayload;
 
@@ -35,6 +38,14 @@ interface Props {
   error?: string | null;
 }
 
+/**
+ * The reference FormPage body: <Card title/footer> + <Field> + <FormFooter>.
+ *
+ * Shared by farm create and edit, so converting it once covers both. Field
+ * ids, `aria-describedby` and `aria-invalid` are wired by <Field> rather than
+ * hand-numbered, and help text sits outside the <label> so it doesn't end up
+ * in the control's accessible name.
+ */
 export function FarmForm({
   initial,
   submitLabel,
@@ -129,7 +140,7 @@ export function FarmForm({
       established_date: established || null,
       tags: tags
         .split(",")
-        .map((t) => t.trim())
+        .map((tag) => tag.trim())
         .filter(Boolean),
     };
 
@@ -137,190 +148,194 @@ export function FarmForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6" aria-label={submitLabel}>
-      <div className="card grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="farm-code">
-            {t("form.code")}
-          </label>
-          <input
-            id="farm-code"
-            className="input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-            disabled={!!initial?.code}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4" aria-label={submitLabel}>
+      <Card
+        title={t("form.identity")}
+        bodyClassName="grid grid-cols-1 gap-4 sm:grid-cols-2"
+        footer={
+          <FormFooter
+            message={boundaryError ?? error ?? undefined}
+            cancel={
+              onCancel ? (
+                <Button variant="ghost" onClick={onCancel}>
+                  {t("form.cancel")}
+                </Button>
+              ) : null
+            }
+            submit={
+              <Button type="submit" disabled={busy}>
+                {busy ? t("actions.saving") : submitLabel}
+              </Button>
+            }
           />
-          <p className="mt-1 text-xs text-ap-muted">{t("form.codeHelp")}</p>
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-name">
-            {t("form.name")}
-          </label>
-          <input
-            id="farm-name"
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="farm-description">
-            {t("form.description")}
-          </label>
-          <textarea
-            id="farm-description"
-            className="input"
-            rows={2}
-            value={description ?? ""}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-country">
-            {t("form.country")}
-          </label>
-          <select
-            id="farm-country"
-            className="input"
-            value={country ?? ""}
-            onChange={(e) => setCountry(e.target.value)}
-          >
-            <option value="">{t("form.countryNone")}</option>
-            {countries.map((c) => (
-              <option key={c.code} value={c.code}>
-                {isAr ? c.name_ar : c.name_en}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-gov">
-            {t("form.governorate")}
-          </label>
-          <input
-            id="farm-gov"
-            className="input"
-            value={governorate ?? ""}
-            onChange={(e) => setGovernorate(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-district">
-            {t("form.district")}
-          </label>
-          <input
-            id="farm-district"
-            className="input"
-            value={district ?? ""}
-            onChange={(e) => setDistrict(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-city">
-            {t("form.nearestCity")}
-          </label>
-          <input
-            id="farm-city"
-            className="input"
-            value={nearestCity ?? ""}
-            onChange={(e) => setNearestCity(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-address">
-            {t("form.addressLine")}
-          </label>
-          <input
-            id="farm-address"
-            className="input"
-            value={addressLine ?? ""}
-            onChange={(e) => setAddressLine(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-type">
-            {t("form.farmType")}
-          </label>
-          <select
-            id="farm-type"
-            className="input"
-            value={farmType}
-            onChange={(e) => setFarmType(e.target.value as FarmType)}
-          >
-            {FARM_TYPES.map((v) => (
-              <option key={v} value={v}>
-                {t(`farmType.${v}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-ownership">
-            {t("form.ownershipType")}
-          </label>
-          <select
-            id="farm-ownership"
-            className="input"
-            value={ownershipType}
-            onChange={(e) => setOwnershipType(e.target.value as OwnershipType)}
-          >
-            <option value="">—</option>
-            {OWNERSHIP_TYPES.map((v) => (
-              <option key={v} value={v}>
-                {t(`ownershipType.${v}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-water">
-            {t("form.primaryWaterSource")}
-          </label>
-          <select
-            id="farm-water"
-            className="input"
-            value={waterSource}
-            onChange={(e) => setWaterSource(e.target.value as WaterSource)}
-          >
-            <option value="">—</option>
-            {WATER_SOURCES.map((v) => (
-              <option key={v} value={v}>
-                {t(`waterSource.${v}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="farm-established">
-            {t("form.establishedDate")}
-          </label>
-          <input
-            id="farm-established"
-            className="input"
-            type="date"
-            value={established ?? ""}
-            onChange={(e) => setEstablished(e.target.value)}
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="farm-tags">
-            {t("form.tags")}
-          </label>
-          <input
-            id="farm-tags"
-            className="input"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-          />
-          <p className="mt-1 text-xs text-ap-muted">{t("form.tagsHelp")}</p>
-        </div>
-      </div>
+        }
+      >
+        <Field label={t("form.code")} required help={t("form.codeHelp")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              disabled={!!initial?.code}
+            />
+          )}
+        </Field>
+        <Field label={t("form.name")} required>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Field label={t("form.description")} className="sm:col-span-2">
+          {(props) => (
+            <textarea
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              rows={2}
+              value={description ?? ""}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.country")}>
+          {(props) => (
+            <select
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={country ?? ""}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              <option value="">{t("form.countryNone")}</option>
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {isAr ? c.name_ar : c.name_en}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t("form.governorate")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={governorate ?? ""}
+              onChange={(e) => setGovernorate(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.district")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={district ?? ""}
+              onChange={(e) => setDistrict(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.nearestCity")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={nearestCity ?? ""}
+              onChange={(e) => setNearestCity(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.addressLine")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={addressLine ?? ""}
+              onChange={(e) => setAddressLine(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.farmType")}>
+          {(props) => (
+            <select
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={farmType}
+              onChange={(e) => setFarmType(e.target.value as FarmType)}
+            >
+              {FARM_TYPES.map((v) => (
+                <option key={v} value={v}>
+                  {t(`farmType.${v}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t("form.ownershipType")}>
+          {(props) => (
+            <select
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={ownershipType}
+              onChange={(e) => setOwnershipType(e.target.value as OwnershipType)}
+            >
+              <option value="">—</option>
+              {OWNERSHIP_TYPES.map((v) => (
+                <option key={v} value={v}>
+                  {t(`ownershipType.${v}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t("form.primaryWaterSource")}>
+          {(props) => (
+            <select
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={waterSource}
+              onChange={(e) => setWaterSource(e.target.value as WaterSource)}
+            >
+              <option value="">—</option>
+              {WATER_SOURCES.map((v) => (
+                <option key={v} value={v}>
+                  {t(`waterSource.${v}`)}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label={t("form.establishedDate")}>
+          {(props) => (
+            <input
+              {...props}
+              type="date"
+              className={FIELD_CONTROL_CLASS}
+              value={established ?? ""}
+              onChange={(e) => setEstablished(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.tags")} help={t("form.tagsHelp")} className="sm:col-span-2">
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+          )}
+        </Field>
+      </Card>
 
-      <div className="card">
-        <h2 className="text-lg font-semibold text-ap-ink">{t("form.boundary")}</h2>
-        <p className="mt-1 text-sm text-ap-muted">{t("form.boundaryHelp")}</p>
+      <Card title={t("form.boundary")}>
+        <p className="text-sm text-ap-muted">{t("form.boundaryHelp")}</p>
         <div className="mt-4">
           <MapDraw onChange={setDrawnPolygon} />
         </div>
@@ -329,29 +344,7 @@ export function FarmForm({
             onFeaturesParsed={(features) => setUploadedBoundary(singleBoundary(features))}
           />
         </div>
-      </div>
-
-      {boundaryError ? (
-        <p role="alert" className="text-sm text-ap-crit">
-          {boundaryError}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="text-sm text-ap-crit">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="flex gap-2">
-        <button type="submit" className="btn btn-primary" disabled={busy}>
-          {busy ? t("actions.saving") : submitLabel}
-        </button>
-        {onCancel ? (
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
-            {t("form.cancel")}
-          </button>
-        ) : null}
-      </div>
+      </Card>
     </form>
   );
 }

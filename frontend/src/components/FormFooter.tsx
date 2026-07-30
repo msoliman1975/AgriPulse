@@ -19,7 +19,11 @@ export function FormFooter({ cancel, submit, message, className }: FormFooterPro
         className,
       )}
     >
-      {message ? <div className="me-auto text-xs text-ap-crit">{message}</div> : null}
+      {message ? (
+        <div role="alert" className="me-auto text-xs text-ap-crit">
+          {message}
+        </div>
+      ) : null}
       {cancel}
       {submit}
     </div>

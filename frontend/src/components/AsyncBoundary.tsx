@@ -27,6 +27,8 @@ interface AsyncBoundaryProps<T> {
   empty: ReactNode;
   /** Falls back to `empty` when a page has no filters. */
   noResults?: ReactNode;
+  /** Page-specific failure copy; falls back to the error's own detail. */
+  errorMessage?: ReactNode;
   children: (data: T) => ReactNode;
 }
 
@@ -48,6 +50,7 @@ export function AsyncBoundary<T>({
   filtered,
   empty,
   noResults,
+  errorMessage,
   children,
 }: AsyncBoundaryProps<T>): ReactNode {
   const { t } = useTranslation("common");
@@ -70,7 +73,7 @@ export function AsyncBoundary<T>({
     case "error":
       return (
         <ErrorState
-          message={resolveErrorMessage(slot.error, t("state.loadFailed"))}
+          message={errorMessage ?? resolveErrorMessage(slot.error, t("state.loadFailed"))}
           action={
             slot.retry ? (
               <Button variant="secondary" size="sm" onClick={slot.retry}>

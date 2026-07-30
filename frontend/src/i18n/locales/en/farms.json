@@ -78,7 +78,8 @@
       "boundaryInvalid": "Boundary is not a valid polygon.",
       "boundarySelfIntersect": "Boundary self-intersects.",
       "boundaryOutOfEgypt": "Boundary is outside Egypt's bounding box."
-    }
+    },
+    "identity": "Farm details"
   },
   "farmType": {
     "commercial": "Commercial",

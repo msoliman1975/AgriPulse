@@ -29,6 +29,10 @@ interface DataTableProps<T> {
   filtered?: boolean;
   empty?: ReactNode;
   noResults?: ReactNode;
+  /** Page-specific failure copy. Falls back to the problem detail carried by
+   *  the error, then to a generic message. Worth setting: a raw
+   *  `Error("Network Error")` is not something to show an operator. */
+  errorMessage?: ReactNode;
   skeletonRows?: number;
   /** Decision 1C: renders the identity cell as a real <Link> AND makes the
    *  whole row clickable. */
@@ -62,6 +66,7 @@ export function DataTable<T>({
   filtered,
   empty,
   noResults,
+  errorMessage,
   skeletonRows = 3,
   rowHref,
   identityKey,
@@ -145,7 +150,7 @@ export function DataTable<T>({
             <Td colSpan={colSpan} className="py-8">
               <div role="alert" className="flex flex-col items-center gap-3 text-center">
                 <span className="text-sm text-ap-crit">
-                  {resolveErrorMessage(slot.error, t("state.loadFailed"))}
+                  {errorMessage ?? resolveErrorMessage(slot.error, t("state.loadFailed"))}
                 </span>
                 {slot.retry ? (
                   <Button variant="secondary" size="sm" onClick={slot.retry}>

@@ -40,14 +40,21 @@ export function Field({
 
   return (
     <div className={clsx("flex flex-col gap-1", className)}>
-      <label htmlFor={id} className="text-xs font-medium text-ap-ink">
-        {label}
+      {/* The asterisk sits OUTSIDE the <label>. Inside, it lands in the
+          control's accessible name ("Name *"), which is both wrong for screen
+          readers and enough to break `getByLabelText("Name")`. Required-ness
+          is carried by the control's own `required` attribute; the glyph is
+          decoration. */}
+      <span className="flex items-center gap-0.5">
+        <label htmlFor={id} className="text-xs font-medium text-ap-ink">
+          {label}
+        </label>
         {required ? (
-          <span className="ms-0.5 text-ap-crit" aria-hidden="true">
+          <span className="text-ap-crit" aria-hidden="true">
             *
           </span>
         ) : null}
-      </label>
+      </span>
       {children({
         id,
         "aria-describedby": describedBy,

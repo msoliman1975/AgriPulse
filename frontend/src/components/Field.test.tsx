@@ -13,6 +13,19 @@ describe("Field", () => {
     expect(screen.getByLabelText("Farm code")).toHaveValue("BSH-01");
   });
 
+  // The required marker is decoration. Folding it into the label text makes
+  // the accessible name "Farm code *" and breaks every getByLabelText call.
+  it("keeps the required asterisk out of the label text", () => {
+    render(
+      <Field label="Farm code" required>
+        {(props) => <input {...props} required />}
+      </Field>,
+    );
+    const input = screen.getByLabelText("Farm code");
+    expect(input).toBeRequired();
+    expect(input).toHaveAccessibleName("Farm code");
+  });
+
   // Help text inside a <label> pollutes the accessible name — the reason this
   // component renders it as a sibling and wires it via aria-describedby.
   it("keeps help text out of the accessible name", () => {
