@@ -24,7 +24,9 @@ const SEV_KIND: Record<AlertSeverity, "info" | "warn" | "crit"> = {
 export function AlertsFeedCard({ farmId }: Props): ReactNode {
   const { t } = useTranslation("insights");
   const navigate = useNavigate();
-  const { data, isLoading, isError } = useAlerts({ status: "open" });
+  // Scope to the farm — an unscoped list is tenant-wide, so the feed showed
+  // other farms' alerts whose "Resolve" jumps to a lane this board lacks.
+  const { data, isLoading, isError } = useAlerts({ farm_id: farmId, status: "open" });
 
   return (
     <section
