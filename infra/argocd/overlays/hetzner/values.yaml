@@ -261,13 +261,26 @@ global:
   #   failure before re-raising. Third instance of the same CAST-plus-string
   #   bind family after #331 and #332. Task runs in the WORKERS; api bumped
   #   only to keep one SHA. No migration; frontend stays 131813b, tile 9d140cc.
+  # ab866ad = #336 two things. (a) The index continuous aggregates
+  #   (block_index_daily/_weekly) have ROLLING refresh policies (3d / 21d,
+  #   tenant 0003), so a historical backfill writes rows outside them and they
+  #   are never materialized -- and since they are real-time aggregates
+  #   (0004), buckets older than the materialization threshold come from the
+  #   materialized store alone, i.e. the history is invisible although every
+  #   raw row exists (seen live: 47,852 raw rows, daily CAGG covering one day).
+  #   New indices.refresh_index_caggs_for_tenant + hourly Beat sweep on the
+  #   light queue (~2.5s/tenant for a full refresh). (b) Weather-index trends
+  #   card on Insights: small multiples in real units + a z-score "Compare"
+  #   view on one axis (no dual-axis), same spans as the vegetation chart;
+  #   zscore already shipped per point so no API change. No migration.
+  #   Beat/light + FE -> api + workers + frontend bumped; tile-server 9d140cc.
   images:
     api:
-      tag: "ccb8643"
+      tag: "ab866ad"
     workers:
-      tag: "ccb8643"
+      tag: "ab866ad"
     frontend:
-      tag: "131813b"
+      tag: "ab866ad"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
