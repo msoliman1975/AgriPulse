@@ -11,6 +11,7 @@ accounting exists one tenant must not be able to exhaust it for everyone.
   POST /tenants/{tenant_id}/runs       — start a run (409 if farm is busy)
   GET  /runs                           — cross-tenant run list
   GET  /runs/{run_id}                  — one run with per-source progress
+  POST /runs/{run_id}:cancel           — release a stuck run (frees the farm)
 """
 
 from __future__ import annotations
@@ -241,6 +242,31 @@ async def get_run(
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "run not found")
     return run
+
+
+@router.post("/runs/{run_id}:cancel", response_model=RunRow)
+async def cancel_run(
+    run_id: UUID,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: BackfillService = Depends(_service),
+) -> dict[str, Any]:
+    """Release a run that is stuck queued/running so its farm is free again.
+
+    One run per farm is enforced by a partial unique index, so a run that
+    never settles blocks that farm for good. Progress reporting is
+    best-effort and a worker can die mid-task, so there has to be an
+    operator escape hatch that is not "edit the table by hand".
+    """
+    row = await service.cancel_run(run_id=run_id, actor_email=getattr(context, "email", None))
+    if row is not None:
+        return row
+    # Distinguish "no such run" from "already finished" — retrying helps in
+    # neither case, but they mean very different things to the operator.
+    if await service.get_run(run_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "run not found")
+    raise HTTPException(
+        status.HTTP_409_CONFLICT, "This run has already finished; there is nothing to cancel."
+    )
 
 
 # --- helpers ---------------------------------------------------------------
