@@ -208,11 +208,23 @@ global:
   #   unarchived farm). Reason now repeats above the button row +
   #   aria-describedby. FE only; api already 2cb2740, workers stay 1bad71a
   #   (nothing worker-side since #329), tile-server 9d140cc.
+  # 65af132 = #332 a finished backfill run never settled: it sat on `running`
+  #   with its data fully loaded, and because one queued/running run per farm
+  #   is enforced by a partial unique index that farm was blocked against all
+  #   further runs. finish() stamps progress->src->state and _settle() tests
+  #   for exactly that key, but the stamping UPDATE had never parsed --
+  #   jsonb_build_object('state', :state) is IndeterminateDatatype under
+  #   psycopg3's server-side binds, and a postfix :err::text does not survive
+  #   SQLAlchemy text(). Both now use CAST(x AS t). Progress writes are
+  #   best-effort (swallow + log), which is why it was silent. Also adds
+  #   POST /runs/{id}:cancel as the operator escape hatch (none existed).
+  #   No migration. finish() runs in the WORKERS and cancel in the api ->
+  #   api + workers bumped; frontend stays 2cb2740, tile-server 9d140cc.
   images:
     api:
-      tag: "2cb2740"
+      tag: "65af132"
     workers:
-      tag: "1bad71a"
+      tag: "65af132"
     frontend:
       tag: "2cb2740"
     tileServer:
