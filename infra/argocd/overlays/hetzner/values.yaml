@@ -201,13 +201,20 @@ global:
   #   5 of 6 tests skipped, so the INSERT never ran in CI; a seeded test that
   #   cannot skip now covers it. No migration; api request-path only -> api
   #   bumped; workers + frontend stay 1bad71a, tile-server 9d140cc.
+  # frontend 2cb2740 = carries 94220af: the purge dialog's blocking banner sits
+  #   at the top while the disabled Delete button is at the bottom, so once you
+  #   had typed the confirmation the reason was off-screen and the button read
+  #   as broken rather than as refusing on purpose (reported against a live,
+  #   unarchived farm). Reason now repeats above the button row +
+  #   aria-describedby. FE only; api already 2cb2740, workers stay 1bad71a
+  #   (nothing worker-side since #329), tile-server 9d140cc.
   images:
     api:
       tag: "2cb2740"
     workers:
       tag: "1bad71a"
     frontend:
-      tag: "1bad71a"
+      tag: "2cb2740"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
