@@ -81,5 +81,27 @@
     "retry": "إعادة المحاولة",
     "close": "إغلاق",
     "loading": "جارٍ التحميل…"
+  },
+  "toolbar": {
+    "search": "بحث",
+    "filters": "عوامل التصفية",
+    "clearAll": "مسح الكل",
+    "showing": "عرض {{shown}} من {{total}}",
+    "removeFilter": "إزالة عامل التصفية {{name}}"
+  },
+  "state": {
+    "loadFailed": "تعذّر تحميل البيانات. فشل الطلب.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا يوجد شيء هنا بعد.",
+    "noResults": "لا توجد نتائج مطابقة لعوامل التصفية."
+  },
+  "pagination": {
+    "label": "ترقيم الصفحات",
+    "showing": "عرض {{first}}–{{last}} من {{total}}",
+    "prev": "السابق",
+    "next": "التالي"
+  },
+  "table": {
+    "openRow": "فتح"
   }
 }

@@ -35,6 +35,7 @@ import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTr
 import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
+import { PatternsPage } from "@/modules/labs/patterns/PatternsPage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
@@ -157,6 +158,11 @@ export function App(): ReactNode {
                 <Route path="/labs/map-next/:farmId" element={<FarmConsolePage />} />
                 <Route path="/labs/map-legacy" element={<MapExperiencePage />} />
                 <Route path="/labs/map-legacy/:farmId" element={<MapExperiencePage />} />
+                {/* Page-template gallery. Every standard template in every
+                  state — the reference for "what does an index page look
+                  like" in code review. See
+                  docs/proposals/ui-standard-implementation-plan.md. */}
+                <Route path="/labs/patterns" element={<PatternsPage />} />
                 <Route path="/insights/:farmId" element={<InsightsPage />} />
                 {/* Board PR-7 cutover: /plan/:farmId redirects to /board/:farmId.
                   The legacy PlanPage (modules/plan/*) was removed once the

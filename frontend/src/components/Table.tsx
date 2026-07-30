@@ -1,9 +1,5 @@
 import clsx from "clsx";
-import type {
-  HTMLAttributes,
-  TdHTMLAttributes,
-  ThHTMLAttributes,
-} from "react";
+import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import type { ReactNode } from "react";
 
 /*
@@ -20,10 +16,7 @@ export function Table({
 }: HTMLAttributes<HTMLTableElement>): ReactNode {
   return (
     <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-      <table
-        className={clsx("min-w-full divide-y divide-ap-line text-sm", className)}
-        {...rest}
-      >
+      <table className={clsx("min-w-full divide-y divide-ap-line text-sm", className)} {...rest}>
         {children}
       </table>
     </div>
@@ -37,10 +30,7 @@ export function Thead({
 }: HTMLAttributes<HTMLTableSectionElement>): ReactNode {
   return (
     <thead
-      className={clsx(
-        "bg-ap-bg/40 text-[11px] uppercase tracking-wider text-ap-muted",
-        className,
-      )}
+      className={clsx("bg-ap-bg/40 text-[11px] uppercase tracking-wider text-ap-muted", className)}
       {...rest}
     >
       {children}
@@ -65,12 +55,7 @@ interface TrProps extends HTMLAttributes<HTMLTableRowElement> {
   interactive?: boolean;
 }
 
-export function Tr({
-  interactive = false,
-  className,
-  children,
-  ...rest
-}: TrProps): ReactNode {
+export function Tr({ interactive = false, className, children, ...rest }: TrProps): ReactNode {
   return (
     <tr
       className={clsx(
@@ -90,11 +75,7 @@ export function Th({
   ...rest
 }: ThHTMLAttributes<HTMLTableCellElement>): ReactNode {
   return (
-    <th
-      scope="col"
-      className={clsx("px-3 py-2 text-start font-semibold", className)}
-      {...rest}
-    >
+    <th scope="col" className={clsx("px-3 py-2 text-start font-semibold", className)} {...rest}>
       {children}
     </th>
   );
