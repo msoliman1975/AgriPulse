@@ -15,7 +15,7 @@ export function Table({
   ...rest
 }: HTMLAttributes<HTMLTableElement>): ReactNode {
   return (
-    <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
+    <div className="overflow-x-auto rounded-card border border-ap-line bg-ap-panel">
       <table className={clsx("min-w-full divide-y divide-ap-line text-sm", className)} {...rest}>
         {children}
       </table>

@@ -45,6 +45,21 @@ export default {
           "stage-post": "#cfd1ca",
         },
       },
+      // Type scale as tokens (DS-9). Page titles drifted across text-2xl /
+      // xl / lg / base / sm before <PageHeader> centralised them; naming the
+      // roles means the scale is a decision you make once, not a number you
+      // pick per file. The lint rule stops raw <h1>; these stop the raw size.
+      fontSize: {
+        "page-title": ["1.5rem", { lineHeight: "2rem", letterSpacing: "-0.015em" }],
+        "section-title": ["1.125rem", { lineHeight: "1.75rem" }],
+        "card-title": ["0.875rem", { lineHeight: "1.25rem" }],
+        meta: ["0.6875rem", { lineHeight: "1rem" }],
+      },
+      // One card radius. `rounded-xl` and `rounded-lg` both claimed to be
+      // "the card" and appeared on the same detail page.
+      borderRadius: {
+        card: "0.75rem",
+      },
       fontFamily: {
         // Falls back to OS UI fonts; Arabic-friendly fonts come in last so
         // both scripts render with consistent metrics.

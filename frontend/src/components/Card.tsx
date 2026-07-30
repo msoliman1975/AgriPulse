@@ -56,7 +56,7 @@ export const Card = forwardRef<HTMLElement, CardProps>(function Card(
     <Tag
       ref={ref as never}
       className={clsx(
-        "rounded-xl border border-ap-line bg-ap-panel",
+        "rounded-card border border-ap-line bg-ap-panel",
         !hasChrome && bodyPadding,
         className,
       )}
@@ -64,7 +64,7 @@ export const Card = forwardRef<HTMLElement, CardProps>(function Card(
     >
       {title ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ap-line px-4 py-2.5">
-          <h2 className="text-sm font-semibold text-ap-ink">{title}</h2>
+          <h2 className="text-card-title font-semibold text-ap-ink">{title}</h2>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>
       ) : null}

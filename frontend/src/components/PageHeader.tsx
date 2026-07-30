@@ -32,7 +32,7 @@ export function PageHeader({
     <header className={clsx("flex flex-wrap items-end justify-between gap-3", className)}>
       <div className="min-w-0">
         {above ? <div className="mb-1">{above}</div> : null}
-        <h1 className="flex flex-wrap items-center gap-2.5 text-2xl font-semibold text-ap-ink">
+        <h1 className="flex flex-wrap items-center gap-2.5 text-page-title font-semibold text-ap-ink">
           {title}
           {badge}
         </h1>

@@ -114,7 +114,7 @@ export default tseslint.config(
         },
         {
           selector:
-            "Literal[value=/rounded-(?:xl|lg)\\s+border\\s+border-ap-line\\s+bg-ap-panel/]",
+            "Literal[value=/rounded-(?:xl|lg|card)\\s+border\\s+border-ap-line\\s+bg-ap-panel/]",
           message: "This is <Card>. Inlining it is how we ended up with three card styles.",
         },
         // Shadowing a shipped primitive re-creates the divergence the
