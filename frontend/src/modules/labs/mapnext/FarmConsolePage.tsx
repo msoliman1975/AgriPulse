@@ -56,7 +56,7 @@ import { CreateFarmFlow } from "./CreateFarmFlow";
 import { BulkAoiUploadPanel } from "./BulkAoiUploadPanel";
 import type { BulkPreviewProps } from "../map/MapCanvas";
 import type { ExistingBlock } from "@/lib/aoi/bulk";
-import { Inspector } from "./Inspector";
+import { BlockDock } from "./BlockDock";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
 
@@ -815,25 +815,25 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             </div>
           ) : null}
         </main>
-
-        {selectedId ? (
-          <aside className="w-[372px] flex-none border-s border-ap-line">
-            <Inspector
-              detail={detailQ.data}
-              loading={detailQ.isLoading}
-              error={detailQ.isError}
-              activeIndex={activeIndex}
-              onActiveIndexChange={setActiveIndex}
-              onClose={deselect}
-              farmId={farmId}
-              gridProductId={gridProductId}
-              onReshape={() => void openReshape()}
-              onInactivate={() => setInactivateOpen(true)}
-              resetKey={resetKey}
-            />
-          </aside>
-        ) : null}
       </div>
+
+      {/* Block detail runs full-width under the map, not in a 372px column —
+          see docs/proposals/block-dock.html. */}
+      {selectedId ? (
+        <BlockDock
+          detail={detailQ.data}
+          loading={detailQ.isLoading}
+          error={detailQ.isError}
+          activeIndex={activeIndex}
+          onActiveIndexChange={setActiveIndex}
+          onClose={deselect}
+          farmId={farmId}
+          gridProductId={gridProductId}
+          onReshape={() => void openReshape()}
+          onInactivate={() => setInactivateOpen(true)}
+          resetKey={resetKey}
+        />
+      ) : null}
 
       {settingsOpen ? (
         <SettingsDrawer

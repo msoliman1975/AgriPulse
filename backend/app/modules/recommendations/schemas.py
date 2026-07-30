@@ -157,6 +157,59 @@ class EvaluateBlockResponse(BaseModel):
     recommendations_opened: int
 
 
+class ExplainStep(BaseModel):
+    """One node visited while walking a tree against a block."""
+
+    node_id: str
+    # None on leaf nodes — those are the verdict, not a check.
+    matched: bool | None
+    label_en: str | None
+    label_ar: str | None
+    # Resolved left-hand (and ref-valued right-hand) values, keyed by
+    # dotted ref, e.g. {"index.ndvi.mean": "0.39"}.
+    values: dict[str, Any] = Field(default_factory=dict)
+    # The node's raw condition tree, so the reader can show the threshold
+    # the value was compared against. None on leaves.
+    condition: dict[str, Any] | None = None
+
+
+class ExplainTree(BaseModel):
+    """One tree's verdict for a block.
+
+    ``status``:
+      * ``fired``    — reached a leaf that opens a recommendation/alert
+      * ``clear``    — evaluated to no_action
+      * ``per_cell`` — cell-scoped; evaluated per grid cell, not here
+      * ``skipped``  — targeting (crop/country/soil) excluded this block
+      * ``error``    — the walk hit a malformed node
+    """
+
+    tree_id: UUID
+    code: str
+    name_en: str | None = None
+    name_ar: str | None = None
+    version: int | None = None
+    scope: str = "block"
+    status: str
+    steps: list[ExplainStep] = Field(default_factory=list)
+    kind: str | None = None
+    action_type: str | None = None
+    severity: str | None = None
+    confidence: float | None = None
+    text_en: str | None = None
+    text_ar: str | None = None
+    error: str | None = None
+
+
+class ExplainBlockResponse(BaseModel):
+    """GET /api/v1/blocks/{block_id}/decision-trees:explain response."""
+
+    block_id: UUID
+    evaluated_at: datetime
+    crop_path: str | None = None
+    trees: list[ExplainTree] = Field(default_factory=list)
+
+
 # =====================================================================
 # Decision-tree authoring (PlatformAdmin)
 # =====================================================================

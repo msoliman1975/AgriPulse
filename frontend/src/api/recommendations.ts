@@ -158,3 +158,66 @@ export async function listDecisionTrees(): Promise<DecisionTree[]> {
   const { data } = await apiClient.get<DecisionTree[]>("/v1/decision-trees");
   return data;
 }
+
+// ---- Read-only tree explain (Farm Console "Conditions" tab) ---------------
+// Re-walks every visible tree against a block's current signals and reports
+// why each did or didn't fire. Writes nothing — unlike `:evaluate` (POST).
+
+export type ExplainStatus = "fired" | "clear" | "per_cell" | "skipped" | "error";
+
+/** One comparison in the dialect the condition evaluator speaks. */
+export interface ExplainCondition {
+  op?: string;
+  left?: unknown;
+  right?: unknown;
+  low?: unknown;
+  high?: unknown;
+  values?: unknown[];
+  all_of?: ExplainCondition[];
+  any_of?: ExplainCondition[];
+  not?: ExplainCondition;
+}
+
+export interface ExplainStep {
+  node_id: string;
+  /** null on leaf nodes — those are the verdict, not a check. */
+  matched: boolean | null;
+  label_en: string | null;
+  label_ar: string | null;
+  /** Resolved values keyed by dotted ref, e.g. `indices.ndvi.mean`. */
+  values: Record<string, string>;
+  /** The predicate the value was compared against; null on leaves. */
+  condition: ExplainCondition | null;
+}
+
+export interface ExplainTree {
+  tree_id: string;
+  code: string;
+  name_en: string | null;
+  name_ar: string | null;
+  version: number | null;
+  scope: string;
+  status: ExplainStatus;
+  steps: ExplainStep[];
+  kind: string | null;
+  action_type: RecommendationActionType | null;
+  severity: RecommendationSeverity | null;
+  confidence: number | null;
+  text_en: string | null;
+  text_ar: string | null;
+  error: string | null;
+}
+
+export interface ExplainBlockResponse {
+  block_id: string;
+  evaluated_at: string;
+  crop_path: string | null;
+  trees: ExplainTree[];
+}
+
+export async function explainBlock(blockId: string): Promise<ExplainBlockResponse> {
+  const { data } = await apiClient.get<ExplainBlockResponse>(
+    `/v1/blocks/${blockId}/decision-trees:explain`,
+  );
+  return data;
+}

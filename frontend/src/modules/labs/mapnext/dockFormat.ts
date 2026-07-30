@@ -1,0 +1,149 @@
+// Pure helpers for the Block Dock. Kept out of the component files so the
+// tricky bits — reading a condition step back into "actual vs. threshold" —
+// are unit-testable without rendering anything.
+import type { ExplainStep } from "@/api/recommendations";
+
+export function fmt(v: number | null | undefined, digits = 2): string {
+  return v == null ? "—" : v.toFixed(digits);
+}
+
+export function shortDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
+/** ISO yyyy-mm-dd, `days` before `to` (default today). */
+export function isoDaysBefore(days: number, to: Date = new Date()): string {
+  const d = new Date(to.getTime() - days * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+export function isoDay(d: Date = new Date()): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// ---- condition reading ----------------------------------------------------
+
+/** Mirrors `_ref_key` in backend/app/shared/conditions/evaluator.py — the
+ * dotted key a resolved value is filed under in `ExplainStep.values`. */
+export function refKey(ref: unknown): string | null {
+  if (ref == null || typeof ref !== "object") return null;
+  const r = ref as Record<string, unknown>;
+  const src = r.source;
+  if (typeof src !== "string") return null;
+  switch (src) {
+    case "indices":
+      return `indices.${String(r.index_code)}.${String(r.key)}`;
+    case "weather":
+      return `weather.${String(r.scope)}.${String(r.field)}`;
+    case "weather_index":
+      return `weather_index.${String(r.index_code)}.${String(r.key)}`;
+    case "weather_risk":
+      return `weather_risk.${String(r.risk_code)}.${String(r.field)}`;
+    case "signals":
+      return `signals.${String(r.code)}.${String(r.key)}`;
+    case "grid":
+      return `grid.${String(r.index_code)}.${String(r.field)}`;
+    case "params":
+      return `params.${String(r.name)}`;
+    case "block":
+      return `block.${String(r.field)}`;
+    default:
+      return null;
+  }
+}
+
+const OP_SYMBOL: Record<string, string> = {
+  lt: "<",
+  le: "≤",
+  gt: ">",
+  ge: "≥",
+  eq: "=",
+  ne: "≠",
+};
+
+/** A comparison operand as text: a literal prints itself, a ref prints the
+ * value it resolved to (so a `$params.threshold` reads as a number, not a
+ * variable name). Returns null when neither is available. */
+function operandText(raw: unknown, values: Record<string, string>): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "object") {
+    // Both sides of a comparison may be refs — the evaluator resolves them
+    // into the same `values` map, keyed by dotted ref.
+    const key = refKey(raw);
+    return key ? (values[key] ?? null) : null;
+  }
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw);
+  }
+  return null;
+}
+
+export interface ConditionReading {
+  /** e.g. "0.39" — what the block actually measured. */
+  actual: string | null;
+  /** e.g. "≥ 0.45" — the bar it had to clear. */
+  threshold: string | null;
+  /** Every resolved ref, for compound conditions we can't summarise. */
+  values: [string, string][];
+}
+
+/** Reduce one visited node to the numbers a reader needs.
+ *
+ * Simple comparisons ("ndvi ≥ 0.45") get an actual/threshold pair. Compound
+ * nodes (all_of / any_of / not) have no single threshold, so they fall back
+ * to listing whatever refs resolved — better than showing nothing. */
+export function readCondition(step: ExplainStep): ConditionReading {
+  const values = Object.entries(step.values ?? {});
+  const cond = step.condition;
+  if (!cond || typeof cond.op !== "string") {
+    return { actual: null, threshold: null, values };
+  }
+
+  const leftKey = refKey(cond.left);
+  const actual = leftKey ? (step.values?.[leftKey] ?? null) : null;
+
+  if (cond.op === "between") {
+    const lo = operandText(cond.low, step.values ?? {});
+    const hi = operandText(cond.high, step.values ?? {});
+    return {
+      actual,
+      threshold: lo != null && hi != null ? `${lo}–${hi}` : null,
+      values,
+    };
+  }
+
+  if (cond.op === "in") {
+    const list = Array.isArray(cond.values)
+      ? cond.values.map((v) => operandText(v, step.values ?? {})).filter((v): v is string => v != null)
+      : [];
+    return { actual, threshold: list.length ? list.join(", ") : null, values };
+  }
+
+  const symbol = OP_SYMBOL[cond.op];
+  const right = operandText(cond.right, step.values ?? {});
+  return {
+    actual,
+    threshold: symbol && right != null ? `${symbol} ${right}` : null,
+    values,
+  };
+}
+
+/** Decision steps are the checks; the trailing leaf is the verdict. */
+export function decisionSteps(steps: ExplainStep[]): ExplainStep[] {
+  return steps.filter((s) => s.matched !== null);
+}
+
+export function leafStep(steps: ExplainStep[]): ExplainStep | null {
+  const leaves = steps.filter((s) => s.matched === null);
+  return leaves.length ? leaves[leaves.length - 1] : null;
+}
+
+/** How many checks a tree failed — drives the tab's count badge. */
+export function failingCount(steps: ExplainStep[]): number {
+  return steps.filter((s) => s.matched === false).length;
+}

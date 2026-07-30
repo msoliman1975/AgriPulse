@@ -42,6 +42,7 @@ from app.modules.recommendations.schemas import (
     DecisionTreeVersionResponse,
     DryRunCandidateBlock,
     EvaluateBlockResponse,
+    ExplainBlockResponse,
     RecommendationResponse,
     RecommendationScheduleRequest,
     RecommendationTransitionRequest,
@@ -382,6 +383,27 @@ async def evaluate_block(
         "trees_skipped_crop": summary["trees_skipped_crop"],
         "recommendations_opened": summary["recommendations_opened"],
     }
+
+
+@router.get(
+    "/blocks/{block_id}/decision-trees:explain",
+    response_model=ExplainBlockResponse,
+    summary="Why each decision tree did or didn't fire on this block (read-only).",
+)
+async def explain_block(
+    block_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """Read model behind the Farm Console's Conditions tab.
+
+    Unlike ``:evaluate`` (POST) this opens nothing — it re-walks the trees
+    against the block's current signals purely to report the reasoning,
+    including for trees that came out clear and so leave no row behind.
+    """
+    _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    return await service.explain_block(block_id=block_id, tenant_id=context.tenant_id)
 
 
 # =====================================================================

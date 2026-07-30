@@ -19,6 +19,7 @@ through this service.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Protocol
@@ -31,6 +32,7 @@ from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.engine import (
+    EvaluationResult,
     TreePathStep,
     evaluate_tree,
 )
@@ -55,6 +57,60 @@ from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 
 
+@dataclass(slots=True)
+class _BlockEvaluation:
+    """Everything needed to walk trees against one block.
+
+    Built once by ``_prepare_block_evaluation`` and shared by the
+    write path (``evaluate_block``) and the read-only explain path
+    (``explain_block``) so the two can never drift on targeting,
+    context construction or parameter overrides.
+    """
+
+    farm_id: UUID
+    block_crop_id: UUID | None
+    crop_path: str | None
+    crop_category: str | None
+    growth_stage: str | None
+    soil_texture: str | None
+    salinity_class: str | None
+    canopy_size_class: str | None
+    latest: dict[str, Any]
+    weather: Any
+    weather_indices: Any
+    weather_risks: Any
+    signals: Any
+    grid: Any
+    ctx: ConditionContext
+    block_trees: list[dict[str, Any]]
+    cell_trees: list[dict[str, Any]]
+    # Trees excluded by multi-axis targeting (crop / country / soil). Kept
+    # so the explain endpoint can answer "why is nothing running here?".
+    skipped_trees: list[dict[str, Any]]
+    param_overrides_per_tree: dict[UUID, dict[str, Any]]
+
+    def cell_context(self, cell_means: Any) -> ConditionContext:
+        """Block context with this cell's imagery means swapped in."""
+        return ConditionContext.from_block_signals(
+            block_id=self.ctx.block_id,
+            crop_category=self.crop_category,
+            block_attributes={
+                "growth_stage": self.growth_stage,
+                "crop_path": self.crop_path,
+                "crop_strain": strain_code(self.crop_path),
+                "soil_texture": self.soil_texture,
+                "salinity_class": self.salinity_class,
+                "canopy_size_class": self.canopy_size_class,
+            },
+            latest_index_aggregates=_merge_cell_means(self.latest, cell_means),
+            weather=self.weather,
+            weather_indices=self.weather_indices,
+            weather_risks=self.weather_risks,
+            signals=self.signals,
+            grid=self.grid,
+        )
+
+
 class RecommendationsService(Protocol):
     """Public contract."""
 
@@ -66,6 +122,13 @@ class RecommendationsService(Protocol):
         tenant_schema: str,
         tenant_id: UUID,
     ) -> dict[str, int]: ...
+
+    async def explain_block(
+        self,
+        *,
+        block_id: UUID,
+        tenant_id: UUID,
+    ) -> dict[str, Any]: ...
 
     async def list_recommendations(
         self,
@@ -129,6 +192,67 @@ class RecommendationsServiceImpl:
         this tenant's own authored trees. The Beat task resolves this
         once per tenant before walking blocks (PR-A).
         """
+        setup = await self._prepare_block_evaluation(block_id=block_id, tenant_id=tenant_id)
+        if setup is None:
+            return {
+                "trees_evaluated": 0,
+                "trees_skipped_crop": 0,
+                "recommendations_opened": 0,
+            }
+
+        farm_id = setup.farm_id
+        block_crop_id = setup.block_crop_id
+        crop_path = setup.crop_path
+        ctx = setup.ctx
+        param_overrides_per_tree = setup.param_overrides_per_tree
+        block_trees = setup.block_trees
+        cell_trees = setup.cell_trees
+        trees_skipped_crop = len(setup.skipped_trees)
+
+        trees_evaluated = len(block_trees) + len(cell_trees)
+        recommendations_opened = 0
+
+        # Block-scoped path.
+        for tree in block_trees:
+            overrides = param_overrides_per_tree.get(tree["tree_id"], {})
+            if (
+                await self._evaluate_and_record(
+                    tree=tree,
+                    eval_ctx=ctx,
+                    overrides=overrides,
+                    block_id=block_id,
+                    cell_id=None,
+                    farm_id=farm_id,
+                    block_crop_id=block_crop_id,
+                    crop_path=crop_path,
+                    actor_user_id=actor_user_id,
+                    tenant_schema=tenant_schema,
+                )
+                is not None
+            ):
+                recommendations_opened += 1
+        return await self._record_cell_scoped(
+            setup=setup,
+            block_id=block_id,
+            actor_user_id=actor_user_id,
+            tenant_schema=tenant_schema,
+            trees_evaluated=trees_evaluated,
+            trees_skipped_crop=trees_skipped_crop,
+            recommendations_opened=recommendations_opened,
+        )
+
+    async def _prepare_block_evaluation(
+        self,
+        *,
+        block_id: UUID,
+        tenant_id: UUID,
+    ) -> _BlockEvaluation | None:
+        """Load the trees, signals and targeting split for ``block_id``.
+
+        Returns ``None`` when the block has no parent farm (nothing can be
+        evaluated). Performs no writes, so both the sweep and the read-only
+        explain endpoint can call it.
+        """
         trees = await self._repo.list_active_trees_with_current_version(
             visible_to_tenant_id=tenant_id
         )
@@ -151,11 +275,7 @@ class RecommendationsServiceImpl:
 
         if farm_id is None:
             self._log.info("recommendations_skip_no_farm", block_id=str(block_id))
-            return {
-                "trees_evaluated": 0,
-                "trees_skipped_crop": 0,
-                "recommendations_opened": 0,
-            }
+            return None
 
         # Country axis for targeting — inherited from the parent farm (PR-3).
         country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
@@ -209,7 +329,7 @@ class RecommendationsServiceImpl:
         # over the block's grid cells (cell imagery, inherit everything else).
         block_trees: list[dict[str, Any]] = []
         cell_trees: list[dict[str, Any]] = []
-        trees_skipped_crop = 0
+        skipped_trees: list[dict[str, Any]] = []
         for tree in trees:
             # Multi-axis targeting (PR-3): a tree fires on this block only if
             # its crop / country / soil sets all admit the block (AND across
@@ -221,32 +341,49 @@ class RecommendationsServiceImpl:
                 country_code=country_code,
                 soil_texture=soil_texture,
             ):
-                trees_skipped_crop += 1
+                skipped_trees.append(tree)
                 continue
             (cell_trees if tree.get("scope") == "cell" else block_trees).append(tree)
 
-        trees_evaluated = len(block_trees) + len(cell_trees)
-        recommendations_opened = 0
+        return _BlockEvaluation(
+            farm_id=farm_id,
+            block_crop_id=block_crop_id,
+            crop_path=crop_path,
+            crop_category=crop_category,
+            growth_stage=growth_stage,
+            soil_texture=soil_texture,
+            salinity_class=salinity_class,
+            canopy_size_class=canopy_size_class,
+            latest=latest,
+            weather=weather,
+            weather_indices=weather_indices,
+            weather_risks=weather_risks,
+            signals=signals,
+            grid=grid,
+            ctx=ctx,
+            block_trees=block_trees,
+            cell_trees=cell_trees,
+            skipped_trees=skipped_trees,
+            param_overrides_per_tree=param_overrides_per_tree,
+        )
 
-        # Block-scoped path.
-        for tree in block_trees:
-            overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            if (
-                await self._evaluate_and_record(
-                    tree=tree,
-                    eval_ctx=ctx,
-                    overrides=overrides,
-                    block_id=block_id,
-                    cell_id=None,
-                    farm_id=farm_id,
-                    block_crop_id=block_crop_id,
-                    crop_path=crop_path,
-                    actor_user_id=actor_user_id,
-                    tenant_schema=tenant_schema,
-                )
-                is not None
-            ):
-                recommendations_opened += 1
+    async def _record_cell_scoped(
+        self,
+        *,
+        setup: _BlockEvaluation,
+        block_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        trees_evaluated: int,
+        trees_skipped_crop: int,
+        recommendations_opened: int,
+    ) -> dict[str, int]:
+        """Run the cell-scoped trees and emit their digest notifications."""
+        farm_id = setup.farm_id
+        block_crop_id = setup.block_crop_id
+        crop_path = setup.crop_path
+        cell_trees = setup.cell_trees
+        param_overrides_per_tree = setup.param_overrides_per_tree
 
         # Cell-scoped path (PR-C3): one evaluation per grid cell, with the
         # cell's own imagery means swapped into an otherwise block-level
@@ -257,24 +394,7 @@ class RecommendationsServiceImpl:
         if cell_trees:
             cell_aggs = await self._repo.get_latest_cell_aggregates(block_id=block_id)
             for cid, cell_means in cell_aggs.items():
-                cell_ctx = ConditionContext.from_block_signals(
-                    block_id=str(block_id),
-                    crop_category=crop_category,
-                    block_attributes={
-                        "growth_stage": growth_stage,
-                        "crop_path": crop_path,
-                        "crop_strain": strain_code(crop_path),
-                        "soil_texture": soil_texture,
-                        "salinity_class": salinity_class,
-                        "canopy_size_class": canopy_size_class,
-                    },
-                    latest_index_aggregates=_merge_cell_means(latest, cell_means),
-                    weather=weather,
-                    weather_indices=weather_indices,
-                    weather_risks=weather_risks,
-                    signals=signals,
-                    grid=grid,
-                )
+                cell_ctx = setup.cell_context(cell_means)
                 for tree in cell_trees:
                     overrides = param_overrides_per_tree.get(tree["tree_id"], {})
                     opened = await self._evaluate_and_record(
@@ -344,6 +464,75 @@ class RecommendationsServiceImpl:
             "trees_evaluated": trees_evaluated,
             "trees_skipped_crop": trees_skipped_crop,
             "recommendations_opened": recommendations_opened,
+        }
+
+    # ---- Read-only explain -------------------------------------------
+
+    async def explain_block(
+        self,
+        *,
+        block_id: UUID,
+        tenant_id: UUID,
+    ) -> dict[str, Any]:
+        """Walk every visible tree against ``block_id`` and report why each
+        one did or didn't fire — **without writing anything**.
+
+        This is the read model behind the Farm Console's Conditions tab.
+        ``evaluate_block`` answers "what advice should exist"; this answers
+        "show me the reasoning", including for trees that came out clear,
+        which never leave a row in ``recommendations``.
+
+        Cell-scoped trees are reported with ``status='per_cell'`` and no
+        steps: they evaluate once per grid cell, so a single block-level
+        verdict would be a lie. The console links those out to the per-cell
+        popups instead.
+        """
+        setup = await self._prepare_block_evaluation(block_id=block_id, tenant_id=tenant_id)
+        if setup is None:
+            return {
+                "block_id": str(block_id),
+                "evaluated_at": datetime.now(UTC),
+                "crop_path": None,
+                "trees": [],
+            }
+
+        trees: list[dict[str, Any]] = []
+
+        for tree in setup.block_trees:
+            overrides = setup.param_overrides_per_tree.get(tree["tree_id"], {})
+            result = evaluate_tree(tree["tree_compiled"], setup.ctx, param_overrides=overrides)
+            outcome = result.outcome
+            fired = outcome is not None and outcome.action_type != "no_action"
+            if result.error is not None:
+                status = "error"
+            elif fired:
+                status = "fired"
+            else:
+                status = "clear"
+            entry = _explain_entry(tree, status=status, steps=_explain_steps(tree, result))
+            entry["error"] = result.error
+            if fired and outcome is not None:
+                entry.update(
+                    kind=outcome.kind,
+                    action_type=outcome.action_type,
+                    severity=outcome.severity,
+                    confidence=float(outcome.confidence),
+                    text_en=outcome.text_en,
+                    text_ar=outcome.text_ar,
+                )
+            trees.append(entry)
+
+        for tree in setup.cell_trees:
+            trees.append(_explain_entry(tree, status="per_cell", steps=[]))
+
+        for tree in setup.skipped_trees:
+            trees.append(_explain_entry(tree, status="skipped", steps=[]))
+
+        return {
+            "block_id": str(block_id),
+            "evaluated_at": datetime.now(UTC),
+            "crop_path": setup.crop_path,
+            "trees": trees,
         }
 
     async def _evaluate_and_record(
@@ -861,6 +1050,62 @@ def _serialize_path(steps: list[TreePathStep]) -> list[dict[str, Any]]:
                 "label_en": step.label_en,
                 "label_ar": step.label_ar,
                 "values": step.condition_snapshot or {},
+            }
+        )
+    return out
+
+
+def _explain_entry(
+    tree: dict[str, Any],
+    *,
+    status: str,
+    steps: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """One tree's row in the explain response, with the outcome fields
+    nulled out. Callers overwrite them when the tree actually fired."""
+    return {
+        "tree_id": str(tree["tree_id"]),
+        "code": tree["tree_code"],
+        "name_en": tree.get("name_en"),
+        "name_ar": tree.get("name_ar"),
+        "version": tree.get("version"),
+        "scope": tree.get("scope") or "block",
+        "status": status,
+        "steps": steps,
+        "kind": None,
+        "action_type": None,
+        "severity": None,
+        "confidence": None,
+        "text_en": None,
+        "text_ar": None,
+        "error": None,
+    }
+
+
+def _explain_steps(tree: dict[str, Any], result: EvaluationResult) -> list[dict[str, Any]]:
+    """Serialize a walk for the Conditions tab.
+
+    ``_serialize_path`` (used for the JSONB snapshot on a recommendation
+    row) carries the resolved left-hand values but not the predicate, so a
+    reader can see "ndvi = 0.39" and not "…and the threshold was 0.45".
+    Here we attach each decision node's raw condition tree as well, which
+    is what lets the UI render the full "actual vs. threshold" line.
+    """
+    nodes = (tree.get("tree_compiled") or {}).get("nodes") or {}
+    out: list[dict[str, Any]] = []
+    for step in result.path:
+        node = nodes.get(step.node_id) or {}
+        # Leaf nodes carry an outcome rather than a condition; matched is
+        # None there and the UI renders them as the verdict, not a check.
+        condition = (node.get("condition") or {}).get("tree")
+        out.append(
+            {
+                "node_id": step.node_id,
+                "matched": step.matched,
+                "label_en": step.label_en,
+                "label_ar": step.label_ar,
+                "values": step.condition_snapshot or {},
+                "condition": condition,
             }
         )
     return out
