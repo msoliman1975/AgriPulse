@@ -231,13 +231,32 @@ global:
   #   data.length and the API default page size (100) would cap it silently.
   #   No migration; FE only -> frontend bumped; api + workers stay 65af132,
   #   tile-server 9d140cc.
+  # 131813b = #334 Admin Portal -> Platform defaults audit. 11 of the 12 seeded
+  #   keys were inert: each had a parallel env setting in app/core/settings.py
+  #   that the pipeline actually honours, so Save wrote a row and an audit
+  #   entry and changed nothing. Only grid.anomaly_z_threshold was ever read.
+  #   Three fixes ship together:
+  #   (a) the per-block imagery tier never fired -- the resolver selected
+  #       cloud_cover_threshold_pct / product_code from
+  #       imagery_aoi_subscriptions, whose columns are cloud_cover_max_pct and
+  #       product_id. UndefinedColumn on every read, swallowed by a bare
+  #       `except Exception`, which also left the tenant txn poisoned.
+  #   (b) migration 0048 DELETES 8 inert keys (email.*, webhook.*, alert.*,
+  #       weather.forecast_retention_days, imagery.default_product_code) plus
+  #       their tenant_settings_overrides rows -- the FK is ON DELETE RESTRICT
+  #       so the overrides must go first. The Email + Webhook Integrations tabs
+  #       go with them. No behaviour is lost; nothing read those keys.
+  #   (c) per-key range/enum validation on all three write paths (tenant
+  #       overrides previously had NO validation at all).
+  #   Migration + api + FE -> api, workers and frontend all bumped;
+  #   tile-server stays 9d140cc.
   images:
     api:
-      tag: "65af132"
+      tag: "131813b"
     workers:
-      tag: "65af132"
+      tag: "131813b"
     frontend:
-      tag: "b75a5d8"
+      tag: "131813b"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
