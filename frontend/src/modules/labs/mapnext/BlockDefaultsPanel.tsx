@@ -66,9 +66,36 @@ interface Props {
   farmId: string;
 }
 
+// Apply reconciles blocks against the template *stored on the server*, not
+// whatever is on screen. So an unsaved edit makes Apply a silent no-op that
+// still reports success. Comparing a normalized snapshot lets us block that
+// instead of letting the user believe it worked. Key order is normalized
+// explicitly because the server and the row editors build these objects
+// independently, and JSON.stringify is order-sensitive.
+function normalizeTemplate(tpl: SubscriptionsTemplate): string {
+  const imagery = [...tpl.imagery]
+    .map((r) => ({
+      product_id: r.product_id,
+      cadence_hours: r.cadence_hours,
+      cloud_cover_max_pct: r.cloud_cover_max_pct ?? null,
+      is_active: r.is_active,
+    }))
+    .sort((a, b) => a.product_id.localeCompare(b.product_id));
+  const weather = [...tpl.weather]
+    .map((r) => ({
+      provider_code: r.provider_code,
+      cadence_hours: r.cadence_hours,
+      is_active: r.is_active,
+    }))
+    .sort((a, b) => a.provider_code.localeCompare(b.provider_code));
+  return JSON.stringify({ imagery, weather });
+}
+
 export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [template, setTemplate] = useState<SubscriptionsTemplate | null>(null);
+  // Last known server state, used only for the dirty check.
+  const [savedTemplate, setSavedTemplate] = useState<string | null>(null);
   const [products, setProducts] = useState<ImageryConfigEntry[]>([]);
   const [weatherProviders, setWeatherProviders] = useState<WeatherProvider[]>([]);
   const [featureOff, setFeatureOff] = useState(false);
@@ -79,6 +106,8 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
+  // A zero-effect apply is not a success — style the message accordingly.
+  const [applyKind, setApplyKind] = useState<"ok" | "warn">("ok");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [locks, setLocks] = useState<LockState | null>(null);
   const [irrigation, setIrrigation] = useState<IrrigationTemplate | null>(null);
@@ -106,6 +135,7 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
         ]);
         if (cancelled) return;
         setTemplate(tpl);
+        setSavedTemplate(normalizeTemplate(tpl));
         setProducts(c.products);
         setLocks(l);
         setIrrigation(irr);
@@ -128,6 +158,10 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
   if (!template) return <p className="text-sm text-ap-muted">{t("blockDefaults.loading")}</p>;
 
   const productById = new Map(products.map((p) => [p.product_id, p]));
+  const dirty = savedTemplate !== null && normalizeTemplate(template) !== savedTemplate;
+  // An empty *saved* template makes Apply a no-op unless blocks have rows to
+  // deactivate; the preview's matched/total tells us which case we're in.
+  const savedIsEmpty = savedTemplate === normalizeTemplate({ imagery: [], weather: [] });
 
   const addImageryRow = () => {
     const remaining = products.filter((p) => !template.imagery.some((r) => r.product_id === p.product_id));
@@ -156,6 +190,7 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
     try {
       const updated = await replaceSubscriptionsTemplate(farmId, template);
       setTemplate(updated);
+      setSavedTemplate(normalizeTemplate(updated));
       setPreview(null);
     } catch (err) {
       setSaveError((err as Error).message ?? t("blockDefaults.saveFailed"));
@@ -165,6 +200,14 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
   };
 
   const openPreview = async () => {
+    // Refuse rather than preview a template the server has never seen —
+    // the diff would be computed against the stored rows and silently
+    // ignore everything the user just typed.
+    if (dirty) {
+      setApplyKind("warn");
+      setApplyMessage(t("blockDefaults.unsavedFirst"));
+      return;
+    }
     setPreviewLoading(true);
     setApplyMessage(null);
     try {
@@ -194,15 +237,28 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
       for (const d of preview.weather) allIds.add(d.block_id);
       const blockIds = [...allIds].filter((id) => !excluded.has(id));
       const counts = await applySubscriptions(farmId, blockIds);
+      const changed =
+        counts.imagery_added +
+        counts.imagery_updated +
+        counts.imagery_deactivated +
+        counts.weather_added +
+        counts.weather_updated +
+        counts.weather_deactivated;
+      // "Applied to 0 blocks" in green reads as success while nothing
+      // happened — the original symptom of this bug. Say so plainly.
+      setApplyKind(changed === 0 ? "warn" : "ok");
       setApplyMessage(
-        t("blockDefaults.applied", {
-          blocks: counts.blocks_touched,
-          imagery: `+${counts.imagery_added}/${counts.imagery_updated}/-${counts.imagery_deactivated}`,
-          weather: `+${counts.weather_added}/${counts.weather_updated}/-${counts.weather_deactivated}`,
-        }),
+        changed === 0
+          ? t("blockDefaults.appliedNothing")
+          : t("blockDefaults.applied", {
+              blocks: counts.blocks_touched,
+              imagery: `+${counts.imagery_added}/${counts.imagery_updated}/-${counts.imagery_deactivated}`,
+              weather: `+${counts.weather_added}/${counts.weather_updated}/-${counts.weather_deactivated}`,
+            }),
       );
       setPreview(null);
     } catch (err) {
+      setApplyKind("warn");
       setApplyMessage((err as Error).message ?? t("blockDefaults.applyFailed"));
     } finally {
       setApplying(false);
@@ -318,14 +374,32 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
         <button type="button" onClick={save} disabled={saving} className={primaryBtn}>
           {saving ? t("manage.saving") : t("blockDefaults.saveSubs")}
         </button>
-        <button type="button" onClick={openPreview} disabled={previewLoading} className={applyBtn}>
+        <button
+          type="button"
+          onClick={openPreview}
+          disabled={previewLoading || dirty}
+          title={dirty ? t("blockDefaults.unsavedFirst") : undefined}
+          className={applyBtn}
+        >
           {previewLoading ? t("blockDefaults.previewing") : t("blockDefaults.applySubs")}
         </button>
         {saveError ? <span className="text-xs text-ap-crit">{saveError}</span> : null}
-        {applyMessage ? <span className="text-xs text-ap-good">{applyMessage}</span> : null}
+        {applyMessage ? <span className={"text-xs " + (applyKind === "ok" ? "text-ap-good" : "text-ap-warn")}>{applyMessage}</span> : null}
       </div>
+      {dirty ? <p className="text-xs text-ap-warn">{t("blockDefaults.unsavedFirst")}</p> : null}
+      {!dirty && savedIsEmpty ? <p className="text-xs text-ap-muted">{t("blockDefaults.emptyTemplateHint")}</p> : null}
 
-      {preview ? <ApplyPreviewPanel preview={preview} excluded={excluded} onToggle={toggleExcluded} onApply={apply} onCancel={() => setPreview(null)} applying={applying} /> : null}
+      {preview ? (
+        <ApplyPreviewPanel
+          preview={preview}
+          excluded={excluded}
+          onToggle={toggleExcluded}
+          onApply={apply}
+          onCancel={() => setPreview(null)}
+          applying={applying}
+          savedIsEmpty={savedIsEmpty}
+        />
+      ) : null}
 
       <Card title={t("blockDefaults.irrigation")} lock={lockChip("irrigation")}>
         {irrigation ? <IrrigationSection farmId={farmId} value={irrigation} onChange={setIrrigation} /> : null}
@@ -578,6 +652,7 @@ function ApplyPreviewPanel({
   onApply,
   onCancel,
   applying,
+  savedIsEmpty,
 }: {
   preview: ApplyPreview;
   excluded: Set<string>;
@@ -585,6 +660,7 @@ function ApplyPreviewPanel({
   onApply: () => void;
   onCancel: () => void;
   applying: boolean;
+  savedIsEmpty: boolean;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
   const imageryById = new Map(preview.imagery.map((d) => [d.block_id, d]));
@@ -592,10 +668,18 @@ function ApplyPreviewPanel({
   const allIds = new Set<string>();
   for (const d of preview.imagery) allIds.add(d.block_id);
   for (const d of preview.weather) allIds.add(d.block_id);
+  // Every block already matches, so confirming would change nothing. Don't
+  // offer a button whose only outcome is a misleading success message.
+  const nothingToDo = preview.total_blocks > 0 && preview.matched_blocks === preview.total_blocks;
 
   return (
     <div className="rounded-xl border border-ap-warn/40 bg-ap-warn/10 p-3">
       <p className="text-xs font-semibold text-ap-ink">{t("blockDefaults.previewMatch", { matched: preview.matched_blocks, total: preview.total_blocks })}</p>
+      {nothingToDo ? (
+        <p className="mt-1 text-xs text-ap-warn">
+          {savedIsEmpty ? t("blockDefaults.emptyTemplateHint") : t("blockDefaults.nothingToApply")}
+        </p>
+      ) : null}
       <ul className="mt-2 max-h-56 divide-y divide-ap-line/60 overflow-y-auto text-sm">
         {[...allIds].map((blockId) => {
           const i = imageryById.get(blockId);
@@ -616,7 +700,13 @@ function ApplyPreviewPanel({
         })}
       </ul>
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={onApply} disabled={applying} className={primaryBtn}>
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={applying || nothingToDo}
+          title={nothingToDo ? t("blockDefaults.nothingToApply") : undefined}
+          className={primaryBtn}
+        >
           {applying ? t("blockDefaults.applying") : t("blockDefaults.confirmApply")}
         </button>
         <button type="button" onClick={onCancel} disabled={applying} className={ghostBtn}>
