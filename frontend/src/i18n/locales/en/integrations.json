@@ -6,20 +6,11 @@
   "imagery": {
     "title": "Imagery integration",
     "subtitle": "Configure satellite product and cloud-cover threshold. Tenant settings cascade to every farm and land unit unless overridden.",
-    "productLabel": "Product code",
     "cloudPctLabel": "Cloud cap (%)",
     "applyToBlocksHint": "Apply Farm settings to every land unit:",
     "applyInherit": "Reset to inherit",
     "applyLock": "Lock to Farm value",
     "applyResult": "{{n}} land units updated."
-  },
-  "email": {
-    "title": "Email server",
-    "subtitle": "Outbound transactional email. Falls back to platform defaults when not set."
-  },
-  "webhook": {
-    "title": "Webhook",
-    "subtitle": "Outbound webhook signing and timeout. Falls back to platform defaults when not set."
   },
   "detection": {
     "title": "Detection",

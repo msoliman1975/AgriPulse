@@ -20,8 +20,6 @@
     "health": "Health",
     "weather": "Weather",
     "imagery": "Imagery",
-    "email": "Email",
-    "webhook": "Webhook",
     "detection": "Detection"
   },
   "placeholder": {

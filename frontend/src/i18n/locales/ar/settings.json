@@ -20,8 +20,6 @@
     "health": "الصحة",
     "weather": "الطقس",
     "imagery": "الصور",
-    "email": "البريد",
-    "webhook": "Webhook",
     "detection": "الكشف"
   },
   "placeholder": {

@@ -26,18 +26,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit import get_audit_service
 from app.modules.integrations.service import (
-    EMAIL_KEYS,
+    DETECTION_KEYS,
     IMAGERY_KEYS,
     WEATHER_KEYS,
-    WEBHOOK_KEYS,
 )
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session
 from app.shared.rbac.check import requires_capability
 from app.shared.settings import (
+    SettingNotFoundError,
     SettingsRepository,
     SettingsResolver,
     invalidate_defaults_cache,
+    validate_value,
 )
 
 router = APIRouter(
@@ -45,13 +46,14 @@ router = APIRouter(
     tags=["admin-tenant-integrations"],
 )
 
-Category = Literal["weather", "imagery", "email", "webhook"]
+# `email` + `webhook` were dropped with public migration 0048 — every key
+# they carried was inert (outbound mail/webhooks read app/core/settings.py).
+Category = Literal["weather", "imagery", "detection"]
 
 CATEGORY_KEYS: dict[Category, tuple[str, ...]] = {
     "weather": WEATHER_KEYS,
     "imagery": IMAGERY_KEYS,
-    "email": EMAIL_KEYS,
-    "webhook": WEBHOOK_KEYS,
+    "detection": DETECTION_KEYS,
 }
 
 
@@ -139,6 +141,11 @@ async def write_tenant_integration(
         )
 
     repo = SettingsRepository(public_session=public_session)
+    default = await repo.get_default(key=key)
+    if default is None:
+        raise SettingNotFoundError(key)
+    # Raises SettingValueError -> 400 via the global handler in core.errors.
+    validate_value(key=key, value=payload.value, value_schema=default["value_schema"])
     await repo.upsert_tenant_override(
         tenant_id=tenant_id,
         key=key,

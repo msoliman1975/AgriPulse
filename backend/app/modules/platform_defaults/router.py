@@ -25,7 +25,9 @@ from app.shared.rbac.check import requires_capability
 from app.shared.settings import (
     SettingNotFoundError,
     SettingsRepository,
+    describe,
     invalidate_defaults_cache,
+    validate_value,
 )
 
 router = APIRouter(prefix="/api/v1/admin/defaults", tags=["admin-defaults"])
@@ -41,6 +43,9 @@ class PlatformDefaultResponse(BaseModel):
     category: str
     updated_at: datetime
     updated_by: object | None  # UUID | None
+    #: Range / choices the value must satisfy, or None when unconstrained.
+    #: The editor mirrors these client-side so bad values never round-trip.
+    constraint: dict[str, Any] | None = None
 
 
 class UpdateDefaultRequest(BaseModel):
@@ -55,7 +60,11 @@ async def list_defaults(
 ) -> list[dict[str, Any]]:
     del context
     repo = SettingsRepository(public_session=public_session)
-    return await repo.list_defaults()
+    return [_with_constraint(row) for row in await repo.list_defaults()]
+
+
+def _with_constraint(row: dict[str, Any]) -> dict[str, Any]:
+    return {**row, "constraint": describe(row["key"])}
 
 
 @router.put("/{key}", response_model=PlatformDefaultResponse)
@@ -77,7 +86,8 @@ async def update_default(
             detail=f"No platform default with key {key!r}.",
             type_="https://agripulse.cloud/problems/platform-default-not-found",
         )
-    _validate_against_schema(payload.value, existing["value_schema"], key)
+    # Raises SettingValueError -> 400 via the global handler in core.errors.
+    validate_value(key=key, value=payload.value, value_schema=existing["value_schema"])
     updated = await repo.update_default_value(
         key=key,
         value_json=json.dumps(payload.value),
@@ -103,37 +113,4 @@ async def update_default(
     )
     after = await repo.get_default(key=key)
     assert after is not None
-    return after
-
-
-def _validate_against_schema(value: Any, schema: str, key: str) -> None:
-    """Lightweight runtime check matching the value_schema CHECK constraint.
-
-    Raises an APIError on mismatch so the client sees a clean 400 with
-    a stable problem-type URI rather than a 500 from the JSON column."""
-    ok: bool
-    if schema == "string":
-        ok = value is None or isinstance(value, str)
-    elif schema == "number":
-        ok = isinstance(value, int | float) and not isinstance(value, bool)
-    elif schema == "boolean":
-        ok = isinstance(value, bool)
-    elif schema == "object":
-        ok = isinstance(value, dict)
-    elif schema == "array":
-        ok = isinstance(value, list)
-    else:
-        ok = True
-    if ok:
-        return
-    from app.core.errors import APIError
-
-    raise APIError(
-        status_code=400,
-        title="Invalid value for platform default",
-        detail=(
-            f"Setting {key!r} expects value_schema={schema!r} " f"but got {type(value).__name__}."
-        ),
-        type_="https://agripulse.cloud/problems/platform-default-invalid-value",
-        extras={"key": key, "expected_schema": schema},
-    )
+    return _with_constraint(after)

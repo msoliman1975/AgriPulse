@@ -66,10 +66,7 @@ export const integrationsApi = {
     },
     putFarm: async (
       farmId: string,
-      payload: {
-        product_code: string | null;
-        cloud_cover_threshold_pct: number | null;
-      },
+      payload: { cloud_cover_threshold_pct: number | null },
     ): Promise<SettingsBag> => {
       const { data } = await apiClient.put<SettingsBag>(
         `/v1/integrations/imagery/farms/${farmId}`,
@@ -98,14 +95,8 @@ export const integrationsApi = {
       return data;
     },
   },
-  email: {
-    getTenant: () => getTenant("email"),
-    putTenant: (key: string, value: unknown) => putTenant("email", key, value),
-  },
-  webhook: {
-    getTenant: () => getTenant("webhook"),
-    putTenant: (key: string, value: unknown) => putTenant("webhook", key, value),
-  },
+  // `email` + `webhook` categories were dropped with public migration 0048:
+  // their keys were inert, and the endpoints no longer exist.
   detection: {
     getTenant: () => getTenant("detection"),
     putTenant: (key: string, value: unknown) => putTenant("detection", key, value),

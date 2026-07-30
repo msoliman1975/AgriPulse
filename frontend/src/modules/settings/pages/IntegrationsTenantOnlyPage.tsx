@@ -5,18 +5,25 @@ import type { ResolvedSetting } from "@/api/integrations";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
-import { usePutTenantIntegration, useTenantIntegration } from "@/queries/integrations";
+import {
+  usePutTenantIntegration,
+  useTenantIntegration,
+  type IntegrationCategory,
+} from "@/queries/integrations";
 
 interface Props {
-  category: "email" | "webhook" | "detection";
+  category: IntegrationCategory;
   i18nTitleKey: string;
   i18nSubtitleKey: string;
 }
 
 /**
- * Email, webhook + detection are tenant-tier-only. One page lists the
- * resolved keys with editable values; per-block detection overrides live
- * on the block grid config card.
+ * Detection is tenant-tier-only. This page lists the resolved keys with
+ * editable values; per-block detection overrides live on the block grid
+ * config card.
+ *
+ * It also served the email + webhook categories until public migration
+ * 0048 dropped their keys as inert.
  */
 export function IntegrationsTenantOnlyPage({
   category,

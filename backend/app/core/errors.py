@@ -107,6 +107,38 @@ async def validation_exception_handler(
     )
 
 
+async def setting_value_error_handler(request: Request, exc: Any) -> JSONResponse:
+    """`SettingValueError` -> 400. Raised by every settings write path.
+
+    Registered globally so the platform-defaults editor, the tenant
+    Integrations pages, and the platform-side per-tenant editor all reject
+    an out-of-range value the same way instead of 500-ing.
+    """
+    problem = Problem(
+        type="https://agripulse.cloud/problems/setting-invalid-value",
+        title="Invalid value for setting",
+        status=status.HTTP_400_BAD_REQUEST,
+        detail=exc.detail,
+        instance=str(request.url),
+        correlation_id=_correlation_id(request),
+        **exc.extras(),
+    )
+    return _problem_response(problem)
+
+
+async def setting_not_found_handler(request: Request, exc: Any) -> JSONResponse:
+    problem = Problem(
+        type="https://agripulse.cloud/problems/setting-not-found",
+        title="Setting not found",
+        status=status.HTTP_404_NOT_FOUND,
+        detail=f"No platform default with key {exc.key!r}.",
+        instance=str(request.url),
+        correlation_id=_correlation_id(request),
+        key=exc.key,
+    )
+    return _problem_response(problem)
+
+
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Last-resort handler.
 
@@ -132,8 +164,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 def install_exception_handlers(app: FastAPI) -> None:
-    """Register the four problem+json error handlers on the FastAPI app."""
+    """Register the problem+json error handlers on the FastAPI app."""
+    # Imported here: app.shared.settings pulls in SQLAlchemy models, and
+    # app.core.errors is imported very early during app construction.
+    from app.shared.settings.errors import SettingNotFoundError, SettingValueError
+
     app.add_exception_handler(APIError, api_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(SettingValueError, setting_value_error_handler)
+    app.add_exception_handler(SettingNotFoundError, setting_not_found_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_exception_handler)

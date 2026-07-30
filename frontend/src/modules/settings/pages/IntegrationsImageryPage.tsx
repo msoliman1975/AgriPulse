@@ -152,14 +152,11 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
   const farmQ = useFarmImagery(farmId);
   const putFarm = usePutFarmImagery();
   const apply = useApplyImageryToBlocks();
-  const [productCode, setProductCode] = useState("");
   const [cloudPct, setCloudPct] = useState("");
 
   useEffect(() => {
     const s = farmQ.data?.settings ?? [];
-    const prod = s.find((x) => x.key === "imagery.default_product_code");
     const cloud = s.find((x) => x.key === "imagery.cloud_cover_threshold_pct");
-    setProductCode(prod && prod.source === "farm" ? String(prod.value) : "");
     setCloudPct(cloud && cloud.source === "farm" ? String(cloud.value) : "");
   }, [farmQ.data]);
 
@@ -197,22 +194,12 @@ function FarmImageryForm({ farmId }: { farmId: string }): ReactNode {
           putFarm.mutate({
             farmId,
             payload: {
-              product_code: productCode.trim() || null,
               cloud_cover_threshold_pct: cloudPct.trim() ? Number(cloudPct) : null,
             },
           });
         }}
         className="flex flex-wrap items-end gap-2"
       >
-        <label className="flex flex-col text-xs">
-          {t("imagery.productLabel")}
-          <input
-            className="mt-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-            value={productCode}
-            placeholder={t("farm.inheritPlaceholder")}
-            onChange={(e) => setProductCode(e.target.value)}
-          />
-        </label>
         <label className="flex flex-col text-xs">
           {t("imagery.cloudPctLabel")}
           <input

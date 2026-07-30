@@ -40,16 +40,9 @@ export function IntegrationsLayout(): ReactNode {
       labelKey: "integrationsTabs.imagery",
       show: canManage,
     },
-    {
-      to: "/settings/integrations/email",
-      labelKey: "integrationsTabs.email",
-      show: canManage,
-    },
-    {
-      to: "/settings/integrations/webhook",
-      labelKey: "integrationsTabs.webhook",
-      show: canManage,
-    },
+    // Email + webhook tabs removed with public migration 0048: every key
+    // they showed was inert. Outbound mail and webhooks are configured at
+    // the platform tier (SMTP_*, WEBHOOK_* env), not per tenant.
     {
       to: "/settings/integrations/detection",
       labelKey: "integrationsTabs.detection",
