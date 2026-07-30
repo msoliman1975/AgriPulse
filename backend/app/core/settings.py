@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     # only if you need to stage the backfill of existing per-block
     # subscriptions before exposing templates. Removed in PR-4.
     farm_config_template_enabled: bool = True
+    # Whether a tenant purge may skip the 30-day grace window via `force`.
+    # Defaults True, which is exactly today's behaviour — `force` has always
+    # been available to anyone holding platform.manage_tenants. It is a setting
+    # now so a real production deployment can turn the escape hatch off without
+    # a code change; dev and staging need it, because a test tenant that cannot
+    # be removed for 30 days is a test tenant that never gets removed.
+    purge_allow_immediate: bool = True
     keycloak_base_url: str = "https://keycloak.dev.agripulse.local"
     keycloak_realm: str = "agripulse"
     keycloak_admin_client_id: str = "agripulse-tenancy"

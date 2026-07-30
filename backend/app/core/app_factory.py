@@ -177,6 +177,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
+    from app.modules.purge.router import router as purge_router
     from app.modules.recommendations.router import router as recommendations_router
     from app.modules.reports.router import router as reports_router
     from app.modules.resources.router import router as resources_router
@@ -186,6 +187,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.shared.eventbus import get_default_bus
 
     app.include_router(backfill_router)
+    app.include_router(purge_router)
     app.include_router(iam_router)
     app.include_router(tenancy_router)
     app.include_router(farms_router)

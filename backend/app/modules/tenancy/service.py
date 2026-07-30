@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +38,10 @@ from app.shared.keycloak import (
     KeycloakNotConfiguredError,
     get_keycloak_client,
 )
+
+if TYPE_CHECKING:
+    from app.shared.purge.engine import PurgeReport
+    from app.shared.purge.imagery import ReclaimPlan, ReclaimResult
 
 # Grace window between request_delete and purge eligibility.
 # Aligns with docs/runbooks/tenant-offboarding.md "≥ 30 days".
@@ -906,6 +910,17 @@ class TenantServiceImpl:
         if slug_confirmation != tenant.slug:
             raise SlugConfirmationMismatchError("slug confirmation does not match tenant slug")
 
+        # `force` skips the grace window. The env gate lets a real production
+        # deployment close that escape hatch without a code change, while dev
+        # and staging keep it — a test tenant that cannot be removed for 30
+        # days is a test tenant that never gets removed.
+        from app.core.settings import get_settings
+
+        if force and not get_settings().purge_allow_immediate:
+            raise PurgeNotEligibleError(
+                (tenant.deleted_at or datetime.now(UTC)) + timedelta(days=PURGE_GRACE_DAYS)
+            )
+
         deleted_at = tenant.deleted_at
         if deleted_at is not None and not force:
             eligible_at = deleted_at + timedelta(days=PURGE_GRACE_DAYS)
@@ -930,24 +945,59 @@ class TenantServiceImpl:
             },
         )
 
-        await self._repo.delete_public_rows(tenant_id)
+        # Plan imagery reclamation while the tenant's blocks still exist: the
+        # aoi_hash values that decide which COGs are shared with another tenant
+        # are only readable before DROP SCHEMA.
+        reclaim_plan = await self._plan_imagery_reclaim(schema_name)
+
+        # Manifest-driven, replacing the old three-table sweep. Everything in
+        # TENANT_PUBLIC_OWNED is a row DROP SCHEMA cannot reach — decision_trees,
+        # backfill_runs, settings overrides, memberships — and every one of them
+        # was left behind by every tenant purged before this change.
+        purge_counts = await self._delete_public_rows(tenant_id)
         await self._session.flush()
 
         # Schema drop runs after the public-row delete commits — the caller's
         # session.begin() will commit on exit. Drop is sync DDL; offload to thread.
         await asyncio.to_thread(self._migrator.purge, schema_name)
 
+        # pgstac lives outside the tenant schema, so DROP SCHEMA leaves the whole
+        # STAC catalogue (and the COGs it points at) behind. Best-effort: the DB
+        # work has already committed, and a leaked object costs storage, not
+        # correctness.
+        reclaim = await self._execute_imagery_reclaim(reclaim_plan)
+
         # Best-effort Keycloak cleanup. Failures here leave orphan groups/
         # users that are easy to delete by hand later via kcadm.sh.
+        kc_error: str | None = None
         try:
             removed = await self._kc.delete_users_and_group(slug)
             self._log.info("tenant_keycloak_purged", tenant_id=str(tenant_id), removed=removed)
         except KeycloakError as exc:
+            kc_error = str(exc)
             self._log.warning(
                 "tenant_keycloak_purge_failed",
                 tenant_id=str(tenant_id),
-                error=str(exc),
+                error=kc_error,
             )
+
+        # The receipt is the tombstone: after this the tenant row, its schema and
+        # its STAC catalogue are all gone, so it is the only remaining record of
+        # what was removed and whether anything was left behind.
+        await self._write_purge_receipt(
+            tenant_id=tenant_id,
+            slug=slug,
+            name=tenant.name,
+            actor_user_id=actor_user_id,
+            started_at=when,
+            deleted={
+                "db_rows": purge_counts.rows,
+                "total_rows": purge_counts.total_rows,
+                "schema_dropped": schema_name,
+                **reclaim.as_dict(),
+            },
+            errors=([*reclaim.errors, f"keycloak: {kc_error}"] if kc_error else reclaim.errors),
+        )
 
         self._bus.publish(
             TenantPurgedV1(
@@ -971,6 +1021,111 @@ class TenantServiceImpl:
         if tenant is None:
             raise TenantNotFoundError(f"tenant {tenant_id} not found")
         return tenant
+
+    # ---- purge internals ---------------------------------------------------
+    #
+    # Split out so the whole-tenant path shares the manifest and the reclaimer
+    # with block/farm purge (app.modules.purge) instead of re-deriving what a
+    # tenant owns. Imports are local: the tenancy module is imported by the
+    # auth middleware, and pulling the purge stack in at import time would drag
+    # boto3 into every request path.
+
+    async def _delete_public_rows(self, tenant_id: UUID) -> PurgeReport:
+        from app.shared.purge.engine import PurgeEngine
+
+        return await PurgeEngine(self._session).delete_tenant_public([tenant_id])
+
+    async def _plan_imagery_reclaim(self, schema_name: str) -> ReclaimPlan:
+        """Read the tenant's STAC items and AOI hashes before the schema drops.
+
+        Deliberately on its own short-lived session, released before returning.
+        Reading ``<tenant>.blocks`` takes an ACCESS SHARE lock on it, and the
+        caller's transaction stays open well past this point; the
+        ``DROP SCHEMA … CASCADE`` that follows needs ACCESS EXCLUSIVE. Planning
+        on ``self._session`` deadlocks the purge against itself — the drop waits
+        forever for a lock the same request is holding.
+        """
+        from app.shared.db.session import AsyncSessionLocal
+        from app.shared.purge.imagery import ImageryReclaimer, ReclaimPlan
+
+        try:
+            factory = AsyncSessionLocal()
+            async with factory() as reader:
+                plan = await ImageryReclaimer(reader).plan_for_tenant(tenant_schema=schema_name)
+                await reader.rollback()
+            return plan
+        except Exception as exc:
+            self._log.warning("tenant_imagery_plan_failed", schema=schema_name, error=str(exc))
+            return ReclaimPlan()
+
+    async def _execute_imagery_reclaim(self, plan: ReclaimPlan) -> ReclaimResult:
+        from app.shared.purge.imagery import ImageryReclaimer, ReclaimResult
+
+        try:
+            from app.shared.storage.client import get_storage_client
+
+            storage = get_storage_client()
+        except Exception as exc:
+            self._log.warning("tenant_storage_unavailable", error=str(exc))
+            storage = None
+        try:
+            return await ImageryReclaimer(self._session).execute(plan, storage=storage)
+        except Exception as exc:
+            self._log.warning("tenant_imagery_reclaim_failed", error=str(exc))
+            return ReclaimResult(errors=[str(exc)])
+
+    async def _write_purge_receipt(
+        self,
+        *,
+        tenant_id: UUID,
+        slug: str,
+        name: str | None,
+        actor_user_id: UUID | None,
+        started_at: datetime,
+        deleted: dict[str, Any],
+        errors: list[str],
+    ) -> None:
+        from app.modules.purge.repository import PurgeRepository
+        from app.shared.db.session import AsyncSessionLocal
+        from app.shared.purge.scanner import scan_public
+
+        # Own session, same reasoning as _plan_imagery_reclaim: the scan reads
+        # every live tenant's `farms` table, and holding those locks open on the
+        # caller's long-running transaction would block a concurrent purge's
+        # DROP SCHEMA. The receipt row itself does go on self._session, so it
+        # commits atomically with the tenant deletion.
+        try:
+            factory = AsyncSessionLocal()
+            async with factory() as reader:
+                verification = (await scan_public(reader)).as_dict()
+                await reader.rollback()
+        except Exception as exc:
+            verification = {"error": str(exc)}
+        try:
+            await PurgeRepository(self._session).create_receipt(
+                # No job row: whole-tenant purge runs inside the tenancy state
+                # machine rather than the purge job runner.
+                job_id=None,
+                job={
+                    "kind": "tenant",
+                    "target_id": tenant_id,
+                    "target_label": name or slug,
+                    "tenant_id": None,
+                    "tenant_slug": slug,
+                    "reason": None,
+                    "started_at": started_at,
+                    "created_by": actor_user_id,
+                    "created_by_email": None,
+                },
+                actor_user_id=actor_user_id,
+                actor_email=None,
+                deleted=deleted,
+                verification=verification,
+                errors=errors,
+            )
+        except Exception as exc:
+            # undo a completed purge; the audit archive row is already written.
+            self._log.warning("tenant_purge_receipt_failed", error=str(exc))
 
 
 def get_tenant_service(

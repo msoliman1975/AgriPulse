@@ -108,6 +108,15 @@ capabilities:
     description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
     scope: platform
     status: active
+  platform.purge_data:
+    # Deliberately NOT folded into platform.manage_tenants. Purge is the only
+    # irreversible delete in the product — it removes rows, object-storage
+    # assets and STAC records with no undo — so it must be withholdable from
+    # someone who otherwise administers tenants. Phase 2 extends a farm/block
+    # subset of this to TenantAdmin; tenants never get tenant-level purge.
+    description: Permanently purge a block, farm, or tenant and everything it owns.
+    scope: platform
+    status: active
   platform.manage_crops:
     description: Create, edit, or retire crops, varieties, and strains in the catalog.
     scope: platform

@@ -306,7 +306,11 @@
     "matches": "matches",
     "willChange": "will change",
     "applying": "Applying…",
-    "confirmApply": "Confirm apply"
+    "confirmApply": "Confirm apply",
+    "unsavedFirst": "You have unsaved template changes. Apply uses the saved template, so save it first.",
+    "nothingToApply": "Nothing to apply — every block already matches the saved template.",
+    "emptyTemplateHint": "The saved template is empty, so applying it would change nothing. Add an imagery product or weather provider above, then save the template.",
+    "appliedNothing": "No changes made — 0 blocks were modified. Make sure the template is saved and not empty."
   },
   "gridPopup": {
     "title": "Grid cell",
