@@ -336,5 +336,65 @@
   },
   "sparkline": {
     "notEnough": "Not enough data for a trend."
+  },
+  "dock": {
+    "regionLabel": "Block details",
+    "close": "Close",
+    "collapse": "Collapse panel",
+    "expand": "Expand panel",
+    "noCrop": "no crop assigned",
+    "openIndexDetail": "Open index detail →",
+    "nextUp": "Next up",
+    "nextActivity": "Next activity",
+    "signalsAndSources": "Field signals & sources",
+    "noSignals": "No field observations recorded.",
+    "imagerySubs": "Imagery subscriptions",
+    "weatherSubs": "Weather subscriptions",
+    "tab": {
+      "overview": "Overview",
+      "index": "Index",
+      "conditions": "Conditions",
+      "field": "Field & plan",
+      "manage": "Manage"
+    },
+    "peek": {
+      "soil": "soil",
+      "alerts": "alerts"
+    },
+    "index": {
+      "pickIndex": "Choose an index",
+      "from": "From date",
+      "to": "To date",
+      "preset": {
+        "d30": "30 d",
+        "d90": "90 d",
+        "season": "Season"
+      },
+      "chartLabel": "Index time series",
+      "notEnough": "Not enough clear passes to chart this range.",
+      "error": "Couldn't load this index.",
+      "footer": "{{count}} clear passes in range",
+      "footer_one": "{{count}} clear pass in range",
+      "over14d": "over last 14 days",
+      "definition": "Definition",
+      "otherIndices": "Other indices",
+      "showingInstead": "Charting {{code}} instead."
+    },
+    "conditions": {
+      "treesHeading": "Decision trees",
+      "error": "Couldn't evaluate this block's decision trees.",
+      "noneTargeted": "No decision tree targets this block. {{count}} trees were skipped because their crop, country or soil targeting excludes it.",
+      "noneTargeted_one": "No decision tree targets this block. {{count}} tree was skipped because its crop, country or soil targeting excludes it.",
+      "noneAtAll": "No active decision trees are visible to this tenant yet.",
+      "nFailing": "{{count}} failing",
+      "nSkipped": "{{count}} trees not targeted here",
+      "nSkipped_one": "{{count}} tree not targeted here",
+      "perCell": "This tree runs per grid cell, not per block. Open a cell on the map to see its checks.",
+      "perCellShort": "per cell",
+      "noChecks": "This tree reached its outcome without evaluating any condition.",
+      "noAction": "No action required.",
+      "outcome": "Outcome —",
+      "treeError": "This tree could not be evaluated: {{error}}"
+    }
   }
 }

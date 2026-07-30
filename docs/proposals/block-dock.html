@@ -1,0 +1,1320 @@
+<title>Block Dock — Farm Console mockup</title>
+
+<style>
+  /* ---------- tokens: mirrors frontend/tailwind.config.ts `ap.*` ---------- */
+  :root {
+    --bg: #f7f6f1;
+    --panel: #ffffff;
+    --panel-2: #faf9f4;
+    --line: #e8e5db;
+    --line-soft: #f1efe8;
+    --ink: #1f2420;
+    --muted: #6c7268;
+    --primary: #356b30;
+    --primary-soft: #dceadb;
+    --good: #4f8e4a;
+    --accent: #1f6f9a;
+    --accent-soft: #dfeaf1;
+    --warn: #c98a18;
+    --warn-soft: #f7e7c2;
+    --crit: #b24430;
+    --crit-soft: #f3d2c9;
+    --irrig: #2a8a9c;
+    --unknown: #a9aba4;
+
+    --map-soil: #ded6c4;
+    --map-soil-2: #d5ccb7;
+    --map-grat: #0000000d;
+    --map-road: #cbc2ad;
+    --map-halo: #ffffff;
+
+    --shadow-dock: 0 -1px 0 var(--line), 0 -20px 44px -28px rgb(31 36 32 / 0.32);
+    --shadow-pop: 0 8px 26px -14px rgb(31 36 32 / 0.4);
+    --focus: #1f6f9a;
+    --r: 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14170f; --panel: #1b1f18; --panel-2: #20241c;
+      --line: #2f352b; --line-soft: #262b21;
+      --ink: #e9ebe2; --muted: #969c8e;
+      --primary: #7aae72; --primary-soft: #24361f; --good: #7aae72;
+      --accent: #6fb2d6; --accent-soft: #1c2c34;
+      --warn: #e0ab4a; --warn-soft: #3a2f14;
+      --crit: #e08066; --crit-soft: #3d211a;
+      --irrig: #5cbccd; --unknown: #6a7064;
+      --map-soil: #2a2b22; --map-soil-2: #23241c; --map-grat: #ffffff0d;
+      --map-road: #3a3a2e; --map-halo: #0d0f09;
+      --shadow-dock: 0 -1px 0 var(--line), 0 -20px 44px -24px rgb(0 0 0 / 0.8);
+      --shadow-pop: 0 8px 26px -12px rgb(0 0 0 / 0.7);
+      --focus: #6fb2d6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14170f; --panel: #1b1f18; --panel-2: #20241c;
+    --line: #2f352b; --line-soft: #262b21;
+    --ink: #e9ebe2; --muted: #969c8e;
+    --primary: #7aae72; --primary-soft: #24361f; --good: #7aae72;
+    --accent: #6fb2d6; --accent-soft: #1c2c34;
+    --warn: #e0ab4a; --warn-soft: #3a2f14;
+    --crit: #e08066; --crit-soft: #3d211a;
+    --irrig: #5cbccd; --unknown: #6a7064;
+    --map-soil: #2a2b22; --map-soil-2: #23241c; --map-grat: #ffffff0d;
+    --map-road: #3a3a2e; --map-halo: #0d0f09;
+    --shadow-dock: 0 -1px 0 var(--line), 0 -20px 44px -24px rgb(0 0 0 / 0.8);
+    --shadow-pop: 0 8px 26px -12px rgb(0 0 0 / 0.7);
+    --focus: #6fb2d6;
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f6f1; --panel: #ffffff; --panel-2: #faf9f4;
+    --line: #e8e5db; --line-soft: #f1efe8;
+    --ink: #1f2420; --muted: #6c7268;
+    --primary: #356b30; --primary-soft: #dceadb; --good: #4f8e4a;
+    --accent: #1f6f9a; --accent-soft: #dfeaf1;
+    --warn: #c98a18; --warn-soft: #f7e7c2;
+    --crit: #b24430; --crit-soft: #f3d2c9;
+    --irrig: #2a8a9c; --unknown: #a9aba4;
+    --map-soil: #ded6c4; --map-soil-2: #d5ccb7; --map-grat: #0000000d;
+    --map-road: #cbc2ad; --map-halo: #ffffff;
+    --shadow-dock: 0 -1px 0 var(--line), 0 -20px 44px -28px rgb(31 36 32 / 0.32);
+    --shadow-pop: 0 8px 26px -14px rgb(31 36 32 / 0.4);
+    --focus: #1f6f9a;
+  }
+
+  /* ---------- base ---------- */
+  * { box-sizing: border-box; }
+
+  .console {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Cairo, Tahoma, Arial, sans-serif;
+    color: var(--ink); background: var(--bg);
+    height: 100vh; min-height: 600px;
+    display: grid; grid-template-rows: 1fr auto;
+    overflow: hidden; font-size: 13.5px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .muted { color: var(--muted); }
+
+  /* ---------- map ---------- */
+  .stage { position: relative; overflow: hidden; }
+  .stage svg.basemap { width: 100%; height: 100%; display: block; }
+
+  .parcel { cursor: pointer; }
+  .parcel .parcel-fill { fill-opacity: .3; transition: fill-opacity .14s ease; }
+  .parcel:hover .parcel-fill { fill-opacity: .5; }
+  .parcel.selected .parcel-fill { fill-opacity: .55; }
+  .parcel-stroke { fill: none; stroke-width: 1.5; }
+  .parcel.selected .parcel-stroke { stroke-width: 3.5; }
+  .parcel-halo { fill: none; stroke: var(--map-halo); stroke-width: 7; opacity: 0; }
+  .parcel.selected .parcel-halo { opacity: .85; }
+  .parcel-label {
+    font-size: 13px; font-weight: 700; fill: var(--ink);
+    paint-order: stroke; stroke: var(--map-halo); stroke-width: 3px; stroke-linejoin: round;
+    pointer-events: none; user-select: none;
+  }
+  .parcel-sub {
+    font-size: 10.5px; fill: var(--muted); font-weight: 600;
+    paint-order: stroke; stroke: var(--map-halo); stroke-width: 3px; stroke-linejoin: round;
+    pointer-events: none; user-select: none;
+  }
+  /* map edit affordances driven by the Manage tab */
+  .handle { fill: var(--panel); stroke: var(--accent); stroke-width: 2.5; cursor: grab; }
+  .handle:active { cursor: grabbing; }
+  .handle:hover { fill: var(--accent-soft); }
+  .gridline { stroke: var(--accent); stroke-width: 1; opacity: .55; }
+  .console.editing .parcel:not(.selected) { opacity: .35; pointer-events: none; }
+
+  .map-chrome {
+    position: absolute; inset-block-start: 12px; inset-inline-start: 12px;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .plate {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+    box-shadow: var(--shadow-pop);
+  }
+  .map-title { padding: 7px 12px; }
+  .map-title strong { font-size: 13.5px; }
+  .map-title span { color: var(--muted); font-size: 11.5px; }
+
+  .segmented { display: flex; padding: 3px; gap: 2px; }
+  .segmented button {
+    border: 0; background: transparent; padding: 5px 11px; border-radius: 7px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+  }
+  .segmented button[aria-pressed="true"] { background: var(--primary-soft); color: var(--primary); }
+
+  .note { position: absolute; inset-block-start: 12px; inset-inline-end: 12px; }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 12px; background: var(--panel); box-shadow: var(--shadow-pop);
+  }
+  .toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+
+  .hint {
+    position: absolute; inset-inline: 0; inset-block-end: 26px;
+    display: flex; justify-content: center; pointer-events: none; transition: opacity .2s ease;
+  }
+  .hint span {
+    background: var(--ink); color: var(--bg); border-radius: 999px;
+    padding: 8px 16px; font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow-pop);
+  }
+  .console.has-selection .hint { opacity: 0; }
+
+  /* ---------- dock ---------- */
+  .dock {
+    background: var(--panel); box-shadow: var(--shadow-dock);
+    display: grid; grid-template-rows: auto auto 1fr;
+    transform: translateY(101%); height: 0;
+    transition: transform .26s cubic-bezier(.2,.7,.3,1), height .22s ease;
+  }
+  .console.has-selection .dock { transform: translateY(0); height: 384px; }
+  .console.has-selection.peek .dock { height: 56px; }
+  @media (prefers-reduced-motion: reduce) { .dock { transition: none; } }
+
+  /* row 1 — identity */
+  .idbar {
+    display: flex; align-items: center; gap: 11px; height: 56px; padding: 0 14px;
+    border-block-end: 1px solid var(--line);
+  }
+  .idbar h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.015em; white-space: nowrap; }
+  .idbar .sub { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+    padding: 3px 10px; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill.healthy { background: var(--primary-soft); color: var(--primary); }
+  .pill.watch { background: var(--warn-soft); color: var(--warn); }
+  .pill.critical { background: var(--crit-soft); color: var(--crit); }
+  .pill.unknown { background: var(--line-soft); color: var(--muted); }
+  .pill.editing { background: var(--accent-soft); color: var(--accent); }
+
+  .peekstats { display: none; gap: 7px; margin-inline-start: 4px; }
+  .console.peek .peekstats { display: flex; }
+  .peekstat {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px;
+  }
+  .peekstat b { font-size: 13px; }
+  .peekstat i {
+    font-style: normal; font-size: 9.5px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+
+  .idbar .right { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; }
+  .stamp { font-size: 11.5px; color: var(--muted); }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+    padding: 6px 11px; font-size: 12.5px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--line-soft); }
+  .btn.icon { padding: 6px 9px; color: var(--muted); }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--panel); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { border-color: var(--crit); color: var(--crit); }
+  .btn.danger:hover { background: var(--crit-soft); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* row 2 — view tabs */
+  .tabbar {
+    display: flex; align-items: center; gap: 2px; padding: 0 10px;
+    border-block-end: 1px solid var(--line); background: var(--panel-2);
+  }
+  .console.peek .tabbar, .console.peek .viewport { display: none; }
+  .tabbar button {
+    border: 0; background: transparent; padding: 9px 12px 10px; font-size: 13px; font-weight: 600;
+    color: var(--muted); border-block-end: 2px solid transparent; margin-block-end: -1px;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .tabbar button:hover { color: var(--ink); }
+  .tabbar button[aria-selected="true"] { color: var(--ink); border-block-end-color: var(--primary); }
+  .tabbar button.manage { margin-inline-start: auto; }
+  .tabbar button.manage[aria-selected="true"] { border-block-end-color: var(--accent); color: var(--accent); }
+  .count {
+    font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 1px 6px; line-height: 1.5;
+    background: var(--line); color: var(--muted);
+  }
+  .count.crit { background: var(--crit-soft); color: var(--crit); }
+  .count.warn { background: var(--warn-soft); color: var(--warn); }
+
+  /* row 3 — the single visible view */
+  .viewport { overflow: auto; }
+  .view { display: none; padding: 16px 18px 20px; }
+  .view.on { display: grid; }
+  .view.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
+  .view.cols2 { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 26px; }
+  .view.manage { grid-template-columns: 214px minmax(0, 1fr); gap: 0; padding: 0; }
+
+  .stack { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  .stack > .eyebrow { margin-block-end: -2px; }
+
+  .rows > div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+  .rows > div + div { border-block-start: 1px solid var(--line-soft); }
+  .rows .k { color: var(--muted); }
+  .rows .v { font-weight: 600; text-align: end; }
+
+  .lead { font-size: 14px; }
+  .big { font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.025em; }
+  .delta { font-size: 13px; font-weight: 700; }
+
+  .alert { display: flex; gap: 9px; padding: 8px 10px; border-radius: 8px; font-size: 13px; align-items: flex-start; }
+  .alert.critical { background: var(--crit-soft); }
+  .alert.watch { background: var(--warn-soft); }
+  .alert .bar { width: 3px; align-self: stretch; border-radius: 2px; flex: 0 0 auto; }
+  .alert.critical .bar { background: var(--crit); }
+  .alert.watch .bar { background: var(--warn); }
+
+  .rec { display: flex; gap: 9px; padding: 7px 0; }
+  .rec + .rec { border-block-start: 1px solid var(--line-soft); }
+  .rec .sev { width: 3px; border-radius: 2px; flex: 0 0 auto; }
+  .rec .src { font-size: 11px; color: var(--muted); margin-block-start: 2px; }
+
+  .analysis {
+    border-inline-start: 3px solid var(--warn); background: var(--warn-soft);
+    border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 13px;
+  }
+  .analysis.calm { border-inline-start-color: var(--primary); background: var(--primary-soft); }
+  .analysis b { color: var(--warn); }
+  .analysis.calm b { color: var(--primary); }
+
+  .empty { color: var(--muted); }
+
+  .link {
+    border: 0; background: transparent; padding: 0; color: var(--accent);
+    font-size: 12.5px; font-weight: 600; align-self: flex-start;
+  }
+  .link:hover { text-decoration: underline; }
+
+  /* index view */
+  .index-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .index-pills button {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    padding: 4px 12px; font-size: 12px; font-weight: 700; color: var(--muted);
+  }
+  .index-pills button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--panel); }
+  .index-pills button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .range { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .range input[type="date"] {
+    font: inherit; font-size: 12px; font-variant-numeric: tabular-nums;
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px;
+    background: var(--panel); color: var(--ink);
+  }
+  .range .preset {
+    border: 0; background: var(--line-soft); border-radius: 999px;
+    padding: 4px 10px; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  }
+  .range .preset:hover { background: var(--primary-soft); color: var(--primary); }
+
+  .chartwrap { position: relative; }
+  .chartwrap svg { display: block; width: 100%; height: auto; }
+  .grid-line { stroke: var(--line); }
+  .grid-label, .axis-label { font-size: 9.5px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .norm-band { fill: var(--primary); opacity: .08; }
+  .series-line { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .series-area { fill: url(#areaFade); }
+  .endpoint { fill: var(--primary); stroke: var(--panel); stroke-width: 2.5; }
+  .cursor-line { stroke: var(--ink); stroke-dasharray: 3 3; opacity: .4; }
+  .cursor-dot { fill: var(--ink); }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--bg);
+    border-radius: 7px; padding: 5px 9px; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+    transform: translate(-50%, -125%); opacity: 0; transition: opacity .1s ease; font-variant-numeric: tabular-nums;
+  }
+  .tip.on { opacity: 1; }
+  .definition code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+    background: var(--line-soft); border-radius: 5px; padding: 1px 6px;
+  }
+
+  /* conditions view */
+  .treelist { display: flex; flex-direction: column; gap: 3px; }
+  .treelist button {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: start;
+    border: 0; background: transparent; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600;
+  }
+  .treelist button:hover { background: var(--line-soft); }
+  .treelist button[aria-pressed="true"] { background: var(--line-soft); }
+  .treelist .flag { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .treelist .tail { margin-inline-start: auto; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+  .cond { display: flex; gap: 9px; padding: 9px 11px; border-radius: 8px; align-items: flex-start; }
+  .cond + .cond { margin-block-start: 5px; }
+  .cond .mark { font-weight: 800; flex: 0 0 auto; }
+  .cond.pass { background: var(--primary-soft); }
+  .cond.pass .mark { color: var(--primary); }
+  .cond.fail { background: var(--crit-soft); }
+  .cond.fail .mark { color: var(--crit); }
+  .cond.idle { background: var(--line-soft); color: var(--muted); }
+  .cond .val { color: var(--muted); font-size: 11.5px; display: block; margin-block-start: 2px; font-variant-numeric: tabular-nums; }
+
+  /* field view */
+  .meter { height: 7px; border-radius: 999px; background: var(--line); overflow: hidden; margin-block: 7px 4px; }
+  .meter > i { display: block; height: 100%; border-radius: 999px; }
+  .meter-scale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .wx { display: flex; gap: 7px; }
+  .wx div { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 7px 0; text-align: center; }
+  .wx .d { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .wx .t { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ---------- manage view ---------- */
+  .mnav {
+    border-inline-end: 1px solid var(--line); background: var(--panel-2);
+    padding: 12px 10px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .mnav button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;
+    border: 0; background: transparent; border-radius: 8px; padding: 9px 11px; font-size: 13px; font-weight: 600;
+  }
+  .mnav button:hover { background: var(--line-soft); }
+  .mnav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .mnav button.danger { color: var(--crit); margin-block-start: auto; }
+  .mnav button.danger:hover { background: var(--crit-soft); }
+  .mnav .glyph { width: 16px; text-align: center; opacity: .8; }
+
+  .mpane { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 13px; min-width: 0; }
+  .mpane h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  .mpane .why { color: var(--muted); font-size: 12.5px; margin-block-start: -8px; }
+
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 16px; max-width: 720px; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field label { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .field input, .field select, .field textarea {
+    font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 9px; background: var(--panel); color: var(--ink); width: 100%;
+  }
+  .field input:read-only { background: var(--line-soft); color: var(--muted); }
+  .field .hintline { font-size: 11px; color: var(--muted); }
+
+  .formbar { display: flex; gap: 8px; align-items: center; padding-block-start: 3px; }
+  .formbar .spacer { margin-inline-start: auto; }
+
+  .callout {
+    display: flex; gap: 10px; align-items: flex-start; border-radius: 8px; padding: 10px 12px; font-size: 13px;
+    background: var(--accent-soft); border-inline-start: 3px solid var(--accent);
+  }
+  .callout.danger { background: var(--crit-soft); border-inline-start-color: var(--crit); }
+  .callout b { display: block; margin-block-end: 2px; }
+
+  .checkline { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; }
+  .checkline input { margin-block-start: 3px; }
+  .checkline span small { display: block; color: var(--muted); font-size: 11.5px; }
+
+  .toast {
+    position: absolute; inset-block-end: 400px; inset-inline-start: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg); border-radius: 999px; padding: 9px 18px;
+    font-size: 13px; font-weight: 600; box-shadow: var(--shadow-pop);
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .toast.on { opacity: 1; }
+
+  /* provenance marking (review aid) */
+  .tag {
+    display: none; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    border-radius: 4px; padding: 2px 5px; border: 1px solid; vertical-align: 2px;
+  }
+  .console.show-origin .tag { display: inline-block; }
+  .tag.new { color: var(--accent); border-color: var(--accent); }
+  .tag.live { color: var(--muted); border-color: var(--line); }
+
+  @media (max-width: 1040px) {
+    .view.cols3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .view.manage { grid-template-columns: 168px minmax(0, 1fr); }
+    .idbar .sub { display: none; }
+  }
+</style>
+
+<div class="console" id="console">
+
+  <!-- ============================== MAP ============================== -->
+  <div class="stage">
+    <svg class="basemap" id="basemap" viewBox="0 0 1200 660" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Farm map with selectable blocks">
+      <defs>
+        <pattern id="grat" width="60" height="60" patternUnits="userSpaceOnUse">
+          <path d="M60 0 L0 0 0 60" fill="none" stroke="var(--map-grat)" stroke-width="1"/>
+        </pattern>
+        <linearGradient id="areaFade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/>
+        </linearGradient>
+        <clipPath id="gridClip"><rect x="0" y="0" width="0" height="0"/></clipPath>
+      </defs>
+
+      <rect width="1200" height="660" fill="var(--map-soil)"/>
+      <path d="M0 0 L1200 0 L1200 250 Q 700 300 0 230 Z" fill="var(--map-soil-2)"/>
+      <rect width="1200" height="660" fill="url(#grat)"/>
+
+      <rect x="84" y="0" width="13" height="660" fill="var(--map-road)"/>
+      <path d="M90 278 H 1140" stroke="var(--irrig)" stroke-width="9" opacity="0.4" fill="none"/>
+      <path d="M90 278 H 1140" stroke="var(--irrig)" stroke-width="2.5" opacity="0.75" fill="none"/>
+      <text x="1010" y="270" class="parcel-sub">Main canal</text>
+
+      <g id="parcels"></g>
+      <g id="overlay"></g>
+
+      <g transform="translate(1044,614)">
+        <rect x="0" y="0" width="60" height="4" fill="var(--ink)" opacity=".5"/>
+        <rect x="60" y="0" width="60" height="4" fill="var(--ink)" opacity=".18"/>
+        <text x="0" y="18" class="parcel-sub">0</text>
+        <text x="106" y="18" class="parcel-sub">400 m</text>
+      </g>
+      <g transform="translate(1152,44)">
+        <path d="M0 -18 L7 10 L0 4 L-7 10 Z" fill="var(--ink)" opacity=".55"/>
+        <text x="-4" y="26" class="parcel-sub">N</text>
+      </g>
+    </svg>
+
+    <div class="map-chrome">
+      <div class="plate map-title"><strong>Bashayer Farm</strong> &nbsp;<span class="num">36 blocks · 148.6 ha · Ismailia</span></div>
+      <div class="plate segmented" role="group" aria-label="Map layer">
+        <button type="button" aria-pressed="true" data-layer="health">Health</button>
+        <button type="button" aria-pressed="false" data-layer="ndvi">NDVI</button>
+        <button type="button" aria-pressed="false" data-layer="soil">Soil</button>
+      </div>
+    </div>
+
+    <div class="note">
+      <button type="button" class="toggle" id="originToggle" aria-pressed="false">
+        <span aria-hidden="true">◨</span> Mark what&rsquo;s new
+      </button>
+    </div>
+
+    <div class="hint"><span>Select a block to open its details</span></div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <!-- ============================== DOCK ============================== -->
+  <div class="dock" id="dock" role="region" aria-label="Block details">
+
+    <!-- identity -->
+    <div class="idbar">
+      <h2 id="dkName">Block A2</h2>
+      <span class="sub" id="dkSub">Mango · Alphonso · 4.0 ha</span>
+      <span class="pill watch" id="dkHealth"><span class="dot"></span> Watch</span>
+      <span class="pill editing" id="dkEditing" hidden>✎ Editing</span>
+      <div class="peekstats" id="dkPeek"></div>
+      <div class="right">
+        <span class="stamp num" id="dkStamp">Updated 2 h ago</span>
+        <button type="button" class="btn icon" id="peekBtn" title="Collapse panel" aria-label="Collapse panel">▾</button>
+        <button type="button" class="btn icon" id="closeBtn" title="Close" aria-label="Close panel">✕</button>
+      </div>
+    </div>
+
+    <!-- view tabs -->
+    <div class="tabbar" role="tablist" id="tabbar">
+      <button type="button" role="tab" data-view="overview" aria-selected="true">Overview</button>
+      <button type="button" role="tab" data-view="index" aria-selected="false">Index</button>
+      <button type="button" role="tab" data-view="conditions" aria-selected="false">Conditions <span class="count" id="tbCond">4</span></button>
+      <button type="button" role="tab" data-view="field" aria-selected="false">Field &amp; plan</button>
+      <button type="button" role="tab" data-view="manage" aria-selected="false" class="manage">✎ Manage</button>
+    </div>
+
+    <div class="viewport">
+
+      <!-- ---------- OVERVIEW ---------- -->
+      <section class="view cols3 on" id="v-overview">
+        <div class="stack">
+          <div class="eyebrow">Needs attention <span class="tag live">in app today</span></div>
+          <div id="ovAlerts"></div>
+          <div id="ovRecs"></div>
+        </div>
+
+        <div class="stack">
+          <div class="eyebrow">Vegetation index <span class="tag new">reworked</span></div>
+          <div style="display:flex;align-items:flex-end;gap:14px">
+            <span class="big num" id="ovValue">0.58</span>
+            <span style="padding-block-end:4px">
+              <span class="delta num" id="ovDelta">▲ +4.2%</span><br/>
+              <span class="stamp">NDVI · last 14 days</span>
+            </span>
+          </div>
+          <div class="chartwrap"><svg id="ovChart" viewBox="0 0 420 92" aria-hidden="true"></svg></div>
+          <button type="button" class="link" data-goto="index">Open index detail →</button>
+        </div>
+
+        <div class="stack">
+          <div class="eyebrow">Reading <span class="tag new">new</span></div>
+          <div id="ovAnalysis"></div>
+          <div class="rows" id="ovNext"></div>
+        </div>
+      </section>
+
+      <!-- ---------- INDEX ---------- -->
+      <section class="view cols2" id="v-index">
+        <div class="stack">
+          <div class="index-pills" id="idxPills" role="group" aria-label="Index"></div>
+          <div class="range">
+            <input type="date" id="dFrom" value="2026-05-01" aria-label="From date"/>
+            <span class="muted" aria-hidden="true">→</span>
+            <input type="date" id="dTo" value="2026-06-30" aria-label="To date"/>
+            <button type="button" class="preset" data-days="30">30 d</button>
+            <button type="button" class="preset" data-days="90">90 d</button>
+            <button type="button" class="preset" data-days="365">Season</button>
+          </div>
+          <div class="chartwrap">
+            <svg id="chart" viewBox="0 0 620 190" role="img" aria-label="Index time series"></svg>
+            <div class="tip" id="tip"></div>
+          </div>
+          <div class="stamp" id="idxFoot"></div>
+        </div>
+
+        <div class="stack">
+          <div style="display:flex;align-items:flex-end;gap:16px">
+            <span class="big num" id="idxValue">0.58</span>
+            <span style="padding-block-end:4px">
+              <span class="delta num" id="idxDelta">▲ +4.2%</span><br/>
+              <span class="stamp">over last 14 days</span>
+            </span>
+          </div>
+          <div class="rows" id="idxRows"></div>
+          <div class="eyebrow" style="margin-block-start:4px">Definition &amp; logic <span class="tag new">new</span></div>
+          <div class="definition" id="idxDef"></div>
+          <div class="eyebrow" style="margin-block-start:4px">Analysis <span class="tag new">new</span></div>
+          <div id="idxAnalysis"></div>
+        </div>
+      </section>
+
+      <!-- ---------- CONDITIONS ---------- -->
+      <section class="view cols2" id="v-conditions">
+        <div class="stack" style="grid-column: 1 / -1; display:grid; grid-template-columns: 236px minmax(0,1fr); gap: 26px">
+          <div class="stack">
+            <div class="eyebrow">Decision trees <span class="tag new">new</span></div>
+            <div class="treelist" id="dtList" role="group" aria-label="Decision trees"></div>
+          </div>
+          <div class="stack">
+            <div class="eyebrow" id="dtHeading">Conditions</div>
+            <div id="dtBody"></div>
+            <div class="lead" id="dtVerdict" style="margin-block-start:4px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- FIELD & PLAN ---------- -->
+      <section class="view cols3" id="v-field">
+        <div class="stack">
+          <div class="eyebrow">Water <span class="tag live">in app today</span></div>
+          <div class="rows">
+            <div><span class="k">Last irrigation</span><span class="v num" id="fLast">—</span></div>
+            <div><span class="k">Next scheduled</span><span class="v num" id="fNext">—</span></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between"><span class="muted">Soil moisture</span><span class="num" style="font-weight:600" id="fSoil">—</span></div>
+            <div class="meter"><i id="fMeter" style="width:0%"></i></div>
+            <div class="meter-scale"><span>0%</span><span>target 35–50%</span><span>100%</span></div>
+          </div>
+          <div class="eyebrow" style="margin-block-start:6px">3-day outlook</div>
+          <div class="wx" id="fWx"></div>
+        </div>
+
+        <div class="stack">
+          <div class="eyebrow">Plan &amp; activities <span class="tag live">in app today</span></div>
+          <div class="lead" id="fPlanLine"></div>
+          <div class="rows" id="fActs"></div>
+        </div>
+
+        <div class="stack">
+          <div class="eyebrow">Field signals &amp; sources <span class="tag live">in app today</span></div>
+          <div class="rows" id="fSignals"></div>
+          <div class="rows" id="fSources"></div>
+        </div>
+      </section>
+
+      <!-- ---------- MANAGE ---------- -->
+      <section class="view manage" id="v-manage">
+        <nav class="mnav" id="mnav" aria-label="Manage actions">
+          <button type="button" data-act="edit" aria-pressed="true"><span class="glyph">✎</span> Edit details</button>
+          <button type="button" data-act="crop"><span class="glyph">🌱</span> Assign crop</button>
+          <button type="button" data-act="reshape"><span class="glyph">⬡</span> Reshape boundary</button>
+          <button type="button" data-act="grid"><span class="glyph">◫</span> Grid configuration</button>
+          <button type="button" data-act="inactivate" class="danger"><span class="glyph">⊘</span> Inactivate block</button>
+        </nav>
+        <div class="mpane" id="mpane"></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var HEALTH = { healthy: "var(--good)", watch: "var(--warn)", critical: "var(--crit)", unknown: "var(--unknown)" };
+  var HEALTH_LABEL = { healthy: "Healthy", watch: "Watch", critical: "Critical", unknown: "No data" };
+
+  var INDEX = {
+    ndvi: { label: "NDVI", name: "Normalised Difference Vegetation Index", formula: "(NIR − Red) / (NIR + Red)",
+      text: "Canopy greenness. Rises as leaf area and chlorophyll build up, so it tracks vigour through the season.",
+      prov: "Sentinel-2 L2A, 10 m, cloud-free pixels only. Averaged over the block boundary.", lo: 0.15, hi: 0.9 },
+    ndre: { label: "NDRE", name: "Normalised Difference Red-Edge", formula: "(NIR − RedEdge) / (NIR + RedEdge)",
+      text: "Chlorophyll in the upper canopy. Moves about a week before NDVI, so it is the earlier warning of the two.",
+      prov: "Sentinel-2 L2A band 5 (705 nm), 20 m resampled to block mean.", lo: 0.1, hi: 0.6 },
+    ndwi: { label: "NDWI", name: "Normalised Difference Water Index", formula: "(Green − NIR) / (Green + NIR)",
+      text: "Canopy water content. Falls first when a block enters water stress, ahead of visible greenness loss.",
+      prov: "Sentinel-2 L2A bands 3 and 8. Block mean over cloud-free pixels.", lo: -0.35, hi: 0.35 },
+    ndmi: { label: "NDMI", name: "Normalised Difference Moisture Index", formula: "(NIR − SWIR1) / (NIR + SWIR1)",
+      text: "Moisture held in leaf tissue.",
+      prov: "Needs a SWIR band, which the current imagery provider does not supply.", lo: 0, hi: 0.5, unavailable: true }
+  };
+
+  var BLOCKS = [
+    { id: "A1", name: "Block A1", code: "BSH-A1", type: "Block", crop: "Mango", variety: "Alphonso", area: 5.2, health: "healthy",
+      stage: "Fruit development", season: "Summer 2026", planted: "2019-03-12", updated: "Updated 3 h ago",
+      base: { ndvi: 0.71, ndre: 0.38, ndwi: 0.14 }, slope: 0.9, soil: 44, soilStatus: "optimal",
+      pts: "140,110 340,104 352,252 150,258",
+      alerts: [], recs: [{ sev: "info", txt: "Hold the current irrigation interval.", src: "irrigation_mango_v4 · 0.91" }],
+      irr: { last: "20 mm · 26 Jun", next: "20 mm · 3 Jul" }, wx: [["Today", 36], ["Fri", 37], ["Sat", 35]],
+      acts: [["Irrigation", "Mon 1 Jul"], ["Scouting", "Thu 4 Jul"]],
+      planLine: "2 activities this week — irrigation (Mon), scouting (Thu).",
+      signals: [["Leaf sample N", "2.4 % · 26 Jun"], ["Trap count", "3 · 27 Jun"]],
+      imagery: "2 active", weather: "1 active", grid: 30,
+      analysis: { tone: "calm", txt: "Steady rise consistent with fruit development, tracking the 5-season normal within 0.02. No anomaly. Continue the current plan." },
+      dt: {
+        Irrigation: { flag: "pass", conds: [["pass", "Soil moisture within target range", "44% · target 35–50%"], ["pass", "No rainfall above 5 mm in 72 h", "0.0 mm forecast"], ["pass", "Days since last irrigation below threshold", "4 d · threshold 7 d"]], verdict: "No action required." },
+        "Pest risk": { flag: "pass", conds: [["pass", "Trap count below action threshold", "3 · threshold 12"], ["pass", "Humidity below fungal risk band", "38% · band 70–95%"]], verdict: "No action required." },
+        "Growth stage": { flag: "pass", conds: [["pass", "Accumulated GDD in window", "1 420 °C·d"], ["pass", "NDVI plateau not reached", "0.71 rising"]], verdict: "Stage confirmed: fruit development." },
+        Nutrient: { flag: "pass", conds: [["pass", "NDRE above deficiency threshold", "0.38 · threshold 0.30"], ["idle", "Leaf tissue test within 30 days", "sampled 26 Jun"]], verdict: "No fertigation change indicated." }
+      } },
+
+    { id: "A2", name: "Block A2", code: "BSH-A2", type: "Block", crop: "Mango", variety: "Alphonso", area: 4.0, health: "watch",
+      stage: "Fruit development", season: "Summer 2026", planted: "2019-03-12", updated: "Updated 2 h ago",
+      base: { ndvi: 0.58, ndre: 0.31, ndwi: 0.06 }, slope: 0.6, soil: 41, soilStatus: "optimal",
+      pts: "368,104 566,100 576,248 380,252",
+      alerts: [{ sev: "watch", txt: "NDWI down 0.05 in 10 days while NDVI held — early canopy water stress." }],
+      recs: [{ sev: "warning", txt: "Bring the next irrigation forward by one day and add 4 mm.", src: "irrigation_mango_v4 · 0.78" },
+             { sev: "info", txt: "Re-check NDWI after the 2 Jul pass.", src: "imagery_followup_v2 · 0.85" }],
+      irr: { last: "18 mm · 24 Jun", next: "22 mm · 2 Jul" }, wx: [["Today", 37], ["Fri", 38], ["Sat", 36]],
+      acts: [["Irrigation", "Mon 1 Jul"], ["Scouting", "Thu 4 Jul"]],
+      planLine: "2 activities this week — irrigation (Mon), scouting (Thu).",
+      signals: [["Leaf sample N", "2.1 % · 24 Jun"], ["Trap count", "7 · 27 Jun"], ["Soil probe 30 cm", "41 % · 28 Jun"]],
+      imagery: "2 active", weather: "1 active", grid: 30,
+      analysis: { tone: "warn", txt: "Greenness still climbing, but canopy water has dropped for three consecutive passes while air temperature ran 2 °C above normal. That split usually precedes a vigour stall by 7–10 days." },
+      dt: {
+        Irrigation: { flag: "fail", conds: [["pass", "Soil moisture within target range", "41% · target 35–50%"], ["fail", "NDWI 10-day change above stress threshold", "−0.05 · threshold −0.03"], ["fail", "Forecast max temperature below stress band", "38 °C · band ≥ 36 °C"]], verdict: "2 of 3 conditions failed → irrigation advance recommended." },
+        "Pest risk": { flag: "pass", conds: [["pass", "Trap count below action threshold", "7 · threshold 12"], ["pass", "Humidity below fungal risk band", "35% · band 70–95%"]], verdict: "No action required." },
+        "Growth stage": { flag: "pass", conds: [["pass", "Accumulated GDD in window", "1 385 °C·d"], ["pass", "NDVI plateau not reached", "0.58 rising"]], verdict: "Stage confirmed: fruit development." },
+        Nutrient: { flag: "pass", conds: [["pass", "NDRE above deficiency threshold", "0.31 · threshold 0.30"], ["idle", "Leaf tissue test within 30 days", "sampled 24 Jun"]], verdict: "Margin is thin — recheck after the next pass." }
+      } },
+
+    { id: "B1", name: "Block B1", code: "BSH-B1", type: "Block", crop: "Citrus", variety: "Valencia", area: 6.1, health: "critical",
+      stage: "Fruit set", season: "Summer 2026", planted: "2017-11-04", updated: "Updated 40 min ago",
+      base: { ndvi: 0.39, ndre: 0.19, ndwi: -0.08 }, slope: -1.6, soil: 22, soilStatus: "low",
+      pts: "150,300 350,296 360,444 160,450",
+      alerts: [{ sev: "critical", txt: "Soil moisture 22% — below the 30% critical floor for citrus at fruit set." },
+               { sev: "critical", txt: "NDVI down 0.11 over 14 days across the north-west third." },
+               { sev: "watch", txt: "Weather subscription last synced 31 h ago." }],
+      recs: [{ sev: "critical", txt: "Irrigate 30 mm within 24 hours. Fruit drop risk if deferred past 2 Jul.", src: "irrigation_citrus_v3 · 0.94" },
+             { sev: "warning", txt: "Inspect the north-west zone for emitter blockage — the decline is spatially clustered.", src: "zone_anomaly_v2 · 0.72" }],
+      irr: { last: "12 mm · 20 Jun", next: "not scheduled" }, wx: [["Today", 38], ["Fri", 39], ["Sat", 38]],
+      acts: [["Fertigation", "Wed 3 Jul"]],
+      planLine: "1 activity this week — fertigation (Wed). No irrigation on the calendar.",
+      signals: [["Soil probe 30 cm", "22 % · 29 Jun"], ["Emitter pressure", "0.9 bar · 28 Jun"]],
+      imagery: "2 active", weather: "1 failing", grid: 20,
+      analysis: { tone: "warn", txt: "Sustained decline across all three indices, steepest in NDWI. With a 0.9 bar emitter reading, this reads as a delivery fault rather than a scheduling gap — a normal-interval irrigation will not recover it." },
+      dt: {
+        Irrigation: { flag: "fail", conds: [["fail", "Soil moisture within target range", "22% · target 35–50%"], ["fail", "Days since last irrigation below threshold", "9 d · threshold 6 d"], ["fail", "NDWI 10-day change above stress threshold", "−0.09 · threshold −0.03"]], verdict: "3 of 3 conditions failed → emergency irrigation." },
+        "Pest risk": { flag: "idle", conds: [["pass", "Trap count below action threshold", "4 · threshold 10"], ["idle", "Scouting record within 14 days", "last 18 Jun — overdue"]], verdict: "Inconclusive: scouting record is stale." },
+        "Growth stage": { flag: "fail", conds: [["fail", "NDVI above fruit-set floor", "0.39 · floor 0.45"], ["pass", "Accumulated GDD in window", "980 °C·d"]], verdict: "Stage at risk — vigour below the floor for fruit set." },
+        Nutrient: { flag: "fail", conds: [["fail", "NDRE above deficiency threshold", "0.19 · threshold 0.26"], ["idle", "Leaf tissue test within 30 days", "no sample on record"]], verdict: "Deficiency indicated, but water stress must be resolved first." }
+      } },
+
+    { id: "B2", name: "Block B2", code: "BSH-B2", type: "Block", crop: "Citrus", variety: "Valencia", area: 2.8, health: "healthy",
+      stage: "Fruit set", season: "Summer 2026", planted: "2017-11-04", updated: "Updated 3 h ago",
+      base: { ndvi: 0.63, ndre: 0.33, ndwi: 0.09 }, slope: 0.3, soil: 43, soilStatus: "optimal",
+      pts: "378,296 536,292 544,440 388,444",
+      alerts: [], recs: [{ sev: "info", txt: "Hold the current plan. Next evaluation 2 Jul.", src: "irrigation_citrus_v3 · 0.90" }],
+      irr: { last: "16 mm · 25 Jun", next: "16 mm · 2 Jul" }, wx: [["Today", 37], ["Fri", 38], ["Sat", 36]],
+      acts: [["Fertigation", "Wed 3 Jul"]], planLine: "1 activity this week — fertigation (Wed).",
+      signals: [["Soil probe 30 cm", "43 % · 28 Jun"]], imagery: "2 active", weather: "1 active", grid: 20,
+      analysis: { tone: "calm", txt: "Flat and on normal. Shares a valve with B1 but shows none of its decline, which supports the emitter-fault reading next door rather than a supply problem." },
+      dt: {
+        Irrigation: { flag: "pass", conds: [["pass", "Soil moisture within target range", "43% · target 35–50%"], ["pass", "Days since last irrigation below threshold", "4 d · threshold 6 d"]], verdict: "No action required." },
+        "Pest risk": { flag: "pass", conds: [["pass", "Trap count below action threshold", "3 · threshold 10"]], verdict: "No action required." },
+        "Growth stage": { flag: "pass", conds: [["pass", "NDVI above fruit-set floor", "0.63 · floor 0.45"]], verdict: "Stage confirmed: fruit set." },
+        Nutrient: { flag: "pass", conds: [["pass", "NDRE above deficiency threshold", "0.33 · threshold 0.26"]], verdict: "No fertigation change indicated." }
+      } },
+
+    { id: "C1", name: "Pivot C1", code: "BSH-C1", type: "Pivot", crop: "Alfalfa", variety: null, area: 12.5, health: "watch",
+      stage: "Cut 3 regrowth", season: "Summer 2026", planted: "2025-10-02", updated: "Updated 5 h ago",
+      base: { ndvi: 0.52, ndre: 0.27, ndwi: 0.04 }, slope: 2.4, soil: 38, soilStatus: "optimal",
+      circle: { cx: 700, cy: 420, r: 125 },
+      alerts: [{ sev: "watch", txt: "Regrowth is 4 days behind the cut-3 curve." }],
+      recs: [{ sev: "warning", txt: "Delay the next cut by 3–4 days to recover biomass.", src: "forage_cut_v1 · 0.69" }],
+      irr: { last: "24 mm · 27 Jun", next: "24 mm · 1 Jul" }, wx: [["Today", 36], ["Fri", 37], ["Sat", 35]],
+      acts: [["Irrigation", "Mon 1 Jul"], ["Cut", "Sun 7 Jul"]],
+      planLine: "2 activities this week — irrigation (Mon), cut (Sun).",
+      signals: [["Biomass estimate", "1.9 t/ha · 28 Jun"]], imagery: "1 active", weather: "1 active", grid: 50,
+      analysis: { tone: "warn", txt: "Regrowth slope is positive but shallower than the previous two cuts at the same day-count. Heat in the first week after cutting is the likely cause; the curve usually recovers if the cut is pushed back." },
+      dt: {
+        Irrigation: { flag: "pass", conds: [["pass", "Soil moisture within target range", "38% · target 30–45%"]], verdict: "No action required." },
+        "Pest risk": { flag: "pass", conds: [["pass", "No aphid threshold breach", "below threshold"]], verdict: "No action required." },
+        "Growth stage": { flag: "fail", conds: [["fail", "Regrowth on the cut-3 curve", "day 14 · 4 d behind"], ["pass", "Accumulated GDD since cut", "310 °C·d"]], verdict: "Cut date should move out by 3–4 days." },
+        Nutrient: { flag: "pass", conds: [["pass", "NDRE above deficiency threshold", "0.27 · threshold 0.24"]], verdict: "No fertigation change indicated." }
+      } },
+
+    { id: "D1", name: "Block D1", code: "BSH-D1", type: "Block", crop: null, variety: null, area: 4.7, health: "unknown",
+      stage: "—", season: "—", planted: null, updated: "No data yet",
+      base: null, slope: 0, soil: null, soilStatus: "unknown",
+      pts: "860,110 1050,105 1060,250 870,256",
+      alerts: [], recs: [], irr: { last: "—", next: "—" }, wx: [["Today", 36], ["Fri", 37], ["Sat", 35]],
+      acts: [], planLine: "No plan assigned to this block.", signals: [],
+      imagery: "0 active", weather: "0 active", grid: null, analysis: null, dt: null }
+  ];
+
+  // ------------------------------------------------------------ helpers
+  var $ = function (id) { return document.getElementById(id); };
+  var con = $("console");
+  var state = { id: null, view: "overview", index: "ndvi", tree: "Irrigation", from: "2026-05-01", to: "2026-06-30", act: "edit", mapMode: null, gridSize: 30 };
+
+  function B() { for (var i = 0; i < BLOCKS.length; i++) if (BLOCKS[i].id === state.id) return BLOCKS[i]; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function hash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) { var a = seed >>> 0; return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function pISO(v) { var p = v.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function fmtDay(d) { return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
+  function rowsHTML(pairs) { return pairs.map(function (p) { return '<div><span class="k">' + esc(p[0]) + '</span><span class="v num">' + esc(p[1]) + "</span></div>"; }).join(""); }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast"); el.textContent = msg; el.classList.add("on");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("on"); }, 2400);
+  }
+
+  // ------------------------------------------------------------ map
+  function centroid(b) {
+    if (b.circle) return [b.circle.cx, b.circle.cy];
+    var n = b.pts.split(/[ ,]+/).map(Number), xs = [], ys = [];
+    for (var i = 0; i < n.length; i += 2) { xs.push(n[i]); ys.push(n[i + 1]); }
+    return [xs.reduce(function (a, c) { return a + c; }, 0) / xs.length, ys.reduce(function (a, c) { return a + c; }, 0) / ys.length];
+  }
+  function bbox(b) {
+    if (b.circle) return [b.circle.cx - b.circle.r, b.circle.cy - b.circle.r, b.circle.r * 2, b.circle.r * 2];
+    var n = b.pts.split(/[ ,]+/).map(Number), xs = [], ys = [];
+    for (var i = 0; i < n.length; i += 2) { xs.push(n[i]); ys.push(n[i + 1]); }
+    var x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys);
+    return [x0, y0, Math.max.apply(null, xs) - x0, Math.max.apply(null, ys) - y0];
+  }
+
+  function drawParcels() {
+    var out = "";
+    BLOCKS.forEach(function (b) {
+      var color = HEALTH[b.health], c = centroid(b), shape;
+      if (b.circle) {
+        shape = '<circle class="parcel-halo" cx="' + b.circle.cx + '" cy="' + b.circle.cy + '" r="' + b.circle.r + '"/>' +
+          '<circle class="parcel-fill" cx="' + b.circle.cx + '" cy="' + b.circle.cy + '" r="' + b.circle.r + '" fill="' + color + '"/>' +
+          '<circle class="parcel-stroke" cx="' + b.circle.cx + '" cy="' + b.circle.cy + '" r="' + b.circle.r + '" stroke="' + color + '"/>' +
+          '<path d="M' + b.circle.cx + " " + b.circle.cy + " L" + (b.circle.cx + b.circle.r - 6) + " " + (b.circle.cy - 8) + '" stroke="' + color + '" stroke-width="2" opacity=".65" fill="none"/>';
+      } else {
+        shape = '<polygon class="parcel-halo" points="' + b.pts + '"/>' +
+          '<polygon class="parcel-fill" points="' + b.pts + '" fill="' + color + '"/>' +
+          '<polygon class="parcel-stroke" points="' + b.pts + '" stroke="' + color + '"/>';
+      }
+      var sub = (b.crop ? b.crop : "unassigned") + " · " + b.area.toFixed(1) + " ha";
+      out += '<g class="parcel" data-id="' + b.id + '" tabindex="0" role="button" aria-label="' + esc(b.name) + '">' + shape +
+        '<text class="parcel-label" x="' + c[0] + '" y="' + (c[1] - 2) + '" text-anchor="middle">' + esc(b.name) + "</text>" +
+        '<text class="parcel-sub" x="' + c[0] + '" y="' + (c[1] + 14) + '" text-anchor="middle">' + esc(sub) + "</text></g>";
+    });
+    $("parcels").innerHTML = out;
+    Array.prototype.forEach.call($("parcels").querySelectorAll(".parcel"), function (el) {
+      el.addEventListener("click", function () { select(el.getAttribute("data-id")); });
+      el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(el.getAttribute("data-id")); } });
+    });
+  }
+  function paintSelection() {
+    Array.prototype.forEach.call(document.querySelectorAll(".parcel"), function (el) {
+      el.classList.toggle("selected", el.getAttribute("data-id") === state.id);
+    });
+  }
+
+  // map overlays driven by the Manage tab
+  function renderOverlay() {
+    var ov = $("overlay"), b = B();
+    con.classList.toggle("editing", !!state.mapMode);
+    $("dkEditing").hidden = !state.mapMode;
+    if (!b || !state.mapMode) { ov.innerHTML = ""; return; }
+
+    if (state.mapMode === "reshape") {
+      if (b.circle) {
+        ov.innerHTML = '<circle class="handle" cx="' + (b.circle.cx + b.circle.r) + '" cy="' + b.circle.cy + '" r="7" data-vi="r"/>';
+      } else {
+        var n = b.pts.split(/[ ,]+/).map(Number), h = "";
+        for (var i = 0; i < n.length; i += 2) h += '<circle class="handle" cx="' + n[i] + '" cy="' + n[i + 1] + '" r="7" data-vi="' + (i / 2) + '"/>';
+        ov.innerHTML = h;
+      }
+      wireHandles();
+    } else if (state.mapMode === "grid") {
+      var bb = bbox(b), step = { 20: 26, 30: 39, 50: 65 }[state.gridSize] || 39;
+      var clip = document.querySelector("#gridClip");
+      clip.innerHTML = b.circle
+        ? '<circle cx="' + b.circle.cx + '" cy="' + b.circle.cy + '" r="' + b.circle.r + '"/>'
+        : '<polygon points="' + b.pts + '"/>';
+      var lines = "";
+      for (var x = bb[0]; x <= bb[0] + bb[2]; x += step) lines += '<line class="gridline" x1="' + x + '" y1="' + bb[1] + '" x2="' + x + '" y2="' + (bb[1] + bb[3]) + '"/>';
+      for (var y = bb[1]; y <= bb[1] + bb[3]; y += step) lines += '<line class="gridline" x1="' + bb[0] + '" y1="' + y + '" x2="' + (bb[0] + bb[2]) + '" y2="' + y + '"/>';
+      ov.innerHTML = '<g clip-path="url(#gridClip)">' + lines + "</g>";
+    } else {
+      ov.innerHTML = "";
+    }
+  }
+
+  function wireHandles() {
+    var svg = $("basemap"), b = B();
+    Array.prototype.forEach.call($("overlay").querySelectorAll(".handle"), function (h) {
+      h.addEventListener("pointerdown", function (e) {
+        e.preventDefault(); h.setPointerCapture(e.pointerId);
+        function move(ev) {
+          var pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+          var loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+          var vi = h.getAttribute("data-vi");
+          if (vi === "r") {
+            b.circle.r = Math.max(40, Math.abs(loc.x - b.circle.cx));
+          } else {
+            var n = b.pts.split(/[ ,]+/).map(Number);
+            n[vi * 2] = Math.round(loc.x); n[vi * 2 + 1] = Math.round(loc.y);
+            var out = []; for (var i = 0; i < n.length; i += 2) out.push(n[i] + "," + n[i + 1]);
+            b.pts = out.join(" ");
+          }
+          drawParcels(); paintSelection(); renderOverlay();
+          b.dirtyArea = true; renderManage();
+        }
+        function up() { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ series + charts
+  function series(b, code) {
+    if (!b.base) return null;
+    var f = pISO(state.from), t = pISO(state.to);
+    var days = Math.max(6, Math.round((t - f) / 86400000));
+    var n = Math.min(60, Math.max(8, Math.round(days / 4)));
+    var r = rng(hash(b.id + code + String(days))), meta = INDEX[code];
+    var end = b.base[code], drift = (b.slope / 100) * (days / 30) * (meta.hi - meta.lo) * 1.4, start = end - drift;
+    var pts = [], dates = [];
+    for (var i = 0; i < n; i++) {
+      var k = i / (n - 1), eased = k * k * (3 - 2 * k);
+      var v = start + (end - start) * eased + (r() - 0.5) * (meta.hi - meta.lo) * 0.05 + Math.sin(k * 7.5) * (meta.hi - meta.lo) * 0.015;
+      if (i === n - 1) v = end;
+      pts.push(Math.max(meta.lo, Math.min(meta.hi, v)));
+      dates.push(new Date(f.getTime() + k * (t - f)));
+    }
+    return { pts: pts, dates: dates, days: days };
+  }
+
+  function paintChart(svgEl, s, opts) {
+    var W = opts.W, H = opts.H, padL = opts.full ? 34 : 4, padR = opts.full ? 12 : 4, padT = 10, padB = opts.full ? 22 : 6;
+    if (!s) { svgEl.innerHTML = '<text x="' + W / 2 + '" y="' + H / 2 + '" text-anchor="middle" class="grid-label" style="font-size:12px">No imagery for this block yet</text>'; return; }
+    var v = s.pts, lo = Math.min.apply(null, v), hi = Math.max.apply(null, v);
+    var pad = (hi - lo) * 0.35 || 0.05, yMin = lo - pad, yMax = hi + pad;
+    var X = function (i) { return padL + (i / (v.length - 1)) * (W - padL - padR); };
+    var Y = function (n) { return padT + (1 - (n - yMin) / (yMax - yMin)) * (H - padT - padB); };
+    var o = "";
+
+    if (opts.full) {
+      var mid = (lo + hi) / 2, half = (hi - lo) * 0.28 + 0.012;
+      o += '<rect class="norm-band" x="' + padL + '" y="' + Y(mid + half).toFixed(1) + '" width="' + (W - padL - padR) + '" height="' + Math.max(2, Y(mid - half) - Y(mid + half)).toFixed(1) + '" rx="3"/>';
+      for (var g = 0; g <= 4; g++) {
+        var gv = yMin + (g / 4) * (yMax - yMin), gy = Y(gv);
+        o += '<line class="grid-line" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + gy.toFixed(1) + '" y2="' + gy.toFixed(1) + '" opacity="' + (g === 0 ? 1 : .55) + '"/>';
+        o += '<text class="grid-label" x="' + (padL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end">' + gv.toFixed(2) + "</text>";
+      }
+    }
+    var line = v.map(function (n, i) { return (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(n).toFixed(1); }).join(" ");
+    o += '<path class="series-area" d="' + line + " L" + X(v.length - 1).toFixed(1) + " " + (H - padB) + " L" + X(0).toFixed(1) + " " + (H - padB) + ' Z"/>';
+    o += '<path class="series-line" d="' + line + '"/>';
+    o += '<circle class="endpoint" cx="' + X(v.length - 1).toFixed(1) + '" cy="' + Y(v[v.length - 1]).toFixed(1) + '" r="' + (opts.full ? 4.5 : 3.5) + '"/>';
+
+    if (opts.full) {
+      [0, Math.floor((v.length - 1) / 2), v.length - 1].forEach(function (i, k) {
+        o += '<text class="axis-label" x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '">' + fmtDay(s.dates[i]) + "</text>";
+      });
+      o += '<g id="cursor" style="display:none"><line class="cursor-line" y1="' + padT + '" y2="' + (H - padB) + '"/><circle class="cursor-dot" r="3.5"/></g>';
+      o += '<rect id="hitbox" x="' + padL + '" y="' + padT + '" width="' + (W - padL - padR) + '" height="' + (H - padT - padB) + '" fill="transparent"/>';
+    }
+    svgEl.innerHTML = o;
+
+    if (opts.full) {
+      var tip = $("tip"), cur = svgEl.querySelector("#cursor"), hit = svgEl.querySelector("#hitbox");
+      hit.addEventListener("pointermove", function (ev) {
+        var r = svgEl.getBoundingClientRect();
+        var i = Math.round((((ev.clientX - r.left) / r.width * W) - padL) / (W - padL - padR) * (v.length - 1));
+        i = Math.max(0, Math.min(v.length - 1, i));
+        cur.style.display = "";
+        cur.querySelector("line").setAttribute("x1", X(i)); cur.querySelector("line").setAttribute("x2", X(i));
+        cur.querySelector("circle").setAttribute("cx", X(i)); cur.querySelector("circle").setAttribute("cy", Y(v[i]));
+        tip.textContent = fmtDay(s.dates[i]) + " · " + v[i].toFixed(2);
+        tip.style.left = (X(i) / W * r.width) + "px"; tip.style.top = (Y(v[i]) / H * r.height) + "px";
+        tip.classList.add("on");
+      });
+      hit.addEventListener("pointerleave", function () { cur.style.display = "none"; tip.classList.remove("on"); });
+    }
+  }
+
+  function pctChange(s, days) {
+    var v = s.pts, n = v.length;
+    var per = s.days / (n - 1);
+    var i = Math.max(0, n - 1 - Math.round(days / per));
+    var base = v[i];
+    return base === 0 ? 0 : ((v[n - 1] - base) / Math.abs(base)) * 100;
+  }
+  function deltaHTML(d) {
+    var a = d > 0.6 ? "▲" : d < -0.6 ? "▼" : "→";
+    var c = d > 0.6 ? "var(--good)" : d < -2 ? "var(--crit)" : d < -0.6 ? "var(--warn)" : "var(--muted)";
+    return '<span style="color:' + c + '">' + a + " " + (d >= 0 ? "+" : "") + d.toFixed(1) + "%</span>";
+  }
+
+  // ------------------------------------------------------------ views
+  function renderIdentity() {
+    var b = B();
+    $("dkName").textContent = b.name;
+    $("dkSub").textContent = (b.crop ? b.crop + (b.variety ? " · " + b.variety : "") : "no crop assigned") + " · " + b.area.toFixed(1) + " ha";
+    var h = $("dkHealth"); h.className = "pill " + b.health;
+    h.innerHTML = '<span class="dot"></span> ' + HEALTH_LABEL[b.health];
+    $("dkStamp").textContent = b.updated;
+
+    var crit = b.alerts.filter(function (a) { return a.sev === "critical"; }).length;
+    var fails = b.dt ? Object.keys(b.dt).filter(function (k) { return b.dt[k].flag === "fail"; }).length : 0;
+    var cc = $("tbCond");
+    cc.textContent = fails ? fails + " failing" : (b.dt ? "clear" : "—");
+    cc.className = "count" + (fails ? " crit" : "");
+
+    $("dkPeek").innerHTML =
+      '<span class="peekstat"><i>' + INDEX[state.index].label + "</i><b class=\"num\">" + (b.base ? b.base[state.index].toFixed(2) : "—") + "</b></span>" +
+      '<span class="peekstat"><i>soil</i><b class="num">' + (b.soil == null ? "—" : b.soil + "%") + "</b></span>" +
+      '<span class="peekstat"><i>alerts</i><b class="num">' + b.alerts.length + (crit ? " (" + crit + " crit)" : "") + "</b></span>";
+  }
+
+  function renderOverview() {
+    var b = B();
+    $("ovAlerts").innerHTML = b.alerts.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px">' + b.alerts.map(function (a) {
+          return '<div class="alert ' + a.sev + '"><span class="bar"></span><span>' + esc(a.txt) + "</span></div>";
+        }).join("") + "</div>"
+      : '<div class="lead"><span class="pill healthy"><span class="dot"></span> Clear</span> <span class="muted">no open alerts</span></div>';
+
+    $("ovRecs").innerHTML = b.recs.length
+      ? b.recs.slice(0, 2).map(function (r) {
+          var c = r.sev === "critical" ? "var(--crit)" : r.sev === "warning" ? "var(--warn)" : "var(--accent)";
+          return '<div class="rec"><span class="sev" style="background:' + c + '"></span><span><span>' + esc(r.txt) + '</span><span class="src num">' + esc(r.src) + "</span></span></div>";
+        }).join("")
+      : '<div class="empty">No open recommendations.</div>';
+
+    var s = series(b, state.index);
+    paintChart($("ovChart"), s, { W: 420, H: 92, full: false });
+    $("ovValue").textContent = s ? s.pts[s.pts.length - 1].toFixed(2) : "—";
+    $("ovDelta").innerHTML = s ? deltaHTML(pctChange(s, 14)) : "—";
+
+    $("ovAnalysis").innerHTML = b.analysis
+      ? '<div class="analysis ' + (b.analysis.tone === "calm" ? "calm" : "") + '">' + esc(b.analysis.txt) + "</div>"
+      : '<div class="empty">No analysis — this block has no imagery history.</div>';
+
+    $("ovNext").innerHTML = rowsHTML([
+      ["Next irrigation", b.irr.next],
+      ["Soil moisture", b.soil == null ? "—" : b.soil + "% · " + b.soilStatus],
+      ["Next activity", b.acts.length ? b.acts[0][0] + " · " + b.acts[0][1] : "none scheduled"]
+    ]);
+  }
+
+  function renderIndexView() {
+    var b = B(), code = state.index, meta = INDEX[code];
+
+    $("idxPills").innerHTML = Object.keys(INDEX).map(function (c) {
+      var m = INDEX[c], dis = m.unavailable || !b.base;
+      return '<button type="button" data-code="' + c + '" aria-pressed="' + (state.index === c) + '"' + (dis ? " disabled" : "") + ' title="' + esc(m.name) + '">' + m.label + "</button>";
+    }).join("");
+    Array.prototype.forEach.call($("idxPills").querySelectorAll("button"), function (el) {
+      el.addEventListener("click", function () { state.index = el.getAttribute("data-code"); renderIndexView(); renderOverview(); renderIdentity(); });
+    });
+
+    var s = series(b, code);
+    paintChart($("chart"), s, { W: 620, H: 190, full: true });
+
+    if (!s) {
+      $("idxValue").textContent = "—"; $("idxDelta").textContent = "—";
+      $("idxRows").innerHTML = ""; $("idxFoot").textContent = "";
+      $("idxDef").innerHTML = '<div class="empty">Assign a crop and an imagery subscription to compute indices.</div>';
+      $("idxAnalysis").innerHTML = '<div class="empty">No analysis available.</div>';
+      return;
+    }
+    var v = s.pts, cur = v[v.length - 1];
+    $("idxValue").textContent = cur.toFixed(2);
+    $("idxDelta").innerHTML = deltaHTML(pctChange(s, 14));
+
+    var norm = b.base[code] + (b.health === "critical" ? .14 : b.health === "watch" ? .03 : -.03);
+    var gap = cur - norm;
+    $("idxRows").innerHTML =
+      '<div><span class="k">Change · 14 days</span><span class="v num">' + deltaHTML(pctChange(s, 14)) + "</span></div>" +
+      '<div><span class="k">Change · 7 days</span><span class="v num">' + deltaHTML(pctChange(s, 7)) + "</span></div>" +
+      '<div><span class="k">vs. 5-season normal</span><span class="v num" style="color:' + (gap < -.05 ? "var(--crit)" : gap < -.01 ? "var(--warn)" : "var(--good)") + '">' +
+        (gap >= 0 ? "+" : "") + gap.toFixed(2) + "</span></div>";
+
+    $("idxFoot").textContent = v.length + " clear passes · last " + fmtDay(s.dates[s.dates.length - 1]) + " · shaded band = 5-season normal at " + b.stage.toLowerCase();
+
+    $("idxDef").innerHTML =
+      "<div><strong>" + meta.label + "</strong> · " + esc(meta.name) + "</div>" +
+      '<div style="margin-block-start:5px"><code>' + esc(meta.formula) + "</code></div>" +
+      '<div style="margin-block-start:6px">' + esc(meta.text) + "</div>" +
+      '<div class="stamp" style="margin-block-start:5px">' + esc(meta.prov) + "</div>";
+
+    $("idxAnalysis").innerHTML = b.analysis
+      ? '<div class="analysis ' + (b.analysis.tone === "calm" ? "calm" : "") + '">' + esc(b.analysis.txt) + "</div>"
+      : '<div class="empty">No analysis available.</div>';
+  }
+
+  function renderConditions() {
+    var b = B();
+    if (!b.dt) {
+      $("dtList").innerHTML = ""; $("dtHeading").textContent = "Conditions";
+      $("dtBody").innerHTML = '<div class="empty">No decision tree targets this block — it has no crop assignment yet.</div>';
+      $("dtVerdict").textContent = ""; return;
+    }
+    var names = Object.keys(b.dt);
+    if (names.indexOf(state.tree) === -1) state.tree = names[0];
+
+    $("dtList").innerHTML = names.map(function (nm) {
+      var t = b.dt[nm];
+      var col = t.flag === "fail" ? "var(--crit)" : t.flag === "pass" ? "var(--good)" : "var(--unknown)";
+      var tail = t.conds.filter(function (c) { return c[0] === "fail"; }).length;
+      return '<button type="button" data-tree="' + esc(nm) + '" aria-pressed="' + (state.tree === nm) + '">' +
+        '<span class="flag" style="background:' + col + '"></span>' + esc(nm) +
+        '<span class="tail">' + (tail ? tail + " failing" : "clear") + "</span></button>";
+    }).join("");
+    Array.prototype.forEach.call($("dtList").querySelectorAll("button"), function (el) {
+      el.addEventListener("click", function () { state.tree = el.getAttribute("data-tree"); renderConditions(); });
+    });
+
+    var t = b.dt[state.tree];
+    $("dtHeading").textContent = state.tree + " conditions";
+    $("dtBody").innerHTML = t.conds.map(function (c) {
+      var m = c[0] === "pass" ? "✓" : c[0] === "fail" ? "✕" : "◦";
+      return '<div class="cond ' + c[0] + '"><span class="mark">' + m + "</span><span>" + esc(c[1]) + '<span class="val">' + esc(c[2]) + "</span></span></div>";
+    }).join("");
+    $("dtVerdict").innerHTML = '<span class="muted">Outcome — </span>' + esc(t.verdict);
+  }
+
+  function renderField() {
+    var b = B();
+    $("fLast").textContent = b.irr.last; $("fNext").textContent = b.irr.next;
+    $("fSoil").textContent = b.soil == null ? "—" : b.soil + "% · " + b.soilStatus;
+    $("fMeter").style.width = (b.soil || 0) + "%";
+    $("fMeter").style.background = b.soilStatus === "low" ? "var(--crit)" : "var(--irrig)";
+    $("fWx").innerHTML = b.wx.map(function (w) { return '<div><div class="d">' + esc(w[0]) + '</div><div class="t">' + w[1] + "°C</div></div>"; }).join("");
+    $("fPlanLine").textContent = b.planLine;
+    $("fActs").innerHTML = b.acts.length ? rowsHTML(b.acts) : '<div><span class="k">No activities scheduled</span><span class="v"></span></div>';
+    $("fSignals").innerHTML = b.signals.length ? rowsHTML(b.signals) : '<div><span class="k">No field observations</span><span class="v"></span></div>';
+    $("fSources").innerHTML = rowsHTML([["Imagery subscriptions", b.imagery], ["Weather subscriptions", b.weather], ["Season", b.season]]);
+  }
+
+  // ------------------------------------------------------------ manage
+  function renderManage() {
+    var b = B(), p = $("mpane"), a = state.act;
+    Array.prototype.forEach.call($("mnav").querySelectorAll("button"), function (el) {
+      el.setAttribute("aria-pressed", String(el.getAttribute("data-act") === a));
+    });
+
+    if (a === "edit") {
+      p.innerHTML =
+        "<h3>Edit details</h3>" +
+        '<p class="why">Name and code are what everyone else sees in lists, reports and alerts.</p>' +
+        '<div class="fields">' +
+          field("Block name", '<input type="text" value="' + esc(b.name) + '"/>') +
+          field("Block code", '<input type="text" value="' + esc(b.code) + '"/>') +
+          field("Area", '<input type="text" readonly value="' + b.area.toFixed(2) + ' ha"/>', "Calculated from the boundary. Change it under Reshape.") +
+          field("Land unit type", '<select><option' + (b.type === "Block" ? " selected" : "") + ">Block</option><option" + (b.type === "Pivot" ? " selected" : "") + ">Pivot</option><option>Greenhouse</option></select>") +
+        "</div>" +
+        formbar("Save changes");
+      wireForm("Details saved.");
+    }
+
+    else if (a === "crop") {
+      p.innerHTML =
+        "<h3>Assign crop</h3>" +
+        '<p class="why">' + (b.crop
+          ? "Currently " + esc(b.crop) + (b.variety ? " · " + esc(b.variety) : "") + ", planted " + esc(b.planted) + ". Assigning a new crop closes the current assignment."
+          : "This block has no crop. Decision trees and indices stay dormant until one is assigned.") + "</p>" +
+        '<div class="fields">' +
+          field("Crop", '<select><option>Mango</option><option' + (b.crop === "Citrus" ? " selected" : "") + ">Citrus</option><option" + (b.crop === "Alfalfa" ? " selected" : "") + ">Alfalfa</option><option>Olive</option></select>") +
+          field("Variety", '<select><option>Alphonso</option><option>Keitt</option><option' + (b.variety === "Valencia" ? " selected" : "") + ">Valencia</option></select>") +
+          field("Strain", '<select><option>— none —</option><option>Short cycle</option><option>Long cycle</option></select>') +
+          field("Planting date", '<input type="date" value="' + (b.planted || "2026-03-01") + '"/>') +
+        "</div>" +
+        '<div class="callout"><span aria-hidden="true">◷</span><span><b>This changes what runs on the block.</b>' +
+          "Trees targeted at the new crop path start evaluating on the next imagery pass. Open recommendations from the old crop are expired.</span></div>" +
+        formbar("Assign crop");
+      wireForm("Crop assigned. Trees re-target on the next pass.");
+    }
+
+    else if (a === "reshape") {
+      var live = b.dirtyArea;
+      p.innerHTML =
+        "<h3>Reshape boundary</h3>" +
+        '<p class="why">The map is in edit mode. Drag any handle on ' + esc(b.name) + " to move a corner.</p>" +
+        '<div class="callout"><span aria-hidden="true">⬡</span><span><b>' + (live ? "Boundary edited" : "Waiting for an edit") + "</b>" +
+          (live ? "Area is now " + b.area.toFixed(2) + " ha. Sub-block grid cells and index history are re-cut against the new boundary on save."
+                : "Grab a handle on the map. Nothing is saved until you confirm.") + "</span></div>" +
+        '<div class="fields">' +
+          field("Area", '<input type="text" readonly value="' + b.area.toFixed(2) + ' ha"/>', live ? "Changed from the stored boundary." : "Unchanged.") +
+          field("Vertices", '<input type="text" readonly value="' + (b.circle ? "circle · radius handle" : b.pts.split(" ").length + " points") + '"/>') +
+        "</div>" +
+        formbar(live ? "Save boundary" : "Save boundary", !live);
+      wireForm("Boundary saved. Grid and history re-cut.", function () { b.dirtyArea = false; });
+    }
+
+    else if (a === "grid") {
+      p.innerHTML =
+        "<h3>Grid configuration</h3>" +
+        '<p class="why">Sub-block cells are the unit that per-zone indices and cell-scoped recommendations are computed on. The preview is live on the map.</p>' +
+        '<div class="fields">' +
+          field("Cell size", '<select id="gridSel"><option value="20"' + (state.gridSize == 20 ? " selected" : "") + ">20 × 20 m</option>" +
+            '<option value="30"' + (state.gridSize == 30 ? " selected" : "") + ">30 × 30 m</option>" +
+            '<option value="50"' + (state.gridSize == 50 ? " selected" : "") + ">50 × 50 m</option></select>", "≈ " + Math.round(b.area * 10000 / (state.gridSize * state.gridSize)) + " cells over " + b.area.toFixed(1) + " ha") +
+          field("Index set", '<select><option>All block indices</option><option>NDVI only</option></select>') +
+        "</div>" +
+        '<label class="checkline"><input type="checkbox" checked/><span>Backfill the new grid<small>Re-computes cell indices over the last 90 days. Runs on the heavy worker, usually 10–20 minutes.</small></span></label>' +
+        formbar("Apply grid");
+      var sel = document.getElementById("gridSel");
+      if (sel) sel.addEventListener("change", function () { state.gridSize = +sel.value; renderOverlay(); renderManage(); });
+      wireForm("Grid applied. Backfill queued.");
+    }
+
+    else if (a === "inactivate") {
+      p.innerHTML =
+        "<h3>Inactivate " + esc(b.name) + "</h3>" +
+        '<p class="why">The block stops being monitored but nothing is deleted. You can restore it later.</p>' +
+        '<div class="callout danger"><span aria-hidden="true">⊘</span><span><b>What stops</b>' +
+          "Imagery and weather subscriptions are suspended, open alerts and recommendations are closed, and the block leaves the farm map and every report. History is kept.</span></div>" +
+        '<div class="fields"><div class="field"><label>Type the block name to confirm</label><input type="text" id="confirmName" placeholder="' + esc(b.name) + '"/></div></div>' +
+        '<div class="formbar"><button type="button" class="btn danger" id="doInactivate" disabled>Inactivate block</button>' +
+          '<button type="button" class="btn" data-cancel>Cancel</button></div>';
+      var inp = document.getElementById("confirmName"), go = document.getElementById("doInactivate");
+      inp.addEventListener("input", function () { go.disabled = inp.value.trim() !== b.name; });
+      go.addEventListener("click", function () {
+        b.health = "unknown"; b.alerts = []; b.recs = []; b.imagery = "0 active"; b.weather = "0 active";
+        drawParcels(); paintSelection(); toast(b.name + " inactivated."); setView("overview"); renderAll();
+      });
+      p.querySelector("[data-cancel]").addEventListener("click", function () { setView("overview"); });
+    }
+
+    state.mapMode = a === "reshape" ? "reshape" : a === "grid" ? "grid" : null;
+    renderOverlay();
+
+    function field(label, control, hint) {
+      return '<div class="field"><label>' + esc(label) + "</label>" + control + (hint ? '<span class="hintline">' + esc(hint) + "</span>" : "") + "</div>";
+    }
+    function formbar(primary, disabled) {
+      return '<div class="formbar"><button type="button" class="btn primary" data-save' + (disabled ? " disabled" : "") + ">" + esc(primary) + "</button>" +
+        '<button type="button" class="btn" data-cancel>Cancel</button>' +
+        '<span class="spacer stamp">Changes apply to ' + esc(b.name) + " only.</span></div>";
+    }
+    function wireForm(msg, after) {
+      var s = p.querySelector("[data-save]"), c = p.querySelector("[data-cancel]");
+      if (s) s.addEventListener("click", function () { if (after) after(); toast(msg); setView("overview"); renderAll(); });
+      if (c) c.addEventListener("click", function () { if (b.dirtyArea) { b.dirtyArea = false; } setView("overview"); });
+    }
+  }
+
+  // ------------------------------------------------------------ view switching
+  function setView(v) {
+    state.view = v;
+    Array.prototype.forEach.call($("tabbar").querySelectorAll("button"), function (el) {
+      el.setAttribute("aria-selected", String(el.getAttribute("data-view") === v));
+    });
+    ["overview", "index", "conditions", "field", "manage"].forEach(function (name) {
+      $("v-" + name).classList.toggle("on", name === v);
+    });
+    if (v === "manage") { renderManage(); }
+    else { state.mapMode = null; renderOverlay(); }
+    if (v === "index") renderIndexView();
+    if (v === "conditions") renderConditions();
+    if (v === "field") renderField();
+  }
+
+  function renderAll() {
+    if (!B()) return;
+    renderIdentity();
+    renderOverview();
+    if (state.view === "index") renderIndexView();
+    if (state.view === "conditions") renderConditions();
+    if (state.view === "field") renderField();
+    if (state.view === "manage") renderManage();
+  }
+
+  function select(id) {
+    if (state.mapMode) return;                       // don't switch blocks mid-edit
+    state.id = id; state.tree = "Irrigation"; state.act = "edit";
+    var b = B();
+    if (b && !b.base) state.index = "ndvi";
+    con.classList.add("has-selection"); con.classList.remove("peek");
+    $("peekBtn").textContent = "▾";
+    paintSelection(); setView("overview"); renderAll();
+  }
+
+  // ------------------------------------------------------------ wiring
+  Array.prototype.forEach.call($("tabbar").querySelectorAll("button"), function (el) {
+    el.addEventListener("click", function () { setView(el.getAttribute("data-view")); });
+  });
+  Array.prototype.forEach.call($("mnav").querySelectorAll("button"), function (el) {
+    el.addEventListener("click", function () { state.act = el.getAttribute("data-act"); renderManage(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"), function (el) {
+    el.addEventListener("click", function () { setView(el.getAttribute("data-goto")); });
+  });
+  $("closeBtn").addEventListener("click", function () {
+    state.mapMode = null; renderOverlay();
+    con.classList.remove("has-selection", "peek"); state.id = null; paintSelection();
+  });
+  $("peekBtn").addEventListener("click", function () {
+    var peek = con.classList.toggle("peek");
+    $("peekBtn").textContent = peek ? "▴" : "▾";
+    $("peekBtn").title = peek ? "Expand panel" : "Collapse panel";
+    if (!peek && state.view === "index") renderIndexView();
+  });
+  $("originToggle").addEventListener("click", function () {
+    var on = con.classList.toggle("show-origin");
+    $("originToggle").setAttribute("aria-pressed", String(on));
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".segmented [data-layer]"), function (el) {
+    el.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".segmented [data-layer]"), function (o) {
+        o.setAttribute("aria-pressed", String(o === el));
+      });
+    });
+  });
+  ["dFrom", "dTo"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      var f = $("dFrom").value, t = $("dTo").value;
+      if (pISO(t) <= pISO(f)) return;
+      state.from = f; state.to = t; renderIndexView(); renderOverview();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".preset"), function (el) {
+    el.addEventListener("click", function () {
+      var to = pISO("2026-06-30"), from = new Date(to.getTime() - Number(el.getAttribute("data-days")) * 86400000);
+      state.from = iso(from); state.to = iso(to);
+      $("dFrom").value = state.from; $("dTo").value = state.to;
+      renderIndexView(); renderOverview();
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (state.mapMode) { state.mapMode = null; renderOverlay(); setView("overview"); return; }
+    con.classList.remove("has-selection", "peek"); state.id = null; paintSelection();
+  });
+
+  drawParcels();
+  select("A2");
+})();
+</script>
