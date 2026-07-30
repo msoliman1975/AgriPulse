@@ -8,6 +8,7 @@ import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { PageHeader } from "@/components/PageHeader";
@@ -84,9 +85,9 @@ export function FarmDetailPage(): JSX.Element {
         actions={
           <>
             {canEdit ? (
-              <Link to={`/farms/${farm.id}/edit`} className="btn btn-ghost">
+              <LinkButton variant="ghost" to={`/farms/${farm.id}/edit`}>
                 {t("detail.edit")}
-              </Link>
+              </LinkButton>
             ) : null}
             {canArchive ? (
               <ArchiveButton label={t("detail.archive")} busy={busy} onConfirm={handleArchive} />
@@ -108,12 +109,10 @@ export function FarmDetailPage(): JSX.Element {
           <h2 className="text-lg font-semibold text-ap-ink">{t("detail.blocksTab")}</h2>
           {canCreateBlock ? (
             <span className="flex gap-2">
-              <Link to={`/farms/${farm.id}/blocks/new`} className="btn btn-primary">
-                {t("detail.addBlock")}
-              </Link>
-              <Link to={`/farms/${farm.id}/blocks/auto-grid`} className="btn btn-ghost">
+              <LinkButton to={`/farms/${farm.id}/blocks/new`}>{t("detail.addBlock")}</LinkButton>
+              <LinkButton variant="ghost" to={`/farms/${farm.id}/blocks/auto-grid`}>
                 {t("detail.autoGrid")}
-              </Link>
+              </LinkButton>
             </span>
           ) : null}
         </div>

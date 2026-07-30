@@ -11,6 +11,7 @@ import {
   type PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
+import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
@@ -261,15 +262,25 @@ export function PlanTemplateEditorPage(): ReactNode {
         <h2 className="mb-3 text-sm font-semibold text-ap-ink">{t("editor.section.header")}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t("editor.field.name")}>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
           </Field>
-          <Field label={t("editor.field.code")} hint={t("editor.field.codeHint")}>
-            <input
-              className="input font-mono"
-              value={code}
-              disabled={!isNew}
-              onChange={(e) => setCode(e.target.value)}
-            />
+          <Field label={t("editor.field.code")} help={t("editor.field.codeHint")}>
+            {(props) => (
+              <input
+                {...props}
+                className={`${FIELD_CONTROL_CLASS} font-mono`}
+                value={code}
+                disabled={!isNew}
+                onChange={(e) => setCode(e.target.value)}
+              />
+            )}
           </Field>
           <div className="sm:col-span-2">
             <span className="mb-1 block text-xs font-medium text-ap-muted">
@@ -278,17 +289,34 @@ export function PlanTemplateEditorPage(): ReactNode {
             <CropPathFilter value={cropPath} onChange={setCropPath} scope="platform" />
           </div>
           <Field label={t("editor.field.country")}>
-            <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+              />
+            )}
           </Field>
           <Field label={t("editor.field.region")}>
-            <input className="input" value={region} onChange={(e) => setRegion(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+              />
+            )}
           </Field>
           <Field label={t("editor.field.description")} className="sm:col-span-2">
-            <textarea
-              className="input min-h-[60px]"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            {(props) => (
+              <textarea
+                {...props}
+                className={`${FIELD_CONTROL_CLASS} min-h-[60px]`}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            )}
           </Field>
         </div>
       </section>
@@ -505,26 +533,6 @@ export function PlanTemplateEditorPage(): ReactNode {
         </div>
       ) : null}
     </Page>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  className,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  className?: string;
-  children: ReactNode;
-}): ReactNode {
-  return (
-    <label className={className}>
-      <span className="mb-1 block text-xs font-medium text-ap-muted">{label}</span>
-      {children}
-      {hint ? <span className="mt-0.5 block text-[11px] text-ap-muted">{hint}</span> : null}
-    </label>
   );
 }
 

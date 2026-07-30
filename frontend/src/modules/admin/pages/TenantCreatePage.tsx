@@ -1,6 +1,7 @@
+import { Field } from "@/components/Field";
 import { Page } from "@/components/Page";
 import type { ReactNode } from "react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -268,9 +269,9 @@ function ProfileStep({
         help={t("tenants.create.fields.slugHelp")}
         error={errors.slug}
       >
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.slug}
             onChange={(e) => onChange("slug", e.target.value.toLowerCase())}
@@ -280,9 +281,9 @@ function ProfileStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.name")} error={errors.name}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.name}
             onChange={(e) => onChange("name", e.target.value)}
@@ -292,9 +293,9 @@ function ProfileStep({
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={t("tenants.create.fields.legalName")}>
-          {(id) => (
+          {(props) => (
             <input
-              id={id}
+              {...props}
               type="text"
               value={form.legal_name}
               onChange={(e) => onChange("legal_name", e.target.value)}
@@ -303,9 +304,9 @@ function ProfileStep({
           )}
         </Field>
         <Field label={t("tenants.create.fields.taxId")}>
-          {(id) => (
+          {(props) => (
             <input
-              id={id}
+              {...props}
               type="text"
               value={form.tax_id}
               onChange={(e) => onChange("tax_id", e.target.value)}
@@ -315,9 +316,9 @@ function ProfileStep({
         </Field>
       </div>
       <Field label={t("tenants.create.fields.contactEmail")} error={errors.contact_email}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="email"
             value={form.contact_email}
             onChange={(e) => onChange("contact_email", e.target.value)}
@@ -326,9 +327,9 @@ function ProfileStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.contactPhone")}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="tel"
             value={form.contact_phone}
             onChange={(e) => onChange("contact_phone", e.target.value)}
@@ -338,9 +339,9 @@ function ProfileStep({
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={t("tenants.create.fields.locale")}>
-          {(id) => (
+          {(props) => (
             <select
-              id={id}
+              {...props}
               value={form.default_locale}
               onChange={(e) =>
                 onChange("default_locale", e.target.value as FormState["default_locale"])
@@ -356,9 +357,9 @@ function ProfileStep({
           )}
         </Field>
         <Field label={t("tenants.create.fields.unitSystem")}>
-          {(id) => (
+          {(props) => (
             <select
-              id={id}
+              {...props}
               value={form.default_unit_system}
               onChange={(e) =>
                 onChange("default_unit_system", e.target.value as FormState["default_unit_system"])
@@ -388,9 +389,9 @@ function OwnerStep({
   return (
     <div className="mt-6 space-y-4">
       <Field label={t("tenants.create.fields.tier")} help={t("tenants.create.fields.tierHelp")}>
-        {(id) => (
+        {(props) => (
           <select
-            id={id}
+            {...props}
             value={form.initial_tier}
             onChange={(e) => onChange("initial_tier", e.target.value as TenantTier)}
             className="w-full rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm shadow-sm"
@@ -408,9 +409,9 @@ function OwnerStep({
         help={t("tenants.create.fields.ownerEmailHelp")}
         error={errors.owner_email}
       >
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="email"
             value={form.owner_email}
             onChange={(e) => onChange("owner_email", e.target.value)}
@@ -419,9 +420,9 @@ function OwnerStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.ownerFullName")} error={errors.owner_full_name}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.owner_full_name}
             onChange={(e) => onChange("owner_full_name", e.target.value)}
@@ -479,30 +480,6 @@ function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => vo
         {t("tenants.detail.title")}
       </button>
     </section>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  help?: string;
-  error?: string;
-  children: (id: string) => ReactNode;
-}
-
-function Field({ label, help, error, children }: FieldProps): ReactNode {
-  const id = useId();
-  return (
-    <div className="text-sm">
-      <label
-        htmlFor={id}
-        className="block text-xs font-semibold uppercase tracking-wide text-ap-muted"
-      >
-        {label}
-      </label>
-      <div className="mt-1">{children(id)}</div>
-      {help && !error ? <p className="mt-1 text-xs text-ap-muted">{help}</p> : null}
-      {error ? <p className="mt-1 text-xs text-ap-crit">{error}</p> : null}
-    </div>
   );
 }
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { FilterChip } from "@/components/FilterChip";
+import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
@@ -507,75 +508,95 @@ function CropForm({
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Field label={t("crops.form.code")}>
-          <input
-            className="input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            disabled={mode === "edit"}
-            placeholder="mango"
-            required
-          />
-        </Field>
-        <Field label={t("crops.form.nameEn")}>
-          <input
-            className="input"
-            value={nameEn}
-            onChange={(e) => setNameEn(e.target.value)}
-            required
-          />
-        </Field>
-        <Field label={t("crops.form.nameAr")}>
-          <input
-            className="input"
-            value={nameAr}
-            onChange={(e) => setNameAr(e.target.value)}
-            required
-            dir="rtl"
-          />
-        </Field>
-        <Field label={t("crops.form.category")}>
-          <select
-            className="input"
-            value={customCat ? OTHER : category}
-            onChange={(e) => {
-              if (e.target.value === OTHER) {
-                setCustomCat(true);
-                setCategory("");
-              } else {
-                setCustomCat(false);
-                setCategory(e.target.value);
-              }
-            }}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-            <option value={OTHER}>{t("crops.form.categoryOther")}</option>
-          </select>
-          {customCat ? (
+          {(props) => (
             <input
-              className="input mt-1"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder={t("crops.form.categoryCustom")}
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              disabled={mode === "edit"}
+              placeholder="mango"
               required
             />
-          ) : null}
+          )}
+        </Field>
+        <Field label={t("crops.form.nameEn")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Field label={t("crops.form.nameAr")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              required
+              dir="rtl"
+            />
+          )}
+        </Field>
+        <Field label={t("crops.form.category")}>
+          {(props) => (
+            <>
+              <select
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={customCat ? OTHER : category}
+                onChange={(e) => {
+                  if (e.target.value === OTHER) {
+                    setCustomCat(true);
+                    setCategory("");
+                  } else {
+                    setCustomCat(false);
+                    setCategory(e.target.value);
+                  }
+                }}
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                <option value={OTHER}>{t("crops.form.categoryOther")}</option>
+              </select>
+              {/* "Other" reveals a free-text box under the select; both belong
+                  to the same field, so they share its label and wiring. */}
+              {customCat ? (
+                <input
+                  className={`${FIELD_CONTROL_CLASS} mt-1`}
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder={t("crops.form.categoryCustom")}
+                  aria-label={t("crops.form.categoryCustom")}
+                  required
+                />
+              ) : null}
+            </>
+          )}
         </Field>
         <Field label={t("crops.form.depth")}>
-          <select
-            className="input"
-            value={depth}
-            onChange={(e) => setDepth(e.target.value as ClassificationDepth)}
-          >
-            {DEPTHS.map((d) => (
-              <option key={d} value={d}>
-                {t(`crops.depth.${d}`)}
-              </option>
-            ))}
-          </select>
+          {(props) => (
+            <select
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={depth}
+              onChange={(e) => setDepth(e.target.value as ClassificationDepth)}
+            >
+              {DEPTHS.map((d) => (
+                <option key={d} value={d}>
+                  {t(`crops.depth.${d}`)}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <label className="flex items-end gap-1.5 pb-2 text-xs text-ap-muted">
           <input
@@ -657,43 +678,43 @@ function NodeForm({
     >
       <div className="grid grid-cols-3 gap-2">
         <Field label={t("crops.form.code")}>
-          <input
-            className="input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            disabled={editing}
-            required
-          />
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              disabled={editing}
+              required
+            />
+          )}
         </Field>
         <Field label={t("crops.form.nameEn")}>
-          <input
-            className="input"
-            value={nameEn}
-            onChange={(e) => setNameEn(e.target.value)}
-            required
-          />
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              required
+            />
+          )}
         </Field>
         <Field label={t("crops.form.nameAr")}>
-          <input
-            className="input"
-            value={nameAr}
-            onChange={(e) => setNameAr(e.target.value)}
-            dir="rtl"
-          />
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              dir="rtl"
+            />
+          )}
         </Field>
       </div>
       {error ? <p className="text-xs text-ap-crit">{error}</p> : null}
       <FormButtons busy={busy} onCancel={onClose} />
     </form>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
-  return (
-    <label className="flex flex-col gap-0.5 text-[11px] text-ap-muted">
-      {label}
-      {children}
-    </label>
   );
 }
 

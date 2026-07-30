@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { archiveBlock, getBlock, type BlockDetail } from "@/api/blocks";
@@ -7,7 +7,10 @@ import { assignBlockCrop, listBlockCrops, type BlockCropAssignment } from "@/api
 import { getFarm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
@@ -144,9 +147,9 @@ export function BlockDetailPage(): JSX.Element {
         actions={
           <>
             {canEdit ? (
-              <Link to={`/farms/${farmId}/blocks/${block.id}/edit`} className="btn btn-ghost">
+              <LinkButton variant="ghost" to={`/farms/${farmId}/blocks/${block.id}/edit`}>
                 {t("block.edit")}
-              </Link>
+              </LinkButton>
             ) : null}
             {canArchive ? (
               <ArchiveButton label={t("block.archive")} busy={busy} onConfirm={handleArchive} />
@@ -155,11 +158,11 @@ export function BlockDetailPage(): JSX.Element {
         }
       />
 
-      <div className="card">
+      <Card>
         <MapPreview geometry={block.boundary} />
-      </div>
+      </Card>
 
-      <div className="card">
+      <Card>
         <h2 className="text-lg font-semibold text-ap-ink">{t("block.currentCrop")}</h2>
         {current ? (
           <p className="mt-2 text-sm text-ap-ink">
@@ -219,18 +222,14 @@ export function BlockDetailPage(): JSX.Element {
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={!cropSelectionComplete || !seasonLabel || busy}
-            >
+            <Button type="submit" disabled={!cropSelectionComplete || !seasonLabel || busy}>
               {t("block.submit")}
-            </button>
+            </Button>
           </form>
         ) : null}
-      </div>
+      </Card>
 
-      <div className="card">
+      <Card>
         <h2 className="text-lg font-semibold text-ap-ink">{t("block.history")}</h2>
         {history.length === 0 ? (
           <p className="mt-2 text-sm text-ap-muted">{t("block.noCrop")}</p>
@@ -246,7 +245,7 @@ export function BlockDetailPage(): JSX.Element {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
       <AttachmentsTab ownerKind="block" ownerId={block.id} farmId={farmId} />
 

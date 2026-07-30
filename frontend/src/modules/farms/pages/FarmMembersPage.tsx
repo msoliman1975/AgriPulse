@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -13,7 +13,11 @@ import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { useTenantUsers } from "@/queries/users";
 import { MembersList } from "../components/MembersList";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 
 const ROLES: FarmMemberRole[] = ["FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"];
 
@@ -72,12 +76,18 @@ export function FarmMembersPage(): JSX.Element {
 
   return (
     <Page>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("members.heading")}</h1>
-        <Link to={`/farms/${farmId}`} className="btn btn-ghost">
-          {t("block.back")}
-        </Link>
-      </div>
+      <PageHeader
+        above={
+          <Breadcrumb
+            items={[
+              { label: t("list.heading"), to: "/farms" },
+              { label: t("block.back"), to: `/farms/${farmId}` },
+              { label: t("members.heading") },
+            ]}
+          />
+        }
+        title={t("members.heading")}
+      />
 
       {error ? (
         <p role="alert" className="text-sm text-ap-crit">
@@ -85,12 +95,12 @@ export function FarmMembersPage(): JSX.Element {
         </p>
       ) : null}
 
-      <div className="card">
+      <Card>
         <MembersList members={members} canRevoke={canAssign} onRevoke={handleRevoke} />
-      </div>
+      </Card>
 
       {canAssign ? (
-        <form onSubmit={handleAssign} className="card flex items-end gap-3">
+        <Card className="flex items-end gap-3" onSubmit={handleAssign}>
           <div className="flex-1">
             <label className="label" htmlFor="membership-id">
               {t("members.membershipId")}
@@ -144,10 +154,10 @@ export function FarmMembersPage(): JSX.Element {
               ))}
             </select>
           </div>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             {t("members.submit")}
-          </button>
-        </form>
+          </Button>
+        </Card>
       ) : null}
     </Page>
   );

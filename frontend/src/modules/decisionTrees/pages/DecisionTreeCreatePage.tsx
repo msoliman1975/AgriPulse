@@ -7,6 +7,7 @@ import { useCapability } from "@/rbac/useCapability";
 import { STARTER_TREE_YAML } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
+import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { Page } from "@/components/Page";
 
 // Default for the YAML textarea when the page first loads. Authors who
@@ -146,15 +147,18 @@ export function DecisionTreeCreatePage(): ReactNode {
         </header>
 
         <section className="grid grid-cols-1 gap-3 rounded-xl border border-ap-line bg-ap-panel p-4">
-          <Field label={t("create.fields.code")} hint={t("create.fields.codeHint")}>
-            <input
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder={t("create.fields.codePlaceholder")}
-              pattern="^[a-z0-9][a-z0-9_-]*$"
-              className={`${inputCls} sm:max-w-sm`}
-            />
+          <Field label={t("create.fields.code")} help={t("create.fields.codeHint")} required>
+            {(props) => (
+              <input
+                {...props}
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={t("create.fields.codePlaceholder")}
+                pattern="^[a-z0-9][a-z0-9_-]*$"
+                className={`${FIELD_CONTROL_CLASS} sm:max-w-sm`}
+              />
+            )}
           </Field>
         </section>
 
@@ -198,18 +202,21 @@ export function DecisionTreeCreatePage(): ReactNode {
               <p className="text-xs text-ap-muted">{t("create.fields.yamlHint")}</p>
             </div>
             <Field label={t("create.templates.heading")}>
-              <select
-                value={templateId}
-                onChange={(e) => onTemplateChange(e.target.value)}
-                className={inputCls}
-              >
-                <option value="custom">{t("create.templates.custom")}</option>
-                {TREE_TEMPLATES.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {t(tpl.labelKey)}
-                  </option>
-                ))}
-              </select>
+              {(props) => (
+                <select
+                  {...props}
+                  value={templateId}
+                  onChange={(e) => onTemplateChange(e.target.value)}
+                  className={FIELD_CONTROL_CLASS}
+                >
+                  <option value="custom">{t("create.templates.custom")}</option>
+                  {TREE_TEMPLATES.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {t(tpl.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
           </div>
           {templateId !== "custom" ? (
@@ -257,26 +264,5 @@ export function DecisionTreeCreatePage(): ReactNode {
         </footer>
       </form>
     </Page>
-  );
-}
-
-const inputCls =
-  "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm text-ap-ink shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary";
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}): ReactNode {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-ap-muted">{label}</span>
-      {children}
-      {hint ? <span className="text-[11px] text-ap-muted">{hint}</span> : null}
-    </label>
   );
 }

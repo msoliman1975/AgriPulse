@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { autoGrid, createBlock, type AutoGridCandidate } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
 import { AreaDisplay } from "../components/AreaDisplay";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 
 export function BlockAutoGridPage(): JSX.Element {
   const { farmId = "" } = useParams<{ farmId: string }>();
@@ -63,14 +67,20 @@ export function BlockAutoGridPage(): JSX.Element {
 
   return (
     <Page>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("autoGrid.heading")}</h1>
-        <Link to={`/farms/${farmId}`} className="btn btn-ghost">
-          {t("autoGrid.back")}
-        </Link>
-      </div>
+      <PageHeader
+        above={
+          <Breadcrumb
+            items={[
+              { label: t("list.heading"), to: "/farms" },
+              { label: t("autoGrid.back"), to: `/farms/${farmId}` },
+              { label: t("autoGrid.heading") },
+            ]}
+          />
+        }
+        title={t("autoGrid.heading")}
+      />
 
-      <div className="card flex items-end gap-3">
+      <Card className="flex items-end gap-3">
         <div>
           <label className="label" htmlFor="cell-size">
             {t("autoGrid.cellSize")}
@@ -86,10 +96,10 @@ export function BlockAutoGridPage(): JSX.Element {
             onChange={(e) => setCellSize(Number(e.target.value))}
           />
         </div>
-        <button type="button" className="btn btn-primary" onClick={compute} disabled={busy}>
+        <Button onClick={compute} disabled={busy}>
           {t("autoGrid.compute")}
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       {error ? (
         <p role="alert" className="text-sm text-ap-crit">
@@ -97,7 +107,7 @@ export function BlockAutoGridPage(): JSX.Element {
         </p>
       ) : null}
 
-      <div className="card">
+      <Card>
         <h2 className="text-lg font-semibold text-ap-ink">{t("autoGrid.candidates")}</h2>
         {candidates.length === 0 ? (
           <p className="mt-2 text-sm text-ap-muted">{t("autoGrid.empty")}</p>
@@ -118,16 +128,11 @@ export function BlockAutoGridPage(): JSX.Element {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={commit}
-        disabled={busy || selected.size === 0}
-      >
+      <Button onClick={commit} disabled={busy || selected.size === 0}>
         {t("autoGrid.commit")}
-      </button>
+      </Button>
     </Page>
   );
 }
