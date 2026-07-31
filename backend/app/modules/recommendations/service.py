@@ -37,6 +37,7 @@ from app.modules.recommendations.engine import (
     evaluate_tree,
 )
 from app.modules.recommendations.errors import (
+    BlockNotInFarmError,
     InvalidRecommendationTransitionError,
     RecommendationNotFoundError,
 )
@@ -128,6 +129,7 @@ class RecommendationsService(Protocol):
         *,
         block_id: UUID,
         tenant_id: UUID,
+        farm_id: UUID,
     ) -> dict[str, Any]: ...
 
     async def list_recommendations(
@@ -473,6 +475,7 @@ class RecommendationsServiceImpl:
         *,
         block_id: UUID,
         tenant_id: UUID,
+        farm_id: UUID,
     ) -> dict[str, Any]:
         """Walk every visible tree against ``block_id`` and report why each
         one did or didn't fire — **without writing anything**.
@@ -486,15 +489,18 @@ class RecommendationsServiceImpl:
         steps: they evaluate once per grid cell, so a single block-level
         verdict would be a lie. The console links those out to the per-cell
         popups instead.
+
+        ``farm_id`` is the farm the caller was authorized against. The block
+        is verified to belong to it — otherwise a user scoped to one farm
+        could authorize with that farm and read a block from another.
         """
         setup = await self._prepare_block_evaluation(block_id=block_id, tenant_id=tenant_id)
         if setup is None:
-            return {
-                "block_id": str(block_id),
-                "evaluated_at": datetime.now(UTC),
-                "crop_path": None,
-                "trees": [],
-            }
+            # No parent farm at all — indistinguishable from "not in your
+            # farm" as far as the caller is concerned.
+            raise BlockNotInFarmError(block_id=block_id, farm_id=farm_id)
+        if setup.farm_id != farm_id:
+            raise BlockNotInFarmError(block_id=block_id, farm_id=farm_id)
 
         trees: list[dict[str, Any]] = []
 

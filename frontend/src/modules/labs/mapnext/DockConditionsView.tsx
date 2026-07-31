@@ -45,17 +45,19 @@ function StepRow({ step }: { step: ExplainStep }): ReactNode {
 
 export function DockConditionsView({
   blockId,
+  farmId,
   onFailingCountChange,
 }: {
   blockId: string;
+  farmId: string;
   onFailingCountChange?: (n: number | null) => void;
 }): ReactNode {
   const { t, i18n } = useTranslation("farmConsole");
   const [selectedTreeId, setSelectedTreeId] = useState<string | null>(null);
 
   const explainQ = useQuery({
-    queryKey: ["labs/mapnext/explain", blockId],
-    queryFn: () => explainBlock(blockId),
+    queryKey: ["labs/mapnext/explain", blockId, farmId],
+    queryFn: () => explainBlock(blockId, farmId),
     staleTime: 60_000,
   });
 

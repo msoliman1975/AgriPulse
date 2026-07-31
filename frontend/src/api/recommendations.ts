@@ -215,9 +215,16 @@ export interface ExplainBlockResponse {
   trees: ExplainTree[];
 }
 
-export async function explainBlock(blockId: string): Promise<ExplainBlockResponse> {
+// `farmId` is required: it is what the request is authorized against, so a
+// farm-scoped user (Agronomist, Scout, Viewer) resolves. The server verifies
+// the block actually belongs to it.
+export async function explainBlock(
+  blockId: string,
+  farmId: string,
+): Promise<ExplainBlockResponse> {
   const { data } = await apiClient.get<ExplainBlockResponse>(
     `/v1/blocks/${blockId}/decision-trees:explain`,
+    { params: { farm_id: farmId } },
   );
   return data;
 }

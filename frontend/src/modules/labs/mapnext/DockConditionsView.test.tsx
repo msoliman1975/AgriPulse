@@ -86,7 +86,7 @@ describe("DockConditionsView", () => {
       trees: [FAILING_TREE],
     } satisfies ExplainBlockResponse);
 
-    renderView(<DockConditionsView blockId="b1" />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
     await waitFor(() =>
       expect(screen.getByText("Soil moisture within target range")).toBeTruthy(),
@@ -107,7 +107,7 @@ describe("DockConditionsView", () => {
       ],
     } satisfies ExplainBlockResponse);
 
-    renderView(<DockConditionsView blockId="b1" />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
     // Appears twice — once in the tree list, once as the detail-pane heading.
     await waitFor(() => expect(screen.getAllByText("Pest risk").length).toBeGreaterThan(0));
@@ -123,7 +123,7 @@ describe("DockConditionsView", () => {
     } satisfies ExplainBlockResponse);
 
     const onCount = vi.fn();
-    renderView(<DockConditionsView blockId="b1" onFailingCountChange={onCount} />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" onFailingCountChange={onCount} />);
 
     await waitFor(() => expect(onCount).toHaveBeenCalledWith(1));
   });
@@ -139,7 +139,7 @@ describe("DockConditionsView", () => {
       ],
     } satisfies ExplainBlockResponse);
 
-    renderView(<DockConditionsView blockId="b1" />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
     await waitFor(() => expect(screen.getByText("Growth stage")).toBeTruthy());
     await userEvent.click(screen.getByRole("button", { name: /Growth stage/ }));
@@ -157,7 +157,7 @@ describe("DockConditionsView", () => {
       trees: [tree({ status: "skipped" }), tree({ tree_id: "t2", status: "skipped" })],
     } satisfies ExplainBlockResponse);
 
-    renderView(<DockConditionsView blockId="b1" />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
     await waitFor(() =>
       expect(screen.getByText(/No decision tree targets this block/i)).toBeTruthy(),
@@ -172,7 +172,7 @@ describe("DockConditionsView", () => {
       trees: [tree({ tree_id: "t3", name_en: "Zone anomaly", scope: "cell", status: "per_cell" })],
     } satisfies ExplainBlockResponse);
 
-    renderView(<DockConditionsView blockId="b1" />);
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
     await waitFor(() =>
       expect(screen.getByText(/runs per grid cell, not per block/i)).toBeTruthy(),

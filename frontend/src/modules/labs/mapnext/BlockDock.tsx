@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
+import { useCapability } from "@/rbac/useCapability";
 import type { UnitDetail } from "../map/types";
 import { HEALTH_DOT, INDEX_META, isBlockLevel } from "./constants";
 import { DockConditionsView } from "./DockConditionsView";
@@ -25,6 +26,11 @@ import { Dot, ghostBtn } from "./ui";
 export type DockTab = "overview" | "index" | "conditions" | "field" | "manage";
 
 const TABS: DockTab[] = ["overview", "index", "conditions", "field", "manage"];
+
+// Conditions is the only tab behind a capability: it calls the tree-explain
+// endpoint, which is gated on `recommendation.read`. Hide it rather than let
+// it render and 403.
+const TAB_CAPABILITY = "recommendation.read" as const;
 
 interface Props {
   detail: UnitDetail | undefined;
@@ -88,6 +94,8 @@ export function BlockDock({
   const [collapsed, setCollapsed] = useState(false);
   const [manageMode, setManageMode] = useState<ManageMode | null>(null);
   const [failingCount, setFailingCount] = useState<number | null>(null);
+  const canReadConditions = useCapability(TAB_CAPABILITY, { farmId });
+  const tabs = canReadConditions ? TABS : TABS.filter((v) => v !== "conditions");
 
   const selId = detail?.id;
   // A new selection always lands on Overview — carrying the previous block's
@@ -187,7 +195,7 @@ export function BlockDock({
         <>
           {/* ---- tabs ---- */}
           <div role="tablist" aria-label={t("dock.regionLabel")} className="flex flex-none gap-1 border-b border-ap-line px-3">
-            {TABS.map((v) => (
+            {tabs.map((v) => (
               <button
                 key={v}
                 type="button"
@@ -305,8 +313,12 @@ export function BlockDock({
               />
             ) : null}
 
-            {tab === "conditions" ? (
-              <DockConditionsView blockId={detail.id} onFailingCountChange={onFailingCountChange} />
+            {tab === "conditions" && canReadConditions ? (
+              <DockConditionsView
+                blockId={detail.id}
+                farmId={farmId}
+                onFailingCountChange={onFailingCountChange}
+              />
             ) : null}
 
             {tab === "field" ? (

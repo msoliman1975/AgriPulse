@@ -392,7 +392,17 @@ async def evaluate_block(
 )
 async def explain_block(
     block_id: UUID,
-    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    farm_id: UUID = Query(
+        ...,
+        description=(
+            "The block's parent farm. Required because it is what the request "
+            "is authorized against — a farm-scoped user has no tenant-wide "
+            "role to fall back on. Verified against the block."
+        ),
+    ),
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     """Read model behind the Farm Console's Conditions tab.
@@ -400,10 +410,25 @@ async def explain_block(
     Unlike ``:evaluate`` (POST) this opens nothing — it re-walks the trees
     against the block's current signals purely to report the reasoning,
     including for trees that came out clear and so leave no row behind.
+
+    Gated on ``recommendation.read``, NOT ``decision_tree.read`` like its
+    neighbours here. This endpoint explains recommendations, so everyone who
+    can see one should be able to see why it fired — and that is the whole
+    audience for it: Agronomist, FarmManager, Scout and Viewer all hold
+    ``recommendation.read`` but none of them hold ``decision_tree.read``.
+    Widening ``decision_tree.read`` instead is not an option: it also gates
+    ``:evaluate`` and ``:dry-run``, both of which write.
+
+    Authorization is scoped by the ``farm_id`` query parameter, mirroring
+    ``GET /recommendations``. Without it ``requires_capability`` has no farm
+    to test scopes against, so a user whose only grant is a farm scope is
+    denied no matter which capability the route names.
     """
     _ensure_tenant(context)
     assert context.tenant_id is not None  # _ensure_tenant guarantees
-    return await service.explain_block(block_id=block_id, tenant_id=context.tenant_id)
+    return await service.explain_block(
+        block_id=block_id, tenant_id=context.tenant_id, farm_id=farm_id
+    )
 
 
 # =====================================================================
