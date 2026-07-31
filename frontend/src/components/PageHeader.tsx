@@ -32,10 +32,15 @@ export function PageHeader({
     <header className={clsx("flex flex-wrap items-end justify-between gap-3", className)}>
       <div className="min-w-0">
         {above ? <div className="mb-1">{above}</div> : null}
-        <h1 className="flex flex-wrap items-center gap-2.5 text-page-title font-semibold text-ap-ink">
-          {title}
+        {/* The badge sits beside the h1, not inside it. Inline with the title
+            is the point of 4C, but a pill rendered *within* the heading lands
+            in its accessible name — "Farm asdsad" becomes "Farm asdsad
+            Active" — which is the same defect the render-prop <Field> exists
+            to prevent for labels. */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-page-title font-semibold text-ap-ink">{title}</h1>
           {badge}
-        </h1>
+        </div>
         {subtitle ? <p className="mt-1 text-sm text-ap-muted">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

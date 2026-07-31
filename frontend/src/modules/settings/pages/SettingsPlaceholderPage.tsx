@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PageHeader } from "@/components/PageHeader";
 import { useCapability } from "@/rbac/useCapability";
 import type { Capability } from "@/rbac/capabilities";
 
@@ -28,10 +29,17 @@ export function SettingsPlaceholderPage({ i18nKey, requires }: Props): ReactNode
       </div>
     );
   }
+  // The placeholder IS the whole route, so its title is the page title.
+  // Demoting it to <h2> to satisfy the no-raw-<h1> rule left /settings/org
+  // and /settings/notifications with no page heading at all; <PageHeader> is
+  // what the rule was pointing at. The dashed panel stays — it reads as
+  // "not built yet" in a way a normal Card does not.
   return (
-    <div className="rounded-xl border border-dashed border-ap-line bg-ap-panel/50 p-10 text-center">
-      <h2 className="text-lg font-semibold text-ap-ink">{t(`placeholder.${i18nKey}.title`)}</h2>
-      <p className="mt-2 text-sm text-ap-muted">{t(`placeholder.${i18nKey}.body`)}</p>
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t(`placeholder.${i18nKey}.title`)} />
+      <div className="rounded-xl border border-dashed border-ap-line bg-ap-panel/50 p-10 text-center">
+        <p className="text-sm text-ap-muted">{t(`placeholder.${i18nKey}.body`)}</p>
+      </div>
     </div>
   );
 }
