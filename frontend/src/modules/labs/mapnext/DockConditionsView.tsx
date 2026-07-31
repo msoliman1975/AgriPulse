@@ -19,19 +19,23 @@ function statusColor(tree: ExplainTree): string {
   return HEALTH_DOT.unknown;
 }
 
-function StepRow({ step }: { step: ExplainStep }): ReactNode {
+function StepRow({ step, fired }: { step: ExplainStep; fired: boolean }): ReactNode {
   const { i18n } = useTranslation("farmConsole");
   const reading = readCondition(step);
   const label =
     localizedField(i18n.language, step.label_en, step.label_ar) ?? step.node_id;
-  const mark = step.matched ? "✓" : "✕";
+  // A condition evaluating false is NOT a failure — it just means the walk
+  // took the other branch. Only mark it red when the tree actually fired, so
+  // a block with nothing wrong doesn't read as a wall of red crosses.
+  const mark = step.matched ? "✓" : fired ? "✕" : "○";
+  const color = step.matched
+    ? HEALTH_DOT.healthy
+    : fired
+      ? HEALTH_DOT.critical
+      : HEALTH_DOT.unknown;
   return (
     <div className="flex items-start gap-2 border-b border-ap-line/70 py-1.5 last:border-b-0">
-      <span
-        aria-hidden="true"
-        className="mt-px w-3.5 text-center text-xs font-bold"
-        style={{ color: step.matched ? HEALTH_DOT.healthy : HEALTH_DOT.critical }}
-      >
+      <span aria-hidden="true" className="mt-px w-3.5 text-center text-xs font-bold" style={{ color }}>
         {mark}
       </span>
       <span className="min-w-0 flex-1 text-sm text-ap-ink">{label}</span>
@@ -67,8 +71,11 @@ export function DockConditionsView({
   const ran = trees.filter((tr) => tr.status !== "skipped");
   const skipped = trees.length - ran.length;
 
-  // The tab badge counts failed checks across everything that ran.
-  const totalFailing = ran.reduce((n, tr) => n + failingCount(tr.steps), 0);
+  // The tab badge counts unmet checks on trees that actually FIRED. Counting
+  // them on clear trees turned "nothing is wrong here" into a red badge.
+  const totalFailing = ran
+    .filter((tr) => tr.status === "fired")
+    .reduce((n, tr) => n + failingCount(tr.steps), 0);
   useEffect(() => {
     onFailingCountChange?.(explainQ.data ? totalFailing : null);
   }, [onFailingCountChange, explainQ.data, totalFailing]);
@@ -141,9 +148,11 @@ export function DockConditionsView({
                 <span className="whitespace-nowrap text-xs text-ap-muted">
                   {tr.status === "per_cell"
                     ? t("dock.conditions.perCellShort")
-                    : failing
+                    : tr.status === "fired" && failing
                       ? t("dock.conditions.nFailing", { count: failing })
-                      : t("inspector.clear")}
+                      : tr.status === "fired"
+                        ? t("dock.conditions.action")
+                        : t("inspector.clear")}
                 </span>
               </button>
             );
@@ -172,7 +181,7 @@ export function DockConditionsView({
           <>
             <div className="rounded-xl border border-ap-line px-3 py-1">
               {checks.map((s) => (
-                <StepRow key={s.node_id} step={s} />
+                <StepRow key={s.node_id} step={s} fired={active.status === "fired"} />
               ))}
             </div>
             {verdict ? (

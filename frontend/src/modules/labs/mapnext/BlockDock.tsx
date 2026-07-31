@@ -3,23 +3,27 @@
 // Replaces the 372px right-hand inspector. A block's detail is mostly
 // side-by-side comparisons (alerts vs. recommendations, value vs. trend,
 // check vs. threshold) and a narrow column forced all of that into a single
-// stack of collapsed expanders. The dock runs the full width under the map
-// instead, so each view lays out in 2–3 columns with nothing collapsed.
+// stack of collapsed expanders. The dock runs under the map instead, so each
+// view lays out in 2–3 columns with nothing collapsed.
+//
+// It spans the map canvas only — it lives inside the map column, so it
+// tracks the units rail as that collapses rather than sliding under it.
 //
 // Views: Overview · Index · Conditions · Field & plan · Manage.
 // See docs/proposals/block-dock.html for the design it implements.
+import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
-import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 import { useCapability } from "@/rbac/useCapability";
+import { clearDetailCache } from "../map/api";
 import type { UnitDetail } from "../map/types";
 import { HEALTH_DOT, INDEX_META, isBlockLevel } from "./constants";
 import { DockConditionsView } from "./DockConditionsView";
 import { DockIndexView } from "./DockIndexView";
-import { fmt, shortDate } from "./dockFormat";
+import { cropLabel, fmt, longDate, shortDate } from "./dockFormat";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
 
@@ -31,6 +35,19 @@ const TABS: DockTab[] = ["overview", "index", "conditions", "field", "manage"];
 // endpoint, which is gated on `recommendation.read`. Hide it rather than let
 // it render and 403.
 const TAB_CAPABILITY = "recommendation.read" as const;
+
+// Height is user-draggable and remembered. The bar alone is COLLAPSED_H.
+const HEIGHT_KEY = "labs/map/dockHeight";
+const DEFAULT_H = 300;
+const MIN_H = 160;
+const COLLAPSED_H = 52;
+/** Never let the dock squeeze the map to nothing. */
+function maxHeight(): number {
+  return typeof window === "undefined" ? 640 : Math.max(MIN_H, Math.round(window.innerHeight * 0.72));
+}
+function clampHeight(h: number): number {
+  return Math.min(maxHeight(), Math.max(MIN_H, h));
+}
 
 interface Props {
   detail: UnitDetail | undefined;
@@ -46,15 +63,38 @@ interface Props {
   resetKey?: number;
 }
 
-// ---- small layout primitives, flush (no margin) so they tile in columns ----
+// ---- title-bar chip -------------------------------------------------------
+// Every field in the bar is one of these, so they all share a type scale and
+// only the border/value colour carries meaning.
 
-function Col({ title, tag, children }: { title: ReactNode; tag?: ReactNode; children: ReactNode }): ReactNode {
+function Chip({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: ReactNode;
+  color?: string;
+}): ReactNode {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs leading-none"
+      style={{ borderColor: color ?? "var(--ap-line, #e8e5db)" }}
+    >
+      <span className="font-semibold uppercase tracking-wide text-ap-muted">{label}</span>
+      <span className="font-semibold text-ap-ink" style={color ? { color } : undefined}>
+        {value}
+      </span>
+    </span>
+  );
+}
+
+// ---- column + rows --------------------------------------------------------
+
+function Col({ title, children }: { title: ReactNode; children: ReactNode }): ReactNode {
   return (
     <div className="flex min-h-0 flex-col gap-2 overflow-auto">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-ap-primary">{title}</span>
-        {tag}
-      </div>
+      <span className="text-xs font-bold uppercase tracking-wide text-ap-primary">{title}</span>
       {children}
     </div>
   );
@@ -76,6 +116,10 @@ function Rows({ items }: { items: [ReactNode, ReactNode][] }): ReactNode {
   );
 }
 
+// Columns are sized, not stretched: on a wide screen three equal fractions
+// left most of each one empty.
+const COLS_3 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,360px)_minmax(220px,320px)]";
+
 export function BlockDock({
   detail,
   loading,
@@ -90,10 +134,17 @@ export function BlockDock({
   resetKey,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
+  const qc = useQueryClient();
   const [tab, setTab] = useState<DockTab>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [manageMode, setManageMode] = useState<ManageMode | null>(null);
   const [failingCount, setFailingCount] = useState<number | null>(null);
+  const [height, setHeight] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_H;
+    const saved = Number(window.localStorage.getItem(HEIGHT_KEY));
+    return Number.isFinite(saved) && saved > 0 ? clampHeight(saved) : DEFAULT_H;
+  });
+  const [dragging, setDragging] = useState(false);
   const canReadConditions = useCapability(TAB_CAPABILITY, { farmId });
   const tabs = canReadConditions ? TABS : TABS.filter((v) => v !== "conditions");
 
@@ -108,17 +159,62 @@ export function BlockDock({
 
   const onFailingCountChange = useCallback((n: number | null) => setFailingCount(n), []);
 
+  // ---- drag-to-resize ----
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const startDrag = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      if (collapsed) return;
+      dragRef.current = { startY: e.clientY, startH: height };
+      setDragging(true);
+      const move = (ev: PointerEvent): void => {
+        const d = dragRef.current;
+        if (!d) return;
+        // Dragging the top edge upward makes the dock taller.
+        setHeight(clampHeight(d.startH - (ev.clientY - d.startY)));
+      };
+      const up = (): void => {
+        dragRef.current = null;
+        setDragging(false);
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [collapsed, height],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || dragging) return;
+    window.localStorage.setItem(HEIGHT_KEY, String(height));
+  }, [height, dragging]);
+
+  // Keyboard resize, so the handle isn't mouse-only.
+  const nudge = useCallback((delta: number) => setHeight((h) => clampHeight(h + delta)), []);
+
+  // After any manage action, drop BOTH caches. `loadUnitDetail` keeps its own
+  // 30s module-level cache that react-query invalidation does not reach, so
+  // without this a freshly assigned crop keeps reading as "no crop" until it
+  // ages out — which reads as "the save didn't work".
+  const afterManage = useCallback(() => {
+    clearDetailCache();
+    void qc.invalidateQueries({ queryKey: ["labs/mapnext/detail"] });
+    void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+    setManageMode(null);
+  }, [qc]);
+
   if (error) {
     return (
-      <DockShell onClose={onClose} title={t("inspector.errorTitle")}>
+      <DockShell onClose={onClose} title={t("inspector.errorTitle")} height={height}>
         <div className="p-6 text-sm text-ap-muted">{t("inspector.errorBody")}</div>
       </DockShell>
     );
   }
   if (loading || !detail) {
     return (
-      <DockShell onClose={onClose} title={t("inspector.loading")}>
-        <div className="grid grid-cols-3 gap-6 p-4">
+      <DockShell onClose={onClose} title={t("inspector.loading")} height={height}>
+        <div className="grid grid-cols-3 gap-8 p-4">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-ap-line/50" />
           ))}
@@ -129,46 +225,64 @@ export function BlockDock({
 
   const crit = detail.alerts.filter((a) => a.severity === "critical").length;
   const featured = isBlockLevel(activeIndex) ? detail.indices[activeIndex] : undefined;
+  const healthColor = HEALTH_DOT[detail.health];
 
   return (
     <section
       aria-label={t("dock.regionLabel")}
-      className={clsx(
-        "flex flex-none flex-col border-t border-ap-line bg-ap-panel",
-        collapsed ? "h-[52px]" : "h-[344px]",
-      )}
+      className="flex flex-none flex-col border-t border-ap-line bg-ap-panel"
+      style={{ height: collapsed ? COLLAPSED_H : height }}
     >
-      {/* ---- identity bar ---- */}
-      <div className="flex flex-none items-center gap-3 border-b border-ap-line px-4 py-2.5">
-        <h2 className="text-sm font-bold text-ap-ink">{detail.name}</h2>
-        <span className="text-xs text-ap-muted">
-          {detail.crop ?? t("dock.noCrop")} · <AreaDisplay areaM2={detail.area_ha * 10_000} />
-        </span>
-        <span className="flex items-center gap-1.5 rounded-full border border-ap-line px-2 py-0.5 text-xs font-semibold text-ap-ink">
-          <Dot color={HEALTH_DOT[detail.health]} />
-          {t(`health.${detail.health}`)}
-        </span>
-
-        {/* At-a-glance stats stay visible when the dock is collapsed. */}
-        <div className="hidden items-center gap-4 md:flex">
-          <PeekStat label={INDEX_META[activeIndex].label} value={fmt(featured?.current ?? null)} />
-          <PeekStat
-            label={t("dock.peek.soil")}
-            value={
-              detail.irrigation.soil_moisture_pct == null
-                ? "—"
-                : `${detail.irrigation.soil_moisture_pct}%`
+      {/* ---- resize handle ---- */}
+      {collapsed ? null : (
+        /* A button, not a bare div with role=separator: the handle must be
+           focusable for the arrow keys to be reachable without a mouse. */
+        <button
+          type="button"
+          aria-label={t("dock.resize")}
+          onPointerDown={startDrag}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              nudge(24);
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              nudge(-24);
             }
-          />
-          <PeekStat
-            label={t("dock.peek.alerts")}
-            value={crit ? `${detail.alerts.length} (${crit})` : String(detail.alerts.length)}
-          />
-        </div>
+          }}
+          className={clsx(
+            "group relative -mt-px h-1.5 w-full flex-none cursor-row-resize",
+            dragging ? "bg-ap-primary/40" : "hover:bg-ap-primary/25",
+          )}
+        >
+          <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ap-line group-hover:bg-ap-primary/60" />
+        </button>
+      )}
 
-        <div className="ms-auto flex items-center gap-2">
+      {/* ---- title bar ---- */}
+      <div className="flex flex-none flex-wrap items-center gap-2 border-b border-ap-line px-4 py-2">
+        <Chip label={t("dock.title.block")} value={detail.name} />
+        <Chip label={t("dock.title.crop")} value={cropLabel(detail.crop_assignment) ?? t("dock.noCrop")} />
+        <Chip
+          label={t("dock.title.health")}
+          value={
+            <span className="inline-flex items-center gap-1.5">
+              <Dot color={healthColor} />
+              {t(`health.${detail.health}`)}
+            </span>
+          }
+          color={healthColor}
+        />
+        <Chip
+          label={t("dock.title.alerts")}
+          value={crit ? t("dock.title.alertsCrit", { count: detail.alerts.length, crit }) : detail.alerts.length}
+          color={crit ? HEALTH_DOT.critical : undefined}
+        />
+        <Chip label={t("dock.title.date")} value={longDate(detail.last_updated)} />
+
+        <span className="ms-auto flex items-center gap-2">
           <span className="text-xs text-ap-muted">
-            {detail.last_updated ? shortDate(detail.last_updated) : "—"}
+            {INDEX_META[activeIndex].label} {fmt(featured?.current ?? null)}
           </span>
           <button
             type="button"
@@ -188,13 +302,17 @@ export function BlockDock({
           >
             ✕
           </button>
-        </div>
+        </span>
       </div>
 
       {collapsed ? null : (
         <>
           {/* ---- tabs ---- */}
-          <div role="tablist" aria-label={t("dock.regionLabel")} className="flex flex-none gap-1 border-b border-ap-line px-3">
+          <div
+            role="tablist"
+            aria-label={t("dock.regionLabel")}
+            className="flex flex-none gap-1 border-b border-ap-line px-3"
+          >
             {tabs.map((v) => (
               <button
                 key={v}
@@ -211,7 +329,7 @@ export function BlockDock({
               >
                 {v === "manage" ? `✎ ${t("dock.tab.manage")}` : t(`dock.tab.${v}`)}
                 {v === "conditions" && failingCount ? (
-                  <span className="ms-1.5 rounded-full bg-ap-crit px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  <span className="ms-1.5 rounded-full bg-ap-crit px-1.5 py-0.5 text-xs font-bold text-white">
                     {failingCount}
                   </span>
                 ) : null}
@@ -222,7 +340,7 @@ export function BlockDock({
           {/* ---- viewport ---- */}
           <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
             {tab === "overview" ? (
-              <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className={COLS_3}>
                 <Col title={t("inspector.alertsTitle")}>
                   {detail.alerts.length ? (
                     <div className="flex flex-col gap-1.5">
@@ -260,7 +378,7 @@ export function BlockDock({
 
                 <Col title={t("inspector.indicesSection")}>
                   <div className="flex items-end gap-3">
-                    <span className="text-3xl font-bold tabular-nums text-ap-ink">
+                    <span className="text-2xl font-bold tabular-nums text-ap-ink">
                       {fmt(featured?.current ?? null)}
                     </span>
                     <span className="pb-1 text-xs text-ap-muted">
@@ -322,7 +440,7 @@ export function BlockDock({
             ) : null}
 
             {tab === "field" ? (
-              <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className={COLS_3}>
                 <Col title={t("inspector.waterSection")}>
                   <Rows
                     items={[
@@ -417,7 +535,7 @@ export function BlockDock({
                     farmId={farmId}
                     hasCurrentCrop={detail.crop_assignment != null}
                     gridProductId={gridProductId}
-                    onDone={() => setManageMode(null)}
+                    onDone={afterManage}
                   />
                 </div>
               ) : (
@@ -451,32 +569,26 @@ export function BlockDock({
   );
 }
 
-function PeekStat({ label, value }: { label: string; value: string }): ReactNode {
-  return (
-    <span className="flex flex-col leading-tight">
-      <span className="text-[10px] uppercase tracking-wide text-ap-muted">{label}</span>
-      <span className="text-sm font-bold tabular-nums text-ap-ink">{value}</span>
-    </span>
-  );
-}
-
 function DockShell({
   title,
   onClose,
+  height,
   children,
 }: {
   title: ReactNode;
   onClose: () => void;
+  height: number;
   children: ReactNode;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
   return (
     <section
       aria-label={t("dock.regionLabel")}
-      className="flex h-[344px] flex-none flex-col border-t border-ap-line bg-ap-panel"
+      className="flex flex-none flex-col border-t border-ap-line bg-ap-panel"
+      style={{ height }}
     >
-      <div className="flex flex-none items-center gap-3 border-b border-ap-line px-4 py-2.5">
-        <h2 className="text-sm font-bold text-ap-ink">{title}</h2>
+      <div className="flex flex-none items-center gap-3 border-b border-ap-line px-4 py-2">
+        <span className="text-sm font-bold text-ap-ink">{title}</span>
         <button
           type="button"
           onClick={onClose}

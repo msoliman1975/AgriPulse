@@ -297,7 +297,11 @@ export async function loadUnitDetail(args: {
     name: blockShortName(block),
     type: specUnitType(block),
     parent_pivot_id: block.parent_unit_id,
-    crop: null, // backend has crop_assignments — out of prototype scope
+    // Was hardcoded null from the prototype, which quietly rendered every
+    // block as unassigned wherever this field was read. Derived from the
+    // block's current assignment; `crop_assignment` still carries the full
+    // crop/variety/strain triple for callers that want it.
+    crop: cropAssignmentSummary?.crop_name ?? null,
     area_ha: block.area_m2 / 10_000,
     health: classifyHealth({
       worstAlertSeverity: worstAlert?.severity ?? null,
