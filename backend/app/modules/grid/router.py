@@ -69,6 +69,26 @@ async def _resolve_farm_id(*, block_id: UUID, tenant_session: AsyncSession) -> U
     return block["farm_id"]
 
 
+async def _guard_grid_lock(*, tenant_session: AsyncSession, farm_id: UUID) -> None:
+    """Reject block-level grid writes when the farm's grid category is locked.
+
+    Mirrors ``imagery.router._guard_subscriptions_lock``: gated by the
+    farm-config feature flag so the flag fully owns lock behaviour.
+
+    Note this guards the whole grid-config PUT — cell size *and* threshold
+    — while farm-level conformance is currently measured on the threshold
+    alone. Stricter than the diff, never looser, which is the safe
+    direction; cell-size conformance joins when bulk rezone lands.
+    """
+    from app.core.settings import get_settings
+
+    if not get_settings().farm_config_template_enabled:
+        return
+    from app.modules.farms import config_template
+
+    await config_template.assert_category_unlocked(tenant_session, farm_id=farm_id, category="grid")
+
+
 @router.get(
     "/blocks/{block_id}/grid-configs/{product_id}",
     response_model=GridConfigResponse,
@@ -111,6 +131,7 @@ async def put_grid_config(
     # owns the subscription cadence), not index.read.
     if not has_capability(context, "imagery.subscription.manage", farm_id=farm_id):
         raise BlockNotVisibleError(str(block_id))
+    await _guard_grid_lock(tenant_session=tenant_session, farm_id=farm_id)
     return await service.upsert_config(
         block_id=block_id,
         product_id=product_id,

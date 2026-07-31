@@ -230,6 +230,15 @@ class Farm(Base, TimestampedMixin):
     )
     org_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
 
+    # Grid category (tenant migration 0053). NULL on either value column
+    # means "no template set" — Apply is a no-op, not an overwrite with
+    # NULL. Not a resolution tier: copy-on-apply into grid_configs.
+    default_grid_cell_size_m: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    default_anomaly_z_threshold: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 2), nullable=True
+    )
+    grid_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
+
 
 class Block(Base, TimestampedMixin):
     __tablename__ = "blocks"

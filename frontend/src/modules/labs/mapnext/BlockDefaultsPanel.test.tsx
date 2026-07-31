@@ -18,8 +18,13 @@ const PRODUCT_ID = "019eab8c-6550-7827-b10d-007109e77470";
 const h = vi.hoisted(() => ({
   saved: { current: { imagery: [] as unknown[], weather: [] as unknown[] } },
   applySubscriptionsMock: vi.fn(),
+  savedGrid: { current: { cell_size_m: null as number | null, anomaly_z_threshold: null as number | null } },
+  applyGridMock: vi.fn(),
+  previewApplyGridMock: vi.fn(),
 }));
 const applySubscriptionsMock = h.applySubscriptionsMock;
+const applyGridMock = h.applyGridMock;
+const previewApplyGridMock = h.previewApplyGridMock;
 
 vi.mock("@/api/farmConfig", async () => {
   const actual = await vi.importActual<typeof import("@/api/farmConfig")>("@/api/farmConfig");
@@ -53,11 +58,20 @@ vi.mock("@/api/farmConfig", async () => {
       }),
     ),
     applySubscriptions: h.applySubscriptionsMock,
-    getLocks: vi.fn(() => Promise.resolve({ subscriptions: false, irrigation: false, org: false })),
+    getLocks: vi.fn(() =>
+      Promise.resolve({ subscriptions: false, irrigation: false, org: false, grid: false }),
+    ),
     getIrrigationTemplate: vi.fn(() =>
       Promise.resolve({ irrigation_system: null, irrigation_source: null, flow_rate_m3_per_hour: null }),
     ),
     getOrgTemplate: vi.fn(() => Promise.resolve({ default_tags: [] })),
+    getGridTemplate: vi.fn(() => Promise.resolve(h.savedGrid.current)),
+    putGridTemplate: vi.fn((_farmId: string, body: typeof h.savedGrid.current) => {
+      h.savedGrid.current = body;
+      return Promise.resolve(body);
+    }),
+    previewApplyGrid: h.previewApplyGridMock,
+    applyGrid: h.applyGridMock,
   };
 });
 
@@ -150,5 +164,141 @@ describe("BlockDefaultsPanel — apply subscriptions", () => {
     expect(screen.getByRole("button", { name: /Confirm apply/i })).toBeDisabled();
     // The whole point: the user can no longer trigger a no-op that claims success.
     expect(applySubscriptionsMock).not.toHaveBeenCalled();
+  });
+});
+
+// The grid card inherits the same three guards. It applies a *threshold*, so
+// the destructive-sounding cell-size field must not imply a bulk rezone.
+
+const GRID_ROWS = [
+  {
+    block_id: "b1",
+    block_code: "A-01",
+    block_name: "North Mango 1",
+    product_id: "p1",
+    product_code: "s2_l2a",
+    product_name: "Sentinel-2 L2A",
+    native_pixel_m: 10,
+    current_cell_size_m: 20,
+    current_anomaly_z_threshold: 1.5,
+    target_anomaly_z_threshold: 1.2,
+    action: "threshold" as const,
+    reason: "Set from the farm template",
+    matches: false,
+  },
+  {
+    block_id: "b2",
+    block_code: "A-02",
+    block_name: "Windbreak strip",
+    product_id: null,
+    product_code: null,
+    product_name: null,
+    native_pixel_m: null,
+    current_cell_size_m: null,
+    current_anomaly_z_threshold: null,
+    target_anomaly_z_threshold: null,
+    action: "skipped" as const,
+    reason: "No active imagery subscription",
+    matches: true,
+  },
+];
+
+describe("BlockDefaultsPanel — grid & anomaly", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    h.saved.current = { imagery: [], weather: [] };
+    h.savedGrid.current = { cell_size_m: null, anomaly_z_threshold: 1.5 };
+    applyGridMock.mockReset();
+    applyGridMock.mockResolvedValue({ blocks_touched: 1, total_blocks: 2 });
+    previewApplyGridMock.mockReset();
+    previewApplyGridMock.mockResolvedValue({
+      rows: GRID_ROWS,
+      total_rows: 2,
+      changed_rows: 1,
+      unchanged_rows: 0,
+      skipped_rows: 1,
+      is_noop: false,
+    });
+  });
+
+  async function renderGrid() {
+    const view = render(<BlockDefaultsPanel farmId="f1" />);
+    await waitFor(() => expect(screen.getByText(/Grid & anomaly detection/i)).toBeTruthy());
+    return view;
+  }
+
+  it("warns that cell size is not applied to blocks", async () => {
+    await renderGrid();
+    expect(screen.getByText(/Cell size is saved on the template but not applied/i)).toBeTruthy();
+  });
+
+  it("blocks Apply while the grid template has unsaved edits", async () => {
+    const user = userEvent.setup();
+    await renderGrid();
+
+    const field = screen.getByLabelText(/Anomaly sensitivity/i);
+    await user.clear(field);
+    await user.type(field, "1.2");
+
+    // Two Apply buttons exist (subscriptions + grid); the grid one is last.
+    const applyButtons = screen.getAllByRole("button", { name: /Apply to blocks/i });
+    expect(applyButtons[applyButtons.length - 1]).toBeDisabled();
+    expect(previewApplyGridMock).not.toHaveBeenCalled();
+  });
+
+  it("previews and applies once the template is saved", async () => {
+    const user = userEvent.setup();
+    await renderGrid();
+
+    const field = screen.getByLabelText(/Anomaly sensitivity/i);
+    await user.clear(field);
+    await user.type(field, "1.2");
+    const saveButtons = screen.getAllByRole("button", { name: /Save template/i });
+    await user.click(saveButtons[saveButtons.length - 1]);
+
+    const applyButtons = screen.getAllByRole("button", { name: /Apply to blocks/i });
+    await waitFor(() => expect(applyButtons[applyButtons.length - 1]).toBeEnabled());
+    await user.click(applyButtons[applyButtons.length - 1]);
+
+    // Preview lists both rows; the skipped one explains itself.
+    await waitFor(() => expect(screen.getByText("A-01")).toBeTruthy());
+    expect(screen.getByText(/No active imagery subscription/i)).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /Apply to 1 block/i }));
+    await waitFor(() => expect(applyGridMock).toHaveBeenCalled());
+    // Only the changed row's block is submitted — the skipped one is not.
+    expect(applyGridMock.mock.calls[0][1]).toEqual(["b1"]);
+  });
+
+  it("disables confirm and warns when nothing would change", async () => {
+    const user = userEvent.setup();
+    previewApplyGridMock.mockResolvedValue({
+      rows: [{ ...GRID_ROWS[1] }],
+      total_rows: 1,
+      changed_rows: 0,
+      unchanged_rows: 0,
+      skipped_rows: 1,
+      is_noop: true,
+    });
+    await renderGrid();
+
+    const applyButtons = screen.getAllByRole("button", { name: /Apply to blocks/i });
+    await user.click(applyButtons[applyButtons.length - 1]);
+
+    await waitFor(() => expect(screen.getByText(/Nothing to apply/i)).toBeTruthy());
+    expect(screen.getByRole("button", { name: /Apply to 0 block/i })).toBeDisabled();
+    expect(applyGridMock).not.toHaveBeenCalled();
+  });
+
+  it("sends clear_override when the inherit checkbox is ticked", async () => {
+    const user = userEvent.setup();
+    await renderGrid();
+
+    await user.click(screen.getByLabelText(/Clear each block's override/i));
+    const applyButtons = screen.getAllByRole("button", { name: /Apply to blocks/i });
+    await user.click(applyButtons[applyButtons.length - 1]);
+
+    await waitFor(() => expect(previewApplyGridMock).toHaveBeenCalled());
+    expect(previewApplyGridMock.mock.calls[0][2]).toBe(true);
   });
 });

@@ -99,6 +99,7 @@ class LockStateResponse(BaseModel):
     subscriptions: bool
     irrigation: bool
     org: bool
+    grid: bool
 
 
 class LockToggleRequest(BaseModel):
@@ -145,3 +146,67 @@ class OrgTemplateSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     default_tags: list[str] = Field(default_factory=list)
+
+
+# ---------- Grid template (cell size + anomaly threshold) ------------------
+
+
+class GridTemplateSchema(BaseModel):
+    """Farm-level grid defaults. Both nullable — NULL means "not set".
+
+    ``cell_size_m`` is stored and returned but **not** appliable yet; the
+    bulk cell-size path needs grid valid time first. It is accepted now so
+    the template survives a round-trip and the UI has somewhere to put the
+    value.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cell_size_m: float | None = Field(default=None, gt=0)
+    anomaly_z_threshold: float | None = Field(default=None, gt=0)
+
+
+class GridApplyRequest(BaseModel):
+    """Body for the grid apply-preview / apply endpoints.
+
+    ``clear_override=True`` ignores the template's threshold and instead
+    clears each block's own override so it inherits tenant → platform
+    again. Without it, applying a farm threshold would be a one-way door.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_ids: list[UUID] | None = None
+    clear_override: bool = False
+
+
+class GridPlanRowSchema(BaseModel):
+    block_id: UUID
+    block_code: str
+    block_name: str | None
+    product_id: UUID | None
+    product_code: str | None
+    product_name: str | None
+    native_pixel_m: float | None
+    current_cell_size_m: float | None
+    current_anomaly_z_threshold: float | None
+    target_anomaly_z_threshold: float | None
+    action: str
+    reason: str
+    matches: bool
+
+
+class GridApplyPreviewResponse(BaseModel):
+    rows: list[GridPlanRowSchema]
+    total_rows: int
+    changed_rows: int
+    unchanged_rows: int
+    skipped_rows: int
+    # True when Apply would write nothing. The UI disables Confirm on this
+    # and reports a zero-change apply as a warning rather than success.
+    is_noop: bool
+
+
+class GridApplyResponse(BaseModel):
+    blocks_touched: int
+    total_blocks: int

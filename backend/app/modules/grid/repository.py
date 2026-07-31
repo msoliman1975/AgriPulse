@@ -17,7 +17,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, bindparam, text
+from sqlalchemy import DateTime, Numeric, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -218,6 +219,104 @@ class GridRepository:
             {"config_id": config_id, "v": anomaly_z_threshold},
         )
         await self._session.flush()
+
+    async def list_farm_grid_rows(
+        self, *, block_ids: tuple[UUID, ...]
+    ) -> tuple[dict[str, Any], ...]:
+        """One row per (block, active imagery subscription) for a block set.
+
+        Single statement on purpose: the farm-wide preview runs over every
+        block of a farm, and a per-block fan-out here is exactly the N+1
+        that exhausted the pool on the map endpoints (#311).
+
+        Blocks with no active subscription still yield one row with NULL
+        product columns, so the preview can show *why* they were left out
+        instead of dropping them. Blocks whose subscription has no grid
+        config yield NULL config columns.
+        """
+        if not block_ids:
+            return ()
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                            b.id            AS block_id,
+                            b.code          AS block_code,
+                            b.name          AS block_name,
+                            b.area_m2       AS block_area_m2,
+                            s.product_id    AS product_id,
+                            p.code          AS product_code,
+                            p.name          AS product_name,
+                            p.resolution_m  AS native_pixel_m,
+                            cfg.id                  AS grid_config_id,
+                            cfg.cell_size_m         AS current_cell_size_m,
+                            cfg.anomaly_z_threshold AS current_anomaly_z_threshold
+                        FROM blocks b
+                        LEFT JOIN imagery_aoi_subscriptions s
+                               ON s.block_id = b.id
+                              AND s.is_active = TRUE
+                        LEFT JOIN public.imagery_products p
+                               ON p.id = s.product_id
+                              AND p.is_active = TRUE
+                        LEFT JOIN grid_configs cfg
+                               ON cfg.block_id   = b.id
+                              AND cfg.product_id = s.product_id
+                              AND cfg.retired_at IS NULL
+                              AND cfg.deleted_at IS NULL
+                        WHERE b.id = ANY(:block_ids)
+                          AND b.deleted_at IS NULL
+                        ORDER BY b.code, p.code NULLS FIRST
+                        """
+                    ).bindparams(
+                        bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                    ),
+                    {"block_ids": list(block_ids)},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def set_config_thresholds(
+        self,
+        *,
+        config_ids: tuple[UUID, ...],
+        anomaly_z_threshold: Decimal | None,
+    ) -> int:
+        """Set ``anomaly_z_threshold`` on many active configs at once.
+
+        Threshold-only: touches no geometry, retires nothing, regenerates
+        no cells. That is the whole reason a farm-wide threshold apply is
+        safe while a farm-wide cell-size apply is not.
+
+        ``anomaly_z_threshold=None`` clears the override so the block
+        falls back to the tenant/platform default.
+        """
+        if not config_ids:
+            return 0
+        result = await self._session.execute(
+            text(
+                """
+                UPDATE grid_configs
+                SET anomaly_z_threshold = :threshold,
+                    updated_at = now()
+                WHERE id = ANY(:config_ids)
+                  AND retired_at IS NULL
+                  AND deleted_at IS NULL
+                """
+            ).bindparams(
+                bindparam("config_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                # NUMERIC bind pinned so asyncpg doesn't have to infer the
+                # type of a bare NULL on the clear-override path.
+                bindparam("threshold", type_=Numeric(4, 2)),
+            ),
+            {"config_ids": list(config_ids), "threshold": anomaly_z_threshold},
+        )
+        await self._session.flush()
+        return int(getattr(result, "rowcount", 0) or 0)
 
     async def retire_config(self, *, config_id: UUID, retired_at: datetime) -> None:
         await self._session.execute(

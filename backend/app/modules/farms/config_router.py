@@ -31,6 +31,10 @@ from app.modules.farms.config_schemas import (
     ApplyPreviewRequest,
     ApplyPreviewResponse,
     ApplyResponse,
+    GridApplyPreviewResponse,
+    GridApplyRequest,
+    GridApplyResponse,
+    GridTemplateSchema,
     IrrigationTemplateSchema,
     LockStateResponse,
     LockToggleRequest,
@@ -512,11 +516,162 @@ async def apply_org(
     )
 
 
+# ---------- Grid template (cell size + anomaly threshold) ------------------
+
+
+@router.get(
+    "/farms/{farm_id}/config/grid/template",
+    response_model=GridTemplateSchema,
+    summary="Get the farm grid defaults template.",
+)
+async def get_grid_template(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    tpl = await config_template.get_grid_template(session, farm_id=farm_id)
+    return {
+        "cell_size_m": float(tpl.cell_size_m) if tpl.cell_size_m is not None else None,
+        "anomaly_z_threshold": (
+            float(tpl.anomaly_z_threshold) if tpl.anomaly_z_threshold is not None else None
+        ),
+    }
+
+
+@router.put(
+    "/farms/{farm_id}/config/grid/template",
+    response_model=GridTemplateSchema,
+    summary="Replace the farm grid defaults template.",
+)
+async def put_grid_template(
+    farm_id: UUID,
+    payload: GridTemplateSchema,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    tpl = config_template.GridTemplate(
+        cell_size_m=(
+            Decimal(str(payload.cell_size_m)) if payload.cell_size_m is not None else None
+        ),
+        anomaly_z_threshold=(
+            Decimal(str(payload.anomaly_z_threshold))
+            if payload.anomaly_z_threshold is not None
+            else None
+        ),
+    )
+    await config_template.replace_grid_template(
+        session, farm_id=farm_id, tpl=tpl, updated_by=context.user_id
+    )
+    return {
+        "cell_size_m": payload.cell_size_m,
+        "anomaly_z_threshold": payload.anomaly_z_threshold,
+    }
+
+
+def _grid_rows_to_wire(plan: tuple[Any, ...]) -> dict[str, Any]:
+    """Shape a GridPlanRow tuple into the preview response."""
+
+    def _f(v: Any) -> float | None:
+        return float(v) if v is not None else None
+
+    rows = [
+        {
+            "block_id": r.state.block_id,
+            "block_code": r.state.block_code,
+            "block_name": r.state.block_name,
+            "product_id": r.state.product_id,
+            "product_code": r.state.product_code,
+            "product_name": r.state.product_name,
+            "native_pixel_m": _f(r.state.native_pixel_m),
+            "current_cell_size_m": _f(r.state.current_cell_size_m),
+            "current_anomaly_z_threshold": _f(r.state.current_anomaly_z_threshold),
+            "target_anomaly_z_threshold": _f(r.target_anomaly_z_threshold),
+            "action": r.action,
+            "reason": r.reason,
+            "matches": not r.is_change,
+        }
+        for r in plan
+    ]
+    changed = sum(1 for r in plan if r.action == "threshold")
+    return {
+        "rows": rows,
+        "total_rows": len(rows),
+        "changed_rows": changed,
+        "unchanged_rows": sum(1 for r in plan if r.action == "none"),
+        "skipped_rows": sum(1 for r in plan if r.action == "skipped"),
+        "is_noop": changed == 0,
+    }
+
+
+@router.post(
+    "/farms/{farm_id}/config/grid/apply-preview",
+    response_model=GridApplyPreviewResponse,
+    summary="Preview what a farm-wide grid Apply would change.",
+)
+async def apply_grid_preview(
+    farm_id: UUID,
+    payload: GridApplyRequest,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    target = tuple(payload.block_ids) if payload.block_ids is not None else None
+    plan = await config_template.compute_grid_apply_plan(
+        session,
+        farm_id=farm_id,
+        target_block_ids=target,
+        clear_override=payload.clear_override,
+    )
+    return _grid_rows_to_wire(plan)
+
+
+@router.post(
+    "/farms/{farm_id}/config/grid/apply",
+    response_model=GridApplyResponse,
+    summary="Apply the farm anomaly threshold to the target blocks.",
+)
+async def apply_grid(
+    farm_id: UUID,
+    payload: GridApplyRequest,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, int]:
+    """Threshold only — this endpoint never reshapes a grid.
+
+    Cell size is stored on the template but not applied here: changing it
+    retires the grid and orphans its observations, which needs grid valid
+    time to be safe. See docs/proposals/bulk-grid-config-and-valid-time.md.
+    """
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    target = tuple(payload.block_ids) if payload.block_ids is not None else None
+    return await config_template.apply_grid_template(
+        session,
+        farm_id=farm_id,
+        target_block_ids=target,
+        updated_by=context.user_id,
+        clear_override=payload.clear_override,
+    )
+
+
 # ---------- Helpers --------------------------------------------------------
 
 
 def _validate_category(category: str) -> None:
-    if category not in ("subscriptions", "irrigation", "org"):
+    if category not in ("subscriptions", "irrigation", "org", "grid"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown category {category!r}",

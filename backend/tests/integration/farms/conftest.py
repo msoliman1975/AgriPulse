@@ -50,13 +50,26 @@ class StubAuth:
         await self._app(scope, receive, send)
 
 
-def build_app(context: RequestContext, *, with_config: bool = False) -> FastAPI:
-    """Mount the farms router (+ optionally config_router) with stubbed auth."""
+def build_app(
+    context: RequestContext,
+    *,
+    with_config: bool = False,
+    with_grid: bool = False,
+) -> FastAPI:
+    """Mount the farms router (+ optionally config/grid routers) with stubbed auth.
+
+    ``with_grid`` mounts the grid module's block-level routes so tests can
+    assert the farm-level grid lock actually blocks a block-level write.
+    """
     app = FastAPI()
     install_exception_handlers(app)
     app.include_router(farms_router)
     if with_config:
         app.include_router(farms_config_router)
+    if with_grid:
+        from app.modules.grid.router import router as grid_router
+
+        app.include_router(grid_router)
     app.add_middleware(StubAuth, context=context)
     return app
 

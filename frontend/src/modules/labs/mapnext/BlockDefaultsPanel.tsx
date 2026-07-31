@@ -10,17 +10,21 @@ import { useTranslation } from "react-i18next";
 
 import { isApiError } from "@/api/errors";
 import {
+  applyGrid,
   applyIrrigation,
   applyOrg,
   applySubscriptions,
+  getGridTemplate,
   getIrrigationTemplate,
   getLocks,
   getOrgTemplate,
   getSubscriptionsTemplate,
   lockCategory,
+  previewApplyGrid,
   previewApplyIrrigation,
   previewApplyOrg,
   previewApplySubscriptions,
+  putGridTemplate,
   putIrrigationTemplate,
   putOrgTemplate,
   replaceSubscriptionsTemplate,
@@ -28,6 +32,8 @@ import {
 } from "@/api/farmConfig";
 import type {
   ApplyPreview,
+  GridApplyPreview,
+  GridTemplate,
   ImageryTemplateRow,
   IrrigationTemplate,
   LockCategory,
@@ -112,6 +118,7 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
   const [locks, setLocks] = useState<LockState | null>(null);
   const [irrigation, setIrrigation] = useState<IrrigationTemplate | null>(null);
   const [orgTpl, setOrgTpl] = useState<OrgTemplate | null>(null);
+  const [gridTpl, setGridTpl] = useState<GridTemplate | null>(null);
 
   const reloadLocks = async () => {
     try {
@@ -125,13 +132,14 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
     let cancelled = false;
     void (async () => {
       try {
-        const [tpl, c, l, irr, org, wp] = await Promise.all([
+        const [tpl, c, l, irr, org, wp, grid] = await Promise.all([
           getSubscriptionsTemplate(farmId),
           getConfig(),
           getLocks(farmId),
           getIrrigationTemplate(farmId),
           getOrgTemplate(farmId),
           listWeatherProviders(),
+          getGridTemplate(farmId),
         ]);
         if (cancelled) return;
         setTemplate(tpl);
@@ -141,6 +149,7 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
         setIrrigation(irr);
         setOrgTpl(org);
         setWeatherProviders(wp);
+        setGridTpl(grid);
       } catch (err) {
         if (cancelled) return;
         const status = isApiError(err) ? err.status : (err as { response?: { status?: number } })?.response?.status;
@@ -408,6 +417,210 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
       <Card title={t("blockDefaults.tags")} lock={lockChip("org")}>
         {orgTpl ? <OrgSection farmId={farmId} value={orgTpl} onChange={setOrgTpl} /> : null}
       </Card>
+
+      <Card title={t("blockDefaults.grid")} lock={lockChip("grid")}>
+        {gridTpl ? <GridSection farmId={farmId} value={gridTpl} onChange={setGridTpl} /> : null}
+      </Card>
+    </div>
+  );
+}
+
+// ---- Grid & anomaly --------------------------------------------------------
+
+// Same reasoning as normalizeTemplate: Apply reconciles against the SAVED
+// template, so an unsaved edit would make it a silent no-op.
+function normalizeGrid(v: GridTemplate): string {
+  return JSON.stringify({
+    cell_size_m: v.cell_size_m ?? null,
+    anomaly_z_threshold: v.anomaly_z_threshold ?? null,
+  });
+}
+
+function GridSection({ farmId, value, onChange }: { farmId: string; value: GridTemplate; onChange: (next: GridTemplate) => void }): ReactNode {
+  const { t } = useTranslation("farmConsole");
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => normalizeGrid(value));
+  const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [clearOverride, setClearOverride] = useState(false);
+  const [preview, setPreview] = useState<GridApplyPreview | null>(null);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [msg, setMsg] = useState<string | null>(null);
+  const [msgKind, setMsgKind] = useState<"ok" | "warn">("ok");
+
+  const dirty = normalizeGrid(value) !== savedSnapshot;
+
+  const say = (text: string, kind: "ok" | "warn" = "ok") => {
+    setMsgKind(kind);
+    setMsg(text);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const updated = await putGridTemplate(farmId, value);
+      onChange(updated);
+      setSavedSnapshot(normalizeGrid(updated));
+      setPreview(null);
+      say(t("blockDefaults.templateSaved"));
+    } catch (e) {
+      say((e as Error).message ?? t("blockDefaults.saveFailed"), "warn");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPreview = async () => {
+    // #330 guard: never preview a template the server hasn't seen.
+    if (dirty) {
+      say(t("blockDefaults.unsavedFirst"), "warn");
+      return;
+    }
+    setMsg(null);
+    try {
+      setPreview(await previewApplyGrid(farmId, null, clearOverride));
+      setExcluded(new Set());
+    } catch (e) {
+      say((e as Error).message ?? t("blockDefaults.previewFailed"), "warn");
+    }
+  };
+
+  // A row's identity is (block, product) — a block can be gridded against
+  // more than one product, and those are independent decisions.
+  const rowKey = (r: GridApplyPreview["rows"][number]) => `${r.block_id}::${r.product_id ?? "none"}`;
+
+  const toggleExcluded = (key: string) => {
+    const next = new Set(excluded);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setExcluded(next);
+  };
+
+  const selectedBlockIds = (): string[] => {
+    if (!preview) return [];
+    const ids = new Set<string>();
+    for (const r of preview.rows) {
+      if (r.action === "threshold" && !excluded.has(rowKey(r))) ids.add(r.block_id);
+    }
+    return [...ids];
+  };
+
+  const apply = async () => {
+    if (!preview) return;
+    setApplying(true);
+    setMsg(null);
+    try {
+      const counts = await applyGrid(farmId, selectedBlockIds(), clearOverride);
+      // Zero changes is not a success — same lesson as #330.
+      say(
+        counts.blocks_touched === 0
+          ? t("blockDefaults.appliedNothing")
+          : t("blockDefaults.appliedSimple", { blocks: counts.blocks_touched }),
+        counts.blocks_touched === 0 ? "warn" : "ok",
+      );
+      setPreview(null);
+    } catch (e) {
+      say((e as Error).message ?? t("blockDefaults.applyFailed"), "warn");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const selectedCount = preview ? selectedBlockIds().length : 0;
+
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-xs text-ap-muted">{t("blockDefaults.gridIntro")}</p>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs text-ap-muted">
+          {t("blockDefaults.anomalyThreshold")}
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={value.anomaly_z_threshold ?? ""}
+            onChange={(e) => onChange({ ...value, anomaly_z_threshold: e.target.value === "" ? null : Number(e.target.value) })}
+            className={input + " w-24"}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-ap-muted">
+          {t("blockDefaults.cellSize")}
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={value.cell_size_m ?? ""}
+            onChange={(e) => onChange({ ...value, cell_size_m: e.target.value === "" ? null : Number(e.target.value) })}
+            className={input + " w-24"}
+          />
+        </label>
+      </div>
+      <p className="text-xs text-ap-muted">{t("blockDefaults.thresholdHint")}</p>
+      {/* Cell size is stored but deliberately not applied yet — say so rather
+          than letting the field imply a bulk rezone is one click away. */}
+      <p className="rounded-lg bg-ap-warn-soft px-2.5 py-1.5 text-xs text-ap-warn">{t("blockDefaults.cellSizeNotApplied")}</p>
+
+      <label className="flex items-start gap-2 text-xs text-ap-ink">
+        <input type="checkbox" checked={clearOverride} onChange={(e) => { setClearOverride(e.target.checked); setPreview(null); }} className="mt-0.5" />
+        <span>{t("blockDefaults.clearOverride")}</span>
+      </label>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={save} disabled={saving || !dirty} className={primaryBtn}>
+          {saving ? t("manage.saving") : t("blockDefaults.saveTemplate")}
+        </button>
+        <button type="button" onClick={openPreview} disabled={dirty} title={dirty ? t("blockDefaults.unsavedFirst") : undefined} className={applyBtn}>
+          {t("blockDefaults.applyBlocks")}
+        </button>
+        {dirty ? <span className="text-xs text-ap-warn">{t("blockDefaults.unsavedFirst")}</span> : null}
+        {msg ? <span className={msgKind === "warn" ? "text-xs text-ap-warn" : "text-xs text-ap-muted"}>{msg}</span> : null}
+      </div>
+
+      {preview ? (
+        <div className="space-y-2 rounded-lg border border-ap-line bg-ap-panel p-3">
+          <p className="text-xs text-ap-muted">
+            {t("blockDefaults.gridPreviewSummary", {
+              changed: preview.changed_rows,
+              unchanged: preview.unchanged_rows,
+              skipped: preview.skipped_rows,
+            })}
+          </p>
+          {preview.is_noop ? <p className="text-xs text-ap-warn">{t("blockDefaults.gridNothingToDo")}</p> : null}
+          <ul className="max-h-56 space-y-1 overflow-auto">
+            {preview.rows.map((r) => {
+              const key = rowKey(r);
+              const selectable = r.action === "threshold";
+              return (
+                <li key={key} className={"flex items-center gap-2 rounded border border-ap-line/60 px-2 py-1 text-xs " + (selectable ? "" : "opacity-60")}>
+                  <input
+                    type="checkbox"
+                    checked={selectable && !excluded.has(key)}
+                    disabled={!selectable}
+                    onChange={() => toggleExcluded(key)}
+                    aria-label={r.block_code}
+                  />
+                  <span className="font-semibold text-ap-ink">{r.block_code}</span>
+                  <span className="text-ap-muted">{r.product_code ?? "—"}</span>
+                  <span className="ms-auto text-ap-muted">
+                    {selectable
+                      ? `${r.current_anomaly_z_threshold ?? "—"} → ${r.target_anomaly_z_threshold ?? t("blockDefaults.inherit")}`
+                      : r.reason}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={apply} disabled={applying || selectedCount === 0} className={primaryBtn}>
+              {applying ? t("manage.saving") : t("blockDefaults.gridConfirmApply", { blocks: selectedCount })}
+            </button>
+            <button type="button" onClick={() => setPreview(null)} className={ghostBtn}>
+              {t("manage.cancel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
