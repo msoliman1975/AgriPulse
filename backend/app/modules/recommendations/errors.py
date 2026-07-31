@@ -33,6 +33,25 @@ class DecisionTreeNotFoundError(APIError):
         )
 
 
+class BlockNotInFarmError(APIError):
+    """The block exists but does not belong to the farm the caller named.
+
+    Raised by the tree-explain endpoint, which authorizes against a
+    ``farm_id`` query parameter so farm-scoped users resolve. Without this
+    check a user scoped to farm A could pass farm A for authorization and a
+    block from farm B for the read.
+    """
+
+    def __init__(self, *, block_id: UUID, farm_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Block not found in farm",
+            detail=f"Block {block_id} does not belong to farm {farm_id}.",
+            type_=f"{_TYPE_BASE}/block-not-in-farm",
+            extras={"block_id": str(block_id), "farm_id": str(farm_id)},
+        )
+
+
 class InvalidRecommendationTransitionError(APIError):
     """Caller asked to apply / dismiss / defer a recommendation in a
     state that doesn't allow it."""

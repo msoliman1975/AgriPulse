@@ -17,6 +17,7 @@ from uuid import UUID
 
 import pytest
 
+from app.modules.recommendations.errors import BlockNotInFarmError
 from app.modules.recommendations.service import (
     RecommendationsServiceImpl,
     _BlockEvaluation,
@@ -95,7 +96,7 @@ def _setup(
         latest_index_aggregates=latest,
     )
     return _BlockEvaluation(
-        farm_id=UUID("00000000-0000-0000-0000-0000000000f1"),
+        farm_id=_FARM_ID,
         block_crop_id=None,
         crop_path="citrus.valencia",
         crop_category="fruit",
@@ -128,10 +129,14 @@ def _service_with(setup: _BlockEvaluation | None) -> RecommendationsServiceImpl:
     return svc
 
 
+_FARM_ID = UUID("00000000-0000-0000-0000-0000000000f1")
+
+
 async def _explain(setup: _BlockEvaluation | None) -> dict[str, Any]:
     return await _service_with(setup).explain_block(
         block_id=_BLOCK_ID,
         tenant_id=UUID("00000000-0000-0000-0000-0000000000a1"),
+        farm_id=_FARM_ID,
     )
 
 
@@ -213,11 +218,27 @@ async def test_malformed_tree_reports_error_rather_than_failing_the_request() ->
 
 
 @pytest.mark.asyncio
-async def test_block_with_no_farm_returns_an_empty_report_not_an_error() -> None:
-    out = await _explain(None)
-    assert out["trees"] == []
-    assert out["crop_path"] is None
-    assert out["block_id"] == str(_BLOCK_ID)
+async def test_block_with_no_farm_is_indistinguishable_from_not_yours() -> None:
+    """A block with no parent farm cannot be authorized against one, so it
+    404s exactly like a block belonging to someone else's farm — the caller
+    learns nothing either way."""
+    with pytest.raises(BlockNotInFarmError):
+        await _explain(None)
+
+
+@pytest.mark.asyncio
+async def test_a_block_from_another_farm_is_refused() -> None:
+    """Authorization happens against the farm_id query param, so the block
+    must be verified to belong to it. Otherwise a user scoped to farm A
+    could authorize with farm A and read a block from farm B."""
+    setup = _setup(ndvi_mean=0.39, block_trees=[_tree("irrigation_v3")])
+    svc = _service_with(setup)  # setup.farm_id is _FARM_ID
+    with pytest.raises(BlockNotInFarmError):
+        await svc.explain_block(
+            block_id=_BLOCK_ID,
+            tenant_id=UUID("00000000-0000-0000-0000-0000000000a1"),
+            farm_id=UUID("00000000-0000-0000-0000-0000000000f9"),  # a different farm
+        )
 
 
 def test_explain_steps_tolerates_a_node_missing_from_compiled() -> None:
