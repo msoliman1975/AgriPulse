@@ -274,13 +274,35 @@ global:
   #   view on one axis (no dual-axis), same spans as the vegetation chart;
   #   zscore already shipped per point so no API change. No migration.
   #   Beat/light + FE -> api + workers + frontend bumped; tile-server 9d140cc.
+  # d9244d3 = #337 + #338, shipped together because #337's backend is what
+  #   #338 fixes -- promoting the frontend alone would put a Conditions tab
+  #   in front of an endpoint that 404s, and promoting #337's api alone would
+  #   serve that endpoint to nobody but tenant admins.
+  #   #337 replaces the 372px block inspector with a full-width dock under
+  #   the map (Overview | Index | Conditions | Field & plan | Manage). New
+  #   read-only GET /blocks/{id}/decision-trees:explain re-walks every visible
+  #   tree and reports why each did or didn't fire -- including the ones that
+  #   came out clear, which leave no recommendations row, and the ones
+  #   targeting skipped, so a crop-less block can say why it has no advice.
+  #   #338 fixes two authorization defects in that endpoint, both found by
+  #   driving it e2e with a real Keycloak token rather than trusting units:
+  #   (a) it was gated on decision_tree.read, which only TenantOwner/
+  #   TenantAdmin/PlatformSupport hold -- every field role incl. Agronomist
+  #   got 403. Now recommendation.read. Widening decision_tree.read was not
+  #   an option, it also gates :evaluate and :dry-run, both of which write.
+  #   (b) requires_capability only consults farm scopes when a route names a
+  #   farm, and this one took only block_id -- so farm-scoped-only users were
+  #   denied whatever the capability. Adds a required farm_id query param
+  #   (as GET /recommendations already does) + a block-belongs-to-farm check
+  #   so the caller-supplied farm can't be used to read another farm's block.
+  #   No migration. api + workers + frontend bumped; tile-server 9d140cc.
   images:
     api:
-      tag: "ab866ad"
+      tag: "d9244d3"
     workers:
-      tag: "ab866ad"
+      tag: "d9244d3"
     frontend:
-      tag: "ab866ad"
+      tag: "d9244d3"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
