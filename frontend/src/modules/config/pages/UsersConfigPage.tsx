@@ -57,7 +57,8 @@ export function UsersConfigPage(): ReactNode {
   }
 
   return (
-    <Page>
+    // Four columns do not fill max-w-6xl — see decision 5's escape hatch.
+    <Page width="standard">
       <PageHeader
         title={t("page.title")}
         subtitle={t("page.subtitle")}

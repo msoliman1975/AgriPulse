@@ -52,7 +52,8 @@ export function FarmListPage(): JSX.Element {
   ];
 
   return (
-    <Page>
+    // Five columns do not fill max-w-6xl — see decision 5's escape hatch.
+    <Page width="standard">
       <PageHeader
         title={t("list.heading")}
         actions={
