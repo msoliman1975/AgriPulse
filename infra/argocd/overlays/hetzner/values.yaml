@@ -296,13 +296,26 @@ global:
   #   (as GET /recommendations already does) + a block-belongs-to-farm check
   #   so the caller-supplied farm can't be used to read another farm's block.
   #   No migration. api + workers + frontend bumped; tile-server 9d140cc.
+  # cb626e1 = #339, first round of feedback on the #337 dock. Two bugs:
+  #   every block read "No crop assigned" because loadUnitDetail hardcoded
+  #   UnitDetail.crop to null (a map-prototype leftover) -- now derived from
+  #   the block's current assignment, so every reader gets the truth; and
+  #   "assign crop doesn't save" was really loadUnitDetail's 30s
+  #   module-level cache, which react-query invalidation never reaches, so
+  #   the panel re-read the stale value. Manage actions now clear both.
+  #   Also: the dock moved inside the map column so it tracks the units
+  #   rail, gained a drag-resizable top edge (localStorage, clamped 160px
+  #   .. 72vh), and the title bar became one row of chips. The Conditions
+  #   tab no longer reds a block for conditions that merely evaluated
+  #   false -- unmet checks only count when the tree actually fired.
+  #   Frontend only. api + workers stay d9244d3; tile-server 9d140cc.
   images:
     api:
       tag: "d9244d3"
     workers:
       tag: "d9244d3"
     frontend:
-      tag: "d9244d3"
+      tag: "cb626e1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
