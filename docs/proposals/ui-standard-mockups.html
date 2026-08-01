@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgriPulse — Standard Page Pattern · Decision Mockups</title>
+<style>
+/* ============================================================
+   DOC CHROME — matches docs/reports house style
+   ============================================================ */
+:root{
+  --bg:#f7f6f1; --panel:#ffffff; --line:#e8e5db; --ink:#1f2420; --muted:#6c7268;
+  --primary:#356b30; --primary-soft:#dceadb; --crit:#b24430; --crit-soft:#f3d2c9;
+  --good:#4f8e4a; --accent:#1f6f9a; --warn:#c98a18; --warn-soft:#f7e7c2;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 110px}
+header.hero{background:linear-gradient(135deg,#2c5a28,#356b30 55%,#4f8e4a);color:#fff;padding:52px 24px 44px;margin-bottom:36px}
+header.hero .inner{max-width:1180px;margin:0 auto}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.85;font-weight:600}
+h1{font-size:33px;line-height:1.15;margin:.3em 0 .2em;font-weight:700}
+.hero p{max-width:64ch;opacity:.92;margin:.4em 0 0}
+.meta{margin-top:20px;display:flex;flex-wrap:wrap;gap:10px}
+.meta span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:5px 12px;border-radius:999px;font-size:12.5px}
+h2{font-size:23px;margin:52px 0 6px;font-weight:700;letter-spacing:-.01em}
+h2 .num{color:var(--primary);font-variant-numeric:tabular-nums}
+h3{font-size:17px;margin:26px 0 6px;font-weight:650}
+.lede{color:var(--muted);margin:.2em 0 1.1em;max-width:76ch}
+.doccard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0;box-shadow:0 1px 2px rgba(31,36,32,.04)}
+code{background:#f0eee6;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px;
+  font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;color:#3a3f39;white-space:nowrap}
+.note{background:#dceaf2;border:1px solid #b9d4e2;border-radius:10px;padding:13px 17px;font-size:13.5px;color:#244b5c;margin:14px 0}
+.good{background:#e3efe0;border:1px solid #c4ddbd;border-radius:10px;padding:13px 17px;font-size:13.5px;color:#2c5226;margin:14px 0}
+.bad{background:#f6e3df;border:1px solid #e3c3bb;border-radius:10px;padding:13px 17px;font-size:13.5px;color:#7d2f20;margin:14px 0}
+.toc{columns:2;column-gap:34px;font-size:14.5px}
+.toc a{color:var(--ink);text-decoration:none;display:block;padding:4px 0;border-bottom:1px solid transparent}
+.toc a:hover{color:var(--primary);border-color:var(--primary)}
+@media(max-width:640px){.toc{columns:1}}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);margin-top:56px;padding-top:24px}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.tag.rec{background:var(--primary-soft);color:var(--primary)}
+.tag.now{background:#eceae3;color:var(--muted)}
+.tag.bad{background:var(--crit-soft);color:var(--crit)}
+
+/* ============================================================
+   OPTION SWITCHER  — the signature device.
+   Same surface, swapped in place, so the difference is pixels
+   rather than prose.
+   ============================================================ */
+.switcher{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden;margin:18px 0 8px;
+  box-shadow:0 1px 3px rgba(31,36,32,.06)}
+.switchbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;background:#fbfaf6;border-bottom:1px solid var(--line)}
+.switchbar .lbl{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-inline-end:4px}
+.opt{position:relative}
+.opt input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0;width:100%;height:100%}
+.opt span{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:var(--ink);
+  padding:6px 13px;border-radius:999px;font-size:13px;font-weight:550;cursor:pointer;transition:.15s}
+.opt input:checked + span{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);font-weight:650}
+.opt input:focus-visible + span{outline:2px solid var(--primary);outline-offset:2px}
+.opt span em{font-style:normal;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;opacity:.72;font-weight:700}
+.stage{background:var(--bg);padding:0;position:relative}
+.variant{display:none}
+.variant.on{display:block}
+.verdict{display:flex;gap:10px;align-items:flex-start;padding:13px 16px;border-top:1px solid var(--line);background:#fbfaf6;font-size:13.5px}
+.verdict .k{font-weight:700;flex:none;color:var(--ink)}
+.verdict .v{color:var(--muted)}
+.callout{position:absolute;z-index:5;background:var(--ink);color:#fff;font-size:11.5px;font-weight:600;
+  padding:4px 9px;border-radius:6px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.callout:after{content:"";position:absolute;width:8px;height:8px;background:var(--ink);transform:rotate(45deg)}
+.callout.tl:after{left:12px;top:-3px}
+
+/* ============================================================
+   APP MOCK — faithful to tailwind.config.ts ap.* tokens.
+   Nothing in here may drift from the real app values.
+   ============================================================ */
+.app{--a-bg:#f7f6f1;--a-panel:#ffffff;--a-line:#e8e5db;--a-ink:#1f2420;--a-muted:#6c7268;
+  --a-primary:#356b30;--a-primary-soft:#dceadb;--a-good:#4f8e4a;--a-accent:#1f6f9a;
+  --a-warn:#c98a18;--a-warn-soft:#f7e7c2;--a-crit:#b24430;--a-crit-soft:#f3d2c9;
+  --a-radius:12px;
+  font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Cairo,Tahoma,Arial,sans-serif;
+  color:var(--a-ink);background:var(--a-bg)}
+.app[data-theme="dark"]{--a-bg:#171a16;--a-panel:#1f231d;--a-line:#333930;--a-ink:#e9e7dd;--a-muted:#9aa094;
+  --a-primary:#7fb974;--a-primary-soft:#26331f;--a-good:#7fb974;--a-accent:#6cb2d6;
+  --a-warn:#e0b45c;--a-warn-soft:#3a3018;--a-crit:#e19077;--a-crit-soft:#3c221c}
+.app *{box-sizing:border-box}
+
+/* shell */
+.a-shell{display:flex;flex-direction:column;min-height:100%}
+.a-top{display:flex;align-items:center;gap:14px;padding:0 16px;height:52px;flex:none;
+  background:var(--a-panel);border-bottom:1px solid var(--a-line)}
+.a-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px;letter-spacing:-.01em}
+.a-logo i{width:20px;height:20px;border-radius:6px;background:var(--a-primary);display:inline-block;position:relative}
+.a-logo i:after{content:"";position:absolute;inset:5px 5px auto 5px;height:2px;border-radius:2px;background:#fff;opacity:.85}
+.a-top .sp{flex:1}
+.a-chip{border:1px solid var(--a-line);border-radius:8px;padding:4px 10px;font-size:12.5px;color:var(--a-ink);background:var(--a-panel);display:inline-flex;gap:7px;align-items:center}
+.a-chip small{color:var(--a-muted);font-size:11px}
+.a-avatar{width:26px;height:26px;border-radius:999px;background:var(--a-primary-soft);color:var(--a-primary);
+  display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.a-body{display:flex;flex:1;min-height:0}
+.a-nav{width:196px;flex:none;background:var(--a-panel);border-inline-end:1px solid var(--a-line);padding:12px 8px;font-size:13px}
+.a-nav .grp{padding:10px 10px 4px;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--a-muted)}
+.a-nav a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--a-ink);text-decoration:none;margin-bottom:1px}
+.a-nav a:hover{background:color-mix(in srgb,var(--a-line) 55%,transparent)}
+.a-nav a.on{background:var(--a-primary-soft);color:var(--a-primary);font-weight:600}
+.a-nav a b{width:15px;height:15px;border-radius:4px;background:currentColor;opacity:.5;flex:none}
+.a-main{flex:1;min-width:0;overflow-x:hidden;padding:24px 16px}
+
+/* the frame decision: width classes on the content root */
+.a-page{display:flex;flex-direction:column;gap:16px}
+.a-page.w-standard{max-width:1024px;margin:0 auto}   /* max-w-5xl */
+.a-page.w-wide{max-width:1152px;margin:0 auto}       /* max-w-6xl */
+.a-page.w-full{max-width:none}
+/* the bug, made visible */
+.a-main.pad-legacy{padding:24px 16px}
+.a-main.pad-legacy > .a-page{padding:24px}
+.a-main.pad-legacy > .a-page > *{outline:1px dashed #c9a6a0;outline-offset:8px}
+
+/* header */
+.a-h{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.a-h .t{font-size:24px;line-height:1.2;font-weight:600;letter-spacing:-.015em;margin:0}
+.a-h .s{font-size:13px;color:var(--a-muted);margin:4px 0 0}
+.a-h .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.a-crumb{display:flex;gap:7px;align-items:center;font-size:12px;color:var(--a-muted);margin-bottom:5px}
+.a-crumb a{color:var(--a-muted);text-decoration:none}
+.a-crumb a:hover{color:var(--a-primary);text-decoration:underline}
+.a-crumb s{text-decoration:none;opacity:.5}
+.a-back{font-size:13px;color:var(--a-muted);text-decoration:none;display:inline-block;margin-bottom:2px}
+.a-back:hover{color:var(--a-ink)}
+
+/* buttons */
+.a-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;font-weight:500;
+  font-size:13.5px;padding:7px 13px;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:.15s;font-family:inherit}
+.a-btn.pri{background:var(--a-primary);color:#fff}
+.a-btn.pri:hover{filter:brightness(.92)}
+.a-btn.sec{border-color:var(--a-line);background:var(--a-panel);color:var(--a-ink)}
+.a-btn.sec:hover{background:color-mix(in srgb,var(--a-line) 40%,transparent)}
+.a-btn.gho{color:var(--a-ink);background:transparent}
+.a-btn.gho:hover{background:color-mix(in srgb,var(--a-line) 50%,transparent)}
+.a-btn.dan{background:var(--a-crit);color:#fff}
+.a-btn.sm{font-size:12px;padding:5px 10px}
+
+/* card */
+.a-card{border:1px solid var(--a-line);background:var(--a-panel);border-radius:var(--a-radius)}
+.a-card.p{padding:16px}
+.a-card > .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 16px;border-bottom:1px solid var(--a-line)}
+.a-card > .hd h3{margin:0;font-size:14px;font-weight:650}
+.a-card > .ft{padding:11px 16px;border-top:1px solid var(--a-line);display:flex;justify-content:flex-end;gap:8px}
+
+/* toolbar */
+.a-tool{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.a-search{border:1px solid var(--a-line);background:var(--a-panel);border-radius:8px;padding:7px 11px;font-size:13px;
+  color:var(--a-ink);width:250px;font-family:inherit}
+.a-search::placeholder{color:var(--a-muted)}
+.a-chips{display:flex;gap:7px;flex-wrap:wrap}
+.a-fc{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--a-line);background:var(--a-panel);
+  color:var(--a-muted);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit}
+.a-fc.on{border-color:var(--a-primary);background:var(--a-primary-soft);color:var(--a-primary)}
+.a-sel{display:flex;flex-direction:column;gap:3px}
+.a-sel label{font-size:10.5px;font-weight:600;color:var(--a-muted);text-transform:uppercase;letter-spacing:.06em}
+.a-sel select{border:1px solid var(--a-line);background:var(--a-panel);color:var(--a-ink);border-radius:8px;
+  padding:6px 9px;font-size:13px;font-family:inherit}
+.a-pop{position:relative}
+.a-popbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--a-line);background:var(--a-panel);
+  color:var(--a-ink);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.a-popbtn b{background:var(--a-primary);color:#fff;border-radius:999px;font-size:10.5px;min-width:17px;height:17px;
+  display:grid;place-items:center;padding:0 4px}
+.a-popmenu{position:absolute;top:calc(100% + 6px);inset-inline-end:0;width:236px;background:var(--a-panel);
+  border:1px solid var(--a-line);border-radius:10px;box-shadow:0 8px 26px rgba(31,36,32,.14);padding:11px;z-index:9}
+.a-popmenu .r{display:flex;align-items:center;gap:9px;padding:5px 3px;font-size:13px}
+.a-popmenu .r input{accent-color:var(--a-primary)}
+.a-popmenu .hr{height:1px;background:var(--a-line);margin:7px 0}
+.a-popmenu .grp{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--a-muted);margin:4px 0 2px}
+
+/* table */
+.a-tw{border:1px solid var(--a-line);background:var(--a-panel);border-radius:var(--a-radius);overflow:hidden}
+table.a-t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.a-t thead{background:color-mix(in srgb,var(--a-bg) 55%,var(--a-panel))}
+table.a-t th{text-align:start;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--a-muted);padding:9px 12px;border-bottom:1px solid var(--a-line)}
+table.a-t td{padding:9px 12px;border-top:1px solid var(--a-line);color:var(--a-ink);vertical-align:middle}
+table.a-t tbody tr:first-child td{border-top:0}
+table.a-t .num{text-align:end;font-variant-numeric:tabular-nums}
+table.a-t .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+table.a-t a.id{color:var(--a-primary);font-weight:600;text-decoration:none}
+table.a-t a.id:hover{text-decoration:underline}
+tr.click{cursor:pointer}
+tr.click:hover{background:color-mix(in srgb,var(--a-line) 32%,transparent)}
+tr.click:focus-visible{outline:2px solid var(--a-primary);outline-offset:-2px}
+.chev{color:var(--a-muted);opacity:0;transition:.15s}
+tr.click:hover .chev{opacity:1}
+.a-open{color:var(--a-primary);font-size:12.5px;font-weight:600;text-decoration:none}
+.a-open:hover{text-decoration:underline}
+
+/* pills / badges */
+.a-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500}
+.a-pill.ok{background:var(--a-primary-soft);color:var(--a-primary)}
+.a-pill.warn{background:var(--a-warn-soft);color:var(--a-warn)}
+.a-pill.crit{background:var(--a-crit-soft);color:var(--a-crit)}
+.a-pill.neu{background:color-mix(in srgb,var(--a-line) 70%,transparent);color:var(--a-ink)}
+.a-pill.info{background:color-mix(in srgb,var(--a-accent) 14%,transparent);color:var(--a-accent)}
+
+/* states */
+.a-empty{display:flex;flex-direction:column;align-items:center;gap:12px;padding:46px 20px;text-align:center;
+  font-size:13.5px;color:var(--a-muted)}
+.a-empty .ic{width:38px;height:38px;border-radius:11px;background:color-mix(in srgb,var(--a-line) 55%,transparent)}
+.a-err{display:flex;flex-wrap:wrap;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--a-crit) 30%,transparent);
+  background:var(--a-crit-soft);color:var(--a-crit);border-radius:8px;padding:13px 15px;font-size:13.5px}
+.a-err span{flex:1}
+.sk{display:block;border-radius:6px;background:color-mix(in srgb,var(--a-line) 62%,transparent);height:12px}
+@media (prefers-reduced-motion:no-preference){
+  .sk{background:linear-gradient(90deg,
+      color-mix(in srgb,var(--a-line) 55%,transparent) 0%,
+      color-mix(in srgb,var(--a-line) 88%,transparent) 50%,
+      color-mix(in srgb,var(--a-line) 55%,transparent) 100%);
+    background-size:220% 100%;animation:shim 1.25s ease-in-out infinite}
+  @keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
+}
+.a-pag{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--a-muted)}
+.a-pag .btns{display:flex;gap:7px}
+
+/* KPI */
+.a-kpis{display:grid;gap:12px;grid-template-columns:repeat(3,1fr)}
+.a-kpi{border:1px solid var(--a-line);background:var(--a-panel);border-radius:var(--a-radius);padding:14px 16px}
+.a-kpi .l{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--a-muted)}
+.a-kpi .n{font-size:24px;font-weight:650;margin-top:5px;letter-spacing:-.02em}
+.a-kpi .h{font-size:11.5px;color:var(--a-muted);margin-top:2px}
+
+/* segmented control */
+.a-seg{display:inline-flex;border:1px solid var(--a-line);background:var(--a-panel);border-radius:9px;padding:2px;gap:2px}
+.a-seg button{border:0;background:transparent;color:var(--a-muted);font:inherit;font-size:12.5px;font-weight:550;
+  padding:5px 12px;border-radius:7px;cursor:pointer}
+.a-seg button.on{background:var(--a-primary-soft);color:var(--a-primary);font-weight:650}
+
+/* field rows / forms */
+.a-dl{display:flex;flex-direction:column}
+.a-dl .r{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-top:1px solid var(--a-line);font-size:13.5px}
+.a-dl .r:first-child{border-top:0}
+.a-dl dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--a-muted);margin:0}
+.a-dl dd{margin:0;text-align:end}
+.a-field{display:flex;flex-direction:column;gap:5px}
+.a-field .lb{font-size:12.5px;font-weight:600}
+.a-field .lb i{color:var(--a-crit);font-style:normal}
+.a-field .hp{font-size:11.5px;color:var(--a-muted)}
+.a-field input,.a-field select,.a-field textarea{border:1px solid var(--a-line);background:var(--a-panel);color:var(--a-ink);
+  border-radius:8px;padding:8px 11px;font-size:13.5px;font-family:inherit;width:100%}
+.a-field.err input{border-color:var(--a-crit)}
+.a-field .em{font-size:11.5px;color:var(--a-crit)}
+.a-grid2{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+.a-rowlist{list-style:none;margin:0;padding:0}
+.a-rowlist li{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-top:1px solid var(--a-line)}
+.a-rowlist li:first-child{border-top:0}
+.a-rail{width:3px;border-radius:3px;flex:none;align-self:stretch;min-height:38px}
+.a-rowlist .bd{flex:1;min-width:0}
+.a-rowlist .ttl{font-size:13.5px;font-weight:600;display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.a-rowlist .sub{font-size:12.5px;color:var(--a-muted);margin-top:3px}
+.a-rowlist .mt{font-size:11px;color:var(--a-muted);margin-top:5px;display:flex;gap:7px;flex-wrap:wrap}
+.a-rowlist .ac{display:flex;gap:6px;flex:none;align-items:center}
+
+/* drift wall */
+.wall{display:grid;gap:16px;margin:18px 0}
+@media(min-width:860px){.wall{grid-template-columns:1fr 1fr}}
+.spec{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.spec .cap{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:11px 14px;border-bottom:1px solid var(--line);background:#fbfaf6}
+.spec .cap b{font-size:13.5px}
+.spec .cap i{font-style:normal;font-size:11.5px;color:var(--muted);font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+.spec .vp{height:290px;overflow:hidden;position:relative;background:var(--bg)}
+.spec .vp > .app{position:absolute;top:0;left:0;width:167%;transform:scale(.6);transform-origin:top left}
+.spec .dl{padding:11px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.spec .dl b{color:var(--crit)}
+
+/* decision sheet */
+.sheet{width:100%;border-collapse:collapse;font-size:14px}
+.sheet th,.sheet td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.sheet th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:#fbfaf6;font-weight:700}
+.sheet td.pick{font-weight:650;color:var(--primary)}
+.sheet tbody tr:hover{background:#fbfaf6}
+.cta{display:inline-block;background:var(--primary);color:#fff;text-decoration:none;font-weight:600;padding:11px 20px;border-radius:9px;font-size:14.5px;margin-top:6px}
+.cta:hover{background:#2b5827}
+.themebtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 13px;font:inherit;font-size:12.5px;cursor:pointer}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <div class="eyebrow">AgriPulse · Design Decision Deck</div>
+    <h1>Standard Page Pattern — pick the options</h1>
+    <p>Every mockup below is rendered with the real <code style="background:rgba(255,255,255,.18);border:0;color:#fff">ap.*</code> tokens from <code style="background:rgba(255,255,255,.18);border:0;color:#fff">tailwind.config.ts</code>, inside a mock app shell, at true size. Switch between options in place — the point is to see the difference in pixels, not to read a description of it.</p>
+    <div class="meta">
+      <span>📅 29 July 2026</span>
+      <span>🎛 7 decisions · 19 rendered options</span>
+      <span>📄 Companion to the <a href="../reports/ui-pattern-inventory-2026-07-29.html" style="color:#fff">pattern inventory</a></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <h2><span class="num">00</span> &nbsp;How to use this</h2>
+    <div class="doccard">
+      <div class="toc">
+        <a href="#wall">01 · The drift wall — four index pages as they look today</a>
+        <a href="#d1">02 · Decision 1 — row navigation</a>
+        <a href="#d2">03 · Decision 2 — filter idiom</a>
+        <a href="#d3">04 · Decision 3 — skeleton placement</a>
+        <a href="#d4">05 · Decision 4 — detail-page composition</a>
+        <a href="#d5">06 · Decision 5 — page width &amp; the padding bug</a>
+        <a href="#d6">07 · Decision 6 — dark mode</a>
+        <a href="#templates">08 · The three templates, assembled</a>
+        <a href="#sheet">09 · Decision sheet</a>
+      </div>
+      <div class="note" style="margin-bottom:0"><b>Reading the labels:</b> <span class="tag now">today</span> marks what the code does now, <span class="tag rec">recommended</span> marks my proposal, <span class="tag bad">problem</span> marks something actively broken.</div>
+    </div>
+  </section>
+
+  <!-- ============================================ 01 DRIFT WALL -->
+  <section id="wall">
+    <h2><span class="num">01</span> &nbsp;The drift wall</h2>
+    <p class="lede">Four pages that do the same job — list entities, click one, open it. Rendered at 60% so they fit side by side. No two share a table style, a header scale, a filter idiom, or a page width. This is the thing to fix.</p>
+
+    <div class="wall">
+      <!-- Farms -->
+      <div class="spec">
+        <div class="cap"><b>Farms</b> <i>/farms · FarmListPage</i></div>
+        <div class="vp"><div class="app"><div class="a-main" style="padding:20px 16px">
+          <div class="a-page w-full">
+            <div class="a-h"><div><h1 class="t">Farms</h1></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+            <div class="a-card p" style="padding:14px 16px"><label style="display:inline-flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox"> Include archived</label></div>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th>Area</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><a class="id">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td>412.6 ha</td><td>Active</td></tr>
+                <tr><td><a class="id">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td>188.0 ha</td><td>Active</td></tr>
+                <tr><td><a class="id">SUZ-02</a></td><td>Suez East</td><td>Suez</td><td>96.4 ha</td><td>Archived</td></tr>
+              </tbody></table></div>
+          </div>
+        </div></div></div>
+        <div class="dl"><b>No max-width.</b> Checkbox filter in a card. Link-in-cell nav. No pagination. <code>space-y-4</code>.</div>
+      </div>
+
+      <!-- Platform tenants -->
+      <div class="spec">
+        <div class="cap"><b>Tenants</b> <i>/platform/tenants · TenantListPage</i></div>
+        <div class="vp"><div class="app"><div class="a-main" style="padding:20px 16px">
+          <div class="a-page w-standard">
+            <div class="a-h" style="border-bottom:1px solid var(--a-line);padding-bottom:15px">
+              <div><h1 class="t">Tenants</h1><p class="s">Every organisation on the platform.</p></div>
+              <div class="acts"><a class="a-btn pri">New tenant</a></div></div>
+            <div class="a-tool"><input class="a-search" placeholder="Search tenants…">
+              <div class="a-chips"><button class="a-fc on">All</button><button class="a-fc">Active</button><button class="a-fc">Suspended</button><button class="a-fc">Archived</button></div></div>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th>Slug</th><th>Name</th><th>Status</th><th>Contact</th></tr></thead>
+              <tbody>
+                <tr class="click"><td class="mono">bashayer</td><td>Bashayer Agriculture</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">ops@bashayer.eg</td></tr>
+                <tr class="click"><td class="mono">agrosina</td><td>Agrosina</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">admin@agrosina.eg</td></tr>
+              </tbody></table></div>
+            <div class="a-pag"><span>1–2 of 2</span><div class="btns"><button class="a-btn sec sm">Previous</button><button class="a-btn sec sm">Next</button></div></div>
+          </div>
+        </div></div></div>
+        <div class="dl">The <b>best-in-class</b> one. <code>max-w-5xl</code>, chips, <code>&lt;Table&gt;</code>, whole-row click, pagination.</div>
+      </div>
+
+      <!-- Decision trees -->
+      <div class="spec">
+        <div class="cap"><b>Decision trees</b> <i>/decision-trees · DecisionTreeListPage</i></div>
+        <div class="vp"><div class="app"><div class="a-main" style="padding:20px 16px">
+          <div class="a-page w-wide">
+            <div class="a-h"><div><h1 class="t">Decision trees</h1><p class="s">Agronomic logic, versioned per tenant.</p></div><div class="acts"><a class="a-btn pri">New tree</a></div></div>
+            <div style="display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap">
+              <input class="a-search" placeholder="Search…" style="flex:1;min-width:170px;width:auto">
+              <div class="a-sel"><label>Location</label><select><option>All</option></select></div>
+              <div class="a-sel"><label>Soil</label><select><option>All</option></select></div>
+              <div class="a-sel"><label>Scope</label><select><option>All</option></select></div>
+              <div class="a-sel"><label>Status</label><select><option>Active</option></select></div>
+            </div>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th>Code</th><th>Name</th><th>Crop</th><th>Scope</th><th class="num">Version</th><th class="num">Actions</th></tr></thead>
+              <tbody>
+                <tr><td><a class="id mono">MANGO-WATER-01</a></td><td>Mango water stress</td><td><span class="a-pill ok" style="font-family:ui-monospace;font-size:10.5px">fruit/mango</span></td><td>Block</td><td class="num"><span class="a-pill ok">v3</span></td><td class="num"><a class="a-open">Open</a> &nbsp;<a class="a-open" style="color:var(--a-crit)">Archive</a></td></tr>
+                <tr><td><a class="id mono">CITRUS-N-02</a></td><td>Citrus nitrogen</td><td><span class="a-pill ok" style="font-family:ui-monospace;font-size:10.5px">fruit/citrus</span></td><td>Cell</td><td class="num"><span class="a-pill neu">Draft</span></td><td class="num"><a class="a-open">Open</a> &nbsp;<a class="a-open" style="color:var(--a-crit)">Archive</a></td></tr>
+              </tbody></table></div>
+          </div>
+        </div></div></div>
+        <div class="dl"><b>max-w-6xl</b>, four <code>&lt;select&gt;</code> filters, <code>px-4 py-2</code> cells, raw <code>&lt;table&gt;</code>, actions column.</div>
+      </div>
+
+      <!-- Plan templates -->
+      <div class="spec">
+        <div class="cap"><b>Plan templates</b> <i>/platform/plan-templates · PlatformPlanTemplatesPage</i></div>
+        <div class="vp"><div class="app"><div class="a-main" style="padding:20px 16px">
+          <div class="a-page w-standard" style="padding:24px">
+            <div class="a-h"><div><h1 class="t">Plan templates</h1><p class="s">Crop-keyed agriculture plans.</p></div><div class="acts"><a class="a-btn pri" style="padding:9px 13px">New template</a></div></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:11.5px;font-weight:600;color:var(--a-muted)">Status</span>
+              <button class="a-fc on" style="border-color:transparent">All</button>
+              <button class="a-fc" style="border-color:transparent;background:transparent">Draft</button>
+              <button class="a-fc" style="border-color:transparent;background:transparent">Published</button>
+              <button class="a-fc" style="border-color:transparent;background:transparent">Archived</button>
+            </div>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th style="padding:9px 16px">Name</th><th>Crop path</th><th>Status</th><th>Updated</th></tr></thead>
+              <tbody>
+                <tr class="click"><td style="padding:13px 16px"><div style="font-weight:550">Mango — Egypt baseline</div><div class="mono" style="color:var(--a-muted);font-size:11px">mango-eg-base</div></td><td class="mono" style="color:var(--a-primary)">fruit/mango</td><td><span class="a-pill ok">Published</span></td><td style="font-size:12px;color:var(--a-muted)">14 Jul 2026</td></tr>
+                <tr class="click"><td style="padding:13px 16px"><div style="font-weight:550">Citrus — Delta</div><div class="mono" style="color:var(--a-muted);font-size:11px">citrus-delta</div></td><td class="mono" style="color:var(--a-primary)">fruit/citrus</td><td><span class="a-pill neu">Draft</span></td><td style="font-size:12px;color:var(--a-muted)">02 Jul 2026</td></tr>
+              </tbody></table></div>
+          </div>
+        </div></div></div>
+        <div class="dl"><b>Double-padded</b> (<code>p-6</code> inside the shell's <code>py-6</code>). Borderless pill filters — a third idiom. <code>px-4 py-3</code> cells.</div>
+      </div>
+    </div>
+
+    <div class="bad"><b>Four table looks, four filter idioms, three page widths, two header treatments — for one job.</b> None of it was a decision; each page inherited from whichever page its author copied.</div>
+  </section>
+
+  <!-- ============================================ D1 ROW NAV -->
+  <section id="d1">
+    <h2><span class="num">02</span> &nbsp;Decision 1 — row navigation</h2>
+    <p class="lede">How does a row open its detail page? The two conventions in the codebase are mutually exclusive as written, but they don't have to be.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Row navigation option">
+        <span class="lbl">Option</span>
+        <label class="opt"><input type="radio" name="d1" value="a" checked><span>A · Link in identity cell <em>farms today</em></span></label>
+        <label class="opt"><input type="radio" name="d1" value="b"><span>B · Whole row clickable <em>platform today</em></span></label>
+        <label class="opt"><input type="radio" name="d1" value="c"><span>C · Both <em>recommended</em></span></label>
+      </div>
+      <div class="stage" data-group="d1">
+
+        <div class="variant on" data-v="a"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha under management</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th class="num">Area</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><a class="id" href="#d1">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+              <tr><td><a class="id" href="#d1">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+              <tr><td><a class="id" href="#d1">SUZ-02</a></td><td>Suez East</td><td>Suez</td><td class="num">96.4 ha</td><td><span class="a-pill neu">Archived</span></td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="b"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha under management</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th class="num">Area</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr class="click" tabindex="0"><td class="mono">BSH-01</td><td>Bashayer</td><td>Sharqia</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+              <tr class="click" tabindex="0"><td class="mono">AGR-01</td><td>Agrosina</td><td>Ismailia</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+              <tr class="click" tabindex="0"><td class="mono">SUZ-02</td><td>Suez East</td><td>Suez</td><td class="num">96.4 ha</td><td><span class="a-pill neu">Archived</span></td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="c"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha under management</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th class="num">Area</th><th>Status</th><th style="width:24px"></th></tr></thead>
+            <tbody>
+              <tr class="click"><td><a class="id" href="#d1">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td><td class="chev">›</td></tr>
+              <tr class="click"><td><a class="id" href="#d1">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td><td class="chev">›</td></tr>
+              <tr class="click"><td><a class="id" href="#d1">SUZ-02</a></td><td>Suez East</td><td>Suez</td><td class="num">96.4 ha</td><td><span class="a-pill neu">Archived</span></td><td class="chev">›</td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+      </div>
+      <div class="verdict" data-verdict="d1">
+        <span class="k">A</span><span class="v">Only the code is clickable, so the other 90% of the row is dead space. Keyboard and middle-click work correctly.</span>
+      </div>
+    </div>
+    <div class="good"><b>Recommendation: C.</b> The <code>&lt;a&gt;</code> keeps middle-click, ⌘-click, "copy link", and tab-order working — none of which survive an <code>onClick</code> on a <code>&lt;tr&gt;</code>. The row handler is then pure convenience, and the chevron tells the user the row is a target at all. Cost: <code>&lt;DataTable&gt;</code> must stop click propagation for in-row action buttons.</div>
+  </section>
+
+  <!-- ============================================ D2 FILTERS -->
+  <section id="d2">
+    <h2><span class="num">03</span> &nbsp;Decision 2 — filter idiom</h2>
+    <p class="lede">The hard case is <code>/decision-trees</code>: four filter axes (location, soil, scope, status) plus search. Chips are the nicest to use and the worst to scale. Watch the toolbar wrap.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Filter idiom option">
+        <span class="lbl">Option</span>
+        <label class="opt"><input type="radio" name="d2" value="a" checked><span>A · Chips <em>tenants today</em></span></label>
+        <label class="opt"><input type="radio" name="d2" value="b"><span>B · Labelled selects <em>trees today</em></span></label>
+        <label class="opt"><input type="radio" name="d2" value="c"><span>C · Chips + popover <em>recommended</em></span></label>
+      </div>
+      <div class="stage" data-group="d2">
+
+        <div class="variant on" data-v="a"><div class="app"><div class="a-main"><div class="a-page w-wide">
+          <div class="a-h"><div><h1 class="t">Decision trees</h1><p class="s">Agronomic logic, versioned per tenant.</p></div><div class="acts"><a class="a-btn pri">New tree</a></div></div>
+          <div class="a-tool"><input class="a-search" placeholder="Search trees…">
+            <div class="a-chips">
+              <button class="a-fc on">All</button><button class="a-fc">Egypt</button><button class="a-fc">Morocco</button>
+              <button class="a-fc">Sandy</button><button class="a-fc">Loam</button><button class="a-fc">Clay</button>
+              <button class="a-fc">Block</button><button class="a-fc">Cell</button>
+              <button class="a-fc">Active</button><button class="a-fc">Archived</button>
+            </div></div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Crop</th><th>Scope</th><th class="num">Version</th></tr></thead>
+            <tbody>
+              <tr class="click"><td><a class="id mono" href="#d2">MANGO-WATER-01</a></td><td>Mango water stress</td><td class="mono" style="color:var(--a-primary)">fruit/mango</td><td>Block</td><td class="num"><span class="a-pill ok">v3</span></td></tr>
+              <tr class="click"><td><a class="id mono" href="#d2">CITRUS-N-02</a></td><td>Citrus nitrogen</td><td class="mono" style="color:var(--a-primary)">fruit/citrus</td><td>Cell</td><td class="num"><span class="a-pill neu">Draft</span></td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="b"><div class="app"><div class="a-main"><div class="a-page w-wide">
+          <div class="a-h"><div><h1 class="t">Decision trees</h1><p class="s">Agronomic logic, versioned per tenant.</p></div><div class="acts"><a class="a-btn pri">New tree</a></div></div>
+          <div style="display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap">
+            <input class="a-search" placeholder="Search trees…" style="flex:1;min-width:190px;width:auto">
+            <div class="a-sel"><label>Location</label><select><option>All</option><option>Egypt</option></select></div>
+            <div class="a-sel"><label>Soil</label><select><option>All</option><option>Sandy</option></select></div>
+            <div class="a-sel"><label>Scope</label><select><option>All</option><option>Block</option></select></div>
+            <div class="a-sel"><label>Status</label><select><option>Active</option><option>Archived</option></select></div>
+          </div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Crop</th><th>Scope</th><th class="num">Version</th></tr></thead>
+            <tbody>
+              <tr class="click"><td><a class="id mono" href="#d2">MANGO-WATER-01</a></td><td>Mango water stress</td><td class="mono" style="color:var(--a-primary)">fruit/mango</td><td>Block</td><td class="num"><span class="a-pill ok">v3</span></td></tr>
+              <tr class="click"><td><a class="id mono" href="#d2">CITRUS-N-02</a></td><td>Citrus nitrogen</td><td class="mono" style="color:var(--a-primary)">fruit/citrus</td><td>Cell</td><td class="num"><span class="a-pill neu">Draft</span></td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="c"><div class="app"><div class="a-main"><div class="a-page w-wide">
+          <div class="a-h"><div><h1 class="t">Decision trees</h1><p class="s">Agronomic logic, versioned per tenant.</p></div><div class="acts"><a class="a-btn pri">New tree</a></div></div>
+          <div class="a-tool">
+            <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+              <input class="a-search" placeholder="Search trees…">
+              <button class="a-fc on">Active</button><button class="a-fc">Archived</button>
+            </div>
+            <div class="a-pop">
+              <button class="a-popbtn" id="popbtn" aria-expanded="false">Filters <b>2</b> <span style="color:var(--a-muted)">▾</span></button>
+              <div class="a-popmenu" id="popmenu" hidden>
+                <div class="grp">Location</div>
+                <label class="r"><input type="checkbox" checked> Egypt</label>
+                <label class="r"><input type="checkbox"> Morocco</label>
+                <div class="hr"></div>
+                <div class="grp">Soil texture</div>
+                <label class="r"><input type="checkbox" checked> Sandy</label>
+                <label class="r"><input type="checkbox"> Loam</label>
+                <label class="r"><input type="checkbox"> Clay</label>
+                <div class="hr"></div>
+                <div class="grp">Scope</div>
+                <label class="r"><input type="checkbox"> Block</label>
+                <label class="r"><input type="checkbox"> Cell</label>
+                <div class="hr"></div>
+                <button class="a-btn gho sm" style="width:100%">Clear all filters</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--a-muted)">
+            Showing <b style="color:var(--a-ink)">2 of 14</b> ·
+            <span class="a-fc on" style="cursor:default">Egypt ✕</span>
+            <span class="a-fc on" style="cursor:default">Sandy ✕</span>
+          </div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Code</th><th>Name</th><th>Crop</th><th>Scope</th><th class="num">Version</th></tr></thead>
+            <tbody>
+              <tr class="click"><td><a class="id mono" href="#d2">MANGO-WATER-01</a></td><td>Mango water stress</td><td class="mono" style="color:var(--a-primary)">fruit/mango</td><td>Block</td><td class="num"><span class="a-pill ok">v3</span></td></tr>
+              <tr class="click"><td><a class="id mono" href="#d2">CITRUS-N-02</a></td><td>Citrus nitrogen</td><td class="mono" style="color:var(--a-primary)">fruit/citrus</td><td>Cell</td><td class="num"><span class="a-pill neu">Draft</span></td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+      </div>
+      <div class="verdict" data-verdict="d2">
+        <span class="k">A</span><span class="v">Ten chips in one strip. Nothing tells you that "Egypt" and "Sandy" belong to different axes, and the row wraps to two lines the moment a tenant adds a fifth country.</span>
+      </div>
+    </div>
+    <div class="good"><b>Recommendation: C.</b> The one axis a user changes constantly (status) stays as chips in reach; the rest go behind a popover with a count badge, and active choices come back as removable chips below the toolbar. The applied-filter row does double duty as the result count, which is the thing every one of these pages is currently missing.</div>
+    <div class="note">Try the <b>Filters</b> button in option C — the popover is live.</div>
+  </section>
+
+  <!-- ============================================ D3 SKELETON -->
+  <section id="d3">
+    <h2><span class="num">04</span> &nbsp;Decision 3 — skeleton placement</h2>
+    <p class="lede">Where the loading state lives decides whether the page jumps when data lands. Press <b>Reload</b> to replay it.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Skeleton placement option">
+        <span class="lbl">Option</span>
+        <label class="opt"><input type="radio" name="d3" value="a" checked><span>A · Replaces the table <em>farms today</em></span></label>
+        <label class="opt"><input type="radio" name="d3" value="b"><span>B · Inside the table <em>recommended</em></span></label>
+        <span style="flex:1"></span>
+        <button class="a-btn sec sm" id="replay" style="font-family:inherit">↻ Reload</button>
+      </div>
+      <div class="stage" data-group="d3">
+
+        <div class="variant on" data-v="a"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h"><div><h1 class="t">Tenants</h1><p class="s">Every organisation on the platform.</p></div><div class="acts"><a class="a-btn pri">New tenant</a></div></div>
+          <div class="a-tool"><input class="a-search" placeholder="Search tenants…"><div class="a-chips"><button class="a-fc on">All</button><button class="a-fc">Active</button></div></div>
+          <div class="ld-a">
+            <span class="sk" style="height:168px;border-radius:12px"></span>
+          </div>
+          <div class="ld-b" hidden>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th>Slug</th><th>Name</th><th>Status</th><th>Contact</th></tr></thead>
+              <tbody>
+                <tr class="click"><td class="mono">bashayer</td><td>Bashayer Agriculture</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">ops@bashayer.eg</td></tr>
+                <tr class="click"><td class="mono">agrosina</td><td>Agrosina</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">admin@agrosina.eg</td></tr>
+                <tr class="click"><td class="mono">demo-eg</td><td>Demo Egypt</td><td><span class="a-pill warn">Suspended</span></td><td style="color:var(--a-muted)">demo@agripulse.cloud</td></tr>
+              </tbody></table></div>
+          </div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="b"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h"><div><h1 class="t">Tenants</h1><p class="s">Every organisation on the platform.</p></div><div class="acts"><a class="a-btn pri">New tenant</a></div></div>
+          <div class="a-tool"><input class="a-search" placeholder="Search tenants…"><div class="a-chips"><button class="a-fc on">All</button><button class="a-fc">Active</button></div></div>
+          <div class="a-tw"><table class="a-t">
+            <thead><tr><th>Slug</th><th>Name</th><th>Status</th><th>Contact</th></tr></thead>
+            <tbody class="ld-a">
+              <tr><td><span class="sk" style="width:64px"></span></td><td><span class="sk" style="width:132px"></span></td><td><span class="sk" style="width:52px"></span></td><td><span class="sk" style="width:112px"></span></td></tr>
+              <tr><td><span class="sk" style="width:58px"></span></td><td><span class="sk" style="width:96px"></span></td><td><span class="sk" style="width:52px"></span></td><td><span class="sk" style="width:126px"></span></td></tr>
+              <tr><td><span class="sk" style="width:62px"></span></td><td><span class="sk" style="width:114px"></span></td><td><span class="sk" style="width:52px"></span></td><td><span class="sk" style="width:104px"></span></td></tr>
+            </tbody>
+            <tbody class="ld-b" hidden>
+              <tr class="click"><td class="mono">bashayer</td><td>Bashayer Agriculture</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">ops@bashayer.eg</td></tr>
+              <tr class="click"><td class="mono">agrosina</td><td>Agrosina</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">admin@agrosina.eg</td></tr>
+              <tr class="click"><td class="mono">demo-eg</td><td>Demo Egypt</td><td><span class="a-pill warn">Suspended</span></td><td style="color:var(--a-muted)">demo@agripulse.cloud</td></tr>
+            </tbody></table></div>
+        </div></div></div></div>
+
+      </div>
+      <div class="verdict" data-verdict="d3">
+        <span class="k">A</span><span class="v">The column headers don't exist until the data does, so the whole table appears from nothing and everything below it shifts.</span>
+      </div>
+    </div>
+    <div class="good"><b>Recommendation: B.</b> Headers and the toolbar are known before the request resolves, so render them immediately and skeleton only the rows. The page height stays put and there's no layout shift on arrival. <code>&lt;AsyncBoundary skeleton="rows"&gt;</code> makes this the default rather than a per-page choice.</div>
+
+    <h3>While we're here — the other three states</h3>
+    <p class="lede">One <code>&lt;AsyncBoundary&gt;</code> owns all four. Empty states get a required action, which closes F-8.</p>
+    <div class="doccard" style="padding:0;overflow:hidden">
+      <div class="app"><div class="a-main" style="padding:20px 16px"><div class="a-page w-standard">
+        <div class="a-err" role="alert"><span><b>Couldn't load tenants.</b> The request failed after 3 attempts.</span><button class="a-btn sec sm">Try again</button></div>
+        <div class="a-tw"><div class="a-empty"><div class="ic"></div><p style="margin:0">No tenants yet. Create the first one to get started.</p><a class="a-btn pri">New tenant</a></div></div>
+        <div class="a-tw"><div class="a-empty"><div class="ic"></div><p style="margin:0">No tenants match <b style="color:var(--a-ink)">“sharq”</b> with status <b style="color:var(--a-ink)">Archived</b>.</p><button class="a-btn sec">Clear filters</button></div></div>
+      </div></div></div>
+    </div>
+    <div class="note"><b>Empty vs no-results are different states and need different words.</b> Today most pages render the same string for both, so a user who mistyped a search is told the system has no data.</div>
+  </section>
+
+  <!-- ============================================ D4 DETAIL -->
+  <section id="d4">
+    <h2><span class="num">05</span> &nbsp;Decision 4 — detail-page composition</h2>
+    <p class="lede">Both idioms exist and both work. They cannot both be the standard. Same tenant, same data, two compositions.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Detail composition option">
+        <span class="lbl">Option</span>
+        <label class="opt"><input type="radio" name="d4" value="a" checked><span>A · Tabs + KPI row <em>platform today</em></span></label>
+        <label class="opt"><input type="radio" name="d4" value="b"><span>B · Stacked cards <em>farms today</em></span></label>
+        <label class="opt"><input type="radio" name="d4" value="c"><span>C · Unified header, tabs past 3 panels <em>recommended</em></span></label>
+      </div>
+      <div class="stage" data-group="d4">
+
+        <div class="variant on" data-v="a"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <a class="a-back" href="#d4">← Back to tenants</a>
+          <div style="border-bottom:1px solid var(--a-line);padding-bottom:15px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div><h1 style="margin:0;font-size:18px;font-weight:600">Bashayer Agriculture</h1>
+                <p class="mono" style="margin:4px 0 0;font-size:11.5px;color:var(--a-muted);font-family:ui-monospace">bashayer</p></div>
+              <span class="a-pill ok">Active</span></div>
+            <p class="s" style="margin-top:9px">Tenant profile, integrations, and lifecycle.</p>
+          </div>
+          <div class="a-kpis">
+            <div class="a-kpi"><div class="l">Members</div><div class="n">14</div></div>
+            <div class="a-kpi"><div class="l">Tier</div><div class="n">Pro</div><div class="h">annual</div></div>
+            <div class="a-kpi"><div class="l">Farms</div><div class="n">3</div></div>
+          </div>
+          <div class="a-seg"><button class="on">Profile</button><button>Integrations</button><button>Owner</button><button>Data</button><button>Lifecycle</button></div>
+          <div class="a-card"><div class="hd"><h3>Profile</h3></div><div style="padding:6px 16px 14px">
+            <dl class="a-dl">
+              <div class="r"><dt>Contact email</dt><dd>ops@bashayer.eg</dd></div>
+              <div class="r"><dt>Schema</dt><dd class="mono" style="font-family:ui-monospace;font-size:12px">tenant_bashayer</dd></div>
+              <div class="r"><dt>Locale · units</dt><dd>ar-EG · metric</dd></div>
+              <div class="r"><dt>Created</dt><dd>12 Mar 2026</dd></div>
+            </dl></div></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="b"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h">
+            <div>
+              <div class="a-crumb"><a href="#d4">Tenants</a><s>/</s><span>Bashayer Agriculture</span></div>
+              <h1 class="t">Bashayer Agriculture</h1>
+              <p class="s">bashayer · Pro · 14 members</p>
+            </div>
+            <div class="acts"><a class="a-btn gho">Edit</a><a class="a-btn sec">Suspend</a></div>
+          </div>
+          <div class="a-card p"><h3 style="margin:0 0 10px;font-size:14px">Profile</h3>
+            <dl class="a-dl">
+              <div class="r"><dt>Contact email</dt><dd>ops@bashayer.eg</dd></div>
+              <div class="r"><dt>Schema</dt><dd class="mono" style="font-family:ui-monospace;font-size:12px">tenant_bashayer</dd></div>
+              <div class="r"><dt>Locale · units</dt><dd>ar-EG · metric</dd></div>
+            </dl></div>
+          <div class="a-card p"><h3 style="margin:0 0 10px;font-size:14px">Integrations</h3>
+            <dl class="a-dl">
+              <div class="r"><dt>Weather</dt><dd><span class="a-pill ok">Healthy</span></dd></div>
+              <div class="r"><dt>Imagery</dt><dd><span class="a-pill warn">Stale 4d</span></dd></div>
+            </dl></div>
+          <div class="a-card p"><h3 style="margin:0 0 10px;font-size:14px">Owner</h3>
+            <p style="margin:0;font-size:13.5px">Mona Farouk <span style="color:var(--a-muted)">&lt;mona@bashayer.eg&gt;</span></p></div>
+          <div class="a-card p"><h3 style="margin:0 0 10px;font-size:14px">Lifecycle</h3>
+            <p style="margin:0 0 11px;font-size:13.5px;color:var(--a-muted)">Archiving keeps data for 30 days before it becomes purge-eligible.</p>
+            <div style="display:flex;gap:8px"><button class="a-btn sec">Archive tenant</button><button class="a-btn dan">Purge data</button></div></div>
+        </div></div></div></div>
+
+        <div class="variant" data-v="c"><div class="app"><div class="a-main"><div class="a-page w-standard">
+          <div class="a-h">
+            <div>
+              <div class="a-crumb"><a href="#d4">Tenants</a><s>/</s><span>Bashayer Agriculture</span></div>
+              <h1 class="t" style="display:flex;align-items:center;gap:10px">Bashayer Agriculture <span class="a-pill ok">Active</span></h1>
+              <p class="s"><span class="mono" style="font-family:ui-monospace">bashayer</span> · Pro, annual · created 12 Mar 2026</p>
+            </div>
+            <div class="acts"><a class="a-btn gho">Edit</a><a class="a-btn sec">Suspend</a><button class="a-btn dan">Archive</button></div>
+          </div>
+          <div class="a-kpis">
+            <div class="a-kpi"><div class="l">Members</div><div class="n">14</div><div class="h">2 invited</div></div>
+            <div class="a-kpi"><div class="l">Farms</div><div class="n">3</div><div class="h">697 ha</div></div>
+            <div class="a-kpi"><div class="l">Imagery</div><div class="n" style="color:var(--a-warn)">Stale</div><div class="h">last sync 4 days ago</div></div>
+          </div>
+          <div class="a-seg"><button class="on">Profile</button><button>Integrations</button><button>Owner</button><button>Data</button><button>Lifecycle</button></div>
+          <div class="a-card"><div class="hd"><h3>Profile</h3><button class="a-btn gho sm">Edit</button></div><div style="padding:6px 16px 14px">
+            <dl class="a-dl">
+              <div class="r"><dt>Contact email</dt><dd>ops@bashayer.eg</dd></div>
+              <div class="r"><dt>Contact phone</dt><dd>+20 100 555 0142</dd></div>
+              <div class="r"><dt>Schema</dt><dd class="mono" style="font-family:ui-monospace;font-size:12px">tenant_bashayer</dd></div>
+              <div class="r"><dt>Locale · units · timezone</dt><dd>ar-EG · metric · Africa/Cairo</dd></div>
+            </dl></div></div>
+        </div></div></div></div>
+
+      </div>
+      <div class="verdict" data-verdict="d4">
+        <span class="k">A</span><span class="v">Header is <code>text-lg</code> — smaller than every index page's <code>text-2xl</code>, so opening a tenant feels like navigating <em>down</em> into something lesser. Back link instead of a breadcrumb. Destructive actions are buried in the fifth tab.</span>
+      </div>
+    </div>
+    <div class="good"><b>Recommendation: C.</b> One header treatment shared with the index pages (breadcrumb + <code>text-2xl</code> title + inline status + actions right, destructive last), the KPI row kept because it answers "is this thing OK?" before any tab is opened, and tabs only once a page carries more than three panels — which means <code>FarmDetailPage</code> stays stacked and <code>TenantAdminDetailPage</code> stays tabbed, without them looking like different products.</div>
+  </section>
+
+  <!-- ============================================ D5 WIDTH -->
+  <section id="d5">
+    <h2><span class="num">06</span> &nbsp;Decision 5 — page width, and the padding bug</h2>
+    <p class="lede">Nine wrapper variants exist because width was never declared. Two of them are outright bugs: <code>AppShell</code> already applies <code>px-4 py-6</code>, so any page adding its own <code>p-6</code> double-pads, and <code>/settings/*</code> triple-pads.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Page width option">
+        <span class="lbl">Frame</span>
+        <label class="opt"><input type="radio" name="d5" value="a" checked><span>standard <em>max-w-5xl</em></span></label>
+        <label class="opt"><input type="radio" name="d5" value="b"><span>wide <em>max-w-6xl</em></span></label>
+        <label class="opt"><input type="radio" name="d5" value="c"><span>full <em>no cap</em></span></label>
+        <label class="opt"><input type="radio" name="d5" value="d"><span>the bug today <em>double-padded</em></span></label>
+      </div>
+      <div class="stage" data-group="d5">
+        <div class="variant on" data-v="a"><div class="app"><div class="a-shell">
+          <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+          <div class="a-body">
+            <div class="a-nav"><div class="grp">Workspace</div><a href="#d5"><b></b>Insights</a><a href="#d5"><b></b>Farm console</a><a class="on" href="#d5"><b></b>Farms</a><a href="#d5"><b></b>Board</a><a href="#d5"><b></b>Alerts</a><div class="grp">Configure</div><a href="#d5"><b></b>Decision trees</a><a href="#d5"><b></b>Settings</a></div>
+            <div class="a-main"><div class="a-page w-standard" id="pg-a">
+              <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+              <div class="a-tw"><table class="a-t"><thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th>Crop</th><th class="num">Area</th><th>Status</th></tr></thead>
+                <tbody><tr class="click"><td><a class="id" href="#d5">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td>Mango</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+                <tr class="click"><td><a class="id" href="#d5">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td>Citrus</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td></tr></tbody></table></div>
+            </div></div>
+          </div>
+        </div></div></div>
+        <div class="variant" data-v="b"><div class="app"><div class="a-shell">
+          <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+          <div class="a-body">
+            <div class="a-nav"><div class="grp">Workspace</div><a href="#d5"><b></b>Insights</a><a href="#d5"><b></b>Farm console</a><a class="on" href="#d5"><b></b>Farms</a><a href="#d5"><b></b>Board</a><a href="#d5"><b></b>Alerts</a><div class="grp">Configure</div><a href="#d5"><b></b>Decision trees</a><a href="#d5"><b></b>Settings</a></div>
+            <div class="a-main"><div class="a-page w-wide">
+              <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+              <div class="a-tw"><table class="a-t"><thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th>Crop</th><th class="num">Area</th><th>Status</th></tr></thead>
+                <tbody><tr class="click"><td><a class="id" href="#d5">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td>Mango</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+                <tr class="click"><td><a class="id" href="#d5">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td>Citrus</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td></tr></tbody></table></div>
+            </div></div>
+          </div>
+        </div></div></div>
+        <div class="variant" data-v="c"><div class="app"><div class="a-shell">
+          <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+          <div class="a-body">
+            <div class="a-nav"><div class="grp">Workspace</div><a href="#d5"><b></b>Insights</a><a href="#d5"><b></b>Farm console</a><a class="on" href="#d5"><b></b>Farms</a><a href="#d5"><b></b>Board</a><a href="#d5"><b></b>Alerts</a><div class="grp">Configure</div><a href="#d5"><b></b>Decision trees</a><a href="#d5"><b></b>Settings</a></div>
+            <div class="a-main"><div class="a-page w-full">
+              <div class="a-h"><div><h1 class="t">Farms</h1><p class="s">3 farms · 697 ha</p></div><div class="acts"><a class="a-btn pri">Create farm</a></div></div>
+              <div class="a-tw"><table class="a-t"><thead><tr><th>Code</th><th>Name</th><th>Governorate</th><th>Crop</th><th class="num">Area</th><th>Status</th></tr></thead>
+                <tbody><tr class="click"><td><a class="id" href="#d5">BSH-01</a></td><td>Bashayer</td><td>Sharqia</td><td>Mango</td><td class="num">412.6 ha</td><td><span class="a-pill ok">Active</span></td></tr>
+                <tr class="click"><td><a class="id" href="#d5">AGR-01</a></td><td>Agrosina</td><td>Ismailia</td><td>Citrus</td><td class="num">188.0 ha</td><td><span class="a-pill ok">Active</span></td></tr></tbody></table></div>
+            </div></div>
+          </div>
+        </div></div></div>
+        <div class="variant" data-v="d"><div class="app"><div class="a-shell">
+          <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+          <div class="a-body">
+            <div class="a-nav"><div class="grp">Platform</div><a class="on" href="#d5"><b></b>Tenants</a><a href="#d5"><b></b>Defaults</a><a href="#d5"><b></b>Crops</a><a href="#d5"><b></b>Plan templates</a><a href="#d5"><b></b>Backfill</a></div>
+            <div class="a-main pad-legacy"><div class="a-page w-standard">
+              <div class="a-h"><div><h1 class="t">Plan templates</h1><p class="s">Crop-keyed agriculture plans.</p></div><div class="acts"><a class="a-btn pri">New template</a></div></div>
+              <div class="a-tw"><table class="a-t"><thead><tr><th>Name</th><th>Crop path</th><th>Status</th><th>Updated</th></tr></thead>
+                <tbody><tr class="click"><td>Mango — Egypt baseline</td><td class="mono" style="color:var(--a-primary)">fruit/mango</td><td><span class="a-pill ok">Published</span></td><td style="color:var(--a-muted)">14 Jul 2026</td></tr></tbody></table></div>
+            </div></div>
+          </div>
+        </div></div></div>
+      </div>
+      <div class="verdict" data-verdict="d5">
+        <span class="k">standard</span><span class="v"><code>max-w-5xl</code> · 1024px. Comfortable for 4–6 column tables, forms, and detail pages. The default for everything unless a page argues otherwise.</span>
+      </div>
+    </div>
+    <div class="bad"><b>The fourth option is not a proposal, it's the current state of <code>/platform/*</code>.</b> The dashed outlines show the padding the page adds on top of the shell's. On <code>/settings/*</code> there is a third layer under that.</div>
+  </section>
+
+  <!-- ============================================ D6 DARK -->
+  <section id="d6">
+    <h2><span class="num">07</span> &nbsp;Decision 6 — dark mode: in or out?</h2>
+    <p class="lede">Nothing in the codebase anticipates this today; <code>ap.*</code> are literal hex values in <code>tailwind.config.ts</code>. If dark mode is wanted, the tokens must become CSS variables <em>during</em> this pass — retrofitting means touching every file a second time. The dark values below are a first pass, not a finished palette.</p>
+
+    <div class="switcher">
+      <div class="switchbar" role="radiogroup" aria-label="Theme option">
+        <span class="lbl">Theme</span>
+        <label class="opt"><input type="radio" name="d6" value="a" checked><span>Light <em>only — today</em></span></label>
+        <label class="opt"><input type="radio" name="d6" value="b"><span>Dark <em>requires CSS vars</em></span></label>
+      </div>
+      <div class="stage" data-group="d6">
+        <div class="variant on" data-v="a"><div class="app" data-theme="light" id="theme-demo-l">
+          <div class="a-main"><div class="a-page w-standard">
+            <div class="a-h"><div><h1 class="t">Alerts</h1><p class="s">Bashayer · open items first</p></div><div class="acts"><div class="a-seg"><button class="on">Open</button><button>Acknowledged</button><button>Resolved</button></div></div></div>
+            <div class="a-card"><ul class="a-rowlist">
+              <li><span class="a-rail" style="background:var(--a-crit)"></span><div class="bd"><div class="ttl">Water stress detected on block B-14 <span class="a-pill crit">Critical</span></div><div class="sub">NDMI dropped 0.19 below the 30-day baseline. Irrigate within 48 hours.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">MANGO-WATER-01</span><span>·</span><span>2 hours ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+              <li><span class="a-rail" style="background:var(--a-warn)"></span><div class="bd"><div class="ttl">Imagery stale for 4 days <span class="a-pill warn">Warning</span></div><div class="sub">No cloud-free Sentinel-2 scene since 25 July. Cloud cover above the 40% analysis threshold.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">IMAGERY-STALE</span><span>·</span><span>1 day ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+              <li><span class="a-rail" style="background:var(--a-accent)"></span><div class="bd"><div class="ttl">Heat accumulation ahead of plan <span class="a-pill info">Info</span></div><div class="sub">GDD is 112 units above the seasonal average; flowering may arrive early.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">GDD-AHEAD</span><span>·</span><span>3 days ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+            </ul></div>
+          </div></div>
+        </div></div>
+        <div class="variant" data-v="b"><div class="app" data-theme="dark">
+          <div class="a-main"><div class="a-page w-standard">
+            <div class="a-h"><div><h1 class="t">Alerts</h1><p class="s">Bashayer · open items first</p></div><div class="acts"><div class="a-seg"><button class="on">Open</button><button>Acknowledged</button><button>Resolved</button></div></div></div>
+            <div class="a-card"><ul class="a-rowlist">
+              <li><span class="a-rail" style="background:var(--a-crit)"></span><div class="bd"><div class="ttl">Water stress detected on block B-14 <span class="a-pill crit">Critical</span></div><div class="sub">NDMI dropped 0.19 below the 30-day baseline. Irrigate within 48 hours.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">MANGO-WATER-01</span><span>·</span><span>2 hours ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+              <li><span class="a-rail" style="background:var(--a-warn)"></span><div class="bd"><div class="ttl">Imagery stale for 4 days <span class="a-pill warn">Warning</span></div><div class="sub">No cloud-free Sentinel-2 scene since 25 July. Cloud cover above the 40% analysis threshold.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">IMAGERY-STALE</span><span>·</span><span>1 day ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+              <li><span class="a-rail" style="background:var(--a-accent)"></span><div class="bd"><div class="ttl">Heat accumulation ahead of plan <span class="a-pill info">Info</span></div><div class="sub">GDD is 112 units above the seasonal average; flowering may arrive early.</div><div class="mt"><span class="mono" style="font-family:ui-monospace">GDD-AHEAD</span><span>·</span><span>3 days ago</span></div></div><div class="ac"><button class="a-btn sec sm">Acknowledge</button><button class="a-btn gho sm">Resolve</button></div></li>
+            </ul></div>
+          </div></div>
+        </div></div>
+      </div>
+      <div class="verdict" data-verdict="d6">
+        <span class="k">Light</span><span class="v">What ships today. The sand-tinted <code>#f7f6f1</code> background is a real part of the brand and reads well in bright field conditions on a tablet.</span>
+      </div>
+    </div>
+    <div class="note"><b>My read: defer it, but make it cheap.</b> Nobody has asked for dark mode, and the primary use context — a tablet in daylight — argues for light. But moving <code>ap.*</code> to CSS variables in phase 0 costs almost nothing and makes the answer reversible later. Committing to <em>ship</em> dark mode now is the expensive part; committing to <em>not foreclose</em> it is free.</div>
+  </section>
+
+  <!-- ============================================ TEMPLATES -->
+  <section id="templates">
+    <h2><span class="num">08</span> &nbsp;The three templates, assembled</h2>
+    <p class="lede">Every recommended option above, composed. These three cover 28 of the 45 pages; the other 17 are settings surfaces, dashboards, and the seven exempt canvases.</p>
+
+    <h3>&lt;IndexPage&gt; — 18 pages</h3>
+    <div class="doccard" style="padding:0;overflow:hidden">
+      <div class="app"><div class="a-shell">
+        <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+        <div class="a-body">
+          <div class="a-nav"><div class="grp">Platform</div><a class="on" href="#templates"><b></b>Tenants</a><a href="#templates"><b></b>Defaults</a><a href="#templates"><b></b>Crops</a><a href="#templates"><b></b>Plan templates</a><a href="#templates"><b></b>Backfill</a><a href="#templates"><b></b>Admins</a><div class="grp">Health</div><a href="#templates"><b></b>Integrations</a></div>
+          <div class="a-main"><div class="a-page w-standard">
+            <div class="a-h">
+              <div><h1 class="t">Tenants</h1><p class="s">Every organisation on the platform.</p></div>
+              <div class="acts"><button class="a-btn sec">Export CSV</button><a class="a-btn pri">New tenant</a></div>
+            </div>
+            <div class="a-tool">
+              <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+                <input class="a-search" placeholder="Search tenants…">
+                <button class="a-fc on">All</button><button class="a-fc">Active</button><button class="a-fc">Suspended</button>
+              </div>
+              <span style="font-size:12.5px;color:var(--a-muted)">3 of 3</span>
+            </div>
+            <div class="a-tw"><table class="a-t">
+              <thead><tr><th>Slug</th><th>Name</th><th>Status</th><th>Contact</th><th class="num">Members</th><th>Created</th><th style="width:24px"></th></tr></thead>
+              <tbody>
+                <tr class="click"><td class="mono"><a class="id" href="#templates">bashayer</a></td><td>Bashayer Agriculture</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">ops@bashayer.eg</td><td class="num">14</td><td style="color:var(--a-muted)">12 Mar 2026</td><td class="chev">›</td></tr>
+                <tr class="click"><td class="mono"><a class="id" href="#templates">agrosina</a></td><td>Agrosina</td><td><span class="a-pill ok">Active</span></td><td style="color:var(--a-muted)">admin@agrosina.eg</td><td class="num">6</td><td style="color:var(--a-muted)">04 Apr 2026</td><td class="chev">›</td></tr>
+                <tr class="click"><td class="mono"><a class="id" href="#templates">demo-eg</a></td><td>Demo Egypt</td><td><span class="a-pill warn">Suspended</span></td><td style="color:var(--a-muted)">demo@agripulse.cloud</td><td class="num">2</td><td style="color:var(--a-muted)">18 May 2026</td><td class="chev">›</td></tr>
+              </tbody></table></div>
+            <div class="a-pag"><span>Showing 1–3 of 3</span><div class="btns"><button class="a-btn sec sm" disabled style="opacity:.5">Previous</button><button class="a-btn sec sm" disabled style="opacity:.5">Next</button></div></div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <h3>&lt;DetailPage&gt; — 5 pages</h3>
+    <div class="doccard" style="padding:0;overflow:hidden">
+      <div class="app"><div class="a-shell">
+        <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+        <div class="a-body">
+          <div class="a-nav"><div class="grp">Workspace</div><a href="#templates"><b></b>Insights</a><a href="#templates"><b></b>Farm console</a><a class="on" href="#templates"><b></b>Farms</a><a href="#templates"><b></b>Board</a><a href="#templates"><b></b>Alerts</a><a href="#templates"><b></b>Recommendations</a></div>
+          <div class="a-main"><div class="a-page w-standard">
+            <div class="a-h">
+              <div>
+                <div class="a-crumb"><a href="#templates">Farms</a><s>/</s><a href="#templates">Bashayer</a><s>/</s><span>Block B-14</span></div>
+                <h1 class="t" style="display:flex;align-items:center;gap:10px">Block B-14 <span class="a-pill warn">Water stress</span></h1>
+                <p class="s">18.4 ha · drip · Mango, Keitt · planted Mar 2019</p>
+              </div>
+              <div class="acts"><a class="a-btn gho">Edit</a><a class="a-btn sec">Re-zone grid</a><button class="a-btn dan">Archive</button></div>
+            </div>
+            <div class="a-card p" role="status" style="border-color:color-mix(in srgb,var(--a-warn) 32%,transparent);background:var(--a-warn-soft);color:#7a5410;padding:12px 15px;font-size:13.5px">
+              NDMI has been below baseline for 6 consecutive days. One open recommendation is waiting for approval.
+            </div>
+            <div class="a-kpis">
+              <div class="a-kpi"><div class="l">NDVI</div><div class="n">0.61</div><div class="h">−0.04 vs 30-day</div></div>
+              <div class="a-kpi"><div class="l">NDMI</div><div class="n" style="color:var(--a-warn)">0.18</div><div class="h">−0.19 vs baseline</div></div>
+              <div class="a-kpi"><div class="l">Last scene</div><div class="n">25 Jul</div><div class="h">12% cloud</div></div>
+            </div>
+            <div class="a-seg"><button class="on">Overview</button><button>Zones</button><button>Imagery</button><button>Activities</button><button>Attachments</button></div>
+            <div class="a-card"><div class="hd"><h3>Block details</h3><button class="a-btn gho sm">Edit</button></div>
+              <div style="padding:6px 16px 14px"><dl class="a-dl">
+                <div class="r"><dt>Code</dt><dd class="mono" style="font-family:ui-monospace;font-size:12px">B-14</dd></div>
+                <div class="r"><dt>Area</dt><dd>18.4 ha</dd></div>
+                <div class="r"><dt>Irrigation</dt><dd>Drip</dd></div>
+                <div class="r"><dt>Crop</dt><dd>Mango · Keitt</dd></div>
+                <div class="r"><dt>Grid</dt><dd>24 cells · 30 m</dd></div>
+              </dl></div></div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <h3>&lt;FormPage&gt; — 5 pages</h3>
+    <div class="doccard" style="padding:0;overflow:hidden">
+      <div class="app"><div class="a-shell">
+        <div class="a-top"><div class="a-logo"><i></i>AgriPulse</div><span class="a-chip">Bashayer <small>BSH-01</small> ▾</span><div class="sp"></div><span class="a-chip">EN</span><span class="a-avatar">MS</span></div>
+        <div class="a-body">
+          <div class="a-nav"><div class="grp">Workspace</div><a href="#templates"><b></b>Insights</a><a href="#templates"><b></b>Farm console</a><a class="on" href="#templates"><b></b>Farms</a><a href="#templates"><b></b>Board</a><a href="#templates"><b></b>Alerts</a></div>
+          <div class="a-main"><div class="a-page w-standard" style="max-width:720px">
+            <div class="a-h"><div>
+              <div class="a-crumb"><a href="#templates">Farms</a><s>/</s><a href="#templates">Bashayer</a><s>/</s><span>Edit</span></div>
+              <h1 class="t">Edit farm</h1><p class="s">Changes apply immediately and are recorded in the audit log.</p>
+            </div></div>
+            <div class="a-card">
+              <div class="hd"><h3>Identity</h3></div>
+              <div style="padding:16px;display:flex;flex-direction:column;gap:15px">
+                <div class="a-grid2">
+                  <div class="a-field"><span class="lb">Code <i>*</i></span><input value="BSH-01"><span class="hp">Unique within the tenant. Used in exports and reports.</span></div>
+                  <div class="a-field"><span class="lb">Name <i>*</i></span><input value="Bashayer"></div>
+                </div>
+                <div class="a-grid2">
+                  <div class="a-field"><span class="lb">Governorate</span><select><option>Sharqia</option><option>Ismailia</option></select></div>
+                  <div class="a-field err"><span class="lb">Area (ha)</span><input value="-12"><span class="em">Area must be greater than zero.</span></div>
+                </div>
+                <div class="a-field"><span class="lb">Notes</span><textarea rows="2" placeholder="Optional context for other operators"></textarea></div>
+              </div>
+              <div class="ft"><button class="a-btn gho">Cancel</button><button class="a-btn pri">Save changes</button></div>
+            </div>
+          </div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="good"><b>What makes these one family:</b> identical page frame and header, one button set, one card, one field, one table, one async ladder — and destructive actions always last in the action row. Nothing here is new visual language; it is the existing tokens applied once instead of forty times.</div>
+  </section>
+
+  <!-- ============================================ SHEET -->
+  <section id="sheet">
+    <h2><span class="num">09</span> &nbsp;Decision sheet</h2>
+    <p class="lede">Reply with a letter per row, or overwrite the recommendation. Phase 0 can be specified as soon as rows 1–4 and row 7 are settled; rows 5–6 can follow.</p>
+    <div class="doccard" style="padding:0;overflow:hidden">
+      <table class="sheet">
+        <thead><tr><th style="width:34px">#</th><th style="width:22%">Decision</th><th style="width:26%">Options</th><th style="width:16%">Recommendation</th><th>Consequence if we pick the other one</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Row navigation</td><td>A link-in-cell · B whole-row · C both</td><td class="pick">C · both</td><td>A wastes the row; B silently breaks middle-click, ⌘-click and tab-order.</td></tr>
+          <tr><td>2</td><td>Filter idiom</td><td>A chips · B selects · C chips + popover</td><td class="pick">C · hybrid</td><td>A can't hold 4 axes; B makes every list page look like a settings form.</td></tr>
+          <tr><td>3</td><td>Skeleton placement</td><td>A replaces table · B inside table</td><td class="pick">B · inside</td><td>A keeps the layout shift on every load.</td></tr>
+          <tr><td>4</td><td>Detail composition</td><td>A tabs+KPI · B stacked · C unified header</td><td class="pick">C · unified</td><td>Committing to only A buries destructive actions; only B forces 5-panel pages into one scroll.</td></tr>
+          <tr><td>5</td><td>Filtering location</td><td>client-side · server-side</td><td class="pick">server, client fallback</td><td>Client-only breaks as soon as a tenant passes one page of rows.</td></tr>
+          <tr><td>6</td><td>Data layer</td><td>convert 18 <code>useEffect</code> pages · leave them</td><td class="pick">convert, per page</td><td>Leaving them means <code>&lt;AsyncBoundary&gt;</code> needs two shapes and half its value is lost.</td></tr>
+          <tr><td>7</td><td>Dark mode</td><td>ship it · defer but use CSS vars · ignore</td><td class="pick">defer, use CSS vars</td><td>Ignoring it means touching every file again later if the answer changes.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:24px"><a class="cta" href="../reports/ui-pattern-inventory-2026-07-29.html">← Back to the pattern inventory</a></p>
+  </section>
+
+  <footer>
+    <p><b>AgriPulse · Standard Page Pattern — Decision Mockups</b> · 29 July 2026<br>
+    All mockups use the literal <code>ap.*</code> values from <code>frontend/tailwind.config.ts</code>. Nothing here introduces a new colour. Dark-mode values are a first proposal and are not in the config today.</p>
+    <p>Companions: <code>docs/reports/ui-pattern-inventory-2026-07-29.html</code> · <code>docs/proposals/ui-pattern-inventory-and-standard.md</code> · <code>docs/reports/ux-consistency-assessment-2026-06-08.html</code></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- option switchers -------------------------------------------------
+  var VERDICTS = {
+    d1:{
+      a:["A","Only the code is clickable, so the other 90% of the row is dead space. Keyboard and middle-click work correctly."],
+      b:["B","The whole row is a target and feels responsive — but there is no link, so middle-click, ⌘-click and “copy link address” all silently do nothing, and the row needs a manual tabindex to be reachable."],
+      c:["C","Row-wide hover plus a real link in column 1. The chevron says “this opens” without a column heading. Costs one line in DataTable: stop propagation for in-row buttons."]
+    },
+    d2:{
+      a:["A","Ten chips in one strip. Nothing tells you that “Egypt” and “Sandy” belong to different axes, and the row wraps to two lines the moment a tenant adds a fifth country."],
+      b:["B","Axes are labelled and it scales, but five form controls above a table make the page read as configuration rather than as a list, and there is no sign of what is currently filtered once you scroll."],
+      c:["C","Status — the axis people actually toggle — stays one click away. The rest live behind a counted popover, and applied filters return as removable chips that double as the result count."]
+    },
+    d3:{
+      a:["A","The column headers don’t exist until the data does, so the whole table appears from nothing and everything below it shifts."],
+      b:["B","Toolbar and headers render immediately because they don’t depend on the response. Only the rows shimmer, page height holds steady, and nothing jumps when data lands."]
+    },
+    d4:{
+      a:["A","Header is <code>text-lg</code> — smaller than every index page’s <code>text-2xl</code>, so opening a tenant feels like navigating <em>down</em> into something lesser. Back link instead of a breadcrumb. Destructive actions are buried in the fifth tab."],
+      b:["B","Reads well and needs no tab state, but at five panels it becomes a long scroll with no map of what’s below, and “Purge data” sits at the bottom of the page with no ceremony."],
+      c:["C","Same header as the index pages, status inline with the title, actions in reach with the destructive one last, KPIs answering “is this healthy?” before any tab is opened."]
+    },
+    d5:{
+      a:["standard","<code>max-w-5xl</code> · 1024px. Comfortable for 4–6 column tables, forms, and detail pages. The default for everything unless a page argues otherwise."],
+      b:["wide","<code>max-w-6xl</code> · 1152px. For 7+ columns and dashboards. <code>/decision-trees</code> and the health tables genuinely need this."],
+      c:["full","No cap. Rows stretch as far as the window goes, so the eye loses the line on a wide monitor. Correct for the board and the canvases, wrong for a list."],
+      d:["the bug","Dashed outlines mark padding the page adds on top of the shell’s <code>px-4 py-6</code>. Content starts 40px in, and the page is narrower than it declares. <code>/settings/*</code> stacks a third layer under this."]
+    },
+    d6:{
+      a:["Light","What ships today. The sand-tinted <code>#f7f6f1</code> background is a real part of the brand and reads well in bright field conditions on a tablet."],
+      b:["Dark","Legible, and the severity rails still carry meaning — but <code>ap-primary</code> had to be lightened from <code>#356b30</code> to pass contrast on a dark panel, which means the brand green is no longer one value. That is the real cost: a second palette to maintain, not a CSS media query."]
+    }
+  };
+
+  document.querySelectorAll('.switchbar input[type=radio]').forEach(function(radio){
+    radio.addEventListener('change', function(){
+      var group = radio.name, val = radio.value;
+      var stage = document.querySelector('.stage[data-group="'+group+'"]');
+      if (stage) {
+        stage.querySelectorAll(':scope > .variant').forEach(function(v){
+          v.classList.toggle('on', v.getAttribute('data-v') === val);
+        });
+      }
+      var vd = document.querySelector('[data-verdict="'+group+'"]');
+      var text = VERDICTS[group] && VERDICTS[group][val];
+      if (vd && text) {
+        vd.innerHTML = '<span class="k">'+text[0]+'</span><span class="v">'+text[1]+'</span>';
+      }
+    });
+  });
+
+  // ---- filter popover (option 2C) ---------------------------------------
+  var pb = document.getElementById('popbtn'), pm = document.getElementById('popmenu');
+  if (pb && pm) {
+    pb.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = !pm.hidden;
+      pm.hidden = open;
+      pb.setAttribute('aria-expanded', String(!open));
+    });
+    document.addEventListener('click', function(){
+      if (!pm.hidden) { pm.hidden = true; pb.setAttribute('aria-expanded','false'); }
+    });
+    pm.addEventListener('click', function(e){ e.stopPropagation(); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && !pm.hidden) { pm.hidden = true; pb.setAttribute('aria-expanded','false'); pb.focus(); }
+    });
+  }
+
+  // ---- loading replay (decision 3) --------------------------------------
+  var timer = null;
+  function replay(){
+    if (timer) { clearTimeout(timer); timer = null; }
+    var stage = document.querySelector('.stage[data-group="d3"]');
+    if (!stage) return;
+    stage.querySelectorAll('.ld-a').forEach(function(el){ el.hidden = false; });
+    stage.querySelectorAll('.ld-b').forEach(function(el){ el.hidden = true; });
+    timer = setTimeout(function(){
+      stage.querySelectorAll('.ld-a').forEach(function(el){ el.hidden = true; });
+      stage.querySelectorAll('.ld-b').forEach(function(el){ el.hidden = false; });
+      timer = null;
+    }, 1700);
+  }
+  var rb = document.getElementById('replay');
+  if (rb) rb.addEventListener('click', replay);
+  replay();
+
+  // Replay whenever the D3 section scrolls into view, so the comparison is
+  // never a still frame the reader has to imagine animating.
+  var d3 = document.getElementById('d3');
+  if (d3 && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if (en.isIntersecting) replay(); });
+    }, {threshold:0.25}).observe(d3);
+  }
+})();
+</script>
+</body>
+</html>

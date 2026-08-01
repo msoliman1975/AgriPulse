@@ -1,10 +1,14 @@
 import { differenceInHours, formatDistanceToNow, parseISO } from "date-fns";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 
+import type { PlatformTenantHealthRow } from "@/api/platformHealthRollup";
+import { DataTable } from "@/components/DataTable";
+import { EmptyState } from "@/components/EmptyState";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
+import { queryState } from "@/components/asyncState";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCrossTenantHealth } from "@/queries/platformHealthRollup";
 
@@ -33,79 +37,70 @@ export function PlatformHealthPage(): ReactNode {
   const q = useCrossTenantHealth();
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("platformHealth.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("platformHealth.subtitle")}</p>
-      </header>
+    <Page>
+      <PageHeader title={t("platformHealth.title")} subtitle={t("platformHealth.subtitle")} />
 
-      {q.isLoading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : q.isError ? (
-        <p className="text-sm text-ap-crit">{t("platformHealth.loadFailed")}</p>
-      ) : (q.data ?? []).length === 0 ? (
-        <p className="text-sm text-ap-muted">{t("platformHealth.empty")}</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-          <table className="min-w-full text-sm">
-            <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-              <tr>
-                <th className="px-3 py-2 text-start">{t("platformHealth.col.tenant")}</th>
-                <th className="px-3 py-2 text-end">{t("platformHealth.col.farms")}</th>
-                <th className="px-3 py-2 text-start">{t("platformHealth.col.weather")}</th>
-                <th className="px-3 py-2 text-start">{t("platformHealth.col.imagery")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
-              {(q.data ?? []).map((row) => {
-                const wStatus = statusFor(
+      <DataTable<PlatformTenantHealthRow>
+        columns={[
+          {
+            key: "tenant",
+            header: t("platformHealth.col.tenant"),
+            cell: (row) => (
+              <>
+                {row.tenant_name}{" "}
+                <span className="font-mono text-xs text-ap-muted">({row.tenant_slug})</span>
+              </>
+            ),
+          },
+          {
+            key: "farms",
+            header: t("platformHealth.col.farms"),
+            align: "end",
+            cell: (row) => row.farms_count,
+          },
+          {
+            key: "weather",
+            header: t("platformHealth.col.weather"),
+            cell: (row) => (
+              <Cell
+                status={statusFor(
                   row.weather_last_sync_at,
                   row.weather_failed_24h,
                   row.weather_active_subs,
-                );
-                const iStatus = statusFor(
+                )}
+                lastSync={row.weather_last_sync_at}
+                failed24h={row.weather_failed_24h}
+                activeSubs={row.weather_active_subs}
+                dateLocale={dateLocale}
+              />
+            ),
+          },
+          {
+            key: "imagery",
+            header: t("platformHealth.col.imagery"),
+            cell: (row) => (
+              <Cell
+                status={statusFor(
                   row.imagery_last_sync_at,
                   row.imagery_failed_24h,
                   row.imagery_active_subs,
-                );
-                return (
-                  <tr key={row.tenant_id}>
-                    <td className="px-3 py-2 text-ap-ink">
-                      <Link
-                        to={`/platform/integrations/health/tenants/${row.tenant_id}`}
-                        className="hover:text-ap-primary"
-                      >
-                        {row.tenant_name}{" "}
-                        <span className="font-mono text-xs text-ap-muted">({row.tenant_slug})</span>
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-end">{row.farms_count}</td>
-                    <td className="px-3 py-2">
-                      <Cell
-                        status={wStatus}
-                        lastSync={row.weather_last_sync_at}
-                        activeSubs={row.weather_active_subs}
-                        failed24h={row.weather_failed_24h}
-                        dateLocale={dateLocale}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Cell
-                        status={iStatus}
-                        lastSync={row.imagery_last_sync_at}
-                        activeSubs={row.imagery_active_subs}
-                        failed24h={row.imagery_failed_24h}
-                        dateLocale={dateLocale}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+                )}
+                lastSync={row.imagery_last_sync_at}
+                failed24h={row.imagery_failed_24h}
+                activeSubs={row.imagery_active_subs}
+                dateLocale={dateLocale}
+              />
+            ),
+          },
+        ]}
+        rowKey={(row) => row.tenant_id}
+        state={queryState(q)}
+        rowHref={(row) => `/platform/integrations/health/tenants/${row.tenant_id}`}
+        caption={t("platformHealth.title")}
+        errorMessage={t("platformHealth.loadFailed")}
+        empty={<EmptyState message={t("platformHealth.empty")} />}
+      />
+    </Page>
   );
 }
 

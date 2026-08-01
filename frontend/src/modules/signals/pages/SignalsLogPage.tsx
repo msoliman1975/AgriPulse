@@ -15,6 +15,9 @@ import {
 } from "@/api/signals";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -74,11 +77,8 @@ export function SignalsLogPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("log.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("log.subtitle")}</p>
-      </header>
+    <Page>
+      <PageHeader title={t("log.title")} subtitle={t("log.subtitle")} />
 
       {/* Bulk import — same capability gate as the record form (signal.record).
           Operators who can submit one observation can submit many. The
@@ -90,18 +90,15 @@ export function SignalsLogPage(): ReactNode {
           import exists. Shown to anyone who can read signals. */}
       <ImportHistory farmId={farmId} />
 
-      <div
-        className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5 text-xs"
-        role="tablist"
-        aria-label={t("log.mode.label")}
-      >
-        <ModeTab active={mode === "single"} onClick={() => setMode("single")}>
-          {t("log.mode.single")}
-        </ModeTab>
-        <ModeTab active={mode === "template"} onClick={() => setMode("template")}>
-          {t("log.mode.template")}
-        </ModeTab>
-      </div>
+      <SegmentedControl
+        ariaLabel={t("log.mode.label")}
+        value={mode}
+        onChange={setMode}
+        items={[
+          { value: "single" as const, label: t("log.mode.single") },
+          { value: "template" as const, label: t("log.mode.template") },
+        ]}
+      />
 
       {mode === "single" ? (
         defsLoading ? (
@@ -110,7 +107,7 @@ export function SignalsLogPage(): ReactNode {
           <EmptyWithCta message={t("log.noDefinitions")} farmId={farmId} />
         ) : (
           <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-            <aside className="rounded-xl border border-ap-line bg-ap-panel p-2">
+            <Card noPadding className="p-2">
               <ul className="flex flex-col gap-0.5">
                 {defs.map((d) => (
                   <li key={d.id}>
@@ -131,16 +128,16 @@ export function SignalsLogPage(): ReactNode {
                   </li>
                 ))}
               </ul>
-            </aside>
+            </Card>
 
             <section className="flex flex-col gap-3">
               {selectedDef ? (
                 canRecord ? (
                   <RecordForm key={selectedDef.id} defn={selectedDef} farmId={farmId} />
                 ) : (
-                  <div className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-muted">
+                  <Card className="text-sm text-ap-muted">
                     {t("log.missingCapability", { capability: "signal.record" })}
-                  </div>
+                  </Card>
                 )
               ) : null}
               <ObservationList farmId={farmId} definitions={defs ?? []} canDelete={canDeleteObs} />
@@ -153,7 +150,7 @@ export function SignalsLogPage(): ReactNode {
         <EmptyWithCta message={t("log.template.empty")} farmId={farmId} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-          <aside className="rounded-xl border border-ap-line bg-ap-panel p-2">
+          <Card noPadding className="p-2">
             <ul className="flex flex-col gap-0.5">
               {activeTemplates.map((tpl) => (
                 <li key={tpl.id}>
@@ -172,7 +169,7 @@ export function SignalsLogPage(): ReactNode {
                 </li>
               ))}
             </ul>
-          </aside>
+          </Card>
 
           <section className="flex flex-col gap-3">
             {selectedTpl ? (
@@ -184,16 +181,16 @@ export function SignalsLogPage(): ReactNode {
                   definitions={defs ?? []}
                 />
               ) : (
-                <div className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-muted">
+                <Card className="text-sm text-ap-muted">
                   {t("log.missingCapability", { capability: "signal.record" })}
-                </div>
+                </Card>
               )
             ) : null}
             <ObservationList farmId={farmId} definitions={defs ?? []} canDelete={canDeleteObs} />
           </section>
         </div>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -213,30 +210,6 @@ function EmptyWithCta({ message, farmId }: { message: string; farmId: string }):
         }
       />
     </Card>
-  );
-}
-
-function ModeTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}): ReactNode {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      className={`rounded-sm px-3 py-1 font-medium ${
-        active ? "bg-ap-primary text-white" : "text-ap-ink hover:bg-ap-line/40"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -441,10 +414,7 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
   };
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-    >
+    <Card as="form" noPadding className="flex flex-col gap-3 p-4 text-sm" onSubmit={submit}>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
         <Pill kind="info">{t(`valueKind.${defn.value_kind}`)}</Pill>
@@ -515,7 +485,7 @@ function RecordForm({ defn, farmId }: { defn: SignalDefinition; farmId: string }
               : t("log.form.record")}
         </button>
       </div>
-    </form>
+    </Card>
   );
 }
 
@@ -670,10 +640,7 @@ export function TemplateRecordForm({
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="flex flex-col gap-3 rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-    >
+    <Card as="form" noPadding className="flex flex-col gap-3 p-4 text-sm" onSubmit={submit}>
       <div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-ap-ink">{template.name}</span>
@@ -750,7 +717,7 @@ export function TemplateRecordForm({
           {create.isPending ? t("log.form.recording") : t("log.template.submit")}
         </button>
       </div>
-    </form>
+    </Card>
   );
 }
 

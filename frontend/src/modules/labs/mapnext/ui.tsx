@@ -3,13 +3,9 @@
 // risks the existing /labs/map surface. See
 // docs/proposals/farm-management-redesign.md.
 import clsx from "clsx";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Card } from "@/components/Card";
 
 // ---- form primitives -----------------------------------------------------
 // Shared by every console panel (create flows, manage, settings) so the
@@ -36,9 +32,7 @@ export function Dot({ color, className }: { color: string; className?: string })
 export function SectionHeader({ children }: { children: ReactNode }): ReactNode {
   return (
     <div className="mt-4 mb-1.5 flex items-center gap-2 px-4">
-      <span className="text-xs font-bold uppercase tracking-wide text-ap-primary">
-        {children}
-      </span>
+      <span className="text-xs font-bold uppercase tracking-wide text-ap-primary">{children}</span>
       <span className="h-px flex-1 bg-ap-line" />
     </div>
   );
@@ -64,7 +58,10 @@ export function MCard({
         {icon ? <span className="text-base leading-none">{icon}</span> : null}
         <span className="flex-1 text-xs font-bold text-ap-ink">{title}</span>
         {value != null ? (
-          <span className="text-sm font-bold tabular-nums" style={valueColor ? { color: valueColor } : undefined}>
+          <span
+            className="text-sm font-bold tabular-nums"
+            style={valueColor ? { color: valueColor } : undefined}
+          >
             {value}
           </span>
         ) : null}
@@ -159,7 +156,13 @@ export function Sparkline({
   });
   return (
     <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="h-9 w-full">
-      <polyline points={coords.join(" ")} fill="none" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <polyline
+        points={coords.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }
@@ -214,13 +217,14 @@ export function Popover({
 
   if (!open || !pos) return null;
   return (
-    <div
+    <Card
+      noPadding
+      className="fixed z-50 min-w-[230px] p-1.5 shadow-card"
       ref={ref}
-      className="fixed z-50 min-w-[230px] rounded-xl border border-ap-line bg-ap-panel p-1.5 shadow-card"
       style={{ top: pos.top, left: pos.left, right: pos.right }}
     >
       {children}
-    </div>
+    </Card>
   );
 }
 

@@ -2,8 +2,10 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import { Fragment, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useFarmIntegrationHealth, useRecentAttempts } from "@/queries/integrationsHealth";
 import type { AttemptKind, AttemptStatus, IntegrationAttempt } from "@/api/integrationsHealth";
@@ -113,31 +115,31 @@ function RunsTable({
   const dateLocale = useDateLocale();
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-      <table className="min-w-full text-sm">
-        <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-          <tr>
-            <th className="px-3 py-2 text-start">{t("runs.col.kind")}</th>
-            <th className="px-3 py-2 text-start">{t("runs.col.provider")}</th>
-            <th className="px-3 py-2 text-start">{t("runs.col.status")}</th>
-            <th className="px-3 py-2 text-start">{t("runs.col.startedAt")}</th>
-            <th className="px-3 py-2 text-end">{t("runs.col.wait")}</th>
-            <th className="px-3 py-2 text-end">{t("runs.col.run")}</th>
-            <th className="px-3 py-2 text-start">{t("runs.col.detail")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+    <Card noPadding className="overflow-x-auto">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("runs.col.kind")}</Th>
+            <Th>{t("runs.col.provider")}</Th>
+            <Th>{t("runs.col.status")}</Th>
+            <Th>{t("runs.col.startedAt")}</Th>
+            <Th className="text-end">{t("runs.col.wait")}</Th>
+            <Th className="text-end">{t("runs.col.run")}</Th>
+            <Th>{t("runs.col.detail")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((r) => {
             const isOpen = expanded === r.attempt_id;
             return (
               <Fragment key={r.attempt_id}>
-                <tr
+                <Tr
                   className="cursor-pointer hover:bg-ap-line/30"
                   onClick={() => onToggle(r.attempt_id)}
                 >
-                  <td className="px-3 py-2 text-ap-ink">{t(`kind.${r.kind}`)}</td>
-                  <td className="px-3 py-2 text-ap-muted">{r.provider_code ?? "—"}</td>
-                  <td className="px-3 py-2">
+                  <Td className="text-ap-ink">{t(`kind.${r.kind}`)}</Td>
+                  <Td>{r.provider_code ?? "—"}</Td>
+                  <Td>
                     <div className="flex flex-wrap items-center gap-1">
                       <Pill kind={pillForStatus(r.status)}>{t(`attemptStatus.${r.status}`)}</Pill>
                       {r.failed_streak_position > 1 ? (
@@ -146,40 +148,40 @@ function RunsTable({
                         </Pill>
                       ) : null}
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-ap-muted">
+                  </Td>
+                  <Td>
                     {formatDistanceToNow(parseISO(r.started_at), {
                       addSuffix: true,
                       locale: dateLocale,
                     })}
-                  </td>
-                  <td className="px-3 py-2 text-end text-ap-muted">
+                  </Td>
+                  <Td className="text-end">
                     {r.wait_ms !== null && r.wait_ms !== undefined
                       ? formatDuration(r.wait_ms)
                       : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-end text-ap-muted">
+                  </Td>
+                  <Td className="text-end">
                     {r.run_ms !== null && r.run_ms !== undefined
                       ? formatDuration(r.run_ms)
                       : r.duration_ms !== null
                         ? formatDuration(r.duration_ms)
                         : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-ap-muted">{summaryFor(r, t)}</td>
-                </tr>
+                  </Td>
+                  <Td>{summaryFor(r, t)}</Td>
+                </Tr>
                 {isOpen ? (
-                  <tr className="bg-ap-bg/30">
-                    <td colSpan={7} className="px-3 py-3">
+                  <Tr className="bg-ap-bg/30">
+                    <Td colSpan={7} className="py-3">
                       <DetailBlock row={r} />
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ) : null}
               </Fragment>
             );
           })}
-        </tbody>
-      </table>
-    </div>
+        </Tbody>
+      </Table>
+    </Card>
   );
 }
 
@@ -187,20 +189,20 @@ function DetailBlock({ row }: { row: IntegrationAttempt }): ReactNode {
   const { t } = useTranslation("integrationsHealth");
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-      <Field label={t("detail.attemptId")} value={row.attempt_id} />
-      <Field label={t("detail.subscriptionId")} value={row.subscription_id} />
-      <Field label={t("detail.blockId")} value={row.block_id} />
-      <Field label={t("detail.farmId")} value={row.farm_id ?? "—"} />
+      <DetailLine label={t("detail.attemptId")} value={row.attempt_id} />
+      <DetailLine label={t("detail.subscriptionId")} value={row.subscription_id} />
+      <DetailLine label={t("detail.blockId")} value={row.block_id} />
+      <DetailLine label={t("detail.farmId")} value={row.farm_id ?? "—"} />
       {row.queued_at && row.queued_at !== row.started_at ? (
-        <Field label={t("detail.queuedAt")} value={row.queued_at} />
+        <DetailLine label={t("detail.queuedAt")} value={row.queued_at} />
       ) : null}
-      <Field label={t("detail.startedAt")} value={row.started_at} />
-      <Field label={t("detail.completedAt")} value={row.completed_at ?? "—"} />
+      <DetailLine label={t("detail.startedAt")} value={row.started_at} />
+      <DetailLine label={t("detail.completedAt")} value={row.completed_at ?? "—"} />
       {row.rows_ingested !== null ? (
-        <Field label={t("detail.rowsIngested")} value={String(row.rows_ingested)} />
+        <DetailLine label={t("detail.rowsIngested")} value={String(row.rows_ingested)} />
       ) : null}
-      {row.scene_id ? <Field label={t("detail.sceneId")} value={row.scene_id} /> : null}
-      {row.error_code ? <Field label={t("detail.errorCode")} value={row.error_code} /> : null}
+      {row.scene_id ? <DetailLine label={t("detail.sceneId")} value={row.scene_id} /> : null}
+      {row.error_code ? <DetailLine label={t("detail.errorCode")} value={row.error_code} /> : null}
       {row.error_message ? (
         <div className="sm:col-span-2">
           <div className="text-ap-muted">{t("detail.errorMessage")}</div>
@@ -213,7 +215,7 @@ function DetailBlock({ row }: { row: IntegrationAttempt }): ReactNode {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }): ReactNode {
+function DetailLine({ label, value }: { label: string; value: string }): ReactNode {
   return (
     <div>
       <span className="text-ap-muted">{label}: </span>

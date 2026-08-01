@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { getFarmHealthSummary, type Health } from "@/api/insights";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
 
 interface Props {
@@ -32,10 +34,7 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
   });
 
   return (
-    <section
-      aria-labelledby="scorecard-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="scorecard-heading">
       <header className="flex items-baseline justify-between">
         <h2
           id="scorecard-heading"
@@ -54,47 +53,43 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
         ) : !data || data.blocks.length === 0 ? (
           <p className="py-8 text-center text-sm text-ap-muted">{t("scorecard.empty")}</p>
         ) : (
-          <table className="min-w-full divide-y divide-ap-line text-sm">
-            <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-              <tr>
-                <th scope="col" className="px-3 py-2 text-start font-semibold">
-                  {t("scorecard.headers.block")}
-                </th>
-                <th scope="col" className="px-3 py-2 text-start font-semibold">
-                  {t("scorecard.headers.health")}
-                </th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">
+          <Table>
+            <Thead className="text-[11px]">
+              <Tr>
+                <Th scope="col">{t("scorecard.headers.block")}</Th>
+                <Th scope="col">{t("scorecard.headers.health")}</Th>
+                <Th scope="col" className="text-end">
                   {t("scorecard.headers.current")}
-                </th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                </Th>
+                <Th scope="col" className="text-end">
                   {t("scorecard.headers.trend")}
-                </th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                </Th>
+                <Th scope="col" className="text-end">
                   {t("scorecard.headers.alerts")}
-                </th>
-                <th scope="col" className="px-3 py-2 text-end font-semibold">
+                </Th>
+                <Th scope="col" className="text-end">
                   {t("scorecard.headers.lastObs")}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
+                </Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {data.blocks.map((b) => (
-                <tr key={b.block_id} className="hover:bg-ap-bg/40">
-                  <td className="px-3 py-2 text-ap-ink">
+                <Tr key={b.block_id} className="hover:bg-ap-bg/40">
+                  <Td className="text-ap-ink">
                     <Link to={`/labs/map/${farmId}?unit=${b.block_id}`} className="hover:underline">
                       {b.block_name}
                     </Link>
-                  </td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>
                     <HealthBadge health={b.current_health} t={t} />
-                  </td>
-                  <td className="px-3 py-2 text-end tabular-nums text-ap-ink">
+                  </Td>
+                  <Td className="text-end tabular-nums text-ap-ink">
                     {formatIndexValue(b.current_value)}
-                  </td>
-                  <td className="px-3 py-2 text-end tabular-nums">
+                  </Td>
+                  <Td className="text-end tabular-nums">
                     <TrendPct value={b.trend_30d_pct} />
-                  </td>
-                  <td className="px-3 py-2 text-end">
+                  </Td>
+                  <Td className="text-end">
                     {b.alerts_open > 0 ? (
                       <Link
                         to={`/alerts?block_id=${b.block_id}`}
@@ -105,22 +100,22 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
                     ) : (
                       <span className="text-[11px] text-ap-muted">0</span>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-end text-[11px] text-ap-muted">
+                  </Td>
+                  <Td className="text-end text-[11px]">
                     {b.last_observation_at
                       ? formatDistanceToNow(parseISO(b.last_observation_at), {
                           addSuffix: true,
                           locale: dateLocale,
                         })
                       : "—"}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 

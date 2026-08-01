@@ -9,7 +9,9 @@ import {
   type CsvImportRowError,
   type CsvImportSuccess,
 } from "@/api/signals";
+import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
@@ -129,7 +131,7 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
   );
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <header className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ap-muted">
           {t("csvImport.title")}
@@ -187,8 +189,7 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
 
       <label
         className={
-          "mt-2 flex items-center gap-2 text-xs " +
-          (canBulk ? "text-ap-ink" : "text-ap-muted")
+          "mt-2 flex items-center gap-2 text-xs " + (canBulk ? "text-ap-ink" : "text-ap-muted")
         }
         title={canBulk ? t("csvImport.bulkMode.tooltip") : t("csvImport.bulkMode.needsCap")}
       >
@@ -262,30 +263,30 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
           <p role="alert" className="text-xs font-semibold text-ap-crit">
             {t("csvImport.failureBanner", { count: rowErrors.length })}
           </p>
-          <table className="mt-2 min-w-full border border-ap-crit/30 text-xs">
-            <thead className="bg-ap-crit-soft text-ap-crit">
-              <tr>
-                <th scope="col" className="px-2 py-1 text-start font-semibold">
+          <Table className="mt-2 border border-ap-crit/30">
+            <Thead className="bg-ap-crit-soft text-ap-crit">
+              <Tr>
+                <Th scope="col" className="px-2 py-1">
                   {t("csvImport.errorTable.row")}
-                </th>
-                <th scope="col" className="px-2 py-1 text-start font-semibold">
+                </Th>
+                <Th scope="col" className="px-2 py-1">
                   {t("csvImport.errorTable.field")}
-                </th>
-                <th scope="col" className="px-2 py-1 text-start font-semibold">
+                </Th>
+                <Th scope="col" className="px-2 py-1">
                   {t("csvImport.errorTable.message")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {rowErrors.map((e, i) => (
-                <tr key={`${e.row_number}-${i}`} className="border-t border-ap-crit/20">
-                  <td className="px-2 py-1 tabular-nums text-ap-crit">{e.row_number}</td>
-                  <td className="px-2 py-1 text-ap-crit">{e.field ?? "—"}</td>
-                  <td className="px-2 py-1 text-ap-crit">{e.message}</td>
-                </tr>
+                <Tr key={`${e.row_number}-${i}`} className="border-t border-ap-crit/20">
+                  <Td className="px-2 py-1 tabular-nums text-ap-crit">{e.row_number}</Td>
+                  <Td className="px-2 py-1 text-ap-crit">{e.field ?? "—"}</Td>
+                  <Td className="px-2 py-1 text-ap-crit">{e.message}</Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
           <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.failureHint")}</p>
         </div>
       ) : null}
@@ -310,23 +311,23 @@ export function SignalsCsvImport({ farmId }: Props): ReactNode {
             </button>
           </div>
           <p className="mt-1 text-xs text-ap-muted">{t("csvImport.schema.intro")}</p>
-          <table className="mt-3 min-w-full text-xs">
-            <tbody>
+          <Table className="mt-3">
+            <Tbody>
               {CSV_COLUMNS.map((c) => (
-                <tr key={c.name} className="border-t border-ap-line align-top">
-                  <td className="px-2 py-1 font-mono text-ap-ink">
+                <Tr key={c.name} className="border-t align-top">
+                  <Td className="px-2 py-1 font-mono text-ap-ink">
                     {c.name}
                     {c.required ? <span className="text-ap-crit"> *</span> : null}
-                  </td>
-                  <td className="px-2 py-1 text-ap-muted">{t(`csvImport.schema.col.${c.name}`)}</td>
-                </tr>
+                  </Td>
+                  <Td className="px-2 py-1">{t(`csvImport.schema.col.${c.name}`)}</Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
           <p className="mt-2 text-[11px] text-ap-muted">{t("csvImport.schema.requiredNote")}</p>
         </Modal>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

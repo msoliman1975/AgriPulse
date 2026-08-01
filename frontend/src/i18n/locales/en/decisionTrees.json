@@ -75,7 +75,8 @@
       "confirm": "Archive",
       "cancel": "Cancel",
       "failed": "Archive failed."
-    }
+    },
+    "clearFilters": "Clear filters"
   },
   "create": {
     "title": "New decision tree",

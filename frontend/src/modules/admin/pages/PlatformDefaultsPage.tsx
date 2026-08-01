@@ -8,8 +8,13 @@ import {
   formatValue,
   parseAndValidate,
 } from "@/modules/admin/lib/platformDefaultValue";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
+import { mapAsyncState, queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
 import { usePlatformDefaults, useUpdatePlatformDefault } from "@/queries/platformDefaults";
 
@@ -22,7 +27,8 @@ import { usePlatformDefaults, useUpdatePlatformDefault } from "@/queries/platfor
 export function PlatformDefaultsPage(): ReactNode {
   const { t } = useTranslation("admin");
   const canManage = useCapability("platform.manage_defaults");
-  const { data, isLoading, isError } = usePlatformDefaults();
+  const defaults = usePlatformDefaults();
+  const data = defaults.data;
 
   const grouped = useMemo(() => {
     const map = new Map<string, PlatformDefault[]>();
@@ -35,36 +41,36 @@ export function PlatformDefaultsPage(): ReactNode {
   }, [data]);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("defaults.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("defaults.subtitle")}</p>
-        {!canManage ? (
-          <p className="mt-2 text-xs text-ap-warn">{t("defaults.readonlyHint")}</p>
-        ) : null}
-      </header>
+    <Page>
+      <PageHeader
+        title={t("defaults.title")}
+        subtitle={t("defaults.subtitle")}
+        badge={!canManage ? <Pill kind="warn">{t("defaults.readonlyHint")}</Pill> : undefined}
+      />
 
-      {isLoading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : isError ? (
-        <p className="text-sm text-ap-crit">{t("defaults.loadFailed")}</p>
-      ) : grouped.length === 0 ? (
-        <p className="text-sm text-ap-muted">{t("defaults.empty")}</p>
-      ) : (
-        grouped.map(([category, rows]) => (
-          <section key={category} className="rounded-xl border border-ap-line bg-ap-panel">
-            <h2 className="border-b border-ap-line px-4 py-2 text-sm font-semibold text-ap-ink">
-              {t(`defaults.category.${category}`, { defaultValue: category })}
-            </h2>
-            <div className="divide-y divide-ap-line">
-              {rows.map((row) => (
-                <DefaultRow key={row.key} row={row} canManage={canManage} />
-              ))}
-            </div>
-          </section>
-        ))
-      )}
-    </div>
+      <AsyncBoundary
+        state={mapAsyncState(queryState(defaults), () => grouped)}
+        errorMessage={t("defaults.loadFailed")}
+        empty={<EmptyState message={t("defaults.empty")} action={null} />}
+      >
+        {(groups) =>
+          groups.map(([category, rows]) => (
+            <Card
+              key={category}
+              noPadding
+              title={t(`defaults.category.${category}`, { defaultValue: category })}
+              className="mb-4 last:mb-0"
+            >
+              <div className="divide-y divide-ap-line">
+                {rows.map((row) => (
+                  <DefaultRow key={row.key} row={row} canManage={canManage} />
+                ))}
+              </div>
+            </Card>
+          ))
+        }
+      </AsyncBoundary>
+    </Page>
   );
 }
 

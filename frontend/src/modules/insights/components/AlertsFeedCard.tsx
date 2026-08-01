@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { Alert, AlertSeverity } from "@/api/alerts";
+import { Card } from "@/components/Card";
 import { DataPendingChip } from "@/components/DataPendingChip";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
@@ -29,10 +30,7 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
   const { data, isLoading, isError } = useAlerts({ farm_id: farmId, status: "open" });
 
   return (
-    <section
-      aria-labelledby="alerts-feed-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="alerts-feed-heading">
       <header className="flex items-baseline justify-between">
         <h2
           id="alerts-feed-heading"
@@ -63,7 +61,7 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
           data.slice(0, 6).map((a) => <AlertRow key={a.id} alert={a} farmId={farmId} />)
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -99,9 +97,7 @@ function AlertRow({ alert: a, farmId }: { alert: Alert; farmId: string }): React
           </span>
           <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
         </div>
-        {prescription ? (
-          <p className="line-clamp-2 text-xs text-ap-muted">{prescription}</p>
-        ) : null}
+        {prescription ? <p className="line-clamp-2 text-xs text-ap-muted">{prescription}</p> : null}
         <div className="mt-1 flex items-center gap-2 text-[11px] text-ap-muted">
           <span className="font-mono">{a.rule_code}</span>
           <span>·</span>

@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { useTranslation } from "react-i18next";
 
 import { fetchMe, type Me, type TenantMembership } from "@/api/me";
 import { listFarms, type Farm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
+import { Card } from "@/components/Card";
+import { DataTable } from "@/components/DataTable";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { PageHeader } from "@/components/PageHeader";
+import { Pill } from "@/components/Pill";
 import { decodeJwt } from "@/rbac/jwt";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
+import { Page } from "@/components/Page";
 
 export function TenantDetailPage(): ReactNode {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -49,9 +56,9 @@ export function TenantDetailPage(): ReactNode {
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-ap-crit">
-        {error}
-      </p>
+      <Page>
+        <ErrorState message={error} />
+      </Page>
     );
   }
   if (!me) {
@@ -68,97 +75,87 @@ export function TenantDetailPage(): ReactNode {
 
   if (!membership) {
     return (
-      <p role="alert" className="text-sm text-ap-crit">
-        {t("errors.notFound")}
-      </p>
+      <Page>
+        <ErrorState message={t("errors.notFound")} />
+      </Page>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-ap-ink">{membership.tenant_name}</h1>
-        <p className="text-sm text-ap-muted">
-          {membership.tenant_slug} ·{" "}
-          {t(`shell.tenantStatus.${membership.status}`, membership.status)}
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title={membership.tenant_name}
+        subtitle={`${membership.tenant_slug} · ${t(`shell.tenantStatus.${membership.status}`, membership.status)}`}
+      />
 
-      <div className="card">
-        <h2 className="text-lg font-semibold text-ap-ink">{t("tenant.metadata")}</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Row label={t("tenant.id")} value={membership.tenant_id} />
-          <Row label={t("tenant.slug")} value={membership.tenant_slug} />
-          <Row label={t("tenant.status")} value={membership.status} />
-          <Row
-            label={t("tenant.joinedAt")}
-            value={membership.joined_at ? new Date(membership.joined_at).toLocaleDateString() : "—"}
-          />
-          <Row
-            label={t("tenant.roles")}
-            value={
-              membership.tenant_roles.length === 0
-                ? "—"
-                : membership.tenant_roles.map((r) => r.role).join(", ")
-            }
-          />
-        </dl>
-      </div>
+      <Card title={t("tenant.metadata")} bodyClassName="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Row label={t("tenant.id")} value={membership.tenant_id} />
+        <Row label={t("tenant.slug")} value={membership.tenant_slug} />
+        <Row label={t("tenant.status")} value={membership.status} />
+        <Row
+          label={t("tenant.joinedAt")}
+          value={membership.joined_at ? new Date(membership.joined_at).toLocaleDateString() : "—"}
+        />
+        <Row
+          label={t("tenant.roles")}
+          value={
+            membership.tenant_roles.length === 0
+              ? "—"
+              : membership.tenant_roles.map((r) => r.role).join(", ")
+          }
+        />
+      </Card>
 
-      <div className="card">
-        <h2 className="text-lg font-semibold text-ap-ink">{tFarms("nav.farms")}</h2>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold text-ap-ink">{tFarms("nav.farms")}</h2>
         {!isActiveTenant ? (
-          <p className="mt-2 text-sm text-ap-muted">{t("tenant.switchToView")}</p>
-        ) : farms === null ? (
-          <p role="status" className="mt-2 text-sm text-ap-muted">
-            {t("actions.loading")}
-          </p>
-        ) : farms.length === 0 ? (
-          <p className="mt-2 text-sm text-ap-muted">{tFarms("list.empty")}</p>
+          <Card>
+            <p className="text-sm text-ap-muted">{t("tenant.switchToView")}</p>
+          </Card>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-start text-xs uppercase text-ap-muted">
-                  <th className="py-2 text-start">{tFarms("list.columns.code")}</th>
-                  <th className="py-2 text-start">{tFarms("list.columns.name")}</th>
-                  <th className="py-2 text-start">{tFarms("list.columns.governorate")}</th>
-                  <th className="py-2 text-start">{tFarms("list.columns.area")}</th>
-                  <th className="py-2 text-start">{tFarms("list.columns.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {farms.map((f) => (
-                  <tr key={f.id} className="border-t border-ap-line">
-                    <td className="py-2">
-                      <Link to={`/farms/${f.id}`} className="text-ap-primary underline">
-                        {f.code}
-                      </Link>
-                    </td>
-                    <td className="py-2">{f.name}</td>
-                    <td className="py-2">{f.governorate ?? "—"}</td>
-                    <td className="py-2">
-                      <AreaDisplay areaM2={Number(f.area_m2)} />
-                    </td>
-                    <td className="py-2">
-                      {tFarms(f.is_active ? "status.active" : "status.archived")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<Farm>
+            columns={[
+              { key: "code", header: tFarms("list.columns.code"), cell: (f) => f.code },
+              { key: "name", header: tFarms("list.columns.name"), cell: (f) => f.name },
+              {
+                key: "governorate",
+                header: tFarms("list.columns.governorate"),
+                className: "text-ap-muted",
+                cell: (f) => f.governorate ?? "—",
+              },
+              {
+                key: "area",
+                header: tFarms("list.columns.area"),
+                align: "end",
+                cell: (f) => <AreaDisplay areaM2={Number(f.area_m2)} />,
+              },
+              {
+                key: "status",
+                header: tFarms("list.columns.status"),
+                cell: (f) => (
+                  <Pill kind={f.is_active ? "ok" : "neutral"}>
+                    {tFarms(f.is_active ? "status.active" : "status.archived")}
+                  </Pill>
+                ),
+              },
+            ]}
+            rowKey={(f) => f.id}
+            state={farms === null ? { status: "loading" } : { status: "success", data: farms }}
+            rowHref={(f) => `/farms/${f.id}`}
+            caption={tFarms("nav.farms")}
+            empty={<EmptyState message={tFarms("list.empty")} />}
+          />
         )}
       </div>
-    </div>
+    </Page>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }): ReactNode {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-ap-muted">{label}</dt>
-      <dd className="text-sm text-ap-ink">{value}</dd>
+      <div className="text-xs uppercase tracking-wide text-ap-muted">{label}</div>
+      <div className="text-sm text-ap-ink">{value}</div>
     </div>
   );
 }

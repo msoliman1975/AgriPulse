@@ -117,7 +117,13 @@ describe("<TenantAdminDetailPage>", () => {
     sidecarMock.mockResolvedValue(baseSidecar());
     renderDetail();
 
-    expect(await screen.findByText("Acme Farms")).toBeInTheDocument();
+    // The name appears twice by design: as the page title and as the last
+    // breadcrumb crumb. Assert the heading specifically — it is also the
+    // regression guard for the title dropping back to text-lg (decision 4C).
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Acme Farms/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent("Tenants");
     expect(screen.getByText("acme")).toBeInTheDocument();
     expect(await screen.findByText("7")).toBeInTheDocument();
     // "standard" renders both as the KPI value and the subscription tier row.

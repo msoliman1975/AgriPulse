@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { AdminTenant } from "@/api/adminTenants";
 import type { TenantFarmEntity } from "@/api/purge";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { useOrphanScan, useTenantEntities } from "@/queries/admin/purge";
 
@@ -27,7 +28,7 @@ export function TenantDataPanel({ tenant }: Props): ReactNode {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-ap-line bg-ap-panel p-4 shadow-card">
+      <Card noPadding className="p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ap-line pb-2">
           <h2 className="text-sm font-semibold text-ap-ink">
             {t("purge.data.farmsTitle", { count: entities.data?.farms.length ?? 0 })}
@@ -69,7 +70,7 @@ export function TenantDataPanel({ tenant }: Props): ReactNode {
         ) : (
           <p className="mt-3 text-sm text-ap-muted">{t("purge.data.noFarms")}</p>
         )}
-      </section>
+      </Card>
 
       <OrphanPanel />
 
@@ -171,7 +172,7 @@ function OrphanPanel(): ReactNode {
   const scan = useOrphanScan(enabled);
 
   return (
-    <section className="rounded-lg border border-ap-line bg-ap-panel p-4 shadow-card">
+    <Card noPadding className="p-4 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ap-line pb-2">
         <h2 className="text-sm font-semibold text-ap-ink">{t("purge.orphans.title")}</h2>
         <button
@@ -224,6 +225,6 @@ function OrphanPanel(): ReactNode {
           </>
         )
       ) : null}
-    </section>
+    </Card>
   );
 }

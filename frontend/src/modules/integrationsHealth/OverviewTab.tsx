@@ -2,9 +2,11 @@ import { formatDistanceToNow, parseISO, differenceInHours } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useBlockIntegrationHealth, useFarmIntegrationHealth } from "@/queries/integrationsHealth";
 
@@ -110,21 +112,21 @@ function FarmsTable({
   if (isError) return <p className="text-sm text-ap-crit">{t("loadFailed")}</p>;
   if (rows.length === 0) return <p className="text-sm text-ap-muted">{t("empty")}</p>;
   return (
-    <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-      <table className="min-w-full text-sm">
-        <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-          <tr>
-            <th className="px-3 py-2 text-start">{t("col.farm")}</th>
-            <th className="px-3 py-2 text-start">{t("col.weather")}</th>
-            <th className="px-3 py-2 text-start">{t("col.imagery")}</th>
-            <th className="px-3 py-2 text-end">{t("col.actions")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+    <Card noPadding className="overflow-x-auto">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("col.farm")}</Th>
+            <Th>{t("col.weather")}</Th>
+            <Th>{t("col.imagery")}</Th>
+            <Th className="text-end">{t("col.actions")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((r) => (
-            <tr key={r.farm_id}>
-              <td className="px-3 py-2 text-ap-ink">{r.farm_name}</td>
-              <td className="px-3 py-2">
+            <Tr key={r.farm_id}>
+              <Td className="text-ap-ink">{r.farm_name}</Td>
+              <Td>
                 <StatusCell
                   status={statusFor(
                     r.weather_last_sync_at,
@@ -138,8 +140,8 @@ function FarmsTable({
                   runningCount={r.weather_running_count}
                   overdueCount={r.weather_overdue_count}
                 />
-              </td>
-              <td className="px-3 py-2">
+              </Td>
+              <Td>
                 <StatusCell
                   status={statusFor(
                     r.imagery_last_sync_at,
@@ -153,8 +155,8 @@ function FarmsTable({
                   runningCount={r.imagery_running_count}
                   overdueCount={r.imagery_overdue_count}
                 />
-              </td>
-              <td className="px-3 py-2 text-end">
+              </Td>
+              <Td className="text-end">
                 <button
                   type="button"
                   onClick={() => onPick(r.farm_id)}
@@ -162,12 +164,12 @@ function FarmsTable({
                 >
                   {t("col.viewBlocks")}
                 </button>
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Tbody>
+      </Table>
+    </Card>
   );
 }
 
@@ -230,20 +232,20 @@ function BlocksTable({
       ) : rows.length === 0 ? (
         <p className="text-sm text-ap-muted">{t("blockTab.empty")}</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-          <table className="min-w-full text-sm">
-            <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-              <tr>
-                <th className="px-3 py-2 text-start">{t("col.block")}</th>
-                <th className="px-3 py-2 text-start">{t("col.weather")}</th>
-                <th className="px-3 py-2 text-start">{t("col.imagery")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
+        <Card noPadding className="overflow-x-auto">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>{t("col.block")}</Th>
+                <Th>{t("col.weather")}</Th>
+                <Th>{t("col.imagery")}</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {rows.map((r) => (
-                <tr key={r.block_id}>
-                  <td className="px-3 py-2 text-ap-ink">{r.block_name}</td>
-                  <td className="px-3 py-2">
+                <Tr key={r.block_id}>
+                  <Td className="text-ap-ink">{r.block_name}</Td>
+                  <Td>
                     <StatusCell
                       status={statusFor(
                         r.weather_last_sync_at,
@@ -257,8 +259,8 @@ function BlocksTable({
                       runningCount={r.weather_running_count}
                       overdueCount={r.weather_overdue_count}
                     />
-                  </td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>
                     <StatusCell
                       status={statusFor(
                         r.imagery_last_sync_at,
@@ -272,12 +274,12 @@ function BlocksTable({
                       runningCount={r.imagery_running_count}
                       overdueCount={r.imagery_overdue_count}
                     />
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </Tbody>
+          </Table>
+        </Card>
       )}
     </div>
   );

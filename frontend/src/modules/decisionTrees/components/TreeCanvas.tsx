@@ -15,11 +15,18 @@
 //     dashed line from the source port to the cursor.
 //   - pointerup on a node calls `onRewire(parent, branch, target)`.
 
-import { useRef, useState, useEffect, useMemo, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LayoutResult, PositionedNode } from "../layout/treeLayout";
 import { LAYOUT_CONSTANTS } from "../layout/treeLayout";
+import { Card } from "@/components/Card";
 
 const { NODE_WIDTH, NODE_HEIGHT } = LAYOUT_CONSTANTS;
 const DRAG_THRESHOLD_PX = 4;
@@ -182,7 +189,7 @@ export function TreeCanvas({
   const canShowPorts = onAddChild !== undefined || onRewire !== undefined;
 
   return (
-    <div className="overflow-auto rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding className="overflow-auto">
       <svg
         ref={svgRef}
         role="img"
@@ -195,14 +202,7 @@ export function TreeCanvas({
       >
         {layout.edges.map((edge) => {
           const key = `${edge.from}->${edge.to}-${edge.branch}`;
-          return (
-            <EdgePath
-              key={key}
-              edge={edge}
-              t={t}
-              onPath={pathEdgeKeys?.has(key) ?? false}
-            />
-          );
+          return <EdgePath key={key} edge={edge} t={t} onPath={pathEdgeKeys?.has(key) ?? false} />;
         })}
         {layout.nodes.map((node) => (
           <NodeRect
@@ -216,9 +216,7 @@ export function TreeCanvas({
               validDropTargets?.has(node.id) === true &&
               drag.hoverNodeId === node.id
             }
-            isDropEligible={
-              drag !== null && drag.moved && validDropTargets?.has(node.id) === true
-            }
+            isDropEligible={drag !== null && drag.moved && validDropTargets?.has(node.id) === true}
             onPath={pathNodeIds?.has(node.id) ?? false}
             isTerminal={terminalNodeId === node.id}
             onClick={onSelectNode}
@@ -281,7 +279,7 @@ export function TreeCanvas({
           />
         ) : null}
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -477,11 +475,7 @@ interface BranchPortProps {
   nodeX: number;
   nodeY: number;
   onClick: () => void;
-  onPointerDown: (
-    originX: number,
-    originY: number,
-    evt: ReactPointerEvent<SVGGElement>,
-  ) => void;
+  onPointerDown: (originX: number, originY: number, evt: ReactPointerEvent<SVGGElement>) => void;
 }
 
 function BranchPort({
@@ -549,13 +543,7 @@ function DecisionBody({
   const summary = data.label_en ?? "(unlabelled decision)";
   return (
     <>
-      <text
-        x={x + 12}
-        y={y + 42}
-        fontSize={13}
-        fontWeight={600}
-        fill="#0f172a"
-      >
+      <text x={x + 12} y={y + 42} fontSize={13} fontWeight={600} fill="#0f172a">
         Decision
       </text>
       <text x={x + 12} y={y + 64} fontSize={12} fill="#475569">
@@ -582,13 +570,7 @@ function LeafBody({
   void role;
   return (
     <>
-      <text
-        x={x + 12}
-        y={y + 42}
-        fontSize={13}
-        fontWeight={600}
-        fill="#0f172a"
-      >
+      <text x={x + 12} y={y + 42} fontSize={13} fontWeight={600} fill="#0f172a">
         {actionType}
       </text>
       <text x={x + 12} y={y + 64} fontSize={12} fill="#475569">

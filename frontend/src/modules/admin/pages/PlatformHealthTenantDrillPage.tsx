@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { IntegrationsHealthPage } from "@/modules/integrationsHealth";
+import { Page } from "@/components/Page";
 
 /**
  * Platform-side tenant drill-in (PR-IH7).
@@ -19,22 +20,24 @@ export function PlatformHealthTenantDrillPage(): ReactNode {
 
   if (!tenantId) {
     return (
-      <div className="mx-auto max-w-3xl py-12 text-center">
-        <p className="text-sm text-ap-muted">{t("platformHealth.drill.missingTenant")}</p>
-      </div>
+      <Page width="standard">
+        <div className="py-12 text-center">
+          <p className="text-sm text-ap-muted">{t("platformHealth.drill.missingTenant")}</p>
+        </div>
+      </Page>
     );
   }
 
   const basePath = `/v1/admin/tenants/${tenantId}`;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-6">
+    <Page>
       <div className="text-sm">
         <Link to="/platform/integrations/health" className="text-ap-muted hover:text-ap-primary">
           {i18n.dir() === "rtl" ? "→" : "←"} {t("platformHealth.drill.back")}
         </Link>
       </div>
       <IntegrationsHealthPage basePath={basePath} platformProviderScope={true} />
-    </div>
+    </Page>
   );
 }

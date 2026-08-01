@@ -5,8 +5,15 @@ import { useQuery } from "@tanstack/react-query";
 import { listFarms } from "@/api/farms";
 import type { WorkerRole } from "@/api/resources";
 import { listTenantUsers, type TenantUser } from "@/api/users";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { FilterChip } from "@/components/FilterChip";
 import { PageHeader } from "@/components/PageHeader";
-import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { Toolbar } from "@/components/Toolbar";
+import { queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
 import { useCreateResource, useResources, useUpdateResource } from "@/queries/resources";
 
@@ -92,46 +99,50 @@ export function ResourcesWorkersPage(): ReactNode {
     <div className="flex flex-col gap-6">
       <PageHeader title={t("workers.title")} subtitle={t("workers.subtitle")} />
 
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ap-muted">{t("pickFarm")}</span>
-          <select
-            className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-            value={effectiveFarmId ?? ""}
-            onChange={(e) => setFarmId(e.target.value || null)}
-          >
-            <option value="">{t("noFarm")}</option>
-            {(farmsQ.data?.items ?? []).map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
-          />
-          <span>{t("showArchived")}</span>
-        </label>
-      </div>
+      <Toolbar
+        right={
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-ap-muted">{t("pickFarm")}</span>
+            <select
+              className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-sm text-ap-ink"
+              value={effectiveFarmId ?? ""}
+              onChange={(e) => setFarmId(e.target.value || null)}
+            >
+              <option value="">{t("noFarm")}</option>
+              {(farmsQ.data?.items ?? []).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+        chips={
+          <FilterChip active={includeArchived} onToggle={() => setIncludeArchived((v) => !v)}>
+            {t("showArchived")}
+          </FilterChip>
+        }
+      />
 
       {!effectiveFarmId ? (
-        <p className="text-sm text-ap-muted">{t("workers.empty")}</p>
-      ) : workersQ.isLoading ? (
-        <Skeleton className="h-32 w-full" />
-      ) : workersQ.isError ? (
-        <p className="text-sm text-ap-crit">{t("loadFailed")}</p>
+        <EmptyState message={t("workers.empty")} action={null} />
       ) : (
-        <WorkersTable
-          rows={workersQ.data ?? []}
-          farmId={effectiveFarmId}
-          canManage={canManage}
-          members={members}
-          canLink={canReadUsers}
-        />
+        <AsyncBoundary
+          state={queryState(workersQ)}
+          errorMessage={t("loadFailed")}
+          isEmpty={() => false}
+          empty={<EmptyState message={t("workers.emptyList")} action={null} />}
+        >
+          {(rows) => (
+            <WorkersTable
+              rows={rows}
+              farmId={effectiveFarmId}
+              canManage={canManage}
+              members={members}
+              canLink={canReadUsers}
+            />
+          )}
+        </AsyncBoundary>
       )}
     </div>
   );
@@ -152,37 +163,35 @@ function WorkersTable({ rows, farmId, canManage, members, canLink }: WorkersTabl
   const cols = (canLink ? 5 : 4) + (canManage ? 1 : 0);
 
   return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel">
-      <div className="flex items-center justify-between border-b border-ap-line p-3">
-        <h2 className="text-sm font-semibold text-ap-ink">{t("workers.heading")}</h2>
-        {canManage ? (
-          <button
-            type="button"
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary-700"
-            onClick={() => setAdding(true)}
-          >
+    <Card
+      noPadding
+      title={t("workers.heading")}
+      actions={
+        canManage ? (
+          <Button size="sm" onClick={() => setAdding(true)}>
             {t("workers.add")}
-          </button>
-        ) : null}
-      </div>
-      <table className="w-full text-sm">
-        <thead className="bg-ap-bg/50 text-xs uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th className="px-3 py-2 text-start">{t("col.name")}</th>
-            <th className="px-3 py-2 text-start">{t("col.role")}</th>
-            {canLink ? <th className="px-3 py-2 text-start">{t("col.member")}</th> : null}
-            <th className="px-3 py-2 text-start">{t("col.phone")}</th>
-            <th className="px-3 py-2 text-start">{t("col.status")}</th>
-            {canManage ? <th className="w-32" /> : null}
-          </tr>
-        </thead>
-        <tbody>
+          </Button>
+        ) : null
+      }
+    >
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("col.name")}</Th>
+            <Th>{t("col.role")}</Th>
+            {canLink ? <Th>{t("col.member")}</Th> : null}
+            <Th>{t("col.phone")}</Th>
+            <Th>{t("col.status")}</Th>
+            {canManage ? <Th className="w-32" /> : null}
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.length === 0 && !adding ? (
-            <tr>
-              <td colSpan={cols} className="px-3 py-6 text-center text-ap-muted">
+            <Tr>
+              <Td colSpan={cols} className="p-0">
                 {t("workers.emptyList")}
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ) : null}
           {rows.map((r) => (
             <WorkerRow
@@ -202,9 +211,9 @@ function WorkersTable({ rows, farmId, canManage, members, canLink }: WorkersTabl
               onDone={() => setAdding(false)}
             />
           ) : null}
-        </tbody>
-      </table>
-    </div>
+        </Tbody>
+      </Table>
+    </Card>
   );
 }
 
@@ -227,15 +236,15 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
 
   if (editing) {
     return (
-      <tr className="border-t border-ap-line">
-        <td className="px-3 py-2">
+      <Tr className="border-t border-ap-line">
+        <Td>
           <input
             className="w-full rounded border border-ap-line px-2 py-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-        </td>
-        <td className="px-3 py-2">
+        </Td>
+        <Td>
           <select
             className="rounded border border-ap-line px-2 py-1"
             value={role}
@@ -247,23 +256,23 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
               </option>
             ))}
           </select>
-        </td>
+        </Td>
         {canLink ? (
-          <td className="px-3 py-2">
+          <Td>
             <MemberSelect members={members} value={membershipId} onChange={setMembershipId} />
-          </td>
+          </Td>
         ) : null}
-        <td className="px-3 py-2">
+        <Td>
           <input
             className="w-full rounded border border-ap-line px-2 py-1"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
-        </td>
-        <td className="px-3 py-2 text-ap-muted">
+        </Td>
+        <Td className="text-ap-muted">
           {row.archived_at ? t("status.archived") : t("status.active")}
-        </td>
-        <td className="px-3 py-2 text-end">
+        </Td>
+        <Td className="text-end">
           <button
             type="button"
             disabled={update.isPending}
@@ -287,24 +296,24 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
           >
             {t("action.cancel")}
           </button>
-        </td>
-      </tr>
+        </Td>
+      </Tr>
     );
   }
 
   return (
-    <tr className="border-t border-ap-line">
-      <td className="px-3 py-2">{row.name}</td>
-      <td className="px-3 py-2 text-ap-muted">{t(`role.${row.role}`)}</td>
+    <Tr className="border-t border-ap-line">
+      <Td>{row.name}</Td>
+      <Td className="text-ap-muted">{t(`role.${row.role}`)}</Td>
       {canLink ? (
-        <td className="px-3 py-2 text-ap-muted">{memberName(members, row.membership_id) ?? "—"}</td>
+        <Td className="text-ap-muted">{memberName(members, row.membership_id) ?? "—"}</Td>
       ) : null}
-      <td className="px-3 py-2 text-ap-muted">{row.phone ?? "—"}</td>
-      <td className="px-3 py-2 text-ap-muted">
+      <Td className="text-ap-muted">{row.phone ?? "—"}</Td>
+      <Td className="text-ap-muted">
         {row.archived_at ? t("status.archived") : t("status.active")}
-      </td>
+      </Td>
       {canManage ? (
-        <td className="px-3 py-2 text-end">
+        <Td className="text-end">
           <button
             type="button"
             className="me-3 text-sm text-ap-primary hover:underline"
@@ -325,9 +334,9 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
           >
             {row.archived_at ? t("action.restore") : t("action.archive")}
           </button>
-        </td>
+        </Td>
       ) : null}
-    </tr>
+    </Tr>
   );
 }
 
@@ -347,16 +356,16 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
   const create = useCreateResource(farmId);
 
   return (
-    <tr className="border-t border-ap-line bg-ap-bg/30">
-      <td className="px-3 py-2">
+    <Tr className="border-t border-ap-line bg-ap-bg/30">
+      <Td>
         <input
           className="w-full rounded border border-ap-line px-2 py-1"
           placeholder={t("workers.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-      </td>
-      <td className="px-3 py-2">
+      </Td>
+      <Td>
         <select
           className="rounded border border-ap-line px-2 py-1"
           value={role}
@@ -368,22 +377,22 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
             </option>
           ))}
         </select>
-      </td>
+      </Td>
       {canLink ? (
-        <td className="px-3 py-2">
+        <Td>
           <MemberSelect members={members} value={membershipId} onChange={setMembershipId} />
-        </td>
+        </Td>
       ) : null}
-      <td className="px-3 py-2">
+      <Td>
         <input
           className="w-full rounded border border-ap-line px-2 py-1"
           placeholder={t("workers.phonePlaceholder")}
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
-      </td>
-      <td className="px-3 py-2 text-ap-muted">{t("status.active")}</td>
-      <td className="px-3 py-2 text-end">
+      </Td>
+      <Td className="text-ap-muted">{t("status.active")}</Td>
+      <Td className="text-end">
         <button
           type="button"
           disabled={!name.trim() || create.isPending}
@@ -407,7 +416,7 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
           {t("action.cancel")}
         </button>
         {create.isError ? <p className="mt-1 text-xs text-ap-crit">{t("createFailed")}</p> : null}
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   );
 }

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { getWeatherRiskSummary, type RiskLevel } from "@/api/weatherRisk";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 
 interface Props {
@@ -54,10 +55,7 @@ export function ActiveRisksWidget({ farmId }: Props): ReactNode {
   }, [summaryQ.data]);
 
   return (
-    <section
-      aria-labelledby="active-risks-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card noPadding className="p-4" aria-labelledby="active-risks-heading">
       <header className="flex items-baseline justify-between">
         <div>
           <h2 id="active-risks-heading" className="text-sm font-semibold text-ap-ink">
@@ -92,6 +90,6 @@ export function ActiveRisksWidget({ farmId }: Props): ReactNode {
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

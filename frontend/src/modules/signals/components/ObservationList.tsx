@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
+import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import {
   listSignalObservations,
@@ -135,10 +136,7 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
       lastPage.length === PAGE_SIZE ? lastPage[lastPage.length - 1].time : undefined,
   });
 
-  const allRows = useMemo(
-    () => (obsQuery.data?.pages ?? []).flat(),
-    [obsQuery.data],
-  );
+  const allRows = useMemo(() => (obsQuery.data?.pages ?? []).flat(), [obsQuery.data]);
   const viewRows = filters.templatedOnly
     ? allRows.filter((o) => o.template_observation_id)
     : allRows;
@@ -161,7 +159,7 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
   const deleting = deleteOne.isPending || deleteGroup.isPending;
 
   return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <div className="flex items-center justify-between border-b border-ap-line px-4 py-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-ap-muted">
           {t("log.list.heading")}
@@ -232,7 +230,9 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
       </div>
 
       {obsQuery.isLoading ? (
-        <p className="p-6 text-center text-xs text-ap-muted">{t("common.loading", { defaultValue: "Loading…" })}</p>
+        <p className="p-6 text-center text-xs text-ap-muted">
+          {t("common.loading", { defaultValue: "Loading…" })}
+        </p>
       ) : items.length === 0 ? (
         <p className="p-6 text-center text-xs text-ap-muted">{t("log.list.empty")}</p>
       ) : (
@@ -290,7 +290,7 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
           onConfirm={runDelete}
         />
       ) : null}
-    </div>
+    </Card>
   );
 }
 
@@ -371,7 +371,9 @@ function GroupRow({
         <ul className="mt-1 ms-5 flex flex-col gap-0.5 border-s border-ap-line ps-3">
           {rows.map((r) => (
             <li key={r.id} className="flex items-center gap-2 text-xs">
-              <span className="text-ap-muted">{defName.get(r.signal_definition_id) ?? r.signal_code}</span>
+              <span className="text-ap-muted">
+                {defName.get(r.signal_definition_id) ?? r.signal_code}
+              </span>
               <span className="font-medium text-ap-ink">{formatValue(r)}</span>
               {r.notes ? <span className="text-ap-muted">— {r.notes}</span> : null}
             </li>
@@ -439,9 +441,7 @@ function DeleteConfirm({
       <h3 id="obs-delete-title" className="text-sm font-semibold text-ap-ink">
         {t("log.list.delete.confirmTitle")}
       </h3>
-      <p className="mt-1 text-xs text-ap-muted">
-        {t("log.list.delete.confirmBody", { count })}
-      </p>
+      <p className="mt-1 text-xs text-ap-muted">{t("log.list.delete.confirmBody", { count })}</p>
       <div className="mt-4 flex justify-end gap-2">
         <button
           type="button"

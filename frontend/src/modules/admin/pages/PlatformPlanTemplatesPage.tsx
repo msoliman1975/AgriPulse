@@ -1,10 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 
-import type { TemplateStatus } from "@/api/planTemplates";
+import type { PlanTemplateSummary, TemplateStatus } from "@/api/planTemplates";
+import { Button } from "@/components/Button";
+import { DataTable } from "@/components/DataTable";
+import { EmptyState } from "@/components/EmptyState";
+import { LinkButton } from "@/components/LinkButton";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
+import { Toolbar, ToolbarChips } from "@/components/Toolbar";
+import { queryState } from "@/components/asyncState";
 import { usePlanTemplates } from "@/queries/planTemplates";
 
 const STATUS_FILTERS: readonly (TemplateStatus | "all")[] = [
@@ -27,85 +33,86 @@ function statusKind(status: TemplateStatus): "ok" | "neutral" | "warn" {
  */
 export function PlatformPlanTemplatesPage(): ReactNode {
   const { t } = useTranslation("planTemplates");
-  const navigate = useNavigate();
   const [filter, setFilter] = useState<TemplateStatus | "all">("all");
-  const { data, isLoading, isError } = usePlanTemplates(filter === "all" ? undefined : filter);
+  const templates = usePlanTemplates(filter === "all" ? undefined : filter);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("list.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("list.subtitle")}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate("/platform/plan-templates/new")}
-          className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
-        >
-          {t("list.newButton")}
-        </button>
-      </header>
+    <Page>
+      <PageHeader
+        title={t("list.title")}
+        subtitle={t("list.subtitle")}
+        actions={<LinkButton to="/platform/plan-templates/new">{t("list.newButton")}</LinkButton>}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-ap-muted">{t("list.filterLabel")}</span>
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setFilter(s)}
-            className={
-              filter === s
-                ? "rounded-full bg-ap-primary-soft px-3 py-1 text-xs font-medium text-ap-primary"
-                : "rounded-full px-3 py-1 text-xs text-ap-muted hover:bg-ap-line/50"
+      <Toolbar
+        chips={
+          <ToolbarChips
+            value={filter === "all" ? null : filter}
+            onChange={(next) => setFilter((next as TemplateStatus | null) ?? "all")}
+            allLabel={t("status.all")}
+            options={STATUS_FILTERS.filter((s) => s !== "all").map((s) => ({
+              value: s,
+              label: t(`status.${s}`),
+            }))}
+          />
+        }
+      />
+
+      <DataTable<PlanTemplateSummary>
+        columns={[
+          {
+            key: "name",
+            header: t("list.col.name"),
+            cell: (tpl) => (
+              <>
+                <div className="font-medium">{tpl.name}</div>
+                <code className="font-mono text-[11px] text-ap-muted">{tpl.code}</code>
+              </>
+            ),
+          },
+          {
+            key: "cropPath",
+            header: t("list.col.cropPath"),
+            className: "font-mono text-xs text-ap-primary",
+            cell: (tpl) => tpl.crop_path,
+          },
+          {
+            key: "status",
+            header: t("list.col.status"),
+            cell: (tpl) => <Pill kind={statusKind(tpl.status)}>{t(`status.${tpl.status}`)}</Pill>,
+          },
+          {
+            key: "updated",
+            header: t("list.col.updated"),
+            className: "text-xs text-ap-muted",
+            cell: (tpl) => new Date(tpl.updated_at).toLocaleDateString(),
+          },
+        ]}
+        rowKey={(tpl) => tpl.id}
+        state={queryState(templates)}
+        filtered={filter !== "all"}
+        rowHref={(tpl) => `/platform/plan-templates/${tpl.id}`}
+        caption={t("list.title")}
+        errorMessage={t("list.loadFailed")}
+        empty={
+          <EmptyState
+            message={t("list.empty")}
+            action={
+              <LinkButton to="/platform/plan-templates/new">{t("list.newButton")}</LinkButton>
             }
-          >
-            {t(`status.${s}`)}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : isError ? (
-        <p className="text-sm text-ap-crit">{t("list.loadFailed")}</p>
-      ) : (data ?? []).length === 0 ? (
-        <p className="text-sm text-ap-muted">{t("list.empty")}</p>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-ap-line bg-ap-panel">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-ap-line text-start text-xs uppercase tracking-wider text-ap-muted">
-                <th className="px-4 py-2 text-start font-semibold">{t("list.col.name")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("list.col.cropPath")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("list.col.status")}</th>
-                <th className="px-4 py-2 text-start font-semibold">{t("list.col.updated")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
-              {(data ?? []).map((tpl) => (
-                <tr
-                  key={tpl.id}
-                  onClick={() => navigate(`/platform/plan-templates/${tpl.id}`)}
-                  className="cursor-pointer hover:bg-ap-line/30"
-                >
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-ap-ink">{tpl.name}</div>
-                    <code className="font-mono text-[11px] text-ap-muted">{tpl.code}</code>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-ap-primary">{tpl.crop_path}</td>
-                  <td className="px-4 py-3">
-                    <Pill kind={statusKind(tpl.status)}>{t(`status.${tpl.status}`)}</Pill>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-ap-muted">
-                    {new Date(tpl.updated_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+          />
+        }
+        noResults={
+          <EmptyState
+            message={t("list.noResults")}
+            action={
+              <Button variant="secondary" onClick={() => setFilter("all")}>
+                {t("list.clearFilter")}
+              </Button>
+            }
+          />
+        }
+      />
+    </Page>
   );
 }

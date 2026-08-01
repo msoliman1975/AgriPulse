@@ -3,8 +3,16 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TenantUser, UserUpdatePayload } from "@/api/users";
+import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { queryState } from "@/components/asyncState";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -38,39 +46,28 @@ export function UsersConfigPage(): ReactNode {
   const [editing, setEditing] = useState<TenantUser | null>(null);
   const [credential, setCredential] = useState<Credential | null>(null);
 
-  const { data, isLoading, isError } = useTenantUsers();
+  const users = useTenantUsers();
   const suspendMut = useSuspendTenantUser();
   const reactivateMut = useReactivateTenantUser();
   const deleteMut = useDeleteTenantUser();
   const resendMut = useResendTenantUserInvite();
 
   if (!canRead) {
-    return (
-      <div className="mx-auto max-w-3xl py-12 text-center">
-        <p className="text-sm text-ap-muted">
-          {t("page.missingCapability", { capability: "user.read" })}
-        </p>
-      </div>
-    );
+    return <EmptyState message={t("page.missingCapability", { capability: "user.read" })} />;
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
-        </div>
-        {canInvite ? (
-          <button
-            type="button"
-            onClick={() => setInviting(true)}
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
-          >
-            {t("page.newButton")}
-          </button>
-        ) : null}
-      </header>
+    // Four columns do not fill max-w-6xl — see decision 5's escape hatch.
+    <Page width="standard">
+      <PageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          canInvite ? (
+            <Button onClick={() => setInviting(true)}>{t("page.newButton")}</Button>
+          ) : null
+        }
+      />
 
       {inviting ? (
         <InviteForm onClose={() => setInviting(false)} onCredential={setCredential} />
@@ -80,30 +77,37 @@ export function UsersConfigPage(): ReactNode {
         <CredentialBanner credential={credential} onDismiss={() => setCredential(null)} />
       ) : null}
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
-        {isLoading ? (
-          <div className="flex flex-col gap-2 p-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">{t("page.loadFailed")}</p>
-        ) : !data || data.length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">{t("page.empty")}</p>
-        ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
+      <AsyncBoundary
+        state={queryState(users)}
+        skeleton="lines"
+        errorMessage={t("page.loadFailed")}
+        empty={
+          <Card noPadding>
+            <EmptyState
+              message={t("page.empty")}
+              action={
+                canInvite ? (
+                  <Button onClick={() => setInviting(true)}>{t("page.newButton")}</Button>
+                ) : null
+              }
+            />
+          </Card>
+        }
+      >
+        {(rows) => (
+          <Table>
+            <Thead>
               <tr>
-                <th className="px-4 py-2 text-start">{t("table.name")}</th>
-                <th className="px-4 py-2 text-start">{t("table.email")}</th>
-                <th className="px-4 py-2 text-start">{t("table.tenantRoles")}</th>
-                <th className="px-4 py-2 text-start">{t("table.status")}</th>
-                <th className="px-4 py-2 text-start">{t("table.lastLogin")}</th>
-                <th className="px-4 py-2 text-end">{t("table.actions")}</th>
+                <Th>{t("table.name")}</Th>
+                <Th>{t("table.email")}</Th>
+                <Th>{t("table.tenantRoles")}</Th>
+                <Th>{t("table.status")}</Th>
+                <Th>{t("table.lastLogin")}</Th>
+                <Th className="text-end">{t("table.actions")}</Th>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-ap-line">
-              {data.map((user) => (
+            </Thead>
+            <Tbody>
+              {rows.map((user) => (
                 <UserRow
                   key={user.id}
                   user={user}
@@ -128,16 +132,19 @@ export function UsersConfigPage(): ReactNode {
                   }
                 />
               ))}
-            </tbody>
-          </table>
+            </Tbody>
+          </Table>
         )}
-        {suspendMut.isError || reactivateMut.isError || deleteMut.isError || resendMut.isError ? (
-          <p className="border-t border-ap-line p-3 text-xs text-ap-crit">
-            {(suspendMut.error || reactivateMut.error || deleteMut.error || resendMut.error)?.message}
-          </p>
-        ) : null}
-      </div>
-    </div>
+      </AsyncBoundary>
+
+      {suspendMut.isError || reactivateMut.isError || deleteMut.isError || resendMut.isError ? (
+        <ErrorState
+          message={
+            (suspendMut.error || reactivateMut.error || deleteMut.error || resendMut.error)?.message
+          }
+        />
+      ) : null}
+    </Page>
   );
 }
 
@@ -171,10 +178,10 @@ function UserRow({
   const isPending = user.keycloak_subject?.startsWith("pending::") ?? false;
   const memberStatus = user.membership_status;
   return (
-    <tr>
-      <td className="px-4 py-2 text-ap-ink">{user.full_name}</td>
-      <td className="px-4 py-2 font-mono text-xs text-ap-muted">{user.email}</td>
-      <td className="px-4 py-2">
+    <Tr>
+      <Td className="text-ap-ink">{user.full_name}</Td>
+      <Td className="font-mono text-xs text-ap-muted">{user.email}</Td>
+      <Td>
         <div className="flex flex-wrap gap-1">
           {user.tenant_roles.map((role) => (
             <Pill key={role} kind="info">
@@ -182,8 +189,8 @@ function UserRow({
             </Pill>
           ))}
         </div>
-      </td>
-      <td className="px-4 py-2">
+      </Td>
+      <Td>
         <div className="flex flex-wrap items-center gap-1">
           <Pill
             kind={
@@ -196,16 +203,16 @@ function UserRow({
           </Pill>
           {isPending ? <Pill kind="warn">{t("row.pendingProvisioning")}</Pill> : null}
         </div>
-      </td>
-      <td className="px-4 py-2 text-xs text-ap-muted">
+      </Td>
+      <Td className="text-xs text-ap-muted">
         {user.last_login_at
           ? formatDistanceToNow(parseISO(user.last_login_at), {
               addSuffix: true,
               locale: dateLocale,
             })
           : t("row.never")}
-      </td>
-      <td className="px-4 py-2">
+      </Td>
+      <Td>
         <div className="flex flex-wrap justify-end gap-1">
           {canUpdate ? (
             <button
@@ -255,8 +262,8 @@ function UserRow({
             </button>
           ) : null}
         </div>
-      </td>
-    </tr>
+      </Td>
+    </Tr>
   );
 }
 

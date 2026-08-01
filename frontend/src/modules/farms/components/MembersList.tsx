@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { FarmMember } from "@/api/farmMembers";
+import { Button } from "@/components/Button";
 
 interface Props {
   members: FarmMember[];
@@ -27,13 +28,9 @@ export function MembersList({ members, canRevoke, onRevoke }: Props): JSX.Elemen
               {new Date(m.granted_at).toLocaleDateString(i18n.language)}
             </time>
             {canRevoke && onRevoke ? (
-              <button
-                type="button"
-                className="btn btn-ghost text-ap-crit"
-                onClick={() => onRevoke(m.id)}
-              >
+              <Button variant="ghost" className="text-ap-crit" onClick={() => onRevoke(m.id)}>
                 {t("members.revoke")}
-              </button>
+              </Button>
             ) : null}
           </span>
         </li>

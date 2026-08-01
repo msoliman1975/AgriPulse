@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { fromDateInput, presetRange, toDateInput, type DateRange } from "../dateRange";
+import { Button } from "@/components/Button";
 
 interface Props {
   value: DateRange;
@@ -43,20 +44,12 @@ export function DateRangePicker({ value, onChange }: Props): ReactNode {
         />
       </label>
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          className="btn btn-ghost text-xs"
-          onClick={() => onChange(presetRange(30))}
-        >
+        <Button variant="ghost" className="text-xs" onClick={() => onChange(presetRange(30))}>
           {t("range.last30")}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost text-xs"
-          onClick={() => onChange(presetRange(90))}
-        >
+        </Button>
+        <Button variant="ghost" className="text-xs" onClick={() => onChange(presetRange(90))}>
           {t("range.last90")}
-        </button>
+        </Button>
       </div>
     </div>
   );

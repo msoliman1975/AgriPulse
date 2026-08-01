@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -30,15 +31,17 @@ export function ReportsPage(): ReactNode {
 
   if (!farmId) {
     return (
-      <div className="mx-auto max-w-3xl py-12 text-center">
-        <h1 className="text-xl font-semibold text-ap-ink">{t("title")}</h1>
-        <p className="mt-2 text-sm text-ap-muted">{t("pickFarm")}</p>
-      </div>
+      <Page width="standard">
+        <div className="py-12 text-center">
+          <PageHeader title={t("title")} />
+          <p className="mt-2 text-sm text-ap-muted">{t("pickFarm")}</p>
+        </div>
+      </Page>
     );
   }
 
   return (
-    <div className="space-y-5 p-4">
+    <Page>
       <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       {available.length === 0 ? (
@@ -65,6 +68,6 @@ export function ReportsPage(): ReactNode {
           ) : null}
         </>
       )}
-    </div>
+    </Page>
   );
 }

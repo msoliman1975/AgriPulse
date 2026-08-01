@@ -2,6 +2,7 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -72,7 +73,7 @@ function QueueSection({
   const pill: PillKind = kind === "stuck" ? "crit" : kind === "overdue" ? "warn" : "info";
 
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-ap-line bg-ap-panel p-3">
+    <Card noPadding className="flex flex-col gap-2 p-3">
       <header className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-ap-ink">{title}</h2>
         <Pill kind={pill}>{rows.length}</Pill>
@@ -109,6 +110,6 @@ function QueueSection({
       )}
 
       {footer ? <p className="text-[10px] text-ap-muted">{footer}</p> : null}
-    </section>
+    </Card>
   );
 }

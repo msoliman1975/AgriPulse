@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 
 import { getFarm, updateFarm, type FarmDetail } from "@/api/farms";
 import { isApiError } from "@/api/errors";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { FarmForm, type FarmFormValues } from "../components/FarmForm";
 
 export function FarmEditPage(): JSX.Element {
@@ -49,30 +52,47 @@ export function FarmEditPage(): JSX.Element {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-ap-ink">{t("detail.edit")}</h1>
-      <FarmForm
-        initial={{
-          code: farm.code,
-          name: farm.name,
-          description: farm.description,
-          governorate: farm.governorate,
-          district: farm.district,
-          nearest_city: farm.nearest_city,
-          address_line: farm.address_line,
-          farm_type: farm.farm_type,
-          ownership_type: farm.ownership_type,
-          primary_water_source: farm.primary_water_source,
-          established_date: farm.established_date,
-          tags: farm.tags,
-          boundary: farm.boundary,
-        }}
-        submitLabel={t("form.submitUpdate")}
-        onSubmit={handleSubmit}
-        onCancel={() => navigate(`/farms/${farmId}`)}
-        busy={busy}
-        error={error}
-      />
-    </div>
+    <Page>
+      {/* Single-column forms cap their own measure: a 1152px-wide field row
+          puts unreadable distance between a label and its input. The page
+          frame stays wide so the header lines up with every other page. */}
+      <div className="flex max-w-3xl flex-col gap-4">
+        <PageHeader
+          above={
+            <Breadcrumb
+              items={[
+                { label: t("list.heading"), to: "/farms" },
+                { label: farm.name, to: `/farms/${farmId}` },
+                { label: t("detail.edit") },
+              ]}
+            />
+          }
+          title={t("detail.edit")}
+          subtitle={farm.name}
+        />
+        <FarmForm
+          initial={{
+            code: farm.code,
+            name: farm.name,
+            description: farm.description,
+            governorate: farm.governorate,
+            district: farm.district,
+            nearest_city: farm.nearest_city,
+            address_line: farm.address_line,
+            farm_type: farm.farm_type,
+            ownership_type: farm.ownership_type,
+            primary_water_source: farm.primary_water_source,
+            established_date: farm.established_date,
+            tags: farm.tags,
+            boundary: farm.boundary,
+          }}
+          submitLabel={t("form.submitUpdate")}
+          onSubmit={handleSubmit}
+          onCancel={() => navigate(`/farms/${farmId}`)}
+          busy={busy}
+          error={error}
+        />
+      </div>
+    </Page>
   );
 }

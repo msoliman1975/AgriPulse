@@ -2,8 +2,10 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import {
   useProviderErrorHistogram,
@@ -65,7 +67,7 @@ function ErrorHistogram({ kind, code }: { kind: AttemptKind; code: string }): Re
   const max = entries.reduce((m, e) => Math.max(m, e.count), 0);
 
   return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel p-3">
+    <Card noPadding className="p-3">
       <header className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-medium text-ap-ink">{t("providers.histogram.title")}</h3>
         <span className="text-xs text-ap-muted">
@@ -96,7 +98,7 @@ function ErrorHistogram({ kind, code }: { kind: AttemptKind; code: string }): Re
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -114,24 +116,24 @@ function ProvidersTable({
   const { t } = useTranslation("integrationsHealth");
   const dateLocale = useDateLocale();
   return (
-    <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
-      <table className="min-w-full text-sm">
-        <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-          <tr>
-            <th className="px-3 py-2 text-start">{t("providers.col.provider")}</th>
-            <th className="px-3 py-2 text-start">{t("providers.col.kind")}</th>
-            <th className="px-3 py-2 text-start">{t("providers.col.status")}</th>
-            <th className="px-3 py-2 text-start">{t("providers.col.lastProbeAt")}</th>
-            <th className="px-3 py-2 text-end">{t("providers.col.latency")}</th>
-            <th className="px-3 py-2 text-start">{t("providers.col.error")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+    <Card noPadding className="overflow-x-auto">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("providers.col.provider")}</Th>
+            <Th>{t("providers.col.kind")}</Th>
+            <Th>{t("providers.col.status")}</Th>
+            <Th>{t("providers.col.lastProbeAt")}</Th>
+            <Th className="text-end">{t("providers.col.latency")}</Th>
+            <Th>{t("providers.col.error")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((r) => {
             const isSelected =
               selected?.kind === r.provider_kind && selected?.code === r.provider_code;
             return (
-              <tr
+              <Tr
                 key={`${r.provider_kind}-${r.provider_code}`}
                 className={
                   platformScope
@@ -147,9 +149,9 @@ function ProvidersTable({
                     : undefined
                 }
               >
-                <td className="px-3 py-2 font-mono text-ap-ink">{r.provider_code}</td>
-                <td className="px-3 py-2 text-ap-muted">{t(`kind.${r.provider_kind}`)}</td>
-                <td className="px-3 py-2">
+                <Td className="font-mono text-ap-ink">{r.provider_code}</Td>
+                <Td>{t(`kind.${r.provider_kind}`)}</Td>
+                <Td>
                   <Pill kind={pillForProbe(r.last_status)}>
                     {t(
                       r.last_status
@@ -162,30 +164,27 @@ function ProvidersTable({
                       {t("badge.failed24h", { n: r.failed_24h })}
                     </span>
                   ) : null}
-                </td>
-                <td className="px-3 py-2 text-ap-muted">
+                </Td>
+                <Td>
                   {r.last_probe_at
                     ? formatDistanceToNow(parseISO(r.last_probe_at), {
                         addSuffix: true,
                         locale: dateLocale,
                       })
                     : "—"}
-                </td>
-                <td className="px-3 py-2 text-end text-ap-muted">
+                </Td>
+                <Td className="text-end">
                   {r.last_latency_ms !== null ? `${r.last_latency_ms}ms` : "—"}
-                </td>
-                <td
-                  className="max-w-xs truncate px-3 py-2 text-ap-muted"
-                  title={r.last_error_message ?? ""}
-                >
+                </Td>
+                <Td className="max-w-xs truncate" title={r.last_error_message ?? ""}>
                   {r.last_error_message ?? ""}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             );
           })}
-        </tbody>
-      </table>
-    </div>
+        </Tbody>
+      </Table>
+    </Card>
   );
 }
 
@@ -195,7 +194,7 @@ function ProbeHistory({ kind, code }: { kind: AttemptKind; code: string }): Reac
   const dateLocale = useDateLocale();
 
   return (
-    <div className="rounded-xl border border-ap-line bg-ap-panel p-3">
+    <Card noPadding className="p-3">
       <header className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-medium text-ap-ink">
           {kind} · <span className="font-mono">{code}</span>
@@ -228,7 +227,7 @@ function ProbeHistory({ kind, code }: { kind: AttemptKind; code: string }): Reac
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useCapability } from "@/rbac/useCapability";
 
@@ -51,8 +52,7 @@ export function IntegrationsHealthPage({
   return (
     <div className="flex flex-col gap-4">
       <header>
-        <h1 className="text-xl font-semibold text-ap-ink">{t("title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("subtitle")}</p>
+        <PageHeader title={t("title")} subtitle={t("subtitle")} />
       </header>
 
       <SegmentedControl

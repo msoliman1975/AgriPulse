@@ -19,7 +19,8 @@
       "governorate": "المحافظة",
       "tag": "وسم",
       "includeArchived": "إظهار المؤرشفة",
-      "all": "الكل"
+      "all": "الكل",
+      "hideArchived": "إخفاء المؤرشفة"
     },
     "loadMore": "عرض المزيد"
   },
@@ -78,7 +79,8 @@
       "boundaryInvalid": "الحدود ليست مضلعًا صحيحًا.",
       "boundarySelfIntersect": "الحدود تتقاطع مع نفسها.",
       "boundaryOutOfEgypt": "الحدود خارج النطاق الجغرافي لمصر."
-    }
+    },
+    "identity": "بيانات المزرعة"
   },
   "farmType": {
     "commercial": "تجارية",

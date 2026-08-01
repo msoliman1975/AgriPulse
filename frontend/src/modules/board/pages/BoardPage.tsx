@@ -13,6 +13,9 @@ import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import type { ActivityType, BoardActivity, BoardBlock, BoardResourceChip } from "@/api/plans";
+import { Card } from "@/components/Card";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -337,27 +340,27 @@ export function BoardPage(): ReactNode {
   })();
 
   return (
-    <div className="flex w-full flex-col gap-4 px-4 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("subtitle")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canManage ? (
-            <button
-              type="button"
-              onClick={() => setApplyTemplateOpen(true)}
-              className="rounded-md border border-ap-primary px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary-soft"
-            >
-              {t("template.applyButton")}
-            </button>
-          ) : null}
-          <SeasonSelect year={selectedYear} years={seasonYears} onChange={changeSeasonYear} />
-          <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
-          <RangeNavigator label={rangeLabel} onShift={shiftAnchor} onToday={onTodayPressed} />
-        </div>
-      </header>
+    <Page width="full">
+      <PageHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={
+          <div className="flex items-center gap-2">
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setApplyTemplateOpen(true)}
+                className="rounded-md border border-ap-primary px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary-soft"
+              >
+                {t("template.applyButton")}
+              </button>
+            ) : null}
+            <SeasonSelect year={selectedYear} years={seasonYears} onChange={changeSeasonYear} />
+            <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
+            <RangeNavigator label={rangeLabel} onShift={shiftAnchor} onToday={onTodayPressed} />
+          </div>
+        }
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <BoardFilters
@@ -495,7 +498,7 @@ export function BoardPage(): ReactNode {
       {applyTemplateOpen ? (
         <ApplyTemplateDialog farmId={farmId} onClose={() => setApplyTemplateOpen(false)} />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -646,9 +649,9 @@ function BoardGrid({
   const dateLocale = useDateLocale();
   if (blocks.length === 0) {
     return (
-      <p className="rounded-xl border border-ap-line bg-ap-panel p-8 text-center text-sm text-ap-muted">
+      <Card noPadding className="p-8 text-center text-sm text-ap-muted">
         {t("empty")}
-      </p>
+      </Card>
     );
   }
   const columnLabel = (col: ColumnDef): string => {
@@ -674,7 +677,11 @@ function BoardGrid({
   const isTodayColumn = (col: ColumnDef): boolean =>
     col.unit === "day" ? col.start === todayDay : col.start === todayMonth;
   return (
-    <div className="overflow-x-auto rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding className="overflow-x-auto">
+      {/* eslint-disable-next-line no-restricted-syntax --
+          This is a calendar grid, not a data table: fixed layout, collapsed
+          borders, day cells spanning weeks. <Table> would impose the data-
+          table surface and dividers on it. */}
       <table className="min-w-full table-fixed border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-ap-bg/80">
           <tr>
@@ -758,6 +765,6 @@ function BoardGrid({
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

@@ -26,7 +26,11 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
+import { Card } from "@/components/Card";
+import { ErrorState } from "@/components/ErrorState";
 import { Modal } from "@/components/Modal";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -55,11 +59,7 @@ import { ParametersPanel } from "../components/ParametersPanel";
 import { ProvenancePanel } from "../components/ProvenancePanel";
 import { TreeCanvas } from "../components/TreeCanvas";
 import { TreeMetadataPanel } from "../components/TreeMetadataPanel";
-import {
-  applyTreeMetaToYaml,
-  readTreeMeta,
-  type TreeMetaFields,
-} from "../lib/metadataEdit";
+import { applyTreeMetaToYaml, readTreeMeta, type TreeMetaFields } from "../lib/metadataEdit";
 import { layoutTree, type CompiledTree } from "../layout/treeLayout";
 import {
   applyParameterEditsToYaml,
@@ -154,12 +154,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const draft = useUndoableYaml(null);
   const draftYaml = draft.value;
   const setDraftYaml = draft.setValue;
-  const [hydratedFromVersionId, setHydratedFromVersionId] = useState<string | null>(
-    null,
-  );
-  const [addChildPending, setAddChildPending] = useState<PendingAddChild | null>(
-    null,
-  );
+  const [hydratedFromVersionId, setHydratedFromVersionId] = useState<string | null>(null);
+  const [addChildPending, setAddChildPending] = useState<PendingAddChild | null>(null);
   const [addChildError, setAddChildError] = useState<string | null>(null);
   const [deletePending, setDeletePending] = useState<string | null>(null);
   const [structuralError, setStructuralError] = useState<string | null>(null);
@@ -262,9 +258,7 @@ export function DecisionTreeViewerPage(): ReactNode {
       const next = applyDeleteUnreachable(draftYaml);
       setDraftYaml(next);
     } catch (err) {
-      setStructuralError(
-        err instanceof Error ? err.message : "Cleanup failed",
-      );
+      setStructuralError(err instanceof Error ? err.message : "Cleanup failed");
     }
   };
 
@@ -275,12 +269,7 @@ export function DecisionTreeViewerPage(): ReactNode {
     const handler = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      if (
-        tag === "input" ||
-        tag === "textarea" ||
-        tag === "select" ||
-        target?.isContentEditable
-      ) {
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
         return;
       }
       const isMod = e.metaKey || e.ctrlKey;
@@ -299,21 +288,24 @@ export function DecisionTreeViewerPage(): ReactNode {
   }, [canManage, draft]);
 
   if (detail.isError) {
-    return <p className="p-4 text-sm text-ap-crit">{t("edit.loadFailed")}</p>;
+    return (
+      <Page>
+        <ErrorState message={t("edit.loadFailed")} />
+      </Page>
+    );
   }
   if (detail.isLoading || !detail.data) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
+      <Page>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-96 w-full" />
-      </div>
+      </Page>
     );
   }
 
   const tree = detail.data;
   const isDraftOnly = tree.current_version == null;
-  const structuralDirty =
-    draftYaml !== null && sourceYaml !== null && draftYaml !== sourceYaml;
+  const structuralDirty = draftYaml !== null && sourceYaml !== null && draftYaml !== sourceYaml;
 
   // Name/description are two projections of the draft YAML: the persisted
   // values parsed out of it, overlaid with any in-panel edits.
@@ -345,8 +337,7 @@ export function DecisionTreeViewerPage(): ReactNode {
   const latestVersion = tree.versions[0];
   const hasUnpublishedDraft =
     latestVersion !== undefined &&
-    (latestVersion.published_at == null ||
-      tree.current_version !== latestVersion.version);
+    (latestVersion.published_at == null || tree.current_version !== latestVersion.version);
   const rootId = draftCompiled?.root ?? null;
   // Provenance reads from the published/current compiled version (the
   // authoritative normalized shape), not the in-editor draft — it's
@@ -398,10 +389,7 @@ export function DecisionTreeViewerPage(): ReactNode {
             block_id: dryRunBlockId.trim(),
             version: tree.current_version ?? undefined,
           };
-    dryRun.mutate(
-      { code: tree.code, payload },
-      { onSuccess: (res) => setDryRunResult(res) },
-    );
+    dryRun.mutate({ code: tree.code, payload }, { onSuccess: (res) => setDryRunResult(res) });
   };
   const onClearDryRun = (): void => {
     setDryRunResult(null);
@@ -433,26 +421,18 @@ export function DecisionTreeViewerPage(): ReactNode {
       setAddChildPending(null);
       setAddChildError(null);
     } catch (err) {
-      setAddChildError(
-        err instanceof Error ? err.message : t("editor.addChild.failed"),
-      );
+      setAddChildError(err instanceof Error ? err.message : t("editor.addChild.failed"));
     }
   };
   // PR-D6: drag-to-rewire — drop a port onto a target node.
-  const onRewire = (
-    parentId: string,
-    branch: "match" | "miss",
-    targetId: string,
-  ): void => {
+  const onRewire = (parentId: string, branch: "match" | "miss", targetId: string): void => {
     if (!draftYaml) return;
     try {
       const next = applyRewireBranch(draftYaml, { parentId, branch, toNodeId: targetId });
       setDraftYaml(next);
       setStructuralError(null);
     } catch (err) {
-      setStructuralError(
-        err instanceof Error ? err.message : t("editor.canvas.rewireFailed"),
-      );
+      setStructuralError(err instanceof Error ? err.message : t("editor.canvas.rewireFailed"));
     }
   };
 
@@ -463,9 +443,7 @@ export function DecisionTreeViewerPage(): ReactNode {
       const next = applySetNodeCondition(draftYaml, nodeId, nextTree);
       setDraftYaml(next);
     } catch (err) {
-      setStructuralError(
-        err instanceof Error ? err.message : t("editor.condition.applyFailed"),
-      );
+      setStructuralError(err instanceof Error ? err.message : t("editor.condition.applyFailed"));
     }
   };
 
@@ -491,9 +469,7 @@ export function DecisionTreeViewerPage(): ReactNode {
       });
       setDeletePending(null);
     } catch (err) {
-      setStructuralError(
-        err instanceof Error ? err.message : t("editor.delete.failed"),
-      );
+      setStructuralError(err instanceof Error ? err.message : t("editor.delete.failed"));
       setDeletePending(null);
     }
   };
@@ -547,10 +523,7 @@ export function DecisionTreeViewerPage(): ReactNode {
     if (!latestVersion) return;
     await publish.mutateAsync({ code, version: latestVersion.version });
   };
-  const onParameterChange = (
-    name: string,
-    decl: ParameterDeclaration | null,
-  ): void => {
+  const onParameterChange = (name: string, decl: ParameterDeclaration | null): void => {
     setParamsBuffer((buf) => ({ ...buf, [name]: decl }));
   };
 
@@ -578,13 +551,11 @@ export function DecisionTreeViewerPage(): ReactNode {
   return (
     // PR-8: give the canvas the full page width (capped on ultra-wide) so wide
     // trees render with minimal horizontal scroll.
-    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-2">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-ap-ink">
-              {isAr && tree.name_ar ? tree.name_ar : tree.name_en}
-            </h1>
+    <Page width="full">
+      <PageHeader
+        title={isAr && tree.name_ar ? tree.name_ar : tree.name_en}
+        badge={
+          <>
             {isDraftOnly ? (
               <Pill kind="neutral">{t("viewer.header.draftOnly")}</Pill>
             ) : (
@@ -596,105 +567,103 @@ export function DecisionTreeViewerPage(): ReactNode {
                 {t("editor.header.invalidCount", { n: structuralErrors.length })}
               </Pill>
             ) : null}
-          </div>
-          <p className="mt-1 font-mono text-xs text-ap-muted">{tree.code}</p>
-          {(isAr && tree.description_ar) || tree.description_en ? (
-            <p className="mt-2 max-w-prose text-sm text-ap-muted">
-              {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {canManage ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => draft.undo()}
-                disabled={!draft.canUndo}
-                title={t("editor.header.undoTitle")}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
-              >
-                ↶ {t("editor.header.undo")}
-              </button>
-              <button
-                type="button"
-                onClick={() => draft.redo()}
-                disabled={!draft.canRedo}
-                title={t("editor.header.redoTitle")}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
-              >
-                ↷ {t("editor.header.redo")}
-              </button>
-            </div>
-          ) : null}
-          {canManage && dirty ? (
-            <>
-              <button
-                type="button"
-                onClick={onDiscardAll}
-                disabled={append.isPending}
-                className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-50"
-              >
-                {t("editor.header.discardAll")}
-              </button>
+          </>
+        }
+        subtitle={
+          <>
+            <span className="font-mono text-xs">{tree.code}</span>
+            {(isAr && tree.description_ar) || tree.description_en ? (
+              <span className="mt-2 block max-w-prose">
+                {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
+              </span>
+            ) : null}
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {canManage ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => draft.undo()}
+                  disabled={!draft.canUndo}
+                  title={t("editor.header.undoTitle")}
+                  className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
+                >
+                  ↶ {t("editor.header.undo")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => draft.redo()}
+                  disabled={!draft.canRedo}
+                  title={t("editor.header.redoTitle")}
+                  className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-40"
+                >
+                  ↷ {t("editor.header.redo")}
+                </button>
+              </div>
+            ) : null}
+            {canManage && dirty ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onDiscardAll}
+                  disabled={append.isPending}
+                  className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-bg/60 disabled:opacity-50"
+                >
+                  {t("editor.header.discardAll")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void onSave();
+                  }}
+                  disabled={!canSave}
+                  title={structuralErrors.length > 0 ? t("editor.header.fixErrorsHint") : undefined}
+                  className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-50"
+                >
+                  {append.isPending ? t("editor.header.saving") : t("editor.header.saveDraft")}
+                </button>
+              </>
+            ) : null}
+            {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
               <button
                 type="button"
                 onClick={() => {
-                  void onSave();
+                  void onPublishLatest();
                 }}
-                disabled={!canSave}
-                title={
-                  structuralErrors.length > 0
-                    ? t("editor.header.fixErrorsHint")
-                    : undefined
-                }
-                className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-50"
+                disabled={publish.isPending}
+                className="rounded-md bg-ap-info px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-info/90 disabled:opacity-50"
               >
-                {append.isPending
-                  ? t("editor.header.saving")
-                  : t("editor.header.saveDraft")}
+                {publish.isPending
+                  ? t("editor.header.publishing")
+                  : t("editor.header.publish", { n: latestVersion.version })}
               </button>
-            </>
-          ) : null}
-          {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
-            <button
-              type="button"
-              onClick={() => {
-                void onPublishLatest();
-              }}
-              disabled={publish.isPending}
-              className="rounded-md bg-ap-info px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-info/90 disabled:opacity-50"
+            ) : null}
+            <div
+              role="tablist"
+              aria-label={t("workspace.metadata.heading")}
+              className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5"
             >
-              {publish.isPending
-                ? t("editor.header.publishing")
-                : t("editor.header.publish", { n: latestVersion.version })}
-            </button>
-          ) : null}
-          <div
-            role="tablist"
-            aria-label={t("workspace.metadata.heading")}
-            className="inline-flex rounded-md border border-ap-line bg-ap-panel p-0.5"
-          >
-            {(["visual", "yaml"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="tab"
-                aria-selected={viewMode === m}
-                onClick={() => setViewMode(m)}
-                className={clsx(
-                  "rounded px-3 py-1 text-sm font-medium transition-colors",
-                  viewMode === m
-                    ? "bg-ap-primary text-white"
-                    : "text-ap-ink hover:bg-ap-bg/60",
-                )}
-              >
-                {t(`workspace.tab.${m}`)}
-              </button>
-            ))}
+              {(["visual", "yaml"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === m}
+                  onClick={() => setViewMode(m)}
+                  className={clsx(
+                    "rounded px-3 py-1 text-sm font-medium transition-colors",
+                    viewMode === m ? "bg-ap-primary text-white" : "text-ap-ink hover:bg-ap-bg/60",
+                  )}
+                >
+                  {t(`workspace.tab.${m}`)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {append.isError ? (
         <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
@@ -757,105 +726,99 @@ export function DecisionTreeViewerPage(): ReactNode {
           />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="flex flex-col gap-4">
-          <CanvasDryRunPanel
-            blockId={dryRunBlockId}
-            onBlockIdChange={setDryRunBlockId}
-            candidateBlocks={candidateBlocks.data ?? []}
-            candidatesLoading={candidateBlocks.isLoading}
-            mode={dryRunMode}
-            onModeChange={setDryRunMode}
-            canUseCurrent={tree.current_version != null}
-            isRunning={dryRun.isPending}
-            result={dryRunResult}
-            errorMessage={
-              dryRun.isError ? (dryRun.error?.message ?? "") : undefined
-            }
-            onRun={onDryRun}
-            onClear={onClearDryRun}
-          />
-          <TreeCanvas
-            layout={layout}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            dirtyNodeIds={dirtyIds}
-            onAddChild={canManage ? onRequestAddChild : undefined}
-            onRewire={canManage ? onRewire : undefined}
-            pathNodeIds={highlight?.nodes}
-            pathEdgeKeys={highlight?.edges}
-            terminalNodeId={highlight?.terminalNodeId ?? null}
-          />
-          {unreachableNodes.length > 0 ? (
-            <div className="flex items-start justify-between gap-3 rounded-md border border-ap-warn/40 bg-ap-warn/5 p-3 text-xs">
-              <div>
-                <p className="font-semibold text-ap-warn">
-                  {t("editor.unreachable.heading", { count: unreachableNodes.length })}
-                </p>
-                <p className="mt-1 text-ap-ink">
-                  {t("editor.unreachable.body")}
-                </p>
-                <p className="mt-1 font-mono text-[11px] text-ap-muted">
-                  {unreachableNodes.join(", ")}
-                </p>
-              </div>
-              {canManage ? (
-                <button
-                  type="button"
-                  onClick={onCleanupUnreachable}
-                  className="shrink-0 rounded-md border border-ap-warn/60 bg-white px-2 py-1 text-xs font-medium text-ap-warn hover:bg-ap-warn/10"
-                >
-                  {t("editor.unreachable.cleanup")}
-                </button>
+            <div className="flex flex-col gap-4">
+              <CanvasDryRunPanel
+                blockId={dryRunBlockId}
+                onBlockIdChange={setDryRunBlockId}
+                candidateBlocks={candidateBlocks.data ?? []}
+                candidatesLoading={candidateBlocks.isLoading}
+                mode={dryRunMode}
+                onModeChange={setDryRunMode}
+                canUseCurrent={tree.current_version != null}
+                isRunning={dryRun.isPending}
+                result={dryRunResult}
+                errorMessage={dryRun.isError ? (dryRun.error?.message ?? "") : undefined}
+                onRun={onDryRun}
+                onClear={onClearDryRun}
+              />
+              <TreeCanvas
+                layout={layout}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={setSelectedNodeId}
+                dirtyNodeIds={dirtyIds}
+                onAddChild={canManage ? onRequestAddChild : undefined}
+                onRewire={canManage ? onRewire : undefined}
+                pathNodeIds={highlight?.nodes}
+                pathEdgeKeys={highlight?.edges}
+                terminalNodeId={highlight?.terminalNodeId ?? null}
+              />
+              {unreachableNodes.length > 0 ? (
+                <div className="flex items-start justify-between gap-3 rounded-md border border-ap-warn/40 bg-ap-warn/5 p-3 text-xs">
+                  <div>
+                    <p className="font-semibold text-ap-warn">
+                      {t("editor.unreachable.heading", { count: unreachableNodes.length })}
+                    </p>
+                    <p className="mt-1 text-ap-ink">{t("editor.unreachable.body")}</p>
+                    <p className="mt-1 font-mono text-[11px] text-ap-muted">
+                      {unreachableNodes.join(", ")}
+                    </p>
+                  </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={onCleanupUnreachable}
+                      className="shrink-0 rounded-md border border-ap-warn/60 bg-white px-2 py-1 text-xs font-medium text-ap-warn hover:bg-ap-warn/10"
+                    >
+                      {t("editor.unreachable.cleanup")}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {structuralErrors.length > 0 ? (
+                <div className="rounded-md border border-ap-crit/40 bg-ap-crit/5 p-3 text-xs">
+                  <p className="mb-1 font-semibold text-ap-crit">{t("editor.errors.heading")}</p>
+                  <ul className="space-y-0.5 text-ap-ink">
+                    {structuralErrors.map((e, i) => (
+                      <li key={i}>
+                        {e.nodeId ? (
+                          <span className="font-mono text-ap-muted">[{e.nodeId}] </span>
+                        ) : null}
+                        {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <ParametersPanel
+                declared={declaredParams}
+                buffer={paramsBuffer}
+                canEdit={canManage}
+                onChange={onParameterChange}
+              />
+              {Object.keys(declaredParams).length > 0 ? (
+                <ParameterOverridesPanel code={tree.code} canManage={canManage} />
               ) : null}
             </div>
-          ) : null}
-          {structuralErrors.length > 0 ? (
-            <div className="rounded-md border border-ap-crit/40 bg-ap-crit/5 p-3 text-xs">
-              <p className="mb-1 font-semibold text-ap-crit">
-                {t("editor.errors.heading")}
-              </p>
-              <ul className="space-y-0.5 text-ap-ink">
-                {structuralErrors.map((e, i) => (
-                  <li key={i}>
-                    {e.nodeId ? (
-                      <span className="font-mono text-ap-muted">[{e.nodeId}] </span>
-                    ) : null}
-                    {e.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <ParametersPanel
-            declared={declaredParams}
-            buffer={paramsBuffer}
-            canEdit={canManage}
-            onChange={onParameterChange}
-          />
-          {Object.keys(declaredParams).length > 0 ? (
-            <ParameterOverridesPanel code={tree.code} canManage={canManage} />
-          ) : null}
-        </div>
-        {selectedNode ? (
-          <NodeDetailsPanel
-            node={selectedNode}
-            pendingPatch={editBuffer[selectedNode.id]}
-            canEdit={canManage}
-            isRoot={rootId === selectedNode.id}
-            onPatch={onPatch}
-            onClearPatch={onClearNodePatch}
-            onDelete={canManage ? onRequestDelete : undefined}
-            onAddChild={canManage ? onRequestAddChild : undefined}
-            onConditionChange={canManage ? onConditionChange : undefined}
-          />
-        ) : (
-          <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">
-            <p>{t("editor.panel.selectHint")}</p>
-            {canManage ? (
-              <p className="text-xs">{t("editor.panel.selectHintActions")}</p>
-            ) : null}
-          </aside>
-        )}
+            {selectedNode ? (
+              <NodeDetailsPanel
+                node={selectedNode}
+                pendingPatch={editBuffer[selectedNode.id]}
+                canEdit={canManage}
+                isRoot={rootId === selectedNode.id}
+                onPatch={onPatch}
+                onClearPatch={onClearNodePatch}
+                onDelete={canManage ? onRequestDelete : undefined}
+                onAddChild={canManage ? onRequestAddChild : undefined}
+                onConditionChange={canManage ? onConditionChange : undefined}
+              />
+            ) : (
+              <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">
+                <p>{t("editor.panel.selectHint")}</p>
+                {canManage ? (
+                  <p className="text-xs">{t("editor.panel.selectHintActions")}</p>
+                ) : null}
+              </aside>
+            )}
           </div>
 
           {draftCompiled === null && !isDraftOnly ? (
@@ -896,7 +859,7 @@ export function DecisionTreeViewerPage(): ReactNode {
           onConfirm={onConfirmDelete}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -966,7 +929,7 @@ function YamlMode({
 }): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="border-b border-ap-line px-4 py-3">
         <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.yaml.heading")}</h2>
         <p className="text-xs text-ap-muted">{t("workspace.yaml.subtitle")}</p>
@@ -997,9 +960,7 @@ function YamlMode({
             <ul className="space-y-0.5 text-ap-ink">
               {structuralErrors.map((e, i) => (
                 <li key={i}>
-                  {e.nodeId ? (
-                    <span className="font-mono text-ap-muted">[{e.nodeId}] </span>
-                  ) : null}
+                  {e.nodeId ? <span className="font-mono text-ap-muted">[{e.nodeId}] </span> : null}
                   {e.message}
                 </li>
               ))}
@@ -1007,7 +968,7 @@ function YamlMode({
           </div>
         ) : null}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -1034,12 +995,10 @@ function VersionHistorySection({
   const { t } = useTranslation("decisionTrees");
   const [open, setOpen] = useState(false);
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-ap-ink">
-            {t("workspace.versions.heading")}
-          </h2>
+          <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.versions.heading")}</h2>
           <span className="text-xs text-ap-muted">{versions.length}</span>
         </div>
         <button
@@ -1100,9 +1059,7 @@ function VersionHistorySection({
                       disabled={publishing}
                       className="rounded-md bg-ap-primary px-2 py-0.5 text-[11px] font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
                     >
-                      {publishing
-                        ? t("edit.versions.publishing")
-                        : t("edit.versions.publish")}
+                      {publishing ? t("edit.versions.publishing") : t("edit.versions.publish")}
                     </button>
                   ) : null}
                 </div>
@@ -1111,7 +1068,7 @@ function VersionHistorySection({
           })}
         </ul>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

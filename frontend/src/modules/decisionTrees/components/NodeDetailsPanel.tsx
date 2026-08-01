@@ -26,6 +26,7 @@ import type { PositionedNode } from "../layout/treeLayout";
 import type { LeafOutcomePatch, NodePatch } from "../lib/treeEdit";
 import { parseConditionTree } from "../lib/conditionEdit";
 import { ConditionBuilder } from "./ConditionBuilder";
+import { Card } from "@/components/Card";
 
 interface NodeDetailsPanelProps {
   node: PositionedNode;
@@ -62,29 +63,27 @@ export function NodeDetailsPanel({
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   const isLeaf = node.data.outcome !== undefined;
-  const hasPending =
-    pendingPatch !== undefined && Object.keys(pendingPatch).length > 0;
+  const hasPending = pendingPatch !== undefined && Object.keys(pendingPatch).length > 0;
   // Add-child buttons surface for decision nodes with empty branches.
   const canAddMatch =
-    !isLeaf && canEdit && onAddChild !== undefined && !(node.data as { on_match?: string }).on_match;
+    !isLeaf &&
+    canEdit &&
+    onAddChild !== undefined &&
+    !(node.data as { on_match?: string }).on_match;
   const canAddMiss =
     !isLeaf && canEdit && onAddChild !== undefined && !(node.data as { on_miss?: string }).on_miss;
 
   return (
-    <aside className="flex flex-col gap-3 overflow-hidden rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="flex flex-col gap-3 overflow-hidden p-4">
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-xs text-ap-muted">{t("editor.panel.nodeId")}</p>
-          <p className="break-all font-mono text-sm font-semibold text-ap-ink">
-            {node.id}
-          </p>
+          <p className="break-all font-mono text-sm font-semibold text-ap-ink">{node.id}</p>
         </div>
         {canEdit ? (
           <button
             type="button"
-            onClick={() =>
-              setMode((current) => (current === "view" ? "edit" : "view"))
-            }
+            onClick={() => setMode((current) => (current === "view" ? "edit" : "view"))}
             className="shrink-0 rounded-md border border-ap-line bg-ap-bg/60 px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-bg"
           >
             {mode === "view" ? t("editor.panel.edit") : t("editor.panel.done")}
@@ -94,20 +93,10 @@ export function NodeDetailsPanel({
 
       <KeyValue label={t("editor.panel.role")} value={roleLabel(node.role, t)} />
 
-      <LabelsSection
-        node={node}
-        mode={mode}
-        pendingPatch={pendingPatch}
-        onPatch={onPatch}
-      />
+      <LabelsSection node={node} mode={mode} pendingPatch={pendingPatch} onPatch={onPatch} />
 
       {isLeaf ? (
-        <LeafOutcomeSection
-          node={node}
-          mode={mode}
-          pendingPatch={pendingPatch}
-          onPatch={onPatch}
-        />
+        <LeafOutcomeSection node={node} mode={mode} pendingPatch={pendingPatch} onPatch={onPatch} />
       ) : (
         <DecisionConditionSection
           node={node}
@@ -177,12 +166,10 @@ export function NodeDetailsPanel({
               {t("editor.panel.deleteNode")}
             </button>
           ) : null}
-          {isRoot ? (
-            <p className="text-ap-muted">{t("editor.panel.deleteRootBlocked")}</p>
-          ) : null}
+          {isRoot ? <p className="text-ap-muted">{t("editor.panel.deleteRootBlocked")}</p> : null}
         </div>
       ) : null}
-    </aside>
+    </Card>
   );
 }
 
@@ -255,9 +242,7 @@ function DecisionConditionSection({
       ) : (
         <>
           {editable.kind === "unsupported" ? (
-            <p className="text-xs text-ap-muted">
-              {t("editor.panel.condition.unsupportedNote")}
-            </p>
+            <p className="text-xs text-ap-muted">{t("editor.panel.condition.unsupportedNote")}</p>
           ) : null}
           <ConditionBuilder value={editable} onChange={() => {}} readOnly />
         </>
@@ -327,18 +312,11 @@ function LeafOutcomeSection({
         ) : (
           <KeyValue
             label={t("editor.panel.outcome.confidence")}
-            value={
-              effective.confidence !== undefined
-                ? String(effective.confidence)
-                : "—"
-            }
+            value={effective.confidence !== undefined ? String(effective.confidence) : "—"}
             mono
           />
         )}
-        <KeyValue
-          label={t("editor.panel.outcome.textEn")}
-          value={effective.text_en ?? "—"}
-        />
+        <KeyValue label={t("editor.panel.outcome.textEn")} value={effective.text_en ?? "—"} />
         <KeyValue
           label={t("editor.panel.outcome.textAr")}
           value={effective.text_ar ?? "—"}
@@ -407,18 +385,10 @@ function LeafOutcomeSection({
 
 // ---- Atoms ---------------------------------------------------------
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}): JSX.Element {
+function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
     <div className="flex flex-col gap-2 border-t border-ap-line pt-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ap-muted">
-        {title}
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ap-muted">{title}</p>
       {children}
     </div>
   );
@@ -438,10 +408,7 @@ function KeyValue({
   return (
     <div className="grid grid-cols-[120px_1fr] gap-2 text-xs">
       <span className="text-ap-muted">{label}</span>
-      <span
-        className={mono ? "break-all font-mono text-ap-ink" : "text-ap-ink"}
-        dir={dir}
-      >
+      <span className={mono ? "break-all font-mono text-ap-ink" : "text-ap-ink"} dir={dir}>
         {value}
       </span>
     </div>
@@ -548,7 +515,10 @@ function SelectField({
   );
 }
 
-function roleLabel(role: PositionedNode["role"], t: ReturnType<typeof useTranslation>["t"]): string {
+function roleLabel(
+  role: PositionedNode["role"],
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
   switch (role) {
     case "leaf-alert":
       return t("viewer.legend.alert");

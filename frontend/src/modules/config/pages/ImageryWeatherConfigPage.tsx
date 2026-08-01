@@ -13,8 +13,12 @@ import {
   listSubscriptions as listWeatherSubs,
   type Subscription as WeatherSubscription,
 } from "@/api/weather";
+import { Card } from "@/components/Card";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useConfig } from "@/config/ConfigContext";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -35,13 +39,12 @@ export function ImageryWeatherConfigPage(): ReactNode {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header>
-        <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
+        <PageHeader title={t("page.title")} subtitle={t("page.subtitle")} />
       </header>
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <h2 className="text-sm font-semibold text-ap-ink">{t("platform.heading")}</h2>
         <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div className="flex items-center justify-between gap-2 border-b border-ap-line pb-2 sm:border-0 sm:pb-0">
@@ -71,9 +74,9 @@ export function ImageryWeatherConfigPage(): ReactNode {
             </ul>
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className="rounded-xl border border-ap-line bg-ap-panel">
+      <Card noPadding>
         <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
           <h2 className="text-sm font-semibold text-ap-ink">{t("blocks.heading")}</h2>
           <span className="text-xs text-ap-muted">{blocksQuery.data?.items.length ?? 0}</span>
@@ -90,8 +93,8 @@ export function ImageryWeatherConfigPage(): ReactNode {
         ) : (
           <BlocksTable farmId={farmId} blocks={blocksQuery.data.items} />
         )}
-      </section>
-    </div>
+      </Card>
+    </Page>
   );
 }
 
@@ -119,27 +122,27 @@ function BlocksTable({ farmId, blocks }: { farmId: string; blocks: Block[] }): R
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
-        <thead className="bg-ap-bg/40 text-xs uppercase text-ap-muted">
-          <tr>
-            <th className="px-4 py-2 text-start">{t("blocks.table.block")}</th>
-            <th className="px-4 py-2 text-start">{t("blocks.table.imagery")}</th>
-            <th className="px-4 py-2 text-start">{t("blocks.table.lastImagery")}</th>
-            <th className="px-4 py-2 text-start">{t("blocks.table.weather")}</th>
-            <th className="px-4 py-2 text-start">{t("blocks.table.lastWeather")}</th>
-            <th className="px-4 py-2 text-end">{t("blocks.table.actions")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+      <Table>
+        <Thead>
+          <Tr>
+            <Th>{t("blocks.table.block")}</Th>
+            <Th>{t("blocks.table.imagery")}</Th>
+            <Th>{t("blocks.table.lastImagery")}</Th>
+            <Th>{t("blocks.table.weather")}</Th>
+            <Th>{t("blocks.table.lastWeather")}</Th>
+            <Th className="text-end">{t("blocks.table.actions")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {blocks.map((b, idx) => {
             const imagery = imagerySubsQueries[idx];
             const weather = weatherSubsQueries[idx];
             return (
-              <tr key={b.id}>
-                <td className="px-4 py-2">
+              <Tr key={b.id}>
+                <Td>
                   <span className="font-mono text-xs text-ap-muted">{b.code}</span>
                   {b.name ? <span className="ms-2 text-ap-ink">{b.name}</span> : null}
-                </td>
+                </Td>
                 <SubsCell query={imagery} />
                 <LastCell
                   query={imagery}
@@ -152,19 +155,19 @@ function BlocksTable({ farmId, blocks }: { farmId: string; blocks: Block[] }): R
                   pick={(s) => s.last_successful_ingest_at}
                   dateLocale={dateLocale}
                 />
-                <td className="px-4 py-2 text-end">
+                <Td className="text-end">
                   <Link
                     to={`/farms/${farmId}/blocks/${b.id}`}
                     className="text-xs font-medium text-ap-primary hover:underline"
                   >
                     {t("blocks.row.openBlock")}
                   </Link>
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             );
           })}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }
@@ -181,26 +184,26 @@ function SubsCell({
   const { t } = useTranslation("imageryWeatherConfig");
   if (query.isLoading) {
     return (
-      <td className="px-4 py-2">
+      <Td>
         <Skeleton className="h-4 w-20" />
-      </td>
+      </Td>
     );
   }
   if (query.isError) {
-    return <td className="px-4 py-2 text-xs text-ap-crit">!</td>;
+    return <Td className="text-ap-crit">!</Td>;
   }
   const subs = (query.data ?? []).filter((s) => s.is_active);
   if (subs.length === 0) {
     return (
-      <td className="px-4 py-2">
+      <Td>
         <span className="text-xs text-ap-muted">{t("blocks.row.noSubs")}</span>
-      </td>
+      </Td>
     );
   }
   return (
-    <td className="px-4 py-2">
+    <Td>
       <span className="text-xs">{t("blocks.row.subsCount", { count: subs.length })}</span>
-    </td>
+    </Td>
   );
 }
 
@@ -220,13 +223,13 @@ function LastCell({
   const { t } = useTranslation("imageryWeatherConfig");
   if (query.isLoading) {
     return (
-      <td className="px-4 py-2">
+      <Td>
         <Skeleton className="h-4 w-16" />
-      </td>
+      </Td>
     );
   }
   if (query.isError) {
-    return <td className="px-4 py-2 text-xs text-ap-crit">!</td>;
+    return <Td className="text-ap-crit">!</Td>;
   }
   const subs = (query.data ?? []).filter((s) => s.is_active);
   const latest = subs
@@ -235,10 +238,10 @@ function LastCell({
     .sort()
     .pop();
   return (
-    <td className="px-4 py-2 text-xs text-ap-muted">
+    <Td>
       {latest
         ? formatDistanceToNow(parseISO(latest), { addSuffix: true, locale: dateLocale })
         : t("blocks.row.never")}
-    </td>
+    </Td>
   );
 }

@@ -14,6 +14,8 @@ import { listTenantUsers, type TenantUser } from "@/api/users";
 import { useCapability } from "@/rbac/useCapability";
 import { MapDraw } from "./MapDraw";
 import { AoiUploader } from "./AoiUploader";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
 
 const IRRIGATION_SYSTEMS: IrrigationSystem[] = [
   "drip",
@@ -151,7 +153,7 @@ export function BlockForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" aria-label={submitLabel}>
-      <div className="card grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <Card className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="block-code">
             {t("form.blockCode")}
@@ -295,9 +297,9 @@ export function BlockForm({
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
-      </div>
+      </Card>
 
-      <div className="card">
+      <Card>
         <h2 className="text-lg font-semibold text-ap-ink">{t("form.blockBoundary")}</h2>
         <div className="mt-4">
           <MapDraw initial={drawnPolygon ?? null} onChange={setDrawnPolygon} />
@@ -310,7 +312,7 @@ export function BlockForm({
             }}
           />
         </div>
-      </div>
+      </Card>
 
       {boundaryError ? (
         <p role="alert" className="text-sm text-ap-crit">
@@ -324,13 +326,13 @@ export function BlockForm({
       ) : null}
 
       <div className="flex gap-2">
-        <button type="submit" className="btn btn-primary" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           {busy ? t("actions.saving") : submitLabel}
-        </button>
+        </Button>
         {onCancel ? (
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
+          <Button variant="ghost" onClick={onCancel}>
             {t("form.cancel")}
-          </button>
+          </Button>
         ) : null}
       </div>
     </form>

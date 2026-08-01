@@ -1,12 +1,18 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import type { Alert, AlertSeverity, AlertStatus } from "@/api/alerts";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { LinkButton } from "@/components/LinkButton";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
-import { Skeleton } from "@/components/Skeleton";
+import { RowList } from "@/components/RowList";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { queryState } from "@/components/asyncState";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { localizedField } from "@/lib/localizedField";
@@ -27,14 +33,21 @@ const SEV_KIND: Record<AlertSeverity, "info" | "warn" | "crit"> = {
   critical: "crit",
 };
 
+const SEV_RAIL: Record<AlertSeverity, string> = {
+  info: "bg-ap-accent",
+  warning: "bg-ap-warn",
+  critical: "bg-ap-crit",
+};
+
 export function AlertsPage(): ReactNode {
   const farmId = useActiveFarmId();
-  const { t } = useTranslation("alerts");
+  const { t, i18n } = useTranslation("alerts");
+  const dateLocale = useDateLocale();
   const [tab, setTab] = useState<AlertStatus | "all">("open");
   const canAck = useCapability("alert.acknowledge", { farmId });
   const canResolve = useCapability("alert.resolve", { farmId });
 
-  const { data, isLoading, isError } = useAlerts(
+  const alerts = useAlerts(
     tab === "all"
       ? { farm_id: farmId ?? undefined }
       : { farm_id: farmId ?? undefined, status: tab },
@@ -45,169 +58,111 @@ export function AlertsPage(): ReactNode {
     return <Navigate to="/" replace />;
   }
 
+  const ago = (iso: string): string =>
+    formatDistanceToNow(parseISO(iso), { addSuffix: true, locale: dateLocale });
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
-        </div>
-        <SegmentedControl
-          ariaLabel={t("tabsLabel")}
-          items={STATUS_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
-          value={tab}
-          onChange={(v) => setTab(v)}
-        />
-      </header>
-
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
-        {isLoading ? (
-          <div className="flex flex-col gap-2 p-4">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        ) : isError ? (
-          <p className="p-4 text-sm text-ap-crit">{t("page.loadFailed")}</p>
-        ) : !data || data.length === 0 ? (
-          <p className="p-12 text-center text-sm text-ap-muted">
-            {tab === "open" ? t("page.emptyOpen") : t("page.empty")}
-          </p>
-        ) : (
-          <ul className="divide-y divide-ap-line">
-            {data.map((a) => (
-              <Row
-                key={a.id}
-                alert={a}
-                farmId={farmId}
-                canAck={canAck}
-                canResolve={canResolve}
-                onAck={() => transition.mutate({ alertId: a.id, payload: { acknowledge: true } })}
-                onResolve={() => transition.mutate({ alertId: a.id, payload: { resolve: true } })}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface RowProps {
-  alert: Alert;
-  farmId: string;
-  canAck: boolean;
-  canResolve: boolean;
-  onAck: () => void;
-  onResolve: () => void;
-}
-
-function Row({ alert: a, farmId, canAck, canResolve, onAck, onResolve }: RowProps): ReactNode {
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation("alerts");
-  const dateLocale = useDateLocale();
-  const isTerminal = a.status === "resolved";
-  const diagnosis = localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar);
-  const prescription = localizedField(i18n.language, a.prescription_en, a.prescription_ar);
-  return (
-    <li className="flex items-start gap-3 p-4">
-      <div
-        aria-hidden="true"
-        className={`h-12 w-1 flex-none rounded-full ${
-          a.severity === "critical"
-            ? "bg-ap-crit"
-            : a.severity === "warning"
-              ? "bg-ap-warn"
-              : "bg-ap-accent"
-        }`}
+    <Page>
+      <PageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          <SegmentedControl
+            ariaLabel={t("tabsLabel")}
+            items={STATUS_TAB_VALUES.map((v) => ({ value: v, label: t(`tabs.${v}`) }))}
+            value={tab}
+            onChange={(v) => setTab(v)}
+          />
+        }
       />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">{diagnosis ?? a.rule_code}</span>
-          <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
-          <Pill kind={a.status === "resolved" ? "ok" : a.status === "open" ? "crit" : "neutral"}>
-            {t(`status.${a.status}`)}
-          </Pill>
-        </div>
-        {prescription ? (
-          <p className="mt-1 text-sm text-ap-muted">{prescription}</p>
-        ) : null}
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-ap-muted">
-          <span className="font-mono">{a.rule_code}</span>
-          <span>·</span>
-          <span>
-            {formatDistanceToNow(parseISO(a.created_at), {
-              addSuffix: true,
-              locale: dateLocale,
-            })}
-          </span>
-          {a.acknowledged_at ? (
-            <>
-              <span>·</span>
-              <span>
-                {t("row.ackedAgo", {
-                  when: formatDistanceToNow(parseISO(a.acknowledged_at), {
-                    addSuffix: true,
-                    locale: dateLocale,
-                  }),
-                })}
-              </span>
-            </>
-          ) : null}
-          {a.resolved_at ? (
-            <>
-              <span>·</span>
-              <span>
-                {t("row.resolvedAgo", {
-                  when: formatDistanceToNow(parseISO(a.resolved_at), {
-                    addSuffix: true,
-                    locale: dateLocale,
-                  }),
-                })}
-              </span>
-            </>
-          ) : null}
-        </div>
-      </div>
-      <div className="flex flex-none flex-col items-end gap-1.5">
-        <button
-          type="button"
-          onClick={() => {
-            if (a.prescription_activity_id) {
-              navigate(
-                `/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`,
-              );
-            } else {
-              navigate(`/board/${farmId}?lane=${a.block_id}`);
-            }
-          }}
-          className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-        >
-          {t("actions.openInPlan")}
-        </button>
-        {!isTerminal ? (
-          <div className="flex gap-1">
-            {a.status === "open" && canAck ? (
-              <button
-                type="button"
-                onClick={onAck}
-                className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-              >
-                {t("actions.ack")}
-              </button>
+
+      <RowList<Alert>
+        state={queryState(alerts)}
+        filtered={tab !== "all"}
+        rowKey={(a) => a.id}
+        rail={(a) => SEV_RAIL[a.severity]}
+        errorMessage={t("page.loadFailed")}
+        title={(a) => (
+          <>
+            {localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar) ?? a.rule_code}
+            <Pill kind={SEV_KIND[a.severity]}>{t(`severity.${a.severity}`)}</Pill>
+            <Pill kind={a.status === "resolved" ? "ok" : a.status === "open" ? "crit" : "neutral"}>
+              {t(`status.${a.status}`)}
+            </Pill>
+          </>
+        )}
+        subtitle={(a) => localizedField(i18n.language, a.prescription_en, a.prescription_ar)}
+        meta={(a) => (
+          <>
+            <span className="font-mono">{a.rule_code}</span>
+            <span>·</span>
+            <span>{ago(a.created_at)}</span>
+            {a.acknowledged_at ? (
+              <>
+                <span>·</span>
+                <span>{t("row.ackedAgo", { when: ago(a.acknowledged_at) })}</span>
+              </>
             ) : null}
-            {canResolve ? (
-              <button
-                type="button"
-                onClick={onResolve}
-                className="rounded-md bg-ap-primary px-2 py-1 text-xs font-medium text-white hover:bg-ap-primary/90"
-              >
-                {t("actions.resolve")}
-              </button>
+            {a.resolved_at ? (
+              <>
+                <span>·</span>
+                <span>{t("row.resolvedAgo", { when: ago(a.resolved_at) })}</span>
+              </>
+            ) : null}
+          </>
+        )}
+        actions={(a) => (
+          <div className="flex flex-col items-end gap-1.5">
+            <LinkButton
+              size="sm"
+              variant="secondary"
+              to={
+                a.prescription_activity_id
+                  ? `/board/${farmId}?activity=${a.prescription_activity_id}&lane=${a.block_id}`
+                  : `/board/${farmId}?lane=${a.block_id}`
+              }
+            >
+              {t("actions.openInPlan")}
+            </LinkButton>
+            {a.status !== "resolved" ? (
+              <div className="flex gap-1">
+                {a.status === "open" && canAck ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      transition.mutate({ alertId: a.id, payload: { acknowledge: true } })
+                    }
+                  >
+                    {t("actions.ack")}
+                  </Button>
+                ) : null}
+                {canResolve ? (
+                  <Button
+                    size="sm"
+                    onClick={() => transition.mutate({ alertId: a.id, payload: { resolve: true } })}
+                  >
+                    {t("actions.resolve")}
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
-    </li>
+        )}
+        empty={<EmptyState message={t("page.empty")} action={null} />}
+        noResults={
+          <EmptyState
+            message={tab === "open" ? t("page.emptyOpen") : t("page.empty")}
+            action={
+              tab === "all" ? null : (
+                <Button variant="secondary" onClick={() => setTab("all")}>
+                  {t("tabs.all")}
+                </Button>
+              )
+            }
+          />
+        }
+      />
+    </Page>
   );
 }

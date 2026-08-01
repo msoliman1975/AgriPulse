@@ -81,5 +81,27 @@
     "retry": "Retry",
     "close": "Close",
     "loading": "Loading…"
+  },
+  "toolbar": {
+    "search": "Search",
+    "filters": "Filters",
+    "clearAll": "Clear all",
+    "showing": "Showing {{shown}} of {{total}}",
+    "removeFilter": "Remove filter {{name}}"
+  },
+  "state": {
+    "loadFailed": "Couldn't load this. The request failed.",
+    "retry": "Try again",
+    "empty": "Nothing here yet.",
+    "noResults": "Nothing matches your filters."
+  },
+  "pagination": {
+    "label": "Pagination",
+    "showing": "Showing {{first}}–{{last}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "table": {
+    "openRow": "Open"
   }
 }

@@ -34,7 +34,10 @@ import { ghostBtn } from "./ui";
 
 // The console map always wants a units FeatureCollection; a farm being created
 // has no units yet. Module-level so the reference stays stable across renders.
-const NO_UNITS: FeatureCollection<Polygon, UnitFeatureProps> = { type: "FeatureCollection", features: [] };
+const NO_UNITS: FeatureCollection<Polygon, UnitFeatureProps> = {
+  type: "FeatureCollection",
+  features: [],
+};
 
 export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): ReactNode {
   const { t } = useTranslation("farmConsole");
@@ -49,7 +52,10 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
   // The captured boundary, from either capture mode. `source` drives the map:
   // a drawn polygon is already painted by the draw control, an uploaded one
   // has to be handed to the map as an AOI so the operator can see it.
-  const [boundary, setBoundary] = useState<{ geometry: Polygon | MultiPolygon; source: "draw" | "upload" } | null>(null);
+  const [boundary, setBoundary] = useState<{
+    geometry: Polygon | MultiPolygon;
+    source: "draw" | "upload";
+  } | null>(null);
   const [parsing, setParsing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -78,7 +84,9 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
   // orientation. A drawn boundary is left to the draw control.
   const aoi: MultiPolygon | null = useMemo(() => {
     if (boundary?.source === "upload") {
-      return boundary.geometry.type === "Polygon" ? polygonToMultiPolygon(boundary.geometry) : boundary.geometry;
+      return boundary.geometry.type === "Polygon"
+        ? polygonToMultiPolygon(boundary.geometry)
+        : boundary.geometry;
     }
     return contextFarmQ.data?.boundary ?? null;
   }, [boundary, contextFarmQ.data]);
@@ -136,7 +144,9 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
       navigate(`/labs/map/${farm.id}`, { replace: true });
     },
     onError: (err) => {
-      setSubmitError(isApiError(err) ? (err.problem.detail ?? err.problem.title) : t("create.createFailed"));
+      setSubmitError(
+        isApiError(err) ? (err.problem.detail ?? err.problem.title) : t("create.createFailed"),
+      );
     },
   });
 
@@ -148,7 +158,9 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
     let validated: MultiPolygon;
     try {
       validated = ensureValidMultiPolygon(
-        boundary.geometry.type === "Polygon" ? polygonToMultiPolygon(boundary.geometry) : boundary.geometry,
+        boundary.geometry.type === "Polygon"
+          ? polygonToMultiPolygon(boundary.geometry)
+          : boundary.geometry,
       );
     } catch (err) {
       const code = err instanceof GeometryValidationError ? err.code : null;
@@ -175,8 +187,12 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
     <div className="flex h-full flex-col">
       <header className="relative z-30 flex h-12 flex-none items-center gap-2.5 border-b border-ap-line bg-ap-panel px-3.5">
         <span className="text-base">🌾</span>
+        {/* The console is a bleed canvas with no <PageHeader>, so this bar
+            title is the route's only level-1 heading — it stays an <h1>. */}
         <h1 className="text-sm font-bold text-ap-ink">{t("create.farmTitle")}</h1>
-        <span className="text-xs text-ap-muted">{boundary ? t("create.stepDetails") : t("create.stepBoundary")}</span>
+        <span className="text-xs text-ap-muted">
+          {boundary ? t("create.stepDetails") : t("create.stepBoundary")}
+        </span>
         <div className="flex-1" />
         <button type="button" onClick={exit} className={ghostBtn}>
           {t("manage.cancel")}
@@ -194,7 +210,11 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
           // Refit when the AOI we show changes: the context farm on entry,
           // then each uploaded boundary. A drawn polygon must NOT refit —
           // that would yank the map while the operator is still working.
-          fitBoundsKey={boundary?.source === "upload" ? `upload:${uploadSeq.current}` : (contextFarmId ?? "no-farm")}
+          fitBoundsKey={
+            boundary?.source === "upload"
+              ? `upload:${uploadSeq.current}`
+              : (contextFarmId ?? "no-farm")
+          }
           showAoi
           showBlocks={false}
           drawEnabled={drawing}

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { OperationsLogReportResponse, OpsLogEntry, OpsLogKind } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useOperationsLogReport } from "@/queries/reports";
 
@@ -114,52 +115,42 @@ function LogTable({ entries }: { entries: OpsLogEntry[] }): ReactNode {
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-ap-line text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("opsLog.headers.date")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("opsLog.headers.type")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("opsLog.headers.block")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("opsLog.headers.title")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("opsLog.headers.status")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+      <Table>
+        <Thead className="text-[11px]">
+          <Tr>
+            <Th scope="col">{t("opsLog.headers.date")}</Th>
+            <Th scope="col">{t("opsLog.headers.type")}</Th>
+            <Th scope="col">{t("opsLog.headers.block")}</Th>
+            <Th scope="col">{t("opsLog.headers.title")}</Th>
+            <Th scope="col">{t("opsLog.headers.status")}</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {entries.map((e, i) => (
-            <tr key={`${e.kind}-${i}`} className="hover:bg-ap-bg/40">
-              <td className="whitespace-nowrap px-3 py-2 text-[11px] text-ap-muted">
-                {day(e.time)}
-              </td>
-              <td className="px-3 py-2">
+            <Tr key={`${e.kind}-${i}`} className="hover:bg-ap-bg/40">
+              <Td className="whitespace-nowrap text-[11px]">{day(e.time)}</Td>
+              <Td>
                 <span
                   className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${KIND_CHIP[e.kind]}`}
                 >
                   {t(`opsLog.kind.${e.kind}`)}
                 </span>
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-ap-muted">{e.block_name ?? "—"}</td>
-              <td className="px-3 py-2 text-ap-ink">
+              </Td>
+              <Td className="whitespace-nowrap">{e.block_name ?? "—"}</Td>
+              <Td className="text-ap-ink">
                 <div>{e.title}</div>
                 {e.detail ? <div className="text-[11px] text-ap-muted">{e.detail}</div> : null}
-              </td>
-              <td className="px-3 py-2 text-[11px] text-ap-muted">
+              </Td>
+              <Td className="text-[11px]">
                 {e.status ?? "—"}
-                {e.severity ? ` · ${t(`severity.${e.severity}`, { defaultValue: e.severity })}` : ""}
-              </td>
-            </tr>
+                {e.severity
+                  ? ` · ${t(`severity.${e.severity}`, { defaultValue: e.severity })}`
+                  : ""}
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }

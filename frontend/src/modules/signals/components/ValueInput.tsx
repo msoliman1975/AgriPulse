@@ -6,7 +6,7 @@ import type { SignalDefinition } from "@/api/signals";
 const inputCls =
   "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary";
 
-function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
+function LabeledControl({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-ap-muted">{label}</span>
@@ -57,7 +57,7 @@ export function ValueInput({
         (defn.value_max !== null && parsed > Number(defn.value_max)));
     const bounds = `${defn.value_min ?? "−∞"} … ${defn.value_max ?? "∞"}`;
     return (
-      <Field
+      <LabeledControl
         label={defn.unit ? t("log.form.valueWithUnit", { unit: defn.unit }) : t("log.form.value")}
       >
         <input
@@ -69,16 +69,14 @@ export function ValueInput({
           className={inputCls}
         />
         {outOfRange ? (
-          <span className="text-[11px] text-ap-warn">
-            {t("log.form.outOfRange", { bounds })}
-          </span>
+          <span className="text-[11px] text-ap-warn">{t("log.form.outOfRange", { bounds })}</span>
         ) : null}
-      </Field>
+      </LabeledControl>
     );
   }
   if (defn.value_kind === "categorical") {
     return (
-      <Field label={t("log.form.value")}>
+      <LabeledControl label={t("log.form.value")}>
         <select
           required={req}
           value={valueText}
@@ -94,12 +92,12 @@ export function ValueInput({
             </option>
           ))}
         </select>
-      </Field>
+      </LabeledControl>
     );
   }
   if (defn.value_kind === "event") {
     return (
-      <Field label={t("log.form.description")}>
+      <LabeledControl label={t("log.form.description")}>
         <input
           required={req}
           maxLength={500}
@@ -107,12 +105,12 @@ export function ValueInput({
           onChange={(e) => setValueText(e.target.value)}
           className={inputCls}
         />
-      </Field>
+      </LabeledControl>
     );
   }
   if (defn.value_kind === "boolean") {
     return (
-      <Field label={t("log.form.value")}>
+      <LabeledControl label={t("log.form.value")}>
         <label className="inline-flex items-center gap-2">
           <input
             type="checkbox"
@@ -121,13 +119,13 @@ export function ValueInput({
           />
           <span>{valueBool ? "true" : "false"}</span>
         </label>
-      </Field>
+      </LabeledControl>
     );
   }
   // geopoint
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label={t("log.form.lat")}>
+      <LabeledControl label={t("log.form.lat")}>
         <input
           required={req}
           inputMode="decimal"
@@ -135,8 +133,8 @@ export function ValueInput({
           onChange={(e) => setLat(e.target.value)}
           className={inputCls}
         />
-      </Field>
-      <Field label={t("log.form.lon")}>
+      </LabeledControl>
+      <LabeledControl label={t("log.form.lon")}>
         <input
           required={req}
           inputMode="decimal"
@@ -144,7 +142,7 @@ export function ValueInput({
           onChange={(e) => setLon(e.target.value)}
           className={inputCls}
         />
-      </Field>
+      </LabeledControl>
     </div>
   );
 }

@@ -12,7 +12,10 @@ import type {
   TenantRuleUpdatePayload,
 } from "@/api/alerts";
 import { listSignalDefinitions } from "@/api/signals";
+import { Card } from "@/components/Card";
+import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
+import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { useCapability } from "@/rbac/useCapability";
@@ -78,25 +81,25 @@ export function RulesConfigPage(): ReactNode {
   const isAr = i18n.language === "ar";
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("page.subtitle")}</p>
-        </div>
-        <SegmentedControl
-          ariaLabel="Rule source"
-          items={[
-            { value: "platform", label: t("tabs.platform") },
-            { value: "tenant", label: t("tabs.tenant") },
-          ]}
-          value={tab}
-          onChange={(v) => setTab(v)}
-        />
-      </header>
+    <Page>
+      <PageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          <SegmentedControl
+            ariaLabel="Rule source"
+            items={[
+              { value: "platform", label: t("tabs.platform") },
+              { value: "tenant", label: t("tabs.tenant") },
+            ]}
+            value={tab}
+            onChange={(v) => setTab(v)}
+          />
+        }
+      />
 
       {tab === "platform" ? (
-        <div className="rounded-xl border border-ap-line bg-ap-panel">
+        <Card noPadding>
           {isLoading ? (
             <div className="flex flex-col gap-2 p-4">
               <Skeleton className="h-16 w-full" />
@@ -114,11 +117,11 @@ export function RulesConfigPage(): ReactNode {
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       ) : (
         <TenantRulesSection canManage={canManage} isAr={isAr} />
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -316,17 +319,17 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
 
   if (tenantRules.isLoading) {
     return (
-      <div className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <Skeleton className="h-16 w-full" />
         <Skeleton className="mt-2 h-16 w-full" />
-      </div>
+      </Card>
     );
   }
   if (tenantRules.isError) {
     return (
-      <div className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm text-ap-crit">
+      <Card noPadding className="p-4 text-sm text-ap-crit">
         {t("page.loadFailed")}
-      </div>
+      </Card>
     );
   }
 
@@ -341,7 +344,7 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
         />
       ) : null}
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
+      <Card noPadding>
         <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
           <h2 className="text-sm font-semibold text-ap-ink">{t("tabs.tenant")}</h2>
           {canManage ? (
@@ -375,7 +378,7 @@ function TenantRulesSection({ canManage, isAr }: { canManage: boolean; isAr: boo
             {deleteMut.error?.message}
           </p>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }

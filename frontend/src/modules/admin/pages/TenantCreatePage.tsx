@@ -1,5 +1,8 @@
+import { Field } from "@/components/Field";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import type { ReactNode } from "react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -152,94 +155,96 @@ export function TenantCreatePage(): ReactNode {
   }
 
   return (
-    <section className="mx-auto max-w-2xl">
-      <header className="border-b border-ap-line pb-4">
-        <h1 className="text-lg font-semibold text-ap-ink">{t("tenants.create.title")}</h1>
-        <p className="mt-1 text-sm text-ap-muted">{t("tenants.create.subtitle")}</p>
-        <p className="mt-1 text-xs uppercase tracking-wider text-ap-muted">
-          {t("tenants.create.step", {
-            current: STEPS.indexOf(step) + 1,
-            total: STEPS.length,
-          })}
-          {" — "}
-          {t(`tenants.create.steps.${step}`)}
-        </p>
-      </header>
+    <Page>
+      {/* Wizard keeps a narrow measure — see the note in Page.tsx. */}
+      <div className="max-w-3xl">
+        <header className="border-b border-ap-line pb-4">
+          <PageHeader title={t("tenants.create.title")} subtitle={t("tenants.create.subtitle")} />
+          <p className="mt-1 text-xs uppercase tracking-wider text-ap-muted">
+            {t("tenants.create.step", {
+              current: STEPS.indexOf(step) + 1,
+              total: STEPS.length,
+            })}
+            {" — "}
+            {t(`tenants.create.steps.${step}`)}
+          </p>
+        </header>
 
-      {submitError ? (
-        <p
-          role="alert"
-          className="mt-4 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-sm text-ap-crit"
-        >
-          {submitError}
-        </p>
-      ) : null}
+        {submitError ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-ap-crit/30 bg-ap-crit-soft p-3 text-sm text-ap-crit"
+          >
+            {submitError}
+          </p>
+        ) : null}
 
-      {step === "profile" ? (
-        <ProfileStep
-          form={form}
-          errors={errors}
-          onChange={set}
-          locales={meta.data?.locales ?? ["en", "ar"]}
-          unitSystems={meta.data?.unit_systems ?? ["feddan", "acre", "hectare"]}
-        />
-      ) : null}
-      {step === "owner" ? (
-        <OwnerStep
-          form={form}
-          errors={errors}
-          onChange={set}
-          tiers={meta.data?.tiers ?? ["free", "standard", "premium", "enterprise"]}
-        />
-      ) : null}
-      {step === "review" ? <ReviewStep form={form} /> : null}
+        {step === "profile" ? (
+          <ProfileStep
+            form={form}
+            errors={errors}
+            onChange={set}
+            locales={meta.data?.locales ?? ["en", "ar"]}
+            unitSystems={meta.data?.unit_systems ?? ["feddan", "acre", "hectare"]}
+          />
+        ) : null}
+        {step === "owner" ? (
+          <OwnerStep
+            form={form}
+            errors={errors}
+            onChange={set}
+            tiers={meta.data?.tiers ?? ["free", "standard", "premium", "enterprise"]}
+          />
+        ) : null}
+        {step === "review" ? <ReviewStep form={form} /> : null}
 
-      <footer className="mt-6 flex justify-between">
-        <button
-          type="button"
-          onClick={() => navigate("/platform/tenants")}
-          className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-muted hover:bg-ap-line/40"
-        >
-          {t("tenants.create.actions.cancel")}
-        </button>
-        <div className="flex gap-2">
-          {step !== "profile" ? (
-            <button
-              type="button"
-              onClick={() => setStep(STEPS[STEPS.indexOf(step) - 1])}
-              disabled={create.isPending}
-              className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
-            >
-              {t("tenants.create.actions.back")}
-            </button>
-          ) : null}
-          {step !== "review" ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (step === "profile" && !validateProfile()) return;
-                if (step === "owner" && !validateOwner()) return;
-                setStep(STEPS[STEPS.indexOf(step) + 1]);
-              }}
-              className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
-            >
-              {t("tenants.create.actions.next")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={create.isPending}
-              className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
-            >
-              {create.isPending
-                ? t("tenants.create.actions.creating")
-                : t("tenants.create.actions.submit")}
-            </button>
-          )}
-        </div>
-      </footer>
-    </section>
+        <footer className="mt-6 flex justify-between">
+          <button
+            type="button"
+            onClick={() => navigate("/platform/tenants")}
+            className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-muted hover:bg-ap-line/40"
+          >
+            {t("tenants.create.actions.cancel")}
+          </button>
+          <div className="flex gap-2">
+            {step !== "profile" ? (
+              <button
+                type="button"
+                onClick={() => setStep(STEPS[STEPS.indexOf(step) - 1])}
+                disabled={create.isPending}
+                className="rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
+              >
+                {t("tenants.create.actions.back")}
+              </button>
+            ) : null}
+            {step !== "review" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (step === "profile" && !validateProfile()) return;
+                  if (step === "owner" && !validateOwner()) return;
+                  setStep(STEPS[STEPS.indexOf(step) + 1]);
+                }}
+                className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90"
+              >
+                {t("tenants.create.actions.next")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={create.isPending}
+                className="rounded-md bg-ap-primary px-3 py-2 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
+              >
+                {create.isPending
+                  ? t("tenants.create.actions.creating")
+                  : t("tenants.create.actions.submit")}
+              </button>
+            )}
+          </div>
+        </footer>
+      </div>
+    </Page>
   );
 }
 
@@ -264,9 +269,9 @@ function ProfileStep({
         help={t("tenants.create.fields.slugHelp")}
         error={errors.slug}
       >
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.slug}
             onChange={(e) => onChange("slug", e.target.value.toLowerCase())}
@@ -276,9 +281,9 @@ function ProfileStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.name")} error={errors.name}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.name}
             onChange={(e) => onChange("name", e.target.value)}
@@ -288,9 +293,9 @@ function ProfileStep({
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={t("tenants.create.fields.legalName")}>
-          {(id) => (
+          {(props) => (
             <input
-              id={id}
+              {...props}
               type="text"
               value={form.legal_name}
               onChange={(e) => onChange("legal_name", e.target.value)}
@@ -299,9 +304,9 @@ function ProfileStep({
           )}
         </Field>
         <Field label={t("tenants.create.fields.taxId")}>
-          {(id) => (
+          {(props) => (
             <input
-              id={id}
+              {...props}
               type="text"
               value={form.tax_id}
               onChange={(e) => onChange("tax_id", e.target.value)}
@@ -311,9 +316,9 @@ function ProfileStep({
         </Field>
       </div>
       <Field label={t("tenants.create.fields.contactEmail")} error={errors.contact_email}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="email"
             value={form.contact_email}
             onChange={(e) => onChange("contact_email", e.target.value)}
@@ -322,9 +327,9 @@ function ProfileStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.contactPhone")}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="tel"
             value={form.contact_phone}
             onChange={(e) => onChange("contact_phone", e.target.value)}
@@ -334,9 +339,9 @@ function ProfileStep({
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={t("tenants.create.fields.locale")}>
-          {(id) => (
+          {(props) => (
             <select
-              id={id}
+              {...props}
               value={form.default_locale}
               onChange={(e) =>
                 onChange("default_locale", e.target.value as FormState["default_locale"])
@@ -352,9 +357,9 @@ function ProfileStep({
           )}
         </Field>
         <Field label={t("tenants.create.fields.unitSystem")}>
-          {(id) => (
+          {(props) => (
             <select
-              id={id}
+              {...props}
               value={form.default_unit_system}
               onChange={(e) =>
                 onChange("default_unit_system", e.target.value as FormState["default_unit_system"])
@@ -384,9 +389,9 @@ function OwnerStep({
   return (
     <div className="mt-6 space-y-4">
       <Field label={t("tenants.create.fields.tier")} help={t("tenants.create.fields.tierHelp")}>
-        {(id) => (
+        {(props) => (
           <select
-            id={id}
+            {...props}
             value={form.initial_tier}
             onChange={(e) => onChange("initial_tier", e.target.value as TenantTier)}
             className="w-full rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm shadow-sm"
@@ -404,9 +409,9 @@ function OwnerStep({
         help={t("tenants.create.fields.ownerEmailHelp")}
         error={errors.owner_email}
       >
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="email"
             value={form.owner_email}
             onChange={(e) => onChange("owner_email", e.target.value)}
@@ -415,9 +420,9 @@ function OwnerStep({
         )}
       </Field>
       <Field label={t("tenants.create.fields.ownerFullName")} error={errors.owner_full_name}>
-        {(id) => (
+        {(props) => (
           <input
-            id={id}
+            {...props}
             type="text"
             value={form.owner_full_name}
             onChange={(e) => onChange("owner_full_name", e.target.value)}
@@ -463,9 +468,9 @@ function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => vo
       role="status"
       className="mx-auto max-w-lg rounded-md border border-ap-primary/30 bg-ap-primary-soft p-6 shadow-card"
     >
-      <h1 className="text-base font-semibold text-ap-primary">
+      <h2 className="text-base font-semibold text-ap-primary">
         {t("tenants.create.success.title")}
-      </h1>
+      </h2>
       <p className="mt-2 text-sm text-ap-primary">{body}</p>
       <button
         type="button"
@@ -475,30 +480,6 @@ function SuccessPanel({ state, onDone }: { state: SuccessState; onDone: () => vo
         {t("tenants.detail.title")}
       </button>
     </section>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  help?: string;
-  error?: string;
-  children: (id: string) => ReactNode;
-}
-
-function Field({ label, help, error, children }: FieldProps): ReactNode {
-  const id = useId();
-  return (
-    <div className="text-sm">
-      <label
-        htmlFor={id}
-        className="block text-xs font-semibold uppercase tracking-wide text-ap-muted"
-      >
-        {label}
-      </label>
-      <div className="mt-1">{children(id)}</div>
-      {help && !error ? <p className="mt-1 text-xs text-ap-muted">{help}</p> : null}
-      {error ? <p className="mt-1 text-xs text-ap-crit">{error}</p> : null}
-    </div>
   );
 }
 

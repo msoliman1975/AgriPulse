@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { WeatherRiskPressureRow, WeatherRiskPressureSummary } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherRiskPressureReport } from "@/queries/reports";
 
@@ -110,42 +111,36 @@ function PressureTable({
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-ap-line text-sm">
-        <thead className="text-[11px] uppercase tracking-wider text-ap-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("weatherRiskPressure.headers.block")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-start font-semibold">
-              {t("weatherRiskPressure.headers.pathogen")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+      <Table>
+        <Thead className="text-[11px]">
+          <Tr>
+            <Th scope="col">{t("weatherRiskPressure.headers.block")}</Th>
+            <Th scope="col">{t("weatherRiskPressure.headers.pathogen")}</Th>
+            <Th scope="col" className="text-end">
               {t("weatherRiskPressure.headers.peak")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("weatherRiskPressure.headers.daysHigh")}
-            </th>
-            <th scope="col" className="px-3 py-2 text-end font-semibold">
+            </Th>
+            <Th scope="col" className="text-end">
               {t("weatherRiskPressure.headers.latest")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-ap-line">
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {rows.map((r) => (
-            <tr key={`${r.block_id}:${r.risk_code}`} className="hover:bg-ap-bg/40">
-              <td className="px-3 py-2 font-medium text-ap-ink">{r.block_name}</td>
-              <td className="px-3 py-2 text-ap-ink">{pathogenName(r.risk_code)}</td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-ink">{r.peak_score}</td>
-              <td className="px-3 py-2 text-end tabular-nums text-ap-muted">
-                {r.days_high || "—"}
-              </td>
-              <td className={`px-3 py-2 text-end font-medium ${LEVEL_CLASS[r.latest_level]}`}>
+            <Tr key={`${r.block_id}:${r.risk_code}`} className="hover:bg-ap-bg/40">
+              <Td className="font-medium text-ap-ink">{r.block_name}</Td>
+              <Td className="text-ap-ink">{pathogenName(r.risk_code)}</Td>
+              <Td className="text-end tabular-nums text-ap-ink">{r.peak_score}</Td>
+              <Td className="text-end tabular-nums">{r.days_high || "—"}</Td>
+              <Td className={`px-3 py-2 text-end font-medium ${LEVEL_CLASS[r.latest_level]}`}>
                 {levelName(r.latest_level)} · {r.latest_score}
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
+        </Tbody>
+      </Table>
     </div>
   );
 }

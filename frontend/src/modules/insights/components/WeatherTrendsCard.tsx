@@ -17,6 +17,7 @@ import {
   getWeatherIndexTimeseries,
   type WeatherIndexCatalogItem,
 } from "@/api/weatherIndices";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import i18n from "@/i18n";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
@@ -166,10 +167,7 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
   const hasAnyData = series.some((s) => s.points.some((p) => p.value !== null));
 
   return (
-    <section
-      aria-labelledby="weather-trends-heading"
-      className="rounded-xl border border-ap-line bg-ap-panel p-4"
-    >
+    <Card as="section" aria-labelledby="weather-trends-heading">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="weather-trends-heading"
@@ -342,6 +340,6 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
           </ul>
         </div>
       )}
-    </section>
+    </Card>
   );
 }

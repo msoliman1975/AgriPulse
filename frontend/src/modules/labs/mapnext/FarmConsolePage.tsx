@@ -59,6 +59,7 @@ import type { ExistingBlock } from "@/lib/aoi/bulk";
 import { BlockDock } from "./BlockDock";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
+import { Page } from "@/components/Page";
 
 export function FarmConsolePage(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
@@ -136,8 +137,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   // Native +Add create flows (draw on the console map; no navigation).
   const [drawTarget, setDrawTarget] = useState<"block" | "pivot" | null>(null);
   const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
-  const [pendingBlock, setPendingBlock] = useState<{ polygon: Polygon; areaM2: number } | null>(null);
-  const [pendingPivot, setPendingPivot] = useState<{ lat: number; lon: number; radiusM: number } | null>(null);
+  const [pendingBlock, setPendingBlock] = useState<{ polygon: Polygon; areaM2: number } | null>(
+    null,
+  );
+  const [pendingPivot, setPendingPivot] = useState<{
+    lat: number;
+    lon: number;
+    radiusM: number;
+  } | null>(null);
   // Auto-block panel. The per-block area cap is held canonically in m²; the
   // panel renders it in the user's preferred area unit. autoCellSizeM is the
   // grid cell the backend derived on the last compute (for display only).
@@ -153,7 +160,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [autoError, setAutoError] = useState<string | null>(null);
   // Bulk AOI upload panel (+Add → Upload AOI files…).
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkPreviewFc, setBulkPreviewFc] = useState<FeatureCollection<Polygon, BulkPreviewProps> | null>(null);
+  const [bulkPreviewFc, setBulkPreviewFc] = useState<FeatureCollection<
+    Polygon,
+    BulkPreviewProps
+  > | null>(null);
   const canBulkReplace = useCapability("block.delete", { farmId });
 
   useEffect(() => {
@@ -243,7 +253,15 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const cellMeta = useMemo(() => {
     const m = new Map<
       string,
-      { blockId: string; productId: string; lat: number; lon: number; value: number | null; time: string | null; blockName: string }
+      {
+        blockId: string;
+        productId: string;
+        lat: number;
+        lon: number;
+        value: number | null;
+        time: string | null;
+        blockName: string;
+      }
     >();
     for (const g of farmGridQ.data ?? []) {
       for (const c of g.cells) {
@@ -278,7 +296,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     const meta = cellMeta.get(selectedCellId);
     if (!meta || meta.value == null) return null;
     const group = farmGridQ.data?.find((g) => g.blockId === meta.blockId);
-    const vals = (group?.cells ?? []).map((c) => (c.mean === null ? null : Number(c.mean))).filter((v): v is number => v != null);
+    const vals = (group?.cells ?? [])
+      .map((c) => (c.mean === null ? null : Number(c.mean)))
+      .filter((v): v is number => v != null);
     if (vals.length < 2) return null;
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
     const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
@@ -321,22 +341,35 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   });
   const signalObsQ = useQuery({
     queryKey: ["labs/mapnext/signalObs", farmId, signalDefId],
-    queryFn: () => listSignalObservations({ farm_id: farmId, signal_definition_id: signalDefId ?? undefined, limit: 500 }),
+    queryFn: () =>
+      listSignalObservations({
+        farm_id: farmId,
+        signal_definition_id: signalDefId ?? undefined,
+        limit: 500,
+      }),
     enabled: Boolean(farmId && signalDefId),
     staleTime: 30_000,
   });
   const selectedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
   const blockCentroids = useMemo(
-    () => (summaryQ.data ? blockCentroidsFromGeojson(summaryQ.data.geojson) : new Map<string, [number, number]>()),
+    () =>
+      summaryQ.data
+        ? blockCentroidsFromGeojson(summaryQ.data.geojson)
+        : new Map<string, [number, number]>(),
     [summaryQ.data],
   );
   const signalOverlayFc = useMemo(() => {
     if (!signalDefId) return null;
     if (!signalObsQ.data) return { type: "FeatureCollection" as const, features: [] };
-    return buildSignalOverlay(signalObsQ.data, blockCentroids, { valueKind: selectedSignalDef?.value_kind ?? null }).features;
+    return buildSignalOverlay(signalObsQ.data, blockCentroids, {
+      valueKind: selectedSignalDef?.value_kind ?? null,
+    }).features;
   }, [signalDefId, signalObsQ.data, blockCentroids, selectedSignalDef]);
   const selectedObs = useMemo(
-    () => (selectedObsId && signalObsQ.data ? (signalObsQ.data.find((o) => o.id === selectedObsId) ?? null) : null),
+    () =>
+      selectedObsId && signalObsQ.data
+        ? (signalObsQ.data.find((o) => o.id === selectedObsId) ?? null)
+        : null,
     [selectedObsId, signalObsQ.data],
   );
 
@@ -371,7 +404,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     }
   };
   const reshapeMut = useMutation({
-    mutationFn: ({ blockId, boundary }: { blockId: string; boundary: Polygon }) => updateBlock(blockId, { boundary }),
+    mutationFn: ({ blockId, boundary }: { blockId: string; boundary: Polygon }) =>
+      updateBlock(blockId, { boundary }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/detail"] });
@@ -388,7 +422,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     enabled: Boolean(inactivateOpen && selectedId),
   });
   const inactivateMut = useMutation({
-    mutationFn: ({ blockId, reason }: { blockId: string; reason: string }) => inactivateBlock(blockId, { reason }),
+    mutationFn: ({ blockId, reason }: { blockId: string; reason: string }) =>
+      inactivateBlock(blockId, { reason }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
       setInactivateOpen(false);
@@ -501,8 +536,28 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     },
   });
   const createPivotMut = useMutation({
-    mutationFn: ({ lat, lon, radiusM, code, name, sectorCount }: { lat: number; lon: number; radiusM: number; code: string; name: string; sectorCount: number }) =>
-      createPivot(farmId, { code, name: name || null, center: { lat, lon }, radius_m: radiusM, sector_count: sectorCount }),
+    mutationFn: ({
+      lat,
+      lon,
+      radiusM,
+      code,
+      name,
+      sectorCount,
+    }: {
+      lat: number;
+      lon: number;
+      radiusM: number;
+      code: string;
+      name: string;
+      sectorCount: number;
+    }) =>
+      createPivot(farmId, {
+        code,
+        name: name || null,
+        center: { lat, lon },
+        radius_m: radiusM,
+        sector_count: sectorCount,
+      }),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
       resetCreate();
@@ -535,7 +590,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     try {
       let done = 0;
       for (const c of chosen) {
-        await createBlock(farmId, { code: c.code, name: c.code, boundary: c.boundary, unit_type: "block" });
+        await createBlock(farmId, {
+          code: c.code,
+          name: c.code,
+          boundary: c.boundary,
+          unit_type: "block",
+        });
         done += 1;
         setAutoCreatedCount(done);
       }
@@ -556,18 +616,30 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       type: "FeatureCollection",
       features: candidates
         .filter((c) => selectedCandidates.has(c.code))
-        .map((c) => ({ type: "Feature" as const, geometry: c.boundary, properties: { code: c.code } })),
+        .map((c) => ({
+          type: "Feature" as const,
+          geometry: c.boundary,
+          properties: { code: c.code },
+        })),
     };
   }, [autoOpen, candidates, selectedCandidates]);
 
   if (summaryQ.isLoading) {
-    return <div className="grid h-full place-items-center text-sm text-ap-muted">{t("page.loading")}</div>;
+    return (
+      <div className="grid h-full place-items-center text-sm text-ap-muted">
+        {t("page.loading")}
+      </div>
+    );
   }
   if (summaryQ.isError || !summaryQ.data) {
     return (
       <div className="grid h-full place-items-center gap-3 text-center text-sm text-ap-muted">
         <p>{t("page.loadError")}</p>
-        <button type="button" onClick={() => summaryQ.refetch()} className="rounded-md bg-ap-primary px-3 py-1.5 text-white">
+        <button
+          type="button"
+          onClick={() => summaryQ.refetch()}
+          className="rounded-md bg-ap-primary px-3 py-1.5 text-white"
+        >
           {t("page.retry")}
         </button>
       </div>
@@ -580,7 +652,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const reshaping = reshapeTarget != null;
 
   return (
-    <div className="flex h-full flex-col">
+    <Page width="bleed">
       <ViewBar
         activeIndex={activeIndex}
         onIndexChange={setActiveIndex}
@@ -608,7 +680,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       />
 
       <div className="flex min-h-0 flex-1">
-        <UnitsRail blocks={summary.blocks} summaries={summary.summaries} selectedId={selectedId} onSelect={select} />
+        <UnitsRail
+          blocks={summary.blocks}
+          summaries={summary.summaries}
+          selectedId={selectedId}
+          onSelect={select}
+        />
 
         {/* Map + dock share one column so the dock spans the map canvas only,
             and follows the rail as it collapses/expands. */}
@@ -641,7 +718,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               setObsClickPoint(point);
               setSelectedCellId(null);
             }}
-            reshapeBlock={reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null}
+            reshapeBlock={
+              reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
+            }
             onReshape={(poly) => setReshapeCandidate(poly)}
             drawEnabled={drawTarget != null && !reshaping}
             drawTarget={drawTarget ?? "block"}
@@ -650,14 +729,21 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               setDrawProgress(null);
               if (target === "block") setPendingBlock({ polygon: poly, areaM2 });
             }}
-            onPivotDrawn={(r) => setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })}
+            onPivotDrawn={(r) =>
+              setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })
+            }
             autoBlockPreview={autoBlockPreviewFc}
             bulkPreview={bulkPreviewFc}
           />
 
           {/* Draw-in-progress hint (before a shape is completed) */}
           {drawTarget && !pendingBlock && !pendingPivot ? (
-            <DrawHintBar kind={drawTarget} vertices={drawProgress?.vertices} areaM2={drawProgress?.areaM2} onCancel={resetCreate} />
+            <DrawHintBar
+              kind={drawTarget}
+              vertices={drawProgress?.vertices}
+              areaM2={drawProgress?.areaM2}
+              onCancel={resetCreate}
+            />
           ) : null}
 
           {/* Create-block capture (after drawing a polygon) */}
@@ -666,7 +752,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               areaM2={pendingBlock.areaM2}
               submitting={createBlockMut.isPending}
               error={createBlockMut.isError ? t("create.createFailed") : null}
-              onSubmit={({ code, name }) => createBlockMut.mutate({ polygon: pendingBlock.polygon, code, name })}
+              onSubmit={({ code, name }) =>
+                createBlockMut.mutate({ polygon: pendingBlock.polygon, code, name })
+              }
               onCancel={resetCreate}
             />
           ) : null}
@@ -680,7 +768,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               submitting={createPivotMut.isPending}
               error={createPivotMut.isError ? t("create.createFailed") : null}
               onSubmit={({ code, name, sector_count }) =>
-                createPivotMut.mutate({ lat: pendingPivot.lat, lon: pendingPivot.lon, radiusM: pendingPivot.radiusM, code, name, sectorCount: sector_count })
+                createPivotMut.mutate({
+                  lat: pendingPivot.lat,
+                  lon: pendingPivot.lon,
+                  radiusM: pendingPivot.radiusM,
+                  code,
+                  name,
+                  sectorCount: sector_count,
+                })
               }
               onCancel={resetCreate}
             />
@@ -705,7 +800,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                   return next;
                 })
               }
-              onToggleAll={(all) => setSelectedCandidates(all ? new Set((candidates ?? []).map((c) => c.code)) : new Set())}
+              onToggleAll={(all) =>
+                setSelectedCandidates(
+                  all ? new Set((candidates ?? []).map((c) => c.code)) : new Set(),
+                )
+              }
               creating={autoCreating}
               progressDone={autoCreatedCount}
               error={autoError}
@@ -736,7 +835,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               <button
                 type="button"
                 disabled={!reshapeCandidate || reshapeMut.isPending}
-                onClick={() => reshapeCandidate && reshapeMut.mutate({ blockId: reshapeTarget.id, boundary: reshapeCandidate })}
+                onClick={() =>
+                  reshapeCandidate &&
+                  reshapeMut.mutate({ blockId: reshapeTarget.id, boundary: reshapeCandidate })
+                }
                 className="h-8 rounded-lg bg-ap-primary px-3 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {t("manage.save")}
@@ -812,7 +914,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                   disabled={reactivateFarmMut.isPending}
                   className="rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
                 >
-                  {reactivateFarmMut.isPending ? t("dangerZone.reactivating") : t("dangerZone.reactivate")}
+                  {reactivateFarmMut.isPending
+                    ? t("dangerZone.reactivating")
+                    : t("dangerZone.reactivate")}
                 </button>
               ) : null}
             </div>
@@ -881,7 +985,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           onSubmit={(reason) => inactivateFarmMut.mutate(reason)}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -920,7 +1024,12 @@ function SettingsDrawer({
   ];
   return (
     <>
-      <button type="button" aria-label="Close settings" className="fixed inset-0 z-[90] bg-ap-ink/30" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close settings"
+        className="fixed inset-0 z-[90] bg-ap-ink/30"
+        onClick={onClose}
+      />
       <aside className="fixed inset-y-0 end-0 z-[100] flex w-[560px] max-w-[94vw] flex-col bg-ap-panel shadow-2xl">
         <div className="flex items-center gap-3 border-b border-ap-line px-5 py-4">
           <span className="text-xl">⚙</span>
@@ -945,7 +1054,9 @@ function SettingsDrawer({
               onClick={() => setTab(tb.id)}
               className={
                 "rounded-t-lg border-b-2 px-3.5 py-2 text-sm font-semibold " +
-                (tab === tb.id ? "border-ap-primary text-ap-primary" : "border-transparent text-ap-muted hover:text-ap-ink")
+                (tab === tb.id
+                  ? "border-ap-primary text-ap-primary"
+                  : "border-transparent text-ap-muted hover:text-ap-ink")
               }
             >
               {tb.label}
@@ -993,7 +1104,11 @@ function FarmEditTab({
   const { t } = useTranslation("farmConsole");
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const farmQ = useQuery({ queryKey: ["labs/mapnext/farm", farmId], queryFn: () => getFarm(farmId), staleTime: 30_000 });
+  const farmQ = useQuery({
+    queryKey: ["labs/mapnext/farm", farmId],
+    queryFn: () => getFarm(farmId),
+    staleTime: 30_000,
+  });
   const [form, setForm] = useState<FarmUpdatePayload | null>(null);
   const f = farmQ.data;
   const state: FarmUpdatePayload =
@@ -1018,7 +1133,8 @@ function FarmEditTab({
     },
   });
   if (farmQ.isLoading) return <div className="text-sm text-ap-muted">{t("inspector.loading")}</div>;
-  if (farmQ.isError || !f) return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
+  if (farmQ.isError || !f)
+    return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
   return (
     <form
       onSubmit={(e) => {
@@ -1027,40 +1143,95 @@ function FarmEditTab({
       }}
     >
       <label className="mb-3 block">
-        <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.name")}</span>
-        <input className={settingsInput} value={state.name ?? ""} onChange={(e) => set({ name: e.target.value })} />
+        <span className="mb-1 block text-xs font-semibold text-ap-muted">
+          {t("settingsFarm.name")}
+        </span>
+        <input
+          className={settingsInput}
+          value={state.name ?? ""}
+          onChange={(e) => set({ name: e.target.value })}
+        />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.governorate")}</span>
-          <input className={settingsInput} value={state.governorate ?? ""} onChange={(e) => set({ governorate: e.target.value || null })} />
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {t("settingsFarm.governorate")}
+          </span>
+          <input
+            className={settingsInput}
+            value={state.governorate ?? ""}
+            onChange={(e) => set({ governorate: e.target.value || null })}
+          />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.district")}</span>
-          <input className={settingsInput} value={state.district ?? ""} onChange={(e) => set({ district: e.target.value || null })} />
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {t("settingsFarm.district")}
+          </span>
+          <input
+            className={settingsInput}
+            value={state.district ?? ""}
+            onChange={(e) => set({ district: e.target.value || null })}
+          />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.city")}</span>
-          <input className={settingsInput} value={state.nearest_city ?? ""} onChange={(e) => set({ nearest_city: e.target.value || null })} />
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {t("settingsFarm.city")}
+          </span>
+          <input
+            className={settingsInput}
+            value={state.nearest_city ?? ""}
+            onChange={(e) => set({ nearest_city: e.target.value || null })}
+          />
         </label>
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("settingsFarm.water")}</span>
-          <select className={settingsInput} value={state.primary_water_source ?? ""} onChange={(e) => set({ primary_water_source: (e.target.value || null) as WaterSource | null })}>
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {t("settingsFarm.water")}
+          </span>
+          <select
+            className={settingsInput}
+            value={state.primary_water_source ?? ""}
+            onChange={(e) =>
+              set({ primary_water_source: (e.target.value || null) as WaterSource | null })
+            }
+          >
             <option value="">—</option>
-            {WATER_SOURCES.map((w) => <option key={w} value={w}>{w}</option>)}
+            {WATER_SOURCES.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
           </select>
         </label>
       </div>
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold text-ap-muted">{t("manage.tags")}</span>
-        <input className={settingsInput} value={(state.tags ?? []).join(", ")} onChange={(e) => set({ tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+        <input
+          className={settingsInput}
+          value={(state.tags ?? []).join(", ")}
+          onChange={(e) =>
+            set({
+              tags: e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
+        />
       </label>
-      {mut.isError ? <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
+      {mut.isError ? (
+        <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div>
+      ) : null}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={mut.isPending} className="h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={mut.isPending}
+          className="h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-60"
+        >
           {mut.isPending ? t("manage.saving") : t("manage.save")}
         </button>
-        {mut.isSuccess && !form ? <span className="text-xs text-ap-good">{t("settingsFarm.saved")}</span> : null}
+        {mut.isSuccess && !form ? (
+          <span className="text-xs text-ap-good">{t("settingsFarm.saved")}</span>
+        ) : null}
         <button
           type="button"
           onClick={() => navigate(`/labs/map-legacy/${farmId}`)}
@@ -1076,7 +1247,9 @@ function FarmEditTab({
       {canInactivate ? (
         <section className="mt-7 rounded-xl border border-ap-crit/40 bg-ap-crit/5 p-4">
           <h3 className="text-sm font-bold text-ap-crit">{t("dangerZone.title")}</h3>
-          <p className="mt-1 text-xs leading-relaxed text-ap-muted">{t("dangerZone.inactivateHint")}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ap-muted">
+            {t("dangerZone.inactivateHint")}
+          </p>
           {f.is_active ? (
             <button
               type="button"
@@ -1100,7 +1273,9 @@ function FarmEditTab({
               </button>
             </div>
           )}
-          {reactivateError ? <div className="mt-2 text-xs text-ap-crit">{reactivateError}</div> : null}
+          {reactivateError ? (
+            <div className="mt-2 text-xs text-ap-crit">{reactivateError}</div>
+          ) : null}
         </section>
       ) : null}
     </form>

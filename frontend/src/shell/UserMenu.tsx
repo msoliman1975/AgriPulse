@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/Button";
 
 export function UserMenu(): ReactNode {
   const auth = useAuth();
@@ -22,14 +23,14 @@ export function UserMenu(): ReactNode {
       <span className="hidden text-sm text-ap-ink sm:inline" data-testid="user-display-name">
         {displayName}
       </span>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        className="px-2 py-1 text-xs"
         onClick={onSignOut}
-        className="btn-ghost px-2 py-1 text-xs"
         aria-label={t("shell.userMenu")}
       >
         {t("shell.signOut")}
-      </button>
+      </Button>
     </div>
   );
 }

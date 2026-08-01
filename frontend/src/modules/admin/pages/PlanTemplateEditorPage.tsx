@@ -11,6 +11,10 @@ import {
   type PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
+import { Card } from "@/components/Card";
+import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import {
@@ -189,14 +193,14 @@ export function PlanTemplateEditorPage(): ReactNode {
 
   if (!isNew && detailQuery.isLoading) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <Page>
         <Skeleton className="h-96 w-full" />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-6">
+    <Page>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -206,9 +210,7 @@ export function PlanTemplateEditorPage(): ReactNode {
           >
             {i18n.dir() === "rtl" ? "→" : "←"} {t("editor.back")}
           </button>
-          <h1 className="text-xl font-semibold text-ap-ink">
-            {isNew ? t("editor.titleNew") : t("editor.titleEdit")}
-          </h1>
+          <PageHeader title={isNew ? t("editor.titleNew") : t("editor.titleEdit")} />
           {!isNew ? (
             <Pill kind={status === "published" ? "ok" : "neutral"}>{t(`status.${status}`)}</Pill>
           ) : null}
@@ -256,19 +258,29 @@ export function PlanTemplateEditorPage(): ReactNode {
       ) : null}
 
       {/* Header fields */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <h2 className="mb-3 text-sm font-semibold text-ap-ink">{t("editor.section.header")}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t("editor.field.name")}>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
           </Field>
-          <Field label={t("editor.field.code")} hint={t("editor.field.codeHint")}>
-            <input
-              className="input font-mono"
-              value={code}
-              disabled={!isNew}
-              onChange={(e) => setCode(e.target.value)}
-            />
+          <Field label={t("editor.field.code")} help={t("editor.field.codeHint")}>
+            {(props) => (
+              <input
+                {...props}
+                className={`${FIELD_CONTROL_CLASS} font-mono`}
+                value={code}
+                disabled={!isNew}
+                onChange={(e) => setCode(e.target.value)}
+              />
+            )}
           </Field>
           <div className="sm:col-span-2">
             <span className="mb-1 block text-xs font-medium text-ap-muted">
@@ -277,23 +289,40 @@ export function PlanTemplateEditorPage(): ReactNode {
             <CropPathFilter value={cropPath} onChange={setCropPath} scope="platform" />
           </div>
           <Field label={t("editor.field.country")}>
-            <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+              />
+            )}
           </Field>
           <Field label={t("editor.field.region")}>
-            <input className="input" value={region} onChange={(e) => setRegion(e.target.value)} />
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+              />
+            )}
           </Field>
           <Field label={t("editor.field.description")} className="sm:col-span-2">
-            <textarea
-              className="input min-h-[60px]"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            {(props) => (
+              <textarea
+                {...props}
+                className={`${FIELD_CONTROL_CLASS} min-h-[60px]`}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            )}
           </Field>
         </div>
-      </section>
+      </Card>
 
       {/* Milestones */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ap-ink">{t("editor.section.milestones")}</h2>
           <button
@@ -361,10 +390,10 @@ export function PlanTemplateEditorPage(): ReactNode {
             ))}
           </div>
         )}
-      </section>
+      </Card>
 
       {/* Activities */}
-      <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+      <Card noPadding className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ap-ink">{t("editor.section.activities")}</h2>
           <button
@@ -480,7 +509,7 @@ export function PlanTemplateEditorPage(): ReactNode {
         {cropPath && stageOptions.length === 0 && !phenology.isLoading ? (
           <p className="mt-2 text-[11px] text-ap-warn">{t("editor.noStages")}</p>
         ) : null}
-      </section>
+      </Card>
 
       {/* Timeline preview */}
       <TimelinePreview milestones={milestones} activities={activities} stageLabel={stageLabel} />
@@ -503,27 +532,7 @@ export function PlanTemplateEditorPage(): ReactNode {
           </button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  className,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  className?: string;
-  children: ReactNode;
-}): ReactNode {
-  return (
-    <label className={className}>
-      <span className="mb-1 block text-xs font-medium text-ap-muted">{label}</span>
-      {children}
-      {hint ? <span className="mt-0.5 block text-[11px] text-ap-muted">{hint}</span> : null}
-    </label>
+    </Page>
   );
 }
 
@@ -561,7 +570,7 @@ function TimelinePreview({
   const maxDay = dated.reduce((mx, d) => Math.max(mx, d.day + (Number(d.a.duration_days) || 1)), 1);
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <h2 className="mb-3 text-sm font-semibold text-ap-ink">{t("editor.section.timeline")}</h2>
       {dated.length === 0 && staged.length === 0 ? (
         <p className="text-xs text-ap-muted">{t("editor.timelineEmpty")}</p>
@@ -610,6 +619,6 @@ function TimelinePreview({
           </ul>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }

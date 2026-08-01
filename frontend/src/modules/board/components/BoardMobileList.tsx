@@ -6,6 +6,7 @@ import type { BoardActivity, BoardBlock } from "@/api/plans";
 import { useDateLocale } from "@/hooks/useDateLocale";
 
 import { ActivityChip } from "./ActivityChip";
+import { Card } from "@/components/Card";
 
 interface BoardMobileListProps {
   blocks: BoardBlock[];
@@ -44,16 +45,11 @@ export function BoardMobileList({
       {blocks.map((block) => {
         const rows = byBlock.get(block.id) ?? [];
         return (
-          <section
-            key={block.id}
-            className="rounded-xl border border-ap-line bg-ap-panel"
-          >
+          <Card noPadding key={block.id}>
             <header className="flex items-center justify-between border-b border-ap-line p-3">
               <div>
                 <div className="font-medium text-ap-ink">{block.code}</div>
-                {block.name ? (
-                  <div className="text-xs text-ap-muted">{block.name}</div>
-                ) : null}
+                {block.name ? <div className="text-xs text-ap-muted">{block.name}</div> : null}
               </div>
               {canManage && onBlockAddClick ? (
                 <button
@@ -88,7 +84,7 @@ export function BoardMobileList({
                 ))
               )}
             </ul>
-          </section>
+          </Card>
         );
       })}
     </div>

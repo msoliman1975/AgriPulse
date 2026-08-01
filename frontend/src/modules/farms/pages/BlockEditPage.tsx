@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 
 import { getBlock, updateBlock, type BlockDetail } from "@/api/blocks";
 import { isApiError } from "@/api/errors";
+import { Breadcrumb } from "@/components/Breadcrumb";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { BlockForm, type BlockFormValues } from "../components/BlockForm";
 
 export function BlockEditPage(): JSX.Element {
@@ -49,27 +52,43 @@ export function BlockEditPage(): JSX.Element {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-ap-ink">{t("block.edit")}</h1>
-      <BlockForm
-        initial={{
-          code: block.code,
-          name: block.name,
-          irrigation_system: block.irrigation_system,
-          irrigation_source: block.irrigation_source,
-          soil_texture: block.soil_texture,
-          salinity_class: block.salinity_class,
-          soil_ph: block.soil_ph,
-          agronomist_membership_id: block.agronomist_membership_id,
-          notes: block.notes,
-        }}
-        initialBoundary={block.boundary}
-        submitLabel={t("form.submitBlockUpdate")}
-        onSubmit={handleSubmit}
-        onCancel={() => navigate(`/farms/${farmId}/blocks/${blockId}`)}
-        busy={busy}
-        error={error}
-      />
-    </div>
+    <Page>
+      {/* Single-column forms cap their own measure: a 1152px-wide field row
+          puts unreadable distance between a label and its input. The page
+          frame stays wide so the header lines up with every other page. */}
+      <div className="flex max-w-3xl flex-col gap-4">
+        <PageHeader
+          above={
+            <Breadcrumb
+              items={[
+                { label: t("list.heading"), to: "/farms" },
+                { label: t("block.back"), to: `/farms/${farmId}` },
+                { label: t("block.edit") },
+              ]}
+            />
+          }
+          title={t("block.edit")}
+        />
+        <BlockForm
+          initial={{
+            code: block.code,
+            name: block.name,
+            irrigation_system: block.irrigation_system,
+            irrigation_source: block.irrigation_source,
+            soil_texture: block.soil_texture,
+            salinity_class: block.salinity_class,
+            soil_ph: block.soil_ph,
+            agronomist_membership_id: block.agronomist_membership_id,
+            notes: block.notes,
+          }}
+          initialBoundary={block.boundary}
+          submitLabel={t("form.submitBlockUpdate")}
+          onSubmit={handleSubmit}
+          onCancel={() => navigate(`/farms/${farmId}/blocks/${blockId}`)}
+          busy={busy}
+          error={error}
+        />
+      </div>
+    </Page>
   );
 }

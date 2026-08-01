@@ -13,6 +13,11 @@ import type {
   SignalTemplateUpdatePayload,
   ValueKind,
 } from "@/api/signals";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { Field } from "@/components/Field";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
@@ -160,144 +165,174 @@ export function SignalsConfigPage(): ReactNode {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("config.title")}</h1>
-          <p className="mt-1 text-sm text-ap-muted">{t("config.subtitle")}</p>
-        </div>
-        {canDefine ? (
-          <button
-            type="button"
-            onClick={() => setShowForm((s) => !s)}
-            className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90"
-          >
-            {showForm ? t("config.cancel") : t("config.newDefinition")}
-          </button>
-        ) : null}
-      </header>
+    <Page>
+      <PageHeader
+        title={t("config.title")}
+        subtitle={t("config.subtitle")}
+        actions={
+          canDefine ? (
+            <Button onClick={() => setShowForm((s) => !s)}>
+              {showForm ? t("config.cancel") : t("config.newDefinition")}
+            </Button>
+          ) : null
+        }
+      />
 
       {showForm && canDefine ? (
-        <form
-          onSubmit={submit}
-          className="rounded-xl border border-ap-line bg-ap-panel p-4 text-sm"
-        >
+        <Card as="form" noPadding className="p-4 text-sm" onSubmit={submit}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={t("config.form.code")}>
-              <input
-                required
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder={t("config.form.codePlaceholder")}
-                pattern="^[a-z0-9][a-z0-9_-]*$"
-                className={inputCls}
-              />
+              {(props) => (
+                <input
+                  {...props}
+                  required
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  placeholder={t("config.form.codePlaceholder")}
+                  pattern="^[a-z0-9][a-z0-9_-]*$"
+                  className={inputCls}
+                />
+              )}
             </Field>
             <Field label={t("config.form.name")}>
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder={t("config.form.namePlaceholder")}
-                className={inputCls}
-              />
+              {(props) => (
+                <input
+                  {...props}
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={t("config.form.namePlaceholder")}
+                  className={inputCls}
+                />
+              )}
             </Field>
             <Field label={t("config.form.valueKind")}>
-              <select
-                value={form.value_kind}
-                onChange={(e) => setForm({ ...form, value_kind: e.target.value as ValueKind })}
-                className={inputCls}
-              >
-                {VALUE_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`valueKind.${k}`)}
-                  </option>
-                ))}
-              </select>
+              {(props) => (
+                <select
+                  {...props}
+                  value={form.value_kind}
+                  onChange={(e) => setForm({ ...form, value_kind: e.target.value as ValueKind })}
+                  className={inputCls}
+                >
+                  {VALUE_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {t(`valueKind.${k}`)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
             <Field label={t("config.form.unit")}>
-              <input
-                value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                placeholder={t("config.form.unitPlaceholder")}
-                className={inputCls}
-                disabled={form.value_kind !== "numeric"}
-              />
+              {(props) => (
+                <input
+                  {...props}
+                  value={form.unit}
+                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  placeholder={t("config.form.unitPlaceholder")}
+                  className={inputCls}
+                  disabled={form.value_kind !== "numeric"}
+                />
+              )}
             </Field>
             {form.value_kind === "numeric" ? (
               <>
                 <Field label={t("config.form.min")}>
-                  <input
-                    inputMode="decimal"
-                    value={form.value_min}
-                    onChange={(e) => setForm({ ...form, value_min: e.target.value })}
-                    className={inputCls}
-                  />
+                  {(props) => (
+                    <input
+                      {...props}
+                      inputMode="decimal"
+                      value={form.value_min}
+                      onChange={(e) => setForm({ ...form, value_min: e.target.value })}
+                      className={inputCls}
+                    />
+                  )}
                 </Field>
                 <Field label={t("config.form.max")}>
-                  <input
-                    inputMode="decimal"
-                    value={form.value_max}
-                    onChange={(e) => setForm({ ...form, value_max: e.target.value })}
-                    className={inputCls}
-                  />
+                  {(props) => (
+                    <input
+                      {...props}
+                      inputMode="decimal"
+                      value={form.value_max}
+                      onChange={(e) => setForm({ ...form, value_max: e.target.value })}
+                      className={inputCls}
+                    />
+                  )}
                 </Field>
                 <Field label={t("config.form.aggregation.label")}>
-                  <select
-                    value={form.aggregation}
-                    onChange={(e) =>
-                      setForm({ ...form, aggregation: e.target.value as Aggregation })
-                    }
-                    className={inputCls}
-                  >
-                    {AGGREGATIONS.map((a) => (
-                      <option key={a} value={a}>
-                        {t(`config.form.aggregation.options.${a}`)}
-                      </option>
-                    ))}
-                  </select>
+                  {(props) => (
+                    <select
+                      {...props}
+                      value={form.aggregation}
+                      onChange={(e) =>
+                        setForm({ ...form, aggregation: e.target.value as Aggregation })
+                      }
+                      className={inputCls}
+                    >
+                      {AGGREGATIONS.map((a) => (
+                        <option key={a} value={a}>
+                          {t(`config.form.aggregation.options.${a}`)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </Field>
                 <Field label={t("config.form.aggregation.windowLabel")}>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={form.aggregation_window_days}
-                    onChange={(e) => setForm({ ...form, aggregation_window_days: e.target.value })}
-                    placeholder={t("config.form.aggregation.windowHint")}
-                    className={inputCls}
-                    disabled={form.aggregation === "latest"}
-                  />
+                  {(props) => (
+                    <input
+                      {...props}
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={form.aggregation_window_days}
+                      onChange={(e) =>
+                        setForm({ ...form, aggregation_window_days: e.target.value })
+                      }
+                      placeholder={t("config.form.aggregation.windowHint")}
+                      className={inputCls}
+                      disabled={form.aggregation === "latest"}
+                    />
+                  )}
                 </Field>
               </>
             ) : null}
             {form.value_kind === "categorical" ? (
               <Field label={t("config.form.categoricalValues")} className="sm:col-span-2">
-                <input
-                  required
-                  value={form.categorical_values}
-                  onChange={(e) => setForm({ ...form, categorical_values: e.target.value })}
-                  placeholder={t("config.form.categoricalPlaceholder")}
-                  className={inputCls}
-                />
+                {(props) => (
+                  <input
+                    {...props}
+                    required
+                    value={form.categorical_values}
+                    onChange={(e) => setForm({ ...form, categorical_values: e.target.value })}
+                    placeholder={t("config.form.categoricalPlaceholder")}
+                    className={inputCls}
+                  />
+                )}
               </Field>
             ) : null}
             <Field label={t("config.form.description")} className="sm:col-span-2">
-              <input
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className={inputCls}
-              />
-            </Field>
-            <Field label={t("config.form.attachmentAllowed")} className="sm:col-span-2">
-              <label className="inline-flex items-center gap-2 text-sm">
+              {(props) => (
                 <input
+                  {...props}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className={inputCls}
+                />
+              )}
+            </Field>
+            <Field
+              label={t("config.form.attachmentAllowed")}
+              help={t("config.form.attachmentHint")}
+              className="sm:col-span-2"
+            >
+              {(props) => (
+                <input
+                  {...props}
                   type="checkbox"
+                  className="h-4 w-4 accent-ap-primary"
                   checked={form.attachment_allowed}
                   onChange={(e) => setForm({ ...form, attachment_allowed: e.target.checked })}
                 />
-                <span>{t("config.form.attachmentHint")}</span>
-              </label>
+              )}
             </Field>
           </div>
           <div className="mt-3 flex items-center justify-end gap-2">
@@ -314,7 +349,7 @@ export function SignalsConfigPage(): ReactNode {
               {createMut.isPending ? t("config.form.saving") : t("config.form.save")}
             </button>
           </div>
-        </form>
+        </Card>
       ) : null}
 
       {/* CS-13 toolbar */}
@@ -355,7 +390,7 @@ export function SignalsConfigPage(): ReactNode {
         </label>
       </div>
 
-      <div className="rounded-xl border border-ap-line bg-ap-panel">
+      <Card noPadding>
         {isLoading ? (
           <div className="flex flex-col gap-2 p-4">
             <Skeleton className="h-12 w-full" />
@@ -388,7 +423,7 @@ export function SignalsConfigPage(): ReactNode {
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
       <TemplatesCard canDefine={canDefine} definitions={data ?? []} />
 
@@ -407,7 +442,7 @@ export function SignalsConfigPage(): ReactNode {
           onForce={forceArchive}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -557,7 +592,7 @@ function TemplatesCard({
   };
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-2">
         <div>
           <h2 className="text-sm font-semibold text-ap-ink">{t("config.templates.heading")}</h2>
@@ -666,7 +701,7 @@ function TemplatesCard({
           onForce={forceArchiveTemplate}
         />
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -836,29 +871,38 @@ function TemplateEditor({
     <form onSubmit={submit} className="flex flex-col gap-3 text-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label={t("config.form.code")}>
-          <input
-            required
-            value={state.code}
-            onChange={(e) => setState({ ...state, code: e.target.value })}
-            pattern="^[a-z0-9][a-z0-9_-]*$"
-            disabled={mode === "edit"}
-            className={inputCls}
-          />
+          {(props) => (
+            <input
+              {...props}
+              required
+              value={state.code}
+              onChange={(e) => setState({ ...state, code: e.target.value })}
+              pattern="^[a-z0-9][a-z0-9_-]*$"
+              disabled={mode === "edit"}
+              className={inputCls}
+            />
+          )}
         </Field>
         <Field label={t("config.form.name")}>
-          <input
-            required
-            value={state.name}
-            onChange={(e) => setState({ ...state, name: e.target.value })}
-            className={inputCls}
-          />
+          {(props) => (
+            <input
+              {...props}
+              required
+              value={state.name}
+              onChange={(e) => setState({ ...state, name: e.target.value })}
+              className={inputCls}
+            />
+          )}
         </Field>
         <Field label={t("config.form.description")} className="sm:col-span-2">
-          <input
-            value={state.description}
-            onChange={(e) => setState({ ...state, description: e.target.value })}
-            className={inputCls}
-          />
+          {(props) => (
+            <input
+              {...props}
+              value={state.description}
+              onChange={(e) => setState({ ...state, description: e.target.value })}
+              className={inputCls}
+            />
+          )}
         </Field>
       </div>
 
@@ -1011,20 +1055,3 @@ function MemberAdder({
 
 const inputCls =
   "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm text-ap-ink shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary disabled:bg-ap-line/30";
-
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}): ReactNode {
-  return (
-    <label className={`flex flex-col gap-1 ${className ?? ""}`}>
-      <span className="text-xs font-medium text-ap-muted">{label}</span>
-      {children}
-    </label>
-  );
-}

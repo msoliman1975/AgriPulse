@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { SignalObservation } from "@/api/signals";
+import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useSignalObservations } from "@/queries/signals";
@@ -28,7 +29,7 @@ export function LatestSignalsCard({ farmId, limit = 5 }: Props): ReactNode {
     limit,
   });
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-2">
         <h2 className="text-sm font-semibold text-ap-ink">{t("latestSignals.heading")}</h2>
         <button
@@ -64,7 +65,7 @@ export function LatestSignalsCard({ farmId, limit = 5 }: Props): ReactNode {
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 

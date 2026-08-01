@@ -7,6 +7,8 @@ import { Navigate } from "react-router-dom";
 import { getFarm } from "@/api/farms";
 import { listBlocks, type Block } from "@/api/blocks";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
@@ -74,14 +76,14 @@ export function InsightsPage(): ReactNode {
   // single error instead of a broken header over empty widgets.
   if (isError) {
     return (
-      <div className="mx-auto max-w-5xl">
+      <Page>
         <ErrorState message={t("page.loadFailed")} />
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
+    <Page>
       <header className="flex items-start gap-3">
         <img
           src="/agripulse-mark.png"
@@ -89,7 +91,7 @@ export function InsightsPage(): ReactNode {
           className="h-12 w-12 shrink-0 object-contain"
         />
         <div>
-          <h1 className="text-2xl font-semibold text-ap-ink">{t("page.title")}</h1>
+          <PageHeader title={t("page.title")} />
           <div className="mt-1 text-sm text-ap-muted">
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-64" />
@@ -127,6 +129,6 @@ export function InsightsPage(): ReactNode {
       {canReadRisk ? <ActiveRisksWidget farmId={farmId} /> : null}
 
       <BlockHealthScorecard farmId={farmId} />
-    </div>
+    </Page>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
@@ -52,7 +53,7 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
   const newOwner = candidates.find((c) => c.email === newOwnerEmail) ?? null;
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel p-4">
+    <Card noPadding className="p-4">
       <h2 className="text-sm font-semibold text-ap-ink">{t("owner.title")}</h2>
       <p className="mt-1 text-xs text-ap-muted">{t("owner.subtitle")}</p>
 
@@ -94,83 +95,85 @@ export function TenantAdminsPanel({ tenantId, tenantSlug }: Props): ReactNode {
           labelledBy="transfer-owner-title"
           className="max-w-md p-4"
         >
-            <h3 id="transfer-owner-title" className="text-sm font-semibold text-ap-ink">{t("admins.transfer.title")}</h3>
-            <p className="mt-2 text-xs text-ap-muted">
-              {t("owner.transferIntro", {
-                from: owner.full_name ?? owner.email,
-              })}
-            </p>
-            <label className="mt-3 flex flex-col gap-1 text-xs">
-              {t("owner.newOwnerLabel")}
-              <select
-                className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-                value={newOwnerEmail}
-                onChange={(e) => setNewOwnerEmail(e.target.value)}
-              >
-                <option value="">{t("owner.pickNewOwner")}</option>
-                {candidates.map((c) => (
-                  <option key={c.user_id} value={c.email}>
-                    {c.full_name ? `${c.full_name} ` : ""}
-                    &lt;{c.email}&gt;
-                  </option>
-                ))}
-              </select>
-            </label>
-            {candidates.length === 0 ? (
-              <p className="mt-2 text-xs text-ap-warn">{t("owner.noCandidates")}</p>
-            ) : null}
-            <p className="mt-3 text-xs text-ap-warn">
-              {t("admins.transfer.confirmHint", { slug: tenantSlug })}
-            </p>
-            <input
-              value={confirmSlug}
-              onChange={(e) => setConfirmSlug(e.target.value)}
-              className="mt-2 w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
-            />
-            <div className="mt-3 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenTransfer(false);
-                  setNewOwnerEmail("");
-                  setConfirmSlug("");
-                }}
-                className="rounded-md border border-ap-line bg-ap-panel px-3 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
-              >
-                {t("admins.transfer.cancel")}
-              </button>
-              <button
-                type="button"
-                disabled={!newOwner || confirmSlug !== tenantSlug || transferMut.isPending}
-                onClick={() => {
-                  if (!newOwner) return;
-                  transferMut.mutate(
-                    {
-                      newOwnerUserId: newOwner.user_id,
-                      fromUserId: owner.user_id,
+          <h3 id="transfer-owner-title" className="text-sm font-semibold text-ap-ink">
+            {t("admins.transfer.title")}
+          </h3>
+          <p className="mt-2 text-xs text-ap-muted">
+            {t("owner.transferIntro", {
+              from: owner.full_name ?? owner.email,
+            })}
+          </p>
+          <label className="mt-3 flex flex-col gap-1 text-xs">
+            {t("owner.newOwnerLabel")}
+            <select
+              className="rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+              value={newOwnerEmail}
+              onChange={(e) => setNewOwnerEmail(e.target.value)}
+            >
+              <option value="">{t("owner.pickNewOwner")}</option>
+              {candidates.map((c) => (
+                <option key={c.user_id} value={c.email}>
+                  {c.full_name ? `${c.full_name} ` : ""}
+                  &lt;{c.email}&gt;
+                </option>
+              ))}
+            </select>
+          </label>
+          {candidates.length === 0 ? (
+            <p className="mt-2 text-xs text-ap-warn">{t("owner.noCandidates")}</p>
+          ) : null}
+          <p className="mt-3 text-xs text-ap-warn">
+            {t("admins.transfer.confirmHint", { slug: tenantSlug })}
+          </p>
+          <input
+            value={confirmSlug}
+            onChange={(e) => setConfirmSlug(e.target.value)}
+            className="mt-2 w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpenTransfer(false);
+                setNewOwnerEmail("");
+                setConfirmSlug("");
+              }}
+              className="rounded-md border border-ap-line bg-ap-panel px-3 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40"
+            >
+              {t("admins.transfer.cancel")}
+            </button>
+            <button
+              type="button"
+              disabled={!newOwner || confirmSlug !== tenantSlug || transferMut.isPending}
+              onClick={() => {
+                if (!newOwner) return;
+                transferMut.mutate(
+                  {
+                    newOwnerUserId: newOwner.user_id,
+                    fromUserId: owner.user_id,
+                  },
+                  {
+                    onSuccess: () => {
+                      setOpenTransfer(false);
+                      setNewOwnerEmail("");
+                      setConfirmSlug("");
                     },
-                    {
-                      onSuccess: () => {
-                        setOpenTransfer(false);
-                        setNewOwnerEmail("");
-                        setConfirmSlug("");
-                      },
-                    },
-                  );
-                }}
-                className="rounded-md bg-ap-warn px-3 py-1 text-xs font-medium text-white hover:bg-ap-warn/90 disabled:opacity-60"
-              >
-                {transferMut.isPending
-                  ? t("admins.transfer.submitting")
-                  : t("admins.transfer.submit")}
-              </button>
-            </div>
-            {transferMut.error ? (
-              <p className="mt-2 text-xs text-ap-crit">{transferMut.error.message}</p>
-            ) : null}
+                  },
+                );
+              }}
+              className="rounded-md bg-ap-warn px-3 py-1 text-xs font-medium text-white hover:bg-ap-warn/90 disabled:opacity-60"
+            >
+              {transferMut.isPending
+                ? t("admins.transfer.submitting")
+                : t("admins.transfer.submit")}
+            </button>
+          </div>
+          {transferMut.error ? (
+            <p className="mt-2 text-xs text-ap-crit">{transferMut.error.message}</p>
+          ) : null}
         </Modal>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

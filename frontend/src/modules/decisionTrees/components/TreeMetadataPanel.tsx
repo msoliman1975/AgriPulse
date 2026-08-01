@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import type { TreeMetaFields } from "../lib/metadataEdit";
 import { TreeTargetingPicker } from "./TreeTargetingPicker";
+import { Card } from "@/components/Card";
 
 interface TreeMetadataPanelProps {
   meta: TreeMetaFields;
@@ -48,11 +49,9 @@ export function TreeMetadataPanel({
   const [open, setOpen] = useState(true);
 
   return (
-    <section className="rounded-xl border border-ap-line bg-ap-panel">
+    <Card noPadding>
       <header className="flex items-center justify-between border-b border-ap-line px-4 py-3">
-        <h2 className="text-sm font-semibold text-ap-ink">
-          {t("workspace.metadata.heading")}
-        </h2>
+        <h2 className="text-sm font-semibold text-ap-ink">{t("workspace.metadata.heading")}</h2>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -96,13 +95,9 @@ export function TreeMetadataPanel({
               onChange={(v) => onMetaChange({ description_ar: v })}
             />
             {canEdit && meta.name_en.trim() === "" ? (
-              <p className="text-[11px] text-ap-crit">
-                {t("workspace.metadata.nameRequired")}
-              </p>
+              <p className="text-[11px] text-ap-crit">{t("workspace.metadata.nameRequired")}</p>
             ) : null}
-            <p className="text-[11px] text-ap-muted">
-              {t("workspace.metadata.namesSyncNote")}
-            </p>
+            <p className="text-[11px] text-ap-muted">{t("workspace.metadata.namesSyncNote")}</p>
           </div>
 
           {/* Targeting — persisted via PATCH on Save. */}
@@ -118,15 +113,10 @@ export function TreeMetadataPanel({
                   onSoilTexturesChange={onSoilTexturesChange}
                 />
                 <div className="flex flex-col gap-1.5 border-t border-ap-line pt-3">
-                  <span className="text-xs font-medium text-ap-muted">
-                    {t("targeting.scope")}
-                  </span>
+                  <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {(["block", "cell"] as const).map((s) => (
-                      <label
-                        key={s}
-                        className="flex items-center gap-1.5 text-xs text-ap-ink"
-                      >
+                      <label key={s} className="flex items-center gap-1.5 text-xs text-ap-ink">
                         <input
                           type="radio"
                           name="workspace-tree-scope"
@@ -152,7 +142,7 @@ export function TreeMetadataPanel({
           </div>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -168,7 +158,15 @@ function ReadonlyTargeting({
   scope: "block" | "cell";
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
-  const Row = ({ label, values, fallback }: { label: string; values: string[]; fallback: string }) => (
+  const Row = ({
+    label,
+    values,
+    fallback,
+  }: {
+    label: string;
+    values: string[];
+    fallback: string;
+  }) => (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-ap-muted">{label}</span>
       {values.length > 0 ? (
@@ -195,11 +193,7 @@ function ReadonlyTargeting({
         values={countryCodes}
         fallback={t("list.table.anyLocation")}
       />
-      <Row
-        label={t("targeting.soil")}
-        values={soilTextures}
-        fallback={t("list.table.anySoil")}
-      />
+      <Row label={t("targeting.soil")} values={soilTextures} fallback={t("list.table.anySoil")} />
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
         <span className="text-xs text-ap-ink">{t(`targeting.scopeValues.${scope}`)}</span>
