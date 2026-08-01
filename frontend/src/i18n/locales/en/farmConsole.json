@@ -394,7 +394,17 @@
       "noChecks": "This tree reached its outcome without evaluating any condition.",
       "noAction": "No action required.",
       "outcome": "Outcome —",
-      "treeError": "This tree could not be evaluated: {{error}}"
+      "treeError": "This tree could not be evaluated: {{error}}",
+      "action": "action due"
+    },
+    "resize": "Drag to resize panel",
+    "title": {
+      "block": "Block",
+      "crop": "Crop",
+      "health": "Health",
+      "alerts": "Alerts",
+      "alertsCrit": "{{count}} ({{crit}} critical)",
+      "date": "Date"
     }
   }
 }

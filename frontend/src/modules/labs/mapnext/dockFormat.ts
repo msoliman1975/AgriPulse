@@ -16,6 +16,39 @@ export function shortDate(iso: string | null | undefined): string {
   }
 }
 
+/** Observation dates in the title bar carry the year — a block last seen in
+ * a previous season should not read as a recent one. */
+export function longDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** Crop · variety · strain, from the block's current assignment.
+ *
+ * NB: read the ASSIGNMENT, not `UnitDetail.crop` — that field is a hardcoded
+ * null left over from the map prototype, so anything reading it renders every
+ * block as unassigned. See loadUnitDetail in ../map/api.ts.
+ */
+export function cropLabel(
+  assignment:
+    | { crop_name: string; variety_name: string | null; strain_name: string | null }
+    | null
+    | undefined,
+): string | null {
+  if (!assignment) return null;
+  return [assignment.crop_name, assignment.variety_name, assignment.strain_name]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** ISO yyyy-mm-dd, `days` before `to` (default today). */
 export function isoDaysBefore(days: number, to: Date = new Date()): string {
   const d = new Date(to.getTime() - days * 86_400_000);

@@ -610,6 +610,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       <div className="flex min-h-0 flex-1">
         <UnitsRail blocks={summary.blocks} summaries={summary.summaries} selectedId={selectedId} onSelect={select} />
 
+        {/* Map + dock share one column so the dock spans the map canvas only,
+            and follows the rail as it collapses/expands. */}
+        <div className="flex min-w-0 flex-1 flex-col">
         <main className="relative min-w-0 flex-1">
           <MapCanvas
             geojson={summary.geojson}
@@ -815,25 +818,26 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             </div>
           ) : null}
         </main>
-      </div>
 
-      {/* Block detail runs full-width under the map, not in a 372px column —
-          see docs/proposals/block-dock.html. */}
-      {selectedId ? (
-        <BlockDock
-          detail={detailQ.data}
-          loading={detailQ.isLoading}
-          error={detailQ.isError}
-          activeIndex={activeIndex}
-          onActiveIndexChange={setActiveIndex}
-          onClose={deselect}
-          farmId={farmId}
-          gridProductId={gridProductId}
-          onReshape={() => void openReshape()}
-          onInactivate={() => setInactivateOpen(true)}
-          resetKey={resetKey}
-        />
-      ) : null}
+          {/* Block detail spans the map canvas, not the whole page — see
+              docs/proposals/block-dock.html. */}
+          {selectedId ? (
+            <BlockDock
+              detail={detailQ.data}
+              loading={detailQ.isLoading}
+              error={detailQ.isError}
+              activeIndex={activeIndex}
+              onActiveIndexChange={setActiveIndex}
+              onClose={deselect}
+              farmId={farmId}
+              gridProductId={gridProductId}
+              onReshape={() => void openReshape()}
+              onInactivate={() => setInactivateOpen(true)}
+              resetKey={resetKey}
+            />
+          ) : null}
+        </div>
+      </div>
 
       {settingsOpen ? (
         <SettingsDrawer
