@@ -309,13 +309,25 @@ global:
   #   tab no longer reds a block for conditions that merely evaluated
   #   false -- unmet checks only count when the tree actually fired.
   #   Frontend only. api + workers stay d9244d3; tile-server 9d140cc.
+  # 0eceef5 = #340, the UI standard programme (DS-1..DS-11) -- one page
+  #   pattern across all ~45 routes, 148 files. Biggest frontend change
+  #   yet shipped here, so worth knowing what to watch: DS-2 inverts page
+  #   padding ownership (AppShell's <main> no longer pads, <Page> owns the
+  #   inset), and DS-8 retires the .btn/.card/.input/.label layers and the
+  #   brand-*/sand-* palettes outright. Anything visually off after this
+  #   sync is almost certainly one of those two, not a data problem.
+  #   Also fixes /settings/org + /settings/notifications shipping with no
+  #   <h1>, and a badge nested inside <h1> that polluted the accessible
+  #   name. Verified across all 41 routes in a browser pre-merge.
+  #   Frontend only, no migration, no API change. api + workers stay
+  #   d9244d3; tile-server 9d140cc.
   images:
     api:
       tag: "d9244d3"
     workers:
       tag: "d9244d3"
     frontend:
-      tag: "cb626e1"
+      tag: "0eceef5"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
