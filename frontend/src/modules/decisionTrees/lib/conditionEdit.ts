@@ -1,36 +1,58 @@
-// Pure helpers for the visual condition builder (PR-D5).
+// Pure helpers for the visual condition builder.
 //
 // The condition AST (see backend/app/shared/conditions/evaluator.py) is
-// expressive: boolean groups (all_of / any_of / not), six comparison
-// ops + between + in, refs from five sources (indices, block, weather,
-// signals, params). The V1 builder covers the common case observed in
-// the seeds + most authored trees:
+// expressive: boolean groups (all_of / any_of / not), six binary ops
+// plus `between` and `in`, and refs from eight sources. The builder now
+// models all of it, so authoring no longer falls off a cliff into the
+// raw-YAML editor the moment a tree needs a nested group or a NOT.
 //
-//   * One comparison node, OR
-//   * One all_of / any_of group of comparison nodes (single level)
-//
-// Anything else — nested groups, `not`, `between`, `in`, mixed
-// shapes — falls into the `unsupported` form, and the panel surfaces a
-// read-only JSON + "edit this in the YAML editor" hint. We never throw
-// away the original AST; the panel keeps it around and the YAML save
-// path emits it untouched.
+// The `unsupported` branch is kept, but it should now only be reached by
+// a genuinely malformed AST rather than by a shape we simply declined to
+// model. We never throw away the original AST: the panel keeps it and
+// the YAML save path emits it untouched.
 
 // ---- Domain constants ----------------------------------------------
 
 // Mirrors backend constants in `backend/app/shared/conditions/{models,context}.py`.
-// Keep in lock-step.
-export const INDICES_KEYS = ["mean", "baseline_deviation"] as const;
+// Keep in lock-step. These drifted once — the backend gained the KB P2
+// trend keys and the KB P3 / taxonomy block fields while this file stayed
+// on the original pair — which silently made every stage-gated and
+// trend-based tree unparseable here and pushed it into the YAML fallback.
+// If you add a key or field on the backend, add it here in the same PR.
+export const INDICES_KEYS = [
+  "mean",
+  "baseline_deviation",
+  // KB P2 trend features, computed at context load from recent history.
+  "slope",
+  "delta",
+  "trend_direction",
+] as const;
 // The canonical imagery index codes (block_index_aggregates / grid
 // aggregates). Closed list so the author picks from a dropdown rather than
 // guessing; mirrors STANDARD_INDEX_CODES in
 // backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
 export const INDEX_CODES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"] as const;
-export const BLOCK_FIELDS = ["crop_category"] as const;
+export const BLOCK_FIELDS = [
+  "crop_category",
+  // KB P3: the block's current phenological stage, resolved from the crop
+  // taxonomy and auto-advanced daily.
+  "growth_stage",
+  // Crop taxonomy: hierarchical path (`mango.alphonso.short`) + strain leaf.
+  "crop_path",
+  "crop_strain",
+  "soil_texture",
+  "salinity_class",
+  "canopy_size_class",
+] as const;
 export const SIGNAL_KEYS = [
   "value_numeric",
   "value_categorical",
   "value_event",
   "value_boolean",
+  // KB P2 trend features over the numeric observation history.
+  "value_slope",
+  "value_delta",
+  "value_trend_direction",
 ] as const;
 export const WEATHER_SCOPES = [
   "latest_observation",
@@ -74,11 +96,21 @@ export const GRID_FIELDS = [
   "severity",
 ] as const;
 
-// Comparison ops the V1 builder surfaces in the operator dropdown.
-// `between` and `in` exist in the engine but are deferred to YAML —
-// they need range / set inputs the row UI doesn't model yet.
-export const COMPARISON_OPS = ["lt", "le", "gt", "ge", "eq", "ne"] as const;
-export type ComparisonOp = (typeof COMPARISON_OPS)[number];
+// Binary comparison ops — one left ref, one right operand.
+export const BINARY_OPS = ["lt", "le", "gt", "ge", "eq", "ne"] as const;
+export type BinaryOp = (typeof BINARY_OPS)[number];
+
+// Every op the term editor offers. `between` takes a low/high pair and
+// `in` takes a value list, so they get their own operand shapes below.
+export const TERM_OPS = [...BINARY_OPS, "between", "in"] as const;
+export type TermOp = (typeof TERM_OPS)[number];
+
+/** How deep the visual builder lets an author nest groups. The node
+ *  details panel is a fixed ~360px column and each level costs
+ *  indentation, so past this the UI stops offering "add group" — the AST
+ *  itself has no such limit and a deeper tree authored in YAML still
+ *  parses and renders here. */
+export const MAX_GROUP_DEPTH = 3;
 
 // ---- AST types -----------------------------------------------------
 
@@ -110,99 +142,115 @@ export type ValueRef =
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
   | { source: "params"; name: string };
 
-// The right-hand side of a binary comparison can be a literal (number,
-// string, boolean) or a value-ref (typically a params ref so the same
-// tree can be re-parameterized per tenant).
+// The right-hand side of a comparison can be a literal (number, string,
+// boolean) or a value-ref (typically a params ref so the same tree can be
+// re-parameterized per tenant).
 export type RightOperand =
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
   | { kind: "boolean"; value: boolean }
   | { kind: "ref"; ref: ValueRef };
 
-export interface ComparisonTerm {
-  op: ComparisonOp;
-  left: ValueRef;
-  right: RightOperand;
-}
+export type Term =
+  | { op: BinaryOp; left: ValueRef; right: RightOperand }
+  | { op: "between"; left: ValueRef; low: RightOperand; high: RightOperand }
+  | { op: "in"; left: ValueRef; values: RightOperand[] };
 
 export type GroupMode = "all" | "any";
 
+/** One node of the editable condition tree. Recursive, mirroring the
+ *  backend AST rather than the flattened single/group pair the V1
+ *  builder used. */
+export type ConditionNode =
+  | { kind: "term"; term: Term }
+  | { kind: "group"; mode: GroupMode; children: ConditionNode[] }
+  | { kind: "not"; child: ConditionNode };
+
 export type EditableCondition =
-  | { kind: "single"; term: ComparisonTerm }
-  | { kind: "group"; mode: GroupMode; terms: ComparisonTerm[] }
   | { kind: "empty" }
+  | { kind: "node"; node: ConditionNode }
   | { kind: "unsupported"; reason: string; raw: unknown };
 
 // ---- Parse: AST → editable form -----------------------------------
 
 /** Convert a raw `condition.tree` AST into the editable form. Returns
- *  `unsupported` (with the original AST preserved on `raw`) whenever the
- *  shape isn't one of the simple cases the V1 builder handles. Callers
- *  show a read-only fallback in that branch. */
+ *  `unsupported` (with the original AST preserved on `raw`) only when the
+ *  shape is genuinely unrecognisable — an unknown op, a malformed ref, a
+ *  group whose children aren't a list. Callers show a read-only fallback
+ *  in that branch. */
 export function parseConditionTree(raw: unknown): EditableCondition {
   if (raw === undefined || raw === null) return { kind: "empty" };
   if (!isRecord(raw)) {
     return { kind: "unsupported", reason: "Condition is not an object.", raw };
   }
-  // Boolean group?
-  if ("all_of" in raw || "any_of" in raw) {
-    const mode: GroupMode = "all_of" in raw ? "all" : "any";
-    const children = mode === "all" ? raw.all_of : raw.any_of;
-    if (!Array.isArray(children)) {
-      return {
-        kind: "unsupported",
-        reason: `'${mode}_of' must be a list.`,
-        raw,
-      };
-    }
-    const parsedTerms: ComparisonTerm[] = [];
-    for (const child of children) {
-      const term = parseComparison(child);
-      if (!term) {
-        return {
-          kind: "unsupported",
-          reason: "Nested groups, NOT, BETWEEN and IN are edited in YAML.",
-          raw,
-        };
-      }
-      parsedTerms.push(term);
-    }
-    if (parsedTerms.length === 0) return { kind: "empty" };
-    if (parsedTerms.length === 1) {
-      return { kind: "single", term: parsedTerms[0] };
-    }
-    return { kind: "group", mode, terms: parsedTerms };
-  }
-  if ("not" in raw) {
+  const node = parseNode(raw);
+  if (!node) {
     return {
       kind: "unsupported",
-      reason: "NOT groups are edited in YAML.",
+      reason: "Condition shape not recognised.",
       raw,
     };
   }
-  // Single comparison?
-  const term = parseComparison(raw);
-  if (term) return { kind: "single", term };
-  return {
-    kind: "unsupported",
-    reason: "Condition shape not handled by the visual builder.",
-    raw,
-  };
+  // A top-level group with nothing in it reads as "no condition".
+  if (node.kind === "group" && node.children.length === 0) return { kind: "empty" };
+  return { kind: "node", node };
 }
 
-function parseComparison(raw: unknown): ComparisonTerm | null {
+function parseNode(raw: unknown): ConditionNode | null {
+  if (!isRecord(raw)) return null;
+
+  if ("all_of" in raw || "any_of" in raw) {
+    const mode: GroupMode = "all_of" in raw ? "all" : "any";
+    const children = mode === "all" ? raw.all_of : raw.any_of;
+    if (!Array.isArray(children)) return null;
+    const parsed: ConditionNode[] = [];
+    for (const child of children) {
+      const node = parseNode(child);
+      if (!node) return null;
+      parsed.push(node);
+    }
+    return { kind: "group", mode, children: parsed };
+  }
+
+  if ("not" in raw) {
+    const child = parseNode(raw.not);
+    if (!child) return null;
+    return { kind: "not", child };
+  }
+
+  const term = parseTerm(raw);
+  return term ? { kind: "term", term } : null;
+}
+
+function parseTerm(raw: unknown): Term | null {
   if (!isRecord(raw)) return null;
   const op = raw.op;
   if (typeof op !== "string") return null;
-  if (!(COMPARISON_OPS as readonly string[]).includes(op)) {
-    // between / in — defer to YAML for V1.
-    return null;
-  }
   const left = parseValueRef(raw.left);
   if (!left) return null;
+
+  if (op === "between") {
+    const low = parseRightOperand(raw.low);
+    const high = parseRightOperand(raw.high);
+    if (low === null || high === null) return null;
+    return { op: "between", left, low, high };
+  }
+
+  if (op === "in") {
+    if (!Array.isArray(raw.values)) return null;
+    const values: RightOperand[] = [];
+    for (const v of raw.values) {
+      const parsed = parseRightOperand(v);
+      if (parsed === null) return null;
+      values.push(parsed);
+    }
+    return { op: "in", left, values };
+  }
+
+  if (!(BINARY_OPS as readonly string[]).includes(op)) return null;
   const right = parseRightOperand(raw.right);
   if (right === null) return null;
-  return { op: op as ComparisonOp, left, right };
+  return { op: op as BinaryOp, left, right };
 }
 
 function parseValueRef(raw: unknown): ValueRef | null {
@@ -305,18 +353,38 @@ function parseRightOperand(raw: unknown): RightOperand | null {
 
 // ---- Serialize: editable form → AST -------------------------------
 
-/** Inverse of `parseConditionTree`. Single-term editable forms emit
- *  a flat comparison node so the YAML matches the pre-builder style. */
+/** Inverse of `parseConditionTree`. A lone comparison emits a flat
+ *  comparison node (no group wrapper) so the YAML matches the style the
+ *  seeds are written in. */
 export function serializeCondition(cond: EditableCondition): unknown {
   if (cond.kind === "empty") return undefined;
   if (cond.kind === "unsupported") return cond.raw;
-  if (cond.kind === "single") return serializeComparison(cond.term);
-  // Group: keep the original `${mode}_of` key.
-  const key = cond.mode === "all" ? "all_of" : "any_of";
-  return { [key]: cond.terms.map(serializeComparison) };
+  return serializeNode(cond.node);
 }
 
-function serializeComparison(term: ComparisonTerm): Record<string, unknown> {
+export function serializeNode(node: ConditionNode): unknown {
+  if (node.kind === "term") return serializeTerm(node.term);
+  if (node.kind === "not") return { not: serializeNode(node.child) };
+  const key = node.mode === "all" ? "all_of" : "any_of";
+  return { [key]: node.children.map(serializeNode) };
+}
+
+function serializeTerm(term: Term): Record<string, unknown> {
+  if (term.op === "between") {
+    return {
+      op: "between",
+      left: serializeValueRef(term.left),
+      low: serializeRightOperand(term.low),
+      high: serializeRightOperand(term.high),
+    };
+  }
+  if (term.op === "in") {
+    return {
+      op: "in",
+      left: serializeValueRef(term.left),
+      values: term.values.map(serializeRightOperand),
+    };
+  }
   return {
     op: term.op,
     left: serializeValueRef(term.left),
@@ -362,14 +430,48 @@ function serializeRightOperand(rhs: RightOperand): unknown {
   }
 }
 
+// ---- Term shape transitions ----------------------------------------
+
+/** Switch a term to a different operator, carrying the left ref and as
+ *  much of the right-hand side as the new shape can hold. Going binary →
+ *  `between` seeds the low bound from the old right operand; → `in`
+ *  seeds the first list entry. Going back keeps the low bound / first
+ *  entry. Without this an author loses their threshold every time they
+ *  try a different operator. */
+export function changeTermOp(term: Term, op: TermOp): Term {
+  if (term.op === op) return term;
+  const carried = firstOperand(term);
+  if (op === "between") {
+    return { op: "between", left: term.left, low: carried, high: carried };
+  }
+  if (op === "in") {
+    return { op: "in", left: term.left, values: [carried] };
+  }
+  return { op, left: term.left, right: carried };
+}
+
+function firstOperand(term: Term): RightOperand {
+  if (term.op === "between") return term.low;
+  if (term.op === "in") return term.values[0] ?? { kind: "number", value: 0 };
+  return term.right;
+}
+
 // ---- Helpers -------------------------------------------------------
 
-export function defaultComparisonTerm(): ComparisonTerm {
+export function defaultTerm(): Term {
   return {
     op: "lt",
     left: { source: "indices", index_code: "ndvi", key: "baseline_deviation" },
     right: { kind: "number", value: 0 },
   };
+}
+
+export function defaultTermNode(): ConditionNode {
+  return { kind: "term", term: defaultTerm() };
+}
+
+export function defaultGroupNode(mode: GroupMode = "all"): ConditionNode {
+  return { kind: "group", mode, children: [defaultTermNode()] };
 }
 
 export function defaultValueRef(source: ValueRefSource): ValueRef {
