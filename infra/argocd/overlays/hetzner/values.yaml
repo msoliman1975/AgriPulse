@@ -321,13 +321,36 @@ global:
   #   name. Verified across all 41 routes in a browser pre-merge.
   #   Frontend only, no migration, no API change. api + workers stay
   #   d9244d3; tile-server 9d140cc.
+  # a3239b6 = the knowledge-base gap close-out (#342..#346), api + workers +
+  #   frontend together. NO MIGRATION -- decision trees are seeded from disk
+  #   by the loader's sync_from_disk() at api startup, so the six new seed
+  #   YAMLs appear on their own. What to watch, in likelihood order:
+  #   (1) Six new trees register at boot -- potato_petiole_{nitrogen,
+  #   phosphorus,potassium}_v1 and date_palm_{ripening_rain_risk,
+  #   soil_salinity,pollination_rain}_v1. If the api crashloops on start,
+  #   suspect a seed that fails compile_tree, not the phenology change.
+  #   All three petiole trees and the date-palm salinity tree read tenant
+  #   CUSTOM SIGNALS (petiole_no3n / petiole_p / petiole_k / soil_salinity)
+  #   and stay dormant until one is ingested, so expect zero new
+  #   recommendations on day one -- that is correct, not a broken deploy.
+  #   (2) #345 rewrote the visual condition builder to a recursive AST and
+  #   re-synced its constants with the backend. Anything odd in the node
+  #   details panel on /decision-trees is that change. It also means
+  #   conditions that previously rendered as a read-only JSON blob now
+  #   render as editable rows -- that is the fix, not a regression.
+  #   (3) #346 wires gdd_from_planting phenology stages to real farm
+  #   weather. No seeded crop uses that mode, so the daily
+  #   phenology.advance_growth_stages beat task should behave exactly as
+  #   before; a change in its evaluated/advanced counts would be a
+  #   surprise worth reading.
+  #   tile-server stays 9d140cc.
   images:
     api:
-      tag: "d9244d3"
+      tag: "a3239b6"
     workers:
-      tag: "d9244d3"
+      tag: "a3239b6"
     frontend:
-      tag: "0eceef5"
+      tag: "a3239b6"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
