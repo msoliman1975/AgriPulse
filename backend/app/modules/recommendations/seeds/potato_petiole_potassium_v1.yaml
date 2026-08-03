@@ -1,0 +1,217 @@
+# potato_petiole_potassium_v1 — petiole potassium sufficiency for
+# potato, gated to the stage window the reference band is defined for.
+#
+# Same shape and same restraint as potato_petiole_phosphorus_v1: the
+# published band is quoted at tuber bulking, so the tree refuses to
+# interpret K outside tuber initiation / bulking rather than extrapolate.
+#
+# UNITS: petiole K as % of DRY WEIGHT.
+
+code: potato_petiole_potassium_v1
+name_en: Potato — petiole potassium sufficiency
+name_ar: البطاطس — كفاية البوتاسيوم في عنق الورقة
+description_en: >-
+  Flags petiole potassium below the 8.0-10.0% (dry weight) sufficiency
+  range during tuber initiation and bulking. Potato is a heavy potassium
+  feeder and bulking is peak K demand, so a shortfall here costs both
+  yield and tuber quality. Reads the custom signal `petiole_k`. Silent
+  outside that stage window and until a test is ingested.
+description_ar: >-
+  ينبّه عند انخفاض بوتاسيوم عنق الورقة دون نطاق الكفاية 8.0-10.0% (وزن
+  جاف) خلال بداية التدرين وامتلاء الدرنات. البطاطس محصول شره
+  للبوتاسيوم وذروة الطلب في مرحلة الامتلاء، لذا يكلّف النقص هنا المحصول
+  وجودة الدرنات معًا. يقرأ الإشارة المخصّصة `petiole_k`. يبقى صامتًا
+  خارج تلك النافذة وحتى تُدخَل نتيجة تحليل.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The 8.0-10.0% petiole K sufficiency range is published by NDSU
+    (Table 7) and University of Minnesota Extension, both quoting it at
+    the TUBER BULKING stage. As with phosphorus, neither source gives a
+    declining stage series for K, so this tree does not interpret K
+    outside tuber initiation / bulking. Evidence confidence is medium
+    because the band is single-stage and because petiole K is sensitive
+    to sampling position and time of day. Chloride caveat that matters
+    in practice: potassium chloride is the cheapest K source but raises
+    root-zone salinity and can depress tuber specific gravity, so on
+    saline or marginal-water blocks potassium sulfate is preferred —
+    cross-check potato_soil_salinity_v1 before acting on this
+    recommendation. No Egypt-specific primary petiole K threshold was
+    found.
+  citations:
+    - source_type: extension
+      title: >-
+        Fertilizing Potato in North Dakota — NDSU Extension, Table 7
+        (petiole nutrient sufficiency at tuber bulking)
+      url: https://www.ndsu.edu/agriculture/extension/publications/fertilizing-potato-north-dakota
+    - source_type: extension
+      title: >-
+        Potato fertilization on irrigated soils — University of
+        Minnesota Extension
+      url: https://extension.umn.edu/crop-specific-needs/potato-fertilization-irrigated-soils
+
+transferability:
+  egypt: medium
+  middle_east: medium
+  global: high
+
+parameters:
+  sufficient_k:
+    type: number
+    default: 8.0
+    min: 0.0
+    max: 30.0
+    description: >-
+      Petiole potassium (% dry weight) below which the block is
+      deficient during tuber initiation / bulking. Lower bound of the
+      8.0-10.0% range.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in tuber initiation or bulking?
+    label_ar: هل القطعة في بداية التدرين أو امتلاء الدرنات؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [tuber_initiation, tuber_bulking]
+    on_match: data_check
+    on_miss: leaf_out_of_window
+
+  data_check:
+    label_en: Is there a petiole potassium reading for this block?
+    label_ar: هل توجد قراءة بوتاسيوم لعنق الورقة لهذه القطعة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: petiole_k
+          key: value_numeric
+        right: 0
+    on_match: k_check
+    on_miss: leaf_no_data
+
+  k_check:
+    label_en: Is petiole potassium below the sufficiency range?
+    label_ar: هل البوتاسيوم أقل من نطاق الكفاية؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: signals
+          code: petiole_k
+          key: value_numeric
+        right:
+          source: params
+          name: sufficient_k
+    on_match: leaf_deficient
+    on_miss: leaf_sufficient
+
+  leaf_deficient:
+    label_en: Petiole potassium below sufficiency — supplement K
+    label_ar: بوتاسيوم العنق دون الكفاية — عوّض البوتاسيوم
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 336
+      parameters:
+        priority: medium
+      text_en: >-
+        Petiole potassium is below the 8.0-10.0% sufficiency range
+        during peak demand. Potassium drives tuber bulking and quality —
+        a shortfall now shows up as reduced size grade and lower
+        specific gravity. Choose the K source with the block's salinity
+        in mind: potassium sulfate on saline or marginal-water blocks,
+        potassium chloride only where salinity is comfortable.
+      text_ar: >-
+        بوتاسيوم عنق الورقة أقل من نطاق الكفاية 8.0-10.0% في ذروة
+        الطلب. يقود البوتاسيوم امتلاء الدرنات وجودتها — ويظهر النقص الآن
+        في تراجع درجة الحجم وانخفاض الوزن النوعي. اختر مصدر البوتاسيوم
+        بحسب ملوحة القطعة: سلفات البوتاسيوم في القطع المالحة أو ذات
+        المياه الحديّة، وكلوريد البوتاسيوم فقط حيث الملوحة مريحة.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply potassium through fertigation, split across the
+              remaining bulking irrigations.
+            text_ar: >-
+              طبّق البوتاسيوم عبر الريّ بالتسميد، مُجزّأً على ريّات
+              الامتلاء المتبقية.
+          - text_en: >-
+              Check the block's salinity status before choosing
+              potassium chloride over potassium sulfate.
+            text_ar: >-
+              تحقّق من حالة ملوحة القطعة قبل تفضيل كلوريد البوتاسيوم على
+              سلفاته.
+        short_term:
+          - text_en: Re-sample petioles in 7-10 days to confirm recovery.
+            text_ar: أعد أخذ عيّنة الأعناق خلال 7-10 أيام لتأكيد التعافي.
+        long_term:
+          - text_en: >-
+              Raise the pre-plant potassium rate next season; potato
+              removes large amounts of K at harvest.
+            text_ar: >-
+              ارفع معدل البوتاسيوم قبل الزراعة في الموسم القادم؛ تسحب
+              البطاطس كميات كبيرة من البوتاسيوم عند الحصاد.
+        monitoring:
+          - text_en: >-
+              Track petiole K weekly through bulking and record tuber
+              specific gravity at harvest.
+            text_ar: >-
+              تابع بوتاسيوم الأعناق أسبوعيًا حتى نهاية الامتلاء وسجّل
+              الوزن النوعي للدرنات عند الحصاد.
+
+  leaf_sufficient:
+    label_en: No action — petiole potassium within range
+    label_ar: لا إجراء — البوتاسيوم ضمن النطاق
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.85
+      parameters: {}
+      text_en: Petiole potassium is within the 8.0-10.0% sufficiency range.
+      text_ar: بوتاسيوم عنق الورقة ضمن نطاق الكفاية 8.0-10.0%.
+
+  leaf_no_data:
+    label_en: No action — no petiole test on record
+    label_ar: لا إجراء — لا يوجد تحليل أعناق مسجّل
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        No petiole potassium reading has been ingested for this block,
+        so potassium status is unknown.
+      text_ar: >-
+        لم تُدخَل أي قراءة لبوتاسيوم عنق الورقة لهذه القطعة، لذا فحالة
+        البوتاسيوم غير معروفة.
+
+  leaf_out_of_window:
+    label_en: No action — outside the calibrated stage window
+    label_ar: لا إجراء — خارج نافذة المرحلة المعايَرة
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The published petiole potassium range is defined for tuber
+        initiation / bulking only; outside that window it is not
+        interpreted.
+      text_ar: >-
+        نطاق بوتاسيوم عنق الورقة المنشور مُعرَّف لبداية التدرين/امتلاء
+        الدرنات فقط؛ ولا يُفسَّر خارج تلك النافذة.

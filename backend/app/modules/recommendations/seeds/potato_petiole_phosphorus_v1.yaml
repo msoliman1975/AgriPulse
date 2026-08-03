@@ -1,0 +1,219 @@
+# potato_petiole_phosphorus_v1 — petiole phosphorus sufficiency for
+# potato, gated to the stage window the reference band is defined for.
+#
+# Unlike nitrate (see potato_petiole_nitrogen_v1), the published petiole
+# P sufficiency range is quoted at a single stage — tuber bulking — not
+# as a declining series. Rather than extrapolate a band the sources do
+# not give, this tree stays silent outside tuber initiation / bulking.
+# That is deliberate: a fabricated early-season P threshold would be
+# indistinguishable from a real one once it is in the catalog.
+#
+# UNITS: petiole P as % of DRY WEIGHT, not sap.
+
+code: potato_petiole_phosphorus_v1
+name_en: Potato — petiole phosphorus sufficiency
+name_ar: البطاطس — كفاية الفوسفور في عنق الورقة
+description_en: >-
+  Flags petiole phosphorus below the 0.22-0.40% (dry weight)
+  sufficiency range during tuber initiation and bulking, when P drives
+  tuber set and starch accumulation. Reads the custom signal
+  `petiole_p`. Silent outside that stage window and until a test is
+  ingested.
+description_ar: >-
+  ينبّه عند انخفاض فوسفور عنق الورقة دون نطاق الكفاية 0.22-0.40% (وزن
+  جاف) خلال بداية التدرين وامتلاء الدرنات، حيث يقود الفوسفور عقد
+  الدرنات وتراكم النشا. يقرأ الإشارة المخصّصة `petiole_p`. يبقى صامتًا
+  خارج تلك النافذة وحتى تُدخَل نتيجة تحليل.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The 0.22-0.40% petiole P sufficiency range is published by NDSU
+    (Table 7) and University of Minnesota Extension, both quoting it at
+    the TUBER BULKING stage. Neither gives a stage-by-stage series for
+    P the way both do for nitrate, so this tree deliberately refuses to
+    interpret P outside tuber initiation / bulking rather than invent a
+    band. Evidence confidence is medium rather than high for two
+    reasons: the range is single-stage, and petiole P is a weaker
+    diagnostic than petiole nitrate because soil-test P and banded
+    starter placement dominate potato P response. Treat a low reading as
+    a prompt to check soil test P and starter placement, not as a
+    standalone fertigation trigger. No Egypt-specific primary petiole P
+    threshold was found; Egyptian calcareous, high-pH soils fix P more
+    strongly than the temperate soils behind these numbers, which is why
+    Egypt transferability is scored low.
+  citations:
+    - source_type: extension
+      title: >-
+        Fertilizing Potato in North Dakota — NDSU Extension, Table 7
+        (petiole nutrient sufficiency at tuber bulking)
+      url: https://www.ndsu.edu/agriculture/extension/publications/fertilizing-potato-north-dakota
+    - source_type: extension
+      title: >-
+        Potato fertilization on irrigated soils — University of
+        Minnesota Extension
+      url: https://extension.umn.edu/crop-specific-needs/potato-fertilization-irrigated-soils
+
+transferability:
+  egypt: low
+  middle_east: medium
+  global: medium
+
+parameters:
+  sufficient_p:
+    type: number
+    default: 0.22
+    min: 0.0
+    max: 2.0
+    description: >-
+      Petiole phosphorus (% dry weight) below which the block is
+      deficient during tuber initiation / bulking. Lower bound of the
+      0.22-0.40% range.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in tuber initiation or bulking?
+    label_ar: هل القطعة في بداية التدرين أو امتلاء الدرنات؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [tuber_initiation, tuber_bulking]
+    on_match: data_check
+    on_miss: leaf_out_of_window
+
+  data_check:
+    label_en: Is there a petiole phosphorus reading for this block?
+    label_ar: هل توجد قراءة فوسفور لعنق الورقة لهذه القطعة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: petiole_p
+          key: value_numeric
+        right: 0
+    on_match: p_check
+    on_miss: leaf_no_data
+
+  p_check:
+    label_en: Is petiole phosphorus below the sufficiency range?
+    label_ar: هل الفوسفور أقل من نطاق الكفاية؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: signals
+          code: petiole_p
+          key: value_numeric
+        right:
+          source: params
+          name: sufficient_p
+    on_match: leaf_deficient
+    on_miss: leaf_sufficient
+
+  leaf_deficient:
+    label_en: Petiole phosphorus below sufficiency — verify soil P
+    label_ar: فوسفور العنق دون الكفاية — تحقّق من فوسفور التربة
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 336
+      parameters:
+        priority: medium
+      text_en: >-
+        Petiole phosphorus is below the 0.22-0.40% sufficiency range
+        during tuber initiation / bulking. Potato P response is driven
+        mainly by soil-test P and starter placement rather than
+        in-season correction, so confirm against a soil test before
+        fertigating — in calcareous, high-pH soils a low petiole reading
+        often reflects fixation and poor positional availability rather
+        than a true shortage of applied P.
+      text_ar: >-
+        فوسفور عنق الورقة أقل من نطاق الكفاية 0.22-0.40% خلال بداية
+        التدرين/امتلاء الدرنات. تعتمد استجابة البطاطس للفوسفور أساسًا
+        على تحليل التربة وموضع السماد البادئ لا على التصحيح خلال الموسم،
+        لذا تحقّق بتحليل تربة قبل التسميد عبر الريّ — ففي التربة الجيرية
+        عالية الأس الهيدروجيني كثيرًا ما تعكس القراءة المنخفضة التثبيت
+        وضعف الإتاحة الموضعية لا نقصًا حقيقيًا في الفوسفور المُضاف.
+      actions:
+        immediate:
+          - text_en: >-
+              Check the block's most recent soil test P and the starter
+              band placement before adding phosphorus.
+            text_ar: >-
+              راجع أحدث تحليل لفوسفور التربة وموضع شريط السماد البادئ
+              قبل إضافة الفوسفور.
+        short_term:
+          - text_en: >-
+              If soil test P is also low, apply phosphorus through
+              fertigation; if soil P is adequate, address root-zone pH
+              and moisture instead.
+            text_ar: >-
+              إن كان فوسفور التربة منخفضًا أيضًا فطبّق الفوسفور عبر
+              الريّ بالتسميد؛ وإن كان كافيًا فعالج الأس الهيدروجيني
+              ورطوبة منطقة الجذور بدلًا من ذلك.
+        long_term:
+          - text_en: >-
+              Revisit banded starter P rate and placement for next
+              season; broadcast P is poorly available in high-pH soils.
+            text_ar: >-
+              أعد النظر في معدل وموضع الفوسفور البادئ المُشرّط للموسم
+              القادم؛ فالفوسفور المنثور ضعيف الإتاحة في التربة عالية
+              الأس الهيدروجيني.
+        monitoring:
+          - text_en: Re-sample petioles in 10-14 days alongside a soil test.
+            text_ar: أعد أخذ عيّنة الأعناق خلال 10-14 يومًا مع تحليل تربة.
+
+  leaf_sufficient:
+    label_en: No action — petiole phosphorus within range
+    label_ar: لا إجراء — الفوسفور ضمن النطاق
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.85
+      parameters: {}
+      text_en: Petiole phosphorus is within the 0.22-0.40% sufficiency range.
+      text_ar: فوسفور عنق الورقة ضمن نطاق الكفاية 0.22-0.40%.
+
+  leaf_no_data:
+    label_en: No action — no petiole test on record
+    label_ar: لا إجراء — لا يوجد تحليل أعناق مسجّل
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        No petiole phosphorus reading has been ingested for this block,
+        so phosphorus status is unknown.
+      text_ar: >-
+        لم تُدخَل أي قراءة لفوسفور عنق الورقة لهذه القطعة، لذا فحالة
+        الفوسفور غير معروفة.
+
+  leaf_out_of_window:
+    label_en: No action — outside the calibrated stage window
+    label_ar: لا إجراء — خارج نافذة المرحلة المعايَرة
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The published petiole phosphorus range is defined for tuber
+        initiation / bulking only; outside that window it is not
+        interpreted.
+      text_ar: >-
+        نطاق فوسفور عنق الورقة المنشور مُعرَّف لبداية التدرين/امتلاء
+        الدرنات فقط؛ ولا يُفسَّر خارج تلك النافذة.

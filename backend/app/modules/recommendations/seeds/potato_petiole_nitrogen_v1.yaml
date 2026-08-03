@@ -1,0 +1,464 @@
+# potato_petiole_nitrogen_v1 — stage-gated petiole sap nitrate-N status
+# for potato.
+#
+# This is the first tree in the catalog whose thresholds are *phenology
+# dependent* rather than absolute: the sufficiency band for petiole
+# nitrate falls by roughly two thirds between tuberization and
+# maturation, so a single cutoff would either over-fertilize late or
+# miss a genuine early deficiency. It is only expressible because the
+# phenology spine now resolves `block.growth_stage` from the crop
+# taxonomy (see migration 0033 for the potato stage vocabulary).
+#
+# UNITS MATTER: the thresholds below are FRESH SAP nitrate-N in ppm
+# (the Cardy/LAQUA-Twin sap-meter reading). They are NOT the dry-weight
+# petiole values, which run ~1.7-2.2% NO3-N over the same stages — an
+# order of magnitude apart. A tenant ingesting dry-weight numbers into
+# this signal would see the tree fire constantly. The signal
+# description must state "fresh sap, ppm".
+
+code: potato_petiole_nitrogen_v1
+name_en: Potato — petiole sap nitrate (stage-gated)
+name_ar: البطاطس — نترات عنق الورقة (حسب مرحلة النمو)
+description_en: >-
+  Compares a block's petiole sap nitrate-N reading (custom signal
+  `petiole_no3n`, fresh sap in ppm) against the sufficiency band for the
+  block's *current growth stage*. Flags deficiency during vegetative /
+  tuberization (<1200 ppm) and tuber bulking (<800 ppm), when
+  supplemental nitrogen still pays, and flags nitrate still running high
+  at maturation, which delays maturity and skin set. Stays silent until
+  a petiole test is ingested.
+description_ar: >-
+  يقارن قراءة نترات النيتروجين في عصارة عنق الورقة (الإشارة المخصّصة
+  `petiole_no3n`، عصارة طازجة بوحدة ppm) بنطاق الكفاية الخاص بمرحلة نمو
+  القطعة الحالية. ينبّه إلى النقص خلال النمو الخضري/بداية التدرين
+  (أقل من 1200 ppm) وامتلاء الدرنات (أقل من 800 ppm) حيث يظل التسميد
+  النيتروجيني مُجديًا، كما ينبّه إلى بقاء النترات مرتفعة عند النضج مما
+  يؤخّر النضج وتكوّن القشرة. يبقى صامتًا حتى تُدخَل نتيجة تحليل.
+
+crop_code: potato
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    Sufficiency bands are the Russet Burbank petiole SAP nitrate-N
+    ranges published by two independent land-grant extension services
+    that agree to the digit: vegetative/tuberization 1200-1600 ppm,
+    tuber growth/bulking 800-1100 ppm, bulking/maturation 400-700 ppm.
+    The tree tests the LOWER bound of each band. Cultivar caveat: these
+    are Russet Burbank values and other cultivars differ — NDSU and UMN
+    both say so explicitly — hence every bound is a tunable parameter.
+    Basis caveat: these are fresh-sap readings; the dry-weight petiole
+    equivalents for the same stages are 1.7-2.2% / 1.1-1.5% / 0.6-0.9%
+    NO3-N, ~10x larger in ppm terms, and the two are routinely confused
+    in secondary sources. No Egypt-specific primary petiole thresholds
+    were found, so Egypt applicability is inherited from irrigated
+    temperate/arid data — the sampling protocol (4th petiole from the
+    tip, 30-50 plants) transfers, the absolute band may need local
+    calibration. Stage mapping: our `vegetative` and `tuber_initiation`
+    both fall inside extension's "vegetative/tuberization" window.
+  citations:
+    - source_type: extension
+      title: >-
+        Potato fertilization on irrigated soils — University of
+        Minnesota Extension (petiole sap nitrate-N by growth stage,
+        Russet Burbank)
+      url: https://extension.umn.edu/crop-specific-needs/potato-fertilization-irrigated-soils
+    - source_type: extension
+      title: >-
+        Fertilizing Potato in North Dakota — NDSU Extension, Table 8
+        (Russet Burbank petiole sap nitrate) and Table 7 (dry-weight
+        petiole sufficiency)
+      url: https://www.ndsu.edu/agriculture/extension/publications/fertilizing-potato-north-dakota
+    - source_type: extension
+      title: >-
+        Understanding plant analysis for crops — University of Minnesota
+        Extension (petiole sampling position and interpretation)
+      url: https://extension.umn.edu/testing-and-analysis/understanding-plant-analysis-crops
+
+transferability:
+  egypt: medium
+  middle_east: medium
+  global: high
+
+parameters:
+  sufficient_early:
+    type: number
+    default: 1200
+    min: 0
+    max: 5000
+    description: >-
+      Petiole sap NO3-N (ppm) below which the block is nitrogen
+      deficient during vegetative / tuber initiation. Lower bound of the
+      1200-1600 ppm band.
+  sufficient_bulking:
+    type: number
+    default: 800
+    min: 0
+    max: 5000
+    description: >-
+      Petiole sap NO3-N (ppm) below which the block is deficient during
+      tuber bulking. Lower bound of the 800-1100 ppm band.
+  sufficient_maturation:
+    type: number
+    default: 400
+    min: 0
+    max: 5000
+    description: >-
+      Petiole sap NO3-N (ppm) below which nitrate has fallen under the
+      maturation band (400-700 ppm).
+  excess_maturation:
+    type: number
+    default: 1100
+    min: 0
+    max: 10000
+    description: >-
+      Petiole sap NO3-N (ppm) above which nitrate is still running high
+      at maturation, delaying maturity and skin set.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in a stage where petiole nitrate is interpretable?
+    label_ar: هل القطعة في مرحلة يمكن فيها تفسير نترات عنق الورقة؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [vegetative, tuber_initiation, tuber_bulking, maturation]
+    on_match: data_check
+    on_miss: leaf_out_of_window
+
+  # Presence probe. A missing signal resolves to None and every
+  # comparison short-circuits to False, which would otherwise walk to
+  # the "sufficient" leaf and read as false reassurance. Sap nitrate is
+  # strictly positive, so `> 0` separates "no test on record" from a
+  # genuine low reading.
+  data_check:
+    label_en: Is there a petiole sap nitrate reading for this block?
+    label_ar: هل توجد قراءة نترات لعصارة عنق الورقة لهذه القطعة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: petiole_no3n
+          key: value_numeric
+        right: 0
+    on_match: stage_early
+    on_miss: leaf_no_data
+
+  stage_early:
+    label_en: Is the block in vegetative or tuber initiation?
+    label_ar: هل القطعة في النمو الخضري أو بداية التدرين؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [vegetative, tuber_initiation]
+    on_match: early_check
+    on_miss: stage_bulking
+
+  early_check:
+    label_en: Is sap nitrate below the vegetative/tuberization band?
+    label_ar: هل النترات أقل من نطاق النمو الخضري/بداية التدرين؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: signals
+          code: petiole_no3n
+          key: value_numeric
+        right:
+          source: params
+          name: sufficient_early
+    on_match: leaf_deficient_early
+    on_miss: leaf_sufficient
+
+  stage_bulking:
+    label_en: Is the block in tuber bulking?
+    label_ar: هل القطعة في مرحلة امتلاء الدرنات؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: block
+          field: growth_stage
+        right: tuber_bulking
+    on_match: bulking_check
+    on_miss: maturation_excess_check
+
+  bulking_check:
+    label_en: Is sap nitrate below the tuber-bulking band?
+    label_ar: هل النترات أقل من نطاق امتلاء الدرنات؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: signals
+          code: petiole_no3n
+          key: value_numeric
+        right:
+          source: params
+          name: sufficient_bulking
+    on_match: leaf_deficient_bulking
+    on_miss: leaf_sufficient
+
+  maturation_excess_check:
+    label_en: Is sap nitrate still high at maturation?
+    label_ar: هل النترات ما زالت مرتفعة عند النضج؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: petiole_no3n
+          key: value_numeric
+        right:
+          source: params
+          name: excess_maturation
+    on_match: leaf_excess_maturation
+    on_miss: maturation_low_check
+
+  maturation_low_check:
+    label_en: Has sap nitrate fallen below the maturation band?
+    label_ar: هل انخفضت النترات دون نطاق النضج؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: signals
+          code: petiole_no3n
+          key: value_numeric
+        right:
+          source: params
+          name: sufficient_maturation
+    on_match: leaf_low_maturation
+    on_miss: leaf_sufficient
+
+  # ---- leaves -------------------------------------------------------
+
+  leaf_deficient_early:
+    label_en: Nitrogen deficient in vegetative/tuberization — supplement now
+    label_ar: نقص نيتروجين في النمو الخضري/بداية التدرين — عوّض الآن
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.8
+      valid_for_hours: 168
+      parameters:
+        priority: high
+        stage_band: vegetative_tuberization
+      text_en: >-
+        Petiole sap nitrate is below the 1200-1600 ppm sufficiency band
+        for vegetative / tuber initiation. This is the stage where
+        petiole nitrate correlates best with final yield, so a shortfall
+        now is the most costly one to ignore — and the most correctable.
+      text_ar: >-
+        نترات عصارة عنق الورقة أقل من نطاق الكفاية 1200-1600 ppm للنمو
+        الخضري/بداية التدرين. في هذه المرحلة يرتبط قياس النترات بأعلى
+        درجة بالمحصول النهائي، لذا فإن النقص الآن هو الأكثر كلفةً عند
+        تجاهله والأسهل تداركًا.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply supplemental nitrogen through fertigation; split
+              applications track the crop better than a single dose.
+            text_ar: >-
+              طبّق نيتروجينًا تكميليًا عبر الريّ بالتسميد؛ الجرعات
+              المُجزّأة تواكب المحصول أفضل من جرعة واحدة.
+        short_term:
+          - text_en: >-
+              Re-sample petioles 7 days after the application to confirm
+              the reading has moved back into band.
+            text_ar: >-
+              أعد أخذ عيّنة أعناق بعد 7 أيام من التطبيق للتأكد من عودة
+              القراءة إلى النطاق.
+          - text_en: >-
+              Check that irrigation is not leaching nitrate below the
+              root zone before adding more fertilizer.
+            text_ar: >-
+              تأكّد أن الريّ لا يغسل النترات أسفل منطقة الجذور قبل
+              إضافة مزيد من السماد.
+        long_term:
+          - text_en: >-
+              Review the season's nitrogen budget and pre-plant soil
+              test against actual uptake.
+            text_ar: >-
+              راجع الموازنة النيتروجينية للموسم وتحليل التربة قبل
+              الزراعة مقابل الامتصاص الفعلي.
+        monitoring:
+          - text_en: >-
+              Sample the 4th petiole from the shoot tip, 30-50 plants
+              per field, weekly through bulking.
+            text_ar: >-
+              خذ عيّنة من العنق الرابع من قمة النبات، 30-50 نباتًا لكل
+              حقل، أسبوعيًا حتى امتلاء الدرنات.
+
+  leaf_deficient_bulking:
+    label_en: Nitrogen deficient during bulking — supplement
+    label_ar: نقص نيتروجين خلال امتلاء الدرنات — عوّض
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.75
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        stage_band: tuber_bulking
+      text_en: >-
+        Petiole sap nitrate is below the 800-1100 ppm band for tuber
+        bulking. Bulking is the main yield-accumulation window, so
+        correct the shortfall — but keep the application modest, since
+        nitrate must still decline into the maturation band on schedule.
+      text_ar: >-
+        نترات عصارة العنق أقل من نطاق 800-1100 ppm لمرحلة امتلاء
+        الدرنات. هذه المرحلة هي نافذة تراكم المحصول الرئيسية، فعالج
+        النقص — مع إبقاء الجرعة معتدلة لأن النترات يجب أن تنخفض إلى
+        نطاق النضج في موعدها.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply a modest fertigated nitrogen dose sized to close the
+              gap, not to push the reading to the top of the band.
+            text_ar: >-
+              طبّق جرعة نيتروجين معتدلة عبر الريّ بحجم يسدّ الفجوة، لا
+              ليرفع القراءة إلى أعلى النطاق.
+        short_term:
+          - text_en: Re-sample petioles in 7 days to confirm recovery.
+            text_ar: أعد أخذ عيّنة الأعناق خلال 7 أيام لتأكيد التعافي.
+        monitoring:
+          - text_en: >-
+              Track the weekly trend — nitrate should decline steadily
+              toward the 400-700 ppm maturation band.
+            text_ar: >-
+              تابع الاتجاه الأسبوعي — يجب أن تنخفض النترات تدريجيًا نحو
+              نطاق النضج 400-700 ppm.
+
+  leaf_excess_maturation:
+    label_en: Nitrate still high at maturation — maturity at risk
+    label_ar: النترات ما زالت مرتفعة عند النضج — النضج في خطر
+    outcome:
+      kind: recommendation
+      action_type: other
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+        stage_band: maturation
+      text_en: >-
+        Petiole sap nitrate is still above the maturation band. Nitrogen
+        that stays high this late keeps the canopy green, delays tuber
+        maturity and skin set, and raises the risk of bruising and
+        storage losses at harvest. Stop nitrogen and let the crop mature.
+      text_ar: >-
+        نترات عصارة العنق ما زالت أعلى من نطاق النضج. بقاء النيتروجين
+        مرتفعًا في هذا الوقت المتأخر يبقي المجموع الخضري أخضر ويؤخّر نضج
+        الدرنات وتكوّن القشرة، ويرفع خطر الكدمات وفواقد التخزين عند
+        الحصاد. أوقف النيتروجين ودع المحصول ينضج.
+      actions:
+        immediate:
+          - text_en: Stop all further nitrogen applications on this block.
+            text_ar: أوقف كل إضافات النيتروجين على هذه القطعة.
+        short_term:
+          - text_en: >-
+              Plan vine desiccation / haulm destruction to force skin
+              set before harvest.
+            text_ar: >-
+              خطّط لتجفيف العروش/إزالتها لفرض تكوّن القشرة قبل الحصاد.
+        long_term:
+          - text_en: >-
+              Reduce late-season nitrogen in next season's plan; the
+              shortfall is in timing, not total rate.
+            text_ar: >-
+              قلّل نيتروجين آخر الموسم في خطة الموسم القادم؛ الخلل في
+              التوقيت لا في الكمية الإجمالية.
+        monitoring:
+          - text_en: Re-sample weekly and confirm nitrate is falling before harvest.
+            text_ar: أعد أخذ العيّنة أسبوعيًا وتأكّد من انخفاض النترات قبل الحصاد.
+
+  leaf_low_maturation:
+    label_en: Nitrate below the maturation band — expected, verify senescence
+    label_ar: النترات دون نطاق النضج — متوقّع، تحقّق من الشيخوخة
+    outcome:
+      kind: recommendation
+      action_type: other
+      severity: info
+      confidence: 0.6
+      valid_for_hours: 336
+      parameters:
+        priority: low
+        stage_band: maturation
+      text_en: >-
+        Petiole sap nitrate has fallen below the 400-700 ppm maturation
+        band. Late-season decline is normal and desirable; no nitrogen
+        is recommended this close to harvest. Confirm the canopy is
+        senescing on schedule rather than dying prematurely.
+      text_ar: >-
+        انخفضت نترات عصارة العنق دون نطاق النضج 400-700 ppm. الانخفاض في
+        آخر الموسم طبيعي ومرغوب؛ ولا يُنصح بالنيتروجين قرب الحصاد. تأكّد
+        أن المجموع الخضري يشيخ في موعده لا أنه يموت مبكرًا.
+      actions:
+        monitoring:
+          - text_en: >-
+              Confirm senescence is on schedule; premature dieback
+              points at water, disease or root damage, not nitrogen.
+            text_ar: >-
+              تأكّد أن الشيخوخة في موعدها؛ الموت المبكر يشير إلى الماء
+              أو المرض أو ضرر الجذور لا إلى النيتروجين.
+
+  leaf_sufficient:
+    label_en: No action — petiole nitrate within the stage band
+    label_ar: لا إجراء — النترات ضمن نطاق المرحلة
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.85
+      parameters: {}
+      text_en: >-
+        Petiole sap nitrate is within the sufficiency band for the
+        block's current growth stage.
+      text_ar: >-
+        نترات عصارة عنق الورقة ضمن نطاق الكفاية لمرحلة نمو القطعة
+        الحالية.
+
+  leaf_no_data:
+    label_en: No action — no petiole test on record
+    label_ar: لا إجراء — لا يوجد تحليل أعناق مسجّل
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        No petiole sap nitrate reading has been ingested for this block,
+        so nitrogen status is unknown — this is not a statement that
+        nitrogen is adequate.
+      text_ar: >-
+        لم تُدخَل أي قراءة لنترات عصارة عنق الورقة لهذه القطعة، لذا فحالة
+        النيتروجين غير معروفة — وهذا ليس تأكيدًا بأن النيتروجين كافٍ.
+
+  leaf_out_of_window:
+    label_en: No action — outside the interpretable stage window
+    label_ar: لا إجراء — خارج نافذة المراحل القابلة للتفسير
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The block is at emergence or has no resolved growth stage.
+        Petiole sampling starts once the canopy can supply a 4th leaf.
+      text_ar: >-
+        القطعة في مرحلة الإنبات أو ليس لها مرحلة نمو محدّدة. يبدأ أخذ
+        عيّنات الأعناق عندما يوفّر المجموع الخضري ورقة رابعة.
