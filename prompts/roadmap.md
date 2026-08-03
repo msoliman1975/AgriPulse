@@ -288,6 +288,7 @@ This is a **lot** for one prompt. It is intentional. Everything here is foundati
 2. **Internal consumer only.** One platform-admin surface. No tenant-facing usage API in this prompt.
 3. **Full identity** on every event — `user_id` + `tenant_id` + role — so per-role funnels and retention are possible.
 4. **"Struggle" is derived**, not recorded. No session replay, no rage-click SDK, no third-party script.
+5. **Telemetry does not survive a tenant purge.** No archive row, no summary, no exemption. Accepted cost: a churn post-mortem has to be taken while the tenant is still live.
 
 ### In scope
 - Backend: **new `telemetry` module** (`app/modules/telemetry/`) — *not* `analytics`, which `data_model.md § 14` reserves for agronomic aggregates
@@ -296,6 +297,7 @@ This is a **lot** for one prompt. It is intentional. Everything here is foundati
   - `POST /api/v1/telemetry/events` — batched, always `202`, identity stamped server-side from `RequestContext`, `props` keys allow-listed, rate-limited
   - `usage_daily` + `usage_flow_daily` continuous aggregates, kept 24 months
   - Purge registry entries for `(usage_events, tenant_id)` and `(usage_events, farm_id)` — CI's orphan guard fails without them
+  - **Purge-completeness work in `shared/purge/`**: a `PUBLIC_CAGGS` tuple and a `public`-schema continuous-aggregate refresh phase on the tenant path. The existing `BLOCK_CAGGS` machinery is block- and tenant-schema-scoped, and the tenant path has no CAGG phase at all — so without this the aggregates keep serving a purged tenant's numbers. Includes a test that purges a tenant whose events predate the 14-day compression threshold
   - New `"telemetry internals are private"` import-linter contract; telemetry is a leaf, no domain module may import it
   - New capability `platform.read_usage` in `capabilities.yaml`
 - Frontend: `src/telemetry/` SDK — queue with hard cap, batching, unload-safe transport, session lifecycle, route-template resolution with a manifest drift test
@@ -313,6 +315,7 @@ This is a **lot** for one prompt. It is intentional. Everything here is foundati
 - Any third-party analytics SaaS or forwarder
 - Tenant-facing usage surface (needs small-N suppression and a DPA change)
 - Rage-click / dead-click / Web Vitals instrumentation
+- Archive-before-purge (`usage_tenant_summary`) — rejected by scope decision 5, not deferred
 - Retention and cohort engine, feature flags, experiments
 - Server-side request-level capture middleware
 - Pre-authentication events (the login funnel)
@@ -328,16 +331,17 @@ All of the above are Phase B in the plan document, ordered by value-per-effort.
 5. A telemetry endpoint that 500s or times out is invisible to the user — no retry storm, no console noise, no broken render.
 6. `props` containing an unknown key is stored without that key. No agronomic or customer content is reachable in `usage_events`.
 7. Dwell excludes backgrounded time; no `page_leave` row exceeds 30 minutes.
-8. `ruff`, `mypy`, `tsc -b`, `eslint`, `import-linter`, and the purge orphan guard all pass.
-9. `docs/reference/telemetry.md` matches the shipped taxonomy exactly.
+8. Purging a tenant leaves zero rows attributable to it in `usage_events` **and in both continuous aggregates**, including for a tenant whose events predate the compression threshold. The orphan scanner reporting zero is the proof.
+9. `ruff`, `mypy`, `tsc -b`, `eslint`, `import-linter`, and the purge orphan guard all pass.
+10. `docs/reference/telemetry.md` matches the shipped taxonomy exactly.
 
 ### Known traps (repo-specific)
 - **Bind real `datetime` / `UUID` objects, never `.isoformat()` strings through a `CAST`.** This family caused #331, #332 and #335. A 50-row batch insert of timestamps is a textbook place to reintroduce it. The integration test must run against real asyncpg and must not be `skip`ped — 5 of 6 backfill tests were skipped, which is why #331 shipped broken.
 - The rolling CAGG refresh policy is correct here **only because events always arrive at `now`**. Never bulk-import historical events without an explicit `refresh_continuous_aggregate` over the range — that was #336.
 - Do not run `prettier --write` over a broad glob; `main` carries formatting drift. Format only touched files.
+- `OwnedTable(hypertable=True)` in the purge registry is **documentation only** — `shared/purge/engine.py` never reads the flag. Setting it buys no behaviour; the CAGG refresh phase above is what actually makes a hypertable purge complete.
 
 ### Open questions (answer before TEL-1)
-- Does telemetry die with a purged tenant, or does purge write a surviving summary row first?
 - Is the pre-auth login funnel in scope now or Phase B?
 - Unload transport: `fetch(keepalive: true)` (keeps the auth header) or `sendBeacon` (more reliable, needs a token in the URL)?
 - New `platform.read_usage` capability, or fold into the existing `platform.read`?

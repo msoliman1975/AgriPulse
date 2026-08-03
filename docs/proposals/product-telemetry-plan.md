@@ -381,11 +381,54 @@ OwnedTable("usage_events", owner_column="farm_id", schema="public",
            order=10, fk=False, hypertable=True),
 ```
 
-**Trade-off, flagged:** purging a tenant then destroys the evidence of *why* they
-churned. If we'd rather keep it, the archive-first pattern already used by
-`audit_events_archive` applies — have purge write a `usage_tenant_summary` row before
-deleting, and add that table to `EXEMPT_PAIRS` with a reason. Deferred to Phase B (B7);
-MVP takes the simple, privacy-safe option.
+Note that `hypertable=True` is **documentation only** — `shared/purge/engine.py` never
+reads the flag. It does not buy us any behaviour; see §6.2 for what actually has to happen.
+
+**DECIDED (2026-08-03): telemetry does not survive a tenant purge.** No archive row, no
+summary, no exemption. Accepted consequence: once a tenant is purged we lose the evidence
+of *how* they were using the product before they left, so any churn post-mortem has to be
+taken from the dashboard **while they are still live**. The `usage_tenant_summary` /
+archive-first option is rejected, not deferred.
+
+### 6.2 "Does not survive" is more than a DELETE
+
+Deleting rows from `usage_events` is necessary but **not sufficient**, and the existing
+engine does not cover the gap:
+
+1. **The CAGGs keep serving the purged tenant.** `usage_daily` and `usage_flow_daily`
+   group by `tenant_id` and run with real-time aggregation, so already-materialised
+   buckets keep the tenant's numbers alive after the raw rows are gone. The engine
+   already knows this problem — `registry.BLOCK_CAGGS` exists precisely for it, with a
+   post-commit `refresh_continuous_aggregate` on an autocommit connection (it cannot run
+   inside a transaction block).
+
+   But that machinery is **block-scoped and tenant-schema-scoped**:
+   `Engine.cagg_names()` returns only `BLOCK_CAGGS`; `_capture_cagg_range` bounds the
+   window by querying `block_index_aggregates`; and the refresh call is qualified
+   `"{tenant_schema}"."{view}"`. **The tenant-purge path has no CAGG phase at all.**
+
+   So TEL-6 must extend the engine:
+   - a `PUBLIC_CAGGS` tuple in `registry.py` — `[("usage_daily", "usage_events"),
+     ("usage_flow_daily", "usage_events")]`
+   - a time-window capture over `usage_events WHERE tenant_id = ANY(:ids)`, taken
+     **before** the delete
+   - a post-commit refresh on the `public`-qualified view, reusing the existing
+     autocommit-connection helper and its failure-is-logged-not-fatal semantics
+   - the refreshed view names on the purge receipt, as `BLOCK_CAGGS` already does
+
+2. **Compressed chunks.** `usage_events` compresses at 14 days, so purging a tenant older
+   than two weeks means deleting from compressed chunks. Modern TimescaleDB decompresses
+   the affected chunks to do this, but our image is
+   `ghcr.io/imusmanmalik/timescaledb-postgis:16-3.5-115` and the extension version behind
+   that tag is not something to assume. `audit_events` has the same shape (compressed at
+   60 days, registered for purge) so the path may already work — but it may equally never
+   have been exercised on a genuinely old tenant. **TEL-6 needs a test that purges a
+   tenant with events older than the compression threshold** and asserts zero rows
+   remain. This is the most likely place for the requirement to quietly fail.
+
+3. **The orphan scanner is the proof.** `shared/purge/scanner.py` already counts rows whose
+   owner is gone; registering `usage_events` means a post-purge scan reporting zero
+   orphans is the assertion, not a hand-written check.
 
 ---
 
@@ -557,6 +600,7 @@ Eight PRs. Sequential dependencies noted. Rough total: **9–13 working days.**
 | **TEL-4** | Auto-capture | `useTelemetryRoute()` in `AppShell` (page_view / page_leave with visibility-aware dwell) · `api_error` in the axios interceptor · **new `<AppErrorBoundary>`** + `window.onerror` / `unhandledrejection` | TEL-3 | 1.5 d |
 | **TEL-5** | Taxonomy | Generate the TS union + Python enum from `taxonomy.yaml` · ~25 curated `feature_used` calls · 4 flows instrumented | TEL-3 | 1.5 d |
 | **TEL-6** | Rollups & queries | `usage_daily` + `usage_flow_daily` CAGGs + policies · `telemetry/repository.py` with the seven §8/§9 queries · query tests on seeded data | TEL-1 | 1.5 d |
+| **TEL-6b** | Purge completeness | `PUBLIC_CAGGS` + public-schema CAGG refresh phase on the tenant-purge path (§6.2) · window capture before delete · refreshed views on the receipt · **test purging a tenant whose events predate the compression threshold** | TEL-6 | 1 d |
 | **TEL-7** | Dashboard | `platform.read_usage` capability · `/platform/usage` page + nav entry · `api/telemetry.ts` · en+ar i18n · DS components | TEL-6 | 2 d |
 | **TEL-8** | Close-out | `docs/reference/telemetry.md` · Grafana read-only role + datasource (subject to §11) · runbook: how to answer a product question | TEL-7 | 0.5 d |
 
@@ -577,7 +621,11 @@ And these must hold:
 7. A telemetry endpoint returning 500 or timing out is invisible to the user.
 8. A client posting a forged `user_id` / `tenant_id` has it discarded.
 9. `is_platform_staff = true` traffic is excluded from every default chart.
-10. `ruff`, `mypy`, `tsc -b`, `eslint`, `import-linter`, and the purge orphan guard all pass.
+10. **Purging a tenant leaves zero rows attributable to it — in `usage_events` *and* in
+    both continuous aggregates** — and this holds for a tenant whose events predate the
+    14-day compression threshold. Proven by the orphan scanner reporting zero, not by
+    inspection.
+11. `ruff`, `mypy`, `tsc -b`, `eslint`, `import-linter`, and the purge orphan guard all pass.
 
 ---
 
@@ -593,12 +641,13 @@ Ordered by value-per-effort, not by ambition.
 | **B4** | **GlitchTip wiring** — already declared in the observability appset; add `@sentry/react` and stamp `session_id` + `correlation_id` as tags | Real JS stack traces joined to the telemetry session. Self-hosted, so no data leaves | S (after §11) |
 | **B5** | **Session timeline ("replay-lite")** — a per-session ordered event stream in the admin UI | 90% of the diagnostic value of session replay at ~1% of the privacy and infra cost. No DOM capture, nothing to mask | M |
 | **B6** | **Adoption alerting** — beat task → existing `notifications` module: tenant WAU drops >50%, a flow's completion rate falls, a new error-dense route appears | Makes telemetry push instead of pull. `workers/beat/main.py` already has the pattern and a `*_seconds` settings knob convention | S |
-| **B7** | **Archive-before-purge** — `usage_tenant_summary` written by purge, added to `EXEMPT_PAIRS` | Keeps churn evidence after a tenant is deleted (see §6.1) | S |
 | **B8** | **Tenant-facing usage** — "how is my team using AgriPulse" for TenantAdmin | Real product value and a retention hook, but adds an API contract, small-N suppression, and a DPA change. Only after B2 makes the numbers trustworthy | L |
 | **B9** | **Qualitative layer** — thumbs on recommendations, "was this useful?" on Insights cards, micro-surveys triggered by behaviour | The *why*. Recommendations especially: a usefulness signal per decision-tree output is directly actionable for agronomy, not just product | M |
 | **B10** | **Feature flags + experiments** — flag evaluation logged as an event, exposure joined to outcomes | Only worth it once there's enough traffic for a result to mean something. Not before B2 | L |
 
-**Explicitly not planned:** DOM session replay (OpenReplay is too heavy for one node;
+**Explicitly not planned:** archive-before-purge — telemetry dies with the tenant by
+decision (§6.1), so there is no `usage_tenant_summary` and no `EXEMPT_PAIRS` entry.
+Also: DOM session replay (OpenReplay is too heavy for one node;
 Clarity means shipping customer screens to Microsoft), third-party SaaS forwarding, and
 per-keystroke capture.
 
@@ -614,6 +663,8 @@ per-keystroke capture.
 | **Telemetry breaks the app** | Always-202, swallowed client errors, no retries, dual kill switch, queue cap |
 | **CAST + string bind regression** | Bind real `datetime`/`UUID` objects; integration test against real asyncpg; no `skip`ped tests in TEL-1/TEL-2 |
 | **CI purge guard fails the PR** | Registry entries land in TEL-1, same PR as the table |
+| **Telemetry survives a purge in the aggregates** — raw rows deleted, materialised CAGG buckets still keyed by `tenant_id`. Silent: the orphan scanner only looks at tables | `PUBLIC_CAGGS` + a tenant-path refresh phase (TEL-6b, §6.2). The window must be captured *before* the delete or there is nothing left to bound it with |
+| **DELETE on a compressed chunk fails** for a tenant older than 14 days, so an old tenant can't be fully purged | Verify the extension version behind `timescaledb-postgis:16-3.5-115`; TEL-6b test purges a tenant with pre-compression-threshold events. Fallback is `decompress_chunk` before the delete, or dropping compression on this table |
 | **Formatting drift** | Never run `prettier --write` over a broad glob in this repo — main carries drift. Format only touched files |
 | **PII leaks into `props`** | Server-side allow-list; unknown keys dropped, not stored |
 
@@ -621,8 +672,9 @@ per-keystroke capture.
 
 ## 15. Open questions
 
-- **O1 — Purge vs. retain on tenant delete.** MVP deletes telemetry with the tenant (§6.1).
-  Accept, or do B7 up front?
+- ~~**O1 — Purge vs. retain on tenant delete.**~~ **Answered 2026-08-03: telemetry does not
+  survive a tenant purge.** Archive-first rejected. See §6.1 and the engine work in §6.2 /
+  TEL-6b that the answer actually requires.
 - **O2 — Pre-auth events.** The login funnel (sign-in attempts, failures, abandonment)
   needs an unauthenticated ingest path. Worth it now, or Phase B?
 - **O3 — Unload transport.** `fetch(keepalive: true)` keeps the `Authorization` header and
