@@ -12,6 +12,7 @@ import enSignals from "./locales/en/signals.json";
 import enFarmConsole from "./locales/en/farmConsole.json";
 import enInsights from "./locales/en/insights.json";
 import enWeatherIndices from "./locales/en/weatherIndices.json";
+import enDecisionTrees from "./locales/en/decisionTrees.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -23,6 +24,7 @@ import arSignals from "./locales/ar/signals.json";
 import arFarmConsole from "./locales/ar/farmConsole.json";
 import arInsights from "./locales/ar/insights.json";
 import arWeatherIndices from "./locales/ar/weatherIndices.json";
+import arDecisionTrees from "./locales/ar/decisionTrees.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -47,6 +49,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           farmConsole: enFarmConsole,
           insights: enInsights,
           weatherIndices: enWeatherIndices,
+          decisionTrees: enDecisionTrees,
         },
         ar: {
           common: arCommon,
@@ -60,12 +63,23 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           farmConsole: arFarmConsole,
           insights: arInsights,
           weatherIndices: arWeatherIndices,
+          decisionTrees: arDecisionTrees,
         },
       },
       lng: language,
       fallbackLng: "en",
       defaultNS: "common",
-      ns: ["common", "auth", "farms", "imagery", "indices", "weather", "admin", "signals", "farmConsole"],
+      ns: [
+        "common",
+        "auth",
+        "farms",
+        "imagery",
+        "indices",
+        "weather",
+        "admin",
+        "signals",
+        "farmConsole",
+      ],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },
     });

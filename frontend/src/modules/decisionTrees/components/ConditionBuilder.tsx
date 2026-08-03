@@ -1,13 +1,15 @@
-// Visual condition builder for the NodeDetailsPanel (PR-D5).
+// Visual condition builder for the NodeDetailsPanel.
 //
-// Coverage: single comparison OR all_of / any_of group of comparisons.
-// Anything more complex (nested groups, NOT, between, in) falls into a
-// read-only fallback that points the author at the YAML editor — see
-// `conditionEdit.ts` for the parser's gating logic.
+// Renders the condition AST recursively, so nested all_of / any_of
+// groups, NOT wrappers, `between` ranges and `in` value lists are all
+// editable here. Previously any of those dropped the author into a
+// read-only JSON blob with a "use the YAML editor" hint; the engine has
+// supported them since day one, and since decision trees became a
+// top-level tenant surface that fallback was a visible dead end.
 //
-// Edits apply eagerly to the parent's draft YAML (via `onChange`) so
-// the structural validator + canvas re-layout reflect the change
-// immediately. Same model PR-D4 uses for add/delete node.
+// Edits apply eagerly to the parent's draft YAML (via `onChange`) so the
+// structural validator + canvas re-layout reflect the change
+// immediately.
 
 import { useTranslation } from "react-i18next";
 import { type ReactNode } from "react";
@@ -15,24 +17,29 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listSignalDefinitions } from "@/api/signals";
 import {
-  COMPARISON_OPS,
+  BLOCK_FIELDS,
   GRID_FIELDS,
   INDEX_CODES,
   INDICES_KEYS,
+  MAX_GROUP_DEPTH,
   SIGNAL_KEYS,
+  TERM_OPS,
   WEATHER_INDEX_CODES,
   WEATHER_INDEX_KEYS,
   WEATHER_RISK_CODES,
   WEATHER_RISK_FIELDS,
   WEATHER_SCOPES,
-  defaultComparisonTerm,
+  changeTermOp,
+  defaultGroupNode,
+  defaultTermNode,
   defaultValueRef,
-  serializeCondition,
-  type ComparisonOp,
-  type ComparisonTerm,
+  serializeNode,
+  type ConditionNode,
   type EditableCondition,
   type GroupMode,
   type RightOperand,
+  type Term,
+  type TermOp,
   type ValueRef,
   type ValueRefSource,
 } from "../lib/conditionEdit";
@@ -64,93 +71,226 @@ export function ConditionBuilder({
     );
   }
 
-  const setTerms = (terms: ComparisonTerm[], mode: GroupMode = "all"): void => {
-    if (terms.length === 0) {
-      onChange(undefined);
-      return;
-    }
-    if (terms.length === 1) {
-      onChange(serializeCondition({ kind: "single", term: terms[0] }));
-      return;
-    }
-    onChange(serializeCondition({ kind: "group", mode, terms }));
+  const emit = (next: ConditionNode | null): void => {
+    onChange(next ? serializeNode(next) : undefined);
   };
 
-  const terms: ComparisonTerm[] =
-    value.kind === "group" ? value.terms : value.kind === "single" ? [value.term] : [];
+  const root = value.kind === "node" ? value.node : null;
 
-  const groupMode: GroupMode = value.kind === "group" ? value.mode : "all";
-
-  const onTermChange = (idx: number, next: ComparisonTerm): void => {
-    const copy = [...terms];
-    copy[idx] = next;
-    setTerms(copy, groupMode);
-  };
-  const onRemoveTerm = (idx: number): void => {
-    const copy = terms.filter((_, i) => i !== idx);
-    setTerms(copy, groupMode);
-  };
-  const onAddTerm = (): void => {
-    setTerms([...terms, defaultComparisonTerm()], groupMode);
-  };
-  const onModeChange = (mode: GroupMode): void => {
-    setTerms(terms, mode);
-  };
+  if (!root) {
+    return (
+      <div className="flex flex-col gap-2 text-xs">
+        <p className="text-ap-muted">{t("editor.condition.empty")}</p>
+        {!readOnly ? (
+          <div className="flex flex-wrap gap-2">
+            <AddButton
+              label={t("editor.condition.addTerm")}
+              onClick={() => emit(defaultTermNode())}
+            />
+            <AddButton
+              label={t("editor.condition.addGroup")}
+              onClick={() => emit(defaultGroupNode())}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 text-xs">
-      {terms.length > 1 ? (
-        <div className="flex items-center gap-2">
-          <span className="text-ap-muted">{t("editor.condition.match")}</span>
-          <select
-            disabled={readOnly}
-            value={groupMode}
-            onChange={(e) => onModeChange(e.target.value as GroupMode)}
-            className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
-          >
-            <option value="all">{t("editor.condition.modeAll")}</option>
-            <option value="any">{t("editor.condition.modeAny")}</option>
-          </select>
-        </div>
-      ) : null}
-
-      {terms.length === 0 ? (
-        <p className="text-ap-muted">{t("editor.condition.empty")}</p>
-      ) : (
-        terms.map((term, idx) => (
-          <ComparisonRow
-            key={idx}
-            term={term}
-            readOnly={readOnly}
-            onChange={(next) => onTermChange(idx, next)}
-            onRemove={terms.length > 1 ? () => onRemoveTerm(idx) : undefined}
-          />
-        ))
-      )}
-
-      {!readOnly ? (
-        <button
-          type="button"
-          onClick={onAddTerm}
-          className="self-start rounded-md border border-dashed border-ap-line bg-ap-bg/40 px-2 py-1 text-xs text-ap-ink hover:bg-ap-bg/60"
-        >
-          {t("editor.condition.addTerm")}
-        </button>
+      <NodeEditor node={root} depth={0} readOnly={readOnly} onChange={emit} />
+      {/* A bare term or NOT at the root has nowhere to put a sibling, so
+          offer to wrap it in a group rather than making the author
+          rebuild the condition from scratch. */}
+      {!readOnly && root.kind !== "group" ? (
+        <AddButton
+          label={t("editor.condition.addTerm")}
+          onClick={() => emit({ kind: "group", mode: "all", children: [root, defaultTermNode()] })}
+        />
       ) : null}
     </div>
   );
 }
 
-// ---- Comparison row ------------------------------------------------
+// ---- Recursive node editor -----------------------------------------
 
-interface ComparisonRowProps {
-  term: ComparisonTerm;
+interface NodeEditorProps {
+  node: ConditionNode;
+  depth: number;
   readOnly: boolean;
-  onChange: (next: ComparisonTerm) => void;
+  /** `null` means "remove me". */
+  onChange: (next: ConditionNode | null) => void;
   onRemove?: () => void;
 }
 
-function ComparisonRow({ term, readOnly, onChange, onRemove }: ComparisonRowProps): ReactNode {
+function NodeEditor({ node, depth, readOnly, onChange, onRemove }: NodeEditorProps): ReactNode {
+  if (node.kind === "term") {
+    return (
+      <TermRow
+        term={node.term}
+        readOnly={readOnly}
+        onChange={(term) => onChange({ kind: "term", term })}
+        onRemove={onRemove}
+      />
+    );
+  }
+  if (node.kind === "not") {
+    return (
+      <NotBox
+        node={node}
+        depth={depth}
+        readOnly={readOnly}
+        onChange={onChange}
+        onRemove={onRemove}
+      />
+    );
+  }
+  return (
+    <GroupBox
+      node={node}
+      depth={depth}
+      readOnly={readOnly}
+      onChange={onChange}
+      onRemove={onRemove}
+    />
+  );
+}
+
+function GroupBox({
+  node,
+  depth,
+  readOnly,
+  onChange,
+  onRemove,
+}: {
+  node: Extract<ConditionNode, { kind: "group" }>;
+  depth: number;
+  readOnly: boolean;
+  onChange: (next: ConditionNode | null) => void;
+  onRemove?: () => void;
+}): ReactNode {
+  const { t } = useTranslation("decisionTrees");
+
+  const replaceChild = (idx: number, next: ConditionNode | null): void => {
+    const children = next
+      ? node.children.map((c, i) => (i === idx ? next : c))
+      : node.children.filter((_, i) => i !== idx);
+    // An empty group is not a meaningful condition — drop the group
+    // itself rather than leaving an `all_of: []` behind.
+    if (children.length === 0) {
+      onChange(null);
+      return;
+    }
+    onChange({ ...node, children });
+  };
+
+  const append = (child: ConditionNode): void => {
+    onChange({ ...node, children: [...node.children, child] });
+  };
+
+  return (
+    <div className="rounded-md border border-ap-line bg-ap-bg/30 p-2">
+      <div className="flex items-center gap-2">
+        <span className="text-ap-muted">{t("editor.condition.match")}</span>
+        <select
+          disabled={readOnly}
+          value={node.mode}
+          onChange={(e) => onChange({ ...node, mode: e.target.value as GroupMode })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.match")}
+        >
+          <option value="all">{t("editor.condition.modeAll")}</option>
+          <option value="any">{t("editor.condition.modeAny")}</option>
+        </select>
+        {onRemove && !readOnly ? (
+          <RemoveButton label={t("editor.condition.removeGroup")} onClick={onRemove} />
+        ) : null}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2 border-s-2 border-ap-line ps-2">
+        {node.children.map((child, idx) => (
+          <NodeEditor
+            key={idx}
+            node={child}
+            depth={depth + 1}
+            readOnly={readOnly}
+            onChange={(next) => replaceChild(idx, next)}
+            onRemove={() => replaceChild(idx, null)}
+          />
+        ))}
+      </div>
+
+      {!readOnly ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <AddButton
+            label={t("editor.condition.addTerm")}
+            onClick={() => append(defaultTermNode())}
+          />
+          {depth + 1 < MAX_GROUP_DEPTH ? (
+            <AddButton
+              label={t("editor.condition.addGroup")}
+              onClick={() => append(defaultGroupNode(node.mode === "all" ? "any" : "all"))}
+            />
+          ) : null}
+          <AddButton
+            label={t("editor.condition.addNot")}
+            onClick={() => append({ kind: "not", child: defaultTermNode() })}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NotBox({
+  node,
+  depth,
+  readOnly,
+  onChange,
+  onRemove,
+}: {
+  node: Extract<ConditionNode, { kind: "not" }>;
+  depth: number;
+  readOnly: boolean;
+  onChange: (next: ConditionNode | null) => void;
+  onRemove?: () => void;
+}): ReactNode {
+  const { t } = useTranslation("decisionTrees");
+  return (
+    <div className="rounded-md border border-ap-warn/40 bg-ap-warn/5 p-2">
+      <div className="flex items-center gap-2">
+        <span className="rounded bg-ap-warn/20 px-1.5 py-0.5 font-mono text-[11px] font-medium text-ap-warn">
+          {t("editor.condition.notLabel")}
+        </span>
+        {onRemove && !readOnly ? (
+          <RemoveButton label={t("editor.condition.removeNot")} onClick={onRemove} />
+        ) : null}
+      </div>
+      <div className="mt-2">
+        <NodeEditor
+          node={node.child}
+          depth={depth + 1}
+          readOnly={readOnly}
+          // Removing the inner node removes the whole NOT — a NOT with
+          // nothing under it has no meaning.
+          onChange={(next) => onChange(next ? { kind: "not", child: next } : null)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---- Term row ------------------------------------------------------
+
+interface TermRowProps {
+  term: Term;
+  readOnly: boolean;
+  onChange: (next: Term) => void;
+  onRemove?: () => void;
+}
+
+function TermRow({ term, readOnly, onChange, onRemove }: TermRowProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The node details panel is a fixed, narrow (~360px) column, so the
   // comparison fields stack vertically. A previous `sm:grid-cols-[…]`
@@ -172,13 +312,9 @@ function ComparisonRow({ term, readOnly, onChange, onRemove }: ComparisonRowProp
         <OperatorPicker
           value={term.op}
           readOnly={readOnly}
-          onChange={(next) => onChange({ ...term, op: next })}
+          onChange={(next) => onChange(changeTermOp(term, next))}
         />
-        <RightEditor
-          value={term.right}
-          readOnly={readOnly}
-          onChange={(next) => onChange({ ...term, right: next })}
-        />
+        <TermOperands term={term} readOnly={readOnly} onChange={onChange} />
         {onRemove && !readOnly ? (
           <button
             type="button"
@@ -191,6 +327,91 @@ function ComparisonRow({ term, readOnly, onChange, onRemove }: ComparisonRowProp
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** The right-hand side of a term, whose shape follows the operator:
+ *  one operand for the binary ops, a low/high pair for `between`, and a
+ *  variable-length list for `in`. */
+function TermOperands({
+  term,
+  readOnly,
+  onChange,
+}: {
+  term: Term;
+  readOnly: boolean;
+  onChange: (next: Term) => void;
+}): ReactNode {
+  const { t } = useTranslation("decisionTrees");
+
+  if (term.op === "between") {
+    return (
+      <>
+        <RightEditor
+          label={t("editor.condition.low")}
+          value={term.low}
+          readOnly={readOnly}
+          onChange={(low) => onChange({ ...term, low })}
+        />
+        <RightEditor
+          label={t("editor.condition.high")}
+          value={term.high}
+          readOnly={readOnly}
+          onChange={(high) => onChange({ ...term, high })}
+        />
+      </>
+    );
+  }
+
+  if (term.op === "in") {
+    const setValue = (idx: number, next: RightOperand): void => {
+      onChange({ ...term, values: term.values.map((v, i) => (i === idx ? next : v)) });
+    };
+    const removeValue = (idx: number): void => {
+      onChange({ ...term, values: term.values.filter((_, i) => i !== idx) });
+    };
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="text-[11px] text-ap-muted">{t("editor.condition.values")}</span>
+        {term.values.map((v, idx) => (
+          <div key={idx} className="flex items-end gap-1">
+            <div className="min-w-0 flex-1">
+              <RightEditor
+                label={`#${idx + 1}`}
+                value={v}
+                readOnly={readOnly}
+                onChange={(next) => setValue(idx, next)}
+              />
+            </div>
+            {/* Keep at least one entry: an `in` with no values can never
+                match, which is a confusing thing to leave behind. */}
+            {!readOnly && term.values.length > 1 ? (
+              <RemoveButton
+                label={t("editor.condition.removeValue")}
+                onClick={() => removeValue(idx)}
+              />
+            ) : null}
+          </div>
+        ))}
+        {!readOnly ? (
+          <AddButton
+            label={t("editor.condition.addValue")}
+            onClick={() =>
+              onChange({ ...term, values: [...term.values, { kind: "string", value: "" }] })
+            }
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <RightEditor
+      label={t("editor.condition.right")}
+      value={term.right}
+      readOnly={readOnly}
+      onChange={(right) => onChange({ ...term, right })}
+    />
   );
 }
 
@@ -301,8 +522,13 @@ function SourceSpecificFields({
         value={value.field}
         onChange={(e) => onChange({ ...value, field: e.target.value as typeof value.field })}
         className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+        aria-label={t("editor.condition.blockField")}
       >
-        <option value="crop_category">crop_category</option>
+        {BLOCK_FIELDS.map((f) => (
+          <option key={f} value={f}>
+            {f}
+          </option>
+        ))}
       </select>
     );
   }
@@ -502,9 +728,9 @@ function SourceSpecificFields({
 // ---- Operator picker -----------------------------------------------
 
 interface OperatorPickerProps {
-  value: ComparisonOp;
+  value: TermOp;
   readOnly: boolean;
-  onChange: (next: ComparisonOp) => void;
+  onChange: (next: TermOp) => void;
 }
 
 function OperatorPicker({ value, readOnly, onChange }: OperatorPickerProps): ReactNode {
@@ -515,10 +741,10 @@ function OperatorPicker({ value, readOnly, onChange }: OperatorPickerProps): Rea
       <select
         disabled={readOnly}
         value={value}
-        onChange={(e) => onChange(e.target.value as ComparisonOp)}
+        onChange={(e) => onChange(e.target.value as TermOp)}
         className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
       >
-        {COMPARISON_OPS.map((op) => (
+        {TERM_OPS.map((op) => (
           <option key={op} value={op}>
             {opSymbol(op)} {op}
           </option>
@@ -528,7 +754,7 @@ function OperatorPicker({ value, readOnly, onChange }: OperatorPickerProps): Rea
   );
 }
 
-function opSymbol(op: ComparisonOp): string {
+function opSymbol(op: TermOp): string {
   switch (op) {
     case "lt":
       return "<";
@@ -542,18 +768,23 @@ function opSymbol(op: ComparisonOp): string {
       return "=";
     case "ne":
       return "≠";
+    case "between":
+      return "↔";
+    case "in":
+      return "∈";
   }
 }
 
 // ---- Right operand editor -----------------------------------------
 
 interface RightEditorProps {
+  label: string;
   value: RightOperand;
   readOnly: boolean;
   onChange: (next: RightOperand) => void;
 }
 
-function RightEditor({ value, readOnly, onChange }: RightEditorProps): ReactNode {
+function RightEditor({ label, value, readOnly, onChange }: RightEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The user picks between "literal" (number/string/boolean) and "ref"
   // (typically a params ref). Number is the default and most common.
@@ -561,7 +792,7 @@ function RightEditor({ value, readOnly, onChange }: RightEditorProps): ReactNode
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] text-ap-muted">
-        {t("editor.condition.right")} <span className="text-ap-muted">({kindLabel})</span>
+        {label} <span className="text-ap-muted">({kindLabel})</span>
       </span>
       <select
         disabled={readOnly}
@@ -629,4 +860,32 @@ function coerceRight(kind: RightOperand["kind"], prev: RightOperand): RightOpera
   if (kind === "string") return { kind: "string", value: "" };
   if (kind === "boolean") return { kind: "boolean", value: false };
   return { kind: "ref", ref: { source: "params", name: "" } };
+}
+
+// ---- Small shared controls -----------------------------------------
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="self-start rounded-md border border-dashed border-ap-line bg-ap-bg/40 px-2 py-1 text-xs text-ap-ink hover:bg-ap-bg/60"
+    >
+      {label}
+    </button>
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="rounded-md border border-ap-line bg-white px-2 py-0.5 text-[11px] text-ap-crit hover:bg-ap-crit/10"
+    >
+      ✕
+    </button>
+  );
 }
