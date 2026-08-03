@@ -1,0 +1,265 @@
+# date_palm_soil_salinity_v1 — soil salinity stress on date palm from a
+# soil ECe custom signal.
+#
+# Deliberately the mirror image of potato_soil_salinity_v1, and the
+# contrast is the point: date palm is rated TOLERANT with an ECe
+# threshold of 4.0 dS/m, where potato is rated sensitive at 1.7. A block
+# reading 3.5 dS/m is a warning for potato and a non-event for date
+# palm. Sharing one salinity rule across both crops would be wrong in
+# both directions, which is why salinity thresholds live per crop.
+#
+# Reads the same tenant custom signal (`soil_salinity`, ECe in dS/m) as
+# the potato tree, so a tenant ingesting soil tests gets both crops
+# covered from one feed.
+
+code: date_palm_soil_salinity_v1
+name_en: Date palm — soil salinity stress
+name_ar: نخيل البلح — إجهاد ملوحة التربة
+description_en: >-
+  Raises a warning when a block's soil saturated-paste ECe (ingested as
+  the custom signal `soil_salinity`, in dS/m) exceeds date palm's
+  salinity tolerance. FAO-29 rates date palm tolerant: no yield response
+  below ECe 4.0 dS/m, then roughly 3.6% yield loss per additional dS/m.
+  Severe stress (>25% expected loss) starts near ECe 10.9.
+description_ar: >-
+  يُطلق تحذيرًا عند تجاوز ملوحة عجينة التربة المُشبعة (المُدخَلة كإشارة
+  مخصّصة باسم `soil_salinity` بوحدة dS/m) لحدّ تحمّل نخيل البلح. تصنّف
+  FAO-29 النخيل كمتحمّل: لا استجابة للمحصول دون 4.0 dS/m، ثم نحو 3.6%
+  فقد لكل dS/m إضافي. ويبدأ الإجهاد الحاد (فقد يتجاوز 25%) قرب 10.9.
+
+crop_code: date_palm
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    Threshold 4.0 dS/m and slope 3.6% per dS/m are the date-palm row of
+    the FAO crop salt-tolerance table for woody crops (Table A1.2,
+    reproducing FAO Irrigation & Drainage Paper 29, Maas-Hoffman), rated
+    T for tolerant, based on fruit yield. The severe default is derived
+    from that same linear model rather than separately measured:
+    Yr = 100 - 3.6 x (ECe - 4.0) reaches 75% relative yield at ECe 10.9,
+    which is the 25%-loss point used as "severe" in the potato tree, so
+    the two crops are severity-comparable. For reference the model puts
+    90% yield at ECe 6.8 and 50% at ECe 17.9.
+    Cultivar caveat, and it is a large one: cultivar variation in date
+    palm swamps the single FAO figure. Long-term Gulf trials group
+    varieties into distinct tolerance classes, with tolerant cultivars
+    such as Lulu and Barhi holding 50% yield near 12 dS/m ECw and
+    mid-range cultivars nearer 9 dS/m ECw. The FAO row is the
+    conservative crop-wide default; tenants growing a known-tolerant
+    cultivar should raise both parameters rather than accept warnings
+    they will learn to ignore. Note also that those cultivar figures are
+    ECw (irrigation water), not ECe (soil paste) — the two are not
+    interchangeable, ECe runs roughly 1.5x ECw under typical leaching.
+  citations:
+    - source_type: fao
+      title: >-
+        Annex 1, Table A1.2 — Salt tolerance of woody crops (date palm:
+        ECe threshold 4.0 dS/m, slope 3.6%/dS/m, rated tolerant),
+        reproducing FAO Irrigation & Drainage Paper 29
+      url: https://www.fao.org/4/y4263e/y4263e0e.htm
+      year: 1985
+    - source_type: peer_reviewed
+      title: >-
+        Long-term growth, water consumption and yield of date palm as a
+        function of salinity (Agricultural Water Management)
+      url: https://www.sciencedirect.com/science/article/abs/pii/S0378377411001454
+    - source_type: peer_reviewed
+      title: >-
+        Salinity stress in date palm (Phoenix dactylifera L.): tolerance,
+        mechanisms and mitigation — Horticulture, Environment and
+        Biotechnology
+      doi: 10.1007/s13580-023-00511-4
+
+transferability:
+  egypt: high
+  middle_east: very_high
+  global: medium
+
+parameters:
+  threshold_ece:
+    type: number
+    default: 4.0
+    min: 0.0
+    max: 30.0
+    description: >-
+      ECe (dS/m) above which date palm yield begins to decline (FAO-29
+      onset for a tolerant crop).
+  severe_ece:
+    type: number
+    default: 10.9
+    min: 0.0
+    max: 40.0
+    description: >-
+      ECe (dS/m) above which expected yield loss exceeds ~25%, derived
+      from the FAO-29 linear model at a 3.6%/dS/m slope.
+
+root: root
+nodes:
+  root:
+    label_en: Is there a soil ECe reading for this block?
+    label_ar: هل توجد قراءة ملوحة ECe لهذه القطعة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: soil_salinity
+          key: value_numeric
+        right: 0
+    on_match: threshold_check
+    on_miss: leaf_no_data
+
+  threshold_check:
+    label_en: Is soil ECe above date palm's tolerance threshold?
+    label_ar: هل ملوحة التربة أعلى من حدّ تحمّل النخيل؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: soil_salinity
+          key: value_numeric
+        right:
+          source: params
+          name: threshold_ece
+    on_match: severity_check
+    on_miss: leaf_no_action
+
+  severity_check:
+    label_en: Is the salinity severe (yield loss > 25%)?
+    label_ar: هل الملوحة حادة (فقد المحصول > 25%)؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: signals
+          code: soil_salinity
+          key: value_numeric
+        right:
+          source: params
+          name: severe_ece
+    on_match: leaf_severe
+    on_miss: leaf_moderate
+
+  leaf_severe:
+    label_en: Severe salinity for date palm — leach and review water
+    label_ar: ملوحة حادة للنخيل — اغسل وراجع مياه الريّ
+    outcome:
+      kind: recommendation
+      action_type: irrigate
+      severity: critical
+      confidence: 0.8
+      valid_for_hours: 336
+      parameters:
+        priority: high
+      text_en: >-
+        Soil ECe is high enough to cost date palm more than a quarter of
+        its yield, which is notable because date palm is one of the most
+        salt-tolerant fruit crops there is. Salinity this far above the
+        4.0 dS/m threshold usually means the irrigation water itself is
+        saline or that leaching has stopped keeping pace with
+        evaporative concentration in the root zone.
+      text_ar: >-
+        ملوحة التربة مرتفعة بما يكلّف النخيل أكثر من ربع محصوله، وهو أمر
+        لافت لأن النخيل من أكثر محاصيل الفاكهة تحمّلًا للملوحة. تجاوز
+        الملوحة حدّ 4.0 dS/m بهذا القدر يعني عادةً أن ماء الريّ نفسه مالح
+        أو أن الغسل لم يعد يواكب تركّز الأملاح بالتبخّر في منطقة الجذور.
+      actions:
+        immediate:
+          - text_en: Confirm with a laboratory saturated-paste ECe test.
+            text_ar: أكّد بتحليل مخبري لملوحة عجينة التربة المُشبعة.
+          - text_en: >-
+              Test the irrigation water ECw as well — soil salinity this
+              high is usually inherited from the water.
+            text_ar: >-
+              اختبر أيضًا ملوحة ماء الريّ ECw — فالملوحة بهذا الارتفاع
+              تأتي عادةً من الماء.
+        short_term:
+          - text_en: >-
+              Raise the leaching fraction and irrigation frequency to
+              push salts below the root zone.
+            text_ar: >-
+              ارفع نسبة الغسيل وتكرار الريّ لدفع الأملاح أسفل منطقة
+              الجذور.
+        long_term:
+          - text_en: >-
+              Improve subsurface drainage; apply gypsum where the soil
+              is sodic; consider a salt-tolerant cultivar on replant.
+            text_ar: >-
+              حسّن الصرف تحت السطحي؛ وأضِف الجبس حيث التربة صوديّة؛ وفكّر
+              في صنف متحمّل للملوحة عند إعادة الزراعة.
+        monitoring:
+          - text_en: Re-test ECe after leaching and track irrigation-water ECw.
+            text_ar: أعد قياس ECe بعد الغسل وتابع ملوحة ماء الريّ ECw.
+
+  leaf_moderate:
+    label_en: Salinity above threshold — manage leaching
+    label_ar: ملوحة فوق الحدّ — أدر الغسل
+    outcome:
+      kind: recommendation
+      action_type: irrigate
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 720
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil ECe is above date palm's 4.0 dS/m tolerance threshold, so
+        yield is declining at roughly 3.6% per additional dS/m. This is
+        manageable with leaching rather than urgent, but it compounds
+        over seasons if the salt balance is not restored.
+      text_ar: >-
+        ملوحة التربة أعلى من حدّ تحمّل النخيل 4.0 dS/m، لذا يتراجع
+        المحصول بنحو 3.6% لكل dS/m إضافي. يمكن إدارة ذلك بالغسل دون
+        استعجال، لكنه يتراكم عبر المواسم إن لم يُستعَد توازن الأملاح.
+      actions:
+        immediate:
+          - text_en: Verify the reading against a recent laboratory ECe.
+            text_ar: تحقّق من القراءة مقابل تحليل مخبري حديث.
+        short_term:
+          - text_en: >-
+              Add a leaching fraction at the next irrigations and prefer
+              lower-ECw water where a choice exists.
+            text_ar: >-
+              أضِف نسبة غسيل في الريّات القادمة وفضّل المياه الأقل ملوحةً
+              حيثما توفّر الخيار.
+        long_term:
+          - text_en: Review field drainage and the seasonal salt balance.
+            text_ar: راجع صرف الحقل وتوازن الأملاح الموسمي.
+        monitoring:
+          - text_en: Re-test ECe in 4-6 weeks to confirm the trend.
+            text_ar: أعد قياس ECe خلال 4-6 أسابيع لتأكيد الاتجاه.
+
+  leaf_no_action:
+    label_en: No action — salinity within date palm's tolerance
+    label_ar: لا إجراء — الملوحة ضمن تحمّل النخيل
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Soil ECe is below the 4.0 dS/m threshold at which date palm
+        yield begins to respond to salinity.
+      text_ar: >-
+        ملوحة التربة دون حدّ 4.0 dS/m الذي يبدأ عنده تأثّر محصول النخيل
+        بالملوحة.
+
+  leaf_no_data:
+    label_en: No action — no soil salinity test on record
+    label_ar: لا إجراء — لا يوجد تحليل ملوحة مسجّل
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        No soil ECe reading has been ingested for this block, so
+        salinity status is unknown.
+      text_ar: >-
+        لم تُدخَل أي قراءة لملوحة التربة لهذه القطعة، لذا فحالة الملوحة
+        غير معروفة.

@@ -1,0 +1,361 @@
+# date_palm_ripening_rain_risk_v1 — forecast rain / humid air during the
+# ripening sequence, with severity keyed to the stage.
+#
+# Date palm is the clearest case in the catalog of a risk whose SEVERITY,
+# not just its trigger, is phenological. The same 10 mm of forecast rain
+# is a cosmetic nuisance at early Khalal, a skin-cracking loss at Kimri
+# and late Khalal, and a crop-destroying rot-and-souring event at Rutab
+# and Tamar. FAO's climatic-requirements chapter states the ordering
+# explicitly, so the tree encodes it rather than emitting one flat alert.
+#
+# Practical consequence: the action changes with the severity. A Kimri
+# warning is "expect checking, plan the grade-out". A Rutab critical is
+# "cover the bunches or harvest ahead of the front" — a decision the
+# grower has hours, not days, to make.
+
+code: date_palm_ripening_rain_risk_v1
+name_en: Date palm — rain / humidity risk during ripening
+name_ar: نخيل البلح — خطر المطر والرطوبة أثناء النضج
+description_en: >-
+  Warns when the 72-hour forecast carries rain or persistently humid air
+  while the block is in a moisture-sensitive ripening stage. Severity
+  follows FAO's stage ordering: Rutab and Tamar are the most sensitive
+  (rot, fermentation, souring, fruit fall), Kimri and late Khalal risk
+  skin checking and cracking, and humid air alone during Khalal and
+  Rutab favours fungal spoilage.
+description_ar: >-
+  ينبّه عندما تحمل توقعات 72 ساعة مطرًا أو هواءً رطبًا مستمرًا بينما
+  القطعة في مرحلة نضج حسّاسة للرطوبة. تتدرّج الخطورة وفق ترتيب الفاو:
+  الرطب والتمر الأكثر حساسية (تعفّن وتخمّر وحموضة وتساقط الثمار)،
+  والكمري وأواخر الخلال معرّضان لتشقّق القشرة، بينما يهيّئ الهواء الرطب
+  وحده خلال الخلال والرطب للإصابات الفطرية.
+
+crop_code: date_palm
+applicable_regions: []
+
+evidence:
+  confidence: high
+  notes: >-
+    Stage ordering is quoted directly from FAO's date-palm climatic
+    requirements chapter: rain at EARLY Khalal "does not seriously
+    damage" the fruit and even washes off dust, but "can cause severe
+    checking and cracking in the Kimri and late Khalal stages", while
+    "Rutab and Tamar stages are the most sensitive since rain and
+    associated humidity cause severe damage including rotting and
+    fall-off of the fruit". At Rutab the fruit absorbs moisture and
+    ferments and sours rather than splitting — a different failure mode,
+    which is why that leaf talks about souring and not cracking. The same
+    chapter grades harvest-month rainfall: under 50 mm in a month is good
+    to average, over 50 mm in one month is average to poor, and over
+    50 mm in all three harvest months is very poor.
+    Threshold caveat, stated plainly: FAO's 50 mm figure is MONTHLY and
+    our forecast window is 72 hours, so it cannot be used directly. The
+    5 mm default here is an operational trigger chosen to be low, on the
+    documented grounds that brief rain at Rutab can destroy a large share
+    of a crop — it is not a calibrated FAO threshold, and it is a tunable
+    parameter for that reason. The 60% humidity default is likewise
+    operational: FAO describes humid air before and during Khalal as the
+    driver of Blacknose and fungal spoilage without publishing a cutoff.
+    Cultivar caveat: windows come from migration 0038's generic Egyptian
+    soft/semi-dry calendar; dry cultivars such as Siwi ripen later and
+    are markedly less rain-sensitive at Tamar.
+  citations:
+    - source_type: fao
+      title: >-
+        Date Palm Cultivation, Chapter IV — Climatic requirements of date
+        palm (rain and humidity damage by ripening stage; harvest-month
+        rainfall grading)
+      url: https://www.fao.org/4/y4360e/y4360e08.htm
+    - source_type: peer_reviewed
+      title: >-
+        Quality preservation of date palm fruits at the Khalal stage — a
+        review of current challenges, preservation methods and future
+        trends (Frontiers in Sustainable Food Systems)
+      url: https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2025.1558985/full
+      year: 2025
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  rain_mm_72h:
+    type: number
+    default: 5.0
+    min: 0.0
+    max: 200.0
+    description: >-
+      Forecast rainfall total (mm) over the next 72 hours above which
+      ripening-stage rain damage is flagged. Operational trigger, not an
+      FAO threshold — see evidence notes.
+  humid_pct:
+    type: number
+    default: 60.0
+    min: 0.0
+    max: 100.0
+    description: >-
+      Mean relative humidity (%) over the next 72 hours above which
+      humid-air fungal spoilage is flagged during Khalal and Rutab.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in a moisture-sensitive ripening stage?
+    label_ar: هل القطعة في مرحلة نضج حسّاسة للرطوبة؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [kimri, khalal, rutab, tamar]
+    on_match: rain_check
+    on_miss: leaf_out_of_window
+
+  rain_check:
+    label_en: Does the 72-hour forecast carry meaningful rain?
+    label_ar: هل تحمل توقعات 72 ساعة مطرًا مؤثرًا؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: weather
+          scope: forecast_72h
+          field: precipitation_mm_total
+        right:
+          source: params
+          name: rain_mm_72h
+    on_match: rain_stage_severity
+    on_miss: humidity_stage_check
+
+  rain_stage_severity:
+    label_en: Is the block at Rutab or Tamar (most sensitive)?
+    label_ar: هل القطعة في الرطب أو التمر (الأكثر حساسية)؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [rutab, tamar]
+    on_match: leaf_rain_critical
+    on_miss: leaf_rain_cracking
+
+  humidity_stage_check:
+    label_en: Is the block at Khalal or Rutab (fungal-spoilage window)?
+    label_ar: هل القطعة في الخلال أو الرطب (نافذة العفن الفطري)؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [khalal, rutab]
+    on_match: humidity_value_check
+    on_miss: leaf_no_action
+
+  humidity_value_check:
+    label_en: Is the air persistently humid over the next 72 hours?
+    label_ar: هل الهواء رطب باستمرار خلال 72 ساعة القادمة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: weather
+          scope: forecast_72h
+          field: humidity_pct_mean
+        right:
+          source: params
+          name: humid_pct
+    on_match: leaf_humidity_warning
+    on_miss: leaf_no_action
+
+  # ---- leaves -------------------------------------------------------
+
+  leaf_rain_critical:
+    label_en: Rain forecast at Rutab/Tamar — protect or harvest now
+    label_ar: مطر متوقع في الرطب/التمر — احمِ أو احصد الآن
+    outcome:
+      kind: alert
+      action_type: harvest_window
+      severity: critical
+      confidence: 0.85
+      valid_for_hours: 72
+      parameters:
+        priority: high
+        stage_band: rutab_tamar
+      text_en: >-
+        Rain is forecast while the crop is at Rutab or Tamar — the most
+        moisture-sensitive stages. At this point the fruit absorbs water
+        rather than splitting: it turns sticky, ferments and sours, and
+        ripe fruit drops. Losses at this stage are the heaviest of the
+        season and the window to act is hours, not days.
+      text_ar: >-
+        يُتوقّع مطر والمحصول في مرحلة الرطب أو التمر — أكثر المراحل
+        حساسية للرطوبة. في هذه المرحلة تمتص الثمرة الماء بدل أن تتشقّق:
+        فتصبح لزجة وتتخمّر وتحمض، وتتساقط الثمار الناضجة. الفواقد هنا هي
+        الأكبر في الموسم ونافذة التصرّف ساعات لا أيام.
+      actions:
+        immediate:
+          - text_en: >-
+              Harvest ready bunches ahead of the front, or cover them
+              with rain sleeves if harvest is not yet possible.
+            text_ar: >-
+              احصد العذوق الجاهزة قبل وصول المنخفض، أو غطّها بأكياس واقية
+              من المطر إن تعذّر الحصاد.
+          - text_en: >-
+              Prioritise blocks whose bunches are already at Rutab over
+              those still colouring.
+            text_ar: >-
+              أعطِ الأولوية للقطع التي وصلت عذوقها للرطب على تلك التي ما
+              زالت في التلوين.
+        short_term:
+          - text_en: >-
+              After the rain passes, cull wet, split and fermenting
+              fruit before it contaminates sound fruit in store.
+            text_ar: >-
+              بعد مرور المطر، افرز الثمار المبتلّة والمتشقّقة والمتخمّرة
+              قبل أن تلوّث الثمار السليمة في المخزن.
+          - text_en: >-
+              Dry salvaged fruit promptly; sugars plus surface moisture
+              ferment within a day in warm weather.
+            text_ar: >-
+              جفّف الثمار المُنقذة سريعًا؛ فالسكريات مع رطوبة السطح
+              تتخمّر خلال يوم في الجو الدافئ.
+        long_term:
+          - text_en: >-
+              Adopt bunch covering as routine practice for blocks whose
+              Rutab window overlaps the rainy period.
+            text_ar: >-
+              اعتمد تغطية العذوق كممارسة روتينية للقطع التي تتداخل نافذة
+              الرطب فيها مع فترة الأمطار.
+        monitoring:
+          - text_en: >-
+              Track the forecast until the front clears and record the
+              rejected tonnage against the block.
+            text_ar: >-
+              تابع التوقعات حتى انقشاع المنخفض وسجّل الكمية المرفوضة على
+              القطعة.
+
+  leaf_rain_cracking:
+    label_en: Rain forecast at Kimri/Khalal — expect checking and cracking
+    label_ar: مطر متوقع في الكمري/الخلال — توقّع التشقّق
+    outcome:
+      kind: alert
+      action_type: inspect
+      severity: warning
+      confidence: 0.75
+      valid_for_hours: 72
+      parameters:
+        priority: medium
+        stage_band: kimri_khalal
+      text_en: >-
+        Rain is forecast while the crop is at Kimri or Khalal. Water on
+        colouring fruit drives checking and cracking of the skin and the
+        flesh beneath, which downgrades fruit even when it does not
+        destroy it, and wet skin openings are the entry point for the
+        rots that follow. Note that rain at EARLY Khalal is comparatively
+        harmless and can even wash dust off the bunches.
+      text_ar: >-
+        يُتوقّع مطر والمحصول في مرحلة الكمري أو الخلال. الماء على الثمار
+        المتلوّنة يسبّب تشقّق القشرة واللحم تحتها، ما يخفض الدرجة حتى إن
+        لم يتلف الثمار، وفتحات القشرة المبتلّة هي مدخل التعفّنات
+        اللاحقة. لاحظ أن المطر في أوائل الخلال قليل الضرر نسبيًا وقد
+        يغسل الغبار عن العذوق.
+      actions:
+        immediate:
+          - text_en: >-
+              Inspect bunches for skin checking once the fruit surface
+              has dried.
+            text_ar: >-
+              افحص العذوق بحثًا عن تشقّق القشرة بعد جفاف سطح الثمار.
+        short_term:
+          - text_en: >-
+              Improve bunch ventilation and remove any fruit already
+              cracked before rot spreads through the bunch.
+            text_ar: >-
+              حسّن تهوية العذوق وأزل الثمار المتشقّقة قبل انتشار التعفّن
+              في العذق.
+        long_term:
+          - text_en: >-
+              Consider bunch covering or bagging for blocks that see
+              repeated rain during colouring.
+            text_ar: >-
+              فكّر في تغطية أو تكييس العذوق للقطع التي يتكرّر عليها
+              المطر أثناء التلوين.
+        monitoring:
+          - text_en: Re-inspect in 5-7 days for secondary fungal spoilage.
+            text_ar: أعد الفحص خلال 5-7 أيام بحثًا عن عفن فطري ثانوي.
+
+  leaf_humidity_warning:
+    label_en: Persistently humid air at Khalal/Rutab — fungal spoilage risk
+    label_ar: هواء رطب مستمر في الخلال/الرطب — خطر العفن الفطري
+    outcome:
+      kind: alert
+      action_type: scout
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 96
+      parameters:
+        priority: medium
+      text_en: >-
+        No rain is forecast, but the air stays humid through the Khalal /
+        Rutab window. Humid air alone favours the fungi that spoil
+        ripening dates and is associated with Blacknose skin damage.
+        Date palm needs hot, dry air through ripening; humidity without
+        rain still costs grade.
+      text_ar: >-
+        لا يُتوقّع مطر، لكن الهواء يبقى رطبًا خلال نافذة الخلال/الرطب.
+        الهواء الرطب وحده يهيّئ للفطريات التي تفسد البلح أثناء النضج
+        ويرتبط بأضرار "أنف أسود" على القشرة. يحتاج النخيل هواءً حارًا
+        جافًا خلال النضج؛ والرطوبة دون مطر تكلّف الدرجة أيضًا.
+      actions:
+        immediate:
+          - text_en: >-
+              Scout bunches for surface mould and blackened fruit tips.
+            text_ar: >-
+              افحص العذوق بحثًا عن العفن السطحي وسواد أطراف الثمار.
+        short_term:
+          - text_en: >-
+              Thin and lift bunches to improve airflow; remove leaf
+              debris that traps humidity around the fruit.
+            text_ar: >-
+              خفّف العذوق وارفعها لتحسين حركة الهواء؛ وأزل بقايا الأوراق
+              التي تحبس الرطوبة حول الثمار.
+        monitoring:
+          - text_en: >-
+              Track humidity daily until the ripening window closes.
+            text_ar: >-
+              تابع الرطوبة يوميًا حتى انتهاء نافذة النضج.
+
+  leaf_no_action:
+    label_en: No action — ripening weather is dry
+    label_ar: لا إجراء — طقس النضج جاف
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.85
+      parameters: {}
+      text_en: >-
+        No meaningful rain or sustained humidity in the 72-hour forecast
+        for this ripening stage.
+      text_ar: >-
+        لا مطر مؤثر ولا رطوبة مستمرة في توقعات 72 ساعة لهذه المرحلة.
+
+  leaf_out_of_window:
+    label_en: No action — outside the moisture-sensitive stages
+    label_ar: لا إجراء — خارج المراحل الحسّاسة للرطوبة
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The block is in dormancy, pollination or fruit set, where rain
+        does not carry the ripening-stage damage this tree screens for.
+      text_ar: >-
+        القطعة في السكون أو التلقيح أو العقد، حيث لا يحمل المطر أضرار
+        مراحل النضج التي يفحصها هذا القرار.

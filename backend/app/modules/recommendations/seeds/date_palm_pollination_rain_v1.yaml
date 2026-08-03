@@ -1,0 +1,211 @@
+# date_palm_pollination_rain_v1 — rain forecast inside the pollination
+# window, when date palm is hand-pollinated and the pollen is exposed.
+#
+# Scope note, deliberately narrow: this tree fires only during the
+# `pollination` stage. It is a *timing* aid — "do not apply pollen into
+# a wet forecast, and check set if rain followed a recent application" —
+# not a claim that rain reliably destroys fruit set. The literature is
+# genuinely split on how much rain actually washes pollen away, and the
+# evidence block says so rather than papering over it. That is why this
+# leaf is a warning with a scout action and not a critical alert.
+#
+# What IS well quantified is the cost of delay: fruit set falls sharply
+# when pollination is postponed more than 3-4 days past spathe cracking.
+# So the recommendation is never "wait indefinitely for dry weather" —
+# it is "re-time within the window, and verify set afterwards".
+
+code: date_palm_pollination_rain_v1
+name_en: Date palm — rain during the pollination window
+name_ar: نخيل البلح — مطر خلال نافذة التلقيح
+description_en: >-
+  Warns when rain is forecast while the block is in the spathe-emergence
+  and pollination stage, so hand-pollination can be re-timed within the
+  receptivity window rather than applied into a wet forecast. Because
+  fruit set drops sharply if pollination is delayed beyond 3-4 days
+  after spathe cracking, the advice is to re-time and verify set, not to
+  wait out the weather.
+description_ar: >-
+  ينبّه عند توقّع مطر بينما القطعة في مرحلة خروج الطلع والتلقيح، ليُعاد
+  توقيت التلقيح اليدوي داخل نافذة التقبّل بدل تنفيذه في توقّعات ممطرة.
+  ولأن العقد ينخفض بشدّة إذا تأخّر التلقيح أكثر من 3-4 أيام بعد تشقّق
+  الطلع، فالنصيحة هي إعادة التوقيت والتحقّق من العقد، لا انتظار الطقس.
+
+crop_code: date_palm
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Confidence is medium on purpose, and the reason is the trigger, not
+    the action. The literature is explicitly split on rain washing
+    pollen: reviews of date-palm pollination management record a
+    controversy, with some workers treating rain shortly after
+    pollination as a washing agent that removes most of the applied
+    pollen, and others not — and bunch covering is noted as reducing the
+    exposure either way. This tree therefore raises a warning to re-time
+    and verify, and does not assert that rain will destroy the set.
+    What is well quantified is the opposing cost of delay, and it is the
+    reason the actions push toward re-timing rather than waiting: fruit
+    set is about 95% when pollen is applied on the day of spathe
+    cracking and falls away as pollination is delayed, with the working
+    guidance being not to delay more than 3-4 days. FAO's pollination
+    and bunch-management chapter is the standing reference for the
+    operation itself. Stage windows come from migration 0038's generic
+    Egyptian calendar (spathe cracking late Feb into March); cultivar and
+    season shift this, and the stage is editable per tenant.
+  citations:
+    - source_type: fao
+      title: >-
+        Date Palm Cultivation, Chapter VIII — Pollination and bunch
+        management
+      url: https://www.fao.org/4/y4360e/y4360e0c.htm
+    - source_type: peer_reviewed
+      title: >-
+        Effect of pollination time, hour of daytime, pollen storage
+        temperature and duration on pollen viability, germinability and
+        fruit set of date palm cv. Deglet Nour
+      url: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8847947/
+    - source_type: peer_reviewed
+      title: >-
+        Date Palm Pollination Management (review; records the
+        rain-washing controversy and the role of bunch covering)
+      url: https://www.researchgate.net/publication/371564030_Date_Palm_Pollination_Management
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  rain_mm_24h:
+    type: number
+    default: 2.0
+    min: 0.0
+    max: 100.0
+    description: >-
+      Forecast rainfall total (mm) over the next 24 hours above which
+      pollination timing is flagged. Low by design — the concern is wet
+      spathes and exposed pollen, not accumulation.
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in the spathe-emergence / pollination stage?
+    label_ar: هل القطعة في مرحلة خروج الطلع والتلقيح؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: block
+          field: growth_stage
+        right: pollination
+    on_match: rain_check
+    on_miss: leaf_out_of_window
+
+  rain_check:
+    label_en: Is rain forecast within the next 24 hours?
+    label_ar: هل يُتوقّع مطر خلال 24 ساعة القادمة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: weather
+          scope: forecast_24h
+          field: precipitation_mm_total
+        right:
+          source: params
+          name: rain_mm_24h
+    on_match: leaf_rain_in_window
+    on_miss: leaf_no_action
+
+  leaf_rain_in_window:
+    label_en: Rain forecast during pollination — re-time and verify set
+    label_ar: مطر متوقع أثناء التلقيح — أعد التوقيت وتحقّق من العقد
+    outcome:
+      kind: recommendation
+      action_type: scout
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 48
+      parameters:
+        priority: medium
+      text_en: >-
+        Rain is forecast while this block is in the pollination window.
+        Avoid applying pollen into the wet period if receptive spathes
+        allow it, and if pollen was applied within the last day or two,
+        plan to check set and consider re-pollinating. Do not simply wait
+        for settled weather: fruit set falls off sharply once pollination
+        slips more than 3-4 days past spathe cracking, so re-timing
+        inside the window beats postponing past it.
+      text_ar: >-
+        يُتوقّع مطر بينما هذه القطعة في نافذة التلقيح. تجنّب وضع اللقاح
+        في الفترة الممطرة إن سمحت الطلوع المتقبّلة بذلك، وإن كان اللقاح
+        قد وُضع خلال اليوم أو اليومين الماضيين فخطّط لفحص العقد وفكّر في
+        إعادة التلقيح. ولا تكتفِ بانتظار استقرار الطقس: فالعقد ينخفض
+        بشدّة متى تأخّر التلقيح أكثر من 3-4 أيام بعد تشقّق الطلع، وإعادة
+        التوقيت داخل النافذة أفضل من التأجيل خارجها.
+      actions:
+        immediate:
+          - text_en: >-
+              Hold pollination on spathes not yet treated until the rain
+              clears, provided that keeps you inside the 3-4 day
+              receptivity window.
+            text_ar: >-
+              أرجئ تلقيح الطلوع التي لم تُعالَج حتى ينقشع المطر، بشرط أن
+              يُبقيك ذلك داخل نافذة التقبّل 3-4 أيام.
+          - text_en: >-
+              Where bunches were pollinated in the last 48 hours, cover
+              them if covering is part of your practice.
+            text_ar: >-
+              حيث لُقّحت العذوق خلال 48 ساعة الماضية، غطّها إن كانت
+              التغطية جزءًا من ممارستك.
+        short_term:
+          - text_en: >-
+              Inspect treated spathes for set 10-14 days after
+              pollination and re-pollinate any still within receptivity.
+            text_ar: >-
+              افحص الطلوع المُعالَجة للتأكد من العقد بعد 10-14 يومًا من
+              التلقيح وأعد تلقيح ما زال ضمن فترة التقبّل.
+        long_term:
+          - text_en: >-
+              If rain recurs in this window across seasons, plan pollen
+              reserves and covering so applications can be compressed
+              into dry days.
+            text_ar: >-
+              إن تكرّر المطر في هذه النافذة عبر المواسم، جهّز مخزون لقاح
+              ووسائل تغطية لتُضغط عمليات التلقيح في الأيام الجافة.
+        monitoring:
+          - text_en: >-
+              Record pollination date per bunch so a weak set can be
+              traced back to the weather on the day.
+            text_ar: >-
+              سجّل تاريخ التلقيح لكل عذق ليُمكن ربط ضعف العقد بطقس ذلك
+              اليوم.
+
+  leaf_no_action:
+    label_en: No action — pollination window is dry
+    label_ar: لا إجراء — نافذة التلقيح جافة
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.85
+      parameters: {}
+      text_en: No meaningful rain forecast during the pollination window.
+      text_ar: لا مطر مؤثر متوقع خلال نافذة التلقيح.
+
+  leaf_out_of_window:
+    label_en: No action — outside the pollination stage
+    label_ar: لا إجراء — خارج مرحلة التلقيح
+    outcome:
+      kind: recommendation
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The block is not in the spathe-emergence / pollination stage, so
+        pollen timing is not in question.
+      text_ar: >-
+        القطعة ليست في مرحلة خروج الطلع والتلقيح، لذا لا مسألة في توقيت
+        اللقاح.
