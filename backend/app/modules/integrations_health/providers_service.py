@@ -21,6 +21,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
+
 _LATEST_PROBE_CTE = """
 WITH latest AS (
     SELECT DISTINCT ON (provider_kind, provider_code)
@@ -151,7 +153,7 @@ class ProviderHealthService:
                         FROM imagery_aoi_subscriptions ias
                         JOIN public.imagery_products prod
                           ON prod.id = ias.product_id
-                        WHERE prod.provider_code = ip.code
+                        WHERE prod.provider_id = ip.id
                           AND ias.is_active = TRUE
                           AND ias.deleted_at IS NULL
                       )
@@ -206,55 +208,76 @@ class ProviderHealthService:
             )
         ).all()
 
+        log = get_logger(__name__)
         merged: dict[str, int] = {}
         for t in tenants:
             try:
                 schema = sanitize_tenant_schema(t.schema_name)
             except ValueError:
+                log.warning("error_histogram_invalid_schema", schema=t.schema_name)
                 continue
-            await self._pub.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+
+            # SAVEPOINT per tenant: a schema mid-migration raises, and
+            # without a subtransaction that aborts the *whole* session —
+            # every later statement (including the search_path reset) then
+            # fails with InFailedSqlTransaction and the endpoint 500s
+            # instead of skipping the one bad tenant.
             try:
-                if provider_kind == "weather":
-                    rows = (
-                        await self._pub.execute(
-                            text(
-                                """
-                                SELECT COALESCE(error_code, 'uncategorized') AS code,
-                                       COUNT(*)::int AS n
-                                FROM weather_ingestion_attempts
-                                WHERE status = 'failed'
-                                  AND provider_code = :p
-                                  AND started_at > now() - make_interval(hours => :h)
-                                GROUP BY 1
-                                """
-                            ),
-                            {"p": provider_code, "h": hours},
-                        )
-                    ).all()
-                else:
-                    # Imagery jobs key on product_id, not provider directly;
-                    # join through public.imagery_products.
-                    rows = (
-                        await self._pub.execute(
-                            text(
-                                """
-                                SELECT COALESCE(ij.error_code, 'uncategorized') AS code,
-                                       COUNT(*)::int AS n
-                                FROM imagery_ingestion_jobs ij
-                                JOIN public.imagery_products ip
-                                  ON ip.id = ij.product_id
-                                WHERE ij.status = 'failed'
-                                  AND ip.provider_code = :p
-                                  AND ij.requested_at > now() - make_interval(hours => :h)
-                                GROUP BY 1
-                                """
-                            ),
-                            {"p": provider_code, "h": hours},
-                        )
-                    ).all()
-            except Exception:  # noqa: S112 - intentional skip across tenants mid-migration
-                # Tenant mid-migration / missing column - skip, don't fail
-                # the whole rollup. Mirrors health_rollup.py behavior.
+                async with self._pub.begin_nested():
+                    await self._pub.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+                    if provider_kind == "weather":
+                        rows = (
+                            await self._pub.execute(
+                                text(
+                                    """
+                                    SELECT COALESCE(error_code, 'uncategorized') AS code,
+                                           COUNT(*)::int AS n
+                                    FROM weather_ingestion_attempts
+                                    WHERE status = 'failed'
+                                      AND provider_code = :p
+                                      AND started_at > now() - make_interval(hours => :h)
+                                    GROUP BY 1
+                                    """
+                                ),
+                                {"p": provider_code, "h": hours},
+                            )
+                        ).all()
+                    else:
+                        # Imagery jobs key on product_id, and products key on
+                        # provider_id — there is no `imagery_products.provider_code`.
+                        # Join out to the provider catalog to match on its `code`.
+                        rows = (
+                            await self._pub.execute(
+                                text(
+                                    """
+                                    SELECT COALESCE(ij.error_code, 'uncategorized') AS code,
+                                           COUNT(*)::int AS n
+                                    FROM imagery_ingestion_jobs ij
+                                    JOIN public.imagery_products prod
+                                      ON prod.id = ij.product_id
+                                    JOIN public.imagery_providers prov
+                                      ON prov.id = prod.provider_id
+                                    WHERE ij.status = 'failed'
+                                      AND prov.code = :p
+                                      AND ij.requested_at >
+                                          now() - make_interval(hours => :h)
+                                    GROUP BY 1
+                                    """
+                                ),
+                                {"p": provider_code, "h": hours},
+                            )
+                        ).all()
+            except Exception as exc:
+                # Tenant mid-migration / missing table — skip that tenant,
+                # don't fail the whole rollup. The SAVEPOINT rollback also
+                # restores search_path, so the loop can continue safely.
+                log.warning(
+                    "error_histogram_tenant_query_failed",
+                    schema=schema,
+                    provider_kind=provider_kind,
+                    provider_code=provider_code,
+                    error=str(exc),
+                )
                 continue
             finally:
                 await self._pub.execute(text("SET LOCAL search_path TO public"))

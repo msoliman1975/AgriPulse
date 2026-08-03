@@ -82,13 +82,17 @@ async def cross_tenant_health(
             log.warning("cross_tenant_health_invalid_schema", schema=t.schema_name)
             continue
 
-        # Switch into the tenant schema and aggregate the view.
-        await public_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+        # Switch into the tenant schema and aggregate the view. The
+        # SAVEPOINT matters: without it a raising tenant aborts the whole
+        # session, so the `finally` reset below fails too and the endpoint
+        # 500s instead of skipping the one bad tenant.
         try:
-            row = (
-                await public_session.execute(
-                    text(
-                        """
+            async with public_session.begin_nested():
+                await public_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+                row = (
+                    await public_session.execute(
+                        text(
+                            """
                         SELECT COUNT(*) AS farms_count,
                                COALESCE(SUM(weather_active_subs), 0) AS w_subs,
                                MAX(weather_last_sync_at) AS w_last,
@@ -103,9 +107,9 @@ async def cross_tenant_health(
                                COALESCE(SUM(imagery_failed_24h), 0) AS i_failed_24h
                         FROM v_farm_integration_health
                         """
+                        )
                     )
-                )
-            ).first()
+                ).first()
         except Exception as exc:
             # Tenant schema might be mid-migration / missing the view.
             log.warning(
