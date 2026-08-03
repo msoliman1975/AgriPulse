@@ -337,6 +337,55 @@ async def _load_derived_for_date(
     return {k: _to_decimal(v) for k, v in row.items()}
 
 
+async def load_gdd_since(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: date,
+    until: date,
+) -> Decimal | None:
+    """Sum daily base-10 GDD for ``farm_id`` over ``[since, until]``.
+
+    Used by the phenology auto-advance task to resolve
+    ``gdd_from_planting`` stage windows. Deliberately sums the *daily*
+    ``gdd_base10`` rather than reading ``gdd_cumulative_base10_season``:
+    the season cumulative resets on the provider's own season anchor,
+    which has no relationship to when a given block was planted, so a
+    block planted mid-season would read far too high.
+
+    Returns ``None`` when the farm has no derived rows in the window at
+    all, which the caller treats as "unknown" and leaves the stage
+    alone. A window that exists but is entirely NULL sums to 0, meaning
+    "no heat accumulated yet" — a real answer, not a missing one.
+
+    ``session`` must already be bound to the tenant schema.
+    """
+    row = (
+        (
+            await session.execute(
+                text(
+                    """
+            SELECT COALESCE(SUM(gdd_base10), 0) AS gdd_total,
+                   COUNT(*)                     AS day_count
+            FROM weather_derived_daily
+            WHERE farm_id = :farm_id
+              AND date >= :since
+              AND date <= :until
+            """
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                # Bind real `date` objects, never isoformat strings — asyncpg
+                # rejects a str where the column is DATE.
+                {"farm_id": farm_id, "since": since, "until": until},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or not row["day_count"]:
+        return None
+    return _to_decimal(row["gdd_total"])
+
+
 def _to_decimal(value: Any) -> Decimal | None:
     if value is None:
         return None

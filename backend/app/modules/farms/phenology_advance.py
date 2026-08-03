@@ -12,8 +12,10 @@ Advance modes (validated upstream against ``Crop.is_perennial`` in
   * ``days_from_planting`` — annuals. ``[start_day, end_day)`` elapsed days
     since ``planting_date``.
   * ``gdd_from_planting`` — annuals; needs accumulated GDD (farm weather).
-    NOT resolved here in V1 — these stages are skipped (no seeded crop uses
-    GDD; see proposal §6 follow-up). Pass ``gdd_cumulative`` to enable.
+    The advance task now supplies ``gdd_cumulative`` by summing daily
+    base-10 GDD from the block's planting date, so these stages resolve.
+    A stage still fails closed (never matches) when the farm has no
+    derived weather rows over that window and ``gdd_cumulative`` is None.
   * ``manual`` — never auto-advanced.
 
 When more than one stage window matches, the highest ``order`` wins.
@@ -51,8 +53,9 @@ def stage_for_date(
     """Return the code of the stage whose window contains ``today``.
 
     Returns ``None`` when no stage matches (so the caller leaves the block's
-    stage unchanged). Manual stages and — in V1 — GDD stages without a
-    supplied ``gdd_cumulative`` never match.
+    stage unchanged). Manual stages never match, and GDD stages only match
+    once ``gdd_cumulative`` is supplied — a farm with no derived weather
+    history holds its stage rather than guessing.
     """
     matches: list[dict[str, Any]] = []
     for stage in stages:
@@ -79,4 +82,15 @@ def stage_for_date(
     return str(winner["code"])
 
 
-__all__ = ["stage_for_date"]
+def needs_gdd(stages: list[dict[str, Any]]) -> bool:
+    """Whether any stage in this calendar advances on accumulated heat.
+
+    The advance sweep uses this to decide whether a block is worth a
+    farm-id resolution and a GDD query at all. Crops on calendar or
+    day-count windows — which is every crop seeded today — short-circuit
+    here and cost nothing extra.
+    """
+    return any((stage.get("advance") or {}).get("mode") == "gdd_from_planting" for stage in stages)
+
+
+__all__ = ["needs_gdd", "stage_for_date"]

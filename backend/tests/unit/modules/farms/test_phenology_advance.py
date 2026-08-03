@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.modules.farms.phenology_advance import stage_for_date
+from app.modules.farms.phenology_advance import needs_gdd, stage_for_date
 
 
 def _cal(code: str, order: int, start: str, end: str) -> dict:
@@ -119,3 +119,75 @@ def test_mode_mismatch_for_cycle_is_ignored() -> None:
         )
         is None
     )
+
+
+# ---- GDD advance mode (W5) -------------------------------------------
+
+
+def _gdd(code: str, order: int, start: int, end: int) -> dict:
+    return {
+        "code": code,
+        "order": order,
+        "advance": {"mode": "gdd_from_planting", "start_gdd": start, "end_gdd": end},
+    }
+
+
+GDD_CALENDAR = [
+    _gdd("emergence", 1, 0, 200),
+    _gdd("vegetative", 2, 200, 600),
+    _gdd("bulking", 3, 600, 1200),
+]
+
+PLANTED = date(2026, 3, 1)
+LATER = date(2026, 5, 1)
+
+
+def _gdd_stage(total: float | None) -> str | None:
+    return stage_for_date(
+        GDD_CALENDAR,
+        is_perennial=False,
+        planting_date=PLANTED,
+        today=LATER,
+        gdd_cumulative=total,
+    )
+
+
+def test_gdd_windows_are_start_inclusive_end_exclusive() -> None:
+    # The boundary matters: at exactly 200 the crop has left emergence.
+    assert _gdd_stage(199.9) == "emergence"
+    assert _gdd_stage(200.0) == "vegetative"
+    assert _gdd_stage(599.9) == "vegetative"
+    assert _gdd_stage(600.0) == "bulking"
+
+
+def test_gdd_beyond_the_last_window_holds_the_stage() -> None:
+    # Past the end of the calendar nothing matches, so the caller leaves
+    # the block where it is rather than resetting it.
+    assert _gdd_stage(5000.0) is None
+
+
+def test_gdd_without_weather_history_holds_the_stage() -> None:
+    # `load_gdd_since` returns None when the farm has no derived rows;
+    # the block must hold its stage rather than snapping to emergence.
+    assert _gdd_stage(None) is None
+
+
+def test_zero_accumulated_heat_is_a_real_answer() -> None:
+    # A farm with weather rows but no accumulated heat is genuinely at
+    # the first stage — distinct from "no data", which returns None.
+    assert _gdd_stage(0.0) == "emergence"
+
+
+def test_needs_gdd_detects_a_heat_driven_calendar() -> None:
+    assert needs_gdd(GDD_CALENDAR) is True
+    assert needs_gdd([_gdd("g", 1, 0, 100), _days("d", 2, 0, 10)]) is True
+
+
+def test_needs_gdd_is_false_for_calendars_seeded_today() -> None:
+    # Mango/date palm (calendar_doy) and potato (days_from_planting) must
+    # not trigger the farm-id resolution or the GDD query.
+    assert needs_gdd(PERENNIAL) is False
+    assert needs_gdd(ANNUAL) is False
+    assert needs_gdd([]) is False
+    assert needs_gdd([{"code": "m", "order": 1, "advance": {"mode": "manual"}}]) is False
+    assert needs_gdd([{"code": "x", "order": 1}]) is False
