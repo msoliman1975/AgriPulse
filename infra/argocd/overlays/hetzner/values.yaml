@@ -344,11 +344,28 @@ global:
   #   before; a change in its evaluated/advanced counts would be a
   #   surprise worth reading.
   #   tile-server stays 9d140cc.
+  # 0b8147b = #347, the Providers tab's "Failure causes (cross-tenant)" card
+  #   500'd for every imagery provider (platform + tenant drill-in alike).
+  #   It filtered on public.imagery_products.provider_code -- a column that
+  #   has never existed; products key on provider_id and only
+  #   imagery_providers carries a code, so the query raised UndefinedColumn.
+  #   The per-tenant `except: continue` meant to absorb that made it worse:
+  #   the raising statement aborts the whole transaction, so the finally's
+  #   `SET LOCAL search_path TO public` then died with InFailedSQLTransaction
+  #   -- raised out of the finally, past the except, and out as a 500.
+  #   Now joins through imagery_providers and wraps each tenant in a
+  #   SAVEPOINT. The same latent trap is fixed in health_rollup.py, where
+  #   one mid-migration tenant would have taken the whole platform health
+  #   page down. NO MIGRATION. What to watch: /platform/integrations/health
+  #   still lists every tenant (the rollup loop changed shape), and the
+  #   Providers tab's histogram now renders counts instead of the error.
+  #   Backend-only -- api + workers bumped; frontend stays a3239b6,
+  #   tile-server stays 9d140cc.
   images:
     api:
-      tag: "a3239b6"
+      tag: "0b8147b"
     workers:
-      tag: "a3239b6"
+      tag: "0b8147b"
     frontend:
       tag: "a3239b6"
     tileServer:
