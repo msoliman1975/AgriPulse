@@ -9,6 +9,7 @@ service layer. Read-side projections back to GeoJSON go through
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from datetime import date as _date
 from decimal import Decimal
@@ -1180,6 +1181,23 @@ class FarmsRepository:
             .all()
         )
         return list(rows)
+
+    async def map_blocks_to_farms(self, block_ids: Sequence[UUID]) -> dict[UUID, UUID]:
+        """``{block_id: farm_id}`` for the given blocks, in one round trip.
+
+        The phenology auto-advance sweep needs a farm id to look up GDD,
+        but only for the minority of blocks whose crop actually declares a
+        ``gdd_from_planting`` stage — so the caller filters first and then
+        resolves the survivors in a batch rather than per block.
+        """
+        if not block_ids:
+            return {}
+        rows = (
+            await self._tenant.execute(
+                select(Block.id, Block.farm_id).where(Block.id.in_(list(block_ids)))
+            )
+        ).all()
+        return {row.id: row.farm_id for row in rows}
 
     async def update_block_crop(
         self, *, bc: BlockCrop, fields: dict[str, Any], actor_user_id: UUID | None

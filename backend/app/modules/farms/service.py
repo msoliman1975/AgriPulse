@@ -62,8 +62,9 @@ from app.modules.farms.phenology import (
     validate_phenology_payload,
     validate_size_classes_payload,
 )
-from app.modules.farms.phenology_advance import stage_for_date
+from app.modules.farms.phenology_advance import needs_gdd, stage_for_date
 from app.modules.farms.repository import FarmsRepository
+from app.modules.weather.snapshot import load_gdd_since
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.keycloak.client import KeycloakAdminClient, get_keycloak_client
@@ -1796,6 +1797,11 @@ class FarmServiceImpl:
         evaluated = 0
         advanced = 0
         no_stages = 0
+        # GDD is a farm-level series, so blocks on the same farm planted on
+        # the same day share an answer. Only crops that actually declare a
+        # `gdd_from_planting` stage pay for the lookup at all.
+        gdd_cache: dict[tuple[UUID, _date], Decimal | None] = {}
+        farm_by_block: dict[UUID, UUID] | None = None
         for bc in candidates:
             evaluated += 1
             crop, variety, strain = await self._repo.resolve_taxonomy_by_path(
@@ -1813,11 +1819,30 @@ class FarmServiceImpl:
             if not stages:
                 no_stages += 1
                 continue
+            gdd_cumulative: float | None = None
+            if needs_gdd(stages) and bc.planting_date is not None and not crop.is_perennial:
+                if farm_by_block is None:
+                    farm_by_block = await self._repo.map_blocks_to_farms(
+                        [c.block_id for c in candidates]
+                    )
+                farm_id = farm_by_block.get(bc.block_id)
+                if farm_id is not None:
+                    key = (farm_id, bc.planting_date)
+                    if key not in gdd_cache:
+                        gdd_cache[key] = await load_gdd_since(
+                            self._tenant_session,
+                            farm_id=farm_id,
+                            since=bc.planting_date,
+                            until=today,
+                        )
+                    total = gdd_cache[key]
+                    gdd_cumulative = None if total is None else float(total)
             target = stage_for_date(
                 stages,
                 is_perennial=crop.is_perennial,
                 planting_date=bc.planting_date,
                 today=today,
+                gdd_cumulative=gdd_cumulative,
             )
             if target is None or target == bc.growth_stage:
                 continue
