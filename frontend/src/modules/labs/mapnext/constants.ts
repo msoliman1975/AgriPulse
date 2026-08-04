@@ -18,7 +18,7 @@ export const HEALTH_DOT: Record<Health, string> = {
 
 // The full index set the sub-block grid pipeline supports (what the map can
 // colour by). The block-level time-series API only serves three of these —
-// see BLOCK_LEVEL_INDICES — so the inspector only charts those.
+// see BLOCK_LEVEL_INDICES — so only those can be charted for a whole block.
 export const MAP_INDEX_ORDER: ApiIndexCode[] = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi", "ndmi"];
 export const BLOCK_LEVEL_INDICES: IndexCode[] = ["ndvi", "ndre", "ndwi"];
 
@@ -26,12 +26,40 @@ export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
   return c === "ndvi" || c === "ndre" || c === "ndwi";
 }
 
-export const INDEX_META: Record<ApiIndexCode, { label: string; family: string; meaning: string }> = {
-  ndvi: { label: "NDVI", family: "Vigour & canopy", meaning: "Overall canopy vigour" },
-  evi: { label: "EVI", family: "Vigour & canopy", meaning: "Vigour, less soil & haze noise" },
-  savi: { label: "SAVI", family: "Vigour & canopy", meaning: "Vigour adjusted for bare soil" },
-  ndre: { label: "NDRE", family: "Nutrition", meaning: "Canopy nitrogen (red-edge)" },
-  gndvi: { label: "GNDVI", family: "Nutrition", meaning: "Chlorophyll / greenness" },
-  ndwi: { label: "NDWI", family: "Water & moisture", meaning: "Canopy water content" },
-  ndmi: { label: "NDMI", family: "Water & moisture", meaning: "Vegetation moisture (SWIR)" },
+// ---- agronomic families ---------------------------------------------------
+//
+// Indices grouped by the question they answer rather than by acronym: is the
+// canopy growing, is it fed, is it thirsty. The Farm Console's first inspector
+// filed them this way and printed the family as a heading above each index
+// (#228); the grouping was dropped when the four grid-only indices arrived and
+// broke the one-index-per-family symmetry (#234), leaving a flat grid and then
+// a flat pill row. The dock restores it as one tab per family.
+export type IndexFamilyKey = "vigour" | "nutrition" | "moisture";
+
+export const INDEX_FAMILIES: { key: IndexFamilyKey; indices: ApiIndexCode[] }[] = [
+  { key: "vigour", indices: ["ndvi", "evi", "savi"] },
+  { key: "nutrition", indices: ["ndre", "gndvi"] },
+  { key: "moisture", indices: ["ndwi", "ndmi"] },
+];
+
+// The one block-level index in each family — what that family's tab charts,
+// since the grid-only members have no block-wide series to plot.
+export const FAMILY_PRIMARY: Record<IndexFamilyKey, IndexCode> = {
+  vigour: "ndvi",
+  nutrition: "ndre",
+  moisture: "ndwi",
+};
+
+// Family names and one-line meanings are i18n keys (`dock.family.*`,
+// `dock.meaning.*`), not English literals in this table: they are read as tab
+// labels now, and an English tab in the Arabic nav is a worse failure than the
+// untranslated tooltip they used to be.
+export const INDEX_META: Record<ApiIndexCode, { label: string; family: IndexFamilyKey }> = {
+  ndvi: { label: "NDVI", family: "vigour" },
+  evi: { label: "EVI", family: "vigour" },
+  savi: { label: "SAVI", family: "vigour" },
+  ndre: { label: "NDRE", family: "nutrition" },
+  gndvi: { label: "GNDVI", family: "nutrition" },
+  ndwi: { label: "NDWI", family: "moisture" },
+  ndmi: { label: "NDMI", family: "moisture" },
 };

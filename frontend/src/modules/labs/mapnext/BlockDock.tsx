@@ -9,7 +9,17 @@
 // It spans the map canvas only — it lives inside the map column, so it
 // tracks the units rail as that collapses rather than sliding under it.
 //
-// Views: Overview · Index · Conditions · Field & plan · Manage.
+// Views: Overview · one tab per index family · Water & environment ·
+// Conditions · Field & plan · Manage.
+//
+// The index families — Vigour & canopy, Nutrition, Water & moisture — are the
+// grouping the first Farm Console inspector had and the 7-index flattening
+// lost (see INDEX_FAMILIES). Each is a tab rather than a heading inside one
+// "Index" tab, so a reader picks the question first and the acronym second.
+//
+// Every tab owns its data outright: water and weather live in Water &
+// environment and nowhere else, activities and sources in Field & plan, and
+// Overview carries only forward-looking summaries that link onward.
 // See docs/proposals/block-dock.html for the design it implements.
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -20,16 +30,41 @@ import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
 import { clearDetailCache } from "../map/api";
 import type { UnitDetail } from "../map/types";
-import { HEALTH_DOT, INDEX_META, isBlockLevel } from "./constants";
+import {
+  HEALTH_DOT,
+  INDEX_FAMILIES,
+  INDEX_META,
+  isBlockLevel,
+  type IndexFamilyKey,
+} from "./constants";
 import { DockConditionsView } from "./DockConditionsView";
-import { DockIndexView } from "./DockIndexView";
-import { cropLabel, fmt, longDate, shortDate } from "./dockFormat";
+import { DockFamilyView } from "./DockFamilyView";
+import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate } from "./dockFormat";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
 
-export type DockTab = "overview" | "index" | "conditions" | "field" | "manage";
+export type DockTab =
+  | "overview"
+  | "vigour"
+  | "nutrition"
+  | "moisture"
+  | "environment"
+  | "conditions"
+  | "field"
+  | "manage";
 
-const TABS: DockTab[] = ["overview", "index", "conditions", "field", "manage"];
+const TABS: DockTab[] = [
+  "overview",
+  "vigour",
+  "nutrition",
+  "moisture",
+  "environment",
+  "conditions",
+  "field",
+  "manage",
+];
+
+const FAMILY_TABS = new Set<DockTab>(INDEX_FAMILIES.map((f) => f.key));
 
 // Conditions is the only tab behind a capability: it calls the tree-explain
 // endpoint, which is gated on `recommendation.read`. Hide it rather than let
@@ -119,6 +154,7 @@ function Rows({ items }: { items: [ReactNode, ReactNode][] }): ReactNode {
 // Columns are sized, not stretched: on a wide screen three equal fractions
 // left most of each one empty.
 const COLS_3 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,360px)_minmax(220px,320px)]";
+const COLS_2 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,400px)]";
 
 export function BlockDock({
   detail,
@@ -226,6 +262,8 @@ export function BlockDock({
   const crit = detail.alerts.filter((a) => a.severity === "critical").length;
   const featured = isBlockLevel(activeIndex) ? detail.indices[activeIndex] : undefined;
   const healthColor = HEALTH_DOT[detail.health];
+  const activeFamily = INDEX_META[activeIndex].family;
+  const activeDelta = deltaLabel(featured?.trend_7d_delta);
 
   return (
     <section
@@ -308,10 +346,12 @@ export function BlockDock({
       {collapsed ? null : (
         <>
           {/* ---- tabs ---- */}
+          {/* Eight tabs do not fit a narrow map column, so the strip scrolls
+              rather than wrapping into a second row that eats the viewport. */}
           <div
             role="tablist"
             aria-label={t("dock.regionLabel")}
-            className="flex flex-none gap-1 border-b border-ap-line px-3"
+            className="flex flex-none gap-1 overflow-x-auto border-b border-ap-line px-3"
           >
             {tabs.map((v) => (
               <button
@@ -321,7 +361,7 @@ export function BlockDock({
                 aria-selected={tab === v}
                 onClick={() => setTab(v)}
                 className={clsx(
-                  "-mb-px border-b-2 px-3 py-2 text-sm font-semibold",
+                  "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold",
                   tab === v
                     ? "border-ap-primary text-ap-ink"
                     : "border-transparent text-ap-muted hover:text-ap-ink",
@@ -384,18 +424,25 @@ export function BlockDock({
                     <span className="pb-1 text-xs text-ap-muted">
                       {INDEX_META[activeIndex].label}
                       <br />
-                      {t("inspector.trend7d")}: {fmt(featured?.trend_7d_delta ?? null)}
+                      {t("inspector.trend7d")}:{" "}
+                      <span style={{ color: activeDelta.color }} className="font-semibold">
+                        {activeDelta.arrow} {activeDelta.text}
+                      </span>
                     </span>
                   </div>
+                  {/* Points at the family the map's current index belongs to,
+                      so the summary and the detail are never a guess apart. */}
                   <button
                     type="button"
-                    onClick={() => setTab("index")}
+                    onClick={() => setTab(activeFamily)}
                     className="self-start text-sm font-semibold text-ap-primary hover:underline"
                   >
-                    {t("dock.openIndexDetail")}
+                    {t("dock.openFamily", { family: t(`dock.family.${activeFamily}`) })}
                   </button>
                 </Col>
 
+                {/* Forward-looking only. Soil moisture is a current reading, so
+                    it belongs to Water & environment and is not repeated. */}
                 <Col title={t("dock.nextUp")}>
                   <Rows
                     items={[
@@ -404,12 +451,6 @@ export function BlockDock({
                         detail.irrigation.next
                           ? `${detail.irrigation.next.volume_mm} mm · ${shortDate(detail.irrigation.next.date)}`
                           : t("inspector.none"),
-                      ],
-                      [
-                        t("inspector.soilMoisture"),
-                        detail.irrigation.soil_moisture_pct == null
-                          ? "—"
-                          : `${detail.irrigation.soil_moisture_pct}%`,
                       ],
                       [
                         t("dock.nextActivity"),
@@ -423,12 +464,84 @@ export function BlockDock({
               </div>
             ) : null}
 
-            {tab === "index" ? (
-              <DockIndexView
+            {FAMILY_TABS.has(tab) ? (
+              <DockFamilyView
                 blockId={detail.id}
+                family={tab as IndexFamilyKey}
+                indices={detail.indices}
                 activeIndex={activeIndex}
                 onActiveIndexChange={onActiveIndexChange}
               />
+            ) : null}
+
+            {tab === "environment" ? (
+              <div className={COLS_2}>
+                <Col title={t("inspector.irrigation")}>
+                  <Rows
+                    items={[
+                      [
+                        t("inspector.last"),
+                        detail.irrigation.last
+                          ? `${detail.irrigation.last.volume_mm} mm · ${shortDate(detail.irrigation.last.date)}`
+                          : t("inspector.none"),
+                      ],
+                      [
+                        t("inspector.next"),
+                        detail.irrigation.next ? (
+                          // The emergency flag was computed and then dropped by
+                          // the dock, so an urgent run read like a routine one.
+                          <span
+                            style={
+                              detail.irrigation.next.is_emergency
+                                ? { color: HEALTH_DOT.critical }
+                                : undefined
+                            }
+                            title={
+                              detail.irrigation.next.is_emergency ? t("dock.emergency") : undefined
+                            }
+                          >
+                            {detail.irrigation.next.volume_mm} mm ·{" "}
+                            {shortDate(detail.irrigation.next.date)}
+                            {detail.irrigation.next.is_emergency ? " ⚠" : ""}
+                          </span>
+                        ) : (
+                          t("inspector.none")
+                        ),
+                      ],
+                      [
+                        t("inspector.soilMoisture"),
+                        detail.irrigation.soil_moisture_pct == null
+                          ? "—"
+                          : `${detail.irrigation.soil_moisture_pct}% · ${t(`soilStatus.${detail.irrigation.soil_status}`)}`,
+                      ],
+                    ]}
+                  />
+                  <p className="text-xs text-ap-muted">{t("dock.soilFromSchedule")}</p>
+                </Col>
+
+                <Col title={t("inspector.weather")}>
+                  {detail.weather_3d.length ? (
+                    <div className="flex gap-2">
+                      {detail.weather_3d.map((w) => (
+                        <div
+                          key={w.day}
+                          className="flex-1 rounded-lg border border-ap-line px-2 py-1.5 text-center"
+                        >
+                          <div className="text-xs text-ap-muted">{w.day}</div>
+                          <div className="text-sm font-semibold tabular-nums text-ap-ink">
+                            {w.temp_c_max == null ? "—" : `${w.temp_c_max}°`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // An absent forecast used to render as nothing at all,
+                    // which reads as "no weather here" rather than "no
+                    // subscription, or the call failed".
+                    <p className="text-sm text-ap-muted">{t("dock.noWeather")}</p>
+                  )}
+                </Col>
+              </div>
             ) : null}
 
             {tab === "conditions" && canReadConditions ? (
@@ -441,42 +554,35 @@ export function BlockDock({
 
             {tab === "field" ? (
               <div className={COLS_3}>
-                <Col title={t("inspector.waterSection")}>
-                  <Rows
-                    items={[
-                      [
-                        t("inspector.last"),
-                        detail.irrigation.last
-                          ? `${detail.irrigation.last.volume_mm} mm · ${shortDate(detail.irrigation.last.date)}`
-                          : t("inspector.none"),
-                      ],
-                      [
-                        t("inspector.next"),
-                        detail.irrigation.next
-                          ? `${detail.irrigation.next.volume_mm} mm · ${shortDate(detail.irrigation.next.date)}`
-                          : t("inspector.none"),
-                      ],
-                      [
-                        t("inspector.soilMoisture"),
-                        detail.irrigation.soil_moisture_pct == null
-                          ? "—"
-                          : `${detail.irrigation.soil_moisture_pct}% · ${detail.irrigation.soil_status}`,
-                      ],
-                    ]}
-                  />
-                  <div className="flex gap-2">
-                    {detail.weather_3d.map((w) => (
-                      <div
-                        key={w.day}
-                        className="flex-1 rounded-lg border border-ap-line px-2 py-1.5 text-center"
-                      >
-                        <div className="text-xs text-ap-muted">{w.day}</div>
-                        <div className="text-sm font-semibold tabular-nums text-ap-ink">
-                          {w.temp_c_max == null ? "—" : `${w.temp_c_max}°`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {/* The tab was called "Field & plan" while showing no plan at
+                    all: crop, growth stage and season had no home after the
+                    drawer's Plan section was dropped. This is that home. */}
+                <Col title={t("dock.cropAndPlan")}>
+                  {detail.crop_assignment || detail.plan ? (
+                    <Rows
+                      items={[
+                        ...(detail.crop_assignment
+                          ? ([
+                              [t("inspector.cropName"), cropLabel(detail.crop_assignment) ?? "—"],
+                              [
+                                t("inspector.growthStage"),
+                                humanize(detail.crop_assignment.growth_stage),
+                              ],
+                            ] as [ReactNode, ReactNode][])
+                          : []),
+                        ...(detail.plan
+                          ? ([
+                              [
+                                t("inspector.season"),
+                                `${detail.plan.season_label} (${detail.plan.season_year})`,
+                              ],
+                            ] as [ReactNode, ReactNode][])
+                          : []),
+                      ]}
+                    />
+                  ) : (
+                    <p className="text-sm text-ap-muted">{t("dock.noCropPlan")}</p>
+                  )}
                 </Col>
 
                 <Col title={t("inspector.activities")}>
