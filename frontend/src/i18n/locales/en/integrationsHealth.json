@@ -112,10 +112,11 @@
     },
     "empty": "No probe results yet — the scheduler runs every few minutes.",
     "platformOnly": "Provider health is shared across the platform.",
+    "probeFailed24h": "{{n}} probe failed (24h)",
     "histogram": {
-      "title": "Failure causes (cross-tenant)",
+      "title": "Ingestion failure causes (cross-tenant)",
       "windowLabel": "Last {{h}}h",
-      "empty": "No failures recorded in this window."
+      "empty": "No ingestion failures recorded in this window."
     }
   },
   "lastSync": "Synced {{when}}",

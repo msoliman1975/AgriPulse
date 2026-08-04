@@ -160,8 +160,12 @@ function ProvidersTable({
                     )}
                   </Pill>
                   {r.failed_24h > 0 ? (
+                    // Probe failures (public.provider_probe_results), NOT the
+                    // ingestion failures `badge.failed24h` counts on the
+                    // Overview tab — different table, different meaning. They
+                    // sit one card apart, so the label has to say which.
                     <span className="ms-2 text-xs text-ap-crit">
-                      {t("badge.failed24h", { n: r.failed_24h })}
+                      {t("providers.probeFailed24h", { n: r.failed_24h })}
                     </span>
                   ) : null}
                 </Td>
