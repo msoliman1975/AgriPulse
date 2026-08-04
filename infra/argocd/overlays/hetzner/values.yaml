@@ -361,13 +361,26 @@ global:
   #   Providers tab's histogram now renders counts instead of the error.
   #   Backend-only -- api + workers bumped; frontend stays a3239b6,
   #   tile-server stays 9d140cc.
+  # 7eedeab = #348, follow-up to #347 found while verifying it live. The
+  #   Providers tab showed "1 failed (24h)" beside sentinel_hub while the
+  #   card below read "No failures recorded" -- not a contradiction: the
+  #   badge counts PROBE failures (public.provider_probe_results) and the
+  #   histogram counts INGESTION failures (tenant imagery_ingestion_jobs /
+  #   weather_ingestion_attempts). One transient probe blip with zero
+  #   failed scene fetches is consistent; nothing in the UI said so.
+  #   The badge had been reusing badge.failed24h, which the Overview tab
+  #   uses for real ingestion failures, so that shared key could not just
+  #   be reworded -- adds providers.probeFailed24h instead and qualifies
+  #   the card as "Ingestion failure causes". EN + AR copy, one key swap,
+  #   no logic. Frontend-only -- api + workers stay 0b8147b, tile-server
+  #   stays 9d140cc.
   images:
     api:
       tag: "0b8147b"
     workers:
       tag: "0b8147b"
     frontend:
-      tag: "a3239b6"
+      tag: "7eedeab"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
