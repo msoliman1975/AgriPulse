@@ -1074,7 +1074,7 @@ function SettingsDrawer({
               reactivateError={reactivateError}
             />
           ) : null}
-          {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} /> : null}
+          {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} farmName={farmName} /> : null}
           {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
         </div>
       </aside>

@@ -955,6 +955,7 @@ async def compute_grid_apply_plan(
     farm_id: UUID,
     target_block_ids: tuple[UUID, ...] | None = None,
     clear_override: bool = False,
+    scope: str = "threshold",
 ) -> tuple[Any, ...]:
     """Dry-run the farm's grid template against its blocks.
 
@@ -970,6 +971,10 @@ async def compute_grid_apply_plan(
         session, farm_id=farm_id, target_block_ids=target_block_ids
     )
     svc = get_grid_service(tenant_session=session)
+    if scope == "cell_size":
+        return await svc.plan_farm_cell_size(
+            block_ids=block_ids, template_cell_size=tpl.cell_size_m
+        )
     return await svc.plan_farm_threshold(
         block_ids=block_ids,
         template_z=tpl.anomaly_z_threshold,
@@ -1008,6 +1013,93 @@ async def apply_grid_template(
         "blocks_touched": written,
         "total_blocks": len(plan),
     }
+
+
+class RezoneConfirmationError(ValueError):
+    """The typed farm name didn't match. Raised before anything is written."""
+
+
+async def apply_grid_cell_size(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    target_block_ids: tuple[UUID, ...] | None,
+    created_by: UUID | None,
+    confirm_farm_name: str | None,
+    backfill_budget_scenes: int | None,
+    tenant_schema: str | None,
+) -> dict[str, int]:
+    """Rezone / create grids across a farm, then queue the backfill.
+
+    **Destructive.** Every rezoned block's live geometry is retired and
+    replaced. Valid time keeps the old geometry serving the scenes it
+    produced, so nothing becomes unreadable at the moment of apply — but
+    the history only moves onto the new geometry once the backfill has
+    recomputed it, and whatever the budget doesn't reach stays behind.
+
+    The confirmation is verified **here**, not in the UI. A destructive
+    endpoint that trusts the client to have shown a confirmation dialog
+    isn't confirmed at all.
+    """
+    from app.modules.grid.service import get_grid_service
+
+    tpl = await get_grid_template(session, farm_id=farm_id)
+    block_ids = await _resolve_target_blocks(
+        session, farm_id=farm_id, target_block_ids=target_block_ids
+    )
+    svc = get_grid_service(tenant_session=session)
+
+    # Plan first so we know whether this is destructive at all. A farm
+    # whose blocks are merely being gridded for the first time destroys
+    # nothing and must not be made to type its own name — a confirmation
+    # demanded for harmless actions is one operators learn to type past.
+    plan = await svc.plan_farm_cell_size(block_ids=block_ids, template_cell_size=tpl.cell_size_m)
+    if any(r.is_destructive for r in plan):
+        farm_name = await _farm_name(session, farm_id=farm_id)
+        if (confirm_farm_name or "").strip() != farm_name:
+            raise RezoneConfirmationError(
+                "This rezone retires live geometry. Type the farm name "
+                f"({farm_name!r}) to confirm."
+            )
+
+    applied, written = await svc.apply_farm_cell_size(
+        block_ids=block_ids,
+        template_cell_size=tpl.cell_size_m,
+        created_by=created_by,
+    )
+
+    scenes_queued = 0
+    scenes_stranded = 0
+    if written and tenant_schema:
+        # Queued, never inline: recomputing a farm's history is heavy-worker
+        # work measured in thousands of scene jobs.
+        from app.modules.grid.tasks import backfill_farm
+
+        backfill_farm.delay(tenant_schema, str(farm_id), backfill_budget_scenes)
+        planned_scenes = sum(r.state.scenes_affected for r in applied if r.is_destructive)
+        if backfill_budget_scenes is None:
+            scenes_queued = planned_scenes
+        else:
+            scenes_queued = min(planned_scenes, backfill_budget_scenes)
+            scenes_stranded = max(0, planned_scenes - backfill_budget_scenes)
+
+    return {
+        "blocks_touched": written,
+        "total_blocks": len(applied),
+        "scenes_queued": scenes_queued,
+        "scenes_stranded": scenes_stranded,
+    }
+
+
+async def _farm_name(session: AsyncSession, *, farm_id: UUID) -> str:
+    row = (
+        await session.execute(
+            select(Farm.name).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        )
+    ).first()
+    if row is None:
+        raise FarmNotFoundError(farm_id)
+    return str(row.name)
 
 
 # ---------- PR-3: Org template (additive tags merge) ------------------------

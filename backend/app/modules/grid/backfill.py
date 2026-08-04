@@ -47,6 +47,80 @@ def extract_raw_bands_key(assets: Any) -> str | None:
     return None
 
 
+async def list_farm_grid_pairs(session: AsyncSession, *, farm_id: UUID) -> list[dict[str, Any]]:
+    """``(block_id, product_id)`` for every live grid under a farm.
+
+    Drives the farm-wide backfill fan-out. Caller must have set the tenant
+    search_path on ``session``.
+    """
+    rows = (
+        (
+            await session.execute(
+                text(
+                    """
+                    SELECT cfg.block_id, cfg.product_id, b.code AS block_code
+                    FROM grid_configs cfg
+                    JOIN blocks b ON b.id = cfg.block_id AND b.deleted_at IS NULL
+                    WHERE b.farm_id = :farm
+                      AND cfg.retired_at IS NULL
+                      AND cfg.deleted_at IS NULL
+                    ORDER BY b.code
+                    """
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                {"farm": farm_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(r) for r in rows]
+
+
+def allocate_budget(
+    jobs_by_pair: dict[tuple[UUID, UUID], list[dict[str, str]]],
+    *,
+    budget: int | None,
+) -> tuple[dict[tuple[UUID, UUID], list[dict[str, str]]], int]:
+    """Spread a farm-wide scene budget fairly across grids.
+
+    Returns ``(allocated, stranded_count)``.
+
+    Round-robin, newest scene first within each pair. Two properties this
+    is chosen for:
+
+    * **Fair share.** A single 500-scene block cannot swallow the whole
+      farm budget and leave 35 blocks with nothing — which is exactly what
+      the old per-block ``limit=200`` did at farm scale (36 x 200 = 7,200
+      unbudgeted jobs, truncating silently per block with no farm-wide
+      view).
+    * **Newest first.** Recent history is what gets looked at, and it
+      makes the settle step's ``effective_from`` walk backwards
+      monotonically — the only order that yields a coherent two-geometry
+      state when the budget doesn't cover everything.
+
+    ``budget=None`` means "everything", so nothing is stranded.
+    """
+    remaining = {k: list(v) for k, v in jobs_by_pair.items()}
+    total = sum(len(v) for v in remaining.values())
+    if budget is None:
+        return remaining, 0
+
+    allocated: dict[tuple[UUID, UUID], list[dict[str, str]]] = {k: [] for k in remaining}
+    left = max(0, budget)
+    # Cycle the pairs, taking one scene each pass, until the budget runs
+    # out or every queue is empty.
+    while left > 0 and any(remaining.values()):
+        for pair, queue in remaining.items():
+            if left == 0:
+                break
+            if not queue:
+                continue
+            allocated[pair].append(queue.pop(0))
+            left -= 1
+    taken = sum(len(v) for v in allocated.values())
+    return allocated, total - taken
+
+
 async def list_backfill_jobs(
     session: AsyncSession,
     *,

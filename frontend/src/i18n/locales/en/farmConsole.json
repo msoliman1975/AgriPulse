@@ -316,12 +316,31 @@
     "anomalyThreshold": "Anomaly sensitivity (z)",
     "cellSize": "Cell size (m)",
     "thresholdHint": "Lower is more sensitive. Takes effect on the next detection sweep — nothing is reprocessed.",
-    "cellSizeNotApplied": "Cell size is saved on the template but not applied to blocks yet — changing a block's grid retires its history. Set it per block for now.",
     "clearOverride": "Clear each block's override instead, so they inherit the tenant default again.",
     "gridPreviewSummary": "{{changed}} to change · {{unchanged}} already match · {{skipped}} skipped",
     "gridNothingToDo": "Nothing to apply. Blocks with no grid yet need a cell size set on the block first.",
     "inherit": "inherit",
-    "gridConfirmApply": "Apply to {{blocks}} block(s)"
+    "gridConfirmApply": "Apply to {{blocks}} block(s)",
+    "gridSectionCellSize": "① Grid cell size",
+    "gridSectionThreshold": "② Anomaly sensitivity",
+    "cellSizeDestructive": "Destructive. Rebuilds each block's grid at the template size. History stays readable on the old grid until the backfill regenerates it.",
+    "applyCellSize": "Apply cell size to blocks…",
+    "gridBlockedRows": "{{blocked}} row(s) refused — this size doesn't fit their imagery product. They are left unchanged.",
+    "rezoneCost": "{{grids}} grid(s) will be rebuilt. {{scenes}} scene(s) of history become unreadable until the backfill regenerates them under the new geometry.",
+    "backfillBudget": "Backfill budget (scenes)",
+    "backfillBudgetAll": "All",
+    "typeFarmName": "Type the farm name ({{farm}}) to confirm this rezone",
+    "typeFarmNameLabel": "Confirm farm name",
+    "gridConfirmRezone": "Rezone {{blocks}} block(s)",
+    "rezonedPartial": "Rezoned {{blocks}} block(s). {{queued}} scene(s) queued, but {{stranded}} older scene(s) stay on the previous geometry — this farm now has two geometries across its history.",
+    "gridAction": {
+      "threshold": "Threshold",
+      "rezone": "Rezone",
+      "create": "Create",
+      "blocked": "Blocked",
+      "none": "No change",
+      "skipped": "Skipped"
+    }
   },
   "gridPopup": {
     "title": "Grid cell",

@@ -239,10 +239,12 @@ export async function applyOrg(
 }
 
 // ---------- Grid template (cell size + anomaly threshold) ----------------
-// Apply currently writes the THRESHOLD only. cell_size_m round-trips on the
-// template but is not applied — changing it retires the grid and orphans its
-// observations, which needs grid valid time first. See
-// docs/proposals/bulk-grid-config-and-valid-time.md.
+// Two scopes, deliberately separate requests. `threshold` writes a number in
+// place; `cell_size` retires geometry and spends compute. Collapsing them
+// into one "apply the template" button is how an operator rezones a farm
+// while meaning to nudge a threshold.
+
+export type GridScope = "threshold" | "cell_size";
 
 export interface GridTemplate {
   cell_size_m: number | null;
@@ -261,9 +263,13 @@ export interface GridPlanRow {
   current_cell_size_m: number | null;
   current_anomaly_z_threshold: number | null;
   target_anomaly_z_threshold: number | null;
-  action: "threshold" | "none" | "skipped";
+  target_cell_size_m: number | null;
+  action: "threshold" | "rezone" | "create" | "blocked" | "none" | "skipped";
   reason: string;
   matches: boolean;
+  /** Scenes on this row's live geometry. For a rezone, what goes dark
+   *  until the backfill regenerates it. */
+  scenes_affected: number;
 }
 
 export interface GridApplyPreview {
@@ -274,6 +280,20 @@ export interface GridApplyPreview {
   skipped_rows: number;
   /** True when Apply would write nothing — drives the disabled Confirm. */
   is_noop: boolean;
+  rezone_rows: number;
+  create_rows: number;
+  blocked_rows: number;
+  scenes_affected: number;
+  /** True only when live geometry would be retired. A farm being gridded
+   *  for the first time must NOT be made to type its own name. */
+  requires_confirmation: boolean;
+}
+
+export interface GridApplyCounts extends SimpleApplyCounts {
+  scenes_queued: number;
+  /** Scenes the budget did not reach. They stay readable on the older
+   *  geometry — the farm genuinely has two geometries until they land. */
+  scenes_stranded: number;
 }
 
 export async function getGridTemplate(farmId: string): Promise<GridTemplate> {
@@ -298,10 +318,11 @@ export async function previewApplyGrid(
   farmId: string,
   blockIds: string[] | null = null,
   clearOverride = false,
+  scope: GridScope = "threshold",
 ): Promise<GridApplyPreview> {
   const { data } = await apiClient.post<GridApplyPreview>(
     `/v1/farms/${farmId}/config/grid/apply-preview`,
-    { block_ids: blockIds, clear_override: clearOverride },
+    { block_ids: blockIds, clear_override: clearOverride, scope },
   );
   return data;
 }
@@ -310,10 +331,33 @@ export async function applyGrid(
   farmId: string,
   blockIds: string[] | null,
   clearOverride = false,
-): Promise<SimpleApplyCounts> {
-  const { data } = await apiClient.post<SimpleApplyCounts>(
+): Promise<GridApplyCounts> {
+  const { data } = await apiClient.post<GridApplyCounts>(
     `/v1/farms/${farmId}/config/grid/apply`,
-    { block_ids: blockIds, clear_override: clearOverride },
+    { block_ids: blockIds, clear_override: clearOverride, scope: "threshold" },
+  );
+  return data;
+}
+
+/** Rezone / create grids across a farm.
+ *
+ * `confirmFarmName` is re-checked server-side, so this is not the only
+ * guard — the UI collects it, the API enforces it.
+ */
+export async function applyGridCellSize(
+  farmId: string,
+  blockIds: string[] | null,
+  confirmFarmName: string | null,
+  backfillBudgetScenes: number | null,
+): Promise<GridApplyCounts> {
+  const { data } = await apiClient.post<GridApplyCounts>(
+    `/v1/farms/${farmId}/config/grid/apply`,
+    {
+      block_ids: blockIds,
+      scope: "cell_size",
+      confirm_farm_name: confirmFarmName,
+      backfill_budget_scenes: backfillBudgetScenes,
+    },
   );
   return data;
 }
