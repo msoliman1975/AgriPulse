@@ -1,9 +1,37 @@
 # Bulk grid config at farm level + grid valid time
 
-**Status:** proposal / implementation plan. Not started.
+**Status:** DELIVERED (2026-08-04). PR 1 `#351` and PR 2 `#353` are merged to `main`;
+PR 3 is this branch. Kept as the design record — the reasoning below is why the
+code looks the way it does, not a to-do list.
 **Supersedes:** the rev-2 UX mock (`Bulk grid & anomaly config`, artifact `64e752d7`).
 **Related:** `farm-block-config-model.md` (the template→apply→lock machine this reuses),
 `grid-aggregates-retention.md`.
+
+### What changed against the plan
+
+* **§2.2 was reproduced, not just derived.** The regression test landed red
+  first: 3 of 5 assertions failed on `main`, exactly as predicted. It is a real
+  bug that shipped, now fixed by migration `0054`.
+* **PR 2 could not be independent of PR 1.** Alembic revisions are linear, so
+  `0054` needs `0053` in the chain. The two were stacked and merged in order.
+* **A same-class bug turned up outside the listed sites.** The reports
+  zone-anomaly query paired configs to aggregates on `(block_id, product_id)` —
+  columns that survive a rezone — so it could score a retired geometry's cells
+  against the current threshold. Fixed in PR 2.
+* **§A5's cleanup task shipped in PR 2** rather than waiting, and gained a
+  scheduled sweep in PR 3 alongside `grid.settle_rezones_sweep`. Step 2 is
+  **polled, not signalled**: nothing knows when a backfill has finished, and a
+  chord over thousands of scene jobs loses one result and never completes.
+* **The confirmation is narrower than the mock's.** It is demanded only when
+  live geometry would be retired — never for a `create`. A confirmation asked
+  for harmless actions is one operators learn to type past.
+* **§B2's extra capability is defence-in-depth, not a live distinction.** Every
+  role granting `farm.manage_config` currently also grants
+  `imagery.subscription.manage`; a lock-step test pins that.
+* **One Save, two Applies.** The mock gave section ① its own Save. The template
+  is a single row carrying both columns, so two Saves writing the same row would
+  be the confusing option. The two *Apply* actions stay separate, which is where
+  the blast-radius difference actually lives.
 
 ---
 
