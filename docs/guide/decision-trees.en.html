@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Trees — AgriPulse Guide</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f8f7;
+    --panel-2: #eef1ee;
+    --ink: #16241a;
+    --ink-soft: #55665a;
+    --line: #dfe4e0;
+    --accent: #356b30;
+    --accent-soft: #e8f1e6;
+    --warn: #8a5a00;
+    --warn-soft: #fdf3e0;
+    --danger: #8c2f2f;
+    --danger-soft: #fbeceb;
+    --code-bg: #f3f5f3;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11150f;
+      --panel: #181d16;
+      --panel-2: #1f251d;
+      --ink: #e6ece5;
+      --ink-soft: #a2b0a4;
+      --line: #2c342a;
+      --accent: #86c07a;
+      --accent-soft: #1d2a1b;
+      --warn: #e0b060;
+      --warn-soft: #2a2214;
+      --danger: #e08a84;
+      --danger-soft: #2b1a19;
+      --code-bg: #10140f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 96px; }
+  header.top {
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--accent-soft), transparent);
+    margin-bottom: 32px;
+  }
+  header.top .wrap { padding-top: 44px; padding-bottom: 34px; }
+  h1 { font-size: 2.1rem; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.02em; }
+  .sub { color: var(--ink-soft); font-size: 1.06rem; margin: 0; max-width: 70ch; }
+  .meta { margin-top: 18px; font-size: .84rem; color: var(--ink-soft); }
+  .meta code { font-size: .84rem; }
+  .lang-switch {
+    display: inline-block; margin-top: 14px; font-size: .88rem;
+    padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+    text-decoration: none; color: var(--ink); background: var(--bg);
+  }
+  .layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 44px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; gap: 0; } nav.toc { position: static !important; margin-bottom: 32px; } }
+  nav.toc {
+    position: sticky; top: 24px; font-size: .88rem;
+    border-inline-start: 2px solid var(--line); padding-inline-start: 16px;
+  }
+  nav.toc strong { display: block; font-size: .74rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-soft); margin-bottom: 10px; }
+  nav.toc a { display: block; padding: 3px 0; color: var(--ink-soft); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  h2 {
+    font-size: 1.45rem; margin: 52px 0 14px; padding-top: 10px;
+    border-top: 1px solid var(--line); letter-spacing: -0.01em;
+  }
+  h2:first-of-type { border-top: 0; margin-top: 0; }
+  h3 { font-size: 1.1rem; margin: 32px 0 10px; }
+  h4 { font-size: .96rem; margin: 22px 0 8px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; }
+  p, li { max-width: 78ch; }
+  code {
+    font-family: var(--mono); font-size: .88em;
+    background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: .84rem; line-height: 1.55;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  .tablewrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: start; padding: 9px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--panel-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  .note, .warn, .danger {
+    border-radius: 8px; padding: 13px 16px; margin: 18px 0;
+    border: 1px solid var(--line); background: var(--panel);
+  }
+  .note { border-inline-start: 3px solid var(--accent); background: var(--accent-soft); }
+  .warn { border-inline-start: 3px solid var(--warn); background: var(--warn-soft); }
+  .danger { border-inline-start: 3px solid var(--danger); background: var(--danger-soft); }
+  .note p:first-child, .warn p:first-child, .danger p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .danger p:last-child { margin-bottom: 0; }
+  .label { font-weight: 700; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 4px; }
+  .note .label { color: var(--accent); }
+  .warn .label { color: var(--warn); }
+  .danger .label { color: var(--danger); }
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding-inline-start: 42px; margin-bottom: 22px; }
+  .steps > li::before {
+    content: counter(step); position: absolute; inset-inline-start: 0; top: 0;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .82rem; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .flow { border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px; background: var(--panel); margin: 18px 0; }
+  .pill { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-soft); }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .86rem; }
+  @media print {
+    nav.toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    h2 { break-after: avoid; }
+    pre, table, .note, .warn, .danger { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>Decision Trees</h1>
+    <p class="sub">How AgriPulse turns imagery, weather, field observations and crop phenology into a
+    specific, explainable recommendation for one block — and how to author or extend a tree yourself.</p>
+    <a class="lang-switch" href="decision-trees.ar.html">العربية ←</a>
+    <p class="meta">Applies to the decision-tree engine in
+      <code>backend/app/modules/recommendations/</code> and the shared condition evaluator in
+      <code>backend/app/shared/conditions/</code>. Audience: agronomists authoring trees, and
+      engineers extending the engine.</p>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <a href="#what">1. What a tree does</a>
+  <a href="#surfaces">2. Where it appears in the app</a>
+  <a href="#lifecycle">3. How it runs</a>
+  <a href="#storage">4. How it is stored</a>
+  <a href="#anatomy">5. Anatomy of a tree</a>
+  <a href="#conditions">6. The condition language</a>
+  <a href="#sources">7. Data sources reference</a>
+  <a href="#outcomes">8. Leaves and outcomes</a>
+  <a href="#params">9. Parameters &amp; overrides</a>
+  <a href="#evidence">10. Evidence &amp; provenance</a>
+  <a href="#authoring">11. Authoring a new tree</a>
+  <a href="#extending">12. Extending a tree</a>
+  <a href="#testing">13. Testing before you ship</a>
+  <a href="#worked">14. Worked example</a>
+  <a href="#pitfalls">15. Pitfalls</a>
+  <a href="#permissions">16. Permissions</a>
+  <a href="#api">17. API reference</a>
+</nav>
+
+<main>
+
+<h2 id="what">1. What a decision tree does</h2>
+
+<p>A decision tree is a <strong>declarative, versioned agronomic rule</strong>. It looks at everything
+the platform currently knows about one block, walks a branching set of yes/no questions, and lands on
+exactly one leaf. That leaf either produces a <strong>recommendation</strong> (or an alert), or it
+explicitly produces nothing.</p>
+
+<p>Trees are the only thing in the platform that turns measurements into advice. Everything upstream —
+satellite index computation, weather ingestion, custom field signals, phenology tracking, grid anomaly
+detection — exists to populate the facts a tree reads. Everything downstream — the recommendations
+page, notifications, the plan board, the block dock's Conditions tab — renders what a tree produced.</p>
+
+<h3>Two kinds of output</h3>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Kind</th><th>Meaning</th><th>Confidence</th></tr>
+  <tr>
+    <td><code>recommendation</code></td>
+    <td>Advice a human should consider and act on. Carries a state machine
+        (<code>open → applied / dismissed / deferred / expired</code>) and can be scheduled onto the plan board.</td>
+    <td>Author-set, <code>0</code>–<code>1</code>, default <code>0.5</code></td>
+  </tr>
+  <tr>
+    <td><code>alert</code></td>
+    <td>A condition that has been detected, not a judgement call. Trees own alerts since the Stage-1
+        rules engine was retired.</td>
+    <td>Always forced to <code>1</code> — alerts express certainty, not probability</td>
+  </tr>
+</table>
+</div>
+
+<h3>The design stance that shapes everything</h3>
+
+<p>The evaluator is <strong>pure and point-in-time</strong>. It has no notion of time, history, or
+"has been falling for three weeks". This is deliberate: every temporal idea is precomputed into a
+<em>fact</em> before evaluation, so the rule language stays a handful of comparison operators instead of
+growing a query language.</p>
+
+<p>That is why a rate of change is exposed as a plain readable field
+(<code>slope</code>, <code>delta</code>, <code>trend_direction</code>) rather than as a
+<code>has_been_falling_for</code> operator, and why growth stage is a resolved string on the block rather
+than a date calculation inside a rule. <strong>Model new temporal or derived ideas as data, not as
+operators.</strong></p>
+
+<h2 id="surfaces">2. Where it appears in the app</h2>
+
+<p>Decision trees have two faces: the <strong>authoring</strong> surface where the rules are built, and
+the <strong>output</strong> surface where everyone else meets the resulting advice.</p>
+
+<h3>Authoring — for knowledge authors and admins</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>Screen</th><th>Route</th><th>What it does</th></tr>
+  <tr><td>Decision trees list</td><td><code>/decision-trees</code></td>
+      <td>The whole catalog with search, status filters, and archive/restore. Entry point.</td></tr>
+  <tr><td>Create</td><td><code>/decision-trees/new</code></td>
+      <td>Pick a code, targeting, and a starter template or a blank tree.</td></tr>
+  <tr><td>Workspace</td><td><code>/decision-trees/:code</code></td>
+      <td>One unified surface: a <strong>Visual</strong> canvas and a <strong>YAML</strong> view of the
+          same document, plus the metadata panel, provenance, parameters and tenant overrides, version
+          history, and dry-run.</td></tr>
+</table>
+</div>
+<div class="note">
+  <span class="label">These routes moved</span>
+  <p>Decision trees used to live under <code>/settings/decision-trees</code> with the canvas and the YAML
+  editor as two separate screens. They are now a top-level navigation item with a single workspace and an
+  in-page toggle. The old paths — and the older <code>/config/decision-trees/:farmId</code> ones — still
+  redirect, so existing links keep working. Note the surface is <strong>tenant-wide</strong>, not per-farm.</p>
+</div>
+
+<h3>Output — for everyone in the field</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>Screen</th><th>Route</th><th>How recommendations appear</th></tr>
+  <tr><td>Recommendations</td><td><code>/recommendations/:farmId</code></td>
+      <td>The full list, tabbed by state. Each row carries the localized text, severity, action type, the
+          source tree and version, confidence and expiry. Expanding a row shows the four-horizon action
+          plan and the decision path that produced it.</td></tr>
+  <tr><td>Plan board</td><td><code>/board/:farmId</code></td>
+      <td>Open recommendations appear as chips in the suggested-actions rail; dragging one onto a day
+          schedules it as real work.</td></tr>
+  <tr><td>Block dock — Conditions tab</td><td>Farm Console</td>
+      <td>Per block: which trees fired, which came out clear, and which were not targeted at all — with the
+          conditions each one actually evaluated. This is the surface that answers "why is there no advice
+          for this block?"</td></tr>
+</table>
+</div>
+
+<h2 id="lifecycle">3. How it runs</h2>
+
+<p>Trees are not evaluated when someone opens a page. A background sweep runs on a schedule and writes
+recommendations into the tenant's schema; the UI only ever reads what the sweep already produced.</p>
+
+<div class="flow">
+<pre><code>Celery Beat  ──▶  recommendations.evaluate_sweep      (default: every 3600 s)
+                        │
+                        ├─▶ for each active tenant → evaluate_for_tenant
+                        │         │
+                        │         └─▶ for each block:
+                        │                 1. load every active tree visible to the tenant
+                        │                 2. filter by targeting  (crop / country / soil)
+                        │                 3. build one ConditionContext for the block
+                        │                 4. walk each tree from its root
+                        │                 5. write an open recommendation per firing leaf
+                        │
+                        └─▶ cell-scoped trees run once per grid cell, with that
+                            cell's own index means swapped into the context</code></pre>
+</div>
+
+<h3>Step 1 — Which trees are considered</h3>
+
+<p>A tree must be <strong>active</strong> and visible to the tenant. Platform seed trees (shipped in the
+repo) are visible to everyone; a tenant-authored tree is visible only to that tenant.</p>
+
+<h3>Step 2 — Targeting</h3>
+
+<p>Three independent axes decide whether a tree applies to a given block. A tree matches
+<strong>only if every axis passes</strong> (AND across axes); within one axis, any listed value is enough
+(OR within an axis). <strong>An empty axis matches anything.</strong></p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Axis</th><th>YAML key</th><th>Matched against</th><th>Rule</th></tr>
+  <tr><td>Crop</td><td><code>crop_paths</code></td><td>The block's crop path, e.g. <code>mango.alphonso.short</code></td>
+      <td><strong>Prefix</strong> match — <code>mango</code> matches every mango variety and strain</td></tr>
+  <tr><td>Country</td><td><code>country_codes</code></td><td>The parent farm's country</td>
+      <td>Exact, ISO 3166-1 alpha-2, normalized to upper case</td></tr>
+  <tr><td>Soil</td><td><code>soil_textures</code></td><td>The block's <code>soil_texture</code></td>
+      <td>Exact, from the closed vocabulary: <code>sandy</code>, <code>sandy_loam</code>, <code>loam</code>,
+          <code>clay_loam</code>, <code>clay</code>, <code>silty_loam</code>, <code>silty_clay</code></td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <span class="label">Coverage guardrail</span>
+  <p>If an axis is constrained and the block's value for it is <strong>unknown</strong>, the tree does
+  <strong>not</strong> match. A tree filtered to <code>country_codes: [EG]</code> will never fire on a farm
+  whose country was never set. This is intentional — it fails quiet rather than firing on a guess — but it
+  means adding a targeting axis to an existing tree can silently shrink its coverage. Check
+  <code>:candidate-blocks</code> after changing targeting.</p>
+</div>
+
+<h3>Step 3 — The context</h3>
+
+<p>One <code>ConditionContext</code> is assembled per block per pass: the latest index aggregates plus their
+trend features, the weather snapshot, farm-level weather indices, per-block disease/pest risk, the latest
+value of every applicable custom signal, grid anomaly verdicts, block attributes, and the tree's resolved
+parameters. Every source is loaded once and shared across all trees for that block.</p>
+
+<h3>Step 4 — The walk</h3>
+
+<p>Evaluation starts at <code>root</code>. At each decision node the node's condition is evaluated to a
+single boolean, and the walk follows <code>on_match</code> or <code>on_miss</code>. It ends when it reaches
+a node carrying an <code>outcome</code>. The walk is capped at <strong>64 steps</strong>; exceeding that is
+reported as a probable cycle.</p>
+
+<p>Every step is recorded — node id, which way it went, and the resolved value of every reference it read.
+That trace is what the block dock's <strong>Conditions</strong> tab and the <code>:explain</code> endpoint
+render, and it is stored on the recommendation as its evaluation snapshot.</p>
+
+<h3>Step 5 — Writing the result</h3>
+
+<p>A leaf whose <code>action_type</code> is <code>no_action</code> produces nothing. Any other leaf opens a
+recommendation.</p>
+
+<div class="note">
+  <span class="label">Idempotency</span>
+  <p>Writes are protected by a partial unique index on <code>(block_id, tree_id) WHERE state = 'open'</code>.
+  A tree that keeps matching every hour does <strong>not</strong> pile up duplicates — there is at most one
+  open recommendation per tree per block. A new one can only appear after the existing one is resolved,
+  dismissed, deferred or expired.</p>
+</div>
+
+<h2 id="storage">4. How it is stored</h2>
+
+<p>Trees live in the <strong>public</strong> schema — they are a shared catalog — while their output lives
+in each tenant's own schema.</p>
+
+<h4>Platform catalog — <code>public</code></h4>
+<div class="tablewrap">
+<table>
+  <tr><th>Table</th><th>Holds</th></tr>
+  <tr><td><code>public.decision_trees</code></td>
+      <td>One row per tree: <code>code</code>, <code>tenant_id</code> (<code>NULL</code> = platform-shipped,
+      non-null = tenant-authored), bilingual names and descriptions, the targeting axes
+      (<code>crop_id</code> / <code>crop_path</code> / <code>crop_paths</code> / <code>country_codes</code> /
+      <code>soil_textures</code>), <code>scope</code>, <code>is_active</code>, and
+      <code>current_version_id</code>.</td></tr>
+  <tr><td><code>public.decision_tree_versions</code></td>
+      <td>One row per version: the <code>version</code> integer, <code>tree_yaml</code> (round-trippable
+      source), <code>tree_compiled</code> (the JSONB the engine actually walks), <code>compiled_hash</code>
+      (SHA-256, which is what makes the disk sync idempotent), and <code>published_at</code> /
+      <code>published_by</code> — <code>NULL</code> meaning still a draft.</td></tr>
+</table>
+</div>
+<p>Uniqueness is partial: <code>(code) WHERE tenant_id IS NULL</code> for platform trees, and
+<code>(tenant_id, code) WHERE tenant_id IS NOT NULL</code> for tenant-authored ones — so a tenant can use a
+code that already exists in the platform set without colliding with it.</p>
+
+<h4>Tenant state — <code>tenant_&lt;id&gt;</code></h4>
+<div class="tablewrap">
+<table>
+  <tr><th>Table</th><th>Holds</th></tr>
+  <tr><td><code>recommendations</code></td>
+      <td>The output: <code>block_id</code> / <code>farm_id</code> (plus <code>cell_id</code>,
+      <code>cell_row</code>, <code>cell_col</code> for cell-scoped trees), <code>tree_id</code> /
+      <code>tree_code</code> / <code>tree_version</code>, <code>action_type</code>, <code>severity</code>,
+      <code>confidence</code>, the resolved <code>parameters</code>, <code>actions</code> (four-horizon
+      JSONB), <code>text_en</code> / <code>text_ar</code>, <code>tree_path</code> (the nodes visited),
+      <code>evaluation_snapshot</code> (every value the walk resolved), <code>state</code>, and the
+      timestamps.</td></tr>
+  <tr><td><code>recommendations_history</code></td><td>The state-transition audit log.</td></tr>
+  <tr><td><code>tree_parameter_overrides</code></td>
+      <td>Per-tenant threshold overrides, keyed <code>(tree_id, param_name)</code> with a JSONB value.</td></tr>
+</table>
+</div>
+
+<h4>Relevant migrations</h4>
+<div class="tablewrap">
+<table>
+  <tr><th>Migration</th><th>Adds</th></tr>
+  <tr><td>public <code>0015</code></td><td><code>decision_trees</code> + <code>decision_tree_versions</code></td></tr>
+  <tr><td>public <code>0024</code></td><td><code>tenant_id</code> on trees + the partial-unique indexes (tenant authoring)</td></tr>
+  <tr><td>tenant <code>0015</code></td><td><code>recommendations</code> + <code>recommendations_history</code></td></tr>
+  <tr><td>tenant <code>0032</code></td><td><code>tree_parameter_overrides</code></td></tr>
+  <tr><td>tenant <code>0037</code></td><td>the <code>actions</code> column (four-horizon guidance)</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <span class="label">Why evidence and targeting needed no migration</span>
+  <p><code>evidence</code> and <code>transferability</code> ride <em>inside</em> <code>tree_compiled</code>,
+  so they version immutably with the tree and required no schema change. That is a deliberate pattern: display
+  and governance metadata belongs in the compiled blob; anything the <em>query planner</em> needs to filter on
+  — the targeting axes — earns a real column.</p>
+</div>
+
+<h2 id="anatomy">5. Anatomy of a tree</h2>
+
+<p>A tree is one YAML file. The skeleton, with every optional block shown:</p>
+
+<pre><code>code: potato_petiole_nitrogen_v1        # required, unique, immutable identity
+name_en: Potato — petiole sap nitrate  # required
+name_ar: البطاطس — نترات عنق الورقة     # optional but expected
+description_en: &gt;-                     # optional
+  What this tree decides and when it stays silent.
+description_ar: &gt;-
+  ...
+
+# ---- targeting (all optional; empty = applies to everything) ----
+crop_code: potato                      # legacy exact-crop link, resolved to crops.id
+crop_paths: [potato]                   # preferred: prefix-matched crop paths
+country_codes: [EG]
+soil_textures: [sandy, sandy_loam]
+applicable_regions: []                 # free-form display metadata
+
+scope: block                           # block (default) | cell
+
+# ---- optional declaration blocks ----
+parameters: { ... }                    # tunable numbers, overridable per tenant
+evidence: { ... }                      # scientific provenance
+transferability: { ... }               # regional suitability grades
+
+# ---- the graph ----
+root: root                             # must name a key in nodes
+nodes:
+  root:                                # a DECISION node
+    label_en: Is the block in an interpretable stage?
+    label_ar: ...
+    condition:
+      tree: { ... }                    # see §6
+    on_match: next_node_id
+    on_miss:  other_node_id
+
+  leaf_example:                        # a LEAF node — has outcome, no condition
+    label_en: Deficient — supplement now
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.8
+      valid_for_hours: 168
+      parameters: { priority: high }
+      text_en: &gt;-
+        What the grower should understand.
+      text_ar: &gt;-
+        ...
+      actions: { ... }                 # see §8</code></pre>
+
+<h3>Node rules</h3>
+<ul>
+  <li>A node is either a <strong>decision</strong> (has <code>condition</code>, <code>on_match</code>,
+      <code>on_miss</code>) or a <strong>leaf</strong> (has <code>outcome</code>). Never both.</li>
+  <li>Every decision node must supply <strong>both</strong> pointers. There is no implicit fall-through.</li>
+  <li>Every pointer must name an existing node. This is validated at load time, not at run time.</li>
+  <li><code>label_en</code> / <code>label_ar</code> are what the Conditions tab shows the grower. Write them
+      as <strong>questions</strong>, because that is how they are rendered.</li>
+</ul>
+
+<h3>Scope: <code>block</code> vs <code>cell</code></h3>
+
+<p>A <code>block</code>-scoped tree evaluates once per block, against block-average index values. A
+<code>cell</code>-scoped tree evaluates <strong>once per sub-block grid cell</strong>, with that cell's own
+index means substituted into an otherwise identical context — so it can find a problem affecting one corner
+of a field. Cell-scoped trees no-op on blocks with no grid, and their recommendations carry
+<code>cell_id</code>, <code>cell_row</code> and <code>cell_col</code>.</p>
+
+<h2 id="conditions">6. The condition language</h2>
+
+<p>Each decision node holds a <code>condition.tree</code>: a small recursive JSON/YAML dialect. Two families
+of node exist.</p>
+
+<h3>Boolean nodes — exactly one key</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>Node</th><th>Meaning</th><th>Empty list</th></tr>
+  <tr><td><code>all_of: [ ... ]</code></td><td>AND</td><td>→ <code>true</code></td></tr>
+  <tr><td><code>any_of: [ ... ]</code></td><td>OR</td><td>→ <code>false</code></td></tr>
+  <tr><td><code>not: { ... }</code></td><td>NOT</td><td>—</td></tr>
+</table>
+</div>
+
+<h3>Comparison nodes — the <code>op</code> key drives the shape</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>Shape</th><th>Notes</th></tr>
+  <tr><td><code>{op: lt|le|gt|ge|eq|ne, left: &lt;ref&gt;, right: &lt;literal|ref&gt;}</code></td>
+      <td>The six scalar comparisons</td></tr>
+  <tr><td><code>{op: between, left: &lt;ref&gt;, low: &lt;…&gt;, high: &lt;…&gt;}</code></td>
+      <td>Inclusive on both bounds — equivalent to <code>ge low AND le high</code></td></tr>
+  <tr><td><code>{op: in, left: &lt;ref&gt;, values: [ … ]}</code></td>
+      <td>Set membership; the natural operator for categoricals like <code>growth_stage</code></td></tr>
+</table>
+</div>
+
+<p><code>left</code> always points at <strong>observed data</strong>. The literal slots
+(<code>right</code>, <code>low</code>, <code>high</code>, and entries inside <code>values</code>) may be plain
+literals or a <code>params</code> reference.</p>
+
+<div class="danger">
+  <span class="label">Fail-closed — the single most important rule</span>
+  <p>Any reference that resolves to <code>None</code> short-circuits its comparison to
+  <strong>false</strong>. A signal never observed, an index with no scene yet, a growth stage not resolved,
+  a misspelled field name — all behave identically: the comparison is false and the walk takes
+  <code>on_miss</code>.</p>
+  <p>This is safe, but it is <em>not</em> the same as "no problem". If your <code>on_miss</code> branch leads
+  to a leaf that says "everything is fine", a block with <strong>no data at all</strong> will be reported as
+  healthy. See the presence-probe pattern in §15.</p>
+</div>
+
+<p>Malformed conditions are equally permissive: a parse error makes the whole condition evaluate to false
+rather than raising. Nothing a tree author writes can crash the sweep — but nothing warns you at run time
+either, which is why the loader validates structure up front and why you should always dry-run.</p>
+
+<h2 id="sources">7. Data sources reference</h2>
+
+<p>Every <code>left</code> reference names a <code>source</code>. These are all of them.</p>
+
+<h3><code>indices</code> — per-block satellite indices</h3>
+<pre><code>{ source: indices, index_code: ndvi, key: baseline_deviation }</code></pre>
+<p>Index codes: <code>ndvi</code>, <code>ndwi</code>, <code>evi</code>, <code>savi</code>, <code>ndre</code>,
+<code>gndvi</code>, <code>ndmi</code>.</p>
+<div class="tablewrap">
+<table>
+  <tr><th>key</th><th>Meaning</th><th>Type</th></tr>
+  <tr><td><code>mean</code></td><td>Latest block-average value</td><td>number</td></tr>
+  <tr><td><code>baseline_deviation</code></td><td>z-score against the block's own baseline — <em>the default</em></td><td>number</td></tr>
+  <tr><td><code>slope</code></td><td>Least-squares trend over the last 30 days, in <strong>index units per day</strong></td><td>number</td></tr>
+  <tr><td><code>delta</code></td><td>Last minus first across that 30-day window — <strong>total</strong> change</td><td>number</td></tr>
+  <tr><td><code>trend_direction</code></td><td><code>rising</code> / <code>falling</code> / <code>stable</code>, using a ±0.02 dead-band on <code>delta</code></td><td>string</td></tr>
+</table>
+</div>
+<p>Trend features are computed at context load from recent aggregate history — there is no trend table and
+no sweep. Fewer than two cloud-free observations in the window leaves all three <code>None</code>, so trend
+rules fail closed. Values are quantized to 4 decimal places.</p>
+
+<h3><code>block</code> — attributes of the block itself</h3>
+<pre><code>{ source: block, field: growth_stage }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>field</th><th>Meaning</th></tr>
+  <tr><td><code>crop_category</code></td><td>Broad crop grouping</td></tr>
+  <tr><td><code>growth_stage</code></td><td>Current phenological stage, auto-advanced daily from the crop taxonomy</td></tr>
+  <tr><td><code>crop_path</code></td><td>Full hierarchical path, e.g. <code>mango.alphonso.short</code></td></tr>
+  <tr><td><code>crop_strain</code></td><td>Just the strain leaf, e.g. <code>short</code></td></tr>
+  <tr><td><code>soil_texture</code></td><td>From the closed soil vocabulary</td></tr>
+  <tr><td><code>salinity_class</code></td><td>Block salinity banding</td></tr>
+  <tr><td><code>canopy_size_class</code></td><td>Resolved size class of the current crop</td></tr>
+</table>
+</div>
+<p>All categorical — compare with <code>eq</code>, <code>ne</code>, <code>in</code>.</p>
+
+<h3><code>weather</code> — raw farm weather snapshot</h3>
+<pre><code>{ source: weather, scope: forecast_24h, field: precipitation_mm_total }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>scope</th><th>Typical fields</th></tr>
+  <tr><td><code>latest_observation</code></td><td><code>air_temp_c</code>, <code>humidity_pct</code>, <code>precipitation_mm</code>, <code>wind_speed_m_s</code>, <code>et0_mm</code></td></tr>
+  <tr><td><code>forecast_24h</code> / <code>forecast_72h</code></td><td><code>precipitation_mm_total</code>, <code>precipitation_probability_pct_max</code>, <code>air_temp_c_max</code>, <code>air_temp_c_min</code>, <code>et0_mm_total</code></td></tr>
+  <tr><td><code>derived_today</code> / <code>derived_yesterday</code></td><td><code>precip_mm_7d</code>, <code>gdd_cumulative_base10_season</code>, <code>temp_max_c</code></td></tr>
+</table>
+</div>
+<div class="warn">
+  <span class="label">Not validated</span>
+  <p><code>field</code> is the one string in the whole dialect that is <strong>not</strong> checked against a
+  closed list — the weather loader is the source of truth for which fields each scope carries. A typo
+  resolves to <code>None</code> and silently fails closed. Verify weather field names with a dry-run.</p>
+</div>
+
+<h3><code>weather_index</code> — farm-level curated weather indices</h3>
+<pre><code>{ source: weather_index, index_code: temperature, key: baseline_deviation }</code></pre>
+<p><code>key</code> is <code>value</code> or <code>baseline_deviation</code> (the default) — a z-score against
+the farm's day-of-year climatology. This is the anomaly-aware counterpart to raw <code>weather</code>: use it
+for "hotter than this farm's normal for early June", not for "above 35 °C".</p>
+
+<h3><code>weather_risk</code> — per-block disease and pest pressure</h3>
+<pre><code>{ source: weather_risk, risk_code: powdery_mildew, field: score }</code></pre>
+<p><code>field</code> is <code>score</code> (0–100, the default) or <code>level</code>
+(<code>low</code> / <code>moderate</code> / <code>high</code>). Unlike <code>weather_index</code>, risk folds
+in the block's crop and growth stage, so it varies block to block even on one farm.</p>
+
+<h3><code>signals</code> — tenant-defined field observations</h3>
+<pre><code>{ source: signals, code: petiole_no3n, key: value_numeric }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>key</th><th>Use for</th></tr>
+  <tr><td><code>value_numeric</code></td><td>Numeric readings — <em>the default</em></td></tr>
+  <tr><td><code>value_categorical</code></td><td>Enumerated observations</td></tr>
+  <tr><td><code>value_event</code></td><td>Event-type observations</td></tr>
+  <tr><td><code>value_boolean</code></td><td>Yes/no observations</td></tr>
+  <tr><td><code>value_slope</code>, <code>value_delta</code>, <code>value_trend_direction</code></td>
+      <td>Trend over the signal's numeric history — same semantics as index trends</td></tr>
+</table>
+</div>
+<p>Exactly one <code>value_*</code> is populated, according to the signal definition's kind. Reading the wrong
+one returns <code>None</code>, which fails closed. <code>code</code> is the tenant's own
+<code>signal_definitions.code</code>.</p>
+
+<h3><code>grid</code> — sub-block spatial anomaly verdict</h3>
+<pre><code>{ source: grid, index_code: ndvi, field: flagged_count }</code></pre>
+<p>Fields: <code>worst_z</code>, <code>flagged_count</code>, <code>worst_row</code>, <code>worst_col</code>,
+<code>severity</code>. Present only when the latest scene actually crossed the detection threshold, so
+absence means "no current anomaly" and fails closed. <strong>Valid on <code>left</code> only.</strong> Note
+this source has no trend fields — rate of change is block-level only.</p>
+
+<h3><code>params</code> — the tree's own tunables</h3>
+<pre><code>{ source: params, name: sufficient_early }</code></pre>
+<p>Resolves to the parameter's default, or the tenant's override if one exists.
+<strong>Valid in literal slots only</strong> — <code>right</code>, <code>low</code>, <code>high</code>, and
+inside <code>values</code>. Never on <code>left</code>.</p>
+
+<h2 id="outcomes">8. Leaves and outcomes</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Field</th><th>Required</th><th>Values / notes</th></tr>
+  <tr><td><code>action_type</code></td><td>yes</td>
+      <td><code>irrigate</code>, <code>fertilize</code>, <code>spray</code>, <code>scout</code>,
+          <code>harvest_window</code>, <code>prune</code>, <code>other</code>, <code>no_action</code></td></tr>
+  <tr><td><code>text_en</code></td><td>yes</td><td>What the grower reads. <code>text_ar</code> optional but expected.</td></tr>
+  <tr><td><code>kind</code></td><td>no</td><td><code>recommendation</code> (default) or <code>alert</code></td></tr>
+  <tr><td><code>severity</code></td><td>no</td><td><code>info</code> (default), <code>warning</code>, <code>critical</code></td></tr>
+  <tr><td><code>confidence</code></td><td>no</td><td><code>0</code>–<code>1</code>, default <code>0.5</code>, clamped. Ignored for alerts (forced to 1).</td></tr>
+  <tr><td><code>valid_for_hours</code></td><td>no</td><td>Positive integer; drives expiry. Non-positive or non-integer values are ignored.</td></tr>
+  <tr><td><code>parameters</code></td><td>no</td><td>Free-form JSON stamped onto the recommendation, e.g. <code>priority</code>. <code>params</code> refs here are substituted to literals before storage.</td></tr>
+  <tr><td><code>actions</code></td><td>no</td><td>The four-horizon action plan, below</td></tr>
+</table>
+</div>
+
+<h3>Four-horizon actions</h3>
+<p>Prose tells a grower <em>what is happening</em>; the action block tells them <em>what to do and when</em>.
+All four horizons are optional, and each holds a list of localized items.</p>
+<pre><code>actions:
+  immediate:                 # do it now
+    - text_en: Apply supplemental nitrogen through fertigation.
+      text_ar: طبّق نيتروجينًا تكميليًا عبر الريّ بالتسميد.
+  short_term:                # days to a couple of weeks
+    - text_en: Re-sample petioles 7 days after the application.
+      text_ar: أعد أخذ عيّنة أعناق بعد 7 أيام من التطبيق.
+  long_term:                 # next season / structural
+    - text_en: Review the season's nitrogen budget.
+      text_ar: راجع الموازنة النيتروجينية للموسم.
+  monitoring:                # what to keep watching
+    - text_en: Sample the 4th petiole weekly through bulking.
+      text_ar: خذ عيّنة من العنق الرابع أسبوعيًا حتى امتلاء الدرنات.</code></pre>
+
+<h3>Silence is a design obligation</h3>
+<div class="note">
+  <span class="label">Always author the quiet leaves</span>
+  <p>Every path that should produce nothing needs its own <code>no_action</code> leaf with honest text.
+  Real trees typically carry three: <em>within range</em>, <em>no data on record</em>, and <em>outside the
+  interpretable window</em>. They cost nothing at runtime — but they are what the Conditions tab shows a
+  grower asking "why is there no advice for this block?", and they are how you distinguish "measured and
+  fine" from "never measured".</p>
+</div>
+
+<h2 id="params">9. Parameters and tenant overrides</h2>
+
+<p>Any threshold a grower might reasonably disagree with should be a parameter, not a hard-coded number.
+Parameters are declared once and referenced anywhere a literal is allowed.</p>
+
+<pre><code>parameters:
+  sufficient_early:
+    type: number             # number | integer | boolean | string | enum
+    default: 1200            # required, and must fit the declared type
+    min: 0                   # optional bounds for numeric types
+    max: 5000
+    description: &gt;-
+      Petiole sap NO3-N (ppm) below which the block is deficient
+      during vegetative / tuber initiation.</code></pre>
+
+<p>An <code>enum</code> parameter additionally requires a non-empty <code>values</code> list, and its default
+must be one of them.</p>
+
+<p>Referenced from a condition:</p>
+<pre><code>condition:
+  tree:
+    op: lt
+    left:  { source: signals, code: petiole_no3n, key: value_numeric }
+    right: { source: params,  name: sufficient_early }</code></pre>
+
+<p>The loader verifies at compile time that <strong>every <code>params</code> reference names a declared
+parameter</strong>, so a typo fails the sync rather than silently resolving to <code>None</code>.</p>
+
+<h3>Per-tenant overrides</h3>
+<p>A tenant can override any declared parameter without forking the tree, via
+<code>PUT /decision-trees/{code}/parameter-overrides/{param_name}</code>. Resolution order at evaluation
+time is <strong>tenant override → declared default</strong>. This is the intended way to localize a
+threshold that is scientifically sound but regionally calibrated — the cultivar caveat on petiole nitrate
+is exactly this case.</p>
+
+<h2 id="evidence">10. Evidence and provenance</h2>
+
+<p>Two optional blocks record <em>why anyone should believe this tree</em>. The evaluator never reads them;
+they ride inside the compiled tree, version immutably with it, and render in the viewer's Provenance panel.</p>
+
+<pre><code>evidence:
+  confidence: high              # very_high | high | medium | low
+  notes: &gt;-
+    Where the numbers come from, which cultivar or region they were
+    established on, and what could make them wrong here.
+  citations:
+    - source_type: extension    # peer_reviewed | fao | usda | extension | university
+                                # research_institution | remote_sensing | government
+      title: Potato fertilization on irrigated soils — UMN Extension
+      url: https://extension.umn.edu/...
+      doi: 10.xxxx/yyyy         # optional
+      year: 2021                # optional, integer
+
+transferability:
+  egypt: medium                 # very_high | high | medium | low | not_applicable
+  middle_east: medium
+  global: high</code></pre>
+
+<div class="note">
+  <span class="label">Write the caveats, not just the citation</span>
+  <p>The <code>notes</code> field is where a future reader learns that a threshold is a Russet Burbank value,
+  or that it is fresh-sap ppm rather than dry-weight percent — the kind of distinction that makes a tree fire
+  constantly when it is misread. A citation proves the number was published; the notes prove you understood
+  what it measures.</p>
+</div>
+
+<h2 id="authoring">11. Authoring a new tree</h2>
+
+<p>There are two routes, and the choice is about audience, not difficulty.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th></th><th>Platform seed (YAML in the repo)</th><th>Tenant tree (UI or API)</th></tr>
+  <tr><td>Visible to</td><td>Every tenant</td><td>The authoring tenant only</td></tr>
+  <tr><td>Authored in</td><td><code>backend/app/modules/recommendations/seeds/*.yaml</code></td><td><code>/decision-trees</code> in the app</td></tr>
+  <tr><td>Ships via</td><td>A pull request; synced to the catalog at app startup</td><td>Saved immediately, no deploy</td></tr>
+  <tr><td>Use for</td><td>Agronomic knowledge that is true for everyone</td><td>One customer's own practice or trial</td></tr>
+</table>
+</div>
+
+<h3>Route A — a platform seed tree</h3>
+<ol class="steps">
+  <li><strong>Decide what the tree refuses to say.</strong> Before writing any node, write the
+      <code>no_action</code> leaves: what does "fine" look like, and what does "I have no data" look like?
+      Trees that skip this step are the ones that produce false reassurance.</li>
+  <li><strong>Establish the thresholds from a primary source</strong> — an extension service, FAO, or peer
+      review — and note the units and the cultivar/region they were established on. Do not take numbers from
+      a search summary; units are routinely swapped in secondary sources.</li>
+  <li><strong>Create <code>seeds/&lt;code&gt;.yaml</code></strong>. The filename should match the
+      <code>code</code>, and the code should carry a version suffix (<code>_v1</code>) so a future
+      incompatible rewrite can coexist.</li>
+  <li><strong>Write the graph.</strong> Conventional order: an applicability gate (right stage, right
+      season), then a <strong>presence probe</strong> (§15), then the actual thresholds, then leaves.</li>
+  <li><strong>Make every threshold a parameter</strong> with a description and sane bounds.</li>
+  <li><strong>Fill in <code>evidence</code> and <code>transferability</code></strong>, including the caveats.</li>
+  <li><strong>Write both languages.</strong> <code>name_ar</code>, <code>description_ar</code>,
+      <code>label_ar</code> on every node, <code>text_ar</code> on every leaf, and <code>text_ar</code> on
+      every action item. Arabic is a first-class UI language here, not a translation afterthought.</li>
+  <li><strong>Start the app.</strong> <code>sync_from_disk</code> compiles and upserts every seed at startup;
+      a structural error raises there, with the file path and the specific problem. Re-running with no
+      changes is a no-op.</li>
+  <li><strong>Dry-run against a real block</strong> before opening the PR (§13).</li>
+</ol>
+
+<h3>Route B — a tenant tree in the app</h3>
+<ol class="steps">
+  <li>Go to <strong>Decision trees</strong> in the navigation and choose to create one. You need the
+      <code>decision_tree.manage</code> capability — held by TenantOwner and TenantAdmin.</li>
+  <li>Set identity and targeting in the metadata panel: name and description in both languages, crop paths,
+      countries, soil textures, and scope.</li>
+  <li>Build the graph in the <strong>Visual</strong> tab. Switch to the <strong>YAML</strong> tab at any
+      time for the same tree as text — the two are views of one document, not an import/export.
+      <div class="tablewrap">
+      <table>
+        <tr><th>On the canvas</th><th>How</th></tr>
+        <tr><td>Add a node</td><td>Add it, then choose decision or leaf. A new decision node starts
+            unwired — both pointers must be set before it will compile.</td></tr>
+        <tr><td>Delete a node</td><td>Deleting re-points anything that referenced it, so the graph never
+            keeps a dangling pointer.</td></tr>
+        <tr><td>Rewire a branch</td><td>Drag from a node's match/miss handle to the target node.</td></tr>
+        <tr><td>Edit a condition</td><td>The structured builder offers only the sources, keys and
+            operators the backend actually accepts, and supports the full nested AST —
+            <code>all_of</code>, <code>any_of</code>, <code>not</code>, <code>between</code>,
+            <code>in</code>.</td></tr>
+        <tr><td>Undo / redo</td><td>Available throughout; edits are local until you save.</td></tr>
+      </table>
+      </div>
+      </li>
+  <li><strong>Dry-run</strong> from the workspace against a candidate block and read the resulting path.</li>
+  <li><strong>Publish</strong> the version. Publishing is what makes it live for the sweep.</li>
+</ol>
+
+<h2 id="extending">12. Extending an existing tree</h2>
+
+<p>Versions are immutable. Editing a published tree creates a <strong>new version</strong>; the previous one
+remains readable, and recommendations already produced keep pointing at the version that produced them
+(<code>tree_version</code> is stamped on every row). Publishing is a separate, deliberate act.</p>
+
+<div class="flow">
+<pre><code>edit ──▶ POST /decision-trees/{code}/versions        create a new draft version
+     ──▶ POST …/versions/{version}:publish           make it the live one
+     ──▶ (old versions stay readable forever)</code></pre>
+</div>
+
+<h3>Choosing how to extend</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>You want to…</th><th>Do this</th></tr>
+  <tr><td>Change a threshold for one customer</td><td>A <strong>parameter override</strong> — no new version, no fork</td></tr>
+  <tr><td>Change a threshold for everyone</td><td>New version changing the parameter's <code>default</code></td></tr>
+  <tr><td>Add a branch or a new leaf</td><td>New version; add nodes and re-wire</td></tr>
+  <tr><td>Narrow who it applies to</td><td>Edit targeting — then re-check <code>:candidate-blocks</code>, because constrained axes exclude unknown values</td></tr>
+  <tr><td>Change what a leaf advises</td><td>New version editing <code>text_*</code> and <code>actions</code></td></tr>
+  <tr><td>Make an incompatible rewrite</td><td>A <strong>new tree</strong> with a bumped code (<code>_v2</code>), and archive the old one</td></tr>
+  <tr><td>Retire a tree</td><td><strong>Archive</strong> it (<code>DELETE /decision-trees/{code}</code>); restorable via <code>:restore</code></td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <span class="label">Adding a node is a compatibility question</span>
+  <p>Inserting a decision node in the middle of an existing path changes where every block downstream of it
+  lands. Because there is at most one open recommendation per (block, tree), an already-open recommendation
+  from the old version will <strong>not</strong> be replaced until it is resolved. Expect a mixed population
+  for a while after publishing, and do not read that as a bug.</p>
+</div>
+
+<h2 id="testing">13. Testing before you ship</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Tool</th><th>What it answers</th></tr>
+  <tr><td><code>POST /decision-trees/{code}:dry-run</code></td>
+      <td>"If I ran this tree right now against this block, where would it land?" — full path, no writes</td></tr>
+  <tr><td><code>GET /decision-trees/{code}/candidate-blocks</code></td>
+      <td>"Which blocks does my targeting actually select?" — the check that catches an over-narrow axis</td></tr>
+  <tr><td><code>GET /blocks/{block_id}/decision-trees:explain</code></td>
+      <td>"Why did this block get the advice it got — and why did the other trees stay quiet?" Re-walks every
+          visible tree, including the ones that came out clear and the ones that were not targeted. Requires
+          <code>farm_id</code> as a query parameter.</td></tr>
+  <tr><td><code>POST /blocks/{block_id}/recommendations:evaluate</code></td>
+      <td>Evaluate on demand and actually write results, instead of waiting for the hourly sweep</td></tr>
+</table>
+</div>
+
+<h4>A checklist worth running</h4>
+<ul>
+  <li>Dry-run a block that <strong>should</strong> fire — confirm the path and the leaf text.</li>
+  <li>Dry-run a block with <strong>no data</strong> for your key input — confirm it lands on the
+      "no data" leaf, not on "everything is fine".</li>
+  <li>Dry-run a block outside the targeting — confirm it is not a candidate at all.</li>
+  <li>Check the Conditions tab in the block dock reads sensibly to a grower: the labels are questions,
+      and a tree that did not fire reads as <em>clear</em> rather than as a failure.</li>
+</ul>
+
+<h2 id="worked">14. Worked example</h2>
+
+<p>A real shipped tree, <code>mango_stress_induction_v1</code>, end to end. The agronomy: during the cool
+pre-flowering window a well-watered mango canopy tends to push a <em>vegetative flush</em> instead of
+flowering — and a lost flowering is a lost season. Withholding irrigation in that window pushes floral bud
+differentiation instead.</p>
+
+<h4>Why it is an AND, not a threshold</h4>
+<p>Water stress alone does <strong>not</strong> induce flowering. It has to coincide with the cool window —
+bud dormancy sits around 15 °C and roughly 30 °C suppresses induction. Suspending irrigation at warm
+temperatures produced only vegetative growth in 'Tommy Atkins'; withholding in the cool season raised
+flowering by about 20 % and yield by about 17 % in 'Kensington Pride'. So the tree fires only when
+<strong>both</strong> hold during <code>pre_flowering</code>.</p>
+
+<pre><code>crop_path: mango
+
+parameters:
+  wet_ndmi:          { type: number, default: 0.30 }   # canopy counts as well-watered above this
+  cool_induction_c:  { type: number, default: 15.0 }   # cool-night threshold
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in the pre-flowering stage?
+    condition:
+      tree:
+        op: eq
+        left:  { source: block, field: growth_stage }
+        right: pre_flowering
+    on_match: wet_and_cool
+    on_miss:  leaf_out_of_window
+
+  wet_and_cool:
+    label_en: Is the canopy well-watered while the forecast is cool?
+    condition:
+      tree:
+        all_of:
+          - op: gt
+            left:  { source: indices, index_code: ndmi, key: mean }
+            right: { source: params,  name: wet_ndmi }
+          - op: le
+            left:  { source: weather, scope: forecast_72h, field: air_temp_c_min }
+            right: { source: params,  name: cool_induction_c }
+    on_match: leaf_warn            # both true → advise withholding irrigation
+    on_miss:  leaf_no_action</code></pre>
+
+<div class="note">
+  <span class="label">Three details worth copying</span>
+  <p><strong>The index choice is load-bearing.</strong> Canopy moisture is read from <code>ndmi</code>
+  (NIR–SWIR, a leaf-water index), <em>not</em> <code>ndwi</code>, which is the McFeeters green–NIR
+  open-water index. They sound interchangeable and are not. Because NDMI needs SWIR, this tree is a
+  Sentinel-2 signal and cannot work on PlanetScope 3 m imagery.</p>
+  <p><strong>Both thresholds are parameters</strong>, so a grower in a different climate can recalibrate
+  without touching the structure.</p>
+  <p><strong>The stage gate comes first.</strong> Checking <code>growth_stage</code> before anything
+  expensive means the tree is silent — and honestly silent, via <code>leaf_out_of_window</code> — for the
+  ten months of the year when the question does not apply.</p>
+</div>
+
+<h2 id="pitfalls">15. Pitfalls</h2>
+
+<h3>The false-reassurance path</h3>
+<p>The most common real defect. Because a missing value fails closed, a block with no observations walks the
+same <code>on_miss</code> route as a block that was measured and found healthy — and lands on your
+"within range" leaf.</p>
+<p><strong>The fix is a presence probe:</strong> before comparing against a threshold, test that the value
+exists at all. For a strictly positive quantity, <code>&gt; 0</code> is enough:</p>
+<pre><code>data_check:
+  label_en: Is there a petiole sap nitrate reading for this block?
+  condition:
+    tree:
+      op: gt
+      left:  { source: signals, code: petiole_no3n, key: value_numeric }
+      right: 0
+  on_match: stage_early        # we have data → evaluate it
+  on_miss:  leaf_no_data       # we do NOT have data → say so honestly</code></pre>
+
+<h3>A one-sided bound on a trend also matches collapse</h3>
+<p><code>delta &lt; 0.01</code> is true for a stalled crop — and equally true for one crashing at
+<code>−0.4</code>. If you mean <em>stagnant</em>, you want a band, not a bound:</p>
+<pre><code>op: between
+left: { source: indices, index_code: ndvi, key: delta }
+low: -0.01
+high: 0.01</code></pre>
+<p>Or simply <code>trend_direction eq stable</code>, which has the noise floor built in.</p>
+
+<h3>Confusing <code>slope</code> with <code>delta</code></h3>
+<p><code>slope</code> is <strong>per day</strong>; <code>delta</code> is the <strong>total</strong> change
+across the 30-day window. A threshold that is sensible for one is off by roughly 30× for the other.</p>
+
+<h3>Assuming <code>mean</code> when you want the anomaly</h3>
+<p>For both <code>indices</code> and <code>weather_index</code>, the default key is
+<code>baseline_deviation</code> — a z-score, not a raw value. This is deliberate: an NDVI of 0.4 means nothing
+without knowing what that block normally does in that week. Write <code>key: mean</code> explicitly when you
+genuinely want the absolute number.</p>
+
+<h3>Prefix matching is wider than it looks</h3>
+<p><code>crop_paths: [mango]</code> targets every mango variety and strain. To target one variety, give the
+fuller path.</p>
+
+<h3>Untranslated leaves</h3>
+<p><code>text_ar</code> and <code>label_ar</code> are optional to the compiler and mandatory in practice. A
+missing Arabic string does not fail the sync; it just degrades the Arabic UI at the exact moment a grower
+needs it.</p>
+
+<h3>Both pointers are mandatory</h3>
+<p>There is no default branch. A decision node missing <code>on_miss</code> ends evaluation with an error
+rather than falling through to a leaf.</p>
+
+<h2 id="permissions">16. Permissions</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Capability</th><th>Grants</th><th>Typical roles</th></tr>
+  <tr><td><code>decision_tree.manage</code></td>
+      <td>Create, edit, version, publish and archive trees; manage parameter overrides</td>
+      <td>TenantOwner · TenantAdmin · PlatformAdmin</td></tr>
+  <tr><td><code>decision_tree.read</code></td>
+      <td>View the catalog and published trees; dry-run; trigger evaluation</td>
+      <td>the above + PlatformSupport (read-only)</td></tr>
+  <tr><td><code>recommendation.read</code></td>
+      <td>See the recommendations list, the board rail, and the block dock's Conditions tab</td>
+      <td>Agronomist · FarmManager · FieldOperator · Scout · Viewer</td></tr>
+  <tr><td><code>recommendation.act</code></td>
+      <td>Apply / dismiss / defer / schedule recommendations</td>
+      <td>Agronomist · FarmManager</td></tr>
+</table>
+</div>
+
+<p>The whole authoring surface is gated on <code>decision_tree.manage</code>: without it the
+<em>New tree</em> action is hidden and the pages render read-only. Capability checks live on each page, so a
+deep link with the wrong role still fails rather than rendering.</p>
+
+<div class="warn">
+  <span class="label">Field roles can read the reasoning, not the rules</span>
+  <p><code>decision_tree.read</code> is deliberately narrow — it also gates <code>:evaluate</code> and
+  <code>:dry-run</code>, both of which can write. So the "why did this fire?" surface
+  (<code>:explain</code>, the Conditions tab) is gated on <code>recommendation.read</code> instead, which
+  every field role holds. An Agronomist can therefore see exactly which conditions were evaluated on their
+  block without being able to author or run trees.</p>
+</div>
+
+<h2 id="api">17. API reference</h2>
+
+<p>All paths are relative to <code>/api/v1</code>.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Method &amp; path</th><th>Purpose</th><th>Capability</th></tr>
+  <tr><td><code>GET /decision-trees</code></td><td>List the catalog</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}</code></td><td>One tree with its current version</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/versions</code></td><td>Version history</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>POST /decision-trees</code></td><td>Create a tenant tree</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}/versions</code></td><td>New version</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}/versions/{version}:publish</code></td><td>Make a version live</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>PATCH /decision-trees/{code}</code></td><td>Edit metadata + targeting + scope</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>DELETE /decision-trees/{code}</code></td><td>Archive</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}:restore</code></td><td>Un-archive</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/candidate-blocks</code></td><td>Which blocks the targeting selects</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}:dry-run</code></td><td>Evaluate without writing</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/parameter-overrides</code></td><td>List overrides</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>PUT /decision-trees/{code}/parameter-overrides/{name}</code></td><td>Set an override</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>DELETE /decision-trees/{code}/parameter-overrides/{name}</code></td><td>Clear an override</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>GET /recommendations</code></td><td>List recommendations</td><td><code>recommendation.read</code></td></tr>
+  <tr><td><code>PATCH /recommendations/{id}</code></td><td>Change state</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>POST /recommendations/{id}/schedule</code></td><td>Put it on the plan board</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>POST /blocks/{id}/recommendations:evaluate</code></td><td>Evaluate on demand</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>GET /blocks/{id}/decision-trees:explain</code></td><td>Why each tree did or did not fire</td><td><code>recommendation.read</code></td></tr>
+</table>
+</div>
+
+<div class="note">
+  <span class="label">Why <code>:explain</code> is not gated on <code>decision_tree.read</code></span>
+  <p>It reports on advice, so it is gated on <code>recommendation.read</code> — which field roles hold.
+  <code>decision_tree.read</code> also gates <code>:evaluate</code> and <code>:dry-run</code>, both of which
+  can write, so widening it was not an option. The endpoint additionally requires a <code>farm_id</code>
+  query parameter and verifies the block belongs to that farm, so a caller cannot use it to read across
+  farms.</p>
+</div>
+
+<h4>Key source files</h4>
+<div class="tablewrap">
+<table>
+  <tr><td><code>recommendations/loader.py</code></td><td>YAML → compiled JSON; all structural validation</td></tr>
+  <tr><td><code>recommendations/engine.py</code></td><td>The tree walk and outcome parsing</td></tr>
+  <tr><td><code>recommendations/service.py</code></td><td>Context assembly, targeting match, writing results</td></tr>
+  <tr><td><code>recommendations/seeds/*.yaml</code></td><td>The shipped platform trees — the best worked examples</td></tr>
+  <tr><td><code>shared/conditions/evaluator.py</code></td><td>The condition dialect</td></tr>
+  <tr><td><code>shared/conditions/models.py</code></td><td>Value references and their allowed keys</td></tr>
+  <tr><td><code>shared/conditions/context.py</code></td><td>The shape of everything a tree can read</td></tr>
+  <tr><td><code>indices/trends.py</code></td><td>slope / delta / trend_direction</td></tr>
+</table>
+</div>
+
+<footer>
+  <p>AgriPulse — Decision Trees guide. Arabic edition: <a href="decision-trees.ar.html">decision-trees.ar.html</a>.</p>
+  <p>When the engine changes, this document changes with it. The closed vocabularies in §7 and §8 are
+  mirrored in <code>shared/conditions/</code> and in the frontend builder
+  (<code>frontend/src/modules/decisionTrees/lib/conditionEdit.ts</code>) — all three must move together, or the
+  visual builder silently falls back to raw YAML for any tree using the new key.</p>
+</footer>
+
+</main>
+</div>
+</div>
+</body>
+</html>
