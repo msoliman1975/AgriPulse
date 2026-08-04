@@ -239,6 +239,22 @@ class Settings(BaseSettings):
     # Idempotent on the alerts partial UNIQUE (block_id, rule_code).
     grid_anomaly_detect_sweep_seconds: int = 3600
 
+    # Cadence for `grid.settle_rezones_sweep` — step 2 of a rezone, which
+    # hands history to the new geometry once the backfill has recomputed
+    # it. Hourly: it is idempotent and cheap when there is nothing to
+    # settle, and a rezone that finishes backfilling should not sit in a
+    # two-geometry state for long.
+    grid_settle_rezones_sweep_seconds: int = 3600
+
+    # Cadence for `grid.cleanup_superseded_grids`. Daily — the rows it
+    # drops are already governing nothing, and the retention delay below
+    # is what actually decides when they go.
+    grid_cleanup_superseded_seconds: int = 86400
+    # How long a fully-replaced geometry's rows are kept. This is a
+    # deliberate delay, not a performance knob: it keeps the previous
+    # geometry recoverable after a rezone that turns out to be a mistake.
+    grid_superseded_retention_days: int = 7
+
     # Cadence for `integrations_health.probe_providers` (PR-IH5). 5 min
     # is the proposal default for Open-Meteo; if Sentinel Hub probe
     # costs need throttling, raise it. Each probe is a single HTTP

@@ -803,3 +803,43 @@ async def _min_scene_time(session: Any, config_id: Any) -> datetime | None:
     )
     value = result.scalar_one_or_none()
     return value if value is None else cast(datetime, value)
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.settle_rezones_sweep",
+    bind=False,
+    ignore_result=True,
+)
+def settle_rezones_sweep() -> dict[str, int]:
+    """Beat-driven fan-out of :func:`settle_rezones` across tenants.
+
+    Step 2 of a rezone can only run once the backfill has actually
+    recomputed history, and nothing knows when that is — so it is polled
+    rather than signalled. Without this schedule a rezone would stay in
+    its two-geometry state forever, which is safe but never completes.
+    """
+    return _run_task(_settle_sweep_async())
+
+
+async def _settle_sweep_async() -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        settle_rezones.delay(schema)
+        enqueued += 1
+    return {"tenants_scanned": len(schemas), "enqueued": enqueued}

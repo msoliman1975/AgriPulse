@@ -142,6 +142,26 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.grid_anomaly_detect_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Step 2 of a rezone. The apply only opens the new geometry at `now`
+    # and leaves the old one serving its own history; handing history over
+    # can only happen once the backfill has actually recomputed it, and
+    # nothing signals when that is — so it is polled. Without this
+    # schedule a rezone stays in its two-geometry state forever: safe, but
+    # never finished. Idempotent and cheap when there's nothing to settle.
+    "grid.settle_rezones_sweep": {
+        "task": "grid.settle_rezones_sweep",
+        "schedule": float(_settings.grid_settle_rezones_sweep_seconds),
+        "options": {"queue": "light"},
+    },
+    # Reclaim rows belonging to geometries that govern nothing. Runs on
+    # `heavy` because deleting from a compressed hypertable is slow — the
+    # reason this is out of band rather than inline with the apply.
+    "grid.cleanup_superseded_grids": {
+        "task": "grid.cleanup_superseded_grids",
+        "schedule": float(_settings.grid_cleanup_superseded_seconds),
+        "kwargs": {"retention_days": _settings.grid_superseded_retention_days},
+        "options": {"queue": "heavy"},
+    },
     # Provider liveness probes (PR-IH5). Pings each active weather +
     # imagery provider on a tight cadence so the Providers tab can show
     # red/green status without waiting for a real tenant fetch to fail.
