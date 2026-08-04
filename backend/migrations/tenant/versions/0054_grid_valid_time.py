@@ -103,8 +103,14 @@ def upgrade() -> None:
     # A range must not end before it starts. `-infinity` makes the lower
     # bound always comparable, so this is a genuine data guard rather than
     # a NULL-handling formality.
+    # Named by its bare suffix, not the full `ck_grid_configs_...`. The
+    # metadata naming convention is `ck_%(table_name)s_%(constraint_name)s`,
+    # so passing a already-prefixed name renders it twice — this table
+    # already carries `ck_grid_configs_ck_grid_configs_cell_size_positive`
+    # from exactly that mistake. Create and drop both apply the convention,
+    # so the two stay symmetric either way; this just spells it correctly.
     op.create_check_constraint(
-        "ck_grid_configs_effective_range",
+        "effective_range",
         "grid_configs",
         "effective_to IS NULL OR effective_to > effective_from",
     )
@@ -139,17 +145,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_grid_configs_superseded_at",
-        table_name="grid_configs",
-        postgresql_where=sa.text("superseded_at IS NOT NULL"),
-    )
+    op.drop_index("ix_grid_configs_superseded_at", table_name="grid_configs")
     op.execute("ALTER TABLE grid_configs DROP CONSTRAINT ex_grid_configs_no_overlap")
-    op.drop_constraint(
-        "ck_grid_configs_effective_range",
-        "grid_configs",
-        type_="check",
-    )
+    # Bare suffix again — the convention re-renders it to the full name.
+    op.drop_constraint("effective_range", "grid_configs", type_="check")
     op.drop_column("grid_configs", "superseded_at")
     op.drop_column("grid_configs", "effective_to")
     op.drop_column("grid_configs", "effective_from")
