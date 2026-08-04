@@ -924,32 +924,46 @@ async def _select_zone_anomaly_stats(
 
     sql = text(
         """
+        -- Observations are tied to a config through `grid_cells`, not by
+        -- (block_id, product_id): those two columns are stable across a
+        -- rezone, so pairing on them would let a retired geometry's rows
+        -- be scored against the current geometry's threshold. Valid time
+        -- (tenant migration 0054) selects the geometry that actually
+        -- produced each scene.
         WITH cfg AS (
-            SELECT gc.block_id, gc.product_id,
+            SELECT gc.id AS config_id, gc.block_id, gc.product_id,
+                   gc.effective_from, gc.effective_to,
                    COALESCE(gc.anomaly_z_threshold, CAST(:default_k AS numeric)) AS z_thr
             FROM grid_configs gc
             JOIN blocks b ON b.id = gc.block_id AND b.deleted_at IS NULL
-            WHERE b.farm_id = :farm_id AND gc.retired_at IS NULL
+            WHERE b.farm_id = :farm_id
+              AND gc.deleted_at IS NULL
+              AND gc.superseded_at IS NULL
+        ),
+        obs AS (
+            SELECT a.block_id, a.product_id, a.time, a.mean,
+                   gcell.area_m2, cfg.z_thr
+            FROM block_grid_aggregates a
+            JOIN grid_cells gcell ON gcell.id = a.cell_id
+            JOIN cfg
+              ON cfg.config_id = gcell.grid_config_id
+             AND tstzrange(cfg.effective_from, cfg.effective_to) @> a.time
+            WHERE a.index_code = :index_code AND a.mean IS NOT NULL
         ),
         latest_scene AS (
-            SELECT DISTINCT ON (a.block_id)
-                   a.block_id, a.product_id, a.time AS scene_time, cfg.z_thr
-            FROM block_grid_aggregates a
-            JOIN cfg ON cfg.block_id = a.block_id AND cfg.product_id = a.product_id
-            WHERE a.index_code = :index_code
-              AND a.time >= :since AND a.time <= :until
-              AND a.mean IS NOT NULL
-            ORDER BY a.block_id, a.time DESC
+            SELECT DISTINCT ON (block_id)
+                   block_id, product_id, time AS scene_time, z_thr
+            FROM obs
+            WHERE time >= :since AND time <= :until
+            ORDER BY block_id, time DESC
         ),
         cells AS (
-            SELECT a.block_id, a.mean, gcell.area_m2, ls.scene_time, ls.z_thr
-            FROM block_grid_aggregates a
+            SELECT o.block_id, o.mean, o.area_m2, ls.scene_time, ls.z_thr
+            FROM obs o
             JOIN latest_scene ls
-              ON ls.block_id = a.block_id
-             AND ls.product_id = a.product_id
-             AND ls.scene_time = a.time
-            JOIN grid_cells gcell ON gcell.id = a.cell_id
-            WHERE a.index_code = :index_code AND a.mean IS NOT NULL
+              ON ls.block_id = o.block_id
+             AND ls.product_id = o.product_id
+             AND ls.scene_time = o.time
         ),
         stats AS (
             SELECT block_id, scene_time, z_thr,

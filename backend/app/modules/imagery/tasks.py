@@ -1052,9 +1052,16 @@ async def _compute_indices_async(
         # Per-cell aggregates — only if a grid_config exists for this
         # (block, product). Skipped silently otherwise; blocks without
         # cells keep working exactly as before.
+        #
+        # Resolved by the scene's own time, not "the current grid": this
+        # same path runs for historical backfills and late deliveries, and
+        # gridding a 2025 scene on a 2026 geometry writes rows no
+        # valid-time-aware read can ever return (tenant migration 0054).
         grid_service = get_grid_service(tenant_session=session)
-        cells = await grid_service.list_active_cells(
-            block_id=job["block_id"], product_id=job["product_id"]
+        cells = await grid_service.list_cells_for_scene(
+            block_id=job["block_id"],
+            product_id=job["product_id"],
+            at=job["scene_datetime"],
         )
         if cells:
             per_cell_per_index: dict[Any, dict[str, Any]] = {}

@@ -96,6 +96,14 @@ class GridService(Protocol):
         product_id: UUID,
     ) -> tuple[dict[str, Any], ...]: ...
 
+    async def list_cells_for_scene(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        at: datetime,
+    ) -> tuple[dict[str, Any], ...]: ...
+
     async def record_grid_aggregates(
         self,
         *,
@@ -297,6 +305,19 @@ class GridServiceImpl:
             await self._repo.retire_config(config_id=prior["id"], retired_at=now)
 
         # 3. Insert new config + generate + bulk-write cells.
+        #
+        # Valid-time cutover (tenant migration 0054). A *first* grid claims
+        # all of history (`-infinity`), so a later historical backfill has a
+        # geometry to land on. A *rezone* opens at `now` instead, leaving the
+        # geometry it replaces governing the scenes it actually produced —
+        # so history stays readable throughout rather than being orphaned
+        # the instant the operator hits save.
+        #
+        # This is deliberately step 1 of two. Making the new geometry
+        # canonical for all of history is a recompute-then-swap that can
+        # only happen once a backfill has regenerated those scenes; doing it
+        # here would delete readable history and then hope the backfill
+        # succeeds.
         utm_srid = int(block["utm_srid"])
         config_id = await self._repo.insert_config(
             block_id=block_id,
@@ -305,6 +326,7 @@ class GridServiceImpl:
             utm_srid=utm_srid,
             created_by=created_by,
             anomaly_z_threshold=anomaly_z_threshold,
+            effective_from=now if prior is not None else None,
         )
 
         cells = list(
@@ -340,6 +362,17 @@ class GridServiceImpl:
     ) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_active_cells_for_block_product(
             block_id=block_id, product_id=product_id
+        )
+
+    async def list_cells_for_scene(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        at: datetime,
+    ) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_cells_for_scene(
+            block_id=block_id, product_id=product_id, at=at
         )
 
     async def record_grid_aggregates(
