@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { isApiError } from "@/api/errors";
 import {
   applyGrid,
+  applyGridCellSize,
   applyIrrigation,
   applyOrg,
   applySubscriptions,
@@ -33,6 +34,7 @@ import {
 import type {
   ApplyPreview,
   GridApplyPreview,
+  GridScope,
   GridTemplate,
   ImageryTemplateRow,
   IrrigationTemplate,
@@ -55,6 +57,10 @@ const input = "rounded-lg border border-ap-line bg-ap-panel px-2.5 py-1.5 text-s
 const primaryBtn = "h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-50";
 const ghostBtn = "h-9 rounded-lg border border-ap-line bg-ap-panel px-3 text-sm font-semibold text-ap-ink hover:bg-ap-primary-soft disabled:opacity-50";
 const applyBtn = "h-9 rounded-lg border border-ap-primary bg-ap-primary-soft px-3 text-sm font-semibold text-ap-primary hover:bg-ap-primary/15 disabled:opacity-50";
+// Destructive actions read as destructive. `ap-crit` is the design
+// system's existing critical colour — the bulk rezone retires live
+// geometry across a whole farm and should not look like a Save.
+const dangerBtn = "h-9 rounded-lg bg-ap-crit px-4 text-sm font-semibold text-white hover:bg-ap-crit/90 disabled:opacity-50";
 
 function Card({ title, lock, children }: { title: string; lock?: ReactNode; children: ReactNode }): ReactNode {
   return (
@@ -70,6 +76,8 @@ function Card({ title, lock, children }: { title: string; lock?: ReactNode; chil
 
 interface Props {
   farmId: string;
+  /** Needed for the type-the-farm-name rezone confirmation. */
+  farmName: string;
 }
 
 // Apply reconciles blocks against the template *stored on the server*, not
@@ -97,7 +105,7 @@ function normalizeTemplate(tpl: SubscriptionsTemplate): string {
   return JSON.stringify({ imagery, weather });
 }
 
-export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
+export function BlockDefaultsPanel({ farmId, farmName }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [template, setTemplate] = useState<SubscriptionsTemplate | null>(null);
   // Last known server state, used only for the dirty check.
@@ -419,7 +427,7 @@ export function BlockDefaultsPanel({ farmId }: Props): ReactNode {
       </Card>
 
       <Card title={t("blockDefaults.grid")} lock={lockChip("grid")}>
-        {gridTpl ? <GridSection farmId={farmId} value={gridTpl} onChange={setGridTpl} /> : null}
+        {gridTpl ? <GridSection farmId={farmId} farmName={farmName} value={gridTpl} onChange={setGridTpl} /> : null}
       </Card>
     </div>
   );
@@ -436,13 +444,36 @@ function normalizeGrid(v: GridTemplate): string {
   });
 }
 
-function GridSection({ farmId, value, onChange }: { farmId: string; value: GridTemplate; onChange: (next: GridTemplate) => void }): ReactNode {
+// Which actions a given scope's Apply would actually write. Used both to
+// enable a row's checkbox and to count the selection, so the footer can
+// never claim work the apply won't do.
+const WRITES: Record<GridScope, ReadonlySet<string>> = {
+  threshold: new Set(["threshold"]),
+  cell_size: new Set(["rezone", "create"]),
+};
+
+function GridSection({
+  farmId,
+  farmName,
+  value,
+  onChange,
+}: {
+  farmId: string;
+  farmName: string;
+  value: GridTemplate;
+  onChange: (next: GridTemplate) => void;
+}): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [savedSnapshot, setSavedSnapshot] = useState<string>(() => normalizeGrid(value));
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState(false);
   const [clearOverride, setClearOverride] = useState(false);
   const [preview, setPreview] = useState<GridApplyPreview | null>(null);
+  // Which scope the open preview belongs to. Kept beside the preview so a
+  // stale preview from the other scope can never be confirmed.
+  const [scope, setScope] = useState<GridScope>("threshold");
+  const [confirmName, setConfirmName] = useState("");
+  const [budget, setBudget] = useState<string>("");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<string | null>(null);
   const [msgKind, setMsgKind] = useState<"ok" | "warn">("ok");
@@ -470,7 +501,7 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
     }
   };
 
-  const openPreview = async () => {
+  const openPreview = async (next: GridScope) => {
     // #330 guard: never preview a template the server hasn't seen.
     if (dirty) {
       say(t("blockDefaults.unsavedFirst"), "warn");
@@ -478,8 +509,11 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
     }
     setMsg(null);
     try {
-      setPreview(await previewApplyGrid(farmId, null, clearOverride));
+      const p = await previewApplyGrid(farmId, null, clearOverride, next);
+      setScope(next);
+      setPreview(p);
       setExcluded(new Set());
+      setConfirmName("");
     } catch (e) {
       say((e as Error).message ?? t("blockDefaults.previewFailed"), "warn");
     }
@@ -500,7 +534,7 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
     if (!preview) return [];
     const ids = new Set<string>();
     for (const r of preview.rows) {
-      if (r.action === "threshold" && !excluded.has(rowKey(r))) ids.add(r.block_id);
+      if (WRITES[scope].has(r.action) && !excluded.has(rowKey(r))) ids.add(r.block_id);
     }
     return [...ids];
   };
@@ -510,15 +544,33 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
     setApplying(true);
     setMsg(null);
     try {
-      const counts = await applyGrid(farmId, selectedBlockIds(), clearOverride);
-      // Zero changes is not a success — same lesson as #330.
-      say(
-        counts.blocks_touched === 0
-          ? t("blockDefaults.appliedNothing")
-          : t("blockDefaults.appliedSimple", { blocks: counts.blocks_touched }),
-        counts.blocks_touched === 0 ? "warn" : "ok",
-      );
+      const counts =
+        scope === "cell_size"
+          ? await applyGridCellSize(
+              farmId,
+              selectedBlockIds(),
+              confirmName || null,
+              budget.trim() === "" ? null : Number(budget),
+            )
+          : await applyGrid(farmId, selectedBlockIds(), clearOverride);
+      if (counts.blocks_touched === 0) {
+        // Zero changes is not a success — same lesson as #330.
+        say(t("blockDefaults.appliedNothing"), "warn");
+      } else if (scope === "cell_size" && counts.scenes_stranded > 0) {
+        // Never let a partial recompute read as a clean rewrite.
+        say(
+          t("blockDefaults.rezonedPartial", {
+            blocks: counts.blocks_touched,
+            queued: counts.scenes_queued,
+            stranded: counts.scenes_stranded,
+          }),
+          "warn",
+        );
+      } else {
+        say(t("blockDefaults.appliedSimple", { blocks: counts.blocks_touched }));
+      }
       setPreview(null);
+      setConfirmName("");
     } catch (e) {
       say((e as Error).message ?? t("blockDefaults.applyFailed"), "warn");
     } finally {
@@ -527,6 +579,9 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
   };
 
   const selectedCount = preview ? selectedBlockIds().length : 0;
+  // The server re-checks this; the UI only decides when to ask.
+  const needsConfirm = Boolean(preview?.requires_confirmation);
+  const confirmSatisfied = !needsConfirm || confirmName.trim() === farmName;
 
   return (
     <div className="space-y-3 text-sm">
@@ -557,24 +612,48 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
         </label>
       </div>
       <p className="text-xs text-ap-muted">{t("blockDefaults.thresholdHint")}</p>
-      {/* Cell size is stored but deliberately not applied yet — say so rather
-          than letting the field imply a bulk rezone is one click away. */}
-      <p className="rounded-lg bg-ap-warn-soft px-2.5 py-1.5 text-xs text-ap-warn">{t("blockDefaults.cellSizeNotApplied")}</p>
-
-      <label className="flex items-start gap-2 text-xs text-ap-ink">
-        <input type="checkbox" checked={clearOverride} onChange={(e) => { setClearOverride(e.target.checked); setPreview(null); }} className="mt-0.5" />
-        <span>{t("blockDefaults.clearOverride")}</span>
-      </label>
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={saving || !dirty} className={primaryBtn}>
           {saving ? t("manage.saving") : t("blockDefaults.saveTemplate")}
         </button>
-        <button type="button" onClick={openPreview} disabled={dirty} title={dirty ? t("blockDefaults.unsavedFirst") : undefined} className={applyBtn}>
+        {dirty ? <span className="text-xs text-ap-warn">{t("blockDefaults.unsavedFirst")}</span> : null}
+        {msg ? <span className={msgKind === "warn" ? "text-xs text-ap-muted" : "text-xs text-ap-muted"}>{msg}</span> : null}
+      </div>
+
+      {/* The numbering is load-bearing: a block with no grid cannot take a
+          threshold, so ① gates ②. Applying them is deliberately two
+          separate actions — one retires geometry and spends compute, the
+          other writes a number. */}
+      <div className="space-y-2 rounded-lg border border-ap-line p-3">
+        <p className="text-xs font-semibold text-ap-ink">{t("blockDefaults.gridSectionCellSize")}</p>
+        <p className="text-xs text-ap-muted">{t("blockDefaults.cellSizeDestructive")}</p>
+        <button
+          type="button"
+          onClick={() => void openPreview("cell_size")}
+          disabled={dirty}
+          title={dirty ? t("blockDefaults.unsavedFirst") : undefined}
+          className={dangerBtn}
+        >
+          {t("blockDefaults.applyCellSize")}
+        </button>
+      </div>
+
+      <div className="space-y-2 rounded-lg border border-ap-line p-3">
+        <p className="text-xs font-semibold text-ap-ink">{t("blockDefaults.gridSectionThreshold")}</p>
+        <label className="flex items-start gap-2 text-xs text-ap-ink">
+          <input type="checkbox" checked={clearOverride} onChange={(e) => { setClearOverride(e.target.checked); setPreview(null); }} className="mt-0.5" />
+          <span>{t("blockDefaults.clearOverride")}</span>
+        </label>
+        <button
+          type="button"
+          onClick={() => void openPreview("threshold")}
+          disabled={dirty}
+          title={dirty ? t("blockDefaults.unsavedFirst") : undefined}
+          className={applyBtn}
+        >
           {t("blockDefaults.applyBlocks")}
         </button>
-        {dirty ? <span className="text-xs text-ap-warn">{t("blockDefaults.unsavedFirst")}</span> : null}
-        {msg ? <span className={msgKind === "warn" ? "text-xs text-ap-warn" : "text-xs text-ap-muted"}>{msg}</span> : null}
       </div>
 
       {preview ? (
@@ -587,10 +666,16 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
             })}
           </p>
           {preview.is_noop ? <p className="text-xs text-ap-warn">{t("blockDefaults.gridNothingToDo")}</p> : null}
+          {scope === "cell_size" && preview.blocked_rows > 0 ? (
+            <p className="text-xs text-ap-warn">
+              {t("blockDefaults.gridBlockedRows", { blocked: preview.blocked_rows })}
+            </p>
+          ) : null}
+
           <ul className="max-h-56 space-y-1 overflow-auto">
             {preview.rows.map((r) => {
               const key = rowKey(r);
-              const selectable = r.action === "threshold";
+              const selectable = WRITES[scope].has(r.action);
               return (
                 <li key={key} className={"flex items-center gap-2 rounded border border-ap-line/60 px-2 py-1 text-xs " + (selectable ? "" : "opacity-60")}>
                   <input
@@ -601,19 +686,75 @@ function GridSection({ farmId, value, onChange }: { farmId: string; value: GridT
                     aria-label={r.block_code}
                   />
                   <span className="font-semibold text-ap-ink">{r.block_code}</span>
+                  {/* Product is a COLUMN, never a control: each block grids
+                      against its own active subscription, so a farm-level
+                      picker could select a product some blocks lack. */}
                   <span className="text-ap-muted">{r.product_code ?? "—"}</span>
+                  <span className={"rounded px-1 " + (r.action === "blocked" ? "bg-ap-warn-soft text-ap-warn" : "text-ap-muted")}>
+                    {t(`blockDefaults.gridAction.${r.action}`)}
+                  </span>
                   <span className="ms-auto text-ap-muted">
-                    {selectable
-                      ? `${r.current_anomaly_z_threshold ?? "—"} → ${r.target_anomaly_z_threshold ?? t("blockDefaults.inherit")}`
-                      : r.reason}
+                    {!selectable
+                      ? r.reason
+                      : scope === "cell_size"
+                        ? r.reason
+                        : `${r.current_anomaly_z_threshold ?? "—"} → ${r.target_anomaly_z_threshold ?? t("blockDefaults.inherit")}`}
                   </span>
                 </li>
               );
             })}
           </ul>
+
+          {scope === "cell_size" && preview.rezone_rows > 0 ? (
+            <div className="space-y-2 rounded-lg bg-ap-crit-soft p-2.5">
+              {/* Refuse to hide the cost. An operator who doesn't know the
+                  history goes dark until the backfill lands will read the
+                  empty heatmap as a bug. */}
+              <p className="text-xs text-ap-crit">
+                {t("blockDefaults.rezoneCost", {
+                  grids: preview.rezone_rows,
+                  scenes: preview.scenes_affected,
+                })}
+              </p>
+              <label className="flex flex-col gap-1 text-xs text-ap-muted">
+                {t("blockDefaults.backfillBudget")}
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={budget}
+                  placeholder={t("blockDefaults.backfillBudgetAll")}
+                  onChange={(e) => setBudget(e.target.value)}
+                  className={input + " w-32"}
+                />
+              </label>
+              {needsConfirm ? (
+                <label className="flex flex-col gap-1 text-xs text-ap-crit">
+                  {t("blockDefaults.typeFarmName", { farm: farmName })}
+                  <input
+                    type="text"
+                    value={confirmName}
+                    onChange={(e) => setConfirmName(e.target.value)}
+                    aria-label={t("blockDefaults.typeFarmNameLabel")}
+                    className={input + " w-56"}
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-2">
-            <button type="button" onClick={apply} disabled={applying || selectedCount === 0} className={primaryBtn}>
-              {applying ? t("manage.saving") : t("blockDefaults.gridConfirmApply", { blocks: selectedCount })}
+            <button
+              type="button"
+              onClick={apply}
+              disabled={applying || selectedCount === 0 || !confirmSatisfied}
+              className={scope === "cell_size" && preview.rezone_rows > 0 ? dangerBtn : primaryBtn}
+            >
+              {applying
+                ? t("manage.saving")
+                : scope === "cell_size" && preview.rezone_rows > 0
+                  ? t("blockDefaults.gridConfirmRezone", { blocks: selectedCount })
+                  : t("blockDefaults.gridConfirmApply", { blocks: selectedCount })}
             </button>
             <button type="button" onClick={() => setPreview(null)} className={ghostBtn}>
               {t("manage.cancel")}
