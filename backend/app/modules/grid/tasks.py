@@ -24,7 +24,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Coroutine
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from celery import shared_task
@@ -574,3 +574,232 @@ async def _cleanup_superseded_async(
         "aggregates_deleted": aggregates_deleted,
         "tenants_failed": tenants_failed,
     }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.backfill_farm",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_farm(
+    tenant_schema: str,
+    farm_id: str,
+    budget_scenes: int | None = None,
+    since_iso: str | None = None,
+) -> dict[str, int]:
+    """Regenerate history onto a farm's grids under one shared budget.
+
+    Replaces per-block ``limit=200`` fan-out at farm scale. On a 36-block
+    farm that cap means 7,200 unbudgeted jobs, truncating silently per
+    block with no farm-wide view of what was skipped.
+
+    **The unit is scene-compute jobs, not provider quota.** Each re-run
+    reads the stored ``raw_bands_key`` from R2 and recomputes; it does not
+    re-fetch from CDSE. The cost is heavy-worker time and the resulting
+    rows, so ``budget_scenes`` is a compute knob, not a spend knob.
+
+    ``budget_scenes=None`` means "everything". Whatever the budget does
+    not reach is **reported, not hidden** — those scenes stay readable on
+    the older geometry, which is a genuinely two-geometry farm, and the UI
+    has to say so.
+    """
+    return _run_task(
+        _backfill_farm_async(
+            tenant_schema=tenant_schema,
+            farm_id=farm_id,
+            budget_scenes=budget_scenes,
+            since_iso=since_iso,
+        )
+    )
+
+
+async def _backfill_farm_async(
+    *,
+    tenant_schema: str,
+    farm_id: str,
+    budget_scenes: int | None,
+    since_iso: str | None,
+) -> dict[str, int]:
+    from app.modules.grid.backfill import allocate_budget, list_farm_grid_pairs
+    from app.modules.imagery.tasks import compute_indices
+
+    since = datetime.fromisoformat(since_iso) if since_iso else None
+    # Per-pair fetch cap. With a farm budget set we can never enqueue more
+    # than the budget in total, so fetching beyond it is pure waste; with
+    # no budget we still bound the query rather than reading a decade of
+    # jobs into memory.
+    per_pair_cap = budget_scenes if budget_scenes is not None else 2000
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        pairs = await list_farm_grid_pairs(session, farm_id=UUID(farm_id))
+        jobs_by_pair: dict[tuple[UUID, UUID], list[dict[str, str]]] = {}
+        for p in pairs:
+            jobs_by_pair[(p["block_id"], p["product_id"])] = await list_backfill_jobs(
+                session,
+                block_id=p["block_id"],
+                product_id=p["product_id"],
+                since=since,
+                limit=per_pair_cap,
+            )
+
+    allocated, stranded = allocate_budget(jobs_by_pair, budget=budget_scenes)
+
+    queued = 0
+    for jobs in allocated.values():
+        for j in jobs:
+            compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
+            queued += 1
+
+    _log.info(
+        "grid_backfill_farm_queued",
+        tenant_schema=tenant_schema,
+        farm_id=farm_id,
+        grids=len(jobs_by_pair),
+        scenes_queued=queued,
+        scenes_stranded=stranded,
+        budget=budget_scenes,
+    )
+    return {
+        "grids": len(jobs_by_pair),
+        "scenes_queued": queued,
+        "scenes_stranded": stranded,
+    }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.settle_rezones",
+    bind=False,
+    ignore_result=True,
+)
+def settle_rezones(tenant_schema: str) -> dict[str, int]:
+    """Step 2 of a rezone: hand history over to the new geometry.
+
+    The apply itself only opens the new grid at ``now`` and closes the old
+    one there, so history stays readable on the geometry that produced it
+    while the backfill runs. This task completes the cutover once the
+    recomputed rows actually exist.
+
+    Deliberately re-derived from the database rather than triggered by a
+    completion callback. A chord over thousands of scene jobs is fragile —
+    one lost result and the cutover never finishes — whereas this is
+    idempotent and self-correcting: run it as often as you like, and a
+    partially-completed backfill simply settles further next time.
+
+    Two outcomes per grid:
+
+    * **Full** — the new geometry now covers everything the old one did.
+      The old config is superseded (its rows become cleanup fodder) and
+      the new one extends back to ``-infinity``. Net effect is "rewrite
+      history": one geometry over the whole record.
+    * **Partial** — the budget did not reach everything. ``effective_from``
+      walks back only as far as was actually recomputed, and the old
+      config keeps governing the rest. The farm genuinely has two
+      geometries across its history, and this records that truthfully
+      instead of implying a clean rewrite.
+    """
+    return _run_task(_settle_rezones_async(tenant_schema))
+
+
+async def _settle_rezones_async(tenant_schema: str) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        candidates = (
+            (
+                await session.execute(
+                    text(
+                        """
+                        SELECT new.id AS new_id, old.id AS old_id,
+                               new.effective_from AS new_from
+                        FROM grid_configs new
+                        JOIN grid_configs old
+                          ON old.block_id   = new.block_id
+                         AND old.product_id = new.product_id
+                         AND old.id <> new.id
+                         AND old.superseded_at IS NULL
+                         AND old.deleted_at IS NULL
+                         AND old.effective_to IS NOT NULL
+                        WHERE new.retired_at IS NULL
+                          AND new.deleted_at IS NULL
+                          AND new.superseded_at IS NULL
+                          AND new.effective_from > '-infinity'::timestamptz
+                        """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+
+        settled_full = 0
+        settled_partial = 0
+        for row in candidates:
+            min_new = await _min_scene_time(session, row["new_id"])
+            if min_new is None:
+                continue  # nothing recomputed onto the new geometry yet
+            min_old = await _min_scene_time(session, row["old_id"])
+
+            if min_old is None or min_new <= min_old:
+                # The new geometry covers everything the old one held.
+                # Supersede FIRST: that drops the old row out of the
+                # non-overlap constraint's WHERE clause, so the new range
+                # can legally expand over it. The reverse order trips the
+                # constraint mid-transaction.
+                await session.execute(
+                    text("UPDATE grid_configs SET superseded_at = now() WHERE id = :id"),
+                    {"id": row["old_id"]},
+                )
+                await session.execute(
+                    text(
+                        "UPDATE grid_configs "
+                        "SET effective_from = '-infinity'::timestamptz "
+                        "WHERE id = :id"
+                    ),
+                    {"id": row["new_id"]},
+                )
+                settled_full += 1
+            elif min_new < row["new_from"]:
+                # Partial. Shrink the old range BEFORE growing the new one,
+                # for the same constraint reason — shrinking can never
+                # create an overlap, growing can.
+                await session.execute(
+                    text("UPDATE grid_configs SET effective_to = :t WHERE id = :id"),
+                    {"id": row["old_id"], "t": min_new},
+                )
+                await session.execute(
+                    text("UPDATE grid_configs SET effective_from = :t WHERE id = :id"),
+                    {"id": row["new_id"], "t": min_new},
+                )
+                settled_partial += 1
+
+    _log.info(
+        "grid_rezones_settled",
+        tenant_schema=tenant_schema,
+        candidates=len(candidates),
+        settled_full=settled_full,
+        settled_partial=settled_partial,
+    )
+    return {
+        "candidates": len(candidates),
+        "settled_full": settled_full,
+        "settled_partial": settled_partial,
+    }
+
+
+async def _min_scene_time(session: Any, config_id: Any) -> datetime | None:
+    """Oldest observation recorded against a config's own cells."""
+    result = await session.execute(
+        text(
+            """
+            SELECT MIN(obs.time)
+            FROM grid_cells gc
+            JOIN block_grid_aggregates obs ON obs.cell_id = gc.id
+            WHERE gc.grid_config_id = :cfg
+            """
+        ),
+        {"cfg": config_id},
+    )
+    value = result.scalar_one_or_none()
+    return value if value is None else cast(datetime, value)

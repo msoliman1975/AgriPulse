@@ -39,6 +39,7 @@ from app.modules.grid.errors import (
 from app.modules.grid.farm_plan import (
     GridPlanRow,
     GridRowState,
+    plan_cell_size,
     plan_threshold,
 )
 from app.modules.grid.geometry import (
@@ -196,6 +197,21 @@ class GridService(Protocol):
         block_ids: tuple[UUID, ...],
         template_z: Decimal | None,
         clear_override: bool,
+    ) -> tuple[tuple[GridPlanRow, ...], int]: ...
+
+    async def plan_farm_cell_size(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_cell_size: Decimal | None,
+    ) -> tuple[GridPlanRow, ...]: ...
+
+    async def apply_farm_cell_size(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_cell_size: Decimal | None,
+        created_by: UUID | None,
     ) -> tuple[tuple[GridPlanRow, ...], int]: ...
 
 
@@ -693,8 +709,18 @@ class GridServiceImpl:
 
     # ---- farm-wide (bulk) config -------------------------------------
 
-    async def _load_farm_rows(self, *, block_ids: tuple[UUID, ...]) -> tuple[GridRowState, ...]:
+    async def _load_farm_rows(
+        self, *, block_ids: tuple[UUID, ...], with_scene_counts: bool = False
+    ) -> tuple[GridRowState, ...]:
         rows = await self._repo.list_farm_grid_rows(block_ids=block_ids)
+        # Only the cell-size scope needs scene counts, and it is an extra
+        # aggregate over the hypertable — don't make the threshold preview
+        # pay for it.
+        scenes = (
+            await self._repo.count_scenes_for_blocks(block_ids=block_ids)
+            if with_scene_counts
+            else {}
+        )
         return tuple(
             GridRowState(
                 block_id=r["block_id"],
@@ -707,6 +733,8 @@ class GridServiceImpl:
                 grid_config_id=r["grid_config_id"],
                 current_cell_size_m=r["current_cell_size_m"],
                 current_anomaly_z_threshold=r["current_anomaly_z_threshold"],
+                block_area_m2=r["block_area_m2"],
+                scenes_affected=scenes.get((r["block_id"], r["product_id"]), 0),
             )
             for r in rows
         )
@@ -767,6 +795,75 @@ class GridServiceImpl:
             rows_written=written,
             clear_override=clear_override,
             threshold=str(target) if target is not None else None,
+        )
+        return plan, written
+
+    async def plan_farm_cell_size(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_cell_size: Decimal | None,
+    ) -> tuple[GridPlanRow, ...]:
+        """Dry-run a farm-wide cell-size apply. No writes."""
+        states = await self._load_farm_rows(block_ids=block_ids, with_scene_counts=True)
+        return plan_cell_size(states, template_cell_size=template_cell_size)
+
+    async def apply_farm_cell_size(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_cell_size: Decimal | None,
+        created_by: UUID | None,
+    ) -> tuple[tuple[GridPlanRow, ...], int]:
+        """Rezone / create grids across a farm. Returns (plan, rows_written).
+
+        Routes each row through :meth:`upsert_config`, which owns the
+        valid-time cutover: the replaced geometry keeps governing the
+        scenes it produced, and the new one opens at ``now``. History
+        stays readable throughout — regenerating it under the new geometry
+        is the backfill's job, enqueued separately by the caller.
+
+        The plan is recomputed here rather than trusting one submitted by
+        the client, so a stale preview cannot cause a rezone the operator
+        never saw.
+
+        **Blocked rows are skipped, not attempted.** ``upsert_config``
+        would raise on them and abort the whole request; the preview
+        already told the operator which blocks refused and why.
+        """
+        plan = await self.plan_farm_cell_size(
+            block_ids=block_ids, template_cell_size=template_cell_size
+        )
+        changed = tuple(r for r in plan if r.is_change)
+        if not changed:
+            return plan, 0
+
+        written = 0
+        for row in changed:
+            target = row.target_cell_size_m
+            if target is None or row.state.product_id is None:
+                continue
+            await self.upsert_config(
+                block_id=row.state.block_id,
+                product_id=row.state.product_id,
+                cell_size_m=target,
+                created_by=created_by,
+                # Carry the block's own tuned sensitivity across the
+                # rezone. Passing None here would silently reset every
+                # block to the tenant default — a farm-wide loss of
+                # operator tuning, invisible until alerts changed shape.
+                anomaly_z_threshold=row.state.current_anomaly_z_threshold,
+            )
+            written += 1
+
+        self._log.info(
+            "grid_farm_cell_size_applied",
+            blocks_targeted=len(block_ids),
+            rows_planned=len(changed),
+            rows_written=written,
+            rezones=sum(1 for r in changed if r.is_destructive),
+            creates=sum(1 for r in changed if r.action == "create"),
+            cell_size_m=str(template_cell_size) if template_cell_size is not None else None,
         )
         return plan, written
 

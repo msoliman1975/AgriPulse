@@ -44,9 +44,14 @@ from app.modules.farms.config_schemas import (
     SubscriptionsTemplateReplaceRequest,
     SubscriptionsTemplateResponse,
 )
+from app.modules.grid.farm_plan import summarize
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
-from app.shared.rbac.check import requires_capability
+from app.shared.rbac.check import (
+    PermissionDeniedError,
+    has_capability,
+    requires_capability,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["farms.config"])
 
@@ -594,20 +599,29 @@ def _grid_rows_to_wire(plan: tuple[Any, ...]) -> dict[str, Any]:
             "current_cell_size_m": _f(r.state.current_cell_size_m),
             "current_anomaly_z_threshold": _f(r.state.current_anomaly_z_threshold),
             "target_anomaly_z_threshold": _f(r.target_anomaly_z_threshold),
+            "target_cell_size_m": _f(r.target_cell_size_m),
             "action": r.action,
             "reason": r.reason,
             "matches": not r.is_change,
+            "scenes_affected": r.state.scenes_affected,
         }
         for r in plan
     ]
-    changed = sum(1 for r in plan if r.action == "threshold")
+    # Derived by the same `summarize` the planner exposes, so the footer
+    # counts and the plan can't drift apart.
+    summary = summarize(tuple(plan))
     return {
         "rows": rows,
-        "total_rows": len(rows),
-        "changed_rows": changed,
-        "unchanged_rows": sum(1 for r in plan if r.action == "none"),
-        "skipped_rows": sum(1 for r in plan if r.action == "skipped"),
-        "is_noop": changed == 0,
+        "total_rows": summary.total_rows,
+        "changed_rows": summary.changed_rows,
+        "unchanged_rows": summary.unchanged_rows,
+        "skipped_rows": summary.skipped_rows,
+        "is_noop": summary.is_noop,
+        "rezone_rows": summary.rezone_rows,
+        "create_rows": summary.create_rows,
+        "blocked_rows": summary.blocked_rows,
+        "scenes_affected": summary.scenes_affected,
+        "requires_confirmation": summary.has_destructive,
     }
 
 
@@ -632,6 +646,7 @@ async def apply_grid_preview(
         farm_id=farm_id,
         target_block_ids=target,
         clear_override=payload.clear_override,
+        scope=payload.scope,
     )
     return _grid_rows_to_wire(plan)
 
@@ -649,15 +664,48 @@ async def apply_grid(
     ),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, int]:
-    """Threshold only — this endpoint never reshapes a grid.
+    """Apply the farm grid template — threshold or cell size.
 
-    Cell size is stored on the template but not applied here: changing it
-    retires the grid and orphans its observations, which needs grid valid
-    time to be safe. See docs/proposals/bulk-grid-config-and-valid-time.md.
+    The two scopes have genuinely different blast radii, so they are
+    separated by an explicit ``scope`` rather than inferred:
+
+    * ``threshold`` — writes ``anomaly_z_threshold`` in place. No geometry
+      is touched, nothing is retired, no compute is spent.
+    * ``cell_size`` — retires and regenerates geometry, and queues a
+      backfill. Requires ``imagery.subscription.manage`` on top of
+      ``farm.manage_config``, and a typed farm-name confirmation whenever
+      a live grid would be replaced.
     """
     _ensure_feature_enabled()
     _require_tenant(context)
     target = tuple(payload.block_ids) if payload.block_ids is not None else None
+
+    if payload.scope == "cell_size":
+        # A rezone reshapes observation streams and spends heavy-worker
+        # time, so it needs the same authority as managing a subscription
+        # — `farm.manage_config` alone is the wrong bar for it.
+        #
+        # Every role that grants the former currently also grants the
+        # latter, so this is defence-in-depth rather than a live
+        # distinction; a lock-step test pins that assumption so a future
+        # config-only role is a deliberate decision, not a surprise 403.
+        if not has_capability(context, "imagery.subscription.manage", farm_id=farm_id):
+            raise PermissionDeniedError("imagery.subscription.manage", farm_id=farm_id)
+        try:
+            return await config_template.apply_grid_cell_size(
+                session,
+                farm_id=farm_id,
+                target_block_ids=target,
+                created_by=context.user_id,
+                confirm_farm_name=payload.confirm_farm_name,
+                backfill_budget_scenes=payload.backfill_budget_scenes,
+                tenant_schema=context.tenant_schema,
+            )
+        except config_template.RezoneConfirmationError as exc:
+            # 409, not 400: the request is well-formed, it just hasn't been
+            # confirmed yet, and the UI reopens the confirm step on this.
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
     return await config_template.apply_grid_template(
         session,
         farm_id=farm_id,

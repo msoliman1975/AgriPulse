@@ -8,7 +8,7 @@ painful.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -152,13 +152,7 @@ class OrgTemplateSchema(BaseModel):
 
 
 class GridTemplateSchema(BaseModel):
-    """Farm-level grid defaults. Both nullable — NULL means "not set".
-
-    ``cell_size_m`` is stored and returned but **not** appliable yet; the
-    bulk cell-size path needs grid valid time first. It is accepted now so
-    the template survives a round-trip and the UI has somewhere to put the
-    value.
-    """
+    """Farm-level grid defaults. Both nullable — NULL means "not set"."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -166,18 +160,38 @@ class GridTemplateSchema(BaseModel):
     anomaly_z_threshold: float | None = Field(default=None, gt=0)
 
 
+# The two scopes are separate requests on purpose. One is a sensitivity
+# tweak, the other retires geometry and spends compute; collapsing them
+# into a single "apply the template" button is how an operator ends up
+# rezoning a farm while meaning to nudge a threshold.
+GridScope = Literal["threshold", "cell_size"]
+
+
 class GridApplyRequest(BaseModel):
     """Body for the grid apply-preview / apply endpoints.
 
-    ``clear_override=True`` ignores the template's threshold and instead
-    clears each block's own override so it inherits tenant → platform
-    again. Without it, applying a farm threshold would be a one-way door.
+    ``clear_override=True`` (threshold scope only) ignores the template's
+    threshold and instead clears each block's own override so it inherits
+    tenant → platform again. Without it, applying a farm threshold would
+    be a one-way door.
+
+    ``confirm_farm_name`` is required by the *apply* endpoint whenever the
+    plan contains a rezone. It is checked server-side rather than being
+    left to the UI: the destructive path must not be reachable by a
+    client that simply doesn't render the confirmation.
+
+    ``backfill_budget_scenes`` bounds the recompute fan-out. ``None``
+    means "everything"; ``0`` means "rezone but queue no backfill", which
+    is legitimate but leaves all history on the older geometry.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     block_ids: list[UUID] | None = None
+    scope: GridScope = "threshold"
     clear_override: bool = False
+    confirm_farm_name: str | None = None
+    backfill_budget_scenes: int | None = Field(default=None, ge=0)
 
 
 class GridPlanRowSchema(BaseModel):
@@ -191,9 +205,13 @@ class GridPlanRowSchema(BaseModel):
     current_cell_size_m: float | None
     current_anomaly_z_threshold: float | None
     target_anomaly_z_threshold: float | None
+    target_cell_size_m: float | None = None
     action: str
     reason: str
     matches: bool
+    # Scenes currently readable on this row's live geometry. For a rezone
+    # this is what stops being readable until the backfill regenerates it.
+    scenes_affected: int = 0
 
 
 class GridApplyPreviewResponse(BaseModel):
@@ -205,8 +223,20 @@ class GridApplyPreviewResponse(BaseModel):
     # True when Apply would write nothing. The UI disables Confirm on this
     # and reports a zero-change apply as a warning rather than success.
     is_noop: bool
+    rezone_rows: int = 0
+    create_rows: int = 0
+    blocked_rows: int = 0
+    scenes_affected: int = 0
+    # Drives the type-the-farm-name confirmation. True only when live
+    # geometry would be retired — a farm being gridded for the first time
+    # must not train operators to type past the confirmation.
+    requires_confirmation: bool = False
 
 
 class GridApplyResponse(BaseModel):
     blocks_touched: int
     total_blocks: int
+    # Cell-size scope only. `scenes_stranded` is the honest half: scenes
+    # the budget did not reach, which stay on the older geometry.
+    scenes_queued: int = 0
+    scenes_stranded: int = 0

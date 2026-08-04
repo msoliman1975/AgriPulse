@@ -465,6 +465,48 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def count_scenes_for_blocks(
+        self, *, block_ids: tuple[UUID, ...]
+    ) -> dict[tuple[UUID, UUID], int]:
+        """Distinct scene times each block's *current* geometry holds.
+
+        This is the number a rezone preview has to show: it is exactly the
+        history that stops being readable on the live grid the moment the
+        geometry is replaced. Counted through ``grid_cells`` so it reflects
+        the config's own rows rather than everything ever written for the
+        block — after an earlier rezone those are not the same set.
+
+        One statement for the whole farm: a per-block fan-out here is the
+        N+1 that exhausted the pool on the map endpoints (#311).
+        """
+        if not block_ids:
+            return {}
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT cfg.block_id, cfg.product_id,
+                               count(DISTINCT obs.time) AS scenes
+                        FROM grid_configs cfg
+                        JOIN grid_cells gc ON gc.grid_config_id = cfg.id
+                        JOIN block_grid_aggregates obs ON obs.cell_id = gc.id
+                        WHERE cfg.block_id = ANY(:block_ids)
+                          AND cfg.retired_at IS NULL
+                          AND cfg.deleted_at IS NULL
+                        GROUP BY cfg.block_id, cfg.product_id
+                        """
+                    ).bindparams(
+                        bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                    ),
+                    {"block_ids": list(block_ids)},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return {(r["block_id"], r["product_id"]): int(r["scenes"]) for r in rows}
+
     async def list_cells_for_scene(
         self, *, block_id: UUID, product_id: UUID, at: datetime
     ) -> tuple[dict[str, Any], ...]:
