@@ -47,11 +47,12 @@ from app.modules.farms.models import (
 from app.modules.imagery.models import ImageryAoiSubscription
 from app.modules.weather.models import WeatherSubscription
 
-Category = Literal["subscriptions", "irrigation", "org"]
+Category = Literal["subscriptions", "irrigation", "org", "grid"]
 _LOCK_COLUMN: dict[Category, str] = {
     "subscriptions": "subscriptions_locked",
     "irrigation": "irrigation_locked",
     "org": "org_locked",
+    "grid": "grid_locked",
 }
 
 
@@ -579,6 +580,7 @@ async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Catego
                 Farm.subscriptions_locked,
                 Farm.irrigation_locked,
                 Farm.org_locked,
+                Farm.grid_locked,
             ).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
         )
     ).first()
@@ -588,6 +590,7 @@ async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Catego
         "subscriptions": bool(row.subscriptions_locked),
         "irrigation": bool(row.irrigation_locked),
         "org": bool(row.org_locked),
+        "grid": bool(row.grid_locked),
     }
 
 
@@ -642,6 +645,10 @@ async def lock_category(
             await apply_org_template(
                 session, farm_id=farm_id, target_block_ids=None, updated_by=updated_by
             )
+        elif category == "grid":
+            await apply_grid_template(
+                session, farm_id=farm_id, target_block_ids=None, updated_by=updated_by
+            )
 
     await _set_lock(session, farm_id=farm_id, category=category, value=True)
     return {**diff_payload, "locked": True}
@@ -694,12 +701,37 @@ async def _build_lock_diff(
             "total_blocks": len(irr_diff),
             "matched_blocks": sum(1 for d in irr_diff if d.matches),
         }
+    if category == "grid":
+        # Conformance is measured on the anomaly threshold only, because
+        # that is the only field Apply can currently write. Locking the
+        # category still blocks block-level writes to *both* fields (the
+        # guard is on the whole grid-config PUT) — deliberately stricter
+        # than the diff, never looser. Cell-size conformance joins here
+        # with the bulk-rezone work.
+        grid_plan = await compute_grid_apply_plan(session, farm_id=farm_id, target_block_ids=None)
+        return {
+            "blocks": [_grid_plan_dict(r) for r in grid_plan],
+            "total_blocks": len(grid_plan),
+            "matched_blocks": sum(1 for r in grid_plan if not r.is_change),
+        }
     # org
     org_diff = await compute_org_apply_diff(session, farm_id=farm_id, target_block_ids=None)
     return {
         "blocks": [_simple_diff(d) for d in org_diff],
         "total_blocks": len(org_diff),
         "matched_blocks": sum(1 for d in org_diff if d.matches),
+    }
+
+
+def _grid_plan_dict(r: Any) -> dict[str, Any]:
+    """Serialise a ``GridPlanRow`` for the lock-divergence payload."""
+    return {
+        "block_id": str(r.state.block_id),
+        "block_code": r.state.block_code,
+        "product_code": r.state.product_code,
+        "action": r.action,
+        "reason": r.reason,
+        "matches": not r.is_change,
     }
 
 
@@ -858,6 +890,124 @@ async def apply_irrigation_template(
         touched += 1
     await session.flush()
     return {"blocks_touched": touched, "total_blocks": len(diffs)}
+
+
+# ---------- Grid template (cell size + anomaly threshold) -------------------
+# Single-row template on `farms` (tenant migration 0053), same shape as
+# Irrigation. Apply currently copies the **threshold only** — see
+# `app.modules.grid.farm_plan` for why cell size waits on grid valid time.
+
+
+@dataclass(frozen=True, slots=True)
+class GridTemplate:
+    cell_size_m: Decimal | None
+    anomaly_z_threshold: Decimal | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "cell_size_m": self.cell_size_m,
+            "anomaly_z_threshold": self.anomaly_z_threshold,
+        }
+
+
+async def get_grid_template(session: AsyncSession, *, farm_id: UUID) -> GridTemplate:
+    row = (
+        await session.execute(
+            select(
+                Farm.default_grid_cell_size_m,
+                Farm.default_anomaly_z_threshold,
+            ).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        )
+    ).first()
+    if row is None:
+        raise FarmNotFoundError(farm_id)
+    return GridTemplate(
+        cell_size_m=row.default_grid_cell_size_m,
+        anomaly_z_threshold=row.default_anomaly_z_threshold,
+    )
+
+
+async def replace_grid_template(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    tpl: GridTemplate,
+    updated_by: UUID | None,
+) -> None:
+    stmt = (
+        update(Farm)
+        .where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        .values(
+            default_grid_cell_size_m=tpl.cell_size_m,
+            default_anomaly_z_threshold=tpl.anomaly_z_threshold,
+            updated_by=updated_by,
+        )
+    )
+    result = await session.execute(stmt)
+    if (getattr(result, "rowcount", 0) or 0) == 0:
+        raise FarmNotFoundError(farm_id)
+    await session.flush()
+
+
+async def compute_grid_apply_plan(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    target_block_ids: tuple[UUID, ...] | None = None,
+    clear_override: bool = False,
+) -> tuple[Any, ...]:
+    """Dry-run the farm's grid template against its blocks.
+
+    Returns ``GridPlanRow`` objects (one per block per active imagery
+    subscription). Delegates to the grid module's service rather than
+    reimplementing grid semantics here — the grid module owns what a
+    config is and which product a block is gridded against.
+    """
+    from app.modules.grid.service import get_grid_service
+
+    tpl = await get_grid_template(session, farm_id=farm_id)
+    block_ids = await _resolve_target_blocks(
+        session, farm_id=farm_id, target_block_ids=target_block_ids
+    )
+    svc = get_grid_service(tenant_session=session)
+    return await svc.plan_farm_threshold(
+        block_ids=block_ids,
+        template_z=tpl.anomaly_z_threshold,
+        clear_override=clear_override,
+    )
+
+
+async def apply_grid_template(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    target_block_ids: tuple[UUID, ...] | None,
+    updated_by: UUID | None,
+    clear_override: bool = False,
+) -> dict[str, int]:
+    """Copy the farm's anomaly threshold onto every target block's grid.
+
+    Non-destructive by construction: no geometry is touched, nothing is
+    retired, no cells are regenerated. ``updated_by`` is accepted for
+    signature symmetry with the other categories but the grid config's
+    own ``updated_at`` is stamped by the repository.
+    """
+    from app.modules.grid.service import get_grid_service
+
+    tpl = await get_grid_template(session, farm_id=farm_id)
+    block_ids = await _resolve_target_blocks(
+        session, farm_id=farm_id, target_block_ids=target_block_ids
+    )
+    svc = get_grid_service(tenant_session=session)
+    plan, written = await svc.apply_farm_threshold(
+        block_ids=block_ids,
+        template_z=tpl.anomaly_z_threshold,
+        clear_override=clear_override,
+    )
+    return {
+        "blocks_touched": written,
+        "total_blocks": len(plan),
+    }
 
 
 # ---------- PR-3: Org template (additive tags merge) ------------------------

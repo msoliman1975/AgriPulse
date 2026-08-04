@@ -91,12 +91,13 @@ export async function applySubscriptions(
 
 // ---------- PR-3: locks ---------------------------------------------------
 
-export type LockCategory = "subscriptions" | "irrigation" | "org";
+export type LockCategory = "subscriptions" | "irrigation" | "org" | "grid";
 
 export interface LockState {
   subscriptions: boolean;
   irrigation: boolean;
   org: boolean;
+  grid: boolean;
 }
 
 export async function getLocks(farmId: string): Promise<LockState> {
@@ -233,6 +234,86 @@ export async function applyOrg(
   const { data } = await apiClient.post<SimpleApplyCounts>(
     `/v1/farms/${farmId}/config/org/apply`,
     { block_ids: blockIds },
+  );
+  return data;
+}
+
+// ---------- Grid template (cell size + anomaly threshold) ----------------
+// Apply currently writes the THRESHOLD only. cell_size_m round-trips on the
+// template but is not applied — changing it retires the grid and orphans its
+// observations, which needs grid valid time first. See
+// docs/proposals/bulk-grid-config-and-valid-time.md.
+
+export interface GridTemplate {
+  cell_size_m: number | null;
+  anomaly_z_threshold: number | null;
+}
+
+/** One (block, active imagery subscription) pair in the apply preview. */
+export interface GridPlanRow {
+  block_id: string;
+  block_code: string;
+  block_name: string | null;
+  product_id: string | null;
+  product_code: string | null;
+  product_name: string | null;
+  native_pixel_m: number | null;
+  current_cell_size_m: number | null;
+  current_anomaly_z_threshold: number | null;
+  target_anomaly_z_threshold: number | null;
+  action: "threshold" | "none" | "skipped";
+  reason: string;
+  matches: boolean;
+}
+
+export interface GridApplyPreview {
+  rows: GridPlanRow[];
+  total_rows: number;
+  changed_rows: number;
+  unchanged_rows: number;
+  skipped_rows: number;
+  /** True when Apply would write nothing — drives the disabled Confirm. */
+  is_noop: boolean;
+}
+
+export async function getGridTemplate(farmId: string): Promise<GridTemplate> {
+  const { data } = await apiClient.get<GridTemplate>(
+    `/v1/farms/${farmId}/config/grid/template`,
+  );
+  return data;
+}
+
+export async function putGridTemplate(
+  farmId: string,
+  body: GridTemplate,
+): Promise<GridTemplate> {
+  const { data } = await apiClient.put<GridTemplate>(
+    `/v1/farms/${farmId}/config/grid/template`,
+    body,
+  );
+  return data;
+}
+
+export async function previewApplyGrid(
+  farmId: string,
+  blockIds: string[] | null = null,
+  clearOverride = false,
+): Promise<GridApplyPreview> {
+  const { data } = await apiClient.post<GridApplyPreview>(
+    `/v1/farms/${farmId}/config/grid/apply-preview`,
+    { block_ids: blockIds, clear_override: clearOverride },
+  );
+  return data;
+}
+
+export async function applyGrid(
+  farmId: string,
+  blockIds: string[] | null,
+  clearOverride = false,
+): Promise<SimpleApplyCounts> {
+  const { data } = await apiClient.post<SimpleApplyCounts>(
+    `/v1/farms/${farmId}/config/grid/apply`,
+    { block_ids: blockIds, clear_override: clearOverride },
   );
   return data;
 }

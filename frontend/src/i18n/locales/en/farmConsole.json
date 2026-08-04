@@ -310,7 +310,18 @@
     "unsavedFirst": "You have unsaved template changes. Apply uses the saved template, so save it first.",
     "nothingToApply": "Nothing to apply — every block already matches the saved template.",
     "emptyTemplateHint": "The saved template is empty, so applying it would change nothing. Add an imagery product or weather provider above, then save the template.",
-    "appliedNothing": "No changes made — 0 blocks were modified. Make sure the template is saved and not empty."
+    "appliedNothing": "No changes made — 0 blocks were modified. Make sure the template is saved and not empty.",
+    "grid": "Grid & anomaly detection",
+    "gridIntro": "Detection sensitivity for every block that has a sub-block grid. Applying writes each block's own override.",
+    "anomalyThreshold": "Anomaly sensitivity (z)",
+    "cellSize": "Cell size (m)",
+    "thresholdHint": "Lower is more sensitive. Takes effect on the next detection sweep — nothing is reprocessed.",
+    "cellSizeNotApplied": "Cell size is saved on the template but not applied to blocks yet — changing a block's grid retires its history. Set it per block for now.",
+    "clearOverride": "Clear each block's override instead, so they inherit the tenant default again.",
+    "gridPreviewSummary": "{{changed}} to change · {{unchanged}} already match · {{skipped}} skipped",
+    "gridNothingToDo": "Nothing to apply. Blocks with no grid yet need a cell size set on the block first.",
+    "inherit": "inherit",
+    "gridConfirmApply": "Apply to {{blocks}} block(s)"
   },
   "gridPopup": {
     "title": "Grid cell",

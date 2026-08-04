@@ -36,6 +36,11 @@ from app.modules.grid.errors import (
     GridConfigNotFoundError,
     ProductNotFoundError,
 )
+from app.modules.grid.farm_plan import (
+    GridPlanRow,
+    GridRowState,
+    plan_threshold,
+)
 from app.modules.grid.geometry import (
     estimate_cell_count,
     generate_cells,
@@ -168,6 +173,22 @@ class GridService(Protocol):
         since: datetime | None,
         limit: int,
     ) -> int: ...
+
+    async def plan_farm_threshold(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_z: Decimal | None,
+        clear_override: bool,
+    ) -> tuple[GridPlanRow, ...]: ...
+
+    async def apply_farm_threshold(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_z: Decimal | None,
+        clear_override: bool,
+    ) -> tuple[tuple[GridPlanRow, ...], int]: ...
 
 
 class GridServiceImpl:
@@ -636,6 +657,85 @@ class GridServiceImpl:
             limit=limit,
         )
         return len(jobs)
+
+    # ---- farm-wide (bulk) config -------------------------------------
+
+    async def _load_farm_rows(self, *, block_ids: tuple[UUID, ...]) -> tuple[GridRowState, ...]:
+        rows = await self._repo.list_farm_grid_rows(block_ids=block_ids)
+        return tuple(
+            GridRowState(
+                block_id=r["block_id"],
+                block_code=r["block_code"],
+                block_name=r["block_name"],
+                product_id=r["product_id"],
+                product_code=r["product_code"],
+                product_name=r["product_name"],
+                native_pixel_m=r["native_pixel_m"],
+                grid_config_id=r["grid_config_id"],
+                current_cell_size_m=r["current_cell_size_m"],
+                current_anomaly_z_threshold=r["current_anomaly_z_threshold"],
+            )
+            for r in rows
+        )
+
+    async def plan_farm_threshold(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_z: Decimal | None,
+        clear_override: bool,
+    ) -> tuple[GridPlanRow, ...]:
+        """Dry-run a farm-wide threshold apply. No writes."""
+        states = await self._load_farm_rows(block_ids=block_ids)
+        return plan_threshold(states, template_z=template_z, clear_override=clear_override)
+
+    async def apply_farm_threshold(
+        self,
+        *,
+        block_ids: tuple[UUID, ...],
+        template_z: Decimal | None,
+        clear_override: bool,
+    ) -> tuple[tuple[GridPlanRow, ...], int]:
+        """Write the planned thresholds. Returns (plan, rows_written).
+
+        Deliberately does NOT go through :meth:`upsert_config`: that
+        method retires + regenerates the grid whenever the cell size
+        differs, which would turn a sensitivity tweak into a farm-wide
+        rezone. This path only ever touches ``anomaly_z_threshold`` on an
+        already-active config.
+
+        The plan is recomputed here rather than trusting one submitted by
+        the client, so a stale preview can't cause a write the operator
+        never saw. Callers wanting the two to agree should compare counts.
+        """
+        plan = await self.plan_farm_threshold(
+            block_ids=block_ids,
+            template_z=template_z,
+            clear_override=clear_override,
+        )
+        changed = tuple(r for r in plan if r.is_change)
+        if not changed:
+            return plan, 0
+
+        # Every changed row writes the same value (either the template's
+        # or NULL), so one statement covers the whole farm.
+        config_ids = tuple(
+            r.state.grid_config_id for r in changed if r.state.grid_config_id is not None
+        )
+        target = None if clear_override else template_z
+        written = await self._repo.set_config_thresholds(
+            config_ids=config_ids,
+            anomaly_z_threshold=target,
+        )
+        self._log.info(
+            "grid_farm_threshold_applied",
+            blocks_targeted=len(block_ids),
+            rows_planned=len(changed),
+            rows_written=written,
+            clear_override=clear_override,
+            threshold=str(target) if target is not None else None,
+        )
+        return plan, written
 
 
 def get_grid_service(*, tenant_session: AsyncSession) -> GridService:

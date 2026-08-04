@@ -361,4 +361,5 @@ async def test_get_lock_state(admin_session: AsyncSession) -> None:
             "subscriptions": False,
             "irrigation": False,
             "org": False,
+            "grid": False,
         }
