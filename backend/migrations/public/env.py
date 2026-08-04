@@ -19,6 +19,7 @@ import app.modules.grid.models
 import app.modules.iam.models
 import app.modules.imagery.models
 import app.modules.indices.models
+import app.modules.telemetry.models
 import app.modules.tenancy.models
 from app.core.settings import get_settings
 from app.shared.db.base import Base

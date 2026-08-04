@@ -415,6 +415,15 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     # NULL farm_id are platform-wide (a failing background task) and are left
     # alone by construction, because the delete is keyed on the column.
     OwnedTable("platform_alerts", owner_column="farm_id", schema="public", order=10, fk=False),
+    OwnedTable(
+        "usage_events",
+        owner_column="farm_id",
+        schema="public",
+        order=10,
+        fk=False,
+        hypertable=True,
+        note="product telemetry; farm-scoped events die with the farm",
+    ),
 )
 
 
@@ -434,6 +443,18 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored trees; decision_tree_versions cascades off this",
     ),
     OwnedTable("backfill_runs", owner_column="tenant_id", schema="public", order=10, fk=False),
+    OwnedTable(
+        "usage_events",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        fk=False,
+        hypertable=True,
+        note="product telemetry does NOT survive a purge — decided, not deferred. "
+        "Deleting these rows is necessary but NOT sufficient: the TEL-6 continuous "
+        "aggregates group by tenant_id and keep serving a purged tenant until they "
+        "are refreshed. TEL-6b adds that phase.",
+    ),
     # The trial signup that created this tenant (public migration 0078). It
     # holds the person's name, work address and phone, so a purge that leaves
     # it behind leaves their personal data behind. Rows with tenant_id NULL —
