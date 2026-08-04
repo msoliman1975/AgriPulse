@@ -21,7 +21,9 @@
     "imageryWeather": "Imagery & weather",
     "customSignals": "Custom signals",
     "settings": "Settings",
-    "pickFarm": "Pick a farm to continue"
+    "pickFarm": "Pick a farm to continue",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
   },
   "shell": {
     "languageToggle": "Language",

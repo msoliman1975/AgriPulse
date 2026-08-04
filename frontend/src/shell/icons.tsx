@@ -183,6 +183,24 @@ export function UsersIcon(props: IconProps): ReactNode {
   );
 }
 
+/**
+ * Sidebar collapse/expand glyph: a panel outline whose rail column is filled
+ * while the nav is expanded. Deliberately chevron-free so it stays correct in
+ * both directions (the caller mirrors it with `rtl:-scale-x-100`).
+ */
+export function PanelToggleIcon(props: IconProps & { collapsed?: boolean }): ReactNode {
+  const { collapsed = false, ...rest } = props;
+  return (
+    <svg {...base(rest)}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+      {collapsed ? null : (
+        <path d="M4 4h5v16H4z" fill="currentColor" fillOpacity="0.3" stroke="none" />
+      )}
+    </svg>
+  );
+}
+
 export function ChevronIcon(props: IconProps & { open?: boolean }): ReactNode {
   const { open = false, ...rest } = props;
   return (

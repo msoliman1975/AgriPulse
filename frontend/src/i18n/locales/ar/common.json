@@ -21,7 +21,9 @@
     "imageryWeather": "الصور والطقس",
     "customSignals": "الإشارات المخصصة",
     "settings": "الإعدادات",
-    "pickFarm": "اختر مزرعة للمتابعة"
+    "pickFarm": "اختر مزرعة للمتابعة",
+    "collapse": "طي الشريط الجانبي",
+    "expand": "توسيع الشريط الجانبي"
   },
   "shell": {
     "languageToggle": "اللغة",
