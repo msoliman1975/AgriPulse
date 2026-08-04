@@ -32,6 +32,7 @@ def _alembic_cfg(schema: str) -> Config:
     cfg.cmd_opts = Namespace(x=[f"schema={schema}"])
     return cfg
 
+
 _OBJECTS = {
     "ex_grid_configs_no_overlap": "constraint",
     "ck_grid_configs_effective_range": "constraint",
@@ -84,11 +85,9 @@ async def test_0054_names_match_what_downgrade_drops(admin_session: Any) -> None
     assert set(_COLUMNS).issubset(cols), f"missing valid-time columns: {set(_COLUMNS) - cols}"
 
     cons = await _constraints(admin_session, schema)
+    present = sorted(cons)
     for name in _OBJECTS:
-        assert name in cons, (
-            f"{name!r} not found — downgrade() would fail to drop it. "
-            f"Present: {sorted(cons)}"
-        )
+        assert name in cons, f"{name!r} missing — downgrade() cannot drop it. Have: {present}"
 
     idx = (
         await admin_session.execute(
@@ -149,9 +148,9 @@ async def test_0054_downgrade_then_upgrade_actually_runs(admin_session: Any) -> 
     await asyncio.to_thread(command.downgrade, cfg, "0053")
 
     after_down = await _columns(admin_session, schema)
-    assert not set(_COLUMNS) & after_down, (
-        f"downgrade left valid-time columns behind: {set(_COLUMNS) & after_down}"
-    )
+    assert (
+        not set(_COLUMNS) & after_down
+    ), f"downgrade left valid-time columns behind: {set(_COLUMNS) & after_down}"
     cons_down = await _constraints(admin_session, schema)
     for name in _OBJECTS:
         assert name not in cons_down, f"downgrade left {name!r} behind"
