@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>أشجار القرار — دليل AgriPulse</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f8f7;
+    --panel-2: #eef1ee;
+    --ink: #16241a;
+    --ink-soft: #55665a;
+    --line: #dfe4e0;
+    --accent: #356b30;
+    --accent-soft: #e8f1e6;
+    --warn: #8a5a00;
+    --warn-soft: #fdf3e0;
+    --danger: #8c2f2f;
+    --danger-soft: #fbeceb;
+    --code-bg: #f3f5f3;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11150f;
+      --panel: #181d16;
+      --panel-2: #1f251d;
+      --ink: #e6ece5;
+      --ink-soft: #a2b0a4;
+      --line: #2c342a;
+      --accent: #86c07a;
+      --accent-soft: #1d2a1b;
+      --warn: #e0b060;
+      --warn-soft: #2a2214;
+      --danger: #e08a84;
+      --danger-soft: #2b1a19;
+      --code-bg: #10140f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16.5px/1.9 "Segoe UI", Tahoma, "Noto Naskh Arabic", "Geeza Pro", "Traditional Arabic", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 96px; }
+  header.top {
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--accent-soft), transparent);
+    margin-bottom: 32px;
+  }
+  header.top .wrap { padding-top: 44px; padding-bottom: 34px; }
+  h1 { font-size: 2.1rem; line-height: 1.45; margin: 0 0 10px; }
+  .sub { color: var(--ink-soft); font-size: 1.06rem; margin: 0; max-width: 70ch; }
+  .meta { margin-top: 18px; font-size: .86rem; color: var(--ink-soft); }
+  .lang-switch {
+    display: inline-block; margin-top: 14px; font-size: .9rem;
+    padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px;
+    text-decoration: none; color: var(--ink); background: var(--bg);
+  }
+  .layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 44px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; gap: 0; } nav.toc { position: static !important; margin-bottom: 32px; } }
+  nav.toc {
+    position: sticky; top: 24px; font-size: .92rem;
+    border-inline-start: 2px solid var(--line); padding-inline-start: 16px;
+  }
+  nav.toc strong { display: block; font-size: .78rem; letter-spacing: .04em; color: var(--ink-soft); margin-bottom: 10px; }
+  nav.toc a { display: block; padding: 3px 0; color: var(--ink-soft); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  h2 { font-size: 1.45rem; margin: 52px 0 14px; padding-top: 10px; border-top: 1px solid var(--line); line-height: 1.5; }
+  h2:first-of-type { border-top: 0; margin-top: 0; }
+  h3 { font-size: 1.12rem; margin: 32px 0 10px; line-height: 1.6; }
+  h4 { font-size: .98rem; margin: 22px 0 8px; color: var(--ink-soft); }
+  p, li { max-width: 74ch; }
+  code {
+    font-family: var(--mono); font-size: .86em;
+    background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px;
+    direction: ltr; unicode-bidi: isolate; display: inline-block;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: .84rem; line-height: 1.6;
+    direction: ltr; text-align: left; unicode-bidi: isolate;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; display: inline; }
+  .tablewrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: start; padding: 10px 13px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.75; }
+  th { background: var(--panel-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .note, .warn, .danger {
+    border-radius: 8px; padding: 13px 16px; margin: 18px 0;
+    border: 1px solid var(--line); background: var(--panel);
+  }
+  .note { border-inline-start: 3px solid var(--accent); background: var(--accent-soft); }
+  .warn { border-inline-start: 3px solid var(--warn); background: var(--warn-soft); }
+  .danger { border-inline-start: 3px solid var(--danger); background: var(--danger-soft); }
+  .note p:first-child, .warn p:first-child, .danger p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .danger p:last-child { margin-bottom: 0; }
+  .label { font-weight: 700; font-size: .8rem; display: block; margin-bottom: 4px; }
+  .note .label { color: var(--accent); }
+  .warn .label { color: var(--warn); }
+  .danger .label { color: var(--danger); }
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding-inline-start: 44px; margin-bottom: 22px; }
+  .steps > li::before {
+    content: counter(step); position: absolute; inset-inline-start: 0; top: 4px;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .82rem; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .flow { border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px; background: var(--panel); margin: 18px 0; }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .9rem; }
+  @media print {
+    nav.toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    h2 { break-after: avoid; }
+    pre, table, .note, .warn, .danger { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <h1>أشجار القرار</h1>
+    <p class="sub">كيف يحوّل نظام AgriPulse صور الأقمار الصناعية وبيانات الطقس والملاحظات الحقلية ومراحل نمو
+    المحصول إلى توصية محدّدة وقابلة للتفسير لقطعة واحدة — وكيف تُنشئ شجرة جديدة أو توسّع شجرة قائمة.</p>
+    <a class="lang-switch" href="decision-trees.en.html">→ English</a>
+    <p class="meta">ينطبق هذا الدليل على محرّك أشجار القرار في
+      <code>backend/app/modules/recommendations/</code> ومُقيّم الشروط المشترك في
+      <code>backend/app/shared/conditions/</code>. الجمهور المستهدف: المهندسون الزراعيون الذين يؤلّفون
+      الأشجار، ومطوّرو النظام الذين يوسّعون المحرّك.</p>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="layout">
+
+<nav class="toc">
+  <strong>المحتويات</strong>
+  <a href="#what">١. ما الذي تفعله الشجرة</a>
+  <a href="#surfaces">٢. أين تظهر في التطبيق</a>
+  <a href="#lifecycle">٣. كيف تعمل</a>
+  <a href="#storage">٤. كيف تُخزَّن</a>
+  <a href="#anatomy">٥. بنية الشجرة</a>
+  <a href="#conditions">٦. لغة الشروط</a>
+  <a href="#sources">٧. مرجع مصادر البيانات</a>
+  <a href="#outcomes">٨. الأوراق والنتائج</a>
+  <a href="#params">٩. المُعاملات والتجاوزات</a>
+  <a href="#evidence">١٠. الأدلة العلمية</a>
+  <a href="#authoring">١١. إنشاء شجرة جديدة</a>
+  <a href="#extending">١٢. توسيع شجرة قائمة</a>
+  <a href="#testing">١٣. الاختبار قبل الإطلاق</a>
+  <a href="#worked">١٤. مثال تطبيقي</a>
+  <a href="#pitfalls">١٥. المزالق</a>
+  <a href="#permissions">١٦. الصلاحيات</a>
+  <a href="#api">١٧. مرجع الواجهة البرمجية</a>
+</nav>
+
+<main>
+
+<h2 id="what">١. ما الذي تفعله شجرة القرار</h2>
+
+<p>شجرة القرار هي <strong>قاعدة زراعية تعريفية ذات إصدارات</strong>. تنظر في كل ما يعرفه النظام حاليًا عن
+قطعة واحدة، وتسير عبر مجموعة متفرّعة من الأسئلة، لتصل إلى ورقة واحدة بالضبط. وتلك الورقة إمّا أن تُنتج
+<strong>توصية</strong> (أو تنبيهًا)، وإمّا ألّا تُنتج شيئًا بشكل صريح.</p>
+
+<p>الأشجار هي الوسيلة الوحيدة في المنصّة التي تحوّل القياسات إلى نصيحة. فكل ما يسبقها — حساب مؤشّرات الأقمار
+الصناعية، واستيراد بيانات الطقس، والإشارات الحقلية المخصّصة، وتتبّع مراحل النمو، وكشف الشذوذ المكاني في
+الشبكة — موجود لتغذية الحقائق التي تقرأها الشجرة. وكل ما يليها — صفحة التوصيات، والإشعارات، ولوحة الخطة،
+وتبويب «الحالة» في لوحة تفاصيل القطعة — يعرض ما أنتجته الشجرة.</p>
+
+<h3>نوعان من المخرجات</h3>
+
+<div class="tablewrap">
+<table>
+  <tr><th>النوع</th><th>المعنى</th><th>درجة الثقة</th></tr>
+  <tr>
+    <td><code>recommendation</code></td>
+    <td>نصيحة ينبغي أن ينظر فيها إنسان ويتصرّف بناءً عليها. لها دورة حياة
+        (<code>open → applied / dismissed / deferred / expired</code>) ويمكن جدولتها على لوحة الخطة.</td>
+    <td>يحدّدها المؤلّف بين <code>0</code> و<code>1</code>، والافتراضي <code>0.5</code></td>
+  </tr>
+  <tr>
+    <td><code>alert</code></td>
+    <td>حالة تمّ رصدها، لا اجتهاد في الرأي. وقد صارت الأشجار تملك التنبيهات بعد إيقاف محرّك القواعد السابق.</td>
+    <td>تُثبَّت دائمًا عند <code>1</code> — فالتنبيه يعبّر عن يقين لا عن احتمال</td>
+  </tr>
+</table>
+</div>
+
+<h3>المبدأ التصميمي الذي يحكم كل شيء</h3>
+
+<p>المُقيّم <strong>نقي ولحظي</strong>: لا يعرف شيئًا عن الزمن ولا عن التاريخ، ولا يفهم عبارة «ظلّ ينخفض
+ثلاثة أسابيع». وهذا مقصود: فكل فكرة زمنية تُحسب مسبقًا وتتحوّل إلى <em>حقيقة</em> قبل التقييم، حتى تبقى لغة
+القواعد بضعة عوامل مقارنة بدل أن تتحوّل إلى لغة استعلام.</p>
+
+<p>لهذا السبب يُعرض معدّل التغيّر كحقل عادي قابل للقراءة (<code>slope</code> و<code>delta</code>
+و<code>trend_direction</code>) لا كعامل باسم «ظلّ ينخفض منذ»، ولهذا تكون مرحلة النمو نصًّا محسومًا على
+القطعة لا عملية حسابية على التواريخ داخل القاعدة. <strong>صُغ أي فكرة زمنية أو مشتقّة جديدة كبيانات، لا
+كعامل جديد.</strong></p>
+
+<h2 id="surfaces">٢. أين تظهر في التطبيق</h2>
+
+<p>لأشجار القرار وجهان: سطح <strong>التأليف</strong> حيث تُبنى القواعد، وسطح <strong>المخرجات</strong> حيث
+يلتقي بقية المستخدمين بالنصيحة الناتجة.</p>
+
+<h3>التأليف — لمؤلّفي المعرفة والمسؤولين</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>الشاشة</th><th>المسار</th><th>وظيفتها</th></tr>
+  <tr><td>قائمة أشجار القرار</td><td><code>/decision-trees</code></td>
+      <td>الفهرس كاملًا مع البحث وترشيح الحالة والأرشفة والاستعادة. وهي نقطة الدخول.</td></tr>
+  <tr><td>الإنشاء</td><td><code>/decision-trees/new</code></td>
+      <td>اختيار رمز واستهداف وقالب بداية أو شجرة فارغة.</td></tr>
+  <tr><td>مساحة العمل</td><td><code>/decision-trees/:code</code></td>
+      <td>سطح موحّد واحد: لوحة <strong>مرئية</strong> وعرض <strong>YAML</strong> للمستند نفسه، مع لوحة
+          البيانات الوصفية والمرجعية العلمية والمُعاملات وتجاوزات المستأجر وسجل الإصدارات والتشغيل
+          التجريبي.</td></tr>
+</table>
+</div>
+<div class="note">
+  <span class="label">هذه المسارات تغيّرت</span>
+  <p>كانت أشجار القرار سابقًا ضمن <code>/settings/decision-trees</code> وكانت اللوحة المرئية ومحرّر YAML
+  شاشتين منفصلتين. وقد صارت الآن عنصرًا رئيسيًا في القائمة بمساحة عمل واحدة ومبدّل داخل الصفحة. وما زالت
+  المسارات القديمة — وكذلك <code>/config/decision-trees/:farmId</code> الأقدم — تُعيد التوجيه، فتظل الروابط
+  القائمة تعمل. ولاحظ أن هذا السطح <strong>على مستوى المستأجر</strong> لا لكل مزرعة على حدة.</p>
+</div>
+
+<h3>المخرجات — لكل العاملين في الحقل</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>الشاشة</th><th>المسار</th><th>كيف تظهر التوصيات</th></tr>
+  <tr><td>التوصيات</td><td><code>/recommendations/:farmId</code></td>
+      <td>القائمة كاملة مبوّبة حسب الحالة. ويحمل كل صف النصّ المترجم ودرجة الخطورة ونوع الإجراء والشجرة
+          المصدر وإصدارها ودرجة الثقة وتاريخ الانتهاء. وبتوسيع الصف تظهر خطة العمل رباعية الآفاق ومسار
+          القرار الذي أنتجها.</td></tr>
+  <tr><td>لوحة الخطة</td><td><code>/board/:farmId</code></td>
+      <td>تظهر التوصيات المفتوحة كبطاقات في شريط الإجراءات المقترحة؛ وسحب البطاقة إلى يوم يجدولها عملًا
+          حقيقيًا.</td></tr>
+  <tr><td>لوحة القطعة — تبويب الحالة</td><td>وحدة إدارة المزرعة</td>
+      <td>لكل قطعة: أي الأشجار انطلقت، وأيّها خرجت سليمة، وأيّها لم تكن مستهدفة أصلًا — مع الشروط التي
+          قيّمتها كل واحدة فعلًا. وهذا هو السطح الذي يجيب عن سؤال «لماذا لا توجد نصيحة لهذه القطعة؟»</td></tr>
+</table>
+</div>
+
+<h2 id="lifecycle">٣. كيف تعمل</h2>
+
+<p>لا تُقيَّم الأشجار عند فتح المستخدم للصفحة. فهناك مسح دوري في الخلفية يعمل وفق جدول زمني ويكتب التوصيات
+في مخطّط بيانات المستأجر؛ أمّا الواجهة فلا تقرأ إلا ما أنتجه المسح مسبقًا.</p>
+
+<div class="flow">
+<pre><code>Celery Beat  ──▶  recommendations.evaluate_sweep      (الافتراضي: كل 3600 ثانية)
+                        │
+                        ├─▶ لكل مستأجر نشط → evaluate_for_tenant
+                        │         │
+                        │         └─▶ لكل قطعة:
+                        │                 1. حمّل كل شجرة نشطة مرئية للمستأجر
+                        │                 2. رشّح حسب الاستهداف (محصول / دولة / تربة)
+                        │                 3. ابنِ سياق شروط واحدًا للقطعة
+                        │                 4. سِر في كل شجرة من جذرها
+                        │                 5. اكتب توصية مفتوحة لكل ورقة أطلقت
+                        │
+                        └─▶ الأشجار ذات النطاق الخلوي تعمل مرة لكل خلية شبكة،
+                            مع إحلال متوسّطات تلك الخلية في السياق</code></pre>
+</div>
+
+<h3>الخطوة ١ — أي الأشجار تُؤخذ في الحسبان</h3>
+<p>يجب أن تكون الشجرة <strong>نشطة</strong> ومرئية للمستأجر. فأشجار المنصّة الأساسية (المشحونة داخل
+المستودع) مرئية للجميع، أمّا الشجرة التي يؤلّفها مستأجر فمرئية له وحده.</p>
+
+<h3>الخطوة ٢ — الاستهداف</h3>
+<p>ثلاثة محاور مستقلّة تحدّد ما إذا كانت الشجرة تنطبق على قطعة بعينها. وتنطبق الشجرة
+<strong>فقط إذا نجحت كل المحاور</strong> (رابطة «و» بين المحاور)، وداخل المحور الواحد تكفي أي قيمة مذكورة
+(رابطة «أو» داخل المحور). <strong>والمحور الفارغ ينطبق على كل شيء.</strong></p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>المحور</th><th>مفتاح YAML</th><th>يُطابَق مع</th><th>القاعدة</th></tr>
+  <tr><td>المحصول</td><td><code>crop_paths</code></td><td>مسار محصول القطعة، مثل <code>mango.alphonso.short</code></td>
+      <td>مطابقة <strong>ببداية النص</strong> — فـ<code>mango</code> يطابق كل أصناف المانجو وسلالاتها</td></tr>
+  <tr><td>الدولة</td><td><code>country_codes</code></td><td>دولة المزرعة الأم</td>
+      <td>مطابقة تامّة بترميز ISO 3166-1 alpha-2، وتُحوَّل إلى حروف كبيرة</td></tr>
+  <tr><td>التربة</td><td><code>soil_textures</code></td><td>قوام تربة القطعة</td>
+      <td>مطابقة تامّة من قائمة مغلقة: <code>sandy</code>، <code>sandy_loam</code>، <code>loam</code>،
+          <code>clay_loam</code>، <code>clay</code>، <code>silty_loam</code>، <code>silty_clay</code></td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <span class="label">ضمانة التغطية</span>
+  <p>إذا كان المحور مقيّدًا وكانت قيمة القطعة فيه <strong>غير معروفة</strong>، فإن الشجرة
+  <strong>لا</strong> تنطبق. فشجرة مقيّدة بـ<code>country_codes: [EG]</code> لن تعمل أبدًا على مزرعة لم
+  تُحدَّد دولتها. وهذا سلوك مقصود — يفضّل الصمت على التخمين — لكنه يعني أن إضافة محور استهداف إلى شجرة قائمة
+  قد يقلّص تغطيتها في صمت. راجع <code>:candidate-blocks</code> بعد أي تعديل على الاستهداف.</p>
+</div>
+
+<h3>الخطوة ٣ — السياق</h3>
+<p>يُجمَّع سياق شروط واحد لكل قطعة في كل دورة: آخر تجميعات المؤشّرات مع خصائص اتجاهها، ولقطة الطقس، ومؤشّرات
+الطقس على مستوى المزرعة، ومخاطر الأمراض والآفات على مستوى القطعة، وآخر قيمة لكل إشارة مخصّصة تنطبق على
+القطعة، وأحكام شذوذ الشبكة، وسمات القطعة، ومُعاملات الشجرة بعد حسمها. وتُحمَّل كل المصادر مرة واحدة وتتشارك
+فيها جميع الأشجار لتلك القطعة.</p>
+
+<h3>الخطوة ٤ — السير في الشجرة</h3>
+<p>يبدأ التقييم من <code>root</code>. وعند كل عقدة قرار يُقيَّم شرط العقدة إلى قيمة منطقية واحدة، فيتّجه
+السير إلى <code>on_match</code> أو <code>on_miss</code>. وينتهي عند بلوغ عقدة تحمل <code>outcome</code>.
+والسير محدود بـ<strong>٦٤ خطوة</strong>، وتجاوزها يُبلَّغ عنه باعتباره دورة مغلقة على الأرجح.</p>
+
+<p>وتُسجَّل كل خطوة — معرّف العقدة، والاتجاه الذي سلكته، والقيمة المحسومة لكل مرجع قرأته. وهذا الأثر هو ما
+يعرضه تبويب <strong>الحالة</strong> في لوحة القطعة وما تعرضه نقطة النهاية <code>:explain</code>، وهو مخزّن
+على التوصية بوصفه لقطة التقييم الخاصة بها.</p>
+
+<h3>الخطوة ٥ — كتابة النتيجة</h3>
+<p>الورقة التي نوع إجرائها <code>no_action</code> لا تُنتج شيئًا. وأي ورقة أخرى تفتح توصية.</p>
+
+<div class="note">
+  <span class="label">عدم التكرار</span>
+  <p>الكتابة محميّة بفهرس فريد جزئي على <code>(block_id, tree_id) WHERE state = 'open'</code>. فالشجرة التي
+  يتحقّق شرطها كل ساعة <strong>لا</strong> تكدّس نسخًا مكرّرة — إذ هناك على الأكثر توصية مفتوحة واحدة لكل
+  شجرة لكل قطعة. ولا تظهر توصية جديدة إلا بعد أن تُعالَج القائمة أو تُرفَض أو تُؤجَّل أو تنتهي صلاحيتها.</p>
+</div>
+
+<h2 id="storage">٤. كيف تُخزَّن</h2>
+
+<p>تعيش الأشجار في مخطّط <strong>public</strong> — فهي فهرس مشترك — بينما تعيش مخرجاتها في مخطّط كل مستأجر
+على حدة.</p>
+
+<h4>فهرس المنصّة — <code>public</code></h4>
+<div class="tablewrap">
+<table>
+  <tr><th>الجدول</th><th>ما يحتويه</th></tr>
+  <tr><td><code>public.decision_trees</code></td>
+      <td>صف لكل شجرة: <code>code</code>، و<code>tenant_id</code> (<code>NULL</code> = مشحونة مع المنصّة،
+      وغير فارغة = من تأليف مستأجر)، والأسماء والأوصاف باللغتين، ومحاور الاستهداف
+      (<code>crop_id</code> / <code>crop_path</code> / <code>crop_paths</code> / <code>country_codes</code> /
+      <code>soil_textures</code>)، و<code>scope</code>، و<code>is_active</code>،
+      و<code>current_version_id</code>.</td></tr>
+  <tr><td><code>public.decision_tree_versions</code></td>
+      <td>صف لكل إصدار: رقم <code>version</code>، و<code>tree_yaml</code> (المصدر القابل للاسترجاع)،
+      و<code>tree_compiled</code> (وهو JSONB الذي يسير فيه المحرّك فعلًا)، و<code>compiled_hash</code>
+      (SHA-256، وهو ما يجعل المزامنة من القرص غير مكرّرة الأثر)، و<code>published_at</code> /
+      <code>published_by</code> — وكون الأخيرين فارغين يعني أنه ما زال مسوّدة.</td></tr>
+</table>
+</div>
+<p>والتفرّد جزئي: <code>(code) WHERE tenant_id IS NULL</code> لأشجار المنصّة، و
+<code>(tenant_id, code) WHERE tenant_id IS NOT NULL</code> لأشجار المستأجرين — فيستطيع المستأجر استخدام رمز
+موجود أصلًا في مجموعة المنصّة دون تعارض معها.</p>
+
+<h4>حالة المستأجر — <code>tenant_&lt;id&gt;</code></h4>
+<div class="tablewrap">
+<table>
+  <tr><th>الجدول</th><th>ما يحتويه</th></tr>
+  <tr><td><code>recommendations</code></td>
+      <td>المخرجات: <code>block_id</code> / <code>farm_id</code> (إضافةً إلى <code>cell_id</code>
+      و<code>cell_row</code> و<code>cell_col</code> للأشجار الخلوية)، و<code>tree_id</code> /
+      <code>tree_code</code> / <code>tree_version</code>، و<code>action_type</code>، و<code>severity</code>،
+      و<code>confidence</code>، والمُعاملات بعد حسمها، و<code>actions</code> (رباعية الآفاق بصيغة JSONB)،
+      و<code>text_en</code> / <code>text_ar</code>، و<code>tree_path</code> (العقد التي زارها)،
+      و<code>evaluation_snapshot</code> (كل قيمة حسمها السير)، و<code>state</code>، والطوابع الزمنية.</td></tr>
+  <tr><td><code>recommendations_history</code></td><td>سجل تدقيق انتقالات الحالة.</td></tr>
+  <tr><td><code>tree_parameter_overrides</code></td>
+      <td>تجاوزات العتبات لكل مستأجر، بمفتاح <code>(tree_id, param_name)</code> وقيمة JSONB.</td></tr>
+</table>
+</div>
+
+<h4>الترحيلات ذات الصلة</h4>
+<div class="tablewrap">
+<table>
+  <tr><th>الترحيل</th><th>ما يضيفه</th></tr>
+  <tr><td>public <code>0015</code></td><td><code>decision_trees</code> و<code>decision_tree_versions</code></td></tr>
+  <tr><td>public <code>0024</code></td><td><code>tenant_id</code> على الأشجار مع الفهارس الفريدة الجزئية (تأليف المستأجرين)</td></tr>
+  <tr><td>tenant <code>0015</code></td><td><code>recommendations</code> و<code>recommendations_history</code></td></tr>
+  <tr><td>tenant <code>0032</code></td><td><code>tree_parameter_overrides</code></td></tr>
+  <tr><td>tenant <code>0037</code></td><td>عمود <code>actions</code> (الإرشاد رباعي الآفاق)</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <span class="label">لماذا لم تحتج الأدلة والاستهداف إلى ترحيل</span>
+  <p>يُحفظ <code>evidence</code> و<code>transferability</code> <em>داخل</em> <code>tree_compiled</code>،
+  فيصدران مع الشجرة بصورة ثابتة ولا يحتاجان إلى تغيير في المخطّط. وهذا نمط مقصود: بيانات العرض والحوكمة
+  مكانها الكتلة المترجمة؛ أمّا ما يحتاج <em>مخطّط الاستعلام</em> إلى الترشيح عليه — وهو محاور الاستهداف —
+  فيستحقّ عمودًا حقيقيًا.</p>
+</div>
+
+<h2 id="anatomy">٥. بنية الشجرة</h2>
+
+<p>الشجرة ملف YAML واحد. وهذا هيكلها مع عرض كل الأقسام الاختيارية:</p>
+
+<pre><code>code: potato_petiole_nitrogen_v1        # مطلوب، فريد، وهوية ثابتة
+name_en: Potato — petiole sap nitrate  # مطلوب
+name_ar: البطاطس — نترات عنق الورقة     # اختياري لكنه متوقَّع
+description_en: &gt;-                     # اختياري
+  ما الذي تقرّره هذه الشجرة ومتى تبقى صامتة.
+description_ar: &gt;-
+  ...
+
+# ---- الاستهداف (كله اختياري؛ الفراغ = ينطبق على كل شيء) ----
+crop_code: potato                      # ربط قديم بمحصول بعينه
+crop_paths: [potato]                   # المفضّل: مسارات محصول تُطابَق ببداية النص
+country_codes: [EG]
+soil_textures: [sandy, sandy_loam]
+applicable_regions: []                 # بيانات عرض حرّة
+
+scope: block                           # block (افتراضي) | cell
+
+# ---- أقسام تعريفية اختيارية ----
+parameters: { ... }                    # أرقام قابلة للضبط والتجاوز لكل مستأجر
+evidence: { ... }                      # المرجعية العلمية
+transferability: { ... }               # درجات الملاءمة الإقليمية
+
+# ---- الرسم البياني ----
+root: root                             # يجب أن يسمّي مفتاحًا داخل nodes
+nodes:
+  root:                                # عقدة قرار
+    label_en: Is the block in an interpretable stage?
+    label_ar: هل القطعة في مرحلة قابلة للتفسير؟
+    condition:
+      tree: { ... }                    # انظر §٦
+    on_match: next_node_id
+    on_miss:  other_node_id
+
+  leaf_example:                        # ورقة — لها outcome ولا شرط لها
+    label_en: Deficient — supplement now
+    label_ar: يوجد نقص — عوّض الآن
+    outcome:
+      kind: recommendation
+      action_type: fertilize
+      severity: warning
+      confidence: 0.8
+      valid_for_hours: 168
+      parameters: { priority: high }
+      text_en: &gt;-
+        ما ينبغي أن يفهمه المزارع.
+      text_ar: &gt;-
+        ...
+      actions: { ... }                 # انظر §٨</code></pre>
+
+<h3>قواعد العقد</h3>
+<ul>
+  <li>العقدة إمّا <strong>قرار</strong> (لها <code>condition</code> و<code>on_match</code>
+      و<code>on_miss</code>) وإمّا <strong>ورقة</strong> (لها <code>outcome</code>). ولا تجمع بينهما أبدًا.</li>
+  <li>كل عقدة قرار يجب أن توفّر <strong>كلا</strong> المؤشّرين. ولا يوجد مسار افتراضي ضمني.</li>
+  <li>كل مؤشّر يجب أن يسمّي عقدة موجودة. ويُتحقَّق من ذلك وقت التحميل لا وقت التشغيل.</li>
+  <li><code>label_en</code> و<code>label_ar</code> هما ما يراه المزارع في تبويب الحالة. فاكتبهما
+      <strong>على هيئة أسئلة</strong>، لأن هذه هي طريقة عرضهما.</li>
+</ul>
+
+<h3>النطاق: <code>block</code> مقابل <code>cell</code></h3>
+<p>الشجرة ذات النطاق <code>block</code> تُقيَّم مرة واحدة للقطعة مقابل متوسّطات المؤشّرات على مستواها. أمّا
+ذات النطاق <code>cell</code> فتُقيَّم <strong>مرة لكل خلية في شبكة القطعة الفرعية</strong>، مع إحلال
+متوسّطات تلك الخلية في سياق مطابق فيما عدا ذلك — فتستطيع أن تكتشف مشكلة تصيب ركنًا واحدًا من الحقل.
+والأشجار الخلوية لا تفعل شيئًا في القطع التي لا شبكة لها، وتحمل توصياتها <code>cell_id</code>
+و<code>cell_row</code> و<code>cell_col</code>.</p>
+
+<h2 id="conditions">٦. لغة الشروط</h2>
+
+<p>تحمل كل عقدة قرار <code>condition.tree</code>: لهجة صغيرة تعاودية بصيغة JSON/YAML. وفيها عائلتان من
+العقد.</p>
+
+<h3>عقد منطقية — بمفتاح واحد فقط</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>العقدة</th><th>المعنى</th><th>القائمة الفارغة</th></tr>
+  <tr><td><code>all_of: [ ... ]</code></td><td>«و» المنطقية</td><td>← <code>true</code></td></tr>
+  <tr><td><code>any_of: [ ... ]</code></td><td>«أو» المنطقية</td><td>← <code>false</code></td></tr>
+  <tr><td><code>not: { ... }</code></td><td>النفي</td><td>—</td></tr>
+</table>
+</div>
+
+<h3>عقد المقارنة — المفتاح <code>op</code> يحدّد الشكل</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>الشكل</th><th>ملاحظات</th></tr>
+  <tr><td><code>{op: lt|le|gt|ge|eq|ne, left: &lt;ref&gt;, right: &lt;literal|ref&gt;}</code></td>
+      <td>المقارنات الستّ القياسية</td></tr>
+  <tr><td><code>{op: between, left: &lt;ref&gt;, low: &lt;…&gt;, high: &lt;…&gt;}</code></td>
+      <td>شامل للحدّين — يكافئ <code>ge low</code> مع <code>le high</code></td></tr>
+  <tr><td><code>{op: in, left: &lt;ref&gt;, values: [ … ]}</code></td>
+      <td>الانتماء لمجموعة؛ وهو العامل الطبيعي للقيم الفئوية مثل <code>growth_stage</code></td></tr>
+</table>
+</div>
+
+<p>ويشير <code>left</code> دائمًا إلى <strong>بيانات مرصودة</strong>. أمّا خانات القيم
+(<code>right</code> و<code>low</code> و<code>high</code> والعناصر داخل <code>values</code>) فيمكن أن تكون
+قيمًا صريحة أو مرجعًا إلى <code>params</code>.</p>
+
+<div class="danger">
+  <span class="label">الفشل المغلق — أهمّ قاعدة على الإطلاق</span>
+  <p>أي مرجع تكون قيمته غير متاحة (<code>None</code>) يجعل مقارنته تُختصَر إلى <strong>خطأ</strong>. فإشارة
+  لم تُرصد قط، أو مؤشّر لا مشهد له بعد، أو مرحلة نمو غير محسومة، أو اسم حقل مكتوب خطأً — كلها تتصرّف بالطريقة
+  نفسها: تصبح المقارنة خاطئة ويسلك السير <code>on_miss</code>.</p>
+  <p>وهذا آمن، لكنه <em>ليس</em> مرادفًا لـ«لا توجد مشكلة». فإذا كان مسار <code>on_miss</code> عندك يؤدّي إلى
+  ورقة تقول «كل شيء على ما يرام»، فإن قطعة <strong>بلا أي بيانات</strong> ستظهر بوصفها سليمة. راجع نمط
+  «مجسّ الوجود» في §١٥.</p>
+</div>
+
+<p>والشروط المشوَّهة تُعامَل بالتساهل نفسه: فخطأ التحليل يجعل الشرط كلّه خاطئًا بدل أن يرفع استثناءً. فلا شيء
+يكتبه مؤلّف الشجرة يمكن أن يُعطِّل المسح — لكن لا شيء ينبّهك وقت التشغيل أيضًا، ولهذا يتحقّق المُحمِّل من
+البنية مقدَّمًا، ولهذا يجب أن تجرّب دائمًا بالتشغيل التجريبي.</p>
+
+<h2 id="sources">٧. مرجع مصادر البيانات</h2>
+
+<p>كل مرجع في <code>left</code> يسمّي <code>source</code>. وهذه كلّها.</p>
+
+<h3><code>indices</code> — مؤشّرات الأقمار الصناعية على مستوى القطعة</h3>
+<pre><code>{ source: indices, index_code: ndvi, key: baseline_deviation }</code></pre>
+<p>رموز المؤشّرات: <code>ndvi</code>، <code>ndwi</code>، <code>evi</code>، <code>savi</code>،
+<code>ndre</code>، <code>gndvi</code>، <code>ndmi</code>.</p>
+<div class="tablewrap">
+<table>
+  <tr><th>المفتاح</th><th>المعنى</th><th>النوع</th></tr>
+  <tr><td><code>mean</code></td><td>آخر متوسّط للقطعة</td><td>رقم</td></tr>
+  <tr><td><code>baseline_deviation</code></td><td>درجة معيارية مقابل خطّ الأساس الخاص بالقطعة — <em>وهو الافتراضي</em></td><td>رقم</td></tr>
+  <tr><td><code>slope</code></td><td>ميل الاتجاه بالمربّعات الصغرى خلال آخر ٣٠ يومًا، <strong>بوحدات المؤشّر لكل يوم</strong></td><td>رقم</td></tr>
+  <tr><td><code>delta</code></td><td>آخر قيمة ناقص أول قيمة عبر نافذة الثلاثين يومًا — التغيّر <strong>الكلّي</strong></td><td>رقم</td></tr>
+  <tr><td><code>trend_direction</code></td><td><code>rising</code> / <code>falling</code> / <code>stable</code>، بنطاق ميت قدره ±0.02 على <code>delta</code></td><td>نص</td></tr>
+</table>
+</div>
+<p>وتُحسب خصائص الاتجاه عند تحميل السياق من تاريخ التجميعات الحديث — فلا يوجد جدول اتجاهات ولا مسح خاص بها.
+ووجود أقل من رصدتين خاليتين من السحب في النافذة يترك القيم الثلاث غير متاحة، فتفشل قواعد الاتجاه مغلقةً.
+والقيم مقرّبة إلى أربع خانات عشرية.</p>
+
+<h3><code>block</code> — سمات القطعة نفسها</h3>
+<pre><code>{ source: block, field: growth_stage }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>الحقل</th><th>المعنى</th></tr>
+  <tr><td><code>crop_category</code></td><td>التصنيف العام للمحصول</td></tr>
+  <tr><td><code>growth_stage</code></td><td>مرحلة النمو الحالية، تتقدّم يوميًا آليًا من تصنيف المحاصيل</td></tr>
+  <tr><td><code>crop_path</code></td><td>المسار الهرمي الكامل، مثل <code>mango.alphonso.short</code></td></tr>
+  <tr><td><code>crop_strain</code></td><td>السلالة وحدها، مثل <code>short</code></td></tr>
+  <tr><td><code>soil_texture</code></td><td>من قائمة قوام التربة المغلقة</td></tr>
+  <tr><td><code>salinity_class</code></td><td>تصنيف ملوحة القطعة</td></tr>
+  <tr><td><code>canopy_size_class</code></td><td>فئة حجم المجموع الخضري للمحصول الحالي</td></tr>
+</table>
+</div>
+<p>وكلّها فئوية — قارنها بـ<code>eq</code> أو <code>ne</code> أو <code>in</code>.</p>
+
+<h3><code>weather</code> — لقطة الطقس الخام للمزرعة</h3>
+<pre><code>{ source: weather, scope: forecast_24h, field: precipitation_mm_total }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>النطاق</th><th>حقول شائعة</th></tr>
+  <tr><td><code>latest_observation</code></td><td><code>air_temp_c</code>، <code>humidity_pct</code>، <code>precipitation_mm</code>، <code>wind_speed_m_s</code>، <code>et0_mm</code></td></tr>
+  <tr><td><code>forecast_24h</code> / <code>forecast_72h</code></td><td><code>precipitation_mm_total</code>، <code>precipitation_probability_pct_max</code>، <code>air_temp_c_max</code>، <code>air_temp_c_min</code>، <code>et0_mm_total</code></td></tr>
+  <tr><td><code>derived_today</code> / <code>derived_yesterday</code></td><td><code>precip_mm_7d</code>، <code>gdd_cumulative_base10_season</code>، <code>temp_max_c</code></td></tr>
+</table>
+</div>
+<div class="warn">
+  <span class="label">غير مُتحقَّق منه</span>
+  <p><code>field</code> هو النص الوحيد في اللهجة كلّها الذي <strong>لا</strong> يُقارن بقائمة مغلقة — فمُحمِّل
+  الطقس هو مرجع الحقيقة في ما يحمله كل نطاق من حقول. والخطأ الإملائي يؤدّي إلى قيمة غير متاحة ويفشل مغلقًا
+  في صمت. تحقّق من أسماء حقول الطقس بتشغيل تجريبي.</p>
+</div>
+
+<h3><code>weather_index</code> — مؤشّرات الطقس المنسّقة على مستوى المزرعة</h3>
+<pre><code>{ source: weather_index, index_code: temperature, key: baseline_deviation }</code></pre>
+<p><code>key</code> إمّا <code>value</code> أو <code>baseline_deviation</code> (الافتراضي) — وهي درجة معيارية
+مقابل مناخ اليوم نفسه من السنة لتلك المزرعة. وهذا هو النظير المدرك للشذوذ لمصدر <code>weather</code> الخام:
+استخدمه لـ«أحرّ من معتاد هذه المزرعة في أوائل يونيو»، لا لـ«فوق ٣٥ درجة مئوية».</p>
+
+<h3><code>weather_risk</code> — ضغط الأمراض والآفات على مستوى القطعة</h3>
+<pre><code>{ source: weather_risk, risk_code: powdery_mildew, field: score }</code></pre>
+<p><code>field</code> إمّا <code>score</code> (من ٠ إلى ١٠٠، وهو الافتراضي) أو <code>level</code>
+(<code>low</code> / <code>moderate</code> / <code>high</code>). وخلافًا لـ<code>weather_index</code>، تدمج
+المخاطر محصول القطعة ومرحلة نموّها، فتتفاوت من قطعة إلى أخرى داخل المزرعة الواحدة.</p>
+
+<h3><code>signals</code> — الملاحظات الحقلية التي يعرّفها المستأجر</h3>
+<pre><code>{ source: signals, code: petiole_no3n, key: value_numeric }</code></pre>
+<div class="tablewrap">
+<table>
+  <tr><th>المفتاح</th><th>يُستخدم لـ</th></tr>
+  <tr><td><code>value_numeric</code></td><td>القراءات الرقمية — <em>وهو الافتراضي</em></td></tr>
+  <tr><td><code>value_categorical</code></td><td>الملاحظات المُعدَّدة</td></tr>
+  <tr><td><code>value_event</code></td><td>ملاحظات من نوع الحدث</td></tr>
+  <tr><td><code>value_boolean</code></td><td>ملاحظات نعم/لا</td></tr>
+  <tr><td><code>value_slope</code>، <code>value_delta</code>، <code>value_trend_direction</code></td>
+      <td>الاتجاه عبر التاريخ الرقمي للإشارة — بالدلالات نفسها لاتجاهات المؤشّرات</td></tr>
+</table>
+</div>
+<p>ويُملأ حقل <code>value_*</code> واحد فقط، بحسب نوع تعريف الإشارة. وقراءة الحقل الخاطئ تُعيد قيمة غير متاحة
+فتفشل مغلقةً. و<code>code</code> هو رمز الإشارة الخاص بالمستأجر.</p>
+
+<h3><code>grid</code> — حكم الشذوذ المكاني داخل القطعة</h3>
+<pre><code>{ source: grid, index_code: ndvi, field: flagged_count }</code></pre>
+<p>الحقول: <code>worst_z</code>، <code>flagged_count</code>، <code>worst_row</code>، <code>worst_col</code>،
+<code>severity</code>. ولا تكون موجودة إلا إذا تجاوز آخر مشهد عتبة الكشف فعلًا، فغيابها يعني «لا شذوذ حاليًا»
+ويفشل مغلقًا. <strong>وهو صالح في <code>left</code> فقط.</strong> ولاحظ أن هذا المصدر لا يحمل حقول اتجاه —
+فمعدّل التغيّر متاح على مستوى القطعة فقط.</p>
+
+<h3><code>params</code> — مُعاملات الشجرة نفسها</h3>
+<pre><code>{ source: params, name: sufficient_early }</code></pre>
+<p>يُحسم إلى القيمة الافتراضية للمُعامل، أو إلى تجاوز المستأجر إن وُجد.
+<strong>وهو صالح في خانات القيم فقط</strong> — <code>right</code> و<code>low</code> و<code>high</code>
+وداخل <code>values</code>. ولا يصحّ أبدًا في <code>left</code>.</p>
+
+<h2 id="outcomes">٨. الأوراق والنتائج</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>الحقل</th><th>مطلوب</th><th>القيم / ملاحظات</th></tr>
+  <tr><td><code>action_type</code></td><td>نعم</td>
+      <td><code>irrigate</code>، <code>fertilize</code>، <code>spray</code>، <code>scout</code>،
+          <code>harvest_window</code>، <code>prune</code>، <code>other</code>، <code>no_action</code></td></tr>
+  <tr><td><code>text_en</code></td><td>نعم</td><td>ما يقرأه المزارع. و<code>text_ar</code> اختياري لكنه متوقَّع.</td></tr>
+  <tr><td><code>kind</code></td><td>لا</td><td><code>recommendation</code> (افتراضي) أو <code>alert</code></td></tr>
+  <tr><td><code>severity</code></td><td>لا</td><td><code>info</code> (افتراضي)، <code>warning</code>، <code>critical</code></td></tr>
+  <tr><td><code>confidence</code></td><td>لا</td><td>بين <code>0</code> و<code>1</code>، والافتراضي <code>0.5</code>، ويُقصَر ضمن المدى. ويُتجاهل في التنبيهات (تُثبَّت عند ١).</td></tr>
+  <tr><td><code>valid_for_hours</code></td><td>لا</td><td>عدد صحيح موجب؛ يحكم انتهاء الصلاحية. وتُتجاهل القيم غير الموجبة أو غير الصحيحة.</td></tr>
+  <tr><td><code>parameters</code></td><td>لا</td><td>بيانات JSON حرّة تُختم على التوصية، مثل <code>priority</code>. ومراجع <code>params</code> هنا تُستبدل بقيم صريحة قبل التخزين.</td></tr>
+  <tr><td><code>actions</code></td><td>لا</td><td>خطة العمل رباعية الآفاق، أدناه</td></tr>
+</table>
+</div>
+
+<h3>الإجراءات رباعية الآفاق</h3>
+<p>النص يخبر المزارع <em>بما يحدث</em>؛ أمّا قسم الإجراءات فيخبره <em>بما يفعله ومتى</em>. والآفاق الأربعة
+كلها اختيارية، ويحمل كلٌّ منها قائمة عناصر مترجمة.</p>
+<pre><code>actions:
+  immediate:                 # الآن
+    - text_en: Apply supplemental nitrogen through fertigation.
+      text_ar: طبّق نيتروجينًا تكميليًا عبر الريّ بالتسميد.
+  short_term:                # أيام إلى أسبوعين
+    - text_en: Re-sample petioles 7 days after the application.
+      text_ar: أعد أخذ عيّنة أعناق بعد 7 أيام من التطبيق.
+  long_term:                 # الموسم القادم / تغيير هيكلي
+    - text_en: Review the season's nitrogen budget.
+      text_ar: راجع الموازنة النيتروجينية للموسم.
+  monitoring:                # ما ينبغي مراقبته
+    - text_en: Sample the 4th petiole weekly through bulking.
+      text_ar: خذ عيّنة من العنق الرابع أسبوعيًا حتى امتلاء الدرنات.</code></pre>
+
+<h3>الصمت واجب تصميمي</h3>
+<div class="note">
+  <span class="label">ألّف دائمًا أوراق الصمت</span>
+  <p>كل مسار يُفترض ألّا يُنتج شيئًا يحتاج إلى ورقة <code>no_action</code> خاصة به بنصّ صادق. والأشجار
+  الحقيقية تحمل عادةً ثلاثًا: <em>ضمن النطاق</em>، و<em>لا توجد بيانات مسجّلة</em>، و<em>خارج النافذة
+  القابلة للتفسير</em>. وهي لا تكلّف شيئًا وقت التشغيل — لكنها ما يعرضه تبويب الحالة على مزارع يسأل «لماذا لا
+  توجد نصيحة لهذه القطعة؟»، وهي الوسيلة للتمييز بين «قِيسَ ووُجد سليمًا» و«لم يُقَس قط».</p>
+</div>
+
+<h2 id="params">٩. المُعاملات وتجاوزات المستأجر</h2>
+
+<p>أي عتبة قد يختلف معها مزارع اختلافًا معقولًا ينبغي أن تكون مُعاملًا لا رقمًا مثبّتًا في النص. وتُعرَّف
+المُعاملات مرة واحدة ويُشار إليها في أي موضع تُقبل فيه قيمة صريحة.</p>
+
+<pre><code>parameters:
+  sufficient_early:
+    type: number             # number | integer | boolean | string | enum
+    default: 1200            # مطلوب، ويجب أن يوافق النوع المعلن
+    min: 0                   # حدود اختيارية للأنواع الرقمية
+    max: 5000
+    description: &gt;-
+      نترات عصارة عنق الورقة (ppm) التي تحتها تُعدّ القطعة ناقصة
+      النيتروجين خلال النمو الخضري / بداية التدرين.</code></pre>
+
+<p>ويشترط في المُعامل من نوع <code>enum</code> قائمة <code>values</code> غير فارغة، وأن تكون قيمته
+الافتراضية واحدة منها.</p>
+
+<p>ويُشار إليه من داخل شرط هكذا:</p>
+<pre><code>condition:
+  tree:
+    op: lt
+    left:  { source: signals, code: petiole_no3n, key: value_numeric }
+    right: { source: params,  name: sufficient_early }</code></pre>
+
+<p>ويتحقّق المُحمِّل وقت الترجمة من أن <strong>كل مرجع <code>params</code> يسمّي مُعاملًا معلنًا</strong>،
+فالخطأ الإملائي يُفشل المزامنة بدل أن يُحسم في صمت إلى قيمة غير متاحة.</p>
+
+<h3>التجاوزات لكل مستأجر</h3>
+<p>يستطيع المستأجر تجاوز أي مُعامل معلن دون نسخ الشجرة، عبر
+<code>PUT /decision-trees/{code}/parameter-overrides/{param_name}</code>. وترتيب الحسم وقت التقييم هو
+<strong>تجاوز المستأجر ← القيمة الافتراضية المعلنة</strong>. وهذه هي الطريقة المقصودة لتوطين عتبة سليمة
+علميًا لكنها تحتاج معايرة إقليمية — وتحفّظ الصنف في نترات عنق الورقة مثال دقيق على ذلك.</p>
+
+<h2 id="evidence">١٠. الأدلة العلمية والمرجعية</h2>
+
+<p>قسمان اختياريان يوثّقان <em>لماذا ينبغي أن يثق أحد بهذه الشجرة</em>. ولا يقرؤهما المُقيّم أبدًا؛ بل
+يُحفظان داخل الشجرة المترجمة، ويُصدَران معها بصورة ثابتة، ويُعرضان في لوحة المرجعية داخل العارض.</p>
+
+<pre><code>evidence:
+  confidence: high              # very_high | high | medium | low
+  notes: &gt;-
+    من أين جاءت الأرقام، وعلى أي صنف أو إقليم أُسِّست،
+    وما الذي قد يجعلها غير صحيحة هنا.
+  citations:
+    - source_type: extension    # peer_reviewed | fao | usda | extension | university
+                                # research_institution | remote_sensing | government
+      title: Potato fertilization on irrigated soils — UMN Extension
+      url: https://extension.umn.edu/...
+      doi: 10.xxxx/yyyy         # اختياري
+      year: 2021                # اختياري، عدد صحيح
+
+transferability:
+  egypt: medium                 # very_high | high | medium | low | not_applicable
+  middle_east: medium
+  global: high</code></pre>
+
+<div class="note">
+  <span class="label">اكتب التحفّظات لا الاستشهاد وحده</span>
+  <p>حقل <code>notes</code> هو حيث يتعلّم القارئ لاحقًا أن العتبة قيمة تخصّ صنفًا بعينه، أو أنها بوحدة ppm
+  في العصارة الطازجة لا نسبة مئوية في الوزن الجاف — وهو التمييز الذي يجعل الشجرة تنطلق باستمرار إذا أُسيء
+  فهمه. الاستشهاد يثبت أن الرقم منشور؛ أمّا الملاحظات فتثبت أنك فهمت ما الذي يقيسه.</p>
+</div>
+
+<h2 id="authoring">١١. إنشاء شجرة جديدة</h2>
+
+<p>هناك مساران، والاختيار بينهما يتعلّق بالجمهور لا بالصعوبة.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th></th><th>شجرة منصّة (YAML في المستودع)</th><th>شجرة مستأجر (الواجهة أو API)</th></tr>
+  <tr><td>مرئية لـ</td><td>كل المستأجرين</td><td>المستأجر المؤلِّف وحده</td></tr>
+  <tr><td>تُؤلَّف في</td><td><code>backend/app/modules/recommendations/seeds/*.yaml</code></td><td><code>/decision-trees</code> داخل التطبيق</td></tr>
+  <tr><td>تُطلَق عبر</td><td>طلب دمج؛ وتُزامَن مع الفهرس عند إقلاع التطبيق</td><td>تُحفظ فورًا، دون نشر إصدار</td></tr>
+  <tr><td>استخدمها لـ</td><td>معرفة زراعية صحيحة للجميع</td><td>ممارسة عميل بعينه أو تجربة خاصة</td></tr>
+</table>
+</div>
+
+<h3>المسار (أ) — شجرة منصّة</h3>
+<ol class="steps">
+  <li><strong>احسم أولًا ما الذي ترفض الشجرة قوله.</strong> قبل كتابة أي عقدة، اكتب أوراق
+      <code>no_action</code>: كيف تبدو حالة «سليم»، وكيف تبدو حالة «لا بيانات لديّ»؟ فالأشجار التي تتخطّى
+      هذه الخطوة هي التي تنتج طمأنة كاذبة.</li>
+  <li><strong>ثبّت العتبات من مصدر أوّلي</strong> — جهة إرشاد زراعي، أو الفاو، أو دورية محكّمة — وسجّل
+      الوحدات والصنف والإقليم الذي أُسِّست عليه. ولا تأخذ الأرقام من ملخّص بحث على الإنترنت؛ فالوحدات كثيرًا
+      ما تُقلب في المصادر الثانوية.</li>
+  <li><strong>أنشئ الملف <code>seeds/&lt;code&gt;.yaml</code></strong>. وليطابق اسم الملف قيمة
+      <code>code</code>، وليحمل الرمز لاحقة إصدار (<code>_v1</code>) حتى تتعايش معه إعادة كتابة غير متوافقة
+      مستقبلًا.</li>
+  <li><strong>اكتب الرسم البياني.</strong> والترتيب المتعارف عليه: بوّابة انطباق (المرحلة الصحيحة، الموسم
+      الصحيح)، ثم <strong>مجسّ وجود</strong> (§١٥)، ثم العتبات الفعلية، ثم الأوراق.</li>
+  <li><strong>اجعل كل عتبة مُعاملًا</strong> مع وصف وحدود منطقية.</li>
+  <li><strong>املأ <code>evidence</code> و<code>transferability</code></strong> بما فيهما التحفّظات.</li>
+  <li><strong>اكتب باللغتين.</strong> <code>name_ar</code> و<code>description_ar</code>
+      و<code>label_ar</code> في كل عقدة، و<code>text_ar</code> في كل ورقة، و<code>text_ar</code> في كل عنصر
+      إجراء. فالعربية لغة واجهة من الدرجة الأولى هنا، لا ترجمة لاحقة.</li>
+  <li><strong>شغّل التطبيق.</strong> يقوم <code>sync_from_disk</code> بترجمة كل الأشجار وتحديثها عند
+      الإقلاع؛ وأي خطأ بنيوي يظهر هناك مع مسار الملف والمشكلة المحدّدة. وإعادة التشغيل دون تغييرات لا تفعل
+      شيئًا.</li>
+  <li><strong>جرّب تشغيلًا تجريبيًا على قطعة حقيقية</strong> قبل فتح طلب الدمج (§١٣).</li>
+</ol>
+
+<h3>المسار (ب) — شجرة مستأجر داخل التطبيق</h3>
+<ol class="steps">
+  <li>اذهب إلى <strong>أشجار القرار</strong> في القائمة واختر إنشاء شجرة. وتحتاج إلى صلاحية
+      <code>decision_tree.manage</code>، ويملكها مالك المستأجر ومديره.</li>
+  <li>اضبط الهوية والاستهداف في لوحة البيانات الوصفية: الاسم والوصف باللغتين، ومسارات المحاصيل، والدول،
+      وقوام التربة، والنطاق.</li>
+  <li>ابنِ الرسم في تبويب <strong>مرئي</strong>. وانتقل إلى تبويب <strong>YAML</strong> متى شئت لترى الشجرة
+      نفسها نصًّا — فكلاهما عرضان لمستند واحد، لا استيراد وتصدير.
+      <div class="tablewrap">
+      <table>
+        <tr><th>على اللوحة</th><th>كيف</th></tr>
+        <tr><td>إضافة عقدة</td><td>أضفها ثم اختر كونها عقدة قرار أو ورقة. وعقدة القرار الجديدة تبدأ غير
+            موصولة — ويجب ضبط المؤشّرين قبل أن تُترجَم.</td></tr>
+        <tr><td>حذف عقدة</td><td>الحذف يعيد توجيه كل ما كان يشير إليها، فلا يبقى في الرسم مؤشّر معلّق.</td></tr>
+        <tr><td>إعادة ربط فرع</td><td>اسحب من مقبض «تحقّق/عدم تحقّق» في العقدة إلى العقدة الهدف.</td></tr>
+        <tr><td>تحرير شرط</td><td>يعرض المُنشئ المهيكل المصادر والمفاتيح والعوامل التي يقبلها الخادم فقط،
+            ويدعم الشجرة المتداخلة كاملةً — <code>all_of</code> و<code>any_of</code> و<code>not</code>
+            و<code>between</code> و<code>in</code>.</td></tr>
+        <tr><td>تراجع / إعادة</td><td>متاحان في كل وقت؛ والتعديلات محلّية حتى تحفظ.</td></tr>
+      </table>
+      </div>
+      </li>
+  <li><strong>شغّل تجريبيًا</strong> من مساحة العمل على قطعة مرشّحة واقرأ المسار الناتج.</li>
+  <li><strong>انشر</strong> الإصدار. فالنشر هو ما يجعلها فاعلة في المسح الدوري.</li>
+</ol>
+
+<h2 id="extending">١٢. توسيع شجرة قائمة</h2>
+
+<p>الإصدارات ثابتة لا تُعدَّل. وتحرير شجرة منشورة يُنشئ <strong>إصدارًا جديدًا</strong>؛ ويبقى السابق قابلًا
+للقراءة، وتظل التوصيات المنتَجة سلفًا مرتبطة بالإصدار الذي أنتجها (إذ يُختم <code>tree_version</code> على كل
+سجل). والنشر فعل منفصل ومقصود.</p>
+
+<div class="flow">
+<pre><code>تحرير ──▶ POST /decision-trees/{code}/versions        إنشاء إصدار مسوّدة
+      ──▶ POST …/versions/{version}:publish           جعله الإصدار الفاعل
+      ──▶ (تبقى الإصدارات القديمة قابلة للقراءة دائمًا)</code></pre>
+</div>
+
+<h3>اختيار طريقة التوسيع</h3>
+<div class="tablewrap">
+<table>
+  <tr><th>إذا أردت…</th><th>فافعل هذا</th></tr>
+  <tr><td>تغيير عتبة لعميل واحد</td><td><strong>تجاوز مُعامل</strong> — دون إصدار جديد ودون نسخ</td></tr>
+  <tr><td>تغيير عتبة للجميع</td><td>إصدار جديد يغيّر القيمة الافتراضية للمُعامل</td></tr>
+  <tr><td>إضافة فرع أو ورقة جديدة</td><td>إصدار جديد؛ أضف العقد وأعد الربط</td></tr>
+  <tr><td>تضييق نطاق من تنطبق عليهم</td><td>عدّل الاستهداف — ثم راجع <code>:candidate-blocks</code>، لأن المحاور المقيّدة تستبعد القيم غير المعروفة</td></tr>
+  <tr><td>تغيير ما تنصح به ورقة</td><td>إصدار جديد يعدّل <code>text_*</code> و<code>actions</code></td></tr>
+  <tr><td>إعادة كتابة غير متوافقة</td><td><strong>شجرة جديدة</strong> برمز مرفوع (<code>_v2</code>)، مع أرشفة القديمة</td></tr>
+  <tr><td>إيقاف شجرة</td><td><strong>أرشفتها</strong> (<code>DELETE /decision-trees/{code}</code>)؛ ويمكن استعادتها بـ<code>:restore</code></td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <span class="label">إضافة عقدة مسألة توافق</span>
+  <p>إدراج عقدة قرار في منتصف مسار قائم يغيّر وجهة كل قطعة تقع بعدها. ولأن هناك على الأكثر توصية مفتوحة
+  واحدة لكل (قطعة، شجرة)، فإن التوصية المفتوحة من الإصدار القديم <strong>لن</strong> تُستبدل حتى تُعالَج.
+  فتوقّع خليطًا من الحالتين لبعض الوقت بعد النشر، ولا تعدّ ذلك خللًا.</p>
+</div>
+
+<h2 id="testing">١٣. الاختبار قبل الإطلاق</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>الأداة</th><th>السؤال الذي تجيب عنه</th></tr>
+  <tr><td><code>POST /decision-trees/{code}:dry-run</code></td>
+      <td>«لو شغّلت هذه الشجرة الآن على هذه القطعة، أين ستستقرّ؟» — المسار كاملًا دون أي كتابة</td></tr>
+  <tr><td><code>GET /decision-trees/{code}/candidate-blocks</code></td>
+      <td>«أي القطع يختارها استهدافي فعلًا؟» — الفحص الذي يكشف المحور المفرط في الضيق</td></tr>
+  <tr><td><code>GET /blocks/{block_id}/decision-trees:explain</code></td>
+      <td>«لماذا حصلت هذه القطعة على هذه النصيحة — ولماذا صمتت بقية الأشجار؟» يعيد السير في كل شجرة مرئية،
+          بما فيها التي خرجت سليمة والتي لم تكن مستهدفة أصلًا. ويتطلّب <code>farm_id</code> كمُعامل استعلام.</td></tr>
+  <tr><td><code>POST /blocks/{block_id}/recommendations:evaluate</code></td>
+      <td>التقييم عند الطلب مع كتابة النتائج فعليًا، بدل انتظار المسح الدوري</td></tr>
+</table>
+</div>
+
+<h4>قائمة فحص جديرة بالتنفيذ</h4>
+<ul>
+  <li>جرّب قطعة <strong>يُفترض</strong> أن تنطلق عليها — وتأكّد من المسار ومن نصّ الورقة.</li>
+  <li>جرّب قطعة <strong>بلا بيانات</strong> لمدخلك الأساسي — وتأكّد أنها تستقرّ على ورقة «لا بيانات» لا على
+      ورقة «كل شيء سليم».</li>
+  <li>جرّب قطعة خارج الاستهداف — وتأكّد أنها ليست مرشّحة من الأصل.</li>
+  <li>افحص تبويب الحالة في لوحة القطعة وتأكّد أنه مفهوم لمزارع: العناوين أسئلة، والشجرة التي لم تنطلق تُقرأ
+      بوصفها <em>سليمة</em> لا بوصفها فشلًا.</li>
+</ul>
+
+<h2 id="worked">١٤. مثال تطبيقي</h2>
+
+<p>شجرة حقيقية مشحونة، هي <code>mango_stress_induction_v1</code>، من أولها إلى آخرها. أمّا الأساس الزراعي
+فهو: خلال نافذة ما قبل التزهير الباردة، يميل المجموع الخضري المُروى جيدًا في المانجو إلى دفع
+<em>نموّ خضري</em> بدلًا من التزهير — وضياع التزهير ضياع لموسم كامل. أمّا تعطيش الأشجار في تلك النافذة فيدفع
+التمايز الزهري بدلًا من ذلك.</p>
+
+<h4>لماذا هو رابطة «و» لا عتبة واحدة</h4>
+<p>الإجهاد المائي وحده <strong>لا</strong> يحفّز التزهير، بل يجب أن يتزامن مع النافذة الباردة — إذ يقع سكون
+البراعم عند نحو ١٥ درجة مئوية، وتُثبّط الحرارة قرب ٣٠ درجة التحفيز. فقد أعطى إيقاف الريّ في الحرارة المرتفعة
+نموًا خضريًا فقط في صنف «تومي أتكنز»؛ بينما رفع التعطيش في الموسم البارد التزهيرَ نحو ٢٠٪ والمحصولَ نحو ١٧٪
+في صنف «كنسينغتون برايد». ولذلك لا تنطلق الشجرة إلا حين يتحقّق <strong>الشرطان معًا</strong> خلال
+<code>pre_flowering</code>.</p>
+
+<pre><code>crop_path: mango
+
+parameters:
+  wet_ndmi:          { type: number, default: 0.30 }   # فوق هذا يُعدّ المجموع مُروى جيدًا
+  cool_induction_c:  { type: number, default: 15.0 }   # عتبة البرودة الليلية
+
+root: root
+nodes:
+  root:
+    label_en: Is the block in the pre-flowering stage?
+    label_ar: هل القطعة في مرحلة ما قبل التزهير؟
+    condition:
+      tree:
+        op: eq
+        left:  { source: block, field: growth_stage }
+        right: pre_flowering
+    on_match: wet_and_cool
+    on_miss:  leaf_out_of_window
+
+  wet_and_cool:
+    label_en: Is the canopy well-watered while the forecast is cool?
+    label_ar: هل المجموع الخضري مُروى جيدًا والتوقّع بارد؟
+    condition:
+      tree:
+        all_of:
+          - op: gt
+            left:  { source: indices, index_code: ndmi, key: mean }
+            right: { source: params,  name: wet_ndmi }
+          - op: le
+            left:  { source: weather, scope: forecast_72h, field: air_temp_c_min }
+            right: { source: params,  name: cool_induction_c }
+    on_match: leaf_warn            # تحقّق الشرطان ← انصح بتعطيش الأشجار
+    on_miss:  leaf_no_action</code></pre>
+
+<div class="note">
+  <span class="label">ثلاث تفاصيل تستحقّ الاقتباس</span>
+  <p><strong>اختيار المؤشّر حاسم.</strong> فرطوبة المجموع الخضري تُقرأ من <code>ndmi</code> (قريب المدى
+  والأشعة تحت الحمراء القصيرة، وهو مؤشّر ماء الورقة)، <em>لا</em> من <code>ndwi</code> الذي هو مؤشّر
+  ماكفيترز للمياه المكشوفة. وهما يبدوان متبادلين وليسا كذلك. ولأن NDMI يحتاج نطاق SWIR، فهذه الشجرة إشارة
+  خاصة بـSentinel-2 ولا تعمل على صور PlanetScope بدقة ٣ أمتار.</p>
+  <p><strong>العتبتان كلتاهما مُعاملان</strong>، فيستطيع مزارع في مناخ مختلف إعادة معايرتهما دون المساس
+  بالبنية.</p>
+  <p><strong>بوّابة المرحلة أولًا.</strong> ففحص <code>growth_stage</code> قبل أي شيء مكلف يجعل الشجرة صامتة
+  — وصامتة بصدق عبر <code>leaf_out_of_window</code> — طوال الأشهر العشرة التي لا ينطبق فيها السؤال.</p>
+</div>
+
+<h2 id="pitfalls">١٥. المزالق</h2>
+
+<h3>مسار الطمأنة الكاذبة</h3>
+<p>وهو أشيع خلل حقيقي. فلأن القيمة الغائبة تفشل مغلقةً، تسلك القطعة التي لا رصدات لها المسار
+<code>on_miss</code> نفسه الذي تسلكه قطعة قِيسَت ووُجدت سليمة — فتستقرّ على ورقة «ضمن النطاق».</p>
+<p><strong>والعلاج مجسّ وجود:</strong> قبل المقارنة بعتبة، اختبر أن القيمة موجودة أصلًا. وللكميات الموجبة
+حتمًا يكفي <code>&gt; 0</code>:</p>
+<pre><code>data_check:
+  label_en: Is there a petiole sap nitrate reading for this block?
+  label_ar: هل توجد قراءة نترات لعصارة عنق الورقة لهذه القطعة؟
+  condition:
+    tree:
+      op: gt
+      left:  { source: signals, code: petiole_no3n, key: value_numeric }
+      right: 0
+  on_match: stage_early        # لدينا بيانات ← قيّمها
+  on_miss:  leaf_no_data       # لا بيانات لدينا ← قل ذلك بصراحة</code></pre>
+
+<h3>الحدّ من جهة واحدة على الاتجاه يشمل الانهيار أيضًا</h3>
+<p>العبارة <code>delta &lt; 0.01</code> صحيحة على محصول متوقّف النمو — وصحيحة تمامًا على محصول ينهار عند
+<code>−0.4</code>. فإذا كنت تقصد <em>الركود</em>، فأنت تريد نطاقًا لا حدًّا:</p>
+<pre><code>op: between
+left: { source: indices, index_code: ndvi, key: delta }
+low: -0.01
+high: 0.01</code></pre>
+<p>أو ببساطة <code>trend_direction eq stable</code>، وفيه أرضية الضوضاء مدمجة أصلًا.</p>
+
+<h3>الخلط بين <code>slope</code> و<code>delta</code></h3>
+<p><code>slope</code> <strong>لكل يوم</strong>، أمّا <code>delta</code> فهو التغيّر <strong>الكلّي</strong>
+عبر نافذة الثلاثين يومًا. والعتبة المنطقية لأحدهما تبتعد عن الآخر بنحو ثلاثين ضعفًا.</p>
+
+<h3>افتراض <code>mean</code> بينما تريد الشذوذ</h3>
+<p>في <code>indices</code> و<code>weather_index</code> معًا، المفتاح الافتراضي هو
+<code>baseline_deviation</code> — أي درجة معيارية لا قيمة خامًا. وهذا مقصود: فقيمة NDVI مقدارها 0.4 لا تعني
+شيئًا دون معرفة ما تفعله تلك القطعة عادةً في ذلك الأسبوع. فاكتب <code>key: mean</code> صراحةً حين تريد الرقم
+المطلق حقًّا.</p>
+
+<h3>المطابقة ببداية النص أوسع مما تبدو</h3>
+<p>القيمة <code>crop_paths: [mango]</code> تستهدف كل أصناف المانجو وسلالاتها. ولاستهداف صنف واحد، اذكر
+المسار الأكمل.</p>
+
+<h3>الأوراق غير المترجمة</h3>
+<p><code>text_ar</code> و<code>label_ar</code> اختياريان لدى المترجم وإلزاميان عمليًا. فالنص العربي الناقص
+لا يُفشل المزامنة، لكنه يُضعف الواجهة العربية في اللحظة التي يحتاج فيها المزارع إليها.</p>
+
+<h3>المؤشّران كلاهما إلزامي</h3>
+<p>لا يوجد فرع افتراضي. وعقدة القرار التي ينقصها <code>on_miss</code> تُنهي التقييم بخطأ بدل أن تنساب إلى
+ورقة.</p>
+
+<h2 id="permissions">١٦. الصلاحيات</h2>
+
+<div class="tablewrap">
+<table>
+  <tr><th>الصلاحية</th><th>ما تتيحه</th><th>الأدوار المعتادة</th></tr>
+  <tr><td><code>decision_tree.manage</code></td>
+      <td>إنشاء الأشجار وتحريرها وإصدارها ونشرها وأرشفتها؛ وإدارة تجاوزات المُعاملات</td>
+      <td>مالك المستأجر · مدير المستأجر · مدير المنصّة</td></tr>
+  <tr><td><code>decision_tree.read</code></td>
+      <td>عرض الفهرس والأشجار المنشورة؛ والتشغيل التجريبي؛ وبدء التقييم</td>
+      <td>ما سبق + دعم المنصّة (قراءة فقط)</td></tr>
+  <tr><td><code>recommendation.read</code></td>
+      <td>رؤية قائمة التوصيات وشريط اللوحة وتبويب الحالة في لوحة القطعة</td>
+      <td>المهندس الزراعي · مدير المزرعة · المشغّل الحقلي · الكشّاف · المشاهد</td></tr>
+  <tr><td><code>recommendation.act</code></td>
+      <td>تطبيق التوصيات أو رفضها أو تأجيلها أو جدولتها</td>
+      <td>المهندس الزراعي · مدير المزرعة</td></tr>
+</table>
+</div>
+
+<p>وسطح التأليف كلّه مقيّد بـ<code>decision_tree.manage</code>: فبدونها يُخفى إجراء <em>شجرة جديدة</em>
+وتُعرض الصفحات للقراءة فقط. وفحوص الصلاحية موجودة في كل صفحة، فالرابط المباشر بدور خاطئ يفشل بدل أن يُعرض.</p>
+
+<div class="warn">
+  <span class="label">الأدوار الحقلية تقرأ التعليل لا القواعد</span>
+  <p><code>decision_tree.read</code> ضيّقة عن قصد — فهي تحكم أيضًا <code>:evaluate</code>
+  و<code>:dry-run</code> وكلاهما قد يكتب. ولذلك فإن سطح «لماذا انطلقت؟» (<code>:explain</code> وتبويب
+  الحالة) مقيّد بـ<code>recommendation.read</code> التي يملكها كل دور حقلي. فيستطيع المهندس الزراعي أن يرى
+  بالضبط أي الشروط قُيّمت على قطعته دون أن يقدر على تأليف الأشجار أو تشغيلها.</p>
+</div>
+
+<h2 id="api">١٧. مرجع الواجهة البرمجية</h2>
+
+<p>كل المسارات نسبةً إلى <code>/api/v1</code>.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>الطريقة والمسار</th><th>الغرض</th><th>الصلاحية</th></tr>
+  <tr><td><code>GET /decision-trees</code></td><td>سرد الفهرس</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}</code></td><td>شجرة واحدة مع إصدارها الحالي</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/versions</code></td><td>سجل الإصدارات</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>POST /decision-trees</code></td><td>إنشاء شجرة مستأجر</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}/versions</code></td><td>إصدار جديد</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}/versions/{version}:publish</code></td><td>جعل إصدار فاعلًا</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>PATCH /decision-trees/{code}</code></td><td>تعديل البيانات الوصفية والاستهداف والنطاق</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>DELETE /decision-trees/{code}</code></td><td>أرشفة</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}:restore</code></td><td>إلغاء الأرشفة</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/candidate-blocks</code></td><td>القطع التي يختارها الاستهداف</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>POST /decision-trees/{code}:dry-run</code></td><td>تقييم دون كتابة</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>GET /decision-trees/{code}/parameter-overrides</code></td><td>سرد التجاوزات</td><td><code>decision_tree.read</code></td></tr>
+  <tr><td><code>PUT /decision-trees/{code}/parameter-overrides/{name}</code></td><td>ضبط تجاوز</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>DELETE /decision-trees/{code}/parameter-overrides/{name}</code></td><td>إلغاء تجاوز</td><td><code>decision_tree.manage</code></td></tr>
+  <tr><td><code>GET /recommendations</code></td><td>سرد التوصيات</td><td><code>recommendation.read</code></td></tr>
+  <tr><td><code>PATCH /recommendations/{id}</code></td><td>تغيير الحالة</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>POST /recommendations/{id}/schedule</code></td><td>جدولتها على لوحة الخطة</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>POST /blocks/{id}/recommendations:evaluate</code></td><td>تقييم عند الطلب</td><td><code>recommendation.act</code></td></tr>
+  <tr><td><code>GET /blocks/{id}/decision-trees:explain</code></td><td>لماذا انطلقت كل شجرة أو لم تنطلق</td><td><code>recommendation.read</code></td></tr>
+</table>
+</div>
+
+<div class="note">
+  <span class="label">لماذا لا تُقيَّد <code>:explain</code> بـ<code>decision_tree.read</code></span>
+  <p>لأنها تُبلّغ عن نصيحة، فقُيّدت بـ<code>recommendation.read</code> التي تملكها الأدوار الحقلية. أمّا
+  <code>decision_tree.read</code> فتحكم أيضًا <code>:evaluate</code> و<code>:dry-run</code> وكلاهما قد يكتب،
+  فلم يكن توسيعها خيارًا. وتشترط نقطة النهاية كذلك مُعامل <code>farm_id</code> وتتحقّق من أن القطعة تتبع تلك
+  المزرعة، فلا يستطيع المستدعي استخدامها للقراءة عبر المزارع.</p>
+</div>
+
+<h4>ملفات المصدر الأساسية</h4>
+<div class="tablewrap">
+<table>
+  <tr><td><code>recommendations/loader.py</code></td><td>تحويل YAML إلى JSON مترجم؛ وكل التحقّق البنيوي</td></tr>
+  <tr><td><code>recommendations/engine.py</code></td><td>السير في الشجرة وتحليل النتائج</td></tr>
+  <tr><td><code>recommendations/service.py</code></td><td>بناء السياق ومطابقة الاستهداف وكتابة النتائج</td></tr>
+  <tr><td><code>recommendations/seeds/*.yaml</code></td><td>أشجار المنصّة المشحونة — وهي أفضل الأمثلة العملية</td></tr>
+  <tr><td><code>shared/conditions/evaluator.py</code></td><td>لهجة الشروط</td></tr>
+  <tr><td><code>shared/conditions/models.py</code></td><td>مراجع القيم ومفاتيحها المسموح بها</td></tr>
+  <tr><td><code>shared/conditions/context.py</code></td><td>شكل كل ما تستطيع الشجرة قراءته</td></tr>
+  <tr><td><code>indices/trends.py</code></td><td>حساب slope و delta و trend_direction</td></tr>
+</table>
+</div>
+
+<footer>
+  <p>AgriPulse — دليل أشجار القرار. النسخة الإنجليزية: <a href="decision-trees.en.html">decision-trees.en.html</a>.</p>
+  <p>حين يتغيّر المحرّك يتغيّر هذا المستند معه. والقوائم المغلقة في §٧ و§٨ منعكسة في
+  <code>shared/conditions/</code> وفي مُنشئ الواجهة
+  (<code>frontend/src/modules/decisionTrees/lib/conditionEdit.ts</code>) — ويجب أن تتحرّك الثلاثة معًا،
+  وإلا عاد المُنشئ المرئي في صمت إلى عرض YAML الخام لأي شجرة تستخدم المفتاح الجديد.</p>
+</footer>
+
+</main>
+</div>
+</div>
+</body>
+</html>
