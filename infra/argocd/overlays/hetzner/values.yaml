@@ -374,13 +374,30 @@ global:
   #   the card as "Ingestion failure causes". EN + AR copy, one key swap,
   #   no logic. Frontend-only -- api + workers stay 0b8147b, tile-server
   #   stays 9d140cc.
+  # 3a4ab66 = #352, the left nav rail becomes collapsible. Clicking the
+  #   panel toggle drops the Workspace nav from w-56 to an icons-only
+  #   w-14: group heading, labels and Beta badges hide, icons center.
+  #   Labels are NOT dropped from the accessibility tree -- they stay as
+  #   .sr-only and move into the native title tooltip -- so if a collapsed
+  #   icon reads as unlabelled to a screen reader, that is a regression,
+  #   not the design. The choice persists per-browser in localStorage
+  #   under ap.sidenav.collapsed, so a user who collapses it will land on
+  #   every subsequent page collapsed; a "the nav disappeared" report is
+  #   far more likely that key than a broken render.
+  #   Both personas share the new NavShell, so this also changes the
+  #   PlatformAdmin nav (Tenants, Defaults, Crops, ...) -- worth checking
+  #   both after sync, since the unit tests cover the tenant list more
+  #   closely. Not browser-verified pre-merge, at the author's call.
+  #   Frontend-only, no migration, no API change -- api + workers stay
+  #   0b8147b, tile-server stays 9d140cc. Rollback is this tag back to
+  #   7eedeab.
   images:
     api:
       tag: "0b8147b"
     workers:
       tag: "0b8147b"
     frontend:
-      tag: "7eedeab"
+      tag: "3a4ab66"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
