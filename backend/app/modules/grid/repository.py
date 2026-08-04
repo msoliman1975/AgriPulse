@@ -24,6 +24,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.grid.geometry import GeneratedCell
 
+# ---- Valid-time predicates (tenant migration 0054) -------------------------
+#
+# Two different questions get asked of grid_configs, and conflating them is
+# the §2.2 defect this module used to have. They are spelled out once here so
+# the six read sites can't drift apart.
+#
+# GOVERNS_AT — "which geometry describes this scene time?" Use wherever an
+# observation is involved. `superseded_at IS NOT NULL` means the config has
+# been fully replaced and governs nothing, even though its rows are still
+# physically present until the cleanup task runs.
+#
+# Interpolated into SQL with `.format()`, so call sites carry `noqa: S608`.
+# The only substitution is the timestamp *expression* — either a column
+# reference chosen here or a `CAST(:at AS timestamptz)` bind — never a
+# caller-supplied value. Values always travel as bind parameters.
+_GOVERNS_AT = """
+          AND cfg.deleted_at IS NULL
+          AND cfg.superseded_at IS NULL
+          AND tstzrange(cfg.effective_from, cfg.effective_to) @> {ts}
+"""
+
+# The other question — "which geometry do new scenes land on?" — keeps its
+# existing `retired_at IS NULL` spelling. That is the honest transaction-time
+# answer, and it already excludes superseded configs (a config is retired at
+# the moment it is replaced, and only ever superseded afterwards), so those
+# sites need no valid-time predicate.
+
 
 class GridRepository:
     """Internal repository — service layer is the only consumer."""
@@ -158,6 +185,7 @@ class GridRepository:
         utm_srid: int,
         created_by: UUID | None,
         anomaly_z_threshold: Decimal | None = None,
+        effective_from: datetime | None = None,
     ) -> UUID:
         """Insert a new active grid_config row. Caller must have retired
         any previous active config for the same (block, product) first.
@@ -165,6 +193,13 @@ class GridRepository:
         ``anomaly_z_threshold`` carries forward a per-block detection
         override across a rezone so the operator's tuning survives a
         cell-size change.
+
+        ``effective_from`` is the scene time this geometry starts
+        governing. ``None`` means ``-infinity`` — "this grid describes all
+        of history" — which is right for a block's *first* grid, including
+        one created before a historical backfill runs. A rezone must pass
+        the cutover instant instead, so the geometry it replaces keeps
+        governing the scenes it actually produced.
         """
         row = (
             await self._session.execute(
@@ -172,10 +207,12 @@ class GridRepository:
                     """
                     INSERT INTO grid_configs (
                         block_id, product_id, cell_size_m, utm_srid,
-                        anomaly_z_threshold, created_by, updated_by
+                        anomaly_z_threshold, created_by, updated_by,
+                        effective_from
                     ) VALUES (
                         :block_id, :product_id, :cell_size_m, :utm_srid,
-                        :anomaly_z_threshold, :created_by, :created_by
+                        :anomaly_z_threshold, :created_by, :created_by,
+                        COALESCE(:effective_from, '-infinity'::timestamptz)
                     )
                     RETURNING id
                     """
@@ -183,6 +220,7 @@ class GridRepository:
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("product_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("created_by", type_=PG_UUID(as_uuid=True)),
+                    bindparam("effective_from", type_=DateTime(timezone=True)),
                 ),
                 {
                     "block_id": block_id,
@@ -191,6 +229,7 @@ class GridRepository:
                     "utm_srid": utm_srid,
                     "anomaly_z_threshold": anomaly_z_threshold,
                     "created_by": created_by,
+                    "effective_from": effective_from,
                 },
             )
         ).scalar_one()
@@ -319,16 +358,29 @@ class GridRepository:
         return int(getattr(result, "rowcount", 0) or 0)
 
     async def retire_config(self, *, config_id: UUID, retired_at: datetime) -> None:
+        """Close a config in both time dimensions at once.
+
+        ``retired_at`` is transaction time — when the operator changed
+        their mind. ``effective_to`` is valid time — the scene times this
+        geometry stops governing. They are stamped together here because
+        the replacement config opens its own range at exactly this
+        instant; letting them drift apart is what produced the §2.2
+        orphaning, and would now also trip the non-overlap constraint.
+        """
         await self._session.execute(
             text(
                 """
                 UPDATE grid_configs
-                SET retired_at = :retired_at,
-                    updated_at = now()
+                SET retired_at   = :retired_at,
+                    effective_to = :retired_at,
+                    updated_at   = now()
                 WHERE id = :config_id
                   AND retired_at IS NULL
                 """
-            ).bindparams(bindparam("config_id", type_=PG_UUID(as_uuid=True))),
+            ).bindparams(
+                bindparam("config_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("retired_at", type_=DateTime(timezone=True)),
+            ),
             {"config_id": config_id, "retired_at": retired_at},
         )
         await self._session.flush()
@@ -413,6 +465,45 @@ class GridRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def list_cells_for_scene(
+        self, *, block_id: UUID, product_id: UUID, at: datetime
+    ) -> tuple[dict[str, Any], ...]:
+        """Cells of the geometry that governs scene time ``at``.
+
+        The write-path counterpart of :meth:`list_cells_with_values`. A
+        scene is not necessarily current: a late-arriving delivery, or any
+        historical backfill, computes cell aggregates for a time that may
+        predate the live grid. Gridding those against "whatever geometry
+        is current" would write 2026 cells for a 2025 scene and leave the
+        row unreadable by every valid-time-aware read path.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT gc.id AS cell_id,
+                               ST_AsText(gc.geom) AS geom_wkt,
+                               cfg.utm_srid       AS utm_srid
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        WHERE cfg.block_id = :block_id
+                          AND cfg.product_id = :product_id
+                          {_GOVERNS_AT.format(ts="CAST(:at AS timestamptz)")}
+                        """
+                    ).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("at", type_=DateTime(timezone=True)),
+                    ),
+                    {"block_id": block_id, "product_id": product_id, "at": at},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def bulk_upsert_aggregates(
         self,
         *,
@@ -487,17 +578,28 @@ class GridRepository:
         product_id: UUID,
         index_code: str,
     ) -> datetime | None:
-        """Most recent scene time with any cell observation for (block, product, index)."""
+        """Most recent *readable* scene time for (block, product, index).
+
+        Joins through to ``grid_configs`` rather than scanning
+        ``block_grid_aggregates`` raw. Without the join this returned the
+        last scene of a retired grid, and the caller then resolved cells
+        against a different geometry — an all-NULL heatmap and a silently
+        dead anomaly sweep (§2.2). A scene time is only useful here if the
+        geometry that produced it can still be read back.
+        """
         row = (
             await self._session.execute(
                 text(
-                    """
-                    SELECT MAX(time) AS t
-                    FROM block_grid_aggregates
-                    WHERE block_id   = :block
-                      AND product_id = :product
-                      AND index_code = :code
-                    """
+                    f"""
+                    SELECT MAX(obs.time) AS t
+                    FROM block_grid_aggregates obs
+                    JOIN grid_cells gc   ON gc.id = obs.cell_id
+                    JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                    WHERE obs.block_id   = :block
+                      AND obs.product_id = :product
+                      AND obs.index_code = :code
+                      {_GOVERNS_AT.format(ts="obs.time")}
+                    """  # noqa: S608 - only _GOVERNS_AT interpolates
                 ).bindparams(
                     bindparam("block", type_=PG_UUID(as_uuid=True)),
                     bindparam("product", type_=PG_UUID(as_uuid=True)),
@@ -569,17 +671,25 @@ class GridRepository:
         actually written for this (block, product). Indices with too few
         observed cells are filtered out downstream by the detector's
         ``min_cells`` guard, so listing all present codes is safe.
+
+        Config-joined for the same reason as :meth:`get_latest_scene_time`:
+        an index whose only observations belong to a superseded geometry is
+        not "observed" for any purpose the caller has — advertising it just
+        sends the sweep after a scene time that resolves to zero cells.
         """
         rows = (
             await self._session.execute(
                 text(
-                    """
-                    SELECT DISTINCT index_code
-                    FROM block_grid_aggregates
-                    WHERE block_id   = :block
-                      AND product_id = :product
-                    ORDER BY index_code
-                    """
+                    f"""
+                    SELECT DISTINCT obs.index_code
+                    FROM block_grid_aggregates obs
+                    JOIN grid_cells gc   ON gc.id = obs.cell_id
+                    JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                    WHERE obs.block_id   = :block
+                      AND obs.product_id = :product
+                      {_GOVERNS_AT.format(ts="obs.time")}
+                    ORDER BY obs.index_code
+                    """  # noqa: S608 - only _GOVERNS_AT interpolates
                 ).bindparams(
                     bindparam("block", type_=PG_UUID(as_uuid=True)),
                     bindparam("product", type_=PG_UUID(as_uuid=True)),
@@ -608,7 +718,7 @@ class GridRepository:
             (
                 await self._session.execute(
                     text(
-                        """
+                        f"""
                         SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx,
                                ST_X(gc.centroid) AS centroid_lon,
                                ST_Y(gc.centroid) AS centroid_lat,
@@ -623,7 +733,7 @@ class GridRepository:
                          AND obs.time       = :at
                         WHERE cfg.block_id   = :block
                           AND cfg.product_id = :product
-                          AND cfg.retired_at IS NULL
+                          {_GOVERNS_AT.format(ts="CAST(:at AS timestamptz)")}
                         """
                     ).bindparams(
                         bindparam("block", type_=PG_UUID(as_uuid=True)),
@@ -654,6 +764,14 @@ class GridRepository:
         """Per-cell GeoJSON + value at a given scene time (or NULL if no
         observations at that time). Cells without any observation still
         appear so the heatmap can render them as "no data" tiles.
+
+        The geometry is chosen by the *requested scene time*, not by "which
+        grid is current": a scene that predates a rezone is served from the
+        grid that produced it. Selecting the current grid instead is what
+        made a rezone render the whole block as "no data" (§2.2).
+
+        ``at IS NULL`` means "the live grid" — no scene time to resolve
+        against, so fall back to the open-ended config.
         """
         rows = (
             (
@@ -680,7 +798,14 @@ class GridRepository:
                          AND (:at IS NULL OR obs.time = :at)
                         WHERE cfg.block_id   = :block
                           AND cfg.product_id = :product
-                          AND cfg.retired_at IS NULL
+                          AND cfg.deleted_at IS NULL
+                          AND cfg.superseded_at IS NULL
+                          AND CASE
+                                WHEN CAST(:at AS timestamptz) IS NULL
+                                  THEN cfg.effective_to IS NULL
+                                ELSE tstzrange(cfg.effective_from, cfg.effective_to)
+                                     @> CAST(:at AS timestamptz)
+                              END
                         ORDER BY gc.row_idx, gc.col_idx
                         """
                     ).bindparams(

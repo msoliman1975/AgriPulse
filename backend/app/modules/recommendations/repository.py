@@ -982,10 +982,17 @@ class RecommendationsRepository:
                                obs.cell_id, obs.index_code, obs.time, obs.mean
                         FROM block_grid_aggregates obs
                         JOIN grid_cells gc ON gc.id = obs.cell_id
+                        -- Valid time, not transaction time: the latest
+                        -- observation per cell may predate a rezone, and
+                        -- filtering on `retired_at IS NULL` would drop it
+                        -- entirely rather than serve it from the geometry
+                        -- that produced it (tenant migration 0054).
                         JOIN grid_configs cfg
                           ON cfg.id = gc.grid_config_id
-                         AND cfg.retired_at IS NULL
                          AND cfg.deleted_at IS NULL
+                         AND cfg.superseded_at IS NULL
+                         AND tstzrange(cfg.effective_from, cfg.effective_to)
+                             @> obs.time
                         WHERE obs.block_id = :block_id
                         ORDER BY obs.cell_id, obs.index_code, obs.time DESC
                         """

@@ -32,7 +32,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -45,12 +45,8 @@ pytestmark = [pytest.mark.integration]
 
 # A block big enough that both 20 m and 40 m grids produce several cells,
 # and small enough to stay under the 5000-cell ceiling.
-_FARM_BOUNDARY = (
-    "POLYGON((31.20 30.00,31.24 30.00,31.24 30.04,31.20 30.04,31.20 30.00))"
-)
-_BLOCK_BOUNDARY = (
-    "POLYGON((31.201 30.001,31.209 30.001,31.209 30.009,31.201 30.009,31.201 30.001))"
-)
+_FARM_BOUNDARY = "POLYGON((31.20 30.00,31.24 30.00,31.24 30.04,31.20 30.04,31.20 30.00))"
+_BLOCK_BOUNDARY = "POLYGON((31.201 30.001,31.209 30.001,31.209 30.009,31.201 30.009,31.201 30.001))"
 
 
 @pytest.fixture

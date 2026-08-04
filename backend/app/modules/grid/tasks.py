@@ -447,3 +447,130 @@ async def _backfill_block_async(
         scenes_queued=len(jobs),
     )
     return {"scenes_queued": len(jobs)}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="grid.cleanup_superseded_grids",
+    bind=False,
+    ignore_result=True,
+)
+def cleanup_superseded_grids(
+    retention_days: int = 7,
+    max_configs_per_tenant: int = 20,
+) -> dict[str, int]:
+    """Drop the rows belonging to grid configs that govern nothing.
+
+    A config is *superseded* once another geometry has been recomputed
+    across its whole range (the second step of a rezone). At that point it
+    describes no scene time, but its cells and aggregate rows are still on
+    disk. This is the task that reclaims them.
+
+    Deliberately not run inline with a rezone. Deleting from a compressed
+    hypertable is slow, and doing it inside the apply request would make an
+    operator watch a spinner while history is dismantled — worse, a failure
+    mid-delete would leave the request looking like it failed when the
+    cutover had already succeeded.
+
+    ``retention_days`` is a deliberate delay, not a performance knob: it
+    keeps the previous geometry recoverable for a while after a rezone that
+    turns out to have been a mistake. It is the same mechanism the
+    aggregate-retention policy (G-8) needs, just on a shorter timer.
+    """
+    return _run_task(
+        _cleanup_superseded_async(
+            retention_days=retention_days,
+            max_configs_per_tenant=max_configs_per_tenant,
+        )
+    )
+
+
+async def _cleanup_superseded_async(
+    *, retention_days: int, max_configs_per_tenant: int
+) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    configs_dropped = 0
+    aggregates_deleted = 0
+    tenants_failed = 0
+
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        factory = AsyncSessionLocal()
+        async with factory() as session:
+            # One SAVEPOINT per tenant. Without it a failure on any tenant
+            # aborts the surrounding transaction, and every later statement
+            # — including the reset — dies with "current transaction is
+            # aborted", turning one bad tenant into a total sweep failure.
+            try:
+                async with session.begin():
+                    await _set_tenant_context(session, schema)
+                    result = await session.execute(
+                        text(
+                            """
+                            WITH doomed AS (
+                                SELECT id FROM grid_configs
+                                 WHERE superseded_at IS NOT NULL
+                                   AND superseded_at < now()
+                                       - make_interval(days => :days)
+                                 ORDER BY superseded_at
+                                 LIMIT :cap
+                            ),
+                            cells AS (
+                                SELECT id FROM grid_cells
+                                 WHERE grid_config_id IN (SELECT id FROM doomed)
+                            ),
+                            killed_aggs AS (
+                                DELETE FROM block_grid_aggregates
+                                 WHERE cell_id IN (SELECT id FROM cells)
+                                RETURNING 1
+                            ),
+                            killed_cells AS (
+                                DELETE FROM grid_cells
+                                 WHERE grid_config_id IN (SELECT id FROM doomed)
+                                RETURNING 1
+                            ),
+                            killed_cfg AS (
+                                DELETE FROM grid_configs
+                                 WHERE id IN (SELECT id FROM doomed)
+                                RETURNING 1
+                            )
+                            SELECT
+                                (SELECT count(*) FROM killed_aggs) AS aggs,
+                                (SELECT count(*) FROM killed_cfg)  AS cfgs
+                            """
+                        ),
+                        {"days": retention_days, "cap": max_configs_per_tenant},
+                    )
+                    counts = result.mappings().one()
+                    aggregates_deleted += int(counts["aggs"])
+                    configs_dropped += int(counts["cfgs"])
+            except Exception:
+                tenants_failed += 1
+                _log.exception("grid_cleanup_superseded_failed", tenant_schema=schema)
+
+    _log.info(
+        "grid_cleanup_superseded",
+        tenants_scanned=len(schemas),
+        configs_dropped=configs_dropped,
+        aggregates_deleted=aggregates_deleted,
+        tenants_failed=tenants_failed,
+    )
+    return {
+        "tenants_scanned": len(schemas),
+        "configs_dropped": configs_dropped,
+        "aggregates_deleted": aggregates_deleted,
+        "tenants_failed": tenants_failed,
+    }
