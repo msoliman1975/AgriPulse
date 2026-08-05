@@ -16,7 +16,8 @@
     "high": "High",
     "low": "Low",
     "precip": "Precip",
-    "precipChance": "Chance"
+    "precipChance": "Chance",
+    "humidity": "Humidity"
   },
   "refresh": {
     "button": "Refresh weather",

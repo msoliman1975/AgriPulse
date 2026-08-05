@@ -16,7 +16,8 @@
     "high": "العظمى",
     "low": "الصغرى",
     "precip": "الأمطار",
-    "precipChance": "احتمال"
+    "precipChance": "احتمال",
+    "humidity": "الرطوبة"
   },
   "refresh": {
     "button": "تحديث الطقس",

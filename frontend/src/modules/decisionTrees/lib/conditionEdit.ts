@@ -66,13 +66,14 @@ export const WEATHER_SCOPES = [
 // climatology. Mirrors WEATHER_INDEX_KEYS in
 // backend/app/shared/conditions/context.py.
 export const WEATHER_INDEX_KEYS = ["value", "baseline_deviation"] as const;
-// The seven catalog codes (public weather_indices_catalog). Kept as a
+// The eight catalog codes (public weather_indices_catalog). Kept as a
 // closed list so the author picks from a dropdown rather than guessing
-// a code; mirrors the migration 0037 seed.
+// a code; mirrors the migration 0037 seed + 0049 (`humidity`).
 export const WEATHER_INDEX_CODES = [
   "temperature",
   "radiation",
   "wind",
+  "humidity",
   "rainfall",
   "evapotranspiration",
   "evaporation_coeff",

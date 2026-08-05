@@ -242,18 +242,21 @@ async def test_forecast_endpoint_aggregates_in_farm_tz(admin_session: AsyncSessi
     today_midnight_utc = today_local_midnight_cairo.astimezone(UTC)
 
     # Two hours today (cairo), high 30 / low 25, with one rainy hour
-    # (probability 80%, precip 5mm). Tomorrow has nothing — that day's
-    # bucket should come back all-None but still present.
+    # (probability 80%, precip 5mm) and humidity 40 / 60 → mean 50.
+    # Tomorrow has nothing — that day's bucket should come back all-None
+    # but still present.
     fcs = (
         HourlyForecast(
             time=today_midnight_utc + timedelta(hours=10),  # 10:00 Cairo today
             air_temp_c=Decimal("30.0"),
+            humidity_pct=Decimal("40.0"),
             precipitation_mm=Decimal("0.0"),
             precipitation_probability_pct=Decimal("10.0"),
         ),
         HourlyForecast(
             time=today_midnight_utc + timedelta(hours=14),  # 14:00 Cairo today
             air_temp_c=Decimal("25.0"),
+            humidity_pct=Decimal("60.0"),
             precipitation_mm=Decimal("5.0"),
             precipitation_probability_pct=Decimal("80.0"),
         ),
@@ -285,10 +288,13 @@ async def test_forecast_endpoint_aggregates_in_farm_tz(admin_session: AsyncSessi
     assert Decimal(today_bucket["low_c"]) == Decimal("25.0")
     assert Decimal(today_bucket["precip_mm_total"]) == Decimal("5.00")
     assert Decimal(today_bucket["precip_probability_max_pct"]) == Decimal("80.0")
+    # Humidity is a MEAN over the day's hours, not a max: (40 + 60) / 2.
+    assert Decimal(today_bucket["humidity_mean_pct"]) == Decimal("50.0")
     # Tomorrow has no data — the row exists but values are all None.
     tomorrow_bucket = body["days"][1]
     assert tomorrow_bucket["high_c"] is None
     assert tomorrow_bucket["precip_mm_total"] is None
+    assert tomorrow_bucket["humidity_mean_pct"] is None
 
 
 @pytest.mark.asyncio

@@ -30,6 +30,9 @@ export interface DailyForecast {
   low_c: string | null;
   precip_mm_total: string | null;
   precip_probability_max_pct: string | null;
+  /** Daily MEAN relative humidity % (not a max). Null when the provider
+   * returned no humidity hours for that day. */
+  humidity_mean_pct: string | null;
 }
 
 export interface ForecastResponse {

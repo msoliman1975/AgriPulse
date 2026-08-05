@@ -1,5 +1,5 @@
-"""Pure functions that project hourly/daily weather into the 7 first-class
-weather indices (catalog seeded in public migration 0037).
+"""Pure functions that project hourly/daily weather into the 8 first-class
+weather indices (catalog seeded in public migrations 0037 + 0049).
 
 Side-effect-free so the derivation task and unit tests share the code.
 The task in ``tasks.py`` is the only caller: it aggregates a window of
@@ -12,6 +12,7 @@ Index → source mapping (codes match ``public.weather_indices_catalog``):
   * ``temperature``        — mean / min / max from ``DailyDerived``
   * ``radiation``          — daily mean W/m² (+ daily insolation MJ/m²)
   * ``wind``               — mean / max speed (+ vector-mean direction)
+  * ``humidity``           — daily mean relative humidity %
   * ``rainfall``           — daily precip (+ rolling 7-/30-day totals)
   * ``evapotranspiration`` — daily ET₀ total
   * ``evaporation_coeff``  — soil dry-down: rolling Σ(ET₀ - precip), 30d
@@ -236,6 +237,16 @@ def project_indices(
                 value=radwind.wind_mean_m_s,
                 value_max=radwind.wind_max_m_s,
                 value_aux=aux,
+            )
+        )
+
+    # humidity — daily mean relative humidity %. Already aggregated for the
+    # risk models; emitting it here makes it a chartable first-class index.
+    if radwind is not None and radwind.humidity_mean_pct is not None:
+        out.append(
+            ProjectedIndex(
+                index_code="humidity",
+                value=radwind.humidity_mean_pct,
             )
         )
 

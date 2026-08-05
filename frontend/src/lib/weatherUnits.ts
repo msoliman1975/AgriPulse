@@ -47,7 +47,9 @@ export function formatPrecip(
   return `${MM_TO_IN(n).toFixed(2)} in`;
 }
 
-export function formatProbability(
+/** Whole-percent display. Unit-system independent — a percentage reads
+ * the same metric or imperial. */
+export function formatPercent(
   pct: string | number | null | undefined,
   options: { emptyDash?: string } = {},
 ): string {
@@ -56,6 +58,9 @@ export function formatProbability(
   if (n === null) return dash;
   return `${Math.round(n)}%`;
 }
+
+/** Precipitation probability — same formatting as any other percent. */
+export const formatProbability = formatPercent;
 
 export function formatWindSpeed(
   ms: string | number | null | undefined,

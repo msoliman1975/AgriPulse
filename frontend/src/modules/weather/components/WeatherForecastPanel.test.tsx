@@ -59,6 +59,7 @@ const sampleForecast = {
       low_c: "22.0",
       precip_mm_total: "0.0",
       precip_probability_max_pct: "10.0",
+      humidity_mean_pct: "44.2",
     },
     {
       date: "2026-05-07",
@@ -66,6 +67,7 @@ const sampleForecast = {
       low_c: "23.0",
       precip_mm_total: "5.5",
       precip_probability_max_pct: "80.0",
+      humidity_mean_pct: null,
     },
   ],
 };
@@ -82,6 +84,10 @@ describe("WeatherForecastPanel", () => {
     expect(screen.getByText(/32°/)).toBeInTheDocument();
     // Precip and probability per day.
     expect(screen.getByText(/Chance: 80%/)).toBeInTheDocument();
+    // Daily mean humidity, rounded to whole percent.
+    expect(screen.getByText(/Humidity: 44%/)).toBeInTheDocument();
+    // A day with no humidity hours shows a dash rather than 0%.
+    expect(screen.getByText(/Humidity: —/)).toBeInTheDocument();
   });
 
   it("triggers a refresh when the button is clicked", async () => {

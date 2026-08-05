@@ -143,7 +143,7 @@ def test_dry_down_missing_precip_counts_as_zero_rain() -> None:
 # --- project_indices -------------------------------------------------------
 
 
-def test_project_indices_full_day_emits_all_seven() -> None:
+def test_project_indices_full_day_emits_all_eight() -> None:
     on = date(2026, 6, 15)
     daily = {
         on: _day(on, tmin=18, tmax=30, tmean=24, precip=2, et0=5),
@@ -156,12 +156,14 @@ def test_project_indices_full_day_emits_all_seven() -> None:
                 solar_radiation_w_m2=200,
                 wind_speed_m_s=2,
                 wind_direction_deg=180,
+                humidity_pct=50,
             ),
             _ih(
                 "2026-06-15T10:00",
                 solar_radiation_w_m2=400,
                 wind_speed_m_s=4,
                 wind_direction_deg=180,
+                humidity_pct=70,
             ),
         ]
     )
@@ -171,11 +173,14 @@ def test_project_indices_full_day_emits_all_seven() -> None:
         "temperature",
         "radiation",
         "wind",
+        "humidity",
         "rainfall",
         "evapotranspiration",
         "evaporation_coeff",
         "rain_et_balance",
     }
+    # Daily MEAN relative humidity — (50 + 70) / 2.
+    assert by_code["humidity"].value == Decimal("60")
     assert by_code["temperature"].value == Decimal("24")
     assert by_code["temperature"].value_min == Decimal("18")
     assert by_code["temperature"].value_max == Decimal("30")
@@ -199,3 +204,14 @@ def test_project_indices_skips_undefined() -> None:
     daily = {on: _day(on, tmean=20)}
     codes = {p.index_code for p in project_indices(on, daily, None)}
     assert codes == {"temperature"}
+
+
+def test_project_indices_emits_humidity_without_radiation_or_wind() -> None:
+    """Humidity is independent of the radiation/wind columns it rides with —
+    an hour with RH but no radiation still yields a humidity index row."""
+    on = date(2026, 6, 15)
+    daily = {on: _day(on, tmean=20)}
+    radwind = aggregate_radiation_wind_day([_ih("2026-06-15T22:00", humidity_pct=88)])
+    by_code = {p.index_code: p for p in project_indices(on, daily, radwind)}
+    assert set(by_code) == {"temperature", "humidity"}
+    assert by_code["humidity"].value == Decimal("88")
