@@ -68,6 +68,12 @@ class BlockSummary(BaseModel):
     ndre_current: float | None
     ndwi_current: float | None
     last_index_at: datetime | None
+    # The imagery product this block's sub-block grid is configured against,
+    # or null when it has no grid. The map turns its grid overlay on by
+    # default when ANY block in the farm carries one, and fetches cells only
+    # for the blocks that do — without this it would have to ask every block
+    # for its subscriptions first, N requests before drawing anything.
+    grid_product_id: UUID | None = None
 
 
 class BlocksSummaryResponse(BaseModel):
@@ -147,7 +153,35 @@ async def get_blocks_summary(
         .all()
     )
 
-    # 3. The full block-id roster — needed so blocks with no indices and
+    # 3. Current grid config per block, if any. `retired_at IS NULL` is the
+    #    live row; 0054 gave configs valid time, so a rezoned block has an
+    #    older superseded row alongside the current one and DISTINCT ON keeps
+    #    the newest. A block can in principle be gridded against more than one
+    #    product; the map colours by one index at a time, so the newest wins.
+    grid_rows = (
+        (
+            await tenant_session.execute(
+                text(
+                    """
+                    SELECT DISTINCT ON (g.block_id)
+                           g.block_id,
+                           g.product_id
+                    FROM grid_configs g
+                    JOIN blocks b ON b.id = g.block_id
+                    WHERE b.farm_id = :farm_id
+                      AND g.retired_at IS NULL
+                      AND g.superseded_at IS NULL
+                    ORDER BY g.block_id, g.created_at DESC
+                    """
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    # 4. The full block-id roster — needed so blocks with no indices and
     #    no alerts still appear in the response (rendered as "unknown").
     block_ids = (
         (
@@ -185,6 +219,8 @@ async def get_blocks_summary(
             "alert_severity": sev,
         }
 
+    grid_by_block: dict[UUID, UUID] = {r["block_id"]: r["product_id"] for r in grid_rows}
+
     units: list[BlockSummary] = []
     for bid in block_ids:
         idx = idx_by_block.get(bid, {})
@@ -214,6 +250,7 @@ async def get_blocks_summary(
                 ndvi_current=ndvi_current,
                 ndre_current=ndre_current,
                 ndwi_current=ndwi_current,
+                grid_product_id=grid_by_block.get(bid),
                 last_index_at=last_at,
             )
         )
