@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import { getFarm } from "@/api/farms";
-import { listBlocks, type Block } from "@/api/blocks";
 import { ErrorState } from "@/components/ErrorState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,14 +12,11 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
-import { ActiveRisksWidget } from "../components/ActiveRisksWidget";
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
-import { FarmWeatherChart } from "../components/FarmWeatherChart";
 import { KPICards } from "../components/KPICards";
 import { SeasonContextBar } from "../components/SeasonContextBar";
-import { WeatherIndicesStrip } from "../components/WeatherIndicesStrip";
-import { WeatherTrendsCard } from "../components/WeatherTrendsCard";
+import { WeatherSection } from "../components/WeatherSection";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -49,24 +45,6 @@ export function InsightsPage(): ReactNode {
   });
   const canReadWeather = useCapability("weather.read", { farmId });
   const canReadRisk = useCapability("weather_risk.read", { farmId });
-
-  // FarmWeatherChart keys on block_id but resolves to the farm
-  // centroid internally; pulling the first block is the existing
-  // contract. When a farm-level weather summary endpoint lands, drop this.
-  const [firstBlock, setFirstBlock] = useState<Block | null>(null);
-  useEffect(() => {
-    if (!farmId) return;
-    let cancelled = false;
-    void listBlocks(farmId)
-      .then((page) => {
-        if (cancelled) return;
-        setFirstBlock(page.items[0] ?? null);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [farmId]);
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -118,15 +96,9 @@ export function InsightsPage(): ReactNode {
 
       <FarmTrendChart farmId={farmId} />
 
-      {canReadWeather && firstBlock ? <FarmWeatherChart blockId={firstBlock.id} /> : null}
-
-      {canReadWeather ? <WeatherIndicesStrip farmId={farmId} /> : null}
-
-      {/* Sits under the strip: the strip answers "what is it now", this
-          answers "how has it moved", over the same spans as FarmTrendChart. */}
-      {canReadWeather ? <WeatherTrendsCard farmId={farmId} /> : null}
-
-      {canReadRisk ? <ActiveRisksWidget farmId={farmId} /> : null}
+      {/* One section for all of it: now → trend → outlook → risk. These were
+          four sibling cards saying "weather" four times over the same data. */}
+      {canReadWeather ? <WeatherSection farmId={farmId} showRisk={canReadRisk} /> : null}
 
       <BlockHealthScorecard farmId={farmId} />
     </Page>

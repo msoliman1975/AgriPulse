@@ -1,4 +1,9 @@
 {
+  "section": {
+    "title": "Weather",
+    "subtitle": "Farm-wide · now, trend, outlook and pressure",
+    "spanAria": "Weather time span"
+  },
   "strip": {
     "title": "Weather indices",
     "subtitle": "Farm-wide · vs. seasonal normal",
@@ -24,15 +29,15 @@
     "empty": "No data in this window."
   },
   "trends": {
-    "title": "Weather index trends",
-    "spanAria": "Weather trend time span",
+    "title": "Trend",
+    "showAll": "Show all indices",
     "modeAria": "Weather trend scale mode",
     "mode": {
       "units": "Units",
-      "anomaly": "Compare"
+      "compare": "Compare"
     },
     "hintUnits": "One chart per index, each on its own scale in its real unit. Values are not comparable between rows.",
-    "hintAnomaly": "Every index as a z-score against its seasonal normal. Zero is normal, so all indices share one scale and can be compared directly.",
+    "hintCompare": "The {{count}} indices furthest from their seasonal normal, as z-scores on one axis. Zero is normal, so co-movement is readable. Pick a card above to see any other index on its own.",
     "noData": "No weather index data for this period yet."
   }
 }
