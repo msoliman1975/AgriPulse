@@ -281,6 +281,7 @@ class InsightsService:
                 name_en=r["name_en"],
                 name_ar=r.get("name_ar"),
                 block_count=r["block_count"],
+                block_ids=list(r.get("block_ids") or []),
             )
             for r in rows
         ]
@@ -351,7 +352,13 @@ async def _select_farm_crops(session: AsyncSession, *, farm_id: UUID) -> list[di
                 text(
                     """
                 SELECT c.id AS crop_id, c.name_en, c.name_ar,
-                       COUNT(DISTINCT bc.block_id) AS block_count
+                       COUNT(DISTINCT bc.block_id) AS block_count,
+                       -- The blocks themselves, not just how many: the
+                       -- overview filters its block-scoped cards by crop on
+                       -- the client, and this is the only place the join is
+                       -- already being made. Without it the FE would have to
+                       -- ask /blocks/{id}/crop-assignments once per block.
+                       ARRAY_AGG(DISTINCT bc.block_id) AS block_ids
                 FROM block_crops bc
                 JOIN blocks b ON b.id = bc.block_id AND b.deleted_at IS NULL
                 JOIN public.crops c ON c.id = bc.crop_id

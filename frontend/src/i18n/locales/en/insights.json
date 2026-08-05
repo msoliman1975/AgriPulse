@@ -62,7 +62,10 @@
     "label": "On this farm:",
     "blockCount": "{{count}} block",
     "blockCount_other": "{{count}} blocks",
-    "noCrops": "{{count}} active blocks · no crops assigned yet"
+    "noCrops": "{{count}} active blocks · no crops assigned yet",
+    "all": "All",
+    "filterLabel": "Filter the overview by crop",
+    "filterScope": "Filtering blocks · farm weather is centroid data and stays farm-wide"
   },
   "scorecard": {
     "title": "Block health scorecard",

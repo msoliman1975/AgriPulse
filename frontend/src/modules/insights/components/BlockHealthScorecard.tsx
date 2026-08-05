@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO } from "date-fns";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -12,6 +12,8 @@ import { useDateLocale } from "@/hooks/useDateLocale";
 
 interface Props {
   farmId: string;
+  /** Blocks to show, or null for every block on the farm (the crop filter). */
+  blockIds?: readonly string[] | null;
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * Alert count links to /alerts?block_id=... — keeps this card a
  * read-only summary and the action surface elsewhere.
  */
-export function BlockHealthScorecard({ farmId }: Props): ReactNode {
+export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactNode {
   const { t } = useTranslation("insights");
   const dateLocale = useDateLocale();
   const { data, isLoading, isError } = useQuery({
@@ -32,6 +34,16 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });
+
+  // The crop filter narrows which rows are shown, not which are fetched: the
+  // summary is one request for the farm either way, and re-fetching per crop
+  // selection would trade a free filter for a round trip.
+  const rows = useMemo(() => {
+    const all = data?.blocks;
+    if (!all || !blockIds) return all;
+    const keep = new Set(blockIds);
+    return all.filter((b) => keep.has(b.block_id));
+  }, [data?.blocks, blockIds]);
 
   return (
     <Card noPadding className="p-4" aria-labelledby="scorecard-heading">
@@ -50,7 +62,7 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
           <Skeleton className="h-40 w-full" />
         ) : isError ? (
           <p className="py-8 text-center text-sm text-ap-crit">{t("scorecard.loadFailed")}</p>
-        ) : !data || data.blocks.length === 0 ? (
+        ) : !rows || rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-ap-muted">{t("scorecard.empty")}</p>
         ) : (
           <Table>
@@ -73,7 +85,7 @@ export function BlockHealthScorecard({ farmId }: Props): ReactNode {
               </Tr>
             </Thead>
             <Tbody>
-              {data.blocks.map((b) => (
+              {rows.map((b) => (
                 <Tr key={b.block_id} className="hover:bg-ap-bg/40">
                   <Td className="text-ap-ink">
                     <Link to={`/labs/map/${farmId}?unit=${b.block_id}`} className="hover:underline">

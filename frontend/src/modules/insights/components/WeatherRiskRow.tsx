@@ -8,6 +8,9 @@ import { Skeleton } from "@/components/Skeleton";
 
 interface Props {
   farmId: string;
+  /** Blocks to count, or null for every block (the crop filter). Risk is the
+   *  one weather reading that IS per-block, so it narrows with the crop. */
+  blockIds?: readonly string[] | null;
 }
 
 const LEVEL_RANK: Record<RiskLevel, number> = { low: 0, moderate: 1, high: 2 };
@@ -30,7 +33,7 @@ const LEVEL_DOT: Record<RiskLevel, string> = {
  *
  * Gated on `weather_risk.read` by the caller.
  */
-export function WeatherRiskRow({ farmId }: Props): ReactNode {
+export function WeatherRiskRow({ farmId, blockIds = null }: Props): ReactNode {
   const { t } = useTranslation("weatherRisk");
 
   const summaryQ = useQuery({
@@ -42,8 +45,10 @@ export function WeatherRiskRow({ farmId }: Props): ReactNode {
 
   // Worst level per block, then count those above "low".
   const { atRiskCount, highCount } = useMemo(() => {
+    const keep = blockIds ? new Set(blockIds) : null;
     const worst = new Map<string, RiskLevel>();
     for (const r of summaryQ.data?.risks ?? []) {
+      if (keep && !keep.has(r.block_id)) continue;
       const cur = worst.get(r.block_id);
       if (cur === undefined || LEVEL_RANK[r.level] > LEVEL_RANK[cur]) {
         worst.set(r.block_id, r.level);
@@ -56,7 +61,7 @@ export function WeatherRiskRow({ farmId }: Props): ReactNode {
       if (level === "high") high += 1;
     }
     return { atRiskCount: atRisk, highCount: high };
-  }, [summaryQ.data]);
+  }, [summaryQ.data, blockIds]);
 
   return (
     <div>
