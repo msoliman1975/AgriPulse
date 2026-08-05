@@ -37,6 +37,8 @@ from app.modules.farms.models import (
     Block,
     BlockAttachment,
     BlockCrop,
+    BlockCropAttributeValue,
+    BlockCropAttributeValueLog,
     Country,
     Crop,
     CropAttributeDefinition,
@@ -1224,6 +1226,74 @@ class FarmsRepository:
         )
         rows = (await self._tenant.execute(stmt)).scalars().all()
         return [_block_crop_to_dict(r) for r in rows]
+
+    async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID | None:
+        """Owning farm of an assignment, in one join — the capability check."""
+        return (
+            await self._tenant.execute(
+                select(Block.farm_id)
+                .join(BlockCrop, BlockCrop.block_id == Block.id)
+                .where(BlockCrop.id == block_crop_id, BlockCrop.deleted_at.is_(None))
+            )
+        ).scalar_one_or_none()
+
+    # ---- Crop attribute values (tenant) ---------------------------------
+
+    async def list_attribute_values(
+        self, *, block_crop_ids: Sequence[UUID]
+    ) -> list[BlockCropAttributeValue]:
+        """Values for many assignments in **one** query.
+
+        Batched deliberately: the map surface already died once on an N+1 that
+        exhausted the connection pool (#311), and this is read per block on
+        every farm-console load.
+        """
+        if not block_crop_ids:
+            return []
+        stmt = select(BlockCropAttributeValue).where(
+            BlockCropAttributeValue.block_crop_id.in_(list(block_crop_ids)),
+            BlockCropAttributeValue.deleted_at.is_(None),
+        )
+        return list((await self._tenant.execute(stmt)).scalars().all())
+
+    async def replace_attribute_values(
+        self,
+        *,
+        block_crop_id: UUID,
+        writes: Sequence[dict[str, Any]],
+        deletes: Sequence[BlockCropAttributeValue],
+        log_rows: Sequence[dict[str, Any]],
+    ) -> None:
+        """Apply one save: upserts, gate-clears and history in one transaction.
+
+        The caller has already resolved which definitions are visible and
+        coerced every value, so this is pure persistence. History rows are
+        written here rather than by a trigger because a trigger cannot see the
+        acting user.
+        """
+        for row in deletes:
+            await self._tenant.delete(row)
+        for payload in writes:
+            existing = payload.pop("_existing", None)
+            if existing is not None:
+                for key, value in payload.items():
+                    setattr(existing, key, value)
+            else:
+                self._tenant.add(BlockCropAttributeValue(block_crop_id=block_crop_id, **payload))
+        for log_payload in log_rows:
+            self._tenant.add(BlockCropAttributeValueLog(block_crop_id=block_crop_id, **log_payload))
+        await self._tenant.flush()
+
+    async def list_attribute_value_log(
+        self, *, block_crop_id: UUID, definition_code: str | None = None
+    ) -> list[BlockCropAttributeValueLog]:
+        stmt = select(BlockCropAttributeValueLog).where(
+            BlockCropAttributeValueLog.block_crop_id == block_crop_id
+        )
+        if definition_code is not None:
+            stmt = stmt.where(BlockCropAttributeValueLog.definition_code == definition_code)
+        stmt = stmt.order_by(BlockCropAttributeValueLog.changed_at.desc())
+        return list((await self._tenant.execute(stmt)).scalars().all())
 
     async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
         return (

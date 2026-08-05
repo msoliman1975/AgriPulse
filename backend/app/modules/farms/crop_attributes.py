@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
 VALUE_TYPES: tuple[str, ...] = (
@@ -232,6 +234,117 @@ def is_required(definition: Any, values: Mapping[str, Any]) -> bool:
 def visible_definitions(definitions: Sequence[Any], values: Mapping[str, Any]) -> list[Any]:
     """The subset of ``definitions`` whose gates are open for ``values``."""
     return [d for d in definitions if is_visible(d, values)]
+
+
+# Which typed column each value_type lands in. One mapping, used by the write
+# path, the read path, the report resolver and the decision-tree context —
+# a second copy is how a value gets written to one column and read from
+# another, which reads as "the field didn't save".
+VALUE_COLUMN_BY_TYPE: dict[str, str] = {
+    "integer": "value_numeric",
+    "decimal": "value_numeric",
+    "text": "value_text",
+    "boolean": "value_boolean",
+    "date": "value_date",
+    "single_select": "value_option",
+    "multi_select": "value_options",
+}
+
+
+def _coerce_number(definition: Any, raw: Any) -> Decimal:
+    code = definition.code
+    try:
+        number = Decimal(str(raw))
+    except (InvalidOperation, TypeError) as exc:
+        raise ValueError(f"{code}: {raw!r} is not a number") from exc
+    if definition.value_type == "integer" and number != number.to_integral_value():
+        raise ValueError(f"{code}: must be a whole number")
+    minimum = getattr(definition, "value_min", None)
+    maximum = getattr(definition, "value_max", None)
+    if minimum is not None and number < Decimal(str(minimum)):
+        raise ValueError(f"{code}: {number} is below the minimum {minimum}")
+    if maximum is not None and number > Decimal(str(maximum)):
+        raise ValueError(f"{code}: {number} is above the maximum {maximum}")
+    return number
+
+
+def _coerce_date(definition: Any, raw: Any) -> date:
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    try:
+        return date.fromisoformat(str(raw))
+    except ValueError as exc:
+        raise ValueError(f"{definition.code}: {raw!r} is not an ISO date (YYYY-MM-DD)") from exc
+
+
+def _coerce_text(definition: Any, raw: Any) -> str:
+    value = str(raw)
+    limit = getattr(definition, "text_max_length", None) or 500
+    if len(value) > limit:
+        raise ValueError(f"{definition.code}: longer than {limit} characters")
+    return value
+
+
+def _coerce_boolean(definition: Any, raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    raise ValueError(f"{definition.code}: expected true or false")
+
+
+def _option_codes(definition: Any) -> set[Any]:
+    return {_option_code(o) for o in (getattr(definition, "options", None) or [])}
+
+
+def _coerce_single_select(definition: Any, raw: Any) -> str:
+    allowed = _option_codes(definition)
+    if raw not in allowed:
+        raise ValueError(f"{definition.code}: {raw!r} is not one of {sorted(allowed)}")
+    return str(raw)
+
+
+def _coerce_multi_select(definition: Any, raw: Any) -> list[str] | None:
+    if not isinstance(raw, list | tuple):
+        raise ValueError(f"{definition.code}: expected a list of option codes")
+    allowed = _option_codes(definition)
+    chosen = list(dict.fromkeys(raw))
+    unknown = [v for v in chosen if v not in allowed]
+    if unknown:
+        raise ValueError(f"{definition.code}: {unknown!r} are not options of this attribute")
+    # An empty selection is an absent value, not an empty array — see the
+    # options_non_empty CHECK in tenant migration 0055.
+    return [str(v) for v in chosen] or None
+
+
+_COERCERS: dict[str, Any] = {
+    "integer": _coerce_number,
+    "decimal": _coerce_number,
+    "text": _coerce_text,
+    "boolean": _coerce_boolean,
+    "date": _coerce_date,
+    "single_select": _coerce_single_select,
+    "multi_select": _coerce_multi_select,
+}
+
+
+def coerce_value(definition: Any, raw: Any) -> Any:
+    """Validate + coerce one submitted value against its definition.
+
+    Returns the Python object to bind to the typed column — ``Decimal`` for
+    numerics, ``date`` for dates, ``list[str]`` for multi-select — never a
+    string standing in for one. Passing an ISO string through a
+    ``CAST(:x AS date)`` is precisely the bug that took the backfill console
+    down (#331), so the coercion happens here, once, in typed Python.
+
+    Raises ``ValueError`` with a message naming the attribute.
+    """
+    if raw is None or raw == "":
+        return None
+    coercer = _COERCERS.get(definition.value_type)
+    if coercer is None:
+        raise ValueError(f"{definition.code}: unknown value_type {definition.value_type!r}")
+    return coercer(definition, raw)
 
 
 def _option_code(option: Any) -> Any:

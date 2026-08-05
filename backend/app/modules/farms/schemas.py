@@ -464,6 +464,47 @@ class CropAttributeDefinitionUpdateRequest(_CropAttributeWriteBase):
     is_active: bool | None = None
 
 
+class BlockCropAttributesResponse(BaseModel):
+    """Resolved definitions + current values for one crop → block assignment.
+
+    Definitions ship with the values so the form can render, gate and validate
+    from a single response — a second round trip to the catalog is how the
+    form and the server end up disagreeing about which fields are required.
+    """
+
+    block_crop_id: UUID
+    crop_path: str
+    definitions: list[CropAttributeDefinitionResponse]
+    values: dict[str, Any] = Field(default_factory=dict)
+
+
+class BlockCropAttributesWriteRequest(BaseModel):
+    """PUT body — the whole visible form, not one field.
+
+    Requiredness depends on a gate, and the gate depends on a sibling field's
+    value, so a per-field write could land a state the form itself rejects.
+    Omitted codes keep their stored value; a code sent as ``null`` clears it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class BlockCropAttributeHistoryEntry(BaseModel):
+    id: UUID
+    block_crop_id: UUID
+    definition_id: UUID
+    definition_code: str
+    value: Any = None
+    previous_value: Any = None
+    # set | updated | cleared | cleared_by_gate — the last distinguishes a
+    # value dropped because its gate closed from one a user cleared.
+    change_kind: str
+    changed_at: datetime
+    changed_by: UUID | None = None
+
+
 # ---------- Farms -----------------------------------------------------------
 
 

@@ -489,6 +489,88 @@ class BlockCrop(Base, TimestampedMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class BlockCropAttributeValue(Base, TimestampedMixin):
+    """One crop-attribute value on one crop → block assignment.
+
+    Typed columns rather than a JSONB blob: the report column picker and the
+    decision-tree evaluator both *compare* these, and JSONB would force a CAST
+    on every comparison — the failure family behind #331/#332/#335. Exactly
+    one ``value_*`` column is non-null, enforced by a CHECK in tenant
+    migration 0055.
+
+    ``definition_id`` / ``definition_code`` are logical cross-schema refs to
+    ``public.crop_attribute_definitions`` (no DB FK — same arrangement as
+    ``block_crops.crop_id``). The code is denormalised because every consumer
+    keys by code, and because it keeps history readable after a definition is
+    retired.
+    """
+
+    __tablename__ = "block_crop_attribute_values"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("block_crops.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    definition_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    definition_code: Mapped[str] = mapped_column(Text, nullable=False)
+    value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+
+
+class BlockCropAttributeValueLog(Base):
+    """Append-only history of one attribute's value on one assignment.
+
+    Written by the service in the same transaction as the value write — a DB
+    trigger has no access to the acting user. Carries both the previous and
+    the new value so a row is self-describing, and distinguishes
+    ``cleared_by_gate`` from a user clearing a field: "who deleted the
+    transplant date?" has an answer when the real cause was someone switching
+    the establishment method back to Seed.
+
+    This is also what lets a report resolve a value **as of the period end**
+    rather than silently back-dating today's number onto a Q1 report.
+    """
+
+    __tablename__ = "block_crop_attribute_value_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("block_crops.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    definition_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    definition_code: Mapped[str] = mapped_column(Text, nullable=False)
+    value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    prev_value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    prev_value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prev_value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    prev_value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    prev_value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prev_value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # set | updated | cleared | cleared_by_gate
+    change_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    changed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
 class GrowthStageLog(Base, TimestampedMixin):
     """Append-only history of phenology transitions for a block.
 

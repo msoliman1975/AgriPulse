@@ -36,6 +36,9 @@ from app.modules.farms.schemas import (
     AutoGridResponse,
     BlockCreateRequest,
     BlockCropAssignRequest,
+    BlockCropAttributeHistoryEntry,
+    BlockCropAttributesResponse,
+    BlockCropAttributesWriteRequest,
     BlockCropResponse,
     BlockCropUpdateRequest,
     BlockDetailResponse,
@@ -774,6 +777,77 @@ async def list_block_crops(
         raise BlockNotFoundError(block_id)
 
     return await service.list_block_crops(block_id=block_id)
+
+
+# ---------- Crop attribute values (per assignment) --------------------------
+#
+# Reads are gated by `block.read` on the owning farm and writes by
+# `block.update_metadata` — attribute values are assignment metadata, not a
+# separate permission surface.
+
+
+@router.get(
+    "/crop-assignments/{block_crop_id}/attributes",
+    response_model=BlockCropAttributesResponse,
+    summary="Resolved crop attribute definitions + current values for an assignment.",
+)
+async def get_block_crop_attributes(
+    block_crop_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import CropAssignmentNotFoundError
+
+    farm_id = await service.get_block_crop_farm_id(block_crop_id=block_crop_id)
+    if not has_capability(context, "block.read", farm_id=farm_id):
+        raise CropAssignmentNotFoundError(block_crop_id)
+    return await service.get_block_crop_attributes(block_crop_id=block_crop_id)
+
+
+@router.put(
+    "/crop-assignments/{block_crop_id}/attributes",
+    response_model=BlockCropAttributesResponse,
+    summary="Replace the crop attribute values on an assignment (whole form).",
+)
+async def put_block_crop_attributes(
+    block_crop_id: UUID,
+    payload: BlockCropAttributesWriteRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    from app.modules.farms.errors import CropAssignmentNotFoundError
+
+    farm_id = await service.get_block_crop_farm_id(block_crop_id=block_crop_id)
+    if not has_capability(context, "block.read", farm_id=farm_id):
+        raise CropAssignmentNotFoundError(block_crop_id)
+    if not has_capability(context, "block.update_metadata", farm_id=farm_id):
+        raise CropAssignmentNotFoundError(block_crop_id)
+    return await service.set_block_crop_attributes(
+        block_crop_id=block_crop_id,
+        submitted=payload.attributes,
+        actor_user_id=context.user_id,
+    )
+
+
+@router.get(
+    "/crop-assignments/{block_crop_id}/attributes/history",
+    response_model=list[BlockCropAttributeHistoryEntry],
+    summary="Change history for an assignment's crop attributes.",
+)
+async def get_block_crop_attribute_history(
+    block_crop_id: UUID,
+    code: str | None = Query(default=None),
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    from app.modules.farms.errors import CropAssignmentNotFoundError
+
+    farm_id = await service.get_block_crop_farm_id(block_crop_id=block_crop_id)
+    if not has_capability(context, "block.read", farm_id=farm_id):
+        raise CropAssignmentNotFoundError(block_crop_id)
+    return await service.list_block_crop_attribute_history(
+        block_crop_id=block_crop_id, definition_code=code
+    )
 
 
 # ---------- Growth-stage logs ----------------------------------------------
