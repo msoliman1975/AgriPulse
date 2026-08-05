@@ -301,17 +301,33 @@ export function MapCanvas({
   onGridCellClickRef.current = onGridCellClick;
   // Tracks the farm we last fit-bounds to, so data refetches don't re-zoom.
   const lastFitKeyRef = useRef<string | null>(null);
+  // The mount effect has `[]` deps, so it reads the FIRST render's geometry
+  // through this ref (same pattern as the callback refs above). Callers gate
+  // the canvas on their data query, so the farm is already known at mount —
+  // seeding the constructor with its bounds is what removes the zoom flash.
+  const initialViewRef = useRef({ geojson, farmBoundary, fitBoundsKey });
 
   // Initial mount.
   useEffect(() => {
     if (!containerRef.current) return;
+    // Framing the map at construction, instead of flying to the farm once the
+    // data effect runs, is what stops the "open Farm Management → watch it
+    // zoom in" flash: otherwise the first paint is the default view below.
+    // maplibre applies `bounds` after center/zoom, with duration forced to 0.
+    const initial = initialViewRef.current;
+    const initialBounds = computeBounds(initial.geojson, initial.farmBoundary ?? null);
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: buildStyle(),
       center: [31.0, 30.5],
       zoom: 14,
+      bounds: initialBounds ?? undefined,
+      fitBoundsOptions: { padding: 40 },
       attributionControl: { compact: true },
     });
+    // Already framed on this farm — record it so the data effect below does
+    // not animate a second fit over an already-correct view.
+    if (initialBounds) lastFitKeyRef.current = initial.fitBoundsKey;
     mapRef.current = map;
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
@@ -731,7 +747,13 @@ export function MapCanvas({
       if (lastFitKeyRef.current !== fitBoundsKey) {
         const bounds = computeBounds(geojson, farmBoundary ?? null);
         if (bounds) {
-          map.fitBounds(bounds, { padding: 40, duration: 600 });
+          // Animate only when moving BETWEEN farms — the motion tells the user
+          // the map followed their switch. A first fit here means the mount
+          // had no geometry yet, so animating it would just be the flash.
+          map.fitBounds(bounds, {
+            padding: 40,
+            duration: lastFitKeyRef.current === null ? 0 : 600,
+          });
           lastFitKeyRef.current = fitBoundsKey;
         }
       }
