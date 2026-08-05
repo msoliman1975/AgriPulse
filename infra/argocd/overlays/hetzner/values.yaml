@@ -427,13 +427,52 @@ global:
   #   (frontend) -- but the migrations do NOT roll back with it. 0053 and
   #   0054 stay applied; undoing them is a manual per-tenant alembic
   #   downgrade. tile-server stays 9d140cc.
+  # bb87e4f = two weather/console PRs promoted together: #357 (humidity as the
+  #   8th first-class weather index) and #356 (one Block Dock tab per index
+  #   family, each index defined and its reading interpreted).
+  #   ONE PUBLIC MIGRATION, 0049, which only INSERTs the humidity row into
+  #   weather_indices_catalog (ON CONFLICT DO NOTHING). The PreSync migrate Job
+  #   runs it before any new pod goes live and fails closed, so a failure
+  #   leaves prod on 608e917 rather than half-migrated. No tenant migration.
+  #   Humidity was ingested and stored all along -- Open-Meteo
+  #   relative_humidity_2m lands in weather_observations/weather_forecasts and
+  #   aggregate_radiation_wind_day already computed humidity_mean_pct -- but it
+  #   was consumed only by the Phase-2 disease risk models. The catalog row is
+  #   what makes project_indices() start writing weather_index_daily rows for
+  #   it, so EXISTING FARMS GROW A HUMIDITY SERIES ONLY FORWARD. An empty
+  #   humidity trend on day one is correct, not a broken deploy; history needs
+  #   weather.backfill_weather_indices plus a manual refresh_continuous_
+  #   aggregate below the CAGG watermark. Its climatology band and z-score
+  #   additionally need >=3 samples per day-of-year, so expect no anomaly chip
+  #   for a while after that.
+  #   Everything downstream keys generically off index_code (baselines, the
+  #   z-score sweep, the Insights strip, the catalog endpoint), so the only
+  #   closed list that had to change was the frontend's WEATHER_INDEX_CODES --
+  #   which means the decision-tree visual builder now offers humidity as a
+  #   weather_index condition source. Trees authored against it stay dormant
+  #   until the series exists.
+  #   What to watch: (1) /weather/indices/catalog returns EIGHT codes in
+  #   sort_order, humidity last at 8 -- the original seven keep their
+  #   positions. (2) The block forecast panel gains a humidity line; it is the
+  #   day-bucket MEAN of hourly RH, not a max, so a partial day still averages
+  #   correctly. (3) #356 is frontend-only: the dock's flat "Index" pill row is
+  #   gone, replaced by a tab per family, and each tab now carries a definition
+  #   and scale per index plus a sentence interpreting the charted value. The
+  #   family formerly called "Water & moisture" is now just "Moisture" -- the
+  #   weather/irrigation tab keeps the water name. NDWI is described as a
+  #   SURFACE-water index there (McFeeters, inverted scale) because that is
+  #   what the backend computes; the old "Canopy water content" label was
+  #   Gao's NIR/SWIR formula, i.e. NDMI. A dense canopy reading strongly
+  #   negative on NDWI is correct.
+  #   Rollback is this tag back to 608e917 on all three; 0049 stays applied,
+  #   which is harmless (an unused catalog row). tile-server stays 9d140cc.
   images:
     api:
-      tag: "608e917"
+      tag: "bb87e4f"
     workers:
-      tag: "608e917"
+      tag: "bb87e4f"
     frontend:
-      tag: "608e917"
+      tag: "bb87e4f"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
