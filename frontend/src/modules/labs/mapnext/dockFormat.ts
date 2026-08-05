@@ -1,9 +1,10 @@
 // Pure helpers for the Block Dock. Kept out of the component files so the
 // tricky bits — reading a condition step back into "actual vs. threshold" —
 // are unit-testable without rendering anything.
+import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import type { ExplainStep } from "@/api/recommendations";
 
-import { HEALTH_DOT } from "./constants";
+import { HEALTH_DOT, INDEX_BANDS, type IndexBand } from "./constants";
 
 export function fmt(v: number | null | undefined, digits = 2): string {
   return v == null ? "—" : v.toFixed(digits);
@@ -25,6 +26,21 @@ export function deltaLabel(d: number | null | undefined): {
   if (d < -0.05) return { text: d.toFixed(2), arrow: "▼", color: HEALTH_DOT.critical };
   if (d < -0.01) return { text: d.toFixed(2), arrow: "▼", color: HEALTH_DOT.watch };
   return { text: "±0", arrow: "→", color: HEALTH_DOT.unknown };
+}
+
+/** Which interpretation band a reading falls in, or null when there is nothing
+ * to interpret — a grid-only index has no block-wide value, and neither does a
+ * block the pipeline has not produced a clear scene for yet.
+ *
+ * Bands are ascending and inclusive on `max`, so the first one the value fits
+ * under wins. The Infinity terminator makes the fallback unreachable in
+ * practice; it is there so a hand-edited table that loses it degrades to "top
+ * band" rather than to null. NaN is treated as no reading, not as a band. */
+export function bandFor(code: ApiIndexCode, value: number | null | undefined): IndexBand | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const bands = INDEX_BANDS[code];
+  if (!bands?.length) return null;
+  return bands.find((b) => value <= b.max) ?? bands[bands.length - 1];
 }
 
 /** `fruit_set` → `Fruit set`. Growth stages and activity types arrive as raw

@@ -1,11 +1,16 @@
 // One agronomic family of indices — the Vigour & canopy / Nutrition /
-// Water & moisture tabs of the Block Dock.
+// Moisture tabs of the Block Dock.
 //
 // Replaces the single "Index" tab, whose pill row listed all seven indices
 // with no values and no grouping. A family tab answers one question, so it can
 // afford to show every member's current reading and 7-day delta side by side
 // (the comparison the flat row lost) and still chart the one index in the
 // family the block-level API actually serves.
+//
+// It also has room to say what each index IS and what its number MEANS, which
+// no surface in the console did: the reference column carries a definition and
+// a scale per index, and the charted reading is turned into a sentence via
+// INDEX_BANDS rather than left as a bare decimal.
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { useMemo, useState, type ReactNode } from "react";
@@ -21,7 +26,7 @@ import {
   isBlockLevel,
   type IndexFamilyKey,
 } from "./constants";
-import { deltaLabel, fmt, isoDay, isoDaysBefore, shortDate } from "./dockFormat";
+import { bandFor, deltaLabel, fmt, isoDay, isoDaysBefore, shortDate } from "./dockFormat";
 import { Dot } from "./ui";
 
 const PRESETS: { days: number; key: string }[] = [
@@ -190,6 +195,7 @@ export function DockFamilyView({
     return before.length ? before[before.length - 1].value : points[0].value;
   }, [points]);
   const delta = current != null && earlier != null && earlier !== 0 ? ((current - earlier) / Math.abs(earlier)) * 100 : null;
+  const chartedBand = bandFor(charted, current);
 
   return (
     <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
@@ -283,6 +289,19 @@ export function DockFamilyView({
           </span>
         </div>
 
+        {/* What the number above actually says about the block. The charted
+            index is the family's only block-level member, so this is the one
+            live interpretation on the tab — the rest carry their scale. */}
+        {chartedBand ? (
+          <div
+            className="mt-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm text-ap-ink"
+            style={{ borderColor: HEALTH_DOT[chartedBand.tone] }}
+          >
+            <Dot color={HEALTH_DOT[chartedBand.tone]} className="mt-1.5 shrink-0" />
+            <span>{t(`dock.band.${charted}.${chartedBand.key}`)}</span>
+          </div>
+        ) : null}
+
         <div className="mt-3 text-xs font-bold uppercase tracking-wide text-ap-primary">
           {t("dock.inThisFamily")}
         </div>
@@ -295,10 +314,24 @@ export function DockFamilyView({
                   {isBlockLevel(code) ? t("dock.blockLevel") : t("dock.gridOnly")}
                 </span>
               </div>
-              <p className="mt-0.5 text-ap-muted">{t(`dock.meaning.${code}`)}</p>
+              <dl className="mt-1 flex flex-col gap-1.5">
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-ap-muted">
+                    {t("dock.definition")}
+                  </dt>
+                  <dd className="text-ap-ink/90">{t(`dock.def.${code}`)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-ap-muted">
+                    {t("dock.howToRead")}
+                  </dt>
+                  <dd className="text-ap-muted">{t(`dock.scale.${code}`)}</dd>
+                </div>
+              </dl>
             </div>
           ))}
         </div>
+        <p className="mt-2 text-xs text-ap-muted">{t("dock.readingCaveat")}</p>
       </div>
     </div>
   );

@@ -381,9 +381,6 @@
     "weatherSubs": "Weather subscriptions",
     "tab": {
       "overview": "Overview",
-      "vigour": "Vigour & canopy",
-      "nutrition": "Nutrition",
-      "moisture": "Water & moisture",
       "environment": "Water & environment",
       "conditions": "Conditions",
       "field": "Field & plan",
@@ -438,7 +435,7 @@
     "family": {
       "vigour": "Vigour & canopy",
       "nutrition": "Nutrition",
-      "moisture": "Water & moisture"
+      "moisture": "Moisture"
     },
     "meaning": {
       "ndvi": "Overall canopy vigour",
@@ -446,8 +443,84 @@
       "savi": "Vigour adjusted for bare soil",
       "ndre": "Canopy nitrogen (red-edge)",
       "gndvi": "Chlorophyll / greenness",
-      "ndwi": "Canopy water content",
+      "ndwi": "Standing surface water",
       "ndmi": "Vegetation moisture (SWIR)"
+    },
+    "definition": "Definition",
+    "howToRead": "How to read it",
+    "readingCaveat": "What counts as healthy moves with the crop and its growth stage — read a value against where this block is in its season, not on its own.",
+    "def": {
+      "ndvi": "Compares near-infrared reflectance with red: (NIR − Red) / (NIR + Red). Healthy leaves reflect infrared strongly and absorb red, so the value rises with how much living, photosynthesising canopy covers the ground.",
+      "evi": "A vigour index built to survive what breaks NDVI: it uses the blue band to cancel haze and aerosol, and a soil term to damp the background. It keeps separating dense canopies apart after NDVI has flattened near its ceiling.",
+      "savi": "NDVI with a soil-brightness correction folded in (L = 0.5). Bare ground between rows inflates a plain NDVI reading, so SAVI is the more honest measure of vigour while cover is still patchy — early season, wide rows, or a thin stand.",
+      "ndre": "Compares near-infrared with the red-edge band, the narrow slice where chlorophyll absorption starts to fall away. It tracks chlorophyll — and so nitrogen — deeper into the canopy than NDVI, and keeps responding at full cover once NDVI has saturated.",
+      "gndvi": "NDVI with green in place of red: (NIR − Green) / (NIR + Green). Green reflectance is governed by chlorophyll concentration, so this leans towards leaf greenness and nitrogen rather than towards sheer canopy size.",
+      "ndwi": "McFeeters' surface-water index, (Green − NIR) / (Green + NIR). Water reflects green and absorbs infrared, so open water sits above zero while canopy and dry soil stay negative. It finds standing water on the block — not moisture inside the leaves.",
+      "ndmi": "Compares near-infrared with shortwave infrared: (NIR − SWIR1) / (NIR + SWIR1). Leaf water absorbs shortwave infrared, so the value falls as tissue dries — usually days before the canopy visibly wilts or NDVI reacts."
+    },
+    "scale": {
+      "ndvi": "Runs −1 to 1. Below 0.2 is effectively bare; 0.2–0.6 is a developing canopy; 0.6 and above is dense and actively growing.",
+      "evi": "Runs −1 to 1, and over crops usually 0.1–0.8. Below 0.2 is near-bare; 0.2–0.55 is developing; above 0.55 is dense cover.",
+      "savi": "Reads on roughly the same 0–1 scale as NDVI. Below 0.2 is near-bare; 0.2–0.55 developing; above 0.55 dense. Expect it to sit below NDVI wherever soil still shows.",
+      "ndre": "Over crops it usually runs 0.1–0.6. Below 0.2 is a thin or nitrogen-short canopy; 0.3–0.45 is comfortable; above 0.45 is well fed.",
+      "gndvi": "Usually 0.1–0.7 over crops. Below 0.2 is near-bare; 0.35–0.55 is a healthy green canopy; above 0.55 is dense and chlorophyll-rich.",
+      "ndwi": "Runs −1 to 1, and the scale is inverted against the canopy indices: a healthy crop reads well below −0.15, and anything above 0 is standing water.",
+      "ndmi": "Runs −1 to 1. Below 0.2 is a dry, stressed canopy; 0.2–0.4 is moderate; 0.4–0.6 is well watered; above 0.6 is a very wet canopy."
+    },
+    "band": {
+      "ndvi": {
+        "bare": "Bare soil, water or cloud — there is effectively no living canopy here.",
+        "verySparse": "Almost no green cover. Normal before emergence; a failed or removed stand if this block should be in crop.",
+        "sparse": "Sparse canopy. Expected soon after planting, and low for a crop that should be in full growth.",
+        "developing": "Canopy is filling in and partly covering the ground. On track mid-season, behind at peak.",
+        "dense": "Dense, actively growing canopy — the healthy range for most crops at full cover.",
+        "veryDense": "Very dense canopy. NDVI flattens out up here, so use NDRE to tell a good canopy from an excellent one."
+      },
+      "evi": {
+        "bare": "Bare or non-vegetated ground.",
+        "verySparse": "Almost no green cover.",
+        "sparse": "Sparse canopy — early growth, or a thin stand for this point in the season.",
+        "developing": "Canopy is developing, with soil still showing between plants.",
+        "dense": "Dense, vigorous canopy — a healthy reading at full cover.",
+        "veryDense": "Very high biomass. EVI still resolves detail up here, where NDVI would have flattened."
+      },
+      "savi": {
+        "bare": "Bare ground — the soil correction leaves almost nothing behind.",
+        "verySparse": "Barely any canopy above the soil background.",
+        "sparse": "Sparse cover. This is the reading to trust over NDVI while so much soil is visible.",
+        "developing": "Canopy developing over partly visible soil.",
+        "dense": "Dense canopy — vigorous once the soil background is corrected out.",
+        "veryDense": "Very dense canopy; the soil correction barely changes the answer at this much cover."
+      },
+      "ndre": {
+        "bare": "No meaningful red-edge signal — bare ground, or a canopy that has senesced.",
+        "low": "Low chlorophyll. A young canopy, a crop shutting down for harvest, or a real nitrogen shortfall.",
+        "moderate": "Moderate chlorophyll. Worth a tissue or soil-nitrogen check if the crop is past early growth.",
+        "good": "Healthy chlorophyll and nitrogen status for most crops at full cover.",
+        "high": "Strong red-edge signal — a well-fed, chlorophyll-rich canopy."
+      },
+      "gndvi": {
+        "bare": "Bare or non-vegetated ground.",
+        "low": "Little green biomass — early growth, senescence, or a chlorophyll shortfall.",
+        "moderate": "Moderate greenness. Reasonable while the canopy is still closing.",
+        "good": "Healthy green canopy with good chlorophyll content.",
+        "high": "Deep green, chlorophyll-rich canopy."
+      },
+      "ndwi": {
+        "denseCanopy": "Strongly negative — a dense canopy with no standing water. This is where a healthy field sits.",
+        "vegetated": "Vegetated ground with no surface water.",
+        "bareOrDamp": "Close to the water threshold. Usually bare or lightly covered soil, but wet ground reads the same — check NDVI to tell them apart.",
+        "standingWater": "Above zero: open water on the block. Expected during and just after flood irrigation; otherwise it points at ponding or poor drainage.",
+        "openWater": "Open water over much of the block — standing flood water, or a pond or canal inside the boundary."
+      },
+      "ndmi": {
+        "bare": "Too little canopy to read moisture from — this is bare ground, not a dry crop.",
+        "severeStress": "Very dry canopy. Severe water stress, or a stand too sparse to hold moisture.",
+        "stress": "Dry canopy — moderate to high water stress for a crop at full cover. Check the irrigation schedule.",
+        "moderate": "Moderate canopy moisture. Comfortable while cover is still partial, on the dry side at full canopy.",
+        "wellWatered": "Well-watered canopy with no sign of moisture stress.",
+        "veryWet": "Very high canopy water content — a full, well-irrigated canopy. If it stays here, check drainage."
+      }
     },
     "openFamily": "Open {{family}} →",
     "inThisFamily": "In this family",

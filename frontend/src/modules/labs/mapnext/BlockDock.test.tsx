@@ -154,11 +154,54 @@ describe("BlockDock", () => {
   it("gives every index family its own tab", async () => {
     renderDock();
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
-    for (const name of [/Vigour & canopy/, /Nutrition/, /Water & moisture/]) {
+    for (const name of [/Vigour & canopy/, /Nutrition/, /^Moisture$/]) {
       expect(screen.getByRole("tab", { name })).toBeTruthy();
     }
     // The undifferentiated "Index" tab the families replace is gone.
     expect(screen.queryByRole("tab", { name: /^Index$/ })).toBeNull();
+    // "Moisture" and "Water & environment" are different subjects; the family
+    // tab used to be called "Water & moisture", which read as the same one.
+    expect(screen.queryByRole("tab", { name: /Water & moisture/ })).toBeNull();
+  });
+
+  it("defines every index in the family and says how to read its scale", async () => {
+    renderDock();
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /^Moisture$/ }));
+
+    // Both members are defined, including the grid-only one that has no value
+    // of its own — a definition is reference material, not a reading.
+    expect(screen.getAllByText("Definition")).toHaveLength(2);
+    expect(screen.getAllByText("How to read it")).toHaveLength(2);
+    expect(screen.getByText(/McFeeters/)).toBeTruthy();
+    expect(screen.getByText(/Leaf water absorbs shortwave infrared/)).toBeTruthy();
+    // The scale text has to warn that this family's charted index is inverted.
+    expect(screen.getByText(/the scale is inverted against the canopy indices/)).toBeTruthy();
+    expect(screen.getByText(/moves with the crop and its growth stage/)).toBeTruthy();
+  });
+
+  it("turns the charted reading into a sentence rather than a bare decimal", async () => {
+    const { getTimeseries } = await import("@/api/indices");
+    // NDWI 0.05 is above McFeeters' zero threshold: standing water, which is
+    // the opposite verdict to what the same number would mean on NDVI.
+    vi.mocked(getTimeseries).mockResolvedValueOnce({
+      block_id: "b1",
+      index_code: "ndwi",
+      granularity: "daily",
+      points: [
+        // The API serves NUMERIC as a string; the view runs it through Number().
+        { time: "2026-06-01", mean: "0.04", min: null, max: null, valid_pixels: 400, valid_pixel_pct: "98" },
+        { time: "2026-06-30", mean: "0.05", min: null, max: null, valid_pixels: 400, valid_pixel_pct: "98" },
+      ],
+    });
+
+    renderDock();
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /^Moisture$/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Above zero: open water on the block/)).toBeTruthy(),
+    );
   });
 
   it("shows a family's members with their readings, grid-only ones disabled", async () => {

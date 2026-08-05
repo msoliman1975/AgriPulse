@@ -12,7 +12,7 @@
 // Views: Overview · one tab per index family · Water & environment ·
 // Conditions · Field & plan · Manage.
 //
-// The index families — Vigour & canopy, Nutrition, Water & moisture — are the
+// The index families — Vigour & canopy, Nutrition, Moisture — are the
 // grouping the first Farm Console inspector had and the 7-index flattening
 // lost (see INDEX_FAMILIES). Each is a tab rather than a heading inside one
 // "Index" tab, so a reader picks the question first and the acronym second.
@@ -367,7 +367,15 @@ export function BlockDock({
                     : "border-transparent text-ap-muted hover:text-ap-ink",
                 )}
               >
-                {v === "manage" ? `✎ ${t("dock.tab.manage")}` : t(`dock.tab.${v}`)}
+                {/* A family tab is labelled from `dock.family.*`, the same key
+                    the ViewBar hint and the family view read. It used to have
+                    its own copy under `dock.tab.*`, so renaming a family
+                    renamed it in one place and not the other. */}
+                {v === "manage"
+                  ? `✎ ${t("dock.tab.manage")}`
+                  : FAMILY_TABS.has(v)
+                    ? t(`dock.family.${v}`)
+                    : t(`dock.tab.${v}`)}
                 {v === "conditions" && failingCount ? (
                   <span className="ms-1.5 rounded-full bg-ap-crit px-1.5 py-0.5 text-xs font-bold text-white">
                     {failingCount}
