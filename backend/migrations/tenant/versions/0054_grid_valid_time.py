@@ -91,12 +91,50 @@ def upgrade() -> None:
     # Retired configs describe the period that ended when they were
     # retired. Active configs keep the open-ended default from the column
     # definition, so they need no UPDATE.
+    # Chain each (block, product)'s configs into a contiguous, non-overlapping
+    # timeline: a geometry governs from the moment the previous one was
+    # retired until it is itself retired. The oldest starts at -infinity, the
+    # live one runs open-ended.
+    #
+    # The obvious backfill — leave every row at the `-infinity` default and
+    # only stamp `effective_to = retired_at` — is WRONG, and wrong in a way
+    # no fresh-tenant test can catch: a block rezoned even once then holds
+    # [-infinity, T1) and [-infinity, NULL), which overlap, and the exclusion
+    # constraint below refuses to build. The migration would fail on exactly
+    # those tenants that have been using the feature.
+    #
+    # Ties (two configs retired at the same instant) are degenerate: the
+    # second governed no scene time at all. Those are marked superseded —
+    # which excludes them from the constraint — rather than given an empty
+    # range, since `effective_to > effective_from` forbids one.
     op.execute(
         """
-        UPDATE grid_configs
-           SET effective_to = retired_at
-         WHERE retired_at IS NOT NULL
-           AND effective_to IS NULL
+        WITH ordered AS (
+            SELECT id,
+                   LAG(retired_at) OVER (
+                       PARTITION BY block_id, product_id
+                       ORDER BY retired_at ASC NULLS LAST, created_at ASC, id ASC
+                   ) AS prev_retired
+              FROM grid_configs
+             WHERE deleted_at IS NULL
+        )
+        UPDATE grid_configs g
+           SET effective_from = COALESCE(o.prev_retired, '-infinity'::timestamptz),
+               effective_to = CASE
+                   WHEN g.retired_at IS NOT NULL
+                    AND (o.prev_retired IS NULL OR g.retired_at > o.prev_retired)
+                   THEN g.retired_at
+                   ELSE NULL
+               END,
+               superseded_at = CASE
+                   WHEN g.retired_at IS NOT NULL
+                    AND o.prev_retired IS NOT NULL
+                    AND g.retired_at <= o.prev_retired
+                   THEN g.retired_at
+                   ELSE g.superseded_at
+               END
+          FROM ordered o
+         WHERE o.id = g.id
         """
     )
 
