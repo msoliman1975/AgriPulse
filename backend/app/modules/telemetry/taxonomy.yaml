@@ -1,0 +1,97 @@
+# Product-telemetry vocabulary — the single source of truth.
+#
+# Closed on purpose. An open `track(anything)` API produces 400 event names in
+# six months and an unqueryable table. The ingest endpoint rejects anything not
+# named here, and TEL-5 generates the TypeScript union from this same file so
+# the two cannot drift. Adding an entry is a PR, deliberately.
+#
+# `props` allow-lists are the control that keeps agronomic and customer content
+# out of telemetry. A key absent from the list is DROPPED, not stored — so a
+# well-meaning PR cannot ship farm names, block notes or coordinates in here.
+# Keep values low-cardinality and non-identifying: enum-ish strings, counts,
+# booleans. Never free text, never a name, never a geometry.
+#
+# See docs/proposals/product-telemetry-plan.md § 4.
+
+version: 1
+
+# --- Event names (§ 4.1) ---------------------------------------------------
+# `props` lists the keys permitted on that event, beyond the typed columns.
+# `flow_abandon` is deliberately absent: it is DERIVED from a flow_start with
+# no flow_complete inside the timeout. A client cannot report the case we care
+# about most — the user who closed the laptop.
+events:
+  session_start:
+    props: []
+  session_end:
+    props: []
+  page_view:
+    props: []
+  page_leave:
+    # `hidden_ms` lets us sanity-check dwell: visible time is what we store in
+    # duration_ms, this is what we excluded.
+    props: [hidden_ms]
+  feature_used:
+    # `action` sub-divides a feature ("export", "apply", "rezone"); `index_code`
+    # and `count` are the two dimensions worth slicing capability usage by.
+    props: [action, index_code, count, source]
+  flow_start:
+    props: [entry_point]
+  flow_step:
+    props: [attempt]
+  flow_complete:
+    props: [steps_taken]
+  api_error:
+    # `method` + `problem_type` (the RFC-7807 `type`) are enough to group
+    # failures without capturing a response body.
+    props: [method, problem_type, retry_count]
+  client_error:
+    # `component` is a React component name, `digest` a stack fingerprint —
+    # never the message, which can interpolate user data.
+    props: [component, digest]
+
+# --- Feature enum (§ 4.2) --------------------------------------------------
+# One entry per capability we would actually make a roadmap decision about.
+# Coarse on purpose: ~20, not 200.
+features:
+  - farm_console
+  - farm_create
+  - block_create
+  - bulk_aoi_upload
+  - block_defaults
+  - grid_config
+  - imagery_config
+  - weather_config
+  - backfill_console
+  - insights
+  - index_chart
+  - weather_chart
+  - board
+  - plan_template
+  - alerts
+  - recommendations
+  - decision_tree_authoring
+  - decision_tree_dryrun
+  - signals
+  - reports
+  - report_export
+  - settings
+  - users_admin
+  - platform_admin
+
+# --- Tracked flows (§ 4.3) -------------------------------------------------
+# `timeout_minutes` is what the abandonment query (TEL-6) uses to decide a
+# flow_start without a flow_complete is dead rather than still in progress.
+flows:
+  farm_onboarding:
+    timeout_minutes: 60
+    steps: [draw_or_upload, details, blocks, subscriptions]
+  backfill_run:
+    timeout_minutes: 30
+    steps: [select_farm, select_range, preview, submit]
+  block_bulk_upload:
+    timeout_minutes: 30
+    steps: [pick_files, map_columns, reconcile, commit]
+  decision_tree_authoring:
+    timeout_minutes: 120
+    steps: [open, edit, dry_run, publish]
