@@ -491,11 +491,30 @@ global:
   #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
   #   bb87e4f, tile-server stays 9d140cc. Rollback is this tag back to
   #   bb87e4f alone.
+  # 2861fe0 = #360, a farm-wide cell-size Apply now reports the scenes it
+  #   actually queued. `scenes_queued` was derived from `scenes_affected`
+  #   -- the DESTRUCTIVE cost, counted through the geometry a rezone
+  #   replaces -- so a block gridded for the FIRST time, having no prior
+  #   geometry to count through, reported 0 while the backfill it had just
+  #   fired recomputed the block's entire imagery history. Seen on
+  #   Bashier Elkhier: a 36-block Apply said "0 scenes queued" and then ran
+  #   ~6,900 scenes for hours. Now counted from the ingestion jobs the
+  #   fan-out will walk.
+  #   REPORTING ONLY -- what the backfill does is unchanged, so an Apply
+  #   made before this deploy is not affected and needs no re-run. The
+  #   visible difference is that the Apply toast and the panel's footer
+  #   will now show a non-zero, often large, scene count on a first-time
+  #   grid. That number was always the truth; it was simply not shown.
+  #   Also fixes `list_backfill_jobs` capping BEFORE discarding rows with
+  #   no raw-bands asset, so a pair whose newest scenes lack the asset no
+  #   longer returns fewer scenes than the cap implies.
+  #   NO MIGRATION. Backend-only -- frontend stays 3537f12, tile-server
+  #   stays 9d140cc. Rollback is this tag back to bb87e4f.
   images:
     api:
-      tag: "bb87e4f"
+      tag: "2861fe0"
     workers:
-      tag: "bb87e4f"
+      tag: "2861fe0"
     frontend:
       tag: "3537f12"
     tileServer:
