@@ -87,6 +87,16 @@ export const WEATHER_RISK_FIELDS = ["score", "level"] as const;
 // the author picks from a dropdown; mirrors REGISTRY in
 // backend/app/modules/weather/risk/registry.py.
 export const WEATHER_RISK_CODES = ["powdery_mildew", "anthracnose", "fruit_fly"] as const;
+// Crop-attribute keys. Mirrors CROP_ATTRIBUTE_KEYS in
+// backend/app/shared/conditions/context.py. One key today; declared as a list
+// so a future `days_since` derivation slots in without changing the ref shape.
+export const CROP_ATTRIBUTE_KEYS = ["value"] as const;
+// NOTE: unlike every other source, crop_attribute has NO closed list of
+// codes here. The codes come from `public.crop_attribute_definitions` and grow
+// with the catalog, so the builder fetches them from
+// GET /api/v1/crops/attribute-definitions. That is why this file carries no
+// CROP_ATTRIBUTE_CODES constant — adding one would immediately be wrong.
+
 // Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
 // backend/app/shared/conditions/context.py.
 export const GRID_FIELDS = [
@@ -123,6 +133,7 @@ export type ValueRefSource =
   | "weather_risk"
   | "signals"
   | "grid"
+  | "crop_attribute"
   | "params";
 
 export type ValueRef =
@@ -141,6 +152,7 @@ export type ValueRef =
     }
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
+  | { source: "crop_attribute"; code: string; key: (typeof CROP_ATTRIBUTE_KEYS)[number] }
   | { source: "params"; name: string };
 
 // The right-hand side of a comparison can be a literal (number, string,
@@ -324,6 +336,16 @@ function parseValueRef(raw: unknown): ValueRef | null {
       field: field as (typeof GRID_FIELDS)[number],
     };
   }
+  if (source === "crop_attribute") {
+    const code = typeof raw.code === "string" ? raw.code : "";
+    const key = (raw.key ?? "value") as string;
+    if (!(CROP_ATTRIBUTE_KEYS as readonly string[]).includes(key)) return null;
+    return {
+      source: "crop_attribute",
+      code,
+      key: key as (typeof CROP_ATTRIBUTE_KEYS)[number],
+    };
+  }
   if (source === "params") {
     const name = typeof raw.name === "string" ? raw.name : "";
     return { source: "params", name };
@@ -413,6 +435,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "signals", code: ref.code, key: ref.key };
     case "grid":
       return { source: "grid", index_code: ref.index_code, field: ref.field };
+    case "crop_attribute":
+      return { source: "crop_attribute", code: ref.code, key: ref.key };
     case "params":
       return { source: "params", name: ref.name };
   }
@@ -491,6 +515,10 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "signals", code: "", key: "value_numeric" };
     case "grid":
       return { source: "grid", index_code: "ndvi", field: "flagged_count" };
+    case "crop_attribute":
+      // Empty code: the builder fills it from the fetched catalog, the same
+      // way `signals` starts blank.
+      return { source: "crop_attribute", code: "", key: "value" };
     case "params":
       return { source: "params", name: "" };
   }

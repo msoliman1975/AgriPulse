@@ -333,6 +333,7 @@
       "weatherRiskCode": "Pathogen / pest",
       "signalCode": "Signal code",
       "gridField": "Grid field",
+      "cropAttributeCode": "Crop field code",
       "paramName": "Parameter name",
       "rightNumber": "Number",
       "rightString": "Text",
@@ -348,6 +349,7 @@
         "weather_risk": "Disease/pest risk",
         "signals": "Custom signal",
         "grid": "Grid anomaly",
+        "crop_attribute": "Crop field",
         "params": "Tree parameter"
       }
     },

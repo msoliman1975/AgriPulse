@@ -15,9 +15,11 @@ import { useTranslation } from "react-i18next";
 import { type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { listCropAttributeCatalog } from "@/api/crops";
 import { listSignalDefinitions } from "@/api/signals";
 import {
   BLOCK_FIELDS,
+  CROP_ATTRIBUTE_KEYS,
   GRID_FIELDS,
   INDEX_CODES,
   INDICES_KEYS,
@@ -436,8 +438,27 @@ function ValueRefEditor({
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const sources: ValueRefSource[] = disallowParams
-    ? ["indices", "block", "weather", "weather_index", "weather_risk", "signals", "grid"]
-    : ["indices", "block", "weather", "weather_index", "weather_risk", "signals", "grid", "params"];
+    ? [
+        "indices",
+        "block",
+        "weather",
+        "weather_index",
+        "weather_risk",
+        "signals",
+        "grid",
+        "crop_attribute",
+      ]
+    : [
+        "indices",
+        "block",
+        "weather",
+        "weather_index",
+        "weather_risk",
+        "signals",
+        "grid",
+        "crop_attribute",
+        "params",
+      ];
 
   const onSourceChange = (next: ValueRefSource): void => {
     if (next === value.source) return;
@@ -479,6 +500,15 @@ function SourceSpecificFields({
   const signalDefs = useQuery({
     queryKey: ["signal_definitions", "list"] as const,
     queryFn: () => listSignalDefinitions(),
+    staleTime: 60_000,
+  });
+  // Crop attribute codes are the one condition source whose vocabulary is
+  // data, not a constant in this file — they come from the platform crop
+  // catalog and grow with it. Fetched once and shared across every condition
+  // row by react-query dedupe, same as the signal definitions above.
+  const cropAttrDefs = useQuery({
+    queryKey: ["crop_attribute_definitions", "catalog"] as const,
+    queryFn: () => listCropAttributeCatalog(),
     staleTime: 60_000,
   });
   if (value.source === "indices") {
@@ -705,6 +735,53 @@ function SourceSpecificFields({
           {GRID_FIELDS.map((f) => (
             <option key={f} value={f}>
               {f}
+            </option>
+          ))}
+        </select>
+      </>
+    );
+  }
+  if (value.source === "crop_attribute") {
+    // One entry per distinct code: the same code can be defined at several
+    // taxonomy nodes (a variety narrowing a crop-level range), and a tree
+    // targets by crop path, so the code is what it branches on.
+    const catalog = cropAttrDefs.data ?? [];
+    const byCode = new Map<string, (typeof catalog)[number]>();
+    for (const def of catalog) if (!byCode.has(def.code)) byCode.set(def.code, def);
+    // Keep an out-of-catalog code (authored in YAML, or since retired)
+    // selectable so switching to the dropdown never silently drops it.
+    const codes = [...byCode.keys()];
+    const codeOptions = value.code && !codes.includes(value.code) ? [value.code, ...codes] : codes;
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.code}
+          onChange={(e) => onChange({ ...value, code: e.target.value })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.cropAttributeCode")}
+        >
+          <option value="">—</option>
+          {codeOptions.map((c) => {
+            const def = byCode.get(c);
+            return (
+              <option key={c} value={c}>
+                {def ? `${def.name_en} (${c})` : c}
+              </option>
+            );
+          })}
+        </select>
+        <select
+          disabled={readOnly}
+          value={value.key}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof CROP_ATTRIBUTE_KEYS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+        >
+          {CROP_ATTRIBUTE_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {k}
             </option>
           ))}
         </select>

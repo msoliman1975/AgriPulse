@@ -38,6 +38,7 @@ from app.shared.conditions.context import ConditionContext
 from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
+    CropAttributeValueRef,
     GridValueRef,
     IndicesValueRef,
     ParamsValueRef,
@@ -193,6 +194,10 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
         if grid_entry is None:
             return None
         return getattr(grid_entry, ref.field, None)
+    if isinstance(ref, CropAttributeValueRef):
+        # Already typed by the loader per the definition's value_type, so no
+        # coercion here — an unknown code fails closed like every other source.
+        return ctx.crop_attributes.get(ref.code)
     if isinstance(ref, ParamsValueRef):
         return ctx.params.get(ref.name)
     return None
@@ -211,6 +216,8 @@ def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef ki
         return f"signals.{ref.code}.{ref.key}"
     if isinstance(ref, GridValueRef):
         return f"grid.{ref.index_code}.{ref.field}"
+    if isinstance(ref, CropAttributeValueRef):
+        return f"crop_attribute.{ref.code}.{ref.key}"
     if isinstance(ref, ParamsValueRef):
         return f"params.{ref.name}"
     return f"block.{ref.field}"
