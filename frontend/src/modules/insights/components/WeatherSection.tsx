@@ -12,7 +12,7 @@ import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import i18n from "@/i18n";
 
-import { TimeSpanChips, timeSpanToSince, type TimeSpanKey } from "./TimeSpanChips";
+import { pastDays as resolvePastDays, toDayRange, type TimeRange } from "../lib/timeRange";
 import { WeatherNowStrip } from "./WeatherNowStrip";
 import { WeatherOutlookPanel } from "./WeatherOutlookPanel";
 import { WeatherRiskRow } from "./WeatherRiskRow";
@@ -20,11 +20,11 @@ import { WeatherTrendsPanel } from "./WeatherTrendsPanel";
 
 interface Props {
   farmId: string;
+  /** The overview's shared time range; the page owns it (see TimeRangeBar). */
+  range: TimeRange;
   /** Caller has `weather_risk.read`; the risk row is a separate capability. */
   showRisk: boolean;
 }
-
-const SPAN_OPTIONS: readonly TimeSpanKey[] = ["7d", "30d", "90d", "all"];
 
 // The outlook's past slice is a stitched daily chart, so "all" would render
 // years of bars against a 7-day forecast. It clamps; the trend panel does not.
@@ -44,10 +44,9 @@ const OUTLOOK_MAX_PAST_DAYS = 90;
  * The catalog and summary queries live here because the strip and the trend
  * panel both need them, and a farm should not pay for them twice.
  */
-export function WeatherSection({ farmId, showRisk }: Props): ReactNode {
+export function WeatherSection({ farmId, range, showRisk }: Props): ReactNode {
   const { t } = useTranslation("weatherIndices");
   const isAr = i18n.language === "ar";
-  const [span, setSpan] = useState<TimeSpanKey>("90d");
   const [selected, setSelected] = useState<string | null>(null);
 
   const catalogQ = useQuery({
@@ -102,26 +101,10 @@ export function WeatherSection({ farmId, showRisk }: Props): ReactNode {
     return unit.split(",")[0].trim();
   };
 
-  const range = useMemo(() => {
-    const since = timeSpanToSince(span);
-    return {
-      // "all" has no lower bound; the endpoint treats a missing `from` as
-      // "everything stored".
-      from: since ? since.slice(0, 10) : undefined,
-      to: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
-    };
-  }, [span]);
-
-  const pastDays = useMemo(() => {
-    switch (span) {
-      case "7d":
-        return 7;
-      case "30d":
-        return 30;
-      default:
-        return OUTLOOK_MAX_PAST_DAYS;
-    }
-  }, [span]);
+  // "all" has no lower bound; the endpoint treats a missing `from` as
+  // "everything stored".
+  const dayRange = useMemo(() => toDayRange(range), [range]);
+  const pastDays = useMemo(() => resolvePastDays(range, OUTLOOK_MAX_PAST_DAYS), [range]);
 
   const loading = catalogQ.isLoading || summaryQ.isLoading;
   const hasError = catalogQ.isError || summaryQ.isError;
@@ -139,12 +122,6 @@ export function WeatherSection({ farmId, showRisk }: Props): ReactNode {
           </h2>
           <p className="text-[11px] text-ap-muted">{t("section.subtitle")}</p>
         </div>
-        <TimeSpanChips
-          value={span}
-          onChange={setSpan}
-          options={SPAN_OPTIONS}
-          ariaLabel={t("section.spanAria")}
-        />
       </header>
 
       {loading ? (
@@ -164,8 +141,8 @@ export function WeatherSection({ farmId, showRisk }: Props): ReactNode {
           <WeatherTrendsPanel
             farmId={farmId}
             indices={indices}
-            from={range.from}
-            to={range.to}
+            from={dayRange.from}
+            to={dayRange.to}
             selected={selected}
             onClearSelection={() => setSelected(null)}
           />

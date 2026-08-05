@@ -40,7 +40,9 @@
       "90d": "90d",
       "season": "Season",
       "all": "All"
-    }
+    },
+    "legendLabel": "Blocks shown",
+    "showAllBlocks": "Show all blocks"
   },
   "weather": {
     "title": "Weather (past · forecast)",
@@ -185,5 +187,9 @@
     "thinning": "Thinning",
     "bagging": "Bagging",
     "hilling": "Hilling"
+  },
+  "range": {
+    "regionLabel": "Time range for the graphs below",
+    "label": "Time range"
   }
 }
