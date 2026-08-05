@@ -130,7 +130,7 @@ export function ViewBar({
               close();
               onIndexChange(code);
             }}
-            hint={INDEX_META[code].family}
+            hint={t(`dock.family.${INDEX_META[code].family}`)}
           >
             {INDEX_META[code].label}
           </PopItem>
