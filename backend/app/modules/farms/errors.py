@@ -146,6 +146,68 @@ class CropCatalogValidationError(APIError):
         )
 
 
+class CropAttributeDefinitionNotFoundError(APIError):
+    def __init__(self, definition_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Crop attribute definition not found",
+            detail=f"No crop attribute definition with id {definition_id} in the catalog.",
+            type_=f"{_TYPE_BASE}/crop-attribute-definition-not-found",
+            extras={"definition_id": str(definition_id)},
+        )
+
+
+class CropAttributeCodeConflictError(APIError):
+    """Two definitions with the same ``code`` on the same taxonomy node.
+
+    Not merely a uniqueness nicety: deepest-wins resolution picks one winner
+    per code per level, so a duplicate would make which definition an author
+    sees depend on row order. 409.
+    """
+
+    def __init__(self, *, path: str, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Crop attribute code already in use",
+            detail=f"An attribute with code {code!r} is already defined on {path!r}.",
+            type_=f"{_TYPE_BASE}/crop-attribute-code-conflict",
+            extras={"path": path, "code": code},
+        )
+
+
+class CropAttributeReservedCodeError(APIError):
+    """The requested code is already a first-class block field.
+
+    Allowing it would put two entries with the same name in the decision-tree
+    condition builder, one of which never resolves. 422.
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Reserved crop attribute code",
+            detail=(
+                f"{code!r} is already a first-class block or crop field. Pick a "
+                "different code — an attribute may not shadow one."
+            ),
+            type_=f"{_TYPE_BASE}/crop-attribute-reserved-code",
+            extras={"code": code},
+        )
+
+
+class CropAttributeValidationError(APIError):
+    """A definition payload is internally inconsistent, or its gate points at
+    something unusable (missing sibling, wrong type, forward reference). 422."""
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid crop attribute definition",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/crop-attribute-validation",
+        )
+
+
 class FarmCodeConflictError(APIError):
     def __init__(self, code: str) -> None:
         super().__init__(

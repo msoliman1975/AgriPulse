@@ -159,6 +159,87 @@ class CropVarietyStrain(Base, TimestampedMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
+class CropAttributeDefinition(Base, TimestampedMixin):
+    """Platform-curated typed field on the crop → block assignment.
+
+    Attaches at any level of the taxonomy (``crop_id`` always set; plus
+    ``crop_variety_id`` and/or ``crop_variety_strain_id`` for deeper rows) and
+    resolves **deepest-wins by ``code``** — see
+    ``app.modules.farms.crop_attributes.resolve_definitions``. A deeper row
+    with the same ``code`` replaces the inherited one wholesale (unlike
+    ``default_thresholds``, which shallow-merges): narrowing a range or an
+    option list only reads correctly if the whole definition is replaced.
+
+    ``show_when`` / ``required_when`` are one-level, non-recursive gates —
+    ``{"code": <other definition code>, "in": [...]}`` against another
+    attribute on the same assignment. Deliberately not a general expression
+    language; the decision-tree evaluator is the place for those.
+    """
+
+    __tablename__ = "crop_attribute_definitions"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crops.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    crop_variety_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crop_varieties.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    crop_variety_strain_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crop_variety_strains.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    # Canonical path of the attachment node ("mango", "mango.sukkary",
+    # "mango.alphonso.short"). Denormalised so the resolve is a prefix match.
+    path: Mapped[str] = mapped_column(Text, nullable=False)
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_type: Mapped[str] = mapped_column(Text, nullable=False)
+    unit_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_min: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_max: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    decimal_places: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    text_max_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # ``[{"code", "name_en", "name_ar", "sort_order"}, ...]`` for select types.
+    #
+    # ``none_as_null=True`` on all three JSONB columns, deliberately. By
+    # default SQLAlchemy serialises Python ``None`` into JSON ``null`` rather
+    # than SQL NULL, so an absent value would be stored as ``'null'::jsonb``
+    # — which ``IS NOT NULL`` reports as present. That breaks the
+    # ``options`` CHECK (a text attribute would look like it carries options)
+    # and would make any future "has a gate" query wrong.
+    options: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
+    required_when: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    show_when: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    group_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    group_name_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    group_name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    is_reportable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("TRUE")
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
 class Farm(Base, TimestampedMixin):
     """Tenant-schema table; resolved via search_path."""
 

@@ -50,6 +50,9 @@ from app.modules.farms.schemas import (
     CountryCreateRequest,
     CountryResponse,
     CountryUpdateRequest,
+    CropAttributeDefinitionCreateRequest,
+    CropAttributeDefinitionResponse,
+    CropAttributeDefinitionUpdateRequest,
     CropCreateRequest,
     CropResponse,
     CropStrainCreateRequest,
@@ -74,6 +77,7 @@ from app.modules.farms.schemas import (
     GrowthStageTransitionRequest,
     PivotCreateRequest,
     PivotCreateResponse,
+    ResolvedCropAttributesResponse,
     ResolvedTaxonomyResponse,
 )
 from app.modules.farms.service import FarmService, get_farm_service
@@ -1297,6 +1301,97 @@ async def get_resolved_taxonomy(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     return await service.get_resolved_taxonomy(crop_path=crop_path)
+
+
+# ---------- Crop attribute definitions --------------------------------------
+#
+# Tenant-facing reads. `resolve` is what the assignment form and the report
+# column picker call; `catalog` is the flat cross-crop list the decision-tree
+# condition builder needs — every other condition source is a closed constant
+# array in the frontend, this one is data.
+
+
+@router.get(
+    "/crops/attribute-definitions",
+    response_model=list[CropAttributeDefinitionResponse],
+    summary="Flat catalog of crop attribute definitions across all crops.",
+)
+async def list_crop_attribute_catalog(
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_crop_attribute_catalog()
+
+
+@router.get(
+    "/crops/resolved-attributes",
+    response_model=ResolvedCropAttributesResponse,
+    summary="Resolve crop attribute definitions (deepest-wins) for a crop path.",
+)
+async def get_resolved_crop_attributes(
+    crop_path: str = Query(min_length=1),
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.resolve_crop_attributes(crop_path=crop_path)
+
+
+@router.get(
+    "/admin/crops/{crop_id}/attribute-definitions",
+    response_model=list[CropAttributeDefinitionResponse],
+    summary="List a crop's attribute definitions at every level (platform).",
+)
+async def admin_list_crop_attributes(
+    crop_id: UUID,
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_crop_attribute_definitions_admin(
+        crop_id=crop_id, include_inactive=include_inactive
+    )
+
+
+@router.post(
+    "/admin/crops/{crop_id}/attribute-definitions",
+    response_model=CropAttributeDefinitionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Define a crop attribute (platform).",
+)
+async def admin_create_crop_attribute(
+    crop_id: UUID,
+    payload: CropAttributeDefinitionCreateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    # by_alias so the gate's ``in_`` field is stored under its wire name
+    # ``in`` — the evaluator and the frontend both read the wire name.
+    return await service.create_crop_attribute_definition(
+        crop_id=crop_id,
+        fields=payload.model_dump(by_alias=True),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.patch(
+    "/admin/crop-attribute-definitions/{definition_id}",
+    response_model=CropAttributeDefinitionResponse,
+    summary="Update a crop attribute (platform). Code and attachment are immutable.",
+)
+async def admin_update_crop_attribute(
+    definition_id: UUID,
+    payload: CropAttributeDefinitionUpdateRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_crops")),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.update_crop_attribute_definition(
+        definition_id=definition_id,
+        fields=payload.model_dump(by_alias=True, exclude_unset=True),
+        actor_user_id=context.user_id,
+    )
 
 
 # ---------- Crop catalog authoring (platform-only) -------------------------
