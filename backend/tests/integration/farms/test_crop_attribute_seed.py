@@ -129,12 +129,13 @@ async def test_seed_is_fully_bilingual(admin_session: AsyncSession) -> None:
     """A label or option that exists in one language only renders as English
     inside an otherwise-Arabic form."""
     for row in await _seeded(admin_session):
-        assert row.name_en and row.name_ar, f"{row.path}.{row.code} is not bilingual"
+        assert row.name_en, f"{row.path}.{row.code} has no English name"
+        assert row.name_ar, f"{row.path}.{row.code} has no Arabic name"
         assert (row.unit_en is None) == (row.unit_ar is None)
         for option in row.options or []:
-            assert option.get("name_en") and option.get(
-                "name_ar"
-            ), f"{row.path}.{row.code} option {option.get('code')!r} is not bilingual"
+            where = f"{row.path}.{row.code} option {option.get('code')!r}"
+            assert option.get("name_en"), f"{where} has no English name"
+            assert option.get("name_ar"), f"{where} has no Arabic name"
 
 
 @pytest.mark.asyncio

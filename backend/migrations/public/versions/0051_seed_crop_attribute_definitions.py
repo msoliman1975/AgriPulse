@@ -651,16 +651,22 @@ def _params(
         "value_max": definition.get("value_max"),
         "decimal_places": definition.get("decimal_places"),
         "text_max_length": definition.get("text_max_length"),
-        "options": json.dumps(definition["options"], ensure_ascii=False)
-        if definition.get("options") is not None
-        else None,
+        "options": (
+            json.dumps(definition["options"], ensure_ascii=False)
+            if definition.get("options") is not None
+            else None
+        ),
         "is_required": definition.get("is_required", False),
-        "required_when": json.dumps(definition["required_when"], ensure_ascii=False)
-        if definition.get("required_when") is not None
-        else None,
-        "show_when": json.dumps(definition["show_when"], ensure_ascii=False)
-        if definition.get("show_when") is not None
-        else None,
+        "required_when": (
+            json.dumps(definition["required_when"], ensure_ascii=False)
+            if definition.get("required_when") is not None
+            else None
+        ),
+        "show_when": (
+            json.dumps(definition["show_when"], ensure_ascii=False)
+            if definition.get("show_when") is not None
+            else None
+        ),
         "group_code": group_code,
         "group_name_en": group_en,
         "group_name_ar": group_ar,
