@@ -466,13 +466,38 @@ global:
   #   negative on NDWI is correct.
   #   Rollback is this tag back to 608e917 on all three; 0049 stays applied,
   #   which is harmless (an unused catalog row). tile-server stays 9d140cc.
+  # 3537f12 = #361, the Insights overview's four weather cards become one
+  #   Weather section, read top to bottom: now (the index strip), trend,
+  #   outlook (observed stitched to forecast), and per-block disease/pest
+  #   pressure. One time-span control governs all of it, and the catalog +
+  #   summary are fetched once for the section instead of once per card.
+  #   Selecting an index card drills the trend panel into that index with its
+  #   climatology band rather than opening a second chart of the same series.
+  #   Carries a real fix riding on bb87e4f: humidity took the weather catalog
+  #   to EIGHT indices while the trend chart's categorical palette had SEVEN
+  #   slots assigned by catalog position, so humidity wrapped onto
+  #   temperature's blue and the two were indistinguishable on the shared
+  #   axis. An eighth slot was added AND the shared-axis view now charts only
+  #   the four indices furthest from their seasonal normal -- eight lines on
+  #   one axis is past what any categorical palette can separate. The other
+  #   four stay one click away on the strip.
+  #   What to watch: (1) /insights should show ONE card headed "Weather"
+  #   where there were four; if two headings survive, the page did not pick
+  #   up the new bundle. (2) The strip still lists all eight indices --
+  #   humidity included, though its series stays empty until the projection
+  #   has run forward (see bb87e4f). (3) The compare view intentionally
+  #   charts four series and names them in the legend; that is the cap, not
+  #   missing data. (4) The risk row only renders with weather_risk.read.
+  #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
+  #   bb87e4f, tile-server stays 9d140cc. Rollback is this tag back to
+  #   bb87e4f alone.
   images:
     api:
       tag: "bb87e4f"
     workers:
       tag: "bb87e4f"
     frontend:
-      tag: "bb87e4f"
+      tag: "3537f12"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
