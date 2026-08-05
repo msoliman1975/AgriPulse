@@ -254,10 +254,21 @@ describe("existing ref sources still parse", () => {
   it("rejects an unknown weather index code", () => {
     const raw = {
       op: "gt",
-      left: { source: "weather_index", index_code: "humidity", key: "value" },
+      left: { source: "weather_index", index_code: "not_an_index", key: "value" },
       right: 2,
     };
     expect(parseConditionTree(raw).kind).toBe("unsupported");
+  });
+
+  it("parses the humidity weather index (migration 0049)", () => {
+    const t = term(
+      parseConditionTree({
+        op: "gt",
+        left: { source: "weather_index", index_code: "humidity", key: "value" },
+        right: 80,
+      }),
+    );
+    expect(t.left).toEqual({ source: "weather_index", index_code: "humidity", key: "value" });
   });
 
   it("parses a weather_risk score ref (PR-R3)", () => {

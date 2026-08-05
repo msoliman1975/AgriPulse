@@ -223,8 +223,11 @@ class DailyForecastRead(BaseModel):
 
     Aggregation rules (per Slice-4 alignment): high/low = max/min of
     hourly air_temp, precip_total = SUM, precip_probability = MAX of
-    hourly probabilities. ``date`` is in the farm's local timezone —
-    not UTC — so "today" matches what the user sees on the farm.
+    hourly probabilities, humidity = MEAN of hourly relative humidity
+    (a mean, not a max — the daily average is what maps to the
+    ``humidity`` weather index and to the disease models). ``date`` is
+    in the farm's local timezone — not UTC — so "today" matches what
+    the user sees on the farm.
     """
 
     date: date_type
@@ -232,6 +235,7 @@ class DailyForecastRead(BaseModel):
     low_c: Decimal | None
     precip_mm_total: Decimal | None
     precip_probability_max_pct: Decimal | None
+    humidity_mean_pct: Decimal | None
 
 
 class ForecastResponse(BaseModel):

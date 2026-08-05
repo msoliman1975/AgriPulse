@@ -299,7 +299,13 @@ class WeatherServiceImpl:
                 for b in bucket
                 if b["precipitation_probability_pct"] is not None
             ]
+            hums: list[Decimal] = [
+                b["humidity_pct"] for b in bucket if b["humidity_pct"] is not None
+            ]
             precip_total = sum(precs, start=Decimal(0)) if precs else None
+            # Mean over whatever hours the provider returned — a partial day
+            # (e.g. "today" fetched at noon) still yields a usable average.
+            humidity_mean = (sum(hums, start=Decimal(0)) / Decimal(len(hums))) if hums else None
             days.append(
                 DailyForecastRead(
                     date=d,
@@ -309,6 +315,11 @@ class WeatherServiceImpl:
                         precip_total.quantize(Decimal("0.01")) if precip_total is not None else None
                     ),
                     precip_probability_max_pct=max(probs) if probs else None,
+                    humidity_mean_pct=(
+                        humidity_mean.quantize(Decimal("0.1"))
+                        if humidity_mean is not None
+                        else None
+                    ),
                 )
             )
 

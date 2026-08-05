@@ -64,7 +64,9 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
         body = resp.json()
 
     codes = [row["code"] for row in body]
-    # The 7 seeded indices surface; the inactive row does not.
+    # The 8 seeded indices surface; the inactive row does not. `humidity`
+    # is last because migration 0049 appended it at sort_order 8, leaving
+    # the original seven in place.
     assert codes == [
         "temperature",
         "radiation",
@@ -73,6 +75,7 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
         "evapotranspiration",
         "evaporation_coeff",
         "rain_et_balance",
+        "humidity",
     ], codes
     assert "zz_inactive_idx" not in codes, codes
 
@@ -88,3 +91,12 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
     assert temp["source_kind"] == "observed"
     assert temp["relation_disease_en"]
     assert temp["relation_insect_ar"]
+
+    # Same for humidity (0049) — the SPA picker reads name/unit off this row.
+    hum = next(r for r in body if r["code"] == "humidity")
+    assert hum["name_en"] == "Relative Humidity"
+    assert hum["name_ar"]
+    assert hum["unit"] == "%"
+    assert hum["source_kind"] == "observed"
+    assert hum["relation_disease_en"]
+    assert hum["relation_insect_ar"]

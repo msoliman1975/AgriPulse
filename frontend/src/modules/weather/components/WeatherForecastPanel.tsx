@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { isApiError } from "@/api/errors";
 import { getForecast, triggerRefresh, type ForecastResponse } from "@/api/weather";
-import { formatPrecip, formatProbability, formatTemp } from "@/lib/weatherUnits";
+import { formatPercent, formatPrecip, formatProbability, formatTemp } from "@/lib/weatherUnits";
 import { usePrefs } from "@/prefs/PrefsContext";
 import { useCapability } from "@/rbac/useCapability";
 import { Button } from "@/components/Button";
@@ -163,6 +163,9 @@ export function WeatherForecastPanel({ blockId, farmId, farmName }: Props): JSX.
                   </p>
                   <p className="text-ap-muted">
                     {t("day.precipChance")}: {formatProbability(day.precip_probability_max_pct)}
+                  </p>
+                  <p className="text-ap-muted">
+                    {t("day.humidity")}: {formatPercent(day.humidity_mean_pct)}
                   </p>
                 </li>
               );
