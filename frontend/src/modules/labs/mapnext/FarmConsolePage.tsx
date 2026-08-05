@@ -38,7 +38,7 @@ import { getGridCells } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
-import { loadMapSummary, loadUnitDetail } from "../map/api";
+import { loadBlockHealth, loadMapSummary, loadUnitDetail, toUnitIntegration } from "../map/api";
 import { MapCanvas, type GridCellProps, type DrawProgress } from "../map/MapCanvas";
 import { GridCellPopup, type CellItem } from "@/modules/grid/GridCellPopup";
 import { useRecommendations } from "@/queries/recommendations";
@@ -198,11 +198,22 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         blockId: selectedId as string,
         blocksById,
         activePlan: summaryQ.data?.activePlan,
-        blockHealth: selectedId ? summaryQ.data?.blockHealth[selectedId] : null,
       }),
     enabled: Boolean(selectedId && blocksById.size > 0),
     staleTime: 30_000,
   });
+
+  // Integration health rides its own query so it can never hold up the map
+  // (it used to sit inside loadMapSummary's Promise.all and gate the whole
+  // page). It only feeds two rows in the dock, which fill in on arrival.
+  const blockHealthQ = useQuery({
+    queryKey: ["labs/mapnext/blockHealth", farmId],
+    queryFn: () => loadBlockHealth(farmId),
+    staleTime: 60_000,
+  });
+  const selectedIntegration = toUnitIntegration(
+    selectedId ? (blockHealthQ.data?.[selectedId] ?? null) : null,
+  );
 
   // First active imagery product for the selected block — needed for grid config.
   const subsQ = useQuery({
@@ -928,6 +939,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           {selectedId ? (
             <BlockDock
               detail={detailQ.data}
+              integration={selectedIntegration}
               loading={detailQ.isLoading}
               error={detailQ.isError}
               activeIndex={activeIndex}

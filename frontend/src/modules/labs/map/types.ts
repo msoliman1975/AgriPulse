@@ -85,11 +85,15 @@ export interface UnitDetail {
     unit: string | null;
     recorded_at: string;
   }[];
-  // Integration health snapshot for the block.
-  integration: {
-    weather: IntegrationKindStatus;
-    imagery: IntegrationKindStatus;
-  } | null;
+}
+
+// Integration health snapshot for a block. Deliberately NOT part of
+// UnitDetail: it comes from a different endpoint on a different (slower)
+// clock, and folding it in here is what let it block the map render. The
+// pages fetch it separately and pass it to the panel alongside the detail.
+export interface UnitIntegration {
+  weather: IntegrationKindStatus;
+  imagery: IntegrationKindStatus;
 }
 
 export interface IntegrationKindStatus {

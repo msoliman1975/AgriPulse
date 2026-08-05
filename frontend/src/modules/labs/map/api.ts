@@ -37,6 +37,7 @@ import type {
   UnitAlert,
   UnitDetail,
   UnitFeatureProps,
+  UnitIntegration,
   UnitSummary,
 } from "./types";
 
@@ -89,25 +90,27 @@ export interface MapSummary {
   summaries: Record<string, UnitSummary>;
   // Active season plan for the farm (status === "active"), if any.
   activePlan: Plan | null;
-  // Per-block integration health indexed by block_id. Empty map if the
-  // health endpoint is unavailable.
-  blockHealth: Record<string, BlockIntegrationHealth>;
 }
 
 export async function loadMapSummary(farmId: string): Promise<MapSummary> {
   // Parallel summary fan-out. Farm + blocks + summary + (best-effort)
-  // active plan + (best-effort) block health.
-  const [farm, blocksPage, summaryResp, plans, healthRows] = await Promise.all([
+  // active plan.
+  //
+  // Integration health is deliberately NOT in here. It used to be, and
+  // because this is a Promise.all the page rendered at the speed of the
+  // slowest member — which was the health endpoint at ~7 s on a 36-block
+  // farm. Nothing on the map reads it: it feeds two rows in the block
+  // panel, so it loads separately via `loadBlockHealth` and the panel
+  // fills in when it arrives. See docs/ or the git history for the
+  // measured breakdown.
+  const [farm, blocksPage, summaryResp, plans] = await Promise.all([
     getFarm(farmId),
     listBlocks(farmId, { limit: 200, include_boundary: true }),
     getBlocksSummary(farmId),
     safePlans(farmId),
-    safeBlockHealth(farmId),
   ]);
   const blocks = blocksPage.items;
   const activePlan = plans.find((p) => p.status === "active") ?? null;
-  const blockHealth: Record<string, BlockIntegrationHealth> = {};
-  for (const h of healthRows) blockHealth[h.block_id] = h;
 
   const summaryByBlock = new Map(summaryResp.units.map((u) => [u.id, u]));
 
@@ -185,7 +188,46 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
     geojson: { type: "FeatureCollection", features },
     summaries,
     activePlan,
-    blockHealth,
+  };
+}
+
+/**
+ * Per-block integration health for a farm, indexed by block_id.
+ *
+ * Off the critical path on purpose — see `loadMapSummary`. Best-effort:
+ * the capability behind it (`tenant.read_integration_health`) is only
+ * granted to TenantOwner/TenantAdmin, so everyone else gets a 403 here
+ * and simply sees no integration rows, exactly as before.
+ */
+export async function loadBlockHealth(
+  farmId: string,
+): Promise<Record<string, BlockIntegrationHealth>> {
+  const rows = await safeBlockHealth(farmId);
+  const byBlock: Record<string, BlockIntegrationHealth> = {};
+  for (const h of rows) byBlock[h.block_id] = h;
+  return byBlock;
+}
+
+/** Shape a health row into what the block panel renders. */
+export function toUnitIntegration(h: BlockIntegrationHealth | null): UnitIntegration | null {
+  if (!h) return null;
+  return {
+    weather: {
+      active_subs: h.weather_active_subs,
+      last_sync_at: h.weather_last_sync_at,
+      last_failed_at: h.weather_last_failed_at,
+      failed_24h: h.weather_failed_24h,
+      running_count: h.weather_running_count,
+      overdue_count: h.weather_overdue_count,
+    },
+    imagery: {
+      active_subs: h.imagery_active_subs,
+      last_sync_at: h.imagery_last_sync_at,
+      last_failed_at: null,
+      failed_24h: h.imagery_failed_24h,
+      running_count: h.imagery_running_count,
+      overdue_count: h.imagery_overdue_count,
+    },
   };
 }
 
@@ -199,7 +241,6 @@ export async function loadUnitDetail(args: {
   blockId: string;
   blocksById: Map<string, Block>;
   activePlan?: Plan | null;
-  blockHealth?: BlockIntegrationHealth | null;
 }): Promise<UnitDetail> {
   const cached = detailCache.get(args.blockId);
   if (cached && Date.now() - cached.at < DETAIL_TTL_MS) return cached.value;
@@ -355,26 +396,6 @@ export async function loadUnitDetail(args: {
       : null,
     crop_assignment: cropAssignmentSummary,
     signals,
-    integration: args.blockHealth
-      ? {
-          weather: {
-            active_subs: args.blockHealth.weather_active_subs,
-            last_sync_at: args.blockHealth.weather_last_sync_at,
-            last_failed_at: args.blockHealth.weather_last_failed_at,
-            failed_24h: args.blockHealth.weather_failed_24h,
-            running_count: args.blockHealth.weather_running_count,
-            overdue_count: args.blockHealth.weather_overdue_count,
-          },
-          imagery: {
-            active_subs: args.blockHealth.imagery_active_subs,
-            last_sync_at: args.blockHealth.imagery_last_sync_at,
-            last_failed_at: null,
-            failed_24h: args.blockHealth.imagery_failed_24h,
-            running_count: args.blockHealth.imagery_running_count,
-            overdue_count: args.blockHealth.imagery_overdue_count,
-          },
-        }
-      : null,
   };
 
   detailCache.set(args.blockId, { at: Date.now(), value: detail });

@@ -13,7 +13,9 @@ map-first frontend needs to color polygons + show alert badges:
 
 Designed to replace ~Nx4 round-trips (per-block detail + per-block-per-
 index timeseries + tenant-wide alert list) the prototype was making for
-N blocks. Two SQL queries against the tenant schema, one in-process join.
+N blocks. Three SQL queries against the tenant schema (alerts, the block
+roster, and the latest index values), plus a fourth only when a block has
+no reading inside the recent window — see `_RECENT_WINDOW_DAYS`.
 
 Health classification mirrors what the frontend used to do:
   critical alert → critical
@@ -36,7 +38,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import bindparam, text
+from sqlalchemy import Text, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,6 +55,26 @@ router = APIRouter(prefix="/api/v1", tags=["farms"])
 # matching substitution. Add NDMI to this tuple once the imagery
 # pipeline starts computing it.
 _MAP_INDICES: tuple[str, ...] = ("ndvi", "ndre", "ndwi")
+
+# How far back the *first* pass of the latest-value lookup looks.
+#
+# `block_index_aggregates` is a TimescaleDB hypertable. "Latest value per
+# (block, index)" has no natural time bound, and without a predicate on
+# `time` TimescaleDB cannot exclude chunks, so it plans every chunk in the
+# table. Measured on prod 2026-08-05 (36-block farm, 494 chunks holding
+# 49k rows): planning 645-1039 ms against execution 190-224 ms — the cost
+# was almost entirely *planning*, and it grew with every week of history
+# rather than with the amount of data.
+#
+# Bounding the scan restores chunk exclusion: 494 chunks -> 72, and the
+# whole query goes 875 ms -> 36 ms (23 ms planning + 13 ms execution).
+#
+# Blocks that return nothing in the window fall back to an unbounded
+# lookup (`_latest_indices`), so a dormant block still shows its last
+# known reading and this is not a behaviour change for them. Migration
+# 0056 additionally right-sizes the chunking so the fallback path stops
+# degrading as history accumulates.
+_RECENT_WINDOW_DAYS = 120
 
 Health = Literal["healthy", "watch", "critical", "unknown"]
 MapSeverity = Literal["watch", "critical"]
@@ -76,6 +99,95 @@ class BlocksSummaryResponse(BaseModel):
     units: list[BlockSummary]
 
 
+# Latest non-null value per (block, index).
+#
+# The time bound is interpolated into the SQL as a literal interval rather
+# than bound as a parameter, and that is load-bearing: TimescaleDB excludes
+# chunks at *plan* time, which it can only do when the cutoff is a
+# plan-time constant. Measured both ways on prod, same farm, same rows:
+#
+#   ... a.time > now() - make_interval(days => $3)   ->  705 ms planning
+#   ... a.time > now() - interval '120 days'         ->   23 ms planning
+#
+# A bound cutoff produces a generic plan over all 494 chunks and the fix
+# evaporates. `_RECENT_WINDOW_DAYS` is a module constant, never user input,
+# so interpolating it carries no injection surface.
+def _latest_indices_sql(*, cutoff_days: int | None) -> str:
+    window = "" if cutoff_days is None else f"AND a.time > now() - interval '{cutoff_days} days'"
+    return f"""
+        SELECT DISTINCT ON (a.block_id, a.index_code)
+               a.block_id,
+               a.index_code,
+               a.mean,
+               a.time
+        FROM block_index_aggregates a
+        WHERE a.block_id = ANY(:block_ids)
+          AND a.index_code = ANY(:codes)
+          AND a.mean IS NOT NULL
+          {window}
+        ORDER BY a.block_id, a.index_code, a.time DESC
+    """
+
+
+# Binds are typed explicitly: asyncpg infers nothing from a bare `text()`
+# placeholder, and an untyped bind reaching an array comparison is the
+# shape that has produced DataError in prod before.
+def _latest_indices_stmt(*, cutoff_days: int | None) -> Any:
+    return text(_latest_indices_sql(cutoff_days=cutoff_days)).bindparams(
+        bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+        bindparam("codes", type_=ARRAY(Text())),
+    )
+
+
+_RECENT_STMT = _latest_indices_stmt(cutoff_days=_RECENT_WINDOW_DAYS)
+_UNBOUNDED_STMT = _latest_indices_stmt(cutoff_days=None)
+
+
+async def _latest_indices(
+    session: AsyncSession, block_ids: list[UUID]
+) -> dict[UUID, dict[str, tuple[float, datetime]]]:
+    """Latest value + time per (block, index), keyed by block id.
+
+    Two passes. The first is bounded to `_RECENT_WINDOW_DAYS` so
+    TimescaleDB can exclude chunks (see that constant for the numbers).
+    Any block the window turned up nothing for — a block whose imagery
+    stopped long ago, or one being backfilled — is swept again without a
+    bound, so it still reports its last known reading.
+
+    The fallback is per-block, not per-(block, index): a block that has
+    *any* recent reading keeps only its in-window values. Indices are
+    computed together from the same scene, so a block with recent NDVI but
+    year-old NDRE isn't a shape the pipeline produces.
+    """
+    if not block_ids:
+        return {}
+
+    out: dict[UUID, dict[str, tuple[float, datetime]]] = {}
+
+    async def sweep(ids: list[UUID], stmt: Any) -> None:
+        rows = (
+            (
+                await session.execute(
+                    stmt,
+                    {"block_ids": ids, "codes": list(_MAP_INDICES)},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        for r in rows:
+            bucket = out.setdefault(r["block_id"], {})
+            bucket[r["index_code"]] = (float(r["mean"]), r["time"])
+
+    await sweep(block_ids, _RECENT_STMT)
+
+    stale = [bid for bid in block_ids if bid not in out]
+    if stale:
+        await sweep(stale, _UNBOUNDED_STMT)
+
+    return out
+
+
 @router.get(
     "/farms/{farm_id}/blocks/summary",
     response_model=BlocksSummaryResponse,
@@ -87,39 +199,6 @@ async def get_blocks_summary(
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> BlocksSummaryResponse:
     del context  # capability check side-effect is the only consumer
-
-    # 1. Latest index value per (block, index) for blocks in this farm.
-    #    DISTINCT ON inside a CTE bounds the scan to currently-active
-    #    blocks per the active_from/active_to lifecycle.
-    index_rows = (
-        (
-            await tenant_session.execute(
-                text(
-                    """
-                    WITH active_blocks AS (
-                        SELECT id FROM blocks
-                        WHERE farm_id = :farm_id
-                          AND active_from <= current_date
-                          AND (active_to IS NULL OR active_to > current_date)
-                    )
-                    SELECT DISTINCT ON (a.block_id, a.index_code)
-                           a.block_id,
-                           a.index_code,
-                           a.mean,
-                           a.time
-                    FROM block_index_aggregates a
-                    JOIN active_blocks b ON b.id = a.block_id
-                    WHERE a.index_code = ANY(:codes)
-                      AND a.mean IS NOT NULL
-                    ORDER BY a.block_id, a.index_code, a.time DESC
-                    """
-                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-                {"farm_id": farm_id, "codes": list(_MAP_INDICES)},
-            )
-        )
-        .mappings()
-        .all()
-    )
 
     # 2. Open-alert count + worst severity per block in this farm.
     alert_rows = (
@@ -167,13 +246,11 @@ async def get_blocks_summary(
         .all()
     )
 
-    # ---- Compose ---------------------------------------------------------
+    # 1. Latest index value per (block, index). Recent window first, then
+    #    an unbounded sweep for whichever blocks it found nothing for.
+    idx_by_block = await _latest_indices(tenant_session, list(block_ids))
 
-    # idx_by_block[block_id] = { 'ndvi': (mean, time), 'ndre': ..., 'ndwi': ... }
-    idx_by_block: dict[UUID, dict[str, tuple[float, datetime]]] = {}
-    for r in index_rows:
-        bucket = idx_by_block.setdefault(r["block_id"], {})
-        bucket[r["index_code"]] = (float(r["mean"]), r["time"])
+    # ---- Compose ---------------------------------------------------------
 
     alerts_by_block: dict[UUID, dict[str, Any]] = {}
     for r in alert_rows:
