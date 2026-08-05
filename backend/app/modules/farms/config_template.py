@@ -1073,15 +1073,33 @@ async def apply_grid_cell_size(
     if written and tenant_schema:
         # Queued, never inline: recomputing a farm's history is heavy-worker
         # work measured in thousands of scene jobs.
+        from app.modules.grid.backfill import (
+            DEFAULT_PER_PAIR_CAP,
+            count_farm_backfill_candidates,
+            split_budget,
+        )
         from app.modules.grid.tasks import backfill_farm
 
         backfill_farm.delay(tenant_schema, str(farm_id), backfill_budget_scenes)
-        planned_scenes = sum(r.state.scenes_affected for r in applied if r.is_destructive)
-        if backfill_budget_scenes is None:
-            scenes_queued = planned_scenes
-        else:
-            scenes_queued = min(planned_scenes, backfill_budget_scenes)
-            scenes_stranded = max(0, planned_scenes - backfill_budget_scenes)
+        # Counted from the ingestion jobs the backfill will actually walk,
+        # NOT from `scenes_affected`. That field is the *destructive* cost
+        # — history a rezone strands, measured through the geometry being
+        # replaced — so it is structurally 0 for a `create`, which has no
+        # prior geometry to count through. Deriving queued work from it
+        # meant a farm gridded for the first time reported "0 scenes
+        # queued" while the task it had just fired recomputed its entire
+        # imagery history.
+        planned_scenes = await count_farm_backfill_candidates(
+            session,
+            farm_id=farm_id,
+            since=None,
+            per_pair_cap=(
+                backfill_budget_scenes
+                if backfill_budget_scenes is not None
+                else DEFAULT_PER_PAIR_CAP
+            ),
+        )
+        scenes_queued, scenes_stranded = split_budget(planned_scenes, budget=backfill_budget_scenes)
 
     return {
         "blocks_touched": written,

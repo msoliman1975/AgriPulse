@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.modules.grid.backfill import allocate_budget
+import pytest
+
+from app.modules.grid.backfill import allocate_budget, split_budget
 
 
 def _jobs(n: int, prefix: str) -> list[dict[str, str]]:
@@ -83,3 +85,37 @@ def test_empty_farm_is_not_an_error() -> None:
     allocated, stranded = allocate_budget({}, budget=10)
     assert allocated == {}
     assert stranded == 0
+
+
+# --- split_budget: the totals the apply endpoint reports -------------------
+#
+# The endpoint cannot run the real allocation inside a request, so it
+# clamps a candidate count instead. These pin that shortcut against the
+# allocator itself: if the round-robin ever starts leaving budget unspent
+# while a queue still holds scenes, the two stop agreeing and the reported
+# numbers become a lie.
+
+
+@pytest.mark.parametrize(
+    ("sizes", "budget"),
+    [
+        ((500, 3), None),
+        ((500, 4, 4), 12),
+        ((5,), 99),
+        ((7,), 0),
+        ((), 10),
+        ((1, 1, 1), 2),
+        ((0, 9), 4),
+    ],
+)
+def test_split_budget_agrees_with_the_allocator(sizes: tuple[int, ...], budget: int | None) -> None:
+    pairs = {(uuid4(), uuid4()): _jobs(n, f"p{i}") for i, n in enumerate(sizes)}
+    allocated, stranded = allocate_budget(pairs, budget=budget)
+    queued_total = sum(len(v) for v in allocated.values())
+
+    assert split_budget(sum(sizes), budget=budget) == (queued_total, stranded)
+
+
+def test_split_budget_treats_a_negative_budget_as_zero() -> None:
+    """Mirrors allocate_budget's `max(0, budget)` rather than going negative."""
+    assert split_budget(7, budget=-5) == (0, 7)
