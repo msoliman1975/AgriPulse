@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import maplibregl, {
   type ExpressionSpecification,
   type GeoJSONSource,
@@ -10,6 +10,7 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
+import { buildAlertBadgePoints } from "./alertBadges";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
 import type { SignalOverlayProps } from "./signalOverlay";
@@ -121,6 +122,13 @@ const SELECTED_LAYER = "units-selected";
 const LABEL_LAYER = "units-label";
 const LOGICAL_PIVOT_LAYER = "logical-pivot-ring";
 const ALERT_BADGE_LAYER = "alert-badges";
+// Alert badges need their own POINT source. A `circle` layer draws one
+// circle per coordinate in the geometry it is bound to, so pointing it at
+// the polygon `units` source rendered a badge on every vertex of every
+// alerting block — a ring of red dots around the corners rather than one
+// badge. `symbol` layers collapse a polygon to a single anchor, which is
+// why the label layer next to it never had this problem.
+const BADGE_SOURCE_ID = "alert-badge-points";
 const AOI_SOURCE_ID = "farm-aoi";
 const AOI_FILL_LAYER = "farm-aoi-fill";
 const AOI_LINE_LAYER = "farm-aoi-line";
@@ -307,6 +315,10 @@ export function MapCanvas({
   // seeding the constructor with its bounds is what removes the zoom flash.
   const initialViewRef = useRef({ geojson, farmBoundary, fitBoundsKey });
 
+  // One badge anchor per alerting block — see alertBadges.ts for why the
+  // badge layer cannot read the polygon source directly.
+  const badgePoints = useMemo(() => buildAlertBadgePoints(geojson), [geojson]);
+
   // Initial mount.
   useEffect(() => {
     if (!containerRef.current) return;
@@ -470,11 +482,16 @@ export function MapCanvas({
         },
       });
 
-      // Alert badges — circles with severity-driven size.
+      // Alert badges — circles with severity-driven size. Bound to the
+      // derived point source, never to `units`: see BADGE_SOURCE_ID.
+      map.addSource(BADGE_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
       map.addLayer({
         id: ALERT_BADGE_LAYER,
         type: "circle",
-        source: SOURCE_ID,
+        source: BADGE_SOURCE_ID,
         filter: ["==", ["get", "has_alert"], true],
         paint: {
           "circle-color": [
@@ -744,6 +761,9 @@ export function MapCanvas({
       const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       if (!src) return;
       src.setData(geojson);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const badgeSrc = map.getSource(BADGE_SOURCE_ID) as GeoJSONSource | undefined;
+      if (badgeSrc) badgeSrc.setData(badgePoints);
       if (lastFitKeyRef.current !== fitBoundsKey) {
         const bounds = computeBounds(geojson, farmBoundary ?? null);
         if (bounds) {
