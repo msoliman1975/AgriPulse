@@ -510,13 +510,34 @@ global:
   #   longer returns fewer scenes than the cap implies.
   #   NO MIGRATION. Backend-only -- frontend stays 3537f12, tile-server
   #   stays 9d140cc. Rollback is this tag back to bb87e4f.
+  # 92e093e = #362, one alert badge per block instead of one per corner.
+  #   `alert-badges` is a maplibre `circle` layer, which paints one circle
+  #   per COORDINATE of the geometry it reads, and it was bound to the
+  #   polygon `units` source -- so every alerting block wore a ring of red
+  #   dots around its outline, one per vertex, offset just outside the
+  #   corners by the layer's circle-translate. The `units-label` layer a
+  #   dozen lines above was always right because `symbol` layers collapse a
+  #   polygon to a single anchor. Badges now read a derived POINT source
+  #   (alertBadges.ts), anchored with turf's pointOnFeature rather than a
+  #   centroid, which can fall outside a concave block and float the badge
+  #   over its neighbour.
+  #   This was broken from the day the layer shipped; it only became
+  #   visible when Bashier Elkhier's bulk cell-size Apply produced grid
+  #   aggregates and the anomaly sweep started raising alerts. So expect
+  #   badges to REMAIN after this deploy -- one per block now. Their
+  #   disappearance would be the surprise, not their presence.
+  #   Colour still encodes severity (critical dark red, watch amber) and
+  #   was never part of the bug.
+  #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
+  #   2861fe0, tile-server stays 9d140cc. Rollback is this tag back to
+  #   3537f12.
   images:
     api:
       tag: "2861fe0"
     workers:
       tag: "2861fe0"
     frontend:
-      tag: "3537f12"
+      tag: "92e093e"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
