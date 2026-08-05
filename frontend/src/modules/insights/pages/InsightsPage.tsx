@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
@@ -12,10 +12,12 @@ import { Skeleton } from "@/components/Skeleton";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
+import { DEFAULT_SPAN, presetRange, type TimeRange } from "../lib/timeRange";
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
 import { KPICards } from "../components/KPICards";
 import { SeasonContextBar } from "../components/SeasonContextBar";
+import { TimeRangeBar } from "../components/TimeRangeBar";
 import { WeatherSection } from "../components/WeatherSection";
 
 // Track B.1 — Insights as "Farm health overview".
@@ -45,6 +47,11 @@ export function InsightsPage(): ReactNode {
   });
   const canReadWeather = useCapability("weather.read", { farmId });
   const canReadRisk = useCapability("weather_risk.read", { farmId });
+
+  // One range for every graph on the page. Each card used to own its own
+  // control, so two of them could sit on different windows with nothing on
+  // screen saying so.
+  const [range, setRange] = useState<TimeRange>(() => presetRange(DEFAULT_SPAN));
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -94,11 +101,17 @@ export function InsightsPage(): ReactNode {
 
       <SeasonContextBar farmId={farmId} />
 
-      <FarmTrendChart farmId={farmId} />
+      {/* One control, every graph below it. KPI tiles stay current-state and
+          deliberately do not follow the range. */}
+      <TimeRangeBar value={range} onChange={setRange} />
+
+      <FarmTrendChart farmId={farmId} range={range} />
 
       {/* One section for all of it: now → trend → outlook → risk. These were
           four sibling cards saying "weather" four times over the same data. */}
-      {canReadWeather ? <WeatherSection farmId={farmId} showRisk={canReadRisk} /> : null}
+      {canReadWeather ? (
+        <WeatherSection farmId={farmId} range={range} showRisk={canReadRisk} />
+      ) : null}
 
       <BlockHealthScorecard farmId={farmId} />
     </Page>

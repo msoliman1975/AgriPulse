@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setupTestI18n } from "@/i18n/testing";
 
+import { presetRange } from "../lib/timeRange";
+
 import { WeatherSection } from "./WeatherSection";
 
 // The section replaced four sibling cards that each read weather at a
@@ -128,7 +130,7 @@ function renderSection(props: { showRisk?: boolean } = {}) {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <WeatherSection farmId="f1" showRisk={props.showRisk ?? true} />
+        <WeatherSection farmId="f1" range={presetRange("90d")} showRisk={props.showRisk ?? true} />
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -145,9 +147,10 @@ describe("WeatherSection", () => {
     await waitFor(() => expect(screen.getByText("Temperature")).toBeTruthy());
 
     expect(container.querySelectorAll("section").length).toBe(1);
-    // One time-span control for the whole section — the four cards each had
-    // their own, so a reader could leave them showing different windows.
-    expect(screen.getAllByRole("radiogroup", { name: /time span/i }).length).toBe(1);
+    // The section owns NO time control of its own: the page's single
+    // TimeRangeBar governs every graph on the overview, so a reader can no
+    // longer leave two of them on different windows.
+    expect(screen.queryByRole("radiogroup", { name: /time span/i })).toBeNull();
   });
 
   it("shows every catalogued index, humidity included", async () => {

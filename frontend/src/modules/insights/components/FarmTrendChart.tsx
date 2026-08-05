@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -23,21 +22,23 @@ import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
+import { toIsoRange, type TimeRange } from "../lib/timeRange";
 import { IndexPicker, SUPPORTED_INDICES, type IndexCode } from "./IndexPicker";
-import { TimeSpanChips, timeSpanToSince, type TimeSpanKey } from "./TimeSpanChips";
 
 interface Props {
   farmId: string;
-  /** Optional initial values; otherwise restored from localStorage. */
+  /** The overview's shared time range; the page owns it (see TimeRangeBar). */
+  range: TimeRange;
+  /** Block ids to draw, or null for every block the farm returns. */
+  blockIds?: readonly string[] | null;
+  /** Optional initial index; otherwise restored from localStorage. */
   indexCode?: IndexCode;
-  timeSpan?: TimeSpanKey;
 }
 
 const LS_KEY = "insights.farmTrend.prefs";
 
 interface StoredPrefs {
   index: IndexCode;
-  span: TimeSpanKey;
 }
 
 function _loadPrefs(farmId: string): StoredPrefs | null {
@@ -69,11 +70,20 @@ function _savePrefs(farmId: string, prefs: StoredPrefs): void {
  * The y-axis is auto-scaled — NDVI ranges [-1, 1] but most farm
  * conditions sit in [0.2, 0.9]; letting recharts pick keeps the lines
  * readable without forcing the viewer to stare at half-empty axis.
+ *
+ * The legend is selectable: a farm with a dozen blocks draws a dozen lines,
+ * which is past what any categorical palette separates, so the reader can
+ * mute the ones they are not asking about. Colour is pinned to the block's
+ * position in the FULL series list, never to its position among the visible
+ * ones — hiding a block must not repaint the others.
+ *
+ * The time range belongs to the page, not to this card.
  */
 export function FarmTrendChart({
   farmId,
+  range,
+  blockIds = null,
   indexCode: indexCodeProp,
-  timeSpan: timeSpanProp,
 }: Props): ReactNode {
   const { t, i18n } = useTranslation("insights");
   const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
@@ -81,39 +91,24 @@ export function FarmTrendChart({
 
   const stored = useMemo(() => _loadPrefs(farmId), [farmId]);
   const [indexCode, setIndexCode] = useState<IndexCode>(indexCodeProp ?? stored?.index ?? "ndvi");
-  const [timeSpan, setTimeSpan] = useState<TimeSpanKey>(timeSpanProp ?? stored?.span ?? "90d");
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
 
-  // Re-anchor state if the active farm changes (different localStorage scope).
+  // Re-anchor state if the active farm changes (different localStorage scope,
+  // and another farm's block names mean nothing here).
   useEffect(() => {
     const fresh = _loadPrefs(farmId);
-    if (fresh) {
-      setIndexCode(fresh.index);
-      setTimeSpan(fresh.span);
-    }
+    if (fresh) setIndexCode(fresh.index);
+    setHidden(new Set());
   }, [farmId]);
 
   useEffect(() => {
-    _savePrefs(farmId, { index: indexCode, span: timeSpan });
-  }, [farmId, indexCode, timeSpan]);
+    _savePrefs(farmId, { index: indexCode });
+  }, [farmId, indexCode]);
 
-  // Custom From→To range. When both ends are set it overrides the
-  // preset TimeSpanChips; clearing either end falls back to the chips.
-  const [range, setRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const hasCustomRange = Boolean(range.from && range.to && range.from <= range.to);
-
-  const since = useMemo(() => timeSpanToSince(timeSpan), [timeSpan]);
-
-  // Resolve the effective {since, until} the query sends. A custom range
-  // wins; otherwise the chip-derived `since` with an open-ended `until`.
-  const apiRange = useMemo(() => {
-    if (hasCustomRange) {
-      return { since: `${range.from}T00:00:00Z`, until: `${range.to}T23:59:59Z` };
-    }
-    return since ? { since } : {};
-  }, [hasCustomRange, range.from, range.to, since]);
+  const apiRange = useMemo(() => toIsoRange(range), [range]);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["insights", "trend", farmId, indexCode, timeSpan, apiRange] as const,
+    queryKey: ["insights", "trend", farmId, indexCode, apiRange] as const,
     queryFn: () =>
       getFarmIndexTimeseries(farmId, {
         index_code: indexCode,
@@ -138,10 +133,27 @@ export function FarmTrendChart({
   // Block names are used as dataKey because they're stable per query
   // result; if two blocks share a name (rare; codes are unique) the
   // later wins — acceptable for V1 visual exploration.
-  const { chartData, blockNames } = useMemo(
-    () => _reshapeForRecharts(data?.points ?? []),
-    [data?.points],
-  );
+  // Crop filtering is applied to the points before reshaping, so a filtered
+  // block leaves the palette entirely rather than keeping a dead legend slot.
+  const points = useMemo(() => {
+    const all = data?.points ?? [];
+    if (!blockIds) return all;
+    const keep = new Set(blockIds);
+    return all.filter((p) => keep.has(p.block_id));
+  }, [data?.points, blockIds]);
+
+  const { chartData, blockNames } = useMemo(() => _reshapeForRecharts(points), [points]);
+
+  const visibleCount = blockNames.filter((n) => !hidden.has(n)).length;
+  const toggle = (name: string): void =>
+    setHidden((cur) => {
+      const next = new Set(cur);
+      // Never let the reader mute the last line — an empty plot with a full
+      // legend reads as "no data", which is a different and alarming message.
+      if (next.has(name)) next.delete(name);
+      else if (visibleCount > 1) next.add(name);
+      return next;
+    });
 
   return (
     <Card noPadding className="p-4" aria-labelledby="farm-trend-heading">
@@ -154,44 +166,6 @@ export function FarmTrendChart({
         </h2>
         <div className="flex flex-wrap items-center gap-3">
           <IndexPicker value={indexCode} onChange={setIndexCode} />
-          <TimeSpanChips
-            // When a custom From→To range is active no preset chip should
-            // read as selected — pass a value outside the option set.
-            value={hasCustomRange ? ("" as TimeSpanKey) : timeSpan}
-            onChange={(next) => {
-              setRange({ from: "", to: "" });
-              setTimeSpan(next);
-            }}
-          />
-          <label className="flex items-center gap-1 text-[11px] text-ap-muted">
-            <span>{t("trend.range.from")}</span>
-            <input
-              type="date"
-              value={range.from}
-              max={range.to || undefined}
-              onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-              className="rounded-md border border-ap-line bg-white px-1.5 py-0.5 text-[11px] text-ap-ink"
-            />
-          </label>
-          <label className="flex items-center gap-1 text-[11px] text-ap-muted">
-            <span>{t("trend.range.to")}</span>
-            <input
-              type="date"
-              value={range.to}
-              min={range.from || undefined}
-              onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              className="rounded-md border border-ap-line bg-white px-1.5 py-0.5 text-[11px] text-ap-ink"
-            />
-          </label>
-          {hasCustomRange ? (
-            <button
-              type="button"
-              onClick={() => setRange({ from: "", to: "" })}
-              className="text-[11px] font-medium text-ap-primary hover:underline"
-            >
-              {t("trend.range.clear")}
-            </button>
-          ) : null}
         </div>
       </header>
 
@@ -218,7 +192,8 @@ export function FarmTrendChart({
                 labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
                 formatter={(value: number) => value.toFixed(3)}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {/* No <Legend>: the selectable one below the plot replaces it,
+                  so identity and visibility live in the same control. */}
               {blockNames.map((name, i) => (
                 <Line
                   key={name}
@@ -228,6 +203,7 @@ export function FarmTrendChart({
                   strokeWidth={1.75}
                   dot={false}
                   connectNulls
+                  hide={hidden.has(name)}
                 />
               ))}
               {/* B.3: alert-opened markers. ReferenceLine stroke
@@ -248,6 +224,53 @@ export function FarmTrendChart({
           </ResponsiveContainer>
         )}
       </div>
+
+      {chartData.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <ul
+            className="flex flex-wrap gap-x-3 gap-y-1.5"
+            role="group"
+            aria-label={t("trend.legendLabel")}
+          >
+            {blockNames.map((name, i) => {
+              const on = !hidden.has(name);
+              return (
+                <li key={name}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(name)}
+                    aria-pressed={on}
+                    className={
+                      "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition-colors " +
+                      (on
+                        ? "border-ap-line bg-ap-panel text-ap-ink"
+                        : "border-ap-line/60 bg-transparent text-ap-muted line-through")
+                    }
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-2.5 w-2.5 rounded-sm"
+                      // Muted swatches keep the hue so the reader can still
+                      // tell which line comes back when they re-enable it.
+                      style={{ backgroundColor: _lineColor(i), opacity: on ? 1 : 0.35 }}
+                    />
+                    {name}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {hidden.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setHidden(new Set())}
+              className="text-[11px] font-medium text-ap-primary hover:underline"
+            >
+              {t("trend.showAllBlocks")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </Card>
   );
 }
