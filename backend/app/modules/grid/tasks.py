@@ -620,7 +620,11 @@ async def _backfill_farm_async(
     budget_scenes: int | None,
     since_iso: str | None,
 ) -> dict[str, int]:
-    from app.modules.grid.backfill import allocate_budget, list_farm_grid_pairs
+    from app.modules.grid.backfill import (
+        DEFAULT_PER_PAIR_CAP,
+        allocate_budget,
+        list_farm_grid_pairs,
+    )
     from app.modules.imagery.tasks import compute_indices
 
     since = datetime.fromisoformat(since_iso) if since_iso else None
@@ -628,7 +632,7 @@ async def _backfill_farm_async(
     # than the budget in total, so fetching beyond it is pure waste; with
     # no budget we still bound the query rather than reading a decade of
     # jobs into memory.
-    per_pair_cap = budget_scenes if budget_scenes is not None else 2000
+    per_pair_cap = budget_scenes if budget_scenes is not None else DEFAULT_PER_PAIR_CAP
 
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():

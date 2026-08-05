@@ -24,6 +24,53 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Per-(block, product) ceiling applied when a farm backfill runs without
+# an explicit budget. Bounds the query rather than reading a decade of
+# ingestion jobs into memory. Shared with the apply endpoint's estimate so
+# the number reported and the number enqueued are capped identically.
+DEFAULT_PER_PAIR_CAP = 2000
+
+
+def _has_raw_bands_sql(col: str = "assets_written") -> str:
+    """SQL mirror of :func:`extract_raw_bands_key`'s "is there one?" test.
+
+    Built once and shared by every query that reasons about the
+    backfillable set. The alternative — one query enumerating jobs and
+    another counting them with a hand-copied predicate — is exactly the
+    silent drift that made a first-time grid report zero queued scenes
+    while hours of compute ran. A lock-step test pins this against the
+    Python extractor over both manifest shapes.
+
+    ``col`` is a caller-supplied column reference, never user input.
+    """
+    return f"""
+        (
+          (jsonb_typeof({col}) = 'object'
+           AND {col} -> 'raw_bands' ->> 'href' LIKE 's3://%')
+          OR
+          (jsonb_typeof({col}) = 'array'
+           AND EXISTS (
+             SELECT 1 FROM jsonb_array_elements_text({col}) AS e
+             WHERE e LIKE '%raw_bands.tif'
+           ))
+        )
+    """  # noqa: S608 - `col` is a caller-supplied literal, never user input
+
+
+def split_budget(total_candidates: int, *, budget: int | None) -> tuple[int, int]:
+    """``(queued, stranded)`` for a candidate pool under a farm budget.
+
+    :func:`allocate_budget` decides *which* scenes each grid gets; this
+    decides how many run at all. The totals reduce to a clamp because the
+    round-robin never leaves budget unspent while any queue still holds a
+    scene — a property :mod:`tests.unit.grid.test_budget_allocation` pins
+    against the allocator itself rather than restating here.
+    """
+    if budget is None:
+        return total_candidates, 0
+    queued = min(total_candidates, max(0, budget))
+    return queued, total_candidates - queued
+
 
 def extract_raw_bands_key(assets: Any) -> str | None:
     """Pull the raw-bands object key out of a job's ``assets_written``.
@@ -133,6 +180,11 @@ async def list_backfill_jobs(
 
     Returns ``[{job_id, scene_datetime, raw_bands_key}]`` newest-first.
     Caller must have set the tenant search_path on ``session``.
+
+    The raw-bands filter is applied in SQL as well as in the loop below,
+    so ``LIMIT`` counts only rows that can actually become jobs. Without
+    it a pair whose newest scenes lack the asset would silently return
+    fewer than ``limit`` backfillable scenes while claiming to be capped.
     """
     since_clause = "AND scene_datetime >= :since" if since is not None else ""
     stmt = text(
@@ -143,10 +195,11 @@ async def list_backfill_jobs(
           AND product_id = :product
           AND status     = 'succeeded'
           AND stac_item_id IS NOT NULL
+          AND {_has_raw_bands_sql()}
           {since_clause}
         ORDER BY scene_datetime DESC
         LIMIT :limit
-        """  # noqa: S608 - since_clause is a fixed literal, not user input
+        """  # noqa: S608 - both interpolations are fixed literals, not user input
     ).bindparams(
         bindparam("block", type_=PG_UUID(as_uuid=True)),
         bindparam("product", type_=PG_UUID(as_uuid=True)),
@@ -172,3 +225,59 @@ async def list_backfill_jobs(
             }
         )
     return out
+
+
+async def count_farm_backfill_candidates(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: datetime | None,
+    per_pair_cap: int,
+) -> int:
+    """How many scenes a farm-wide backfill would have to recompute.
+
+    Counts the same rows :func:`backfill_farm` would enqueue — every live
+    grid under the farm, capped per pair exactly as ``list_backfill_jobs``
+    caps it — without materialising them. The apply endpoint needs the
+    number to report queued work honestly, and cannot pay for the real
+    enumeration inside a request: that is thousands of rows per farm, and
+    the whole reason the backfill is a task in the first place.
+
+    Deliberately keyed on the farm's live grids rather than on the rows a
+    given Apply wrote, because the task fans out over the former. An Apply
+    that adds one grid to a farm that already has 35 really does queue all
+    36 grids' worth of work, and saying otherwise would understate it.
+
+    Caller must have set the tenant search_path on ``session``.
+    """
+    since_clause = "AND j.scene_datetime >= :since" if since is not None else ""
+    stmt = text(
+        f"""
+        SELECT count(*) AS scenes
+        FROM (
+            SELECT row_number() OVER (
+                       PARTITION BY j.block_id, j.product_id
+                       ORDER BY j.scene_datetime DESC
+                   ) AS rn
+            FROM imagery_ingestion_jobs j
+            JOIN grid_configs cfg
+              ON cfg.block_id   = j.block_id
+             AND cfg.product_id = j.product_id
+             AND cfg.retired_at IS NULL
+             AND cfg.deleted_at IS NULL
+            JOIN blocks b
+              ON b.id = cfg.block_id
+             AND b.deleted_at IS NULL
+             AND b.farm_id = :farm
+            WHERE j.status = 'succeeded'
+              AND j.stac_item_id IS NOT NULL
+              AND {_has_raw_bands_sql("j.assets_written")}
+              {since_clause}
+        ) ranked
+        WHERE rn <= :cap
+        """  # noqa: S608 - both interpolations are fixed literals, not user input
+    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+    params: dict[str, object] = {"farm": farm_id, "cap": per_pair_cap}
+    if since is not None:
+        params["since"] = since
+    return int((await session.execute(stmt, params)).scalar_one() or 0)
