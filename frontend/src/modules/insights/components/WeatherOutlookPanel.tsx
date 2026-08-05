@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bar,
@@ -15,14 +15,13 @@ import {
 } from "recharts";
 
 import { getDerivedDaily, getForecast } from "@/api/weather";
-import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
-import { TimeSpanChips, type TimeSpanKey } from "./TimeSpanChips";
-
 interface Props {
   blockId: string;
+  /** Days of observed history to stitch in front of the forecast. */
+  pastDays: number;
   /** Forecast horizon in days; capped at 10 by the API. */
   forecastDays?: number;
 }
@@ -32,38 +31,36 @@ interface CombinedPoint {
   temp_high: number | null;
   temp_low: number | null;
   precip: number | null;
-  /** "past" | "future" — drives series styling. */
-  segment: "past" | "future";
 }
 
-const PAST_SPAN_OPTIONS: readonly TimeSpanKey[] = ["7d", "30d", "90d"];
-
 /**
- * Stitched past + forecast weather chart for the Farm health overview.
+ * Observed weather stitched to the forecast, with a rule at today.
  *
- * - Past slice: `/blocks/{id}/weather/derived` (daily; temp_min/max, precip).
- * - Future slice: `/blocks/{id}/weather/forecast` (daily; high_c/low_c, precip_mm_total).
- * - A ReferenceLine at "today" visually splits observed from forecast.
+ * - Past slice: `/blocks/{id}/weather/derived` (temp_min/max, precip).
+ * - Future slice: `/blocks/{id}/weather/forecast` (high_c/low_c, precip_mm_total).
  *
- * The block id resolves to the farm's centroid server-side; for a farm-level
- * "first block" is the existing convention (see InsightsPage).
+ * Temperature and precipitation are the one pairing that earns two scales
+ * here — they are the conventional weather pair, read together, and the bars
+ * sit under the lines rather than crossing them. Every other cross-index
+ * comparison in this section goes through z-scores instead.
+ *
+ * The block id resolves to the farm centroid server-side; "first block" is
+ * the existing farm-level contract (see WeatherSection).
  */
-export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNode {
+export function WeatherOutlookPanel({ blockId, pastDays, forecastDays = 7 }: Props): ReactNode {
   const { t, i18n } = useTranslation("insights");
   const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), [i18n.language]);
   const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
-  const [pastSpan, setPastSpan] = useState<TimeSpanKey>("30d");
 
   const { since, until } = useMemo(() => {
-    const days = pastSpan === "7d" ? 7 : pastSpan === "30d" ? 30 : 90;
     const now = new Date();
     const start = new Date(now);
-    start.setDate(start.getDate() - days);
+    start.setDate(start.getDate() - pastDays);
     return {
       since: start.toISOString().slice(0, 10), // YYYY-MM-DD
       until: now.toISOString().slice(0, 10),
     };
-  }, [pastSpan]);
+  }, [pastDays]);
 
   const derivedQ = useQuery({
     queryKey: ["weather", "derived", blockId, since, until] as const,
@@ -84,19 +81,17 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
   const data = useMemo<CombinedPoint[]>(() => {
     const past: CombinedPoint[] = (derivedQ.data ?? []).map((row) => ({
       date: row.date,
-      temp_high: _toNum(row.temp_max_c),
-      temp_low: _toNum(row.temp_min_c),
-      precip: _toNum(row.precip_mm_daily),
-      segment: "past",
+      temp_high: toNum(row.temp_max_c),
+      temp_low: toNum(row.temp_min_c),
+      precip: toNum(row.precip_mm_daily),
     }));
     const future: CombinedPoint[] = (forecastQ.data?.days ?? []).map((d) => ({
       date: d.date,
-      temp_high: _toNum(d.high_c),
-      temp_low: _toNum(d.low_c),
-      precip: _toNum(d.precip_mm_total),
-      segment: "future",
+      temp_high: toNum(d.high_c),
+      temp_low: toNum(d.low_c),
+      precip: toNum(d.precip_mm_total),
     }));
-    // De-dupe: forecast usually includes "today" as day 0; prefer the
+    // De-dupe: the forecast usually includes "today" as day 0; prefer the
     // observed value when both exist.
     const seen = new Set(past.map((p) => p.date));
     const stitched = [...past, ...future.filter((f) => !seen.has(f.date))];
@@ -108,26 +103,11 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
   const isEmpty = !loading && data.length === 0;
 
   return (
-    <Card noPadding className="p-4" aria-labelledby="farm-weather-heading">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2
-          id="farm-weather-heading"
-          className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
-        >
-          {t("weather.title")}
-        </h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-[11px] text-ap-muted">{t("weather.pastLabel")}</span>
-          <TimeSpanChips
-            value={pastSpan}
-            onChange={setPastSpan}
-            options={PAST_SPAN_OPTIONS}
-            ariaLabel={t("weather.pastAriaLabel")}
-          />
-        </div>
-      </header>
-
-      <div className="mt-3 min-h-[280px]">
+    <div>
+      <h3 className="text-xs font-bold uppercase tracking-wide text-ap-primary">
+        {t("weather.title")}
+      </h3>
+      <div className="mt-2 min-h-[280px]">
         {loading ? (
           <Skeleton className="h-72 w-full" />
         ) : hasError ? (
@@ -223,11 +203,11 @@ export function FarmWeatherChart({ blockId, forecastDays = 7 }: Props): ReactNod
           </ResponsiveContainer>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
-function _toNum(v: string | number | null | undefined): number | null {
+function toNum(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;

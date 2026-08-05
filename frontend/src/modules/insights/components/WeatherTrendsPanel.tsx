@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -12,40 +12,42 @@ import {
   YAxis,
 } from "recharts";
 
-import {
-  getWeatherIndexCatalog,
-  getWeatherIndexTimeseries,
-  type WeatherIndexCatalogItem,
-} from "@/api/weatherIndices";
-import { Card } from "@/components/Card";
+import { getWeatherIndexTimeseries, type WeatherIndexCatalogItem } from "@/api/weatherIndices";
 import { Skeleton } from "@/components/Skeleton";
 import i18n from "@/i18n";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
-import { TimeSpanChips, timeSpanToSince, type TimeSpanKey } from "./TimeSpanChips";
+import { WeatherIndexChart } from "./WeatherIndexChart";
 
 /**
- * Weather-index trends over the same spans as the vegetation trend chart.
+ * "How has it moved" — the trend half of the weather section.
  *
- * The seven indices are on incompatible scales (°C, mm, W/m², m/s), so this
- * deliberately offers two honest views instead of one dual-axis plot — two
- * y-scales on one plot makes crossings an artifact of axis placement:
+ * The indices are on incompatible scales (°C, mm, W/m², m/s, %), so this
+ * offers two honest views instead of one dual-axis plot, plus a third when
+ * the reader has picked a single index off the strip:
  *
- *   "units"   — small multiples. One compact chart per index, each with its
- *               OWN y-axis in its real unit. Nothing is comparable across
- *               facets, and nothing pretends to be.
- *   "anomaly" — every index on ONE axis as a z-score against its day-of-year
- *               climatology. Unitless and centred on zero, so co-movement
- *               (hot AND dry AND high ET together) is finally readable.
+ *   units    — small multiples. One compact chart per index, each with its
+ *              OWN y-axis in its real unit. Nothing is comparable across
+ *              facets, and nothing pretends to be.
+ *   compare  — z-scores against each index's day-of-year climatology on ONE
+ *              axis, so co-movement (hot AND dry AND high ET together) is
+ *              readable. Capped at COMPARE_LIMIT series — see below.
+ *   single   — the selected index with its climatology band, which is the
+ *              only view that can show the normal it is being judged against.
  *
- * `zscore` is served per point by the timeseries endpoint, so the anomaly
- * view needs no extra request.
+ * `zscore` is served per point by the timeseries endpoint, so compare needs
+ * no extra request.
  */
 
-// Categorical slots 1-7 in fixed order — assigned per index code and never
-// cycled, so a hidden series never repaints the others. Validated for CVD
-// separation and contrast in both modes; the light surface trips a contrast
-// WARN on three slots, which is why every series is also directly labelled.
+// Categorical slots, assigned per index code in catalog order and never
+// cycled, so a hidden series never repaints the others. Eight slots because
+// humidity made the catalog eight indices; a seventh-slot palette silently
+// wrapped it onto temperature's blue.
+//
+// Validated for CVD separation and contrast against each mode's own surface
+// (adjacent-pair check). On the light surface three slots trip a contrast
+// WARN, which is why every series is also directly labelled and the legend is
+// unconditional — identity is never carried by colour alone.
 const SERIES_LIGHT = [
   "#2a78d6",
   "#eb6834",
@@ -54,6 +56,7 @@ const SERIES_LIGHT = [
   "#e87ba4",
   "#008300",
   "#4a3aa7",
+  "#0f9bb0",
 ] as const;
 const SERIES_DARK = [
   "#3987e5",
@@ -63,12 +66,28 @@ const SERIES_DARK = [
   "#d55181",
   "#008300",
   "#9085e9",
+  "#14a2b8",
 ] as const;
 
-type Mode = "units" | "anomaly";
+// Eight lines on one axis is past what any categorical palette can keep
+// separable — the all-pairs check fails for every 8-hue set worth having,
+// including Okabe-Ito. So compare shows the FOUR most anomalous indices and
+// says so; the rest stay one click away on the strip. Four is also the
+// ceiling for direct-labelling every series.
+const COMPARE_LIMIT = 4;
+
+type Mode = "units" | "compare";
 
 interface Props {
   farmId: string;
+  /** Catalog in display order; the section owns the query. */
+  indices: readonly WeatherIndexCatalogItem[];
+  /** Inclusive `from` (YYYY-MM-DD), or undefined for "everything stored". */
+  from?: string;
+  to: string;
+  /** Index code drilled into from the strip, or null for the all-index views. */
+  selected: string | null;
+  onClearSelection: () => void;
 }
 
 interface SeriesPoint {
@@ -77,54 +96,26 @@ interface SeriesPoint {
   zscore: number | null;
 }
 
-function toNum(v: string | null | undefined): number | null {
-  if (v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function prefersDark(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-color-scheme: dark)").matches === true
-  );
-}
-
-export function WeatherTrendsCard({ farmId }: Props): ReactNode {
+export function WeatherTrendsPanel({
+  farmId,
+  indices,
+  from,
+  to,
+  selected,
+  onClearSelection,
+}: Props): ReactNode {
   const { t } = useTranslation("weatherIndices");
   const isAr = i18n.language === "ar";
-  const [span, setSpan] = useState<TimeSpanKey>("90d");
   const [mode, setMode] = useState<Mode>("units");
 
   const dateTickFmt = useMemo(() => makeDateTickFmt(i18n.language), []);
   const dateLabelFmt = useMemo(() => makeDateLabelFmt(i18n.language), []);
 
-  const range = useMemo(() => {
-    const since = timeSpanToSince(span);
-    return {
-      // "all" has no lower bound; the endpoint treats a missing `from` as
-      // "everything stored".
-      from: since ? since.slice(0, 10) : undefined,
-      to: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
-    };
-  }, [span]);
-
-  const catalogQ = useQuery({
-    queryKey: ["weatherIndices", "catalog"] as const,
-    queryFn: getWeatherIndexCatalog,
-    staleTime: 5 * 60_000,
-  });
-
-  const indices = useMemo<WeatherIndexCatalogItem[]>(
-    () => [...(catalogQ.data ?? [])].sort((a, b) => a.sort_order - b.sort_order),
-    [catalogQ.data],
-  );
-
   const seriesQs = useQueries({
     queries: indices.map((idx) => ({
-      queryKey: ["weatherIndices", "trend", farmId, idx.code, range.from ?? "all", range.to],
-      queryFn: () => getWeatherIndexTimeseries(farmId, idx.code, range),
-      enabled: Boolean(farmId && idx.code),
+      queryKey: ["weatherIndices", "trend", farmId, idx.code, from ?? "all", to],
+      queryFn: () => getWeatherIndexTimeseries(farmId, idx.code, { from, to }),
+      enabled: Boolean(farmId && idx.code) && selected === null,
       staleTime: 60_000,
     })),
   });
@@ -137,7 +128,9 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
         zscore: toNum(p.zscore),
       }));
       const latest = [...points].reverse().find((p) => p.value !== null)?.value ?? null;
-      return { idx, points, latest };
+      // Ranking datum for compare: the most recent z-score we actually have.
+      const latestZ = [...points].reverse().find((p) => p.zscore !== null)?.zscore ?? null;
+      return { idx, points, latest, latestZ };
     });
   }, [indices, seriesQs]);
 
@@ -149,11 +142,20 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
   const nameOf = (idx: WeatherIndexCatalogItem): string =>
     (isAr ? idx.name_ar : idx.name_en) || idx.name_en;
 
-  // One row per date so recharts can draw every z-score series from a
-  // single data prop.
-  const anomalyData = useMemo(() => {
+  // The compare subset: most anomalous first, ties and missing z-scores
+  // falling back to catalog order so the choice is deterministic.
+  const compared = useMemo(() => {
+    return [...series]
+      .sort((a, b) => Math.abs(b.latestZ ?? 0) - Math.abs(a.latestZ ?? 0))
+      .slice(0, COMPARE_LIMIT)
+      .sort((a, b) => a.idx.sort_order - b.idx.sort_order);
+  }, [series]);
+
+  // One row per date so recharts can draw every z-score series from a single
+  // data prop.
+  const compareData = useMemo(() => {
     const byDate = new Map<string, Record<string, number | string | null>>();
-    for (const { idx, points } of series) {
+    for (const { idx, points } of compared) {
       for (const p of points) {
         const row = byDate.get(p.date) ?? { date: p.date };
         row[idx.code] = p.zscore;
@@ -161,55 +163,75 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
       }
     }
     return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  }, [series]);
+  }, [compared]);
 
-  const loading = catalogQ.isLoading || seriesQs.some((q) => q.isLoading);
+  const selectedIdx = selected ? indices.find((i) => i.code === selected) : undefined;
+
+  // A drilled-in index owns the whole panel: its own chart carries the
+  // climatology band, which neither all-index view can show.
+  if (selectedIdx) {
+    return (
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-ap-primary">
+            {t("trends.title")}
+          </h3>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="text-xs font-medium text-ap-accent hover:underline"
+          >
+            {t("trends.showAll")}
+          </button>
+        </div>
+        <WeatherIndexChart
+          farmId={farmId}
+          indexCode={selectedIdx.code}
+          name={nameOf(selectedIdx)}
+          unit={selectedIdx.unit}
+        />
+      </div>
+    );
+  }
+
+  const loading = seriesQs.some((q) => q.isLoading);
   const hasAnyData = series.some((s) => s.points.some((p) => p.value !== null));
 
   return (
-    <Card as="section" aria-labelledby="weather-trends-heading">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2
-          id="weather-trends-heading"
-          className="text-sm font-semibold uppercase tracking-wider text-ap-muted"
-        >
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-ap-primary">
           {t("trends.title")}
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <TimeSpanChips
-            value={span}
-            onChange={setSpan}
-            i18nPrefix="trend.timespan"
-            ariaLabel={t("trends.spanAria")}
-          />
-          <div
-            role="radiogroup"
-            aria-label={t("trends.modeAria")}
-            className="flex overflow-hidden rounded-lg border border-ap-line"
-          >
-            {(["units", "anomaly"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={mode === m}
-                onClick={() => setMode(m)}
-                className={
-                  "px-2.5 py-1 text-xs font-semibold " +
-                  (mode === m
-                    ? "bg-ap-primary text-white"
-                    : "bg-ap-panel text-ap-ink hover:bg-ap-primary-soft")
-                }
-              >
-                {t(`trends.mode.${m}`)}
-              </button>
-            ))}
-          </div>
+        </h3>
+        <div
+          role="radiogroup"
+          aria-label={t("trends.modeAria")}
+          className="flex overflow-hidden rounded-lg border border-ap-line"
+        >
+          {(["units", "compare"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => setMode(m)}
+              className={
+                "px-2.5 py-1 text-xs font-semibold " +
+                (mode === m
+                  ? "bg-ap-primary text-white"
+                  : "bg-ap-panel text-ap-ink hover:bg-ap-primary-soft")
+              }
+            >
+              {t(`trends.mode.${m}`)}
+            </button>
+          ))}
         </div>
-      </header>
+      </div>
 
-      <p className="mt-2 text-xs text-ap-muted">
-        {mode === "units" ? t("trends.hintUnits") : t("trends.hintAnomaly")}
+      <p className="mt-1.5 text-xs text-ap-muted">
+        {mode === "units"
+          ? t("trends.hintUnits")
+          : t("trends.hintCompare", { count: compared.length })}
       </p>
 
       {loading ? (
@@ -218,7 +240,7 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
           <Skeleton className="h-24 w-full" />
         </div>
       ) : !hasAnyData ? (
-        <p className="py-12 text-center text-sm text-ap-muted">{t("trends.noData")}</p>
+        <p className="py-10 text-center text-sm text-ap-muted">{t("trends.noData")}</p>
       ) : mode === "units" ? (
         <ul className="mt-3 divide-y divide-ap-line/60">
           {series.map(({ idx, points, latest }) => (
@@ -280,7 +302,7 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
         <div className="mt-3">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={anomalyData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+              <LineChart data={compareData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" vertical={false} />
                 <XAxis
                   dataKey="date"
@@ -308,7 +330,7 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
                     return [`${value > 0 ? "+" : ""}${value.toFixed(2)} σ`, label];
                   }}
                 />
-                {indices.map((idx) => (
+                {compared.map(({ idx }) => (
                   <Line
                     key={idx.code}
                     type="monotone"
@@ -324,10 +346,11 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {/* Legend is always present for >= 2 series, so identity is never
-              carried by colour alone. */}
+          {/* Legend is always present, so identity is never carried by colour
+              alone — and it is the only place that names which indices the
+              cap left out. */}
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-            {indices.map((idx) => (
+            {compared.map(({ idx, latestZ }) => (
               <li key={idx.code} className="flex items-center gap-1.5 text-[11px] text-ap-ink">
                 <span
                   aria-hidden="true"
@@ -335,11 +358,30 @@ export function WeatherTrendsCard({ farmId }: Props): ReactNode {
                   style={{ backgroundColor: colorFor(idx.code) }}
                 />
                 {nameOf(idx)}
+                {latestZ === null ? null : (
+                  <span className="tabular-nums text-ap-muted">
+                    {latestZ > 0 ? "+" : ""}
+                    {latestZ.toFixed(1)}σ
+                  </span>
+                )}
               </li>
             ))}
           </ul>
         </div>
       )}
-    </Card>
+    </div>
+  );
+}
+
+function toNum(v: string | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function prefersDark(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches === true
   );
 }
