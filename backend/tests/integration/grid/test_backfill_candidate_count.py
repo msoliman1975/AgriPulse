@@ -27,6 +27,7 @@ from app.modules.grid.backfill import (
     extract_raw_bands_key,
     list_backfill_jobs,
 )
+from app.modules.grid.repository import GridRepository
 from app.modules.tenancy.service import get_tenant_service
 
 pytestmark = [pytest.mark.integration]
@@ -80,13 +81,29 @@ async def farm_env(admin_session: Any) -> dict[str, Any]:
         )
     ).scalar_one()
     # A live grid — `count_farm_backfill_candidates` keys on the farm's
-    # live grids, exactly as the backfill task's fan-out does.
+    # live grids, exactly as the backfill task's fan-out does. Inserted
+    # raw rather than through `upsert_config` so no cells are materialised:
+    # these tests are about the ingestion-job side of the count, and a
+    # grid with cells but no aggregates is the state under test.
+    # `utm_srid` is NOT NULL — 32636 is UTM 36N, the zone the boundaries
+    # above fall in.
     await admin_session.execute(
         text(
-            "INSERT INTO grid_configs (id, block_id, product_id, cell_size_m) "
-            "VALUES (:id, :b, :p, 30)"
+            "INSERT INTO grid_configs (id, block_id, product_id, cell_size_m, utm_srid) "
+            "VALUES (:id, :b, :p, 30, 32636)"
         ),
         {"id": str(uuid4()), "b": str(block_id), "p": str(product_id)},
+    )
+    # Ingestion jobs are NOT NULL on `subscription_id` — a scene only ever
+    # arrives because something subscribed to it.
+    subscription_id = uuid4()
+    await admin_session.execute(
+        text(
+            "INSERT INTO imagery_aoi_subscriptions "
+            "  (id, block_id, product_id, cadence_hours, is_active) "
+            "VALUES (:id, :b, :p, 24, true)"
+        ),
+        {"id": str(subscription_id), "b": str(block_id), "p": str(product_id)},
     )
     await admin_session.commit()
     return {
@@ -94,6 +111,7 @@ async def farm_env(admin_session: Any) -> dict[str, Any]:
         "farm_id": farm_id,
         "block_id": block_id,
         "product_id": product_id,
+        "subscription_id": subscription_id,
     }
 
 
@@ -109,13 +127,16 @@ async def _add_job(
     await session.execute(
         text(
             "INSERT INTO imagery_ingestion_jobs "
-            "  (id, block_id, product_id, scene_datetime, status, stac_item_id, assets_written) "
-            "VALUES (:id, :b, :p, :dt, :st, :item, CAST(:assets AS jsonb))"
+            "  (id, subscription_id, block_id, product_id, scene_id, scene_datetime, "
+            "   status, stac_item_id, assets_written) "
+            "VALUES (:id, :sub, :b, :p, :scene, :dt, :st, :item, CAST(:assets AS jsonb))"
         ),
         {
             "id": str(uuid4()),
+            "sub": str(env["subscription_id"]),
             "b": str(env["block_id"]),
             "p": str(env["product_id"]),
+            "scene": f"scene-{uuid4().hex[:8]}",
             "dt": scene_datetime or datetime.now(UTC),
             "st": status,
             "item": stac_item_id,
@@ -162,8 +183,13 @@ async def test_sql_predicate_matches_the_python_extractor(
 async def test_a_first_time_grid_reports_the_work_it_queued(
     admin_session: Any, farm_env: dict[str, Any]
 ) -> None:
-    """The shipped bug: a create has no prior geometry, so the old count
-    (through ``grid_cells``) was zero while real work was enqueued."""
+    """The shipped bug, both halves in one assertion pair.
+
+    Contrasts the two counts directly rather than asserting a proxy: the
+    old source returns 0 for a freshly gridded block *by construction* —
+    it counts scene times through ``grid_cells``, and a block that has
+    never been gridded has none — while the work queued is real.
+    """
     await admin_session.execute(text(f'SET search_path TO "{farm_env["schema"]}", public'))
     base = datetime.now(UTC)
     for i in range(7):
@@ -175,12 +201,15 @@ async def test_a_first_time_grid_reports_the_work_it_queued(
         )
     await admin_session.commit()
 
-    # No cells and no aggregates exist — this block has never been gridded
-    # before, which is precisely the state that used to report 0.
     await admin_session.execute(text(f'SET search_path TO "{farm_env["schema"]}", public'))
-    cells = (await admin_session.execute(text("SELECT count(*) FROM grid_cells"))).scalar_one()
-    assert cells == 0
+    # What `scenes_affected` — and therefore the old estimate — was built
+    # from. Empty: no cells, so no aggregates to count scene times through.
+    old_source = await GridRepository(admin_session).count_scenes_for_blocks(
+        block_ids=(farm_env["block_id"],)
+    )
+    assert old_source.get((farm_env["block_id"], farm_env["product_id"]), 0) == 0
 
+    # What the backfill will actually walk.
     counted = await count_farm_backfill_candidates(
         admin_session, farm_id=farm_env["farm_id"], since=None, per_pair_cap=1000
     )
