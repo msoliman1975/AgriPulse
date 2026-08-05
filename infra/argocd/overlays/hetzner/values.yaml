@@ -391,13 +391,49 @@ global:
   #   Frontend-only, no migration, no API change -- api + workers stay
   #   0b8147b, tile-server stays 9d140cc. Rollback is this tag back to
   #   7eedeab.
+  # 608e917 = the farm-level bulk grid/anomaly config stack, promoted as one
+  #   unit: #351 (bulk anomaly-threshold apply) + #353 (grid valid time) +
+  #   #355 (bulk cell-size apply / rezone) + #359 (0054 backfill fix), plus
+  #   #358 (map framing) and #350 (docs) that sat between them on main.
+  #   TWO TENANT MIGRATIONS, 0053 and 0054, and this is the first promote
+  #   since #347 -- the PreSync migrate Job runs both against EVERY active
+  #   tenant schema before any new pod goes live. Read that Job's log first
+  #   if the sync stalls; it fails closed, so a failure leaves prod running
+  #   0b8147b rather than half-migrated.
+  #   0054 puts valid time on grid_configs (effective_from/effective_to/
+  #   superseded_at) behind an EXCLUDE constraint, and needs btree_gist --
+  #   which is NOT in public 0001's _EXTENSIONS and exists today only as a
+  #   side effect of pgstac's bootstrap. 0054 creates it explicitly.
+  #   If the Job still aborts on ex_grid_configs_no_overlap, the #359
+  #   backfill met a history shape it does not chain; do not retry blindly,
+  #   dump the offending (block_id, product_id) configs first.
+  #   Two new beat entries ride along: grid.settle_rezones_sweep (hourly,
+  #   light) and grid.cleanup_superseded_grids (daily, heavy). Step 2 of a
+  #   rezone is POLLED, not signalled -- without those firing a rezone sits
+  #   in a permanent two-geometry state, which is safe but never finishes.
+  #   Confirm both appear in the beat schedule after the workers roll.
+  #   What to watch: (1) #351 shipped the cell-size field as stored-but-inert
+  #   with a warning in the panel; #355 makes it live. A farm whose Block
+  #   defaults were SAVED with a cell size back then will now actually
+  #   rezone on the next Apply -- Apply reads the saved template (see the
+  #   #330 no-op fix). (2) A rezone rebuilds grid geometry for every block
+  #   in the farm and enqueues scene-compute backfill jobs on the heavy
+  #   queue; they read raw_bands_key from R2 and do NOT re-hit CDSE, so
+  #   quota is not at risk but heavy-queue depth will spike. Budget is
+  #   round-robin fair share, newest-first. (3) grid heatmaps and the
+  #   anomaly sweep now resolve cells by requested time -- an all-NULL
+  #   heatmap on a rezoned block is the failure mode to look for.
+  #   Rollback is this tag back to 0b8147b (api + workers) and 3a4ab66
+  #   (frontend) -- but the migrations do NOT roll back with it. 0053 and
+  #   0054 stay applied; undoing them is a manual per-tenant alembic
+  #   downgrade. tile-server stays 9d140cc.
   images:
     api:
-      tag: "0b8147b"
+      tag: "608e917"
     workers:
-      tag: "0b8147b"
+      tag: "608e917"
     frontend:
-      tag: "3a4ab66"
+      tag: "608e917"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
