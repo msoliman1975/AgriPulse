@@ -42,7 +42,9 @@
       "all": "All"
     },
     "legendLabel": "Blocks shown",
-    "showAllBlocks": "Show all blocks"
+    "showAllBlocks": "Show all blocks",
+    "hideAllBlocks": "Hide all blocks",
+    "allHidden": "All blocks are hidden."
   },
   "weather": {
     "title": "Weather (past · forecast)",
