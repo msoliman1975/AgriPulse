@@ -15,6 +15,10 @@ to spend the shared CDSE allowance recomputing it.
   GET /tenants/{tenant_id}/scenes/{job_id}      — L2 scene detail
   GET /tenants/{tenant_id}/scenes/{job_id}/pixel        — L2 explain one pixel
   GET /tenants/{tenant_id}/scenes/{job_id}/pixel-budget — L2 pixel reconciliation
+  POST /tenants/{tenant_id}/scenes/{job_id}:verify     — L3 verify one scene (sync)
+  POST /tenants/{tenant_id}/verify-runs                — L3 named multi-scene run
+  GET  /tenants/{tenant_id}/verify-runs[/{id}[/results]]
+  POST /tenants/{tenant_id}/verify-runs/{id}:cancel
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from celery import current_app as celery_current_app
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +43,7 @@ from app.modules.observer.service import (
     WindowTooWideError,
     get_observer_service,
 )
+from app.modules.observer.verify_store import VerifyRunConflictError
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session
 from app.shared.rbac.check import requires_capability
@@ -303,6 +309,59 @@ class PixelBudgetResponse(BaseModel):
     recomputed_live: bool
 
 
+class VerificationRow(BaseModel):
+    """One scene's verification result."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    run_id: UUID | None
+    job_id: UUID | None
+    block_id: UUID
+    product_id: UUID
+    scene_time: datetime
+    scene_id: str
+    # `fast` checks aggregation only — the index COG already has masking
+    # baked in. Only `full` can catch a masking-rule change, so the mode
+    # travels with the verdict rather than being inferred from it.
+    mode: Literal["fast", "full"]
+    verdict: Literal["match", "drift", "source_missing", "error"]
+    per_index: dict[str, Any]
+    # Which build produced the numbers being checked, when lineage knows.
+    calc_version_stored: str | None
+    error: str | None
+    duration_ms: int | None
+    created_at: datetime
+
+
+class VerifyRunRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    farm_id: UUID
+    block_ids: list[UUID] | None
+    product_id: UUID | None
+    window_from: datetime
+    window_to: datetime
+    mode: Literal["fast", "full"]
+    status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
+    progress: dict[str, Any]
+    error: str | None
+    created_by_email: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+
+
+class VerifyRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    farm_id: UUID
+    window_from: datetime
+    window_to: datetime
+    mode: Literal["fast", "full"] = "full"
+    block_ids: list[UUID] | None = None
+    product_id: UUID | None = None
+
+
 # --- shared query params ---------------------------------------------------
 
 
@@ -559,6 +618,219 @@ async def pixel_budget(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
     except SceneRasterUnavailableError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+# --- L3: verify -------------------------------------------------------------
+
+
+@router.post(
+    "/tenants/{tenant_id}/scenes/{job_id}:verify",
+    response_model=VerificationRow,
+)
+async def verify_scene(
+    tenant_id: UUID,
+    job_id: UUID,
+    mode: Literal["fast", "full"] = Query(default="full"),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Recompute one scene and diff it against the stored aggregates.
+
+    Synchronous — one scene is one task and the operator is already looking at
+    it. Writes only to `observer_verifications`; nothing in the pipeline's
+    tables is touched, because a drift verdict is a signal to open the
+    Backfill Console, not a licence to repair.
+    """
+    schema = await _schema(service, tenant_id)
+    try:
+        row = await service.verify_scene(tenant_schema=schema, job_id=job_id, mode=mode)
+    except SceneNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
+    except SceneRasterUnavailableError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await _audit_verify(
+        tenant_schema=schema,
+        context=context,
+        event="platform.observer_verify_scene",
+        subject_id=job_id,
+        details={"job_id": str(job_id), "mode": mode, "verdict": row["verdict"]},
+    )
+    return row
+
+
+@router.post(
+    "/tenants/{tenant_id}/verify-runs",
+    response_model=VerifyRunRow,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_verify_run(
+    tenant_id: UUID,
+    body: VerifyRunRequest,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Queue a verification across many scenes.
+
+    A year across a 36-block farm is roughly 2,500 recomputations, which is
+    not a request/response. Named run, progress, cancel — the Backfill
+    Console's model, for the same reasons.
+    """
+    schema = await _schema(service, tenant_id)
+    try:
+        run = await service.create_verify_run(
+            tenant_schema=schema,
+            farm_id=body.farm_id,
+            block_ids=body.block_ids,
+            product_id=body.product_id,
+            window_from=body.window_from,
+            window_to=body.window_to,
+            mode=body.mode,
+            created_by_email=getattr(context, "email", None),
+        )
+    except VerifyRunConflictError as exc:
+        # One run per farm: a second would re-read the same COGs while the
+        # first is still working.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "A verification run is already in progress for this farm "
+            f"(run {exc.existing['id']}). Wait for it to finish, or cancel it.",
+        ) from exc
+    except WindowTooWideError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+    # Dispatched by name, so the API process never imports the worker's task
+    # module — the same decoupling the backfill console uses.
+    celery_current_app.send_task(
+        "observer.run_verification",
+        kwargs={"run_id": str(run["id"]), "tenant_schema": schema},
+    )
+    await _audit_verify(
+        tenant_schema=schema,
+        context=context,
+        event="platform.observer_verify_started",
+        subject_id=run["id"],
+        details={
+            "run_id": str(run["id"]),
+            "farm_id": str(body.farm_id),
+            "mode": body.mode,
+            "window_from": body.window_from.isoformat(),
+            "window_to": body.window_to.isoformat(),
+        },
+    )
+    return run
+
+
+@router.get("/tenants/{tenant_id}/verify-runs", response_model=list[VerifyRunRow])
+async def list_verify_runs(
+    tenant_id: UUID,
+    farm_id: UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    return await service.list_verify_runs(
+        tenant_schema=await _schema(service, tenant_id), farm_id=farm_id, limit=limit
+    )
+
+
+@router.get("/tenants/{tenant_id}/verify-runs/{run_id}", response_model=VerifyRunRow)
+async def get_verify_run(
+    tenant_id: UUID,
+    run_id: UUID,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    del context
+    run = await service.get_verify_run(
+        tenant_schema=await _schema(service, tenant_id), run_id=run_id
+    )
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "verify run not found")
+    return run
+
+
+@router.get(
+    "/tenants/{tenant_id}/verify-runs/{run_id}/results",
+    response_model=list[VerificationRow],
+)
+async def list_verify_results(
+    tenant_id: UUID,
+    run_id: UUID,
+    verdict: Literal["match", "drift", "source_missing", "error"] | None = None,
+    limit: int = Query(default=200, ge=1, le=1000),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """A finished run is a browsable report; filtering to `drift` is the point."""
+    del context
+    return await service.list_verifications(
+        tenant_schema=await _schema(service, tenant_id),
+        run_id=run_id,
+        verdict=verdict,
+        limit=limit,
+    )
+
+
+@router.post("/tenants/{tenant_id}/verify-runs/{run_id}:cancel", response_model=VerifyRunRow)
+async def cancel_verify_run(
+    tenant_id: UUID,
+    run_id: UUID,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Release a run that is still queued or running, freeing its farm.
+
+    One run per farm is enforced by a partial unique index, so a run that
+    never settles would hold that farm indefinitely. Distinguishes "no such
+    run" from "already finished" because retrying helps in neither case but
+    they mean very different things.
+    """
+    schema = await _schema(service, tenant_id)
+    row = await service.cancel_verify_run(tenant_schema=schema, run_id=run_id)
+    if row is not None:
+        await _audit_verify(
+            tenant_schema=schema,
+            context=context,
+            event="platform.observer_verify_cancelled",
+            subject_id=run_id,
+            details={"run_id": str(run_id)},
+        )
+        return row
+    if await service.get_verify_run(tenant_schema=schema, run_id=run_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "verify run not found")
+    raise HTTPException(
+        status.HTTP_409_CONFLICT, "This run has already finished; there is nothing to cancel."
+    )
+
+
+async def _audit_verify(
+    *,
+    tenant_schema: str,
+    context: RequestContext,
+    event: str,
+    subject_id: UUID | None,
+    details: dict[str, Any],
+) -> None:
+    """Audit a verification action.
+
+    Verification is the only part of Observer that consumes worker time, so it
+    is the only part that is audited. A drill-down view is indistinguishable
+    from opening a farm page, and a row per pixel click would bury the events
+    that matter.
+    """
+    from app.modules.observer.service import audit_observer_action
+
+    await audit_observer_action(
+        tenant_id=UUID(int=0),
+        tenant_schema=tenant_schema,
+        actor_user_id=getattr(context, "user_id", None),
+        event_type=event,
+        subject_id=subject_id,
+        details=details,
+    )
 
 
 # --- helpers ---------------------------------------------------------------

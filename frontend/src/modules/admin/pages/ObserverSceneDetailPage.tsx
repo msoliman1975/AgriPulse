@@ -18,6 +18,7 @@ import {
 import type { IndexCode } from "@/api/indices";
 import { PixelBudgetCard } from "@/modules/admin/components/observer/PixelBudgetCard";
 import { PixelInspector } from "@/modules/admin/components/observer/PixelInspector";
+import { VerifyPanel } from "@/modules/admin/components/observer/VerifyPanel";
 import {
   usePixelBudget,
   usePixelExplain,
@@ -203,6 +204,8 @@ export function ObserverSceneDetailPage(): ReactNode {
           </dl>
         </Card>
       </div>
+
+      <VerifyPanel tenantId={tenantId as string} jobId={jobId as string} />
 
       <Card
         title={t("observer.detail.history")}

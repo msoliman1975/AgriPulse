@@ -31,6 +31,8 @@ _TASK_PACKAGES: tuple[str, ...] = (
     # decorators so Beat-dispatched tasks resolve on workers.
     "app.modules.imagery.tasks",
     "app.modules.indices.tasks",
+    # Observer verification runs (heavy queue: `full` mode reads every band).
+    "app.modules.observer.tasks",
     "app.modules.weather.tasks",
     "app.modules.farms.tasks",
     # Phenology auto-advance sweep (writes growth_stage source='derived').

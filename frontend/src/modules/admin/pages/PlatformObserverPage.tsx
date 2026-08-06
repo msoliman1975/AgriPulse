@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { SceneHistogram } from "@/modules/admin/components/observer/SceneHistogram";
 import { SceneTable } from "@/modules/admin/components/observer/SceneTable";
 import { StageRibbon } from "@/modules/admin/components/observer/StageRibbon";
+import { VerifyRunsCard } from "@/modules/admin/components/observer/VerifyRunsCard";
 import {
   useObserverFarms,
   useObserverHistogram,
@@ -265,6 +266,15 @@ export function PlatformObserverPage(): ReactNode {
             bucket={bucket}
             onBucketChange={(b) => patch({ bucket: b })}
             isLoading={histogram.isPending}
+          />
+
+          <VerifyRunsCard
+            tenantId={tenantId as string}
+            farmId={farmId}
+            windowFrom={dayToInstant(from, false)}
+            windowTo={dayToInstant(to, true)}
+            blockIds={blockIds}
+            productId={productId}
           />
 
           <Card
