@@ -11,6 +11,11 @@ import { BlockDock } from "./BlockDock";
 // The Conditions tab calls the tree-explain endpoint, which is gated on
 // `recommendation.read`. Roles without it must not see a tab that 403s.
 const caps = vi.hoisted(() => ({ value: true }));
+const getCropAttrs = vi.fn();
+vi.mock("@/api/cropAssignments", () => ({
+  getBlockCropAttributes: (...args: unknown[]) => getCropAttrs(...args),
+}));
+
 vi.mock("@/rbac/useCapability", () => ({
   useCapability: () => caps.value,
 }));
@@ -99,6 +104,77 @@ describe("BlockDock", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
     caps.value = true;
+    getCropAttrs.mockReset();
+    getCropAttrs.mockResolvedValue({
+      block_crop_id: "00000000-0000-0000-0000-0000000000bc",
+      crop_path: "mango.alphonso",
+      definitions: [
+        {
+          code: "establishment_method",
+          name_en: "Establishment method",
+          name_ar: "طريقة التأسيس",
+          value_type: "single_select",
+          unit_en: null,
+          unit_ar: null,
+          options: [{ code: "grafted_tree", name_en: "Grafted tree", name_ar: "x", sort_order: 1 }],
+        },
+        {
+          code: "age_at_transplant_months",
+          name_en: "Age at transplant",
+          name_ar: "x",
+          value_type: "integer",
+          unit_en: "months",
+          unit_ar: "x",
+          options: null,
+        },
+        {
+          code: "nursery_source",
+          name_en: "Nursery / supplier",
+          name_ar: "x",
+          value_type: "text",
+          unit_en: null,
+          unit_ar: null,
+          options: null,
+        },
+      ],
+      // nursery_source deliberately absent — an unset field must not render.
+      values: { establishment_method: "grafted_tree", age_at_transplant_months: 30 },
+    });
+  });
+
+  it("shows the set crop fields in the Field tab, with option labels and units", async () => {
+    // The feature looked unshipped because these lived three clicks away under
+    // Manage -> Crop; the Field tab is where a user actually looks.
+    renderDock();
+    fireEvent.click(await screen.findByRole("tab", { name: /Field & plan/ }));
+
+    expect(await screen.findByText("Establishment method")).toBeTruthy();
+    // Option code mapped to its label, not the raw "grafted_tree".
+    expect(screen.getByText("Grafted tree")).toBeTruthy();
+    expect(screen.getByText("Age at transplant")).toBeTruthy();
+    expect(screen.getByText("months")).toBeTruthy();
+  });
+
+  it("omits crop fields that hold no value", async () => {
+    renderDock();
+    fireEvent.click(await screen.findByRole("tab", { name: /Field & plan/ }));
+    await screen.findByText("Establishment method");
+    expect(screen.queryByText("Nursery / supplier")).toBeNull();
+  });
+
+  it("adds no crop-field rows for a crop with no definitions", async () => {
+    // Wheat/olive blocks must look exactly as they did before this feature.
+    getCropAttrs.mockResolvedValue({
+      block_crop_id: "bc",
+      crop_path: "olive",
+      definitions: [],
+      values: {},
+    });
+    renderDock();
+    fireEvent.click(await screen.findByRole("tab", { name: /Field & plan/ }));
+    await screen.findByText("Crop & plan");
+    expect(screen.queryByText("Establishment method")).toBeNull();
+    expect(screen.queryByText("Age at transplant")).toBeNull();
   });
 
   it("renders the block identity and the tab strip", async () => {

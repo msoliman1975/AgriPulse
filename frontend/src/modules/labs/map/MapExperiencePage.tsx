@@ -43,7 +43,6 @@ import {
   listSignalObservations,
   type SignalDefinition,
 } from "@/api/signals";
-import { CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
 import { BlockCropAssignCard } from "./BlockCropAssignCard";
 import { getWeatherRiskSummary, worstLevelPerBlock, type RiskLevel } from "@/api/weatherRisk";
 import { useCapability } from "@/rbac/useCapability";
@@ -1135,26 +1134,16 @@ function MapForFarm({ farmId }: { farmId: string }) {
               }
               cropAssign={
                 selectedId && detailQ.data ? (
-                  <>
-                    <BlockCropAssignCard
-                      blockId={selectedId}
-                      farmId={farmId}
-                      hasCurrentCrop={detailQ.data.crop_assignment !== null}
-                      onAssigned={() =>
-                        queryClient.invalidateQueries({
-                          queryKey: ["labs/map/detail", farmId, selectedId],
-                        })
-                      }
-                    />
-                    {/* Crop fields hang off the *assignment*, so they only
-                        exist once a crop is assigned. */}
-                    {detailQ.data.crop_assignment ? (
-                      <CropAttributesCard
-                        blockCropId={detailQ.data.crop_assignment.id}
-                        farmId={farmId}
-                      />
-                    ) : null}
-                  </>
+                  <BlockCropAssignCard
+                    blockId={selectedId}
+                    farmId={farmId}
+                    hasCurrentCrop={detailQ.data.crop_assignment !== null}
+                    onAssigned={() =>
+                      queryClient.invalidateQueries({
+                        queryKey: ["labs/map/detail", farmId, selectedId],
+                      })
+                    }
+                  />
                 ) : null
               }
             />

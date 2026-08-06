@@ -40,6 +40,7 @@ import {
 import { DockConditionsView } from "./DockConditionsView";
 import { DockFamilyView } from "./DockFamilyView";
 import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate } from "./dockFormat";
+import { useCropAttributeRows } from "@/modules/farms/lib/useCropAttributeRows";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
 
@@ -178,6 +179,12 @@ export function BlockDock({
   const [tab, setTab] = useState<DockTab>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [manageMode, setManageMode] = useState<ManageMode | null>(null);
+  // Crop-attribute values for the read-only "Crop & plan" column. Shares the
+  // Manage → Crop editor's query key, so the two never disagree and opening
+  // the editor after viewing the summary costs no extra request. `detail` is
+  // undefined while the dock loads, so guard rather than assert — the hook
+  // just stays disabled until an assignment exists.
+  const cropAttributeRows = useCropAttributeRows(detail?.crop_assignment?.id ?? null);
   const [failingCount, setFailingCount] = useState<number | null>(null);
   const [height, setHeight] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_H;
@@ -570,7 +577,7 @@ export function BlockDock({
                     all: crop, growth stage and season had no home after the
                     drawer's Plan section was dropped. This is that home. */}
                 <Col title={t("dock.cropAndPlan")}>
-                  {detail.crop_assignment || detail.plan ? (
+                  {detail.crop_assignment || detail.plan || cropAttributeRows.length ? (
                     <Rows
                       items={[
                         ...(detail.crop_assignment
@@ -582,6 +589,10 @@ export function BlockDock({
                               ],
                             ] as [ReactNode, ReactNode][])
                           : []),
+                        // Platform-curated crop fields that hold a value. Empty
+                        // for crops with no definitions, so this column is
+                        // unchanged for anything outside the seeded set.
+                        ...cropAttributeRows,
                         ...(detail.plan
                           ? ([
                               [
