@@ -256,7 +256,8 @@ function AttributeField({
   );
 }
 
-interface InputProps {
+/** Props for {@link AttributeInput}. */
+export interface AttributeInputProps {
   def: CropAttributeDefinition;
   value: unknown;
   readOnly: boolean;
@@ -265,7 +266,21 @@ interface InputProps {
   a11y: { id: string; "aria-describedby": string | undefined; "aria-invalid": boolean | undefined };
 }
 
-function AttributeInput({ def, value, readOnly, lang, onChange, a11y }: InputProps): ReactNode {
+/**
+ * The bare control for one attribute definition, by `value_type`.
+ *
+ * Exported so the platform authoring page can preview the form a definition
+ * will actually produce. A second copy of this switch is how the preview
+ * starts lying about what the author is building.
+ */
+export function AttributeInput({
+  def,
+  value,
+  readOnly,
+  lang,
+  onChange,
+  a11y,
+}: AttributeInputProps): ReactNode {
   const { t } = useTranslation("farms");
   const options = def.options ?? [];
 

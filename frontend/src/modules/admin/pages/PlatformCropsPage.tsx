@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
 import { isApiError } from "@/api/errors";
@@ -164,6 +165,12 @@ function CropRow({
             {!crop.is_active ? <RetiredBadge /> : null}
           </span>
         </button>
+        <Link
+          to={`/platform/crops/${crop.id}/attributes`}
+          className="text-xs font-medium text-ap-primary hover:underline"
+        >
+          {t("cropAttrs.manageLink")}
+        </Link>
         {canManage ? (
           <RowActions
             isActive={crop.is_active}
