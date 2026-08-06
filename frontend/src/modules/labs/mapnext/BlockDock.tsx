@@ -648,6 +648,7 @@ export function BlockDock({
                     blockId={detail.id}
                     farmId={farmId}
                     hasCurrentCrop={detail.crop_assignment != null}
+                    blockCropId={detail.crop_assignment?.id ?? null}
                     gridProductId={gridProductId}
                     onDone={afterManage}
                   />

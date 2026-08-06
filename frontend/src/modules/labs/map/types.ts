@@ -66,6 +66,8 @@ export interface UnitDetail {
   } | null;
   // Current crop assignment for this block.
   crop_assignment: {
+    // block_crops.id — the key for the crop-attributes endpoints.
+    id: string;
     crop_name: string;
     variety_name: string | null;
     strain_name: string | null;

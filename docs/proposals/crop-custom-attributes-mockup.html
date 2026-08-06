@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crop Custom Attributes — mockup</title>
+<style>
+  :root{
+    --bg:#f7f6f1; --panel:#fff; --line:#e8e5db; --ink:#1f2420; --muted:#6c7268;
+    --primary:#356b30; --primary-soft:#dceadb; --good:#4f8e4a; --accent:#1f6f9a;
+    --warn:#c98a18; --warn-soft:#f7e7c2; --crit:#b24430; --crit-soft:#f3d2c9;
+    --radius:.75rem;
+    --shadow:0 1px 2px rgba(31,36,32,.04), 0 4px 14px rgba(31,36,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Cairo,Tahoma,Arial,sans-serif;
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{margin:0;font-weight:600}
+  a{color:var(--accent)}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8125rem}
+
+  /* ---------- shell ---------- */
+  .shell{max-width:1240px;margin:0 auto;padding:24px 20px 72px}
+  .topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-dot{width:26px;height:26px;border-radius:8px;background:var(--primary);
+    display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
+  .page-title{font-size:1.5rem;line-height:2rem;letter-spacing:-.015em}
+  .sub{color:var(--muted);font-size:.8125rem;margin:2px 0 18px}
+  .spacer{flex:1}
+
+  .mockbadge{font-size:.6875rem;text-transform:uppercase;letter-spacing:.06em;
+    background:var(--warn-soft);color:#7a5406;border:1px solid #e6cd8f;
+    padding:3px 8px;border-radius:999px;font-weight:600}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
+  .tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+    padding:10px 14px;font:inherit;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary)}
+  .tab .n{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:6px;
+    background:var(--line);color:var(--muted);font-size:.625rem;font-weight:700;margin-inline-end:7px;
+    vertical-align:1px}
+  .tab[aria-selected="true"] .n{background:var(--primary-soft);color:var(--primary)}
+  .panelview[hidden]{display:none}
+
+  /* ---------- primitives ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-hd{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .card-hd h3{font-size:.875rem}
+  .card-bd{padding:16px}
+  .card-bd.tight{padding:10px 16px 16px}
+  .grid{display:grid;gap:16px}
+  .cols-2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .cols-sidebar{grid-template-columns:300px minmax(0,1fr)}
+  .cols-sidebar-r{grid-template-columns:minmax(0,1fr) 380px}
+  @media(max-width:960px){.cols-2,.cols-sidebar,.cols-sidebar-r{grid-template-columns:minmax(0,1fr)}}
+
+  .label{display:block;font-size:.75rem;font-weight:500;color:var(--muted);margin-block-end:4px}
+  .input{display:block;width:100%;border-radius:.375rem;border:1px solid var(--line);
+    padding:8px 12px;font:inherit;font-size:.875rem;color:var(--ink);background:var(--panel)}
+  .input:focus{outline:2px solid var(--primary);outline-offset:1px}
+  select.input{cursor:pointer}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:.375rem;padding:7px 12px;font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
+  .btn:hover{background:#fbfaf7}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#2c5a28}
+  .btn.sm{padding:4px 9px;font-size:.75rem}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;
+    font-size:.6875rem;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .pill.crop{background:var(--primary-soft);color:#24501f;border-color:#c3ddc1}
+  .pill.variety{background:#e2eef5;color:#155273;border-color:#c3dced}
+  .pill.strain{background:#efe4f5;color:#5b2a75;border-color:#ddc9e8}
+  .pill.req{background:var(--crit-soft);color:#8a2f1f;border-color:#e6bdb1}
+  .pill.gate{background:var(--warn-soft);color:#7a5406;border-color:#e6cd8f}
+  .pill.rep{background:#e6f0ea;color:#2c5a28;border-color:#cadfd0}
+  .pill.type{background:#f1f0ea;color:#55594f;border-color:#e0ddd2}
+  .pill.ghost{background:transparent;color:var(--muted);border-color:var(--line)}
+
+  .muted{color:var(--muted)}
+  .meta{font-size:.6875rem;line-height:1rem;color:var(--muted)}
+  .hr{height:1px;background:var(--line);margin:14px 0;border:0}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:start;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.6875rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;
+    background:#fbfaf7;position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:0}
+  .num{text-align:end;font-variant-numeric:tabular-nums}
+  .tablewrap{overflow-x:auto;border-radius:var(--radius)}
+
+  .note{border-inline-start:3px solid var(--accent);background:#f2f7fa;padding:10px 14px;
+    border-radius:0 .375rem .375rem 0;font-size:.8125rem}
+  .note.warn{border-color:var(--warn);background:#fdf7e9}
+  .note strong{font-weight:600}
+
+  /* ---------- definition list ---------- */
+  .deflist{display:flex;flex-direction:column}
+  .defrow{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--line);
+    cursor:pointer;background:none;border-inline:0;border-top:0;width:100%;text-align:start;font:inherit;color:inherit}
+  .defrow:last-child{border-bottom:0}
+  .defrow:hover{background:#fbfaf7}
+  .defrow[aria-current="true"]{background:var(--primary-soft)}
+  .defrow .nm{font-weight:600;font-size:.8125rem}
+  .defrow .cd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.6875rem;color:var(--muted)}
+  .defrow .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+  .defrow.overridden .nm{text-decoration:line-through;opacity:.5}
+  .grouphd{padding:9px 14px;background:#fbfaf7;border-bottom:1px solid var(--line);
+    font-size:.6875rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+
+  /* ---------- assignment form ---------- */
+  .formgroup{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+  .formgroup>header{padding:10px 14px;background:#fbfaf7;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px}
+  .formgroup>header h4{font-size:.8125rem}
+  .fields{padding:14px;display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  @media(max-width:700px){.fields{grid-template-columns:minmax(0,1fr)}}
+  .field.wide{grid-column:1/-1}
+  .field .lbl{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+  .field .lbl span.t{font-size:.75rem;font-weight:500;color:var(--muted)}
+  .req-star{color:var(--crit);font-weight:700}
+  .unit{font-size:.6875rem;color:var(--muted)}
+  .help{font-size:.6875rem;color:var(--muted);margin-top:4px}
+  .err{font-size:.6875rem;color:var(--crit);margin-top:4px;font-weight:500}
+  .chkrow{display:flex;gap:16px;flex-wrap:wrap;padding-top:4px}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:.8125rem}
+  .appear{animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+
+  .toast{position:fixed;inset-block-end:20px;inset-inline-end:20px;background:var(--ink);color:#fff;
+    padding:10px 14px;border-radius:.5rem;font-size:.8125rem;box-shadow:var(--shadow);
+    max-width:340px;z-index:50}
+  .toast[hidden]{display:none}
+
+  /* ---------- yaml / code ---------- */
+  pre.code{background:#1f2420;color:#e6e4dc;padding:14px 16px;border-radius:.5rem;overflow:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.75rem;line-height:1.6;margin:0}
+  pre.code .k{color:#9dc7f0}.v{color:#c7e6a8}.c{color:#7d8578;font-style:italic}
+
+  /* ---------- chips ---------- */
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{appearance:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;
+    padding:5px 11px;font:inherit;font-size:.75rem;cursor:pointer;color:var(--muted)}
+  .chip[aria-pressed="true"]{background:var(--primary-soft);border-color:#b7d3b5;color:#24501f;font-weight:600}
+  .chip[disabled]{opacity:.45;cursor:not-allowed}
+
+  /* ---------- timeline ---------- */
+  .tl{position:relative;padding-inline-start:22px}
+  .tl:before{content:"";position:absolute;inset-block:6px 6px;inset-inline-start:5px;width:2px;background:var(--line)}
+  .tl-item{position:relative;padding:0 0 18px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-dot{position:absolute;inset-inline-start:-22px;inset-block-start:4px;width:12px;height:12px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--primary)}
+  .tl-item.gate .tl-dot{border-color:var(--warn)}
+  .tl-item.first .tl-dot{background:var(--primary)}
+  .tl-when{font-size:.6875rem;color:var(--muted)}
+  .tl-what{font-size:.8125rem}
+  .tl-what b{font-weight:600}
+  .arrow{color:var(--muted);padding:0 4px}
+
+  /* ---------- rtl ---------- */
+  [dir="rtl"] .tl:before{inset-inline-start:auto;inset-inline-end:5px}
+  [dir="rtl"] .tl{padding-inline-start:0;padding-inline-end:22px}
+  [dir="rtl"] .tl-dot{inset-inline-start:auto;inset-inline-end:-22px}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.8125rem}
+  .kv dt{color:var(--muted);font-size:.75rem}
+  .kv dd{margin:0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.6875rem;color:var(--muted);margin-top:10px}
+
+  /* ---------- checkbox dropdown ---------- */
+  .menuwrap{position:relative;display:inline-block}
+  .menubtn{display:inline-flex;align-items:center;gap:8px;min-width:230px}
+  .menubtn .caret{margin-inline-start:auto;color:var(--muted);font-size:.75rem}
+  .menubtn[aria-expanded="true"]{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}
+  .menu{position:absolute;inset-block-start:calc(100% + 6px);inset-inline-start:0;z-index:30;min-width:300px;
+    background:var(--panel);border:1px solid var(--line);border-radius:.5rem;box-shadow:0 8px 24px rgba(31,36,32,.14);
+    overflow:hidden}
+  .menu[hidden]{display:none}
+  .menu-hd{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);
+    background:#fbfaf7;font-size:.6875rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+  .menu-item{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .menu-item:last-child{border-bottom:0}
+  .menu-item:hover{background:#fbfaf7}
+  .menu-item input{margin-top:2px;accent-color:var(--primary)}
+  .menu-item .mi-nm{font-size:.8125rem;font-weight:500}
+  .menu-item .mi-cd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.6875rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand"><div class="brand-dot">AP</div>
+      <div><div class="page-title" id="pgtitle">Crop Custom Attributes</div></div>
+    </div>
+    <span class="mockbadge">Mockup — not wired to the API</span>
+    <div class="spacer"></div>
+    <div class="chips">
+      <button class="chip" id="lang-en" aria-pressed="true" onclick="setLang('en')">English</button>
+      <button class="chip" id="lang-ar" aria-pressed="false" onclick="setLang('ar')">العربية (RTL)</button>
+    </div>
+  </div>
+  <p class="sub" id="pgsub">Platform-curated typed fields on the crop → block assignment. Catalogue data below is the
+    real seed: 23 Egyptian crops, mango at <code>variety_strain</code> depth with 7 cultivars and short/long strains.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  onclick="showTab(0)"><span class="n">1</span>Platform · attribute setup</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(1)"><span class="n">2</span>Assignment form</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(2)"><span class="n">3</span>Change history</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(3)"><span class="n">4</span>Decision tree condition</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(4)"><span class="n">5</span>Report columns</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(5)"><span class="n">6</span>Catalogue coverage</button>
+  </div>
+
+  <!-- ============ TAB 1 : PLATFORM SETUP ============ -->
+  <section class="panelview" id="view0">
+    <div class="grid cols-sidebar">
+      <div>
+        <div class="card">
+          <div class="card-hd"><h3>Crop catalogue</h3></div>
+          <div class="card-bd tight">
+            <label class="label" style="margin-top:10px">Crop</label>
+            <select class="input" id="setup-crop" onchange="renderSetup()"></select>
+            <label class="label" style="margin-top:12px">Taxonomy node</label>
+            <select class="input" id="setup-node" onchange="renderSetup()"></select>
+            <p class="meta" style="margin-top:10px" id="setup-nodehint"></p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>Resolution</h3></div>
+          <div class="card-bd">
+            <p class="meta" style="margin:0 0 8px">Definitions attach at any taxonomy level and resolve
+              <strong>deepest-wins by <code>code</code></strong> — the same rule as
+              <code>size_classes</code> and <code>default_thresholds</code>.</p>
+            <div class="legend">
+              <span><span class="pill crop">crop</span></span>
+              <span><span class="pill variety">variety</span></span>
+              <span><span class="pill strain">strain</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid cols-sidebar-r" style="align-content:start">
+        <div class="card">
+          <div class="card-hd">
+            <h3 id="setup-count">Resolved definitions</h3>
+            <div class="spacer"></div>
+            <button class="btn sm primary">+ New attribute</button>
+          </div>
+          <div class="deflist" id="setup-list"></div>
+        </div>
+        <div class="card" style="align-self:start">
+          <div class="card-hd"><h3>Definition</h3></div>
+          <div class="card-bd" id="setup-detail"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2 : ASSIGNMENT FORM ============ -->
+  <section class="panelview" id="view1" hidden>
+    <div class="grid cols-sidebar-r">
+      <div>
+        <div class="card">
+          <div class="card-hd">
+            <h3 id="asg-title">Block B-04 · crop assignment</h3>
+            <div class="spacer"></div>
+            <span class="pill ghost" data-i18n="f.season">Season 2026</span>
+          </div>
+          <div class="card-bd">
+            <div class="fields" style="padding:0 0 14px">
+              <div class="field">
+                <div class="lbl"><span class="t" data-i18n="f.crop">Crop</span></div>
+                <select class="input" id="asg-crop" onchange="onAsgCrop()"></select>
+              </div>
+              <div class="field">
+                <div class="lbl"><span class="t" data-i18n="f.path">Variety / strain</span></div>
+                <select class="input" id="asg-node" onchange="renderForm()"></select>
+              </div>
+            </div>
+            <hr class="hr" />
+            <div id="asg-groups"></div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button class="btn primary" onclick="saveForm()" data-i18n="f.save">Save assignment</button>
+              <button class="btn" onclick="resetForm()" data-i18n="f.reset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="align-self:start">
+        <div class="card">
+          <div class="card-hd"><h3 data-i18n="f.gating">Live gating</h3></div>
+          <div class="card-bd">
+            <p class="meta" style="margin:0 0 10px">Change the first field to watch <code>show_when</code> /
+              <code>required_when</code> take effect. Gating is one level deep and non-recursive —
+              enough for this case without building a second rules engine.</p>
+            <div id="gatelog" class="tl"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>PUT payload</h3></div>
+          <div class="card-bd"><pre class="code" id="asg-payload"></pre></div>
+        </div>
+      </div>
+    </div>
+    <div class="note warn" style="margin-top:16px">
+      <strong>Hidden means cleared.</strong> When a gate closes on a field that already holds a value, the value is
+      cleared on save with a <code>cleared_by_gate</code> history entry — a stale <code>transplant_date</code> must not
+      survive a switch back to <em>Seed</em>.
+    </div>
+  </section>
+
+  <!-- ============ TAB 3 : HISTORY ============ -->
+  <section class="panelview" id="view2" hidden>
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-hd"><h3>Value history · Block B-04 · <code>age_at_transplant_months</code></h3></div>
+        <div class="card-bd">
+          <div class="tl" id="histA"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-hd"><h3>Value history · <code>establishment_method</code></h3></div>
+          <div class="card-bd"><div class="tl" id="histB"></div></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>What history buys</h3></div>
+          <div class="card-bd">
+            <p style="margin:0 0 10px">Reports resolve a value <strong>as of the period end</strong>, not as of now —
+              the latest log row at or before <code>until</code>, falling back to the current value when no log row
+              precedes the period.</p>
+            <div class="note">A Q1-2026 crop-health report shows <code>age_at_transplant_months = 30</code> for
+              B-04, even though the field reads <strong>42</strong> today. Without the log the report would silently
+              back-date today's number.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note warn" style="margin-top:16px">
+      <strong>The v1 staleness gap.</strong> No <code>derived</code> type ships in v1, so a stored age never ages —
+      the two edits above are manual. <code>transplant_date</code> is seeded next to the age so a later
+      <code>derived</code> type (or a <code>days_since()</code> key) computes current age with <em>no data
+      migration</em>.
+    </div>
+  </section>
+
+  <!-- ============ TAB 4 : DECISION TREE ============ -->
+  <section class="panelview" id="view3" hidden>
+    <div class="grid cols-sidebar-r">
+      <div class="card">
+        <div class="card-hd"><h3>Condition builder — node “Young transplant under stress”</h3></div>
+        <div class="card-bd">
+          <p class="meta" style="margin:0 0 12px">Tree <code>mango-young-transplant-v1</code> ·
+            targeting <code>crop_paths: [mango]</code> · scope <code>block</code></p>
+          <div id="dtrows"></div>
+          <button class="btn sm" style="margin-top:10px">+ Add term</button>
+          <hr class="hr" />
+          <h4 style="font-size:.8125rem;margin-bottom:8px">Compiled AST</h4>
+          <pre class="code" id="dtyaml"></pre>
+        </div>
+      </div>
+      <div style="align-self:start">
+        <div class="card">
+          <div class="card-hd"><h3>Source picker</h3></div>
+          <div class="card-bd">
+            <label class="label">Source</label>
+            <select class="input" id="dtsource" onchange="renderDT()">
+              <option>indices</option><option>block</option><option>weather</option>
+              <option>weather_index</option><option>weather_risk</option><option>signals</option>
+              <option>grid</option><option>params</option>
+              <option selected>crop_attribute</option>
+            </select>
+            <p class="meta" style="margin-top:8px">The ninth source — and the <strong>first dynamic one</strong>.
+              Every existing source is a closed constant array hardcoded in
+              <code>conditionEdit.ts</code>; this one populates from the catalogue.</p>
+            <hr class="hr" />
+            <label class="label">Attribute (crop-filtered by tree targeting)</label>
+            <select class="input" id="dtcode" onchange="renderDT()"></select>
+            <p class="help" id="dtoplist" style="margin-top:8px"></p>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>Authoring warning</h3></div>
+          <div class="card-bd">
+            <div class="note warn" style="margin:0">A tree targeting <code>[mango]</code> that references
+              <code>seed_tuber_grade</code> (potato-only) evaluates to <code>None</code> forever, silently. The
+              validator warns at authoring time — it does not hard-fail, since a tree may legitimately target
+              several crop paths.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 5 : REPORTS ============ -->
+  <section class="panelview" id="view4" hidden>
+    <div class="card">
+      <div class="card-hd">
+        <h3>Crop Health · Bashayer Farm · 2026-04-01 → 2026-06-30</h3>
+        <div class="spacer"></div>
+        <button class="btn sm">Export CSV</button><button class="btn sm">Print PDF</button>
+      </div>
+      <div class="card-bd">
+        <label class="label" id="repcollabel">Additional columns <span class="muted">— only <code>is_reportable</code>
+          definitions resolvable for the blocks in this report</span></label>
+        <div class="menuwrap">
+          <button class="btn menubtn" id="repbtn" aria-expanded="false" onclick="toggleRepMenu(event)">
+            <span id="repbtnlabel">Additional columns</span>
+            <span class="pill rep" id="repcount">2</span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="menu" id="repmenu" hidden>
+            <div class="menu-hd">
+              <span id="repmenutitle">Columns to add</span>
+              <div class="spacer"></div>
+              <button class="btn sm" onclick="repAll(true)" id="repselall">All</button>
+              <button class="btn sm" onclick="repAll(false)" id="repclear">None</button>
+            </div>
+            <div id="repmenuitems"></div>
+          </div>
+        </div>
+        <p class="meta" style="margin-top:8px" id="repnote"></p>
+        <hr class="hr" />
+        <div class="tablewrap"><table id="reptable"></table></div>
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="note">Selected columns live in the URL query
+        (<code>?attribute_codes=establishment_method,age_at_transplant_months</code>) so a report link round-trips,
+        and they flow through CSV and print-PDF unchanged.</div>
+      <div class="note warn"><code>weather_summary</code> and <code>operations_log</code> are excluded — wrong row
+        grain, no block-crop to hang values off. The picker ships on <code>crop_health</code> first, then
+        <code>zone_anomaly</code>, <code>water_balance</code>, <code>weather_risk_pressure</code>.</div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 6 : COVERAGE ============ -->
+  <section class="panelview" id="view5" hidden>
+    <div class="card">
+      <div class="card-hd"><h3>Which crops get which attribute groups</h3>
+        <div class="spacer"></div><span class="meta">seed set — <code>public.crop_attribute_definitions</code></span>
+      </div>
+      <div class="card-bd">
+        <p style="margin:0 0 14px">The transplanted-tree case is one group. The mechanism is generic: the same
+          machinery carries a completely different attribute set per crop, which is the point — the concept
+          transfers, the attributes don't.</p>
+        <div class="tablewrap"><table id="covtable"></table></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:16px">
+      <strong>Reserved codes.</strong> <code>planting_date</code>, <code>plant_density_per_ha</code>,
+      <code>row_spacing_m</code>, <code>plant_spacing_m</code>, <code>canopy_size_class</code>,
+      <code>growth_stage</code>, <code>crop_category</code>, <code>crop_path</code>, <code>crop_strain</code>,
+      <code>soil_texture</code>, <code>salinity_class</code> are rejected as attribute codes — they are already
+      first-class block fields and an attribute reusing one would shadow it in the decision-tree builder.
+    </div>
+  </section>
+
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ============================================================
+   CATALOGUE — real seed data
+   public.crops (0006), mango taxonomy (0030 + 0033),
+   date_palm & potato varieties (0039)
+   ============================================================ */
+const CROPS = [
+  { code:"mango", en:"Mango", ar:"مانجو", sci:"Mangifera indica", cat:"fruit_tree", perennial:true, depth:"variety_strain",
+    varieties:[
+      {code:"alphonso", en:"Alphonso", ar:"الفونس", strains:[{code:"short",en:"Short",ar:"قصير"},{code:"long",en:"Long",ar:"طويل"}]},
+      {code:"eswwy",    en:"Eswwy",    ar:"عويس",   strains:[{code:"short",en:"Short",ar:"قصير"},{code:"long",en:"Long",ar:"طويل"}]},
+      {code:"keitt",    en:"Keitt",    ar:"كيت",     strains:[]},
+      {code:"yasmina",  en:"Yasmina",  ar:"ياسمينا", strains:[]},
+      {code:"sukkary",  en:"Sukkary",  ar:"سكري",    strains:[]},
+      {code:"zebda",    en:"Zebda",    ar:"زبدية",   strains:[]},
+      {code:"crimson",  en:"Crimson",  ar:"كريمسون", strains:[]},
+    ]},
+  { code:"date_palm", en:"Date Palm", ar:"نخيل البلح", sci:"Phoenix dactylifera", cat:"fruit_tree", perennial:true, depth:"variety",
+    varieties:[
+      {code:"zaghloul",en:"Zaghloul",ar:"زغلول",strains:[]},{code:"samany",en:"Samany",ar:"سماني",strains:[]},
+      {code:"hayany",en:"Hayany",ar:"حياني",strains:[]},{code:"amhat",en:"Amhat",ar:"أمهات",strains:[]},
+      {code:"siwi",en:"Siwi",ar:"سيوي",strains:[]},{code:"barhi",en:"Barhi",ar:"برحي",strains:[]},
+      {code:"medjool",en:"Medjool",ar:"مجدول",strains:[]},
+    ]},
+  { code:"citrus_orange", en:"Orange", ar:"برتقال", sci:"Citrus sinensis", cat:"fruit_tree", perennial:true, depth:"crop_only", varieties:[] },
+  { code:"potato", en:"Potato", ar:"بطاطس", sci:"Solanum tuberosum", cat:"vegetable", perennial:false, depth:"variety",
+    varieties:[
+      {code:"spunta",en:"Spunta",ar:"سبونتا",strains:[]},{code:"diamant",en:"Diamant",ar:"ديامنت",strains:[]},
+      {code:"cara",en:"Cara",ar:"كارا",strains:[]},{code:"lady_rosetta",en:"Lady Rosetta",ar:"ليدي روزيتا",strains:[]},
+      {code:"hermes",en:"Hermes",ar:"هيرمس",strains:[]},
+    ]},
+  { code:"tomato", en:"Tomato", ar:"طماطم", sci:"Solanum lycopersicum", cat:"vegetable", perennial:false, depth:"crop_only", varieties:[] },
+];
+
+const G_EST  = {code:"establishment",     en:"Establishment",      ar:"التأسيس"};
+const G_PROP = {code:"planting_material", en:"Planting material",  ar:"مادة الزراعة"};
+const G_NUR  = {code:"nursery",           en:"Nursery & transplant",ar:"المشتل والشتل"};
+
+const O = (code,en,ar)=>({code,en,ar});
+
+/* ---- Attribute definitions. `path` = the taxonomy node it attaches to. ---- */
+const DEFS = [
+  /* ===== MANGO — crop level ===== */
+  {path:"mango", code:"establishment_method", group:G_EST, type:"single_select", required:true, reportable:true,
+   en:"Establishment method", ar:"طريقة التأسيس", order:1,
+   help_en:"How the block was established. Gates every other field in this group.",
+   help_ar:"كيف تم تأسيس القطعة. يتحكم في باقي حقول هذه المجموعة.",
+   options:[O("seed","Seed","بذرة"),O("seedling","Seedling","شتلة"),O("transplanted_tree","Transplanted tree","شجرة منقولة"),
+            O("grafted_tree","Grafted tree","شجرة مطعمة"),O("rootstock","Rootstock only","أصل فقط"),
+            O("cutting","Cutting","عقلة"),O("tissue_culture","Tissue culture","زراعة أنسجة")]},
+
+  {path:"mango", code:"transplant_date", group:G_EST, type:"date", reportable:true, order:2,
+   en:"Transplant date", ar:"تاريخ الشتل",
+   help_en:"Date the young tree went into this block — distinct from planting_date, which is the season anchor.",
+   help_ar:"تاريخ نقل الشجرة الصغيرة إلى القطعة — يختلف عن تاريخ الزراعة المرجعي للموسم.",
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]},
+   required_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]}},
+
+  {path:"mango", code:"age_at_transplant_months", group:G_EST, type:"integer", reportable:true, order:3,
+   en:"Age at transplant", ar:"عمر الشجرة عند الشتل", unit_en:"months", unit_ar:"شهر", min:0, max:600,
+   help_en:"Nursery age of the tree on the transplant date. Does not auto-age in v1 — see the staleness note.",
+   help_ar:"عمر الشجرة في المشتل عند الشتل. لا يتحدث تلقائيًا في الإصدار الأول.",
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]},
+   required_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]}},
+
+  {path:"mango", code:"transplant_height_cm", group:G_EST, type:"decimal", dp:1, reportable:true, order:4,
+   en:"Height at transplant", ar:"ارتفاع الشجرة عند الشتل", unit_en:"cm", unit_ar:"سم", min:0, max:2000,
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]}},
+
+  {path:"mango", code:"transplant_trunk_diameter_cm", group:G_EST, type:"decimal", dp:1, order:5,
+   en:"Trunk diameter at transplant", ar:"قطر الساق عند الشتل", unit_en:"cm", unit_ar:"سم", min:0, max:500,
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]}},
+
+  {path:"mango", code:"rootstock_type", group:G_EST, type:"single_select", reportable:true, order:6,
+   en:"Rootstock", ar:"الأصل",
+   options:[O("local_polyembryonic","Local polyembryonic seedling","بذري بلدي متعدد الأجنة"),
+            O("sukkary_seedling","Sukkary seedling","بذري سكري"),O("zebda_seedling","Zebda seedling","بذري زبدية"),
+            O("13_1","13-1","13-1")],
+   show_when:{code:"establishment_method",in:["grafted_tree","rootstock"]},
+   required_when:{code:"establishment_method",in:["grafted_tree","rootstock"]}},
+
+  {path:"mango", code:"graft_union_height_cm", group:G_EST, type:"decimal", dp:1, order:7,
+   en:"Graft union height", ar:"ارتفاع منطقة التطعيم", unit_en:"cm", unit_ar:"سم", min:0, max:200,
+   show_when:{code:"establishment_method",in:["grafted_tree"]}},
+
+  {path:"mango", code:"nursery_source", group:G_EST, type:"text", maxlen:120, order:8,
+   en:"Nursery / supplier", ar:"المشتل / المورد",
+   show_when:{code:"establishment_method",in:["seedling","transplanted_tree","grafted_tree","rootstock","tissue_culture"]}},
+
+  /* ===== MANGO — variety-level override (deepest-wins) ===== */
+  {path:"mango.sukkary", code:"rootstock_type", group:G_EST, type:"single_select", reportable:true, order:6,
+   en:"Rootstock", ar:"الأصل",
+   help_en:"Sukkary is propagated locally on its own seedling rootstock; the generic list is narrowed here.",
+   help_ar:"يُكاثر السكري محليًا على أصله البذري؛ القائمة العامة مختصرة هنا.",
+   options:[O("sukkary_seedling","Sukkary seedling","بذري سكري"),
+            O("local_polyembryonic","Local polyembryonic seedling","بذري بلدي متعدد الأجنة")],
+   show_when:{code:"establishment_method",in:["grafted_tree","rootstock"]},
+   required_when:{code:"establishment_method",in:["grafted_tree","rootstock"]}},
+
+  /* ===== MANGO — strain-level override (three levels deep) ===== */
+  {path:"mango.alphonso.short", code:"transplant_height_cm", group:G_EST, type:"decimal", dp:1, reportable:true, order:4,
+   en:"Height at transplant", ar:"ارتفاع الشجرة عند الشتل", unit_en:"cm", unit_ar:"سم", min:0, max:250,
+   help_en:"Short-strain nursery trees are supplied under 2.5 m — range narrowed from the crop-level 0–2000.",
+   help_ar:"أشجار السلالة القصيرة تُورَّد بارتفاع أقل من 2.5 م — النطاق مختصر من 0–2000.",
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree","rootstock"]}},
+
+  /* ===== DATE PALM — a different nature of attributes ===== */
+  {path:"date_palm", code:"propagation_source", group:G_PROP, type:"single_select", required:true, reportable:true, order:1,
+   en:"Propagation source", ar:"مصدر الإكثار",
+   help_en:"Date palm is not grafted — it establishes from offshoots or tissue culture.",
+   help_ar:"لا يُطعَّم النخيل — يُؤسَّس من الفسائل أو زراعة الأنسجة.",
+   options:[O("offshoot","Offshoot","فسيلة"),O("tissue_culture","Tissue culture","زراعة أنسجة"),O("seedling","Seedling (from seed)","بذري")]},
+  {path:"date_palm", code:"offshoot_age_months", group:G_PROP, type:"integer", reportable:true, order:2,
+   en:"Offshoot age at planting", ar:"عمر الفسيلة عند الزراعة", unit_en:"months", unit_ar:"شهر", min:12, max:120,
+   show_when:{code:"propagation_source",in:["offshoot"]}, required_when:{code:"propagation_source",in:["offshoot"]}},
+  {path:"date_palm", code:"offshoot_weight_kg", group:G_PROP, type:"decimal", dp:1, order:3,
+   en:"Offshoot weight", ar:"وزن الفسيلة", unit_en:"kg", unit_ar:"كجم", min:5, max:60,
+   show_when:{code:"propagation_source",in:["offshoot"]}},
+  {path:"date_palm", code:"mother_palm_ref", group:G_PROP, type:"text", maxlen:60, order:4,
+   en:"Mother palm reference", ar:"مرجع النخلة الأم",
+   show_when:{code:"propagation_source",in:["offshoot"]}},
+  {path:"date_palm", code:"tc_lab_source", group:G_PROP, type:"text", maxlen:120, order:5,
+   en:"Tissue-culture lab", ar:"معمل زراعة الأنسجة",
+   show_when:{code:"propagation_source",in:["tissue_culture"]}, required_when:{code:"propagation_source",in:["tissue_culture"]}},
+  {path:"date_palm", code:"tc_batch_code", group:G_PROP, type:"text", maxlen:40, order:6,
+   en:"TC batch code", ar:"كود التشغيلة", show_when:{code:"propagation_source",in:["tissue_culture"]}},
+
+  /* ===== CITRUS — same shape, different rootstocks ===== */
+  {path:"citrus_orange", code:"establishment_method", group:G_EST, type:"single_select", required:true, reportable:true, order:1,
+   en:"Establishment method", ar:"طريقة التأسيس",
+   options:[O("seedling","Seedling","شتلة"),O("transplanted_tree","Transplanted tree","شجرة منقولة"),
+            O("grafted_tree","Grafted tree","شجرة مطعمة")]},
+  {path:"citrus_orange", code:"transplant_date", group:G_EST, type:"date", reportable:true, order:2,
+   en:"Transplant date", ar:"تاريخ الشتل",
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree"]},
+   required_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree"]}},
+  {path:"citrus_orange", code:"age_at_transplant_months", group:G_EST, type:"integer", reportable:true, order:3,
+   en:"Age at transplant", ar:"عمر الشجرة عند الشتل", unit_en:"months", unit_ar:"شهر", min:0, max:360,
+   show_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree"]},
+   required_when:{code:"establishment_method",in:["transplanted_tree","grafted_tree"]}},
+  {path:"citrus_orange", code:"rootstock_type", group:G_EST, type:"single_select", reportable:true, order:4,
+   en:"Rootstock", ar:"الأصل",
+   options:[O("sour_orange","Sour orange","نارنج"),O("volkamer_lemon","Volkamer lemon","فولكامريانا"),
+            O("carrizo_citrange","Carrizo citrange","كاريزو سيترانج"),O("cleopatra_mandarin","Cleopatra mandarin","كليوباترا")],
+   show_when:{code:"establishment_method",in:["grafted_tree"]}, required_when:{code:"establishment_method",in:["grafted_tree"]}},
+
+  /* ===== POTATO — seed material, not trees ===== */
+  {path:"potato", code:"seed_material", group:G_PROP, type:"single_select", required:true, reportable:true, order:1,
+   en:"Seed material", ar:"مادة التقاوي",
+   options:[O("certified_seed_tuber","Certified seed tuber","تقاوي درنية معتمدة"),
+            O("farm_saved_tuber","Farm-saved tuber","تقاوي من المزرعة"),
+            O("minituber","Minituber","درنة صغيرة"),O("true_potato_seed","True potato seed","بذرة حقيقية")]},
+  {path:"potato", code:"seed_tuber_grade", group:G_PROP, type:"single_select", reportable:true, order:2,
+   en:"Seed tuber grade", ar:"رتبة التقاوي",
+   options:[O("28_35","28–35 mm","28–35 مم"),O("35_45","35–45 mm","35–45 مم"),
+            O("45_55","45–55 mm","45–55 مم"),O("55_65","55–65 mm","55–65 مم")],
+   show_when:{code:"seed_material",in:["certified_seed_tuber","farm_saved_tuber"]},
+   required_when:{code:"seed_material",in:["certified_seed_tuber"]}},
+  {path:"potato", code:"seed_generation", group:G_PROP, type:"single_select", reportable:true, order:3,
+   en:"Seed generation", ar:"جيل التقاوي",
+   options:[O("E","Elite","نخبة"),O("G1","G1","ج1"),O("G2","G2","ج2"),O("G3","G3","ج3"),O("G4","G4","ج4")],
+   show_when:{code:"seed_material",in:["certified_seed_tuber"]}},
+  {path:"potato", code:"seed_lot_code", group:G_PROP, type:"text", maxlen:40, order:4,
+   en:"Seed lot code", ar:"كود التشغيلة", show_when:{code:"seed_material",in:["certified_seed_tuber"]}},
+  {path:"potato", code:"sprouting_status", group:G_PROP, type:"single_select", reportable:true, order:5,
+   en:"Sprouting status at planting", ar:"حالة التزريع عند الزراعة",
+   options:[O("dormant","Dormant","ساكنة"),O("sprouted_1_3","Sprouted 1–3 mm","مزرعة 1–3 مم"),
+            O("sprouted_over_3","Sprouted > 3 mm","مزرعة > 3 مم"),O("pre_sprouted","Pre-sprouted in trays","تزريع مسبق")]},
+  {path:"potato", code:"seed_treatment", group:G_PROP, type:"multi_select", reportable:true, order:6,
+   en:"Seed treatment", ar:"معاملة التقاوي",
+   help_en:"Multi-select — comparable in a decision tree with `in` and `eq` only.",
+   help_ar:"اختيار متعدد — يقارَن في شجرة القرار بـ in و eq فقط.",
+   options:[O("fungicide_dust","Fungicide dust","مطهر فطري بودرة"),O("insecticide","Insecticide","مبيد حشري"),
+            O("sprout_inhibitor","Sprout inhibitor","مثبط تزريع"),O("none","None","بدون")]},
+
+  /* ===== TOMATO — transplanted, but a vegetable ===== */
+  {path:"tomato", code:"planting_material", group:G_NUR, type:"single_select", required:true, reportable:true, order:1,
+   en:"Planting material", ar:"مادة الزراعة",
+   help_en:"Same transplant concept as a tree crop — entirely different attributes.",
+   help_ar:"نفس مفهوم الشتل في أشجار الفاكهة — لكن بحقول مختلفة تمامًا.",
+   options:[O("direct_seed","Direct seed","بذر مباشر"),O("nursery_seedling","Nursery seedling","شتلة مشتل"),
+            O("grafted_seedling","Grafted seedling","شتلة مطعمة")]},
+  {path:"tomato", code:"seedling_age_days", group:G_NUR, type:"integer", reportable:true, order:2,
+   en:"Seedling age at transplant", ar:"عمر الشتلة عند الشتل", unit_en:"days", unit_ar:"يوم", min:14, max:60,
+   show_when:{code:"planting_material",in:["nursery_seedling","grafted_seedling"]},
+   required_when:{code:"planting_material",in:["nursery_seedling","grafted_seedling"]}},
+  {path:"tomato", code:"true_leaves_at_transplant", group:G_NUR, type:"integer", order:3,
+   en:"True leaves at transplant", ar:"عدد الأوراق الحقيقية عند الشتل", min:2, max:10,
+   show_when:{code:"planting_material",in:["nursery_seedling","grafted_seedling"]}},
+  {path:"tomato", code:"tray_cell_count", group:G_NUR, type:"single_select", order:4,
+   en:"Nursery tray", ar:"صينية المشتل",
+   options:[O("209","209-cell","209 عين"),O("104","104-cell","104 عين"),O("84","84-cell","84 عين")],
+   show_when:{code:"planting_material",in:["nursery_seedling","grafted_seedling"]}},
+  {path:"tomato", code:"rootstock_cultivar", group:G_NUR, type:"text", maxlen:60, reportable:true, order:5,
+   en:"Rootstock cultivar", ar:"صنف الأصل",
+   show_when:{code:"planting_material",in:["grafted_seedling"]},
+   required_when:{code:"planting_material",in:["grafted_seedling"]}},
+  {path:"tomato", code:"nursery_name", group:G_NUR, type:"text", maxlen:120, order:6,
+   en:"Nursery", ar:"المشتل",
+   show_when:{code:"planting_material",in:["nursery_seedling","grafted_seedling"]}},
+];
+
+/* ============================================================ */
+let LANG = "en";
+const T = (o,f)=> (LANG==="ar" && o[f+"_ar"]!=null && o[f+"_ar"]!=="") ? o[f+"_ar"] : o[f+"_en"];
+const NM = o => LANG==="ar" ? (o.ar || o.en) : o.en;
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const TYPE_LABEL = {integer:"integer", decimal:"decimal", text:"text", boolean:"boolean",
+  date:"date", single_select:"single_select", multi_select:"multi_select"};
+const OPS_FOR = {integer:"lt le gt ge eq ne between", decimal:"lt le gt ge eq ne between",
+  date:"lt le gt ge eq ne between", text:"eq ne in", boolean:"eq ne",
+  single_select:"eq ne in", multi_select:"in eq ne"};
+
+function levelOf(path){ return path.split(".").length===1?"crop":path.split(".").length===2?"variety":"strain"; }
+function cropOf(code){ return CROPS.find(c=>c.code===code); }
+
+/** deepest-wins resolution for a taxonomy path, e.g. "mango.alphonso.short" */
+function resolveDefs(path){
+  const segs = path.split(".");
+  const prefixes = segs.map((_,i)=>segs.slice(0,i+1).join("."));
+  const byCode = new Map(); const shadowed = [];
+  prefixes.forEach(p=>{
+    DEFS.filter(d=>d.path===p).forEach(d=>{
+      if(byCode.has(d.code)) shadowed.push(byCode.get(d.code));
+      byCode.set(d.code, d);
+    });
+  });
+  const list = [...byCode.values()].sort((a,b)=>(a.order||99)-(b.order||99));
+  return {list, shadowed};
+}
+function gateOpen(def, values){
+  if(!def.show_when) return true;
+  const v = values[def.show_when.code];
+  return def.show_when.in.includes(v);
+}
+function isRequired(def, values){
+  if(def.required) return true;
+  if(!def.required_when) return false;
+  return def.required_when.in.includes(values[def.required_when.code]);
+}
+
+/* ---------- tabs ---------- */
+function showTab(i){
+  document.querySelectorAll('[role="tab"]').forEach((t,n)=>t.setAttribute("aria-selected", n===i));
+  document.querySelectorAll(".panelview").forEach((p,n)=>p.hidden = n!==i);
+}
+/* Mockup chrome strings. The attribute catalogue carries its own name_en /
+   name_ar; this dict is only for the surrounding page furniture. */
+const CHROME = {
+  "f.crop":   ["Crop", "المحصول"],
+  "f.path":   ["Variety / strain", "الصنف / السلالة"],
+  "f.save":   ["Save assignment", "حفظ التخصيص"],
+  "f.reset":  ["Reset", "إعادة تعيين"],
+  "f.season": ["Season 2026", "موسم 2026"],
+  "f.gating": ["Live gating", "التحكم الحي في الحقول"],
+};
+const TABS_AR = ["المنصة · إعداد الحقول","نموذج التخصيص","سجل التغييرات","شرط شجرة القرار","أعمدة التقارير","تغطية الكتالوج"];
+const TABS_EN = ["Platform · attribute setup","Assignment form","Change history","Decision tree condition","Report columns","Catalogue coverage"];
+function setLang(l){
+  LANG=l;
+  document.getElementById("lang-en").setAttribute("aria-pressed", l==="en");
+  document.getElementById("lang-ar").setAttribute("aria-pressed", l==="ar");
+  document.documentElement.lang=l;
+  document.documentElement.dir = l==="ar" ? "rtl" : "ltr";
+  document.getElementById("pgtitle").textContent = l==="ar" ? "حقول المحاصيل المخصصة" : "Crop Custom Attributes";
+  document.getElementById("pgsub").innerHTML = l==="ar"
+    ? "حقول مُنسَّقة من المنصة، محدّدة النوع، على تخصيص المحصول ← القطعة. البيانات أدناه من بذور الكتالوج الفعلية: 23 محصولًا مصريًا، والمانجو بعمق <code>variety_strain</code> بسبعة أصناف وسلالتين قصيرة/طويلة."
+    : "Platform-curated typed fields on the crop → block assignment. Catalogue data below is the real seed: 23 Egyptian crops, mango at <code>variety_strain</code> depth with 7 cultivars and short/long strains.";
+  document.querySelectorAll('[role="tab"]').forEach((t,i)=>{
+    t.innerHTML = `<span class="n">${i+1}</span>${esc(l==="ar"?TABS_AR[i]:TABS_EN[i])}`;
+  });
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const pair=CHROME[el.getAttribute("data-i18n")];
+    if(pair) el.textContent = l==="ar" ? pair[1] : pair[0];
+  });
+  renderAll();
+}
+function toast(msg){
+  const t=document.getElementById("toast"); t.textContent=msg; t.hidden=false;
+  clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true, 3200);
+}
+
+/* ============ TAB 1 : setup ============ */
+let setupSelected = "establishment_method";
+function nodeOptions(crop){
+  const out=[{path:crop.code, label:`${NM(crop)} — ${LANG==="ar"?"مستوى المحصول":"crop level"}`}];
+  crop.varieties.forEach(v=>{
+    out.push({path:`${crop.code}.${v.code}`, label:`↳ ${NM(v)}`});
+    v.strains.forEach(s=>out.push({path:`${crop.code}.${v.code}.${s.code}`, label:`   ↳↳ ${NM(v)} · ${NM(s)}`}));
+  });
+  return out;
+}
+function initSetup(){
+  const sel=document.getElementById("setup-crop");
+  sel.innerHTML = CROPS.map(c=>`<option value="${c.code}">${esc(NM(c))} — ${esc(c.sci)}</option>`).join("");
+  sel.value="mango"; syncSetupNodes();
+}
+function syncSetupNodes(){
+  const crop=cropOf(document.getElementById("setup-crop").value);
+  const node=document.getElementById("setup-node");
+  const prev=node.value;
+  node.innerHTML=nodeOptions(crop).map(o=>`<option value="${o.path}">${esc(o.label)}</option>`).join("");
+  node.value = nodeOptions(crop).some(o=>o.path===prev) ? prev : crop.code;
+}
+function renderSetup(){
+  const cropSel=document.getElementById("setup-crop");
+  if(cropSel.selectedIndex<0) return;
+  const crop=cropOf(cropSel.value);
+  if(!document.getElementById("setup-node").value.startsWith(crop.code)) syncSetupNodes();
+  const path=document.getElementById("setup-node").value || crop.code;
+  const {list, shadowed}=resolveDefs(path);
+
+  document.getElementById("setup-nodehint").innerHTML =
+    `<code>classification_depth = ${crop.depth}</code> · ${crop.perennial?"perennial":"annual"} · `+
+    `${crop.varieties.length} ${LANG==="ar"?"صنف":"varieties"}`;
+  document.getElementById("setup-count").textContent =
+    `${LANG==="ar"?"التعريفات المحلولة":"Resolved definitions"} · ${list.length}`;
+
+  const groups=[...new Set(list.map(d=>d.group.code))];
+  document.getElementById("setup-list").innerHTML = groups.map(gc=>{
+    const g=list.find(d=>d.group.code===gc).group;
+    const rows=list.filter(d=>d.group.code===gc).map(d=>{
+      const lvl=levelOf(d.path);
+      return `<button class="defrow" aria-current="${d.code===setupSelected}" onclick="setupSelected='${d.code}';renderSetup()">
+        <div style="flex:1;min-width:0">
+          <div class="nm">${esc(NM(d))}</div>
+          <div class="cd">${esc(d.code)}</div>
+          <div class="tags">
+            <span class="pill type">${TYPE_LABEL[d.type]}</span>
+            <span class="pill ${lvl}">${lvl}${lvl!=="crop"?" · "+esc(d.path):""}</span>
+            ${d.required?`<span class="pill req">required</span>`:""}
+            ${d.required_when?`<span class="pill gate">conditional</span>`:""}
+            ${d.show_when?`<span class="pill gate">gated</span>`:""}
+            ${d.reportable?`<span class="pill rep">reportable</span>`:""}
+          </div>
+        </div></button>`;
+    }).join("");
+    return `<div class="grouphd">${esc(NM(g))} <span style="text-transform:none;font-weight:400">· ${g.code}</span></div>${rows}`;
+  }).join("");
+
+  if(shadowed.length){
+    document.getElementById("setup-list").insertAdjacentHTML("beforeend",
+      `<div style="padding:11px 14px;border-top:1px solid var(--line);background:#fbfaf7">
+         <div class="meta"><strong>${shadowed.length} inherited definition(s) overridden at a deeper level:</strong>
+         ${shadowed.map(s=>`<code>${esc(s.code)}</code> from <code>${esc(s.path)}</code>`).join(", ")}</div></div>`);
+  }
+
+  const d=list.find(x=>x.code===setupSelected) || list[0];
+  if(!d){ document.getElementById("setup-detail").innerHTML='<p class="muted">No attributes defined for this crop.</p>'; return; }
+  setupSelected=d.code;
+  const opt = d.options ? d.options.map(o=>`<tr><td><code>${esc(o.code)}</code></td><td>${esc(o.en)}</td><td dir="rtl">${esc(o.ar)}</td></tr>`).join("") : "";
+  document.getElementById("setup-detail").innerHTML = `
+    <dl class="kv">
+      <dt>code</dt><dd><code>${esc(d.code)}</code></dd>
+      <dt>name_en</dt><dd>${esc(d.en)}</dd>
+      <dt>name_ar</dt><dd dir="rtl">${esc(d.ar)}</dd>
+      <dt>attached at</dt><dd><span class="pill ${levelOf(d.path)}">${levelOf(d.path)}</span> <code>${esc(d.path)}</code></dd>
+      <dt>value_type</dt><dd><code>${d.type}</code></dd>
+      ${d.unit_en?`<dt>unit</dt><dd>${esc(d.unit_en)} / <span dir="rtl">${esc(d.unit_ar)}</span></dd>`:""}
+      ${d.min!=null?`<dt>range</dt><dd>${d.min} – ${d.max}${d.dp!=null?` · ${d.dp} dp`:""}</dd>`:""}
+      ${d.maxlen?`<dt>max length</dt><dd>${d.maxlen}</dd>`:""}
+      <dt>required</dt><dd>${d.required?"always":(d.required_when?`when <code>${esc(d.required_when.code)}</code> ∈ [${d.required_when.in.map(esc).join(", ")}]`:"no")}</dd>
+      <dt>show_when</dt><dd>${d.show_when?`<code>${esc(d.show_when.code)}</code> ∈ [${d.show_when.in.map(esc).join(", ")}]`:"<span class='muted'>always shown</span>"}</dd>
+      <dt>reportable</dt><dd>${d.reportable?"yes":"no"}</dd>
+      <dt>DT operators</dt><dd class="mono">${OPS_FOR[d.type]}</dd>
+    </dl>
+    ${d.help_en?`<hr class="hr"/><p class="meta" style="margin:0">${esc(T(d,"help"))}</p>`:""}
+    ${opt?`<hr class="hr"/><h4 style="font-size:.75rem;color:var(--muted);margin-bottom:6px">OPTIONS</h4>
+      <div class="tablewrap"><table><thead><tr><th>code</th><th>name_en</th><th>name_ar</th></tr></thead><tbody>${opt}</tbody></table></div>`:""}
+  `;
+}
+
+/* ============ TAB 2 : assignment form ============ */
+let formValues = {establishment_method:"grafted_tree", transplant_date:"2023-02-18",
+  age_at_transplant_months:30, transplant_height_cm:180, rootstock_type:"sukkary_seedling",
+  nursery_source:"Nubaria Nursery Co."};
+let gateEvents = [];
+function initForm(){
+  const sel=document.getElementById("asg-crop");
+  sel.innerHTML=CROPS.map(c=>`<option value="${c.code}">${esc(NM(c))}</option>`).join("");
+  sel.value="mango"; syncFormNodes(); renderForm();
+}
+/* Assignable nodes = the LEAVES of the taxonomy. A variety with strains
+   contributes its strains; a variety without strains contributes itself.
+   (The seed sets mango to `variety_strain` depth but only alphonso/eswwy
+   actually carry strains — so a strict depth filter would hide sukkary,
+   zebda, keitt, yasmina and crimson entirely.) */
+function leafNodes(crop){
+  if(!crop.varieties.length) return [{path:crop.code, label:NM(crop)}];
+  return crop.varieties.flatMap(v=> v.strains.length
+    ? v.strains.map(s=>({path:`${crop.code}.${v.code}.${s.code}`, label:`${NM(v)} · ${NM(s)}`}))
+    : [{path:`${crop.code}.${v.code}`, label:NM(v)}]);
+}
+function syncFormNodes(){
+  const crop=cropOf(document.getElementById("asg-crop").value);
+  const node=document.getElementById("asg-node");
+  const opts=leafNodes(crop);
+  node.innerHTML=opts.map(o=>`<option value="${o.path}">${esc(o.label)}</option>`).join("");
+  node.disabled = opts.length<=1;
+  const preferred = {mango:"mango.sukkary", date_palm:"date_palm.medjool", potato:"potato.spunta"}[crop.code];
+  node.value = opts.some(o=>o.path===preferred) ? preferred : opts[0].path;
+}
+function onAsgCrop(){
+  const crop=cropOf(document.getElementById("asg-crop").value);
+  formValues = {};
+  const first=resolveDefs(crop.code).list[0];
+  if(first && first.options) formValues[first.code]=first.options[0].code;
+  gateEvents=[]; syncFormNodes(); renderForm();
+}
+function setVal(code,v){
+  const path=document.getElementById("asg-node").value;
+  const {list}=resolveDefs(path);
+  const before=list.filter(d=>gateOpen(d,formValues)).map(d=>d.code);
+  formValues[code]= v===""?undefined:v;
+  const after=list.filter(d=>gateOpen(d,formValues)).map(d=>d.code);
+  const opened=after.filter(c=>!before.includes(c));
+  const closed=before.filter(c=>!after.includes(c));
+  closed.forEach(c=>{
+    const had = formValues[c]!==undefined && formValues[c]!=="";
+    if(had){ gateEvents.unshift({kind:"cleared",code:c,val:formValues[c]}); }
+    else gateEvents.unshift({kind:"hidden",code:c});
+    delete formValues[c];
+  });
+  opened.forEach(c=>gateEvents.unshift({kind:"shown",code:c}));
+  gateEvents=gateEvents.slice(0,8);
+  renderForm();
+}
+function toggleMulti(code,opt,on){
+  const cur=new Set(formValues[code]||[]);
+  on?cur.add(opt):cur.delete(opt);
+  formValues[code]=[...cur]; renderForm();
+}
+function widget(d){
+  const v = formValues[d.code];
+  const dis = `oninput="setVal('${d.code}', this.value)"`;
+  if(d.type==="single_select"){
+    return `<select class="input" onchange="setVal('${d.code}', this.value)">
+      <option value="">${LANG==="ar"?"— اختر —":"— select —"}</option>
+      ${d.options.map(o=>`<option value="${o.code}" ${v===o.code?"selected":""}>${esc(NM(o))}</option>`).join("")}
+    </select>`;
+  }
+  if(d.type==="multi_select"){
+    const set=new Set(v||[]);
+    return `<div class="chkrow">${d.options.map(o=>
+      `<label class="chk"><input type="checkbox" ${set.has(o.code)?"checked":""}
+        onchange="toggleMulti('${d.code}','${o.code}',this.checked)"/> ${esc(NM(o))}</label>`).join("")}</div>`;
+  }
+  if(d.type==="boolean") return `<label class="chk"><input type="checkbox" ${v?"checked":""}
+      onchange="setVal('${d.code}', this.checked)"/> ${esc(NM(d))}</label>`;
+  if(d.type==="date") return `<input class="input" type="date" value="${esc(v||"")}" ${dis}/>`;
+  if(d.type==="integer") return `<input class="input" type="number" step="1" min="${d.min??""}" max="${d.max??""}" value="${esc(v??"")}" ${dis}/>`;
+  if(d.type==="decimal") return `<input class="input" type="number" step="${d.dp?Math.pow(10,-d.dp):0.1}" min="${d.min??""}" max="${d.max??""}" value="${esc(v??"")}" ${dis}/>`;
+  return `<input class="input" type="text" maxlength="${d.maxlen||255}" value="${esc(v??"")}" ${dis}/>`;
+}
+function renderForm(){
+  /* Re-label the crop/variety selects in the active language, keeping the
+     current selection — otherwise the taxonomy names stay English in RTL. */
+  const cs=document.getElementById("asg-crop"), keepC=cs.value, ns=document.getElementById("asg-node"), keepN=ns.value;
+  cs.innerHTML=CROPS.map(c=>`<option value="${c.code}">${esc(NM(c))}</option>`).join("");
+  cs.value=keepC;
+  ns.innerHTML=leafNodes(cropOf(keepC)).map(o=>`<option value="${o.path}">${esc(o.label)}</option>`).join("");
+  ns.value=keepN;
+
+  const path=document.getElementById("asg-node").value || document.getElementById("asg-crop").value;
+  const crop=cropOf(path.split(".")[0]);
+  const {list}=resolveDefs(path);
+  const visible=list.filter(d=>gateOpen(d,formValues));
+  const groups=[...new Set(visible.map(d=>d.group.code))];
+
+  document.getElementById("asg-title").innerHTML =
+    `${LANG==="ar"?"القطعة B-04 · تخصيص المحصول":"Block B-04 · crop assignment"} — <code>${esc(path)}</code>`;
+
+  document.getElementById("asg-groups").innerHTML = groups.map(gc=>{
+    const g=visible.find(d=>d.group.code===gc).group;
+    const fields=visible.filter(d=>d.group.code===gc).map(d=>{
+      const req=isRequired(d,formValues);
+      const missing = req && (formValues[d.code]===undefined||formValues[d.code]===""||
+        (Array.isArray(formValues[d.code])&&!formValues[d.code].length));
+      const wide = d.type==="multi_select"||d.type==="text"&&d.maxlen>60;
+      return `<div class="field ${wide?"wide":""} appear">
+        <div class="lbl"><span class="t">${esc(NM(d))}${req?' <span class="req-star">*</span>':""}</span>
+          ${d.unit_en?`<span class="unit">(${esc(T(d,"unit"))})</span>`:""}
+          ${d.min!=null?`<span class="unit">${d.min}–${d.max}</span>`:""}
+          ${levelOf(d.path)!=="crop"?`<span class="pill ${levelOf(d.path)}">${levelOf(d.path)}</span>`:""}
+        </div>
+        ${widget(d)}
+        ${d.help_en?`<div class="help">${esc(T(d,"help"))}</div>`:""}
+        ${missing?`<div class="err">${LANG==="ar"?"مطلوب لهذه الطريقة":"Required for this method"}</div>`:""}
+      </div>`;
+    }).join("");
+    return `<div class="formgroup"><header><h4>${esc(NM(g))}</h4>
+      <span class="pill ghost">${visible.filter(d=>d.group.code===gc).length} / ${list.filter(d=>d.group.code===gc).length}</span>
+      <div class="spacer"></div><span class="meta">${esc(crop.code)}</span></header>
+      <div class="fields">${fields}</div></div>`;
+  }).join("");
+
+  const gl=document.getElementById("gatelog");
+  gl.className = gateEvents.length ? "tl" : "";
+  gl.innerHTML = gateEvents.length ? gateEvents.map(e=>`
+    <div class="tl-item ${e.kind==="cleared"?"gate":""}"><div class="tl-dot"></div>
+      <div class="tl-what"><b>${esc(e.code)}</b> ${
+        e.kind==="shown"?"shown":e.kind==="cleared"?`hidden — value <code>${esc(e.val)}</code> cleared`:"hidden"}</div>
+      <div class="tl-when">${e.kind==="cleared"?"change_kind = cleared_by_gate":"gate re-evaluated"}</div></div>`).join("")
+    : `<p class="meta" style="margin:0">${LANG==="ar"?"لا تغييرات بعد — عدّل الحقل الأول.":"No gate changes yet — edit the first field."}</p>`;
+
+  const payload = {};
+  visible.forEach(d=>{ if(formValues[d.code]!==undefined) payload[d.code]=formValues[d.code]; });
+  document.getElementById("asg-payload").textContent =
+    `PUT /api/farms/{f}/blocks/{b}/block-crops/{id}/attributes\n\n`+
+    JSON.stringify({crop_path:path, attributes:payload}, null, 2);
+}
+function saveForm(){
+  const path=document.getElementById("asg-node").value;
+  const {list}=resolveDefs(path);
+  const missing=list.filter(d=>gateOpen(d,formValues)&&isRequired(d,formValues))
+    .filter(d=>formValues[d.code]===undefined||formValues[d.code]===""||(Array.isArray(formValues[d.code])&&!formValues[d.code].length));
+  if(missing.length) toast(`422 — ${missing.length} required attribute(s) missing: ${missing.map(d=>d.code).join(", ")}`);
+  else toast("Saved · 1 transaction, values + history rows written together");
+}
+function resetForm(){ onAsgCrop(); }
+
+/* ============ TAB 3 : history ============ */
+const HIST_A=[
+  {when:"2026-07-02 09:14", by:"H. Farouk (Agronomist)", from:"36", to:"42", kind:"updated"},
+  {when:"2026-01-08 11:02", by:"H. Farouk (Agronomist)", from:"30", to:"36", kind:"updated"},
+  {when:"2023-02-18 08:41", by:"M. Soliman (Farm Manager)", from:null, to:"30", kind:"set"},
+];
+const HIST_B=[
+  {when:"2023-02-18 08:41", by:"M. Soliman (Farm Manager)", from:"seed", to:"grafted_tree", kind:"updated",
+   note:"transplant_date, age_at_transplant_months and rootstock_type became required"},
+  {when:"2022-11-30 16:20", by:"M. Soliman (Farm Manager)", from:null, to:"seed", kind:"set"},
+];
+function renderHist(){
+  const row=(h,i,n)=>`<div class="tl-item ${i===n-1?"first":""} ${h.kind==="cleared_by_gate"?"gate":""}">
+    <div class="tl-dot"></div>
+    <div class="tl-what">${h.from!=null?`<b>${esc(h.from)}</b><span class="arrow">→</span>`:""}<b>${esc(h.to)}</b>
+      <span class="pill ghost" style="margin-inline-start:6px">${h.kind}</span></div>
+    <div class="tl-when">${esc(h.when)} · ${esc(h.by)}</div>
+    ${h.note?`<div class="meta" style="margin-top:3px">${esc(h.note)}</div>`:""}</div>`;
+  document.getElementById("histA").innerHTML=HIST_A.map((h,i)=>row(h,i,HIST_A.length)).join("");
+  document.getElementById("histB").innerHTML=HIST_B.map((h,i)=>row(h,i,HIST_B.length)).join("");
+}
+
+/* ============ TAB 4 : decision tree ============ */
+let dtCode="age_at_transplant_months";
+function renderDT(){
+  const src=document.getElementById("dtsource").value;
+  const mangoDefs=resolveDefs("mango.sukkary").list;
+  const sel=document.getElementById("dtcode");
+  sel.innerHTML=mangoDefs.map(d=>`<option value="${d.code}" ${d.code===dtCode?"selected":""}>${esc(d.en)} — ${d.code}</option>`).join("");
+  dtCode = sel.value || dtCode;
+  const d=mangoDefs.find(x=>x.code===dtCode);
+  document.getElementById("dtoplist").innerHTML =
+    `<code>${d.type}</code> → operators <code>${OPS_FOR[d.type]}</code>`+
+    (d.options?` · value dropdown from ${d.options.length} catalogue options`:"")+
+    (d.min!=null?` · builder clamps to ${d.min}–${d.max}`:"");
+
+  const term=(left,op,right)=>`<div class="card" style="box-shadow:none;margin-bottom:8px">
+    <div class="card-bd" style="padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill ${left.s==="crop_attribute"?"variety":"type"}">${left.s}</span>
+      <code>${esc(left.c)}</code><span class="muted mono">${op}</span>
+      <span class="pill ghost">${esc(right)}</span></div></div>`;
+  document.getElementById("dtrows").innerHTML =
+    `<p class="meta" style="margin:0 0 8px">all_of</p>`+
+    term({s:"crop_attribute",c:"establishment_method"},"in","transplanted_tree, grafted_tree")+
+    term({s:"crop_attribute",c:"age_at_transplant_months"},"lt","36")+
+    term({s:"indices",c:"ndvi · baseline_deviation"},"lt","-1.5")+
+    term({s:"weather_index",c:"temperature · baseline_deviation"},"gt","1.0");
+
+  document.getElementById("dtyaml").innerHTML =
+`<span class="c"># decision_trees.condition — node "young_transplant_stress"</span>
+<span class="k">all_of</span>:
+  - <span class="k">left</span>:  {<span class="k">source</span>: <span class="v">crop_attribute</span>, <span class="k">code</span>: <span class="v">establishment_method</span>, <span class="k">key</span>: <span class="v">value</span>}
+    <span class="k">op</span>:    <span class="v">in</span>
+    <span class="k">right</span>: [<span class="v">transplanted_tree</span>, <span class="v">grafted_tree</span>]
+  - <span class="k">left</span>:  {<span class="k">source</span>: <span class="v">crop_attribute</span>, <span class="k">code</span>: <span class="v">age_at_transplant_months</span>, <span class="k">key</span>: <span class="v">value</span>}
+    <span class="k">op</span>:    <span class="v">lt</span>
+    <span class="k">right</span>: <span class="v">36</span>
+  - <span class="k">left</span>:  {<span class="k">source</span>: <span class="v">indices</span>, <span class="k">index_code</span>: <span class="v">ndvi</span>, <span class="k">key</span>: <span class="v">baseline_deviation</span>}
+    <span class="k">op</span>:    <span class="v">lt</span>
+    <span class="k">right</span>: <span class="v">-1.5</span>
+  - <span class="k">left</span>:  {<span class="k">source</span>: <span class="v">weather_index</span>, <span class="k">index_code</span>: <span class="v">temperature</span>, <span class="k">key</span>: <span class="v">baseline_deviation</span>}
+    <span class="k">op</span>:    <span class="v">gt</span>
+    <span class="k">right</span>: <span class="v">1.0</span>
+
+<span class="c"># A missing definition, a missing value, or no current block_crop</span>
+<span class="c"># all resolve to None — fails closed, like every other source.</span>`;
+}
+
+/* ============ TAB 5 : reports ============ */
+const REPORT_ROWS=[
+  {block:"B-01", path:"mango.sukkary",        ha:4.2, ndvi:0.71, dev:-0.4, alerts:0,
+   a:{establishment_method:"grafted_tree", transplant_date:"2019-03-04", age_at_transplant_months:24,
+      transplant_height_cm:165, rootstock_type:"sukkary_seedling"}},
+  {block:"B-04", path:"mango.sukkary",        ha:3.8, ndvi:0.52, dev:-1.9, alerts:3,
+   a:{establishment_method:"grafted_tree", transplant_date:"2023-02-18", age_at_transplant_months:30,
+      transplant_height_cm:180, rootstock_type:"sukkary_seedling"}},
+  {block:"B-07", path:"mango.zebda",          ha:5.1, ndvi:0.68, dev:-0.2, alerts:1,
+   a:{establishment_method:"transplanted_tree", transplant_date:"2021-10-12", age_at_transplant_months:18,
+      transplant_height_cm:140, rootstock_type:null}},
+  {block:"B-11", path:"mango.alphonso.short", ha:2.6, ndvi:0.61, dev:-0.9, alerts:2,
+   a:{establishment_method:"transplanted_tree", transplant_date:"2024-01-22", age_at_transplant_months:14,
+      transplant_height_cm:210, rootstock_type:null}},
+  {block:"B-14", path:"mango.keitt",          ha:6.0, ndvi:0.74, dev:0.3, alerts:0,
+   a:{establishment_method:"seed", transplant_date:null, age_at_transplant_months:null,
+      transplant_height_cm:null, rootstock_type:null}},
+];
+let repCols=new Set(["establishment_method","age_at_transplant_months"]);
+function repDefs(){ return resolveDefs("mango.sukkary").list.filter(d=>d.reportable); }
+function toggleRep(code){ repCols.has(code)?repCols.delete(code):repCols.add(code); renderRep(); }
+function repAll(on){ on ? repDefs().forEach(d=>repCols.add(d.code)) : repCols.clear(); renderRep(); }
+function toggleRepMenu(ev){
+  ev.stopPropagation();
+  const m=document.getElementById("repmenu"), b=document.getElementById("repbtn");
+  const open=m.hidden;
+  m.hidden=!open; b.setAttribute("aria-expanded", open);
+}
+document.addEventListener("click", e=>{
+  const m=document.getElementById("repmenu");
+  if(m && !m.hidden && !e.target.closest(".menuwrap")){
+    m.hidden=true; document.getElementById("repbtn").setAttribute("aria-expanded","false");
+  }
+});
+function renderRep(){
+  const defs=repDefs();
+  const ar = LANG==="ar";
+  document.getElementById("repcollabel").innerHTML = ar
+    ? `أعمدة إضافية <span class="muted">— فقط التعريفات <code>is_reportable</code> القابلة للحل لقطع هذا التقرير</span>`
+    : `Additional columns <span class="muted">— only <code>is_reportable</code> definitions resolvable for the blocks in this report</span>`;
+  document.getElementById("repbtnlabel").textContent = ar?"أعمدة إضافية":"Additional columns";
+  document.getElementById("repmenutitle").textContent = ar?"الأعمدة المضافة":"Columns to add";
+  document.getElementById("repselall").textContent = ar?"الكل":"All";
+  document.getElementById("repclear").textContent = ar?"بلا":"None";
+  document.getElementById("repcount").textContent = `${repCols.size}/${defs.length}`;
+  document.getElementById("repmenuitems").innerHTML = defs.map(d=>`
+    <label class="menu-item">
+      <input type="checkbox" ${repCols.has(d.code)?"checked":""} onchange="toggleRep('${d.code}')"/>
+      <span style="flex:1;min-width:0">
+        <span class="mi-nm">${esc(NM(d))}${d.unit_en?` <span class="unit">(${esc(T(d,"unit"))})</span>`:""}</span><br/>
+        <span class="mi-cd">${esc(d.code)}</span>
+      </span>
+      <span class="pill type">${TYPE_LABEL[d.type]}</span>
+    </label>`).join("");
+  document.getElementById("repnote").innerHTML =
+    `${repCols.size} ${ar?"محدد":"selected"} · <code>?attribute_codes=${[...repCols].join(",")}</code>`;
+  const sel=defs.filter(d=>repCols.has(d.code));
+  const fmt=(d,v)=>{
+    if(v==null||v==="") return `<span class="muted">—</span>`;
+    if(d.options){const o=d.options.find(x=>x.code===v);return o?esc(NM(o)):esc(v);}
+    return esc(v)+(d.unit_en?` <span class="unit">${esc(T(d,"unit"))}</span>`:"");
+  };
+  document.getElementById("reptable").innerHTML=`
+    <thead><tr>
+      <th>Block</th><th>Crop path</th><th class="num">Area (ha)</th>
+      <th class="num">NDVI mean</th><th class="num">Baseline dev.</th><th class="num">Alerts</th>
+      ${sel.map(d=>`<th style="background:#f2f6f2">${esc(NM(d))}${d.unit_en?` <span class="unit">(${esc(T(d,"unit"))})</span>`:""}</th>`).join("")}
+    </tr></thead>
+    <tbody>${REPORT_ROWS.map(r=>`<tr>
+      <td><strong>${r.block}</strong></td><td><code>${r.path}</code></td>
+      <td class="num">${r.ha.toFixed(1)}</td><td class="num">${r.ndvi.toFixed(2)}</td>
+      <td class="num" style="color:${r.dev<-1.5?"var(--crit)":r.dev<-0.5?"var(--warn)":"inherit"}">${r.dev.toFixed(1)}</td>
+      <td class="num">${r.alerts||"—"}</td>
+      ${sel.map(d=>`<td style="background:#fafcfa">${fmt(d, r.a[d.code])}</td>`).join("")}
+    </tr>`).join("")}</tbody>`;
+}
+
+/* ============ TAB 6 : coverage ============ */
+function renderCov(){
+  const rows=CROPS.map(c=>{
+    const defs=DEFS.filter(d=>d.path.split(".")[0]===c.code);
+    const groups=[...new Set(defs.map(d=>d.group.code))];
+    const lvls=[...new Set(defs.map(d=>levelOf(d.path)))];
+    return `<tr>
+      <td><strong>${esc(NM(c))}</strong><div class="meta"><code>${c.code}</code> · ${esc(c.sci)}</div></td>
+      <td>${c.cat}<div class="meta">${c.perennial?"perennial":"annual"} · <code>${c.depth}</code></div></td>
+      <td>${groups.map(g=>`<span class="pill type">${esc(g)}</span>`).join(" ")||'<span class="muted">—</span>'}</td>
+      <td class="num">${defs.length}</td>
+      <td>${lvls.map(l=>`<span class="pill ${l}">${l}</span>`).join(" ")}</td>
+      <td class="meta">${defs.filter(d=>d.reportable).length} reportable · ${defs.filter(d=>d.show_when).length} gated</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("covtable").innerHTML=
+    `<thead><tr><th>Crop</th><th>Category</th><th>Attribute group</th><th class="num">Attrs</th>
+      <th>Levels used</th><th>Notes</th></tr></thead><tbody>${rows}</tbody>
+     <tfoot><tr><td colspan="6" class="meta" style="background:#fbfaf7">
+       Remaining 18 seeded crops (wheat, maize, rice, sugarcane, sugar_beet, cotton, soybean, peanut, sunflower,
+       sesame, alfalfa, egyptian_clover, onion, garlic, citrus_mandarin, olive, banana, grape) have no attribute
+       group yet — the assignment form simply renders no Attributes section for them.
+     </td></tr></tfoot>`;
+}
+
+/* ---------- boot ---------- */
+function renderAll(){ renderSetup(); renderForm(); renderHist(); renderDT(); renderRep(); renderCov(); }
+initSetup(); initForm(); renderAll();
+</script>
+</body>
+</html>

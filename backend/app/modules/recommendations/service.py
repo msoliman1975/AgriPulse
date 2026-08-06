@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
+from app.modules.farms.attribute_snapshot import load_crop_attribute_snapshot
 from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.engine import (
     EvaluationResult,
@@ -82,6 +83,7 @@ class _BlockEvaluation:
     weather_risks: Any
     signals: Any
     grid: Any
+    crop_attributes: dict[str, Any]
     ctx: ConditionContext
     block_trees: list[dict[str, Any]]
     cell_trees: list[dict[str, Any]]
@@ -109,6 +111,7 @@ class _BlockEvaluation:
             weather_risks=self.weather_risks,
             signals=self.signals,
             grid=self.grid,
+            crop_attributes=self.crop_attributes,
         )
 
 
@@ -300,6 +303,13 @@ class RecommendationsServiceImpl:
             block_id=block_id,
             tenant_id=tenant_id,
         )
+        # Platform-curated crop attributes on the block's current assignment
+        # (establishment method, transplant date, age at transplant, …).
+        # Empty for a block with no assignment or no recorded values, so
+        # `{source: crop_attribute}` predicates fail closed.
+        crop_attributes = await load_crop_attribute_snapshot(
+            self._tenant, block_crop_id=block_crop_id
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             crop_category=crop_category,
@@ -317,6 +327,7 @@ class RecommendationsServiceImpl:
             weather_risks=weather_risks,
             signals=signals,
             grid=grid,
+            crop_attributes=crop_attributes,
         )
 
         # PR-C: bulk-load tenant parameter overrides for every tree the
@@ -362,6 +373,7 @@ class RecommendationsServiceImpl:
             weather_risks=weather_risks,
             signals=signals,
             grid=grid,
+            crop_attributes=crop_attributes,
             ctx=ctx,
             block_trees=block_trees,
             cell_trees=cell_trees,
@@ -1721,7 +1733,7 @@ class DecisionTreesAuthorService:
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
         farm_id = await repo.get_block_farm_id(block_id=block_id)
         (
-            _,
+            dry_run_block_crop_id,
             _,
             crop_category,
             growth_stage,
@@ -1773,6 +1785,9 @@ class DecisionTreesAuthorService:
             weather_risks=weather_risks,
             signals=signals,
             grid=grid,
+            crop_attributes=await load_crop_attribute_snapshot(
+                tenant_session, block_crop_id=dry_run_block_crop_id
+            ),
         )
         result = evaluate_tree(compiled, ctx)
         outcome_dict: dict[str, Any] | None = None

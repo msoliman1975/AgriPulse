@@ -7,6 +7,7 @@ request via `get_farm_service`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from datetime import date as _date
 from decimal import Decimal
@@ -21,6 +22,23 @@ from app.modules.farms import auto_grid as _auto_grid
 from app.modules.farms import cascade as _cascade
 from app.modules.farms import geometry as _geometry
 from app.modules.farms import pivot_geometry as _pivot_geometry
+from app.modules.farms.crop_attributes import (
+    GATEABLE_VALUE_TYPES,
+    RESERVED_ATTRIBUTE_CODES,
+    VALUE_COLUMN_BY_TYPE,
+    coerce_value,
+    normalize_gate,
+    validate_type_consistency,
+)
+from app.modules.farms.crop_attributes import (
+    is_required as crop_attribute_required,
+)
+from app.modules.farms.crop_attributes import (
+    resolve_definitions as resolve_crop_attribute_definitions,
+)
+from app.modules.farms.crop_attributes import (
+    visible_definitions as visible_crop_attributes,
+)
 from app.modules.farms.crop_thresholds import (
     resolve_phenology_stages,
     resolve_size_classes,
@@ -30,6 +48,10 @@ from app.modules.farms.errors import (
     CountryCodeConflictError,
     CountryNotFoundError,
     CropAssignmentNotFoundError,
+    CropAttributeCodeConflictError,
+    CropAttributeDefinitionNotFoundError,
+    CropAttributeReservedCodeError,
+    CropAttributeValidationError,
     CropCatalogConflictError,
     CropCatalogValidationError,
     CropNotFoundError,
@@ -58,12 +80,13 @@ from app.modules.farms.events import (
     FarmReactivatedV1,
     FarmUpdatedV1,
 )
+from app.modules.farms.models import BlockCrop, Crop
 from app.modules.farms.phenology import (
     validate_phenology_payload,
     validate_size_classes_payload,
 )
 from app.modules.farms.phenology_advance import needs_gdd, stage_for_date
-from app.modules.farms.repository import FarmsRepository
+from app.modules.farms.repository import FarmsRepository, crop_attribute_dict
 from app.modules.weather.snapshot import load_gdd_since
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
@@ -486,7 +509,43 @@ class FarmService(Protocol):
 
     async def get_resolved_taxonomy(self, *, crop_path: str) -> dict[str, Any]: ...
 
+    async def resolve_crop_attributes(
+        self, *, crop_path: str, include_inactive: bool = False
+    ) -> dict[str, Any]: ...
+
+    async def list_crop_attribute_catalog(
+        self, *, include_inactive: bool = False
+    ) -> list[dict[str, Any]]: ...
+
+    async def list_crop_attribute_definitions_admin(
+        self, *, crop_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]: ...
+
+    async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID: ...
+
+    async def get_block_crop_attributes(self, *, block_crop_id: UUID) -> dict[str, Any]: ...
+
+    async def set_block_crop_attributes(
+        self,
+        *,
+        block_crop_id: UUID,
+        submitted: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]: ...
+
+    async def list_block_crop_attribute_history(
+        self, *, block_crop_id: UUID, definition_code: str | None = None
+    ) -> list[dict[str, Any]]: ...
+
     # ---- Crop catalog authoring (platform-only) -----------------------
+
+    async def create_crop_attribute_definition(
+        self, *, crop_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
+
+    async def update_crop_attribute_definition(
+        self, *, definition_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]: ...
 
     async def list_crops_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]: ...
 
@@ -2475,6 +2534,379 @@ class FarmServiceImpl:
             "size_classes": size_classes,
         }
 
+    # ---- Crop attribute definitions -----------------------------------
+
+    @staticmethod
+    def _normalized_gates(fields: dict[str, Any]) -> dict[str, Any]:
+        """Strip unset gate operands before persisting. See ``normalize_gate``."""
+        out = dict(fields)
+        for key in ("show_when", "required_when"):
+            if key in out:
+                out[key] = normalize_gate(out[key])
+        return out
+
+    async def resolve_crop_attributes(
+        self, *, crop_path: str, include_inactive: bool = False
+    ) -> dict[str, Any]:
+        """Deepest-wins definitions for a crop path.
+
+        The assignment form, the report column picker and the decision-tree
+        context all read through here, so they cannot disagree about which
+        definition wins.
+        """
+        crop, _variety, _strain = await self._repo.resolve_taxonomy_by_path(crop_path=crop_path)
+        if crop is None:
+            raise CropNotFoundError(crop_path)  # type: ignore[arg-type]
+        rows = await self._repo.list_crop_attribute_definitions(crop_id=crop.id)
+        resolution = resolve_crop_attribute_definitions(
+            rows, crop_path=crop_path, include_inactive=include_inactive
+        )
+        return {
+            "crop_path": crop_path,
+            "definitions": [crop_attribute_dict(d) for d in resolution.definitions],
+            "shadowed_codes": sorted({d.code for d in resolution.shadowed}),
+        }
+
+    async def list_crop_attribute_catalog(
+        self, *, include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        return await self._repo.list_all_crop_attribute_definitions(
+            include_inactive=include_inactive
+        )
+
+    async def list_crop_attribute_definitions_admin(
+        self, *, crop_id: UUID, include_inactive: bool
+    ) -> list[dict[str, Any]]:
+        """Every definition under a crop, unresolved — the authoring list."""
+        if await self._repo.get_crop(crop_id=crop_id) is None:
+            raise CropNotFoundError(crop_id)
+        rows = await self._repo.list_crop_attribute_definitions(
+            crop_id=crop_id, include_inactive=include_inactive
+        )
+        return [crop_attribute_dict(r) for r in rows]
+
+    async def _attachment_path(
+        self,
+        *,
+        crop: Crop,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None,
+    ) -> str:
+        """Canonical path of the node a definition attaches to.
+
+        Also the ownership check: a variety from a different crop would
+        otherwise produce a path that no block ever matches, so the
+        definition would simply never resolve — silently.
+        """
+        if crop_variety_id is None:
+            return crop.code
+        variety = await self._repo.get_variety(variety_id=crop_variety_id)
+        if variety is None or variety.crop_id != crop.id:
+            raise CropVarietyNotFoundError(crop_variety_id)
+        if crop_variety_strain_id is None:
+            return variety.path or f"{crop.code}.{variety.code}"
+        strain = await self._repo.get_strain(strain_id=crop_variety_strain_id)
+        if strain is None or strain.crop_variety_id != variety.id:
+            raise CropStrainNotFoundError(crop_variety_strain_id)
+        return strain.path or f"{crop.code}.{variety.code}.{strain.code}"
+
+    async def _validate_attribute_gates(
+        self,
+        *,
+        crop_id: UUID,
+        path: str,
+        code: str,
+        sort_order: int,
+        gates: dict[str, dict[str, Any] | None],
+        exclude_definition_id: UUID | None = None,
+    ) -> None:
+        """A gate must point at a usable sibling that is authored *earlier*.
+
+        Three things go wrong otherwise, none of which raise at render time:
+        an unknown code makes the gate never open (the field vanishes for
+        every assignment); a numeric or free-text target makes the gate an
+        equality test nobody can satisfy from the form; and a forward or
+        circular reference makes the form's evaluation order decide the
+        outcome. The strictly-lower ``sort_order`` rule kills cycles by
+        construction — no graph walk needed.
+        """
+        rows = await self._repo.list_crop_attribute_definitions(crop_id=crop_id)
+        siblings = {
+            d.code: d
+            for d in resolve_crop_attribute_definitions(
+                rows, crop_path=path, include_inactive=True
+            ).definitions
+            if d.id != exclude_definition_id
+        }
+        for field_name, gate in gates.items():
+            if not gate:
+                continue
+            target_code = gate.get("code")
+            if target_code == code:
+                raise CropAttributeValidationError(
+                    reason=f"{field_name} cannot reference the attribute itself"
+                )
+            target = siblings.get(target_code)
+            if target is None:
+                raise CropAttributeValidationError(
+                    reason=(
+                        f"{field_name} references {target_code!r}, which is not "
+                        f"defined for {path!r}"
+                    )
+                )
+            if target.value_type not in GATEABLE_VALUE_TYPES:
+                raise CropAttributeValidationError(
+                    reason=(
+                        f"{field_name} references {target_code!r} of type "
+                        f"{target.value_type!r}; only "
+                        f"{sorted(GATEABLE_VALUE_TYPES)} can gate a field"
+                    )
+                )
+            if target.sort_order >= sort_order:
+                raise CropAttributeValidationError(
+                    reason=(
+                        f"{field_name} references {target_code!r}, which is authored "
+                        f"at or after this attribute (sort_order {target.sort_order} "
+                        f">= {sort_order}). A gate must point at an earlier field."
+                    )
+                )
+            allowed = gate.get("in") or ([gate["eq"]] if "eq" in gate else [])
+            option_codes = {o.get("code") for o in (target.options or [])}
+            if target.value_type == "single_select":
+                unknown = [v for v in allowed if v not in option_codes]
+                if unknown:
+                    raise CropAttributeValidationError(
+                        reason=(
+                            f"{field_name} tests {target_code!r} against "
+                            f"{unknown!r}, which are not options of that attribute"
+                        )
+                    )
+
+    async def create_crop_attribute_definition(
+        self, *, crop_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        crop = await self._repo.get_crop(crop_id=crop_id)
+        if crop is None:
+            raise CropNotFoundError(crop_id)
+        code = fields["code"]
+        if code in RESERVED_ATTRIBUTE_CODES:
+            raise CropAttributeReservedCodeError(code)
+        fields = self._normalized_gates(fields)
+        path = await self._attachment_path(
+            crop=crop,
+            crop_variety_id=fields.get("crop_variety_id"),
+            crop_variety_strain_id=fields.get("crop_variety_strain_id"),
+        )
+        if await self._repo.crop_attribute_code_exists(path=path, code=code):
+            raise CropAttributeCodeConflictError(path=path, code=code)
+        await self._validate_attribute_gates(
+            crop_id=crop_id,
+            path=path,
+            code=code,
+            sort_order=int(fields.get("sort_order") or 0),
+            gates={
+                "show_when": fields.get("show_when"),
+                "required_when": fields.get("required_when"),
+            },
+        )
+        out = await self._repo.create_crop_attribute_definition(
+            fields={**fields, "crop_id": crop_id, "path": path}
+        )
+        await self._audit_catalog(
+            event_type="farms.crop_attribute_definition_created",
+            subject_kind="crop_attribute_definition",
+            subject_id=out["id"],
+            actor_user_id=actor_user_id,
+            details={"crop_id": str(crop_id), "path": path, "code": code},
+        )
+        return out
+
+    async def update_crop_attribute_definition(
+        self, *, definition_id: UUID, fields: dict[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        definition = await self._repo.get_crop_attribute_definition(definition_id=definition_id)
+        if definition is None:
+            raise CropAttributeDefinitionNotFoundError(definition_id)
+        fields = self._normalized_gates(fields)
+        # ``value_type`` is immutable, so the consistency rules are re-checked
+        # against the stored type merged with whatever the patch changes —
+        # otherwise a PATCH could add value_min to a text attribute, which the
+        # create-time validator would have rejected.
+        try:
+            validate_type_consistency(
+                value_type=definition.value_type,
+                options=fields.get("options", definition.options),
+                value_min=fields.get("value_min", definition.value_min),
+                value_max=fields.get("value_max", definition.value_max),
+                decimal_places=fields.get("decimal_places", definition.decimal_places),
+                unit_en=fields.get("unit_en", definition.unit_en),
+                unit_ar=fields.get("unit_ar", definition.unit_ar),
+                text_max_length=fields.get("text_max_length", definition.text_max_length),
+            )
+        except ValueError as exc:
+            raise CropAttributeValidationError(reason=str(exc)) from exc
+        await self._validate_attribute_gates(
+            crop_id=definition.crop_id,
+            path=definition.path,
+            code=definition.code,
+            sort_order=int(fields.get("sort_order", definition.sort_order) or 0),
+            gates={
+                "show_when": fields.get("show_when", definition.show_when),
+                "required_when": fields.get("required_when", definition.required_when),
+            },
+            exclude_definition_id=definition_id,
+        )
+        out = await self._repo.update_crop_attribute_definition(
+            definition=definition, fields=fields
+        )
+        await self._audit_catalog(
+            event_type="farms.crop_attribute_definition_updated",
+            subject_kind="crop_attribute_definition",
+            subject_id=definition_id,
+            actor_user_id=actor_user_id,
+            details={"code": definition.code, "fields": sorted(fields.keys())},
+        )
+        return out
+
+    # ---- Crop attribute values (per assignment) ------------------------
+
+    async def _resolved_definitions_for(self, block_crop: BlockCrop) -> list[Any]:
+        crop, _v, _s = await self._repo.resolve_taxonomy_by_path(crop_path=block_crop.crop_path)
+        if crop is None:
+            return []
+        rows = await self._repo.list_crop_attribute_definitions(crop_id=crop.id)
+        return resolve_crop_attribute_definitions(rows, crop_path=block_crop.crop_path).definitions
+
+    async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID:
+        """The farm owning an assignment — the router's capability check.
+
+        One query rather than assignment → block → farm in the router, which
+        would be three round trips on a surface the farm console hits per
+        block.
+        """
+        farm_id = await self._repo.get_block_crop_farm_id(block_crop_id=block_crop_id)
+        if farm_id is None:
+            raise CropAssignmentNotFoundError(block_crop_id)
+        return farm_id
+
+    async def get_block_crop_attributes(self, *, block_crop_id: UUID) -> dict[str, Any]:
+        """Resolved definitions + current values for one assignment."""
+        block_crop = await self._repo.get_block_crop(block_crop_id=block_crop_id)
+        if block_crop is None:
+            raise CropAssignmentNotFoundError(block_crop_id)
+        definitions = await self._resolved_definitions_for(block_crop)
+        values = {
+            row.definition_code: row
+            for row in await self._repo.list_attribute_values(block_crop_ids=[block_crop_id])
+        }
+        return {
+            "block_crop_id": block_crop_id,
+            "crop_path": block_crop.crop_path,
+            "definitions": [crop_attribute_dict(d) for d in definitions],
+            "values": {code: _attribute_value_of(row) for code, row in values.items()},
+        }
+
+    async def set_block_crop_attributes(
+        self,
+        *,
+        block_crop_id: UUID,
+        submitted: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Replace the attribute values on one assignment, atomically.
+
+        One save per form, not per field: requiredness depends on the gate,
+        and the gate depends on a *sibling* field's value, so validating field
+        by field would let a partial save land in a state the form itself
+        would reject.
+
+        Values whose gate has closed are **deleted**, with a
+        ``cleared_by_gate`` history row — a stale ``transplant_date`` must not
+        survive a switch back to Seed and then reappear in a report or a
+        decision tree.
+        """
+        block_crop = await self._repo.get_block_crop(block_crop_id=block_crop_id)
+        if block_crop is None:
+            raise CropAssignmentNotFoundError(block_crop_id)
+
+        definitions = await self._resolved_definitions_for(block_crop)
+        by_code = {d.code: d for d in definitions}
+
+        unknown = sorted(set(submitted) - set(by_code))
+        if unknown:
+            raise CropAttributeValidationError(
+                reason=(
+                    f"{unknown!r} are not attributes of {block_crop.crop_path!r}. "
+                    "A crop's attributes come from the platform catalog."
+                )
+            )
+
+        # Coerce first: the gates are evaluated against typed values, and the
+        # form's own gating uses the same coercion.
+        coerced: dict[str, Any] = {}
+        for code, definition in by_code.items():
+            if code not in submitted:
+                continue
+            try:
+                coerced[code] = coerce_value(definition, submitted[code])
+            except ValueError as exc:
+                raise CropAttributeValidationError(reason=str(exc)) from exc
+
+        existing = {
+            row.definition_code: row
+            for row in await self._repo.list_attribute_values(block_crop_ids=[block_crop_id])
+        }
+
+        # Gates and requiredness are evaluated against the **effective** state
+        # — stored values overlaid with this submission — not the submission
+        # alone. A client that sends only one field would otherwise look like
+        # it had cleared the establishment method, closing every gate that
+        # depends on it and deleting the transplant fields as a side effect.
+        effective: dict[str, Any] = {
+            code: _attribute_value_of(row) for code, row in existing.items()
+        }
+        effective.update(coerced)
+
+        visible = {d.code for d in visible_crop_attributes(definitions, effective)}
+        missing = sorted(
+            d.code
+            for d in definitions
+            if d.code in visible
+            and crop_attribute_required(d, effective)
+            and effective.get(d.code) is None
+        )
+        if missing:
+            raise CropAttributeValidationError(
+                reason=f"required attribute(s) missing for this crop: {missing!r}"
+            )
+
+        writes, deletes, log_rows = _plan_attribute_writes(
+            definitions=definitions,
+            coerced=coerced,
+            visible=visible,
+            existing=existing,
+            actor_user_id=actor_user_id,
+        )
+
+        await self._repo.replace_attribute_values(
+            block_crop_id=block_crop_id,
+            writes=writes,
+            deletes=deletes,
+            log_rows=log_rows,
+        )
+        return await self.get_block_crop_attributes(block_crop_id=block_crop_id)
+
+    async def list_block_crop_attribute_history(
+        self, *, block_crop_id: UUID, definition_code: str | None = None
+    ) -> list[dict[str, Any]]:
+        block_crop = await self._repo.get_block_crop(block_crop_id=block_crop_id)
+        if block_crop is None:
+            raise CropAssignmentNotFoundError(block_crop_id)
+        rows = await self._repo.list_attribute_value_log(
+            block_crop_id=block_crop_id, definition_code=definition_code
+        )
+        return [_log_to_dict(r) for r in rows]
+
     # ---- Crop catalog authoring (platform-only) -----------------------
 
     async def _audit_catalog(
@@ -2689,6 +3121,178 @@ class FarmServiceImpl:
             details={"fields": sorted(fields.keys())},
         )
         return out
+
+
+# ---- Crop attribute value helpers ------------------------------------------
+#
+# One place that knows which typed column a value_type uses, so the write
+# path, the read path and the history rows cannot land in different columns.
+
+_VALUE_COLUMNS: tuple[str, ...] = (
+    "value_numeric",
+    "value_text",
+    "value_boolean",
+    "value_date",
+    "value_option",
+    "value_options",
+)
+
+
+def _attribute_value_of(row: Any) -> Any:
+    """The single non-null typed column on a value row."""
+    for column in _VALUE_COLUMNS:
+        value = getattr(row, column, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _value_payload(definition: Any, row: Any) -> dict[str, Any]:
+    """The stored value of ``row`` keyed by its typed column."""
+    column = VALUE_COLUMN_BY_TYPE[definition.value_type]
+    return {column: getattr(row, column, None)}
+
+
+def _log_payload(
+    *,
+    definition: Any,
+    value: Any,
+    prev: dict[str, Any],
+    change_kind: str,
+    actor_user_id: UUID | None,
+) -> dict[str, Any]:
+    column = VALUE_COLUMN_BY_TYPE[definition.value_type]
+    payload: dict[str, Any] = {
+        "definition_id": definition.id,
+        "definition_code": definition.code,
+        "change_kind": change_kind,
+        "changed_by": actor_user_id,
+    }
+    if value is not None:
+        payload[column] = value
+    for key, prior in prev.items():
+        payload[f"prev_{key}"] = prior
+    return payload
+
+
+def _plan_one_attribute(
+    *,
+    definition: Any,
+    new_value: Any,
+    gate_open: bool,
+    prior: Any,
+    actor_user_id: UUID | None,
+) -> tuple[dict[str, Any] | None, Any, dict[str, Any] | None]:
+    """Decide the (write, delete, log) for a single attribute.
+
+    Returns ``(None, None, None)`` when nothing changed — an unchanged field
+    must not produce a history row, or the timeline fills with saves that
+    changed nothing and the real edits become impossible to find.
+    """
+    prev_payload = _value_payload(definition, prior) if prior is not None else {}
+
+    if new_value is None:
+        if prior is None:
+            return None, None, None
+        return (
+            None,
+            prior,
+            _log_payload(
+                definition=definition,
+                value=None,
+                prev=prev_payload,
+                change_kind="cleared" if gate_open else "cleared_by_gate",
+                actor_user_id=actor_user_id,
+            ),
+        )
+
+    column = VALUE_COLUMN_BY_TYPE[definition.value_type]
+    if prior is not None and getattr(prior, column) == new_value:
+        return None, None, None
+
+    payload: dict[str, Any] = {
+        "definition_id": definition.id,
+        "definition_code": definition.code,
+        column: new_value,
+        "updated_by": actor_user_id,
+    }
+    if prior is not None:
+        # Reset the other value columns. A definition's value_type is
+        # immutable, but a row written before a catalog fix could sit in the
+        # wrong column, and then the one_value CHECK rejects the update
+        # instead of the stale data.
+        for other in set(VALUE_COLUMN_BY_TYPE.values()) - {column}:
+            payload[other] = None
+        payload["_existing"] = prior
+    return (
+        payload,
+        None,
+        _log_payload(
+            definition=definition,
+            value=new_value,
+            prev=prev_payload,
+            change_kind="updated" if prior is not None else "set",
+            actor_user_id=actor_user_id,
+        ),
+    )
+
+
+def _plan_attribute_writes(
+    *,
+    definitions: Sequence[Any],
+    coerced: dict[str, Any],
+    visible: set[str],
+    existing: dict[str, Any],
+    actor_user_id: UUID | None,
+) -> tuple[list[dict[str, Any]], list[Any], list[dict[str, Any]]]:
+    """Turn one submitted form into upserts, gate-clears and history rows."""
+    writes: list[dict[str, Any]] = []
+    deletes: list[Any] = []
+    log_rows: list[dict[str, Any]] = []
+
+    for definition in definitions:
+        code = definition.code
+        gate_open = code in visible
+        # A field the client didn't mention keeps its stored value — omission
+        # is "unchanged", not "clear". A closed gate always clears.
+        if gate_open and code not in coerced:
+            continue
+        write, delete, log_row = _plan_one_attribute(
+            definition=definition,
+            new_value=coerced.get(code) if gate_open else None,
+            gate_open=gate_open,
+            prior=existing.get(code),
+            actor_user_id=actor_user_id,
+        )
+        if write is not None:
+            writes.append(write)
+        if delete is not None:
+            deletes.append(delete)
+        if log_row is not None:
+            log_rows.append(log_row)
+
+    return writes, deletes, log_rows
+
+
+def _log_to_dict(row: Any) -> dict[str, Any]:
+    def _first(prefix: str) -> Any:
+        for column in _VALUE_COLUMNS:
+            value = getattr(row, f"{prefix}{column}", None)
+            if value is not None:
+                return value
+        return None
+
+    return {
+        "id": row.id,
+        "block_crop_id": row.block_crop_id,
+        "definition_id": row.definition_id,
+        "definition_code": row.definition_code,
+        "value": _first(""),
+        "previous_value": _first("prev_"),
+        "change_kind": row.change_kind,
+        "changed_at": row.changed_at,
+        "changed_by": row.changed_by,
+    }
 
 
 def _validate_catalog_payloads(

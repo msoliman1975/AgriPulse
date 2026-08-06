@@ -532,6 +532,7 @@ async function resolveCropAssignment(
     }
   }
   return {
+    id: c.id,
     crop_name: cropName,
     variety_name: varietyName,
     strain_name: strainName,

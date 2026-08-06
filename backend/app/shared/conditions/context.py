@@ -133,6 +133,15 @@ class SignalEntry:
     value_trend_direction: str | None = None
 
 
+# Allowed keys for a crop_attribute value-ref. One key today — the recorded
+# value itself. Declared as a tuple rather than inlined so a future derivation
+# (``days_since`` over a date attribute, which is what would finally let a
+# tree ask "current tree age", see the staleness note in
+# docs/proposals/crop-custom-attributes.md) can be added without changing the
+# ref shape or migrating a single stored condition.
+CROP_ATTRIBUTE_KEYS: tuple[str, ...] = ("value",)
+
+
 # Allowed fields for a grid value-ref (G-4). Each maps 1:1 to a
 # ``GridAnomalyEntry`` attribute; ``parse_value_ref`` validates against
 # this tuple and the evaluator reads via ``getattr``.
@@ -235,6 +244,14 @@ class ConditionContext:
     # Populated by the recommendations driver only when the block has an
     # active grid with a current anomaly; empty otherwise.
     grid: dict[str, GridAnomalyEntry] = field(default_factory=dict)
+    # Platform-curated crop attributes recorded on the block's *current* crop
+    # assignment, keyed by definition code and already typed by the
+    # definition's value_type (Decimal / date / str / list[str]). Empty when
+    # the block has no current assignment or the crop defines no attributes,
+    # so `{source: crop_attribute}` predicates fail closed like every other
+    # source. A plain dict rather than an entry dataclass: unlike indices or
+    # signals there is exactly one value per code and no derived companions.
+    crop_attributes: dict[str, Any] = field(default_factory=dict)
     # Decision-tree parameter values (PR-B): {name: value} resolved
     # from the tree's `parameters:` defaults, layered with tenant
     # overrides in PR-C. The alerts engine leaves this empty.
@@ -255,6 +272,7 @@ class ConditionContext:
         weather_risks: dict[str, WeatherRiskEntry] | None = None,
         signals: dict[str, SignalEntry] | None = None,
         grid: dict[str, GridAnomalyEntry] | None = None,
+        crop_attributes: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
@@ -288,6 +306,7 @@ class ConditionContext:
             weather_risks=weather_risks or {},
             signals=signals or {},
             grid=grid or {},
+            crop_attributes=dict(crop_attributes or {}),
             params=dict(params or {}),
         )
 
