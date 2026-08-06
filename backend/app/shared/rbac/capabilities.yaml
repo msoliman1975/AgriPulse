@@ -104,6 +104,14 @@ capabilities:
     description: Trigger historical imagery/weather backfill and index computation on any tenant.
     scope: platform
     status: active
+  platform.observe_pipeline:
+    # Read-only, and deliberately NOT folded into platform.run_backfill.
+    # Observer only looks: seeing that a number is wrong must not imply the
+    # right to spend the shared CDSE allowance re-computing it. The one
+    # exception (verify runs, which consume worker time) is audited.
+    description: Inspect the indices pipeline end-to-end on any tenant — scenes, pixels, aggregates, lineage.
+    scope: platform
+    status: active
   platform.manage_platform_admins:
     description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
     scope: platform

@@ -157,6 +157,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.notifications.subscribers import (
         register_subscribers as register_notifications_subscribers,
     )
+    from app.modules.observer.router import router as observer_router
     from app.modules.plan_templates.router import router as plan_templates_router
     from app.modules.plans.router import router as plans_router
     from app.modules.platform_admins.admins_router import (
@@ -215,6 +216,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(platform_admins_self_router)
     app.include_router(platform_health_rollup_router)
     app.include_router(platform_health_tenant_drill_router)
+    app.include_router(observer_router)
 
     # Cross-module event subscribers â€” registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from
