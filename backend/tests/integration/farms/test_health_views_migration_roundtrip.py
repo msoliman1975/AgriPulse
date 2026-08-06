@@ -1,8 +1,8 @@
-"""Downgrade/upgrade roundtrip for tenant migrations 0055 + 0056.
+"""Downgrade/upgrade roundtrip for tenant migrations 0056 + 0057.
 
-0055 rewrites the two integration-health views and 0056 re-chunks the
-aggregate hypertables. Both have hand-written `downgrade()` bodies (0055
-carries a verbatim copy of the pre-0055 view SQL), and nothing else in the
+0056 rewrites the two integration-health views and 0057 re-chunks the
+aggregate hypertables. Both have hand-written `downgrade()` bodies (0056
+carries a verbatim copy of the pre-0056 view SQL), and nothing else in the
 suite exercises a tenant downgrade — a typo in either would only surface
 during an incident rollback, which is the worst possible time to find it.
 
@@ -181,9 +181,9 @@ async def test_rewritten_views_match_the_originals_and_roundtrip(
 
     cfg = _alembic(schema)
 
-    # Down to 0054: both migrations' downgrade() bodies have to parse and
+    # Down to 0055: both migrations' downgrade() bodies have to parse and
     # leave the legacy views in place.
-    command.downgrade(cfg, "0054")
+    command.downgrade(cfg, "0055")
     legacy = await _health_rows(admin_session, schema=schema)
 
     # The whole point of the rewrite: same values, different plan.
@@ -197,7 +197,7 @@ async def test_rewritten_views_match_the_originals_and_roundtrip(
 
 @pytest.mark.asyncio
 async def test_chunk_settings_applied_and_reverted(admin_session: AsyncSession) -> None:
-    """0056 moves new chunks to 30 days / 1 space partition, and back."""
+    """0057 moves new chunks to 30 days / 1 space partition, and back."""
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
         slug="chunk-roundtrip", name="chunk-roundtrip", contact_email="ops@cr.test"
@@ -231,7 +231,7 @@ async def test_chunk_settings_applied_and_reverted(admin_session: AsyncSession) 
     assert await dims() == {"days": 30, "partitions": 1}
 
     cfg = _alembic(schema)
-    command.downgrade(cfg, "0055")
+    command.downgrade(cfg, "0056")
     assert await dims() == {"days": 7, "partitions": 4}
 
     command.upgrade(cfg, "head")

@@ -72,7 +72,7 @@ _MAP_INDICES: tuple[str, ...] = ("ndvi", "ndre", "ndwi")
 # Blocks that return nothing in the window fall back to an unbounded
 # lookup (`_latest_indices`), so a dormant block still shows its last
 # known reading and this is not a behaviour change for them. Migration
-# 0056 additionally right-sizes the chunking so the fallback path stops
+# 0057 additionally right-sizes the chunking so the fallback path stops
 # degrading as history accumulates.
 _RECENT_WINDOW_DAYS = 120
 
