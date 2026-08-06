@@ -664,12 +664,69 @@
       "max": "Max",
       "std": "Std dev",
       "validPx": "Valid / total px",
-      "baselineZ": "Baseline z"
+      "baselineZ": "Baseline z",
+      "open": "Open"
     },
     "tooltip": {
       "cloudPct": "Cloud cover across the whole scene as reported by the provider — not measured for this block specifically.",
       "validPct": "Valid pixels divided by the block's pixel footprint. A low value means the number came from a fraction of the field.",
       "indices": "How many of the product's supported indices wrote an aggregate row for this scene."
+    },
+    "pixel": {
+      "title": "Pixel inspector",
+      "clickPrompt": "Click a pixel on the raster to see the bands that went in, the masking decision, and the arithmetic that produced its value.",
+      "error": "Could not read that pixel. It may fall outside the scene's raster.",
+      "coords": "row {{row}} · col {{col}}",
+      "bands": "Bands (surface reflectance)",
+      "masking": "Masking",
+      "masked": "masked",
+      "notMasked": "not masked",
+      "noMaskBand": "This product ships no scene-classification band, so no cloud masking ran. Its valid-pixel share is not comparable to a product that does mask.",
+      "insideAoi": "Inside the block boundary.",
+      "outsideAoi": "Outside the block boundary — this pixel is not aggregated.",
+      "formula": "Formula — {{index}}",
+      "unavailable": "Not available on this product: {{reason}}.",
+      "excluded": "Excluded from every statistic on this scene: {{reason}}.",
+      "contributes": "This pixel contributes to the cell and block aggregates."
+    },
+    "budget": {
+      "title": "Pixel budget",
+      "explain": "Where this scene's pixels went. The database stores only the valid and total counts, so this is recomputed from the stored raster — one read, on request.",
+      "compute": "Compute pixel budget",
+      "validPct": "{{pct}}% valid",
+      "noIndex": "No budget for {{index}} on this scene.",
+      "notStored": "Not stored today: the split between cloud-masked and no-data pixels is recomputed live. OBS-5 persists it.",
+      "row": {
+        "aoi": "Block footprint",
+        "masked": "− cloud-masked",
+        "nodata": "− no data",
+        "valid": "Valid"
+      }
+    },
+    "detail": {
+      "notFound": "Scene not found.",
+      "index": "Index",
+      "raster": "Index raster — click a pixel to explain it",
+      "noRaster": "This scene never produced a raster, so there is nothing to inspect.",
+      "inputs": "Inputs",
+      "rawAsset": "Raw bands",
+      "bands": "Bands",
+      "aoiHash": "AOI hash",
+      "maskRuleset": "Mask ruleset",
+      "grid": "Grid",
+      "cells": "cells",
+      "gridValidFrom": "valid from {{from}}",
+      "noGrid": "No grid governed this scene's time — no cell aggregates are expected.",
+      "stacItem": "STAC item",
+      "error": "Error",
+      "rollup": "Roll-up: pixel → cell → block",
+      "pixel": "Pixel",
+      "clickPixel": "click the raster",
+      "cell": "Cells",
+      "cellCount": "{{n}} cells",
+      "blockMean": "Block mean",
+      "validOf": "{{valid}} of {{total}} px",
+      "rollupNote": "Cell means and the block mean are computed over different lattices, so they reconcile approximately rather than exactly — the block mean covers every pixel in the boundary, while cells partition it on a fixed grid."
     }
   }
 }

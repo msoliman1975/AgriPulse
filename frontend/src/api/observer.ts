@@ -242,3 +242,118 @@ export async function getSceneIndices(
   );
   return data;
 }
+
+// ---- L2: scene detail + pixel explain ------------------------------------
+
+export interface GridSnapshot {
+  grid_config_id: string;
+  cell_size_m: number;
+  utm_srid: number;
+  cell_count: number;
+  effective_from: string | null;
+  effective_to: string | null;
+}
+
+export interface SceneDetail {
+  /** The tenant /v1/config route needs a tenant scope; Observer has none. */
+  tile_server_base_url: string;
+  s3_bucket: string;
+  job_id: string;
+  block_id: string;
+  product_id: string;
+  block_code: string | null;
+  block_name: string | null;
+  farm_id: string;
+  scene_id: string;
+  scene_datetime: string;
+  status: JobStatus;
+  stac_item_id: string | null;
+  cloud_cover_pct: number | null;
+  valid_pixel_pct: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  requested_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  provider_code: string;
+  provider_name: string;
+  product_code: string;
+  product_name: string;
+  resolution_m: number;
+  bands: string[];
+  supported_indices: string[];
+  aoi_hash: string;
+  boundary_geojson: Record<string, unknown>;
+  area_m2: number;
+  raw_asset_key: string | null;
+  index_asset_keys: Record<string, string>;
+  mask_ruleset: string;
+  mask_classes: number[];
+  /** Null when no grid config governed this scene's time. */
+  grid: GridSnapshot | null;
+}
+
+export interface PixelIndexResult {
+  /** What this pixel contributed to the aggregate — null when nothing. */
+  value: number | null;
+  /** What the formula produced regardless, so a dropped pixel still shows it. */
+  raw_value: number | null;
+  formula_text: string | null;
+  substituted: string | null;
+  excluded_reason: string | null;
+}
+
+export interface PixelExplain {
+  job_id: string;
+  scene_id: string;
+  scene_datetime: string;
+  block_id: string;
+  raw_asset_key: string;
+  row: number;
+  col: number;
+  lon: number;
+  lat: number;
+  inside_aoi: boolean;
+  band_values: Record<string, number | null>;
+  scl_value: number | null;
+  scl_label: string | null;
+  masked: boolean;
+  mask_reason: string | null;
+  indices: Record<string, PixelIndexResult>;
+  unavailable_indices: Record<string, string>;
+  /** False = the product ships no SCL band, so no cloud masking happened. */
+  masking_available: boolean;
+}
+
+export interface PixelBudget {
+  job_id: string;
+  aoi_pixel_count: number;
+  masked_pixel_count: number;
+  per_index: Record<string, { aoi: number; masked: number; nodata: number; valid: number }>;
+  recomputed_live: boolean;
+}
+
+export async function getSceneDetail(tenantId: string, jobId: string): Promise<SceneDetail> {
+  const { data } = await apiClient.get<SceneDetail>(`${BASE}/tenants/${tenantId}/scenes/${jobId}`);
+  return data;
+}
+
+export async function explainPixel(
+  tenantId: string,
+  jobId: string,
+  lon: number,
+  lat: number,
+): Promise<PixelExplain> {
+  const { data } = await apiClient.get<PixelExplain>(
+    `${BASE}/tenants/${tenantId}/scenes/${jobId}/pixel`,
+    { params: { lon, lat } },
+  );
+  return data;
+}
+
+export async function getPixelBudget(tenantId: string, jobId: string): Promise<PixelBudget> {
+  const { data } = await apiClient.get<PixelBudget>(
+    `${BASE}/tenants/${tenantId}/scenes/${jobId}/pixel-budget`,
+  );
+  return data;
+}

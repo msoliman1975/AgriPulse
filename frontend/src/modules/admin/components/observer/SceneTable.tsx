@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import type { JobStatus, ObserverScene } from "@/api/observer";
 import { EmptyState } from "@/components/EmptyState";
@@ -123,6 +124,7 @@ export function SceneTable({
           <Th className="text-end">{t("observer.scenes.cells")}</Th>
           <Th className="text-end">{t("observer.scenes.duration")}</Th>
           <Th>{t("observer.scenes.error")}</Th>
+          <Th />
         </Tr>
       </Thead>
       <Tbody>
@@ -179,13 +181,21 @@ export function SceneTable({
                   )}
                 </Td>
                 <Td className="text-end tabular-nums">{fmtDuration(s.duration_s)}</Td>
-                <Td className="max-w-[14rem] truncate text-xs" title={s.error_message ?? ""}>
+                <Td className="max-w-[12rem] truncate text-xs" title={s.error_message ?? ""}>
                   {s.error_code ?? ""}
+                </Td>
+                <Td>
+                  <Link
+                    className="text-xs text-ap-accent underline"
+                    to={`/platform/observer/scenes/${s.job_id}?tenant=${tenantId}`}
+                  >
+                    {t("observer.scenes.open")}
+                  </Link>
                 </Td>
               </Tr>
               {isOpen ? (
                 <Tr>
-                  <Td colSpan={11} className="bg-ap-bg/40">
+                  <Td colSpan={12} className="bg-ap-bg/40">
                     <ExpandedIndices tenantId={tenantId} scene={s} />
                   </Td>
                 </Tr>

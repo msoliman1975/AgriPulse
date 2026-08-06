@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observer.repository import BUCKETS, ObserverRepository
+from app.shared.storage import get_storage_client
 
 # Widest window the overview will scan in one request. The overview fires
 # several aggregates over hypertables; without a ceiling an operator can ask
@@ -519,12 +520,12 @@ def _raw_bands_key(ctx: dict[str, Any]) -> str:
 
 
 def _raw_bands_uri(ctx: dict[str, Any]) -> str:
-    from app.shared.storage import get_storage_client
 
     return f"s3://{get_storage_client().bucket}/{_raw_bands_key(ctx)}"
 
 
 def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
+    from app.core.settings import get_settings
     from app.modules.imagery.storage import build_asset_key
     from app.modules.indices.computation import S2_SCL_MASKED_CLASSES
 
@@ -543,9 +544,16 @@ def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
         if has_raster
         else {}
     )
+    settings = get_settings()
     return {
+        # The tenant /v1/config endpoint carries these, but it requires a
+        # tenant scope and an Observer user has none — so the scene that
+        # needs them ships them.
+        "tile_server_base_url": settings.tile_server_base_url,
+        "s3_bucket": get_storage_client().bucket,
         "job_id": ctx["job_id"],
         "block_id": ctx["block_id"],
+        "product_id": ctx["product_id"],
         "block_code": ctx["block_code"],
         "block_name": ctx["block_name"],
         "farm_id": ctx["farm_id"],

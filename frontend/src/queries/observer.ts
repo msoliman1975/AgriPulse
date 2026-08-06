@@ -9,6 +9,9 @@ import {
   listObserverProducts,
   listObserverScenes,
   listObserverTenants,
+  explainPixel,
+  getPixelBudget,
+  getSceneDetail,
   type HistogramBucket,
   type HistogramBucketSize,
   type ObserverFarm,
@@ -18,6 +21,9 @@ import {
   type ObserverScene,
   type ObserverScope,
   type ObserverTenant,
+  type PixelBudget,
+  type PixelExplain,
+  type SceneDetail,
   type SceneFilters,
 } from "@/api/observer";
 
@@ -125,5 +131,58 @@ export function useSceneIndices(
     queryFn: () => getSceneIndices(tenantId as string, args as NonNullable<typeof args>),
     enabled: Boolean(tenantId && args),
     staleTime: STALE,
+  });
+}
+
+// ---- L2 ------------------------------------------------------------------
+
+export function useSceneDetail(
+  tenantId: string | null,
+  jobId: string | null,
+): UseQueryResult<SceneDetail> {
+  return useQuery({
+    queryKey: [ROOT, "sceneDetail", tenantId, jobId],
+    queryFn: () => getSceneDetail(tenantId as string, jobId as string),
+    enabled: Boolean(tenantId && jobId),
+    staleTime: STALE,
+  });
+}
+
+/**
+ * The pixel budget is recomputed from the COG on every call, so it is
+ * deliberately not fetched until the operator asks for it — opening a scene
+ * should not read a raster.
+ */
+export function usePixelBudget(
+  tenantId: string | null,
+  jobId: string | null,
+  enabled: boolean,
+): UseQueryResult<PixelBudget> {
+  return useQuery({
+    queryKey: [ROOT, "pixelBudget", tenantId, jobId],
+    queryFn: () => getPixelBudget(tenantId as string, jobId as string),
+    enabled: Boolean(tenantId && jobId && enabled),
+    staleTime: Infinity,
+  });
+}
+
+/** One GDAL range read per click; cached forever since a pixel never changes. */
+export function usePixelExplain(
+  tenantId: string | null,
+  jobId: string | null,
+  point: { lon: number; lat: number } | null,
+): UseQueryResult<PixelExplain> {
+  return useQuery({
+    queryKey: [ROOT, "pixel", tenantId, jobId, point?.lon, point?.lat],
+    queryFn: () =>
+      explainPixel(
+        tenantId as string,
+        jobId as string,
+        (point as { lon: number; lat: number }).lon,
+        (point as { lon: number; lat: number }).lat,
+      ),
+    enabled: Boolean(tenantId && jobId && point),
+    staleTime: Infinity,
+    retry: false,
   });
 }

@@ -188,8 +188,13 @@ class GridSnapshot(BaseModel):
 
 
 class SceneDetail(BaseModel):
+    # /v1/config is tenant-scoped and an Observer user has no tenant, so the
+    # tile-server origin and bucket travel with the scene that needs them.
+    tile_server_base_url: str
+    s3_bucket: str
     job_id: UUID
     block_id: UUID
+    product_id: UUID
     block_code: str | None
     block_name: str | None
     farm_id: UUID
