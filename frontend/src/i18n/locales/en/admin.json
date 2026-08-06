@@ -7,7 +7,8 @@
     "planTemplates": "Plan templates",
     "platformAdmins": "Platform admins",
     "platformHealth": "Integration health",
-    "backfill": "Backfill"
+    "backfill": "Backfill",
+    "observer": "Observer"
   },
   "crops": {
     "title": "Crop catalog",
@@ -567,6 +568,108 @@
       "optionCode": "Every option needs a valid code.",
       "optionNames": "Every option needs an English and an Arabic name.",
       "range": "Minimum cannot exceed maximum."
+    }
+  },
+  "observer": {
+    "title": "Observer",
+    "subtitle": "End-to-end view of the indices pipeline: raw scenes, per-pixel maths, cell and block aggregates, trends, and what they produced.",
+    "readOnly": "Read-only",
+    "pickFarmFirst": "Pick a tenant and a farm to begin. Observer is farm-scoped — the pipeline only means something against a specific set of blocks.",
+    "notApplicable": "not applicable",
+    "ofExpected": "{{pct}}% of {{expected}}",
+    "yes": "Yes",
+    "no": "No",
+    "trendAmbiguous": "This farm holds aggregates from more than one product. The daily trend rollup has no product dimension, so trend coverage cannot be attributed to the selected product alone.",
+    "consumersProxy": "Consumers are counted by creation time in this window, not by proven descent from these scenes.",
+    "mixedCalcVersions": "Two calculation versions in this window — the trend line mixes methodologies",
+    "rail": {
+      "title": "Selection",
+      "tenant": "Tenant",
+      "farm": "Farm",
+      "product": "Product",
+      "from": "From",
+      "to": "To",
+      "pick": "Select…",
+      "allProducts": "All products",
+      "blocks": "Blocks",
+      "withImagery": "With imagery subscription",
+      "gridded": "Gridded",
+      "weather": "Weather",
+      "sceneRange": "Scenes",
+      "noScenes": "No scenes have ever been ingested for this farm."
+    },
+    "ribbon": {
+      "title": "Pipeline stages",
+      "blocks_one": "{{count}} block in scope",
+      "blocks_other": "{{count}} blocks in scope"
+    },
+    "stage": {
+      "discovered": "Discovered",
+      "acquired": "Acquired",
+      "indices": "Indices computed",
+      "cells": "Cell aggregates",
+      "trend": "Trend coverage",
+      "consumers": "Consumers"
+    },
+    "diagnosis": {
+      "generic": "{{count}} of {{expected}} expected outputs are missing at this stage.",
+      "acquired": "{{count}} scene(s) were discovered but never downloaded. Check the provider errors in the scene list.",
+      "indices": "{{count}} scene(s) downloaded successfully but wrote no aggregates — the job reads as succeeded because the download succeeded, so index computation is where they died.",
+      "cells": "{{count}} scene(s) on gridded blocks produced no cell aggregates. Blocks with no grid governing the scene's time are already excluded from this count.",
+      "trend": "{{count}} block-day(s) have aggregates but no daily-trend bucket. The trend rollup refreshes on a rolling window, so history written outside it stays invisible until a manual refresh."
+    },
+    "histogram": {
+      "title": "Scenes by date",
+      "bucketLabel": "Bucket size",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "empty": "No scenes in this window.",
+      "legend": {
+        "computed": "Indices computed",
+        "acquired_only": "Acquired, no aggregates",
+        "skipped": "Skipped",
+        "failed": "Failed",
+        "pending": "Pending"
+      }
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "skipped_cloud": "Skipped — cloud",
+      "skipped_duplicate": "Skipped — duplicate"
+    },
+    "scenes": {
+      "title": "Scenes",
+      "empty": "No scenes match this selection.",
+      "clearFilter": "Clear stage filter",
+      "expand": "Show per-index aggregates",
+      "when": "Scene time",
+      "block": "Block",
+      "sceneId": "Scene ID",
+      "status": "Status",
+      "cloud": "Cloud",
+      "valid": "Valid px",
+      "indices": "Indices",
+      "cells": "Cells",
+      "duration": "Duration",
+      "error": "Error",
+      "ungridded": "not gridded",
+      "noAggregates": "This scene wrote no index aggregates.",
+      "index": "Index",
+      "mean": "Mean",
+      "min": "Min",
+      "max": "Max",
+      "std": "Std dev",
+      "validPx": "Valid / total px",
+      "baselineZ": "Baseline z"
+    },
+    "tooltip": {
+      "cloudPct": "Cloud cover across the whole scene as reported by the provider — not measured for this block specifically.",
+      "validPct": "Valid pixels divided by the block's pixel footprint. A low value means the number came from a fraction of the field.",
+      "indices": "How many of the product's supported indices wrote an aggregate row for this scene."
     }
   }
 }

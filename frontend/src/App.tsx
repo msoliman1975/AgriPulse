@@ -55,6 +55,7 @@ import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAt
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
+import { PlatformObserverPage } from "@/modules/admin/pages/PlatformObserverPage";
 import { PlatformPlanTemplatesPage } from "@/modules/admin/pages/PlatformPlanTemplatesPage";
 import { PlanTemplateEditorPage } from "@/modules/admin/pages/PlanTemplateEditorPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
@@ -288,6 +289,7 @@ export function App(): ReactNode {
                 />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
+                <Route path="observer" element={<PlatformObserverPage />} />
                 <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
                 <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
