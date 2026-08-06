@@ -12,6 +12,9 @@ to spend the shared CDSE allowance recomputing it.
   GET /tenants/{tenant_id}/histogram            — L0 scenes by date bucket
   GET /tenants/{tenant_id}/scenes               — L1 scene table
   GET /tenants/{tenant_id}/scenes/indices       — L1 expanded row (per-index stats)
+  GET /tenants/{tenant_id}/scenes/{job_id}      — L2 scene detail
+  GET /tenants/{tenant_id}/scenes/{job_id}/pixel        — L2 explain one pixel
+  GET /tenants/{tenant_id}/scenes/{job_id}/pixel-budget — L2 pixel reconciliation
 """
 
 from __future__ import annotations
@@ -25,9 +28,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.observer.pixels import PixelOutsideRasterError
 from app.modules.observer.repository import JOB_STATUSES
 from app.modules.observer.service import (
     ObserverService,
+    SceneNotFoundError,
+    SceneRasterUnavailableError,
     TenantNotFoundError,
     WindowTooWideError,
     get_observer_service,
@@ -168,6 +174,101 @@ class IndexRow(BaseModel):
     baseline_deviation: float | None
     stac_item_id: str
     inserted_at: datetime
+
+
+class GridSnapshot(BaseModel):
+    """The grid that governed this scene's time — not today's grid."""
+
+    grid_config_id: UUID
+    cell_size_m: float
+    utm_srid: int
+    cell_count: int
+    effective_from: datetime | None
+    effective_to: datetime | None
+
+
+class SceneDetail(BaseModel):
+    job_id: UUID
+    block_id: UUID
+    block_code: str | None
+    block_name: str | None
+    farm_id: UUID
+    scene_id: str
+    scene_datetime: datetime
+    status: str
+    stac_item_id: str | None
+    cloud_cover_pct: float | None
+    valid_pixel_pct: float | None
+    error_code: str | None
+    error_message: str | None
+    requested_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    provider_code: str
+    provider_name: str
+    product_code: str
+    product_name: str
+    resolution_m: float
+    bands: list[str]
+    supported_indices: list[str]
+    aoi_hash: str
+    boundary_geojson: dict[str, Any]
+    area_m2: float
+    raw_asset_key: str | None
+    index_asset_keys: dict[str, str]
+    mask_ruleset: str
+    mask_classes: list[int]
+    grid: GridSnapshot | None
+
+
+class PixelIndexResult(BaseModel):
+    """One index's arithmetic at one pixel.
+
+    `value` is what this pixel contributed to the aggregate — null when it
+    contributed nothing. `raw_value` is what the formula produced regardless,
+    so a masked pixel can still show its number next to the reason it was
+    thrown away.
+    """
+
+    value: float | None
+    raw_value: float | None
+    formula_text: str | None
+    substituted: str | None
+    excluded_reason: str | None
+
+
+class PixelExplainResponse(BaseModel):
+    job_id: UUID
+    scene_id: str
+    scene_datetime: datetime
+    block_id: UUID
+    raw_asset_key: str
+    row: int
+    col: int
+    lon: float
+    lat: float
+    inside_aoi: bool
+    band_values: dict[str, float | None]
+    scl_value: int | None
+    scl_label: str | None
+    masked: bool
+    mask_reason: str | None
+    indices: dict[str, PixelIndexResult]
+    # Index code → why it cannot be shown for this product, e.g. NDMI on a
+    # 4-band product with no SWIR.
+    unavailable_indices: dict[str, str]
+    # False means the product ships no scene-classification band, so no cloud
+    # masking happened and this scene's valid-pixel share is not comparable
+    # to one from a product that does mask.
+    masking_available: bool
+
+
+class PixelBudgetResponse(BaseModel):
+    job_id: UUID
+    aoi_pixel_count: int
+    masked_pixel_count: int
+    per_index: dict[str, dict[str, int]]
+    recomputed_live: bool
 
 
 # --- shared query params ---------------------------------------------------
@@ -349,6 +450,83 @@ async def scene_indices(
         product_id=product_id,
         scene_time=scene_time,
     )
+
+
+# --- L2: scene detail + pixel explain ---------------------------------------
+
+
+@router.get("/tenants/{tenant_id}/scenes/{job_id}", response_model=SceneDetail)
+async def scene_detail(
+    tenant_id: UUID,
+    job_id: UUID,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Inputs, mask ruleset, resolved grid geometry and asset keys."""
+    del context
+    try:
+        return await service.scene_detail(
+            tenant_schema=await _schema(service, tenant_id), job_id=job_id
+        )
+    except SceneNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
+
+
+@router.get("/tenants/{tenant_id}/scenes/{job_id}/pixel", response_model=PixelExplainResponse)
+async def explain_pixel(
+    tenant_id: UUID,
+    job_id: UUID,
+    lon: float = Query(ge=-180, le=180),
+    lat: float = Query(ge=-90, le=90),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Explain one pixel: bands in, mask verdict, formula, value out.
+
+    One GDAL range read against the raw-bands COG, so this answers a click
+    without a job queue.
+    """
+    del context
+    try:
+        return await service.explain_pixel(
+            tenant_schema=await _schema(service, tenant_id),
+            job_id=job_id,
+            lon=lon,
+            lat=lat,
+        )
+    except SceneNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
+    except SceneRasterUnavailableError as exc:
+        # 409, not 404: the scene exists, it simply never produced a raster.
+        # A 404 would send the operator looking for a missing row.
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except PixelOutsideRasterError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/scenes/{job_id}/pixel-budget", response_model=PixelBudgetResponse)
+async def pixel_budget(
+    tenant_id: UUID,
+    job_id: UUID,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Where this scene's pixels went: AOI → masked → no-data → valid.
+
+    Recomputed from the COG on every call, because the database keeps only
+    the valid and total counts and nothing that separates a cloud-masked
+    pixel from a sensor gap. OBS-5 persists the split so this becomes a
+    cheap read.
+    """
+    del context
+    try:
+        return await service.pixel_budget(
+            tenant_schema=await _schema(service, tenant_id), job_id=job_id
+        )
+    except SceneNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
+    except SceneRasterUnavailableError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 # --- helpers ---------------------------------------------------------------

@@ -9,6 +9,7 @@ would drift the first time a denominator changed.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
@@ -36,6 +37,14 @@ class TenantNotFoundError(Exception):
 
 class FarmNotFoundError(Exception):
     """Farm does not exist in this tenant schema."""
+
+
+class SceneNotFoundError(Exception):
+    """No ingestion job with that id in this tenant."""
+
+
+class SceneRasterUnavailableError(Exception):
+    """The scene never produced a raster, so there is nothing to read."""
 
 
 class WindowTooWideError(Exception):
@@ -256,6 +265,115 @@ class ObserverService:
             r["gridded"] = int(r["cells_expected"]) > 0
         return rows
 
+    # ---- L2 --------------------------------------------------------------
+
+    async def scene_detail(self, *, tenant_schema: str, job_id: UUID) -> dict[str, Any]:
+        """Inputs, resolved grid geometry and asset keys for one scene."""
+        await self._scope(tenant_schema)
+        try:
+            ctx = await self._repo.scene_context(job_id)
+        finally:
+            await self._unscope()
+        if ctx is None:
+            raise SceneNotFoundError(str(job_id))
+        return _scene_detail_payload(ctx)
+
+    async def explain_pixel(
+        self,
+        *,
+        tenant_schema: str,
+        job_id: UUID,
+        lon: float,
+        lat: float,
+    ) -> dict[str, Any]:
+        """Read one pixel from the raw COG and show the arithmetic.
+
+        Everything that decides the answer — masking, formulas, the AOI
+        test — is borrowed from the pipeline's own code, so this cannot
+        describe a calculation the pipeline is not performing.
+        """
+        # Local import: rasterio pulls GDAL, and only this path needs it.
+        from app.modules.observer.pixels import explain_pixel as _explain
+
+        ctx, formulas = await self._scene_context_and_formulas(tenant_schema, job_id)
+        raw_uri = _raw_bands_uri(ctx)
+        result = _explain(
+            raw_uri=raw_uri,
+            band_names=tuple(ctx["bands"]),
+            supported_indices=tuple(ctx["supported_indices"]),
+            aoi_geojson_utm=json.loads(ctx["boundary_utm_geojson"]),
+            lon=lon,
+            lat=lat,
+            formulas=formulas,
+        )
+        return {
+            "job_id": job_id,
+            "scene_id": ctx["scene_id"],
+            "scene_datetime": ctx["scene_datetime"],
+            "block_id": ctx["block_id"],
+            "raw_asset_key": _raw_bands_key(ctx),
+            "row": result.row,
+            "col": result.col,
+            "lon": result.lon,
+            "lat": result.lat,
+            "inside_aoi": result.inside_aoi,
+            "band_values": result.band_values,
+            "scl_value": result.scl_value,
+            "scl_label": result.scl_label,
+            "masked": result.masked,
+            "mask_reason": result.mask_reason,
+            "indices": result.indices,
+            "unavailable_indices": result.unavailable_indices,
+            # No SCL band means no cloud masking happened at all, which makes
+            # this scene's valid-pixel percentage incomparable to one from a
+            # product that does mask. Say so rather than let the two sit in
+            # the same column looking alike.
+            "masking_available": result.scl_value is not None,
+        }
+
+    async def pixel_budget(self, *, tenant_schema: str, job_id: UUID) -> dict[str, Any]:
+        """Reconcile AOI footprint → masked → no-data → valid, per index.
+
+        Recomputed from the COG because the database cannot answer it: it
+        stores valid and total counts, and nothing that distinguishes a
+        cloud-masked pixel from a sensor gap.
+        """
+        from app.modules.observer.pixels import compute_pixel_budget
+
+        ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
+        budget = compute_pixel_budget(
+            raw_uri=_raw_bands_uri(ctx),
+            band_names=tuple(ctx["bands"]),
+            supported_indices=tuple(ctx["supported_indices"]),
+            aoi_geojson_utm=json.loads(ctx["boundary_utm_geojson"]),
+        )
+        return {
+            "job_id": job_id,
+            "aoi_pixel_count": budget.aoi_pixel_count,
+            "masked_pixel_count": budget.masked_pixel_count,
+            "per_index": budget.per_index,
+            "recomputed_live": True,
+        }
+
+    async def _scene_context_and_formulas(
+        self, tenant_schema: str, job_id: UUID
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        await self._scope(tenant_schema)
+        try:
+            ctx = await self._repo.scene_context(job_id)
+            formulas = await self._repo.index_formulas()
+        finally:
+            await self._unscope()
+        if ctx is None:
+            raise SceneNotFoundError(str(job_id))
+        if not ctx["stac_item_id"] or ctx["status"] != "succeeded":
+            # No raster was ever written, so there is nothing to read. Saying
+            # which of the two it is beats a GDAL "file not found".
+            raise SceneRasterUnavailableError(
+                f"scene status is {ctx['status']!r}; no raw-bands COG exists for it"
+            )
+        return ctx, formulas
+
     async def scene_indices(
         self,
         *,
@@ -376,6 +494,101 @@ def _stage(
         "shortfall": shortfall,
         "verdict": verdict,
         "detail": detail,
+    }
+
+
+# ---- scene detail ----------------------------------------------------------
+
+
+def _raw_bands_key(ctx: dict[str, Any]) -> str:
+    """The deterministic object-storage key for this scene's raw COG.
+
+    Built with the pipeline's own key builder rather than string-formatted
+    here: the five components and their ordering are what makes ingestion
+    idempotent, and a second implementation of that layout would eventually
+    point the inspector at a path nothing ever wrote.
+    """
+    from app.modules.imagery.storage import raw_bands_key
+
+    return raw_bands_key(
+        provider_code=ctx["provider_code"],
+        product_code=ctx["product_code"],
+        scene_id=ctx["scene_id"],
+        aoi_hash=ctx["aoi_hash"],
+    )
+
+
+def _raw_bands_uri(ctx: dict[str, Any]) -> str:
+    from app.shared.storage import get_storage_client
+
+    return f"s3://{get_storage_client().bucket}/{_raw_bands_key(ctx)}"
+
+
+def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
+    from app.modules.imagery.storage import build_asset_key
+    from app.modules.indices.computation import S2_SCL_MASKED_CLASSES
+
+    has_raster = bool(ctx["stac_item_id"]) and ctx["status"] == "succeeded"
+    index_assets = (
+        {
+            code: build_asset_key(
+                provider_code=ctx["provider_code"],
+                product_code=ctx["product_code"],
+                scene_id=ctx["scene_id"],
+                aoi_hash=ctx["aoi_hash"],
+                band_or_index=code,
+            )
+            for code in ctx["supported_indices"]
+        }
+        if has_raster
+        else {}
+    )
+    return {
+        "job_id": ctx["job_id"],
+        "block_id": ctx["block_id"],
+        "block_code": ctx["block_code"],
+        "block_name": ctx["block_name"],
+        "farm_id": ctx["farm_id"],
+        "scene_id": ctx["scene_id"],
+        "scene_datetime": ctx["scene_datetime"],
+        "status": ctx["status"],
+        "stac_item_id": ctx["stac_item_id"],
+        "cloud_cover_pct": ctx["cloud_cover_pct"],
+        "valid_pixel_pct": ctx["valid_pixel_pct"],
+        "error_code": ctx["error_code"],
+        "error_message": ctx["error_message"],
+        "requested_at": ctx["requested_at"],
+        "started_at": ctx["started_at"],
+        "completed_at": ctx["completed_at"],
+        "provider_code": ctx["provider_code"],
+        "provider_name": ctx["provider_name"],
+        "product_code": ctx["product_code"],
+        "product_name": ctx["product_name"],
+        "resolution_m": ctx["resolution_m"],
+        "bands": list(ctx["bands"]),
+        "supported_indices": list(ctx["supported_indices"]),
+        "aoi_hash": ctx["aoi_hash"],
+        "boundary_geojson": json.loads(ctx["boundary_geojson"]),
+        "area_m2": ctx["area_m2"],
+        "raw_asset_key": _raw_bands_key(ctx) if has_raster else None,
+        "index_asset_keys": index_assets,
+        # Named and versioned so a stored row can be attributed to the rules
+        # that produced it. OBS-5 persists this per run; until then it is the
+        # current ruleset, which is only the truth for freshly-computed rows.
+        "mask_ruleset": "s2_scl_v1",
+        "mask_classes": list(S2_SCL_MASKED_CLASSES),
+        "grid": (
+            {
+                "grid_config_id": ctx["grid_config_id"],
+                "cell_size_m": ctx["cell_size_m"],
+                "utm_srid": ctx["utm_srid"],
+                "cell_count": ctx["cell_count"],
+                "effective_from": ctx["effective_from"],
+                "effective_to": ctx["effective_to"],
+            }
+            if ctx["grid_config_id"]
+            else None
+        ),
     }
 
 

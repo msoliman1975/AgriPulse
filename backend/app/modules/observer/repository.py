@@ -580,6 +580,80 @@ class ObserverRepository:
         ).mappings()
         return [dict(r) for r in rows]
 
+    # ---- L2: scene detail -------------------------------------------------
+
+    async def scene_context(self, job_id: UUID) -> dict[str, Any] | None:
+        """Everything needed to open, mask and explain one scene.
+
+        One query rather than four round-trips: the pixel inspector is a
+        click-latency interaction, and each of these lookups is on the
+        critical path before a single byte of raster is read.
+
+        `provider_code` joins out to `imagery_providers` — `imagery_products`
+        does not carry one. The grid config is resolved by the **scene's own
+        time**, not "the current grid", so a 2025 scene reports the geometry
+        it was actually computed against.
+        """
+        row = (
+            (
+                await self._s.execute(
+                    text(
+                        """
+                    SELECT
+                      j.id AS job_id, j.block_id, j.product_id, j.scene_id,
+                      j.scene_datetime, j.status, j.stac_item_id,
+                      j.cloud_cover_pct, j.valid_pixel_pct,
+                      j.error_code, j.error_message,
+                      j.requested_at, j.started_at, j.completed_at,
+                      j.assets_written,
+                      b.farm_id, b.code AS block_code, b.name AS block_name,
+                      b.aoi_hash, b.area_m2,
+                      ST_AsGeoJSON(b.boundary)::text AS boundary_geojson,
+                      ST_AsGeoJSON(b.boundary_utm)::text AS boundary_utm_geojson,
+                      p.code AS product_code, p.name AS product_name,
+                      p.bands, p.supported_indices, p.resolution_m,
+                      pr.code AS provider_code, pr.name AS provider_name,
+                      cfg.id AS grid_config_id,
+                      cfg.cell_size_m, cfg.utm_srid,
+                      cfg.effective_from, cfg.effective_to,
+                      (SELECT count(*) FROM grid_cells gc
+                        WHERE gc.grid_config_id = cfg.id) AS cell_count
+                      FROM imagery_ingestion_jobs j
+                      JOIN blocks b ON b.id = j.block_id
+                      JOIN public.imagery_products p ON p.id = j.product_id
+                      JOIN public.imagery_providers pr ON pr.id = p.provider_id
+                      LEFT JOIN grid_configs cfg
+                             ON cfg.block_id = j.block_id
+                            AND cfg.product_id = j.product_id
+                            AND cfg.deleted_at IS NULL
+                            AND cfg.superseded_at IS NULL
+                            AND tstzrange(cfg.effective_from, cfg.effective_to)
+                                @> j.scene_datetime
+                     WHERE j.id = :jid
+                       AND b.deleted_at IS NULL
+                    """
+                    ),
+                    {"jid": str(job_id)},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def index_formulas(self) -> dict[str, str]:
+        """`indices_catalog.formula_text` keyed by code.
+
+        The pixel inspector renders the formula from here rather than from a
+        string in the codebase, so there is exactly one place a formula is
+        written down and the panel cannot describe maths the pipeline is not
+        doing.
+        """
+        rows = (
+            await self._s.execute(text("SELECT code, formula_text FROM public.indices_catalog"))
+        ).all()
+        return {str(r[0]): str(r[1]) for r in rows}
+
     # ---- plumbing --------------------------------------------------------
 
     async def _all(self, sql: str, *, block_ids: list[UUID], product_id: UUID | None) -> list[Any]:

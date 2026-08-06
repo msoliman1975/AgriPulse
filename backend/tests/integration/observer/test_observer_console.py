@@ -553,3 +553,155 @@ async def test_expanded_row_returns_all_seven_indices(scenario: Scenario) -> Non
         assert ndvi["total_pixel_count"] == 3508
         # Generated column: 100 * 3214 / 3508.
         assert ndvi["valid_pixel_pct"] == pytest.approx(91.62, abs=0.01)
+
+
+# ---- L2: scene detail ------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_scenes_indices_path_is_not_swallowed_by_the_job_id_route(
+    scenario: Scenario,
+) -> None:
+    """`/scenes/indices` and `/scenes/{job_id}` share a prefix.
+
+    FastAPI resolves by declaration order, so the literal path only wins
+    because it is declared first. Reordering the router would turn this into
+    a 422 ("indices is not a UUID") that no other test would catch.
+    """
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        row = next(r for r in rows if r["indices_written"] == 7)
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/indices",
+            params={
+                "block_id": row["block_id"],
+                "product_id": row["product_id"],
+                "scene_time": row["scene_datetime"],
+            },
+        )
+        assert r.status_code == 200, r.text
+        assert len(r.json()) == 7
+
+
+@pytest.mark.asyncio
+async def test_scene_detail_resolves_the_grid_that_governed_the_scene(
+    scenario: Scenario,
+) -> None:
+    """Not "the current grid" — the one whose valid-time range covers it."""
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        # Newest-first ordering puts the cloud-skipped scene at index 0, and
+        # that one never wrote a raster — pick a scene that actually did.
+        job_id = next(r for r in rows if r["stac_item_id"])["job_id"]
+        r = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["provider_code"] == "sentinel_hub"
+        assert body["product_code"] == "s2_l2a"
+        assert body["grid"] is not None
+        assert body["grid"]["cell_count"] == 4
+        assert body["grid"]["cell_size_m"] == 40.0
+        # The asset layout is the pipeline's, built by its own key builder.
+        assert body["raw_asset_key"].endswith("/raw_bands.tif")
+        assert body["raw_asset_key"].startswith("sentinel_hub/s2_l2a/")
+        assert body["aoi_hash"] in body["raw_asset_key"]
+        assert set(body["index_asset_keys"]) <= set(body["supported_indices"])
+        # The mask ruleset is named and its classes are transmitted, so the
+        # UI never has to hard-code which SCL values were dropped.
+        assert body["mask_ruleset"] == "s2_scl_v1"
+        assert set(body["mask_classes"]) == {0, 1, 3, 8, 9, 10, 11}
+
+
+@pytest.mark.asyncio
+async def test_scene_detail_on_an_ungridded_block_reports_no_grid(
+    scenario: Scenario,
+) -> None:
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_b)],
+                    **_window(),
+                },
+            )
+        ).json()
+        r = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}")
+        assert r.status_code == 200, r.text
+        assert r.json()["grid"] is None
+
+
+@pytest.mark.asyncio
+async def test_scene_detail_of_an_unknown_job_is_404(scenario: Scenario) -> None:
+    async with _platform_client() as client:
+        r = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{uuid4()}")
+        assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pixel_explain_on_a_scene_with_no_raster_is_409_not_404(
+    scenario: Scenario,
+) -> None:
+    """The scene exists; it just never produced a COG.
+
+    A 404 would send the operator looking for a missing row when the real
+    answer is "this job failed before it wrote anything".
+    """
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "status": ["failed"],
+                    **_window(),
+                },
+            )
+        ).json()
+        assert len(rows) == 1
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}/pixel",
+            params={"lon": 31.21, "lat": 30.01},
+        )
+        assert r.status_code == 409, r.text
+        assert "no raw-bands COG" in r.text
+
+
+@pytest.mark.asyncio
+async def test_pixel_budget_on_a_scene_with_no_raster_is_409(
+    scenario: Scenario,
+) -> None:
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "status": ["skipped_cloud"],
+                    **_window(),
+                },
+            )
+        ).json()
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}/pixel-budget"
+        )
+        assert r.status_code == 409, r.text
