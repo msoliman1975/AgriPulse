@@ -705,3 +705,121 @@ async def test_pixel_budget_on_a_scene_with_no_raster_is_409(
             f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}/pixel-budget"
         )
         assert r.status_code == 409, r.text
+
+
+# ---- OBS-5: calculation lineage --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_scene_detail_carries_calculation_history(scenario: Scenario) -> None:
+    """`indices_calc_runs` is what makes a silent overwrite visible.
+
+    The scenario seeds two runs for one scene under different calc versions —
+    the shape a re-computation leaves behind. The aggregate row itself cannot
+    show this: it is upserted on its composite key, so the second run simply
+    replaced the first one's numbers.
+    """
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        job_id = next(r for r in rows if r["scene_id"] == "S2A_OBS_A_00")["job_id"]
+        body = (await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}")).json()
+
+        runs = body["calc_runs"]
+        assert len(runs) == 2
+        # Newest first, so the version currently reflected in the aggregate
+        # row is the one at the top.
+        assert [r["calc_version"] for r in runs] == ["idx-2026.08", "idx-2026.03"]
+        assert runs[0]["mask_ruleset"] == "s2_scl_v1"
+        assert runs[0]["trigger"] == "live"
+        assert runs[0]["outcome"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_lineage_records_the_pixel_split_the_aggregate_cannot(
+    scenario: Scenario,
+) -> None:
+    """masked vs no-data, which `block_index_aggregates` conflates.
+
+    valid + masked + nodata must reconcile to the AOI footprint, or the
+    "why is this only 43% valid?" answer is not an answer.
+    """
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        job_id = next(r for r in rows if r["scene_id"] == "S2A_OBS_A_00")["job_id"]
+        run = (await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}")).json()[
+            "calc_runs"
+        ][0]
+
+        assert run["aoi_pixel_count"] == 3508
+        assert run["masked_pixel_count"] == 239
+        ndvi = run["per_index"]["ndvi"]
+        assert ndvi["valid"] + ndvi["nodata"] + run["masked_pixel_count"] == (
+            run["aoi_pixel_count"]
+        )
+
+
+@pytest.mark.asyncio
+async def test_overview_reports_every_calc_version_in_the_window(
+    scenario: Scenario,
+) -> None:
+    """Two methodologies in one trend line is a warning the UI must be able
+    to render — and it can only be derived from the lineage table."""
+    async with _platform_client() as client:
+        body = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/overview",
+                params={"farm_id": str(scenario.farm_id), **_window()},
+            )
+        ).json()
+        versions = {v["calc_version"] for v in body["calc_versions"]}
+        assert versions == {"idx-2026.08", "idx-2026.03"}
+        for entry in body["calc_versions"]:
+            assert entry["runs"] >= 1
+            assert entry["first_scene_time"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a_failed_execution_is_still_recorded(scenario: Scenario) -> None:
+    """#335 died nine seconds in and reported nothing.
+
+    A failed run row is the difference between "queued, no progress" and
+    "attempted, and here is why it died".
+    """
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        job_id = next(r for r in rows if r["scene_id"] == "S2A_OBS_A_03")["job_id"]
+        runs = (await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}")).json()[
+            "calc_runs"
+        ]
+        assert len(runs) == 1
+        assert runs[0]["outcome"] == "failed"
+        assert runs[0]["error"]
+        # A failed run contributes no version to the overview's version list.
+        assert runs[0]["per_index"] == {}

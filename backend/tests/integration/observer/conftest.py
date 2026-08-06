@@ -363,6 +363,56 @@ async def _insert_cell_aggregates(
             )
 
 
+async def _insert_calc_run(
+    session: AsyncSession,
+    *,
+    job_id: UUID,
+    block_id: UUID,
+    product_id: UUID,
+    scene_dt: datetime,
+    scene_id: str,
+    calc_version: str,
+    outcome: str = "ok",
+    error: str | None = None,
+    per_index: str = '{"ndvi": {"valid": 3214, "total": 3508, "nodata": 55, "mean": 0.5123}}',
+) -> None:
+    """One `indices_calc_runs` row (tenant migration 0058)."""
+    await session.execute(
+        text(
+            """
+            INSERT INTO indices_calc_runs (
+                job_id, scene_time, scene_id, stac_item_id,
+                block_id, product_id, aoi_hash,
+                calc_version, mask_ruleset, band_order,
+                aoi_pixel_count, masked_pixel_count, per_index,
+                trigger, outcome, error, started_at, completed_at, duration_ms
+            ) VALUES (
+                :job, :t, :scene, :scene,
+                :block, :prod, 'a41f9c',
+                :ver, 's2_scl_v1', ARRAY['red', 'nir']::text[],
+                3508, 239, CAST(:per_index AS jsonb),
+                'live', :outcome, :error, :t, :t, 18400
+            )
+            """
+        ).bindparams(
+            bindparam("job", type_=PG_UUID(as_uuid=True)),
+            bindparam("block", type_=PG_UUID(as_uuid=True)),
+            bindparam("prod", type_=PG_UUID(as_uuid=True)),
+        ),
+        {
+            "job": job_id,
+            "t": scene_dt,
+            "scene": scene_id,
+            "block": block_id,
+            "prod": product_id,
+            "ver": calc_version,
+            "outcome": outcome,
+            "error": error,
+            "per_index": per_index,
+        },
+    )
+
+
 @pytest.fixture
 async def scenario(admin_session: AsyncSession) -> Scenario:
     """Build the farm described in this module's docstring."""
@@ -436,7 +486,7 @@ async def scenario(admin_session: AsyncSession) -> Scenario:
     for i in range(4):
         scene_dt = WINDOW_FROM + timedelta(days=i * 2)
         stac = f"S2A_OBS_A_{i:02d}"
-        await _insert_job(
+        job_id = await _insert_job(
             session,
             subscription_id=subs[block_a],
             block_id=block_a,
@@ -446,6 +496,42 @@ async def scenario(admin_session: AsyncSession) -> Scenario:
             status="succeeded",
             stac_item_id=stac,
         )
+        if i == 0:
+            # Two executions of the same scene, oldest first. This is what a
+            # recompute leaves behind: the aggregate row now holds the newer
+            # numbers and says nothing about having been replaced.
+            await _insert_calc_run(
+                session,
+                job_id=job_id,
+                block_id=block_a,
+                product_id=product_id,
+                scene_dt=scene_dt,
+                scene_id=stac,
+                calc_version="idx-2026.03",
+            )
+            await _insert_calc_run(
+                session,
+                job_id=job_id,
+                block_id=block_a,
+                product_id=product_id,
+                scene_dt=scene_dt,
+                scene_id=stac,
+                calc_version="idx-2026.08",
+            )
+        elif i == 3:
+            # The scene that downloaded and then died in compute_indices.
+            await _insert_calc_run(
+                session,
+                job_id=job_id,
+                block_id=block_a,
+                product_id=product_id,
+                scene_dt=scene_dt,
+                scene_id=stac,
+                calc_version="idx-2026.08",
+                outcome="failed",
+                error="compute_indices_failed: rasterio could not open the asset",
+                per_index="{}",
+            )
         if i < 3:
             await _insert_block_aggregates(
                 session,

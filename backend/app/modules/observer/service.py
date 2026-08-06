@@ -273,11 +273,22 @@ class ObserverService:
         await self._scope(tenant_schema)
         try:
             ctx = await self._repo.scene_context(job_id)
+            history = (
+                await self._repo.scene_calc_history(
+                    block_id=ctx["block_id"],
+                    product_id=ctx["product_id"],
+                    scene_time=ctx["scene_datetime"],
+                )
+                if ctx is not None
+                else []
+            )
         finally:
             await self._unscope()
         if ctx is None:
             raise SceneNotFoundError(str(job_id))
-        return _scene_detail_payload(ctx)
+        payload = _scene_detail_payload(ctx)
+        payload["calc_runs"] = history
+        return payload
 
     async def explain_pixel(
         self,
