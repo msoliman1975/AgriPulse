@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crop → block assignment with validity dates — mockup</title>
+<style>
+  :root{
+    --bg:#f7f6f1; --panel:#fff; --line:#e8e5db; --ink:#1f2420; --muted:#6c7268;
+    --primary:#356b30; --primary-soft:#dceadb; --good:#4f8e4a; --accent:#1f6f9a;
+    --warn:#c98a18; --warn-soft:#f7e7c2; --crit:#b24430; --crit-soft:#f3d2c9;
+    --radius:.75rem; --shadow:0 1px 2px rgba(31,36,32,.04), 0 4px 14px rgba(31,36,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Cairo,Tahoma,Arial,sans-serif;
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{margin:0;font-weight:600}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8125rem}
+  .shell{max-width:1180px;margin:0 auto;padding:24px 20px 72px}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-dot{width:26px;height:26px;border-radius:8px;background:var(--primary);display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
+  .page-title{font-size:1.5rem;line-height:2rem;letter-spacing:-.015em}
+  .sub{color:var(--muted);font-size:.8125rem;margin:4px 0 18px}
+  .spacer{flex:1}
+  .mockbadge{font-size:.6875rem;text-transform:uppercase;letter-spacing:.06em;background:var(--warn-soft);color:#7a5406;border:1px solid #e6cd8f;padding:3px 8px;border-radius:999px;font-weight:600}
+
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
+  .tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font:inherit;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary)}
+  .panelview[hidden]{display:none}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-hd{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card-hd h3{font-size:.875rem}
+  .card-bd{padding:16px}
+  .grid{display:grid;gap:16px}
+  .cols-side{grid-template-columns:minmax(0,1fr) 340px}
+  @media(max-width:980px){.cols-side{grid-template-columns:minmax(0,1fr)}}
+
+  .label{display:block;font-size:.75rem;font-weight:500;color:var(--muted);margin-block-end:4px}
+  .input{display:block;width:100%;border-radius:.375rem;border:1px solid var(--line);padding:7px 10px;font:inherit;font-size:.8125rem;color:var(--ink);background:var(--panel)}
+  .input:focus{outline:2px solid var(--primary);outline-offset:1px}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:.375rem;padding:7px 12px;font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
+  .btn:hover{background:#fbfaf7}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#2c5a28}
+  .btn.primary:disabled{background:#b9c9b7;border-color:#b9c9b7;cursor:not-allowed}
+  .btn.sm{padding:4px 9px;font-size:.75rem}
+  .btn.danger{color:var(--crit);border-color:#e6bdb1}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:.6875rem;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .pill.now{background:var(--primary-soft);color:#24501f;border-color:#c3ddc1}
+  .pill.past{background:#f1f0ea;color:#55594f;border-color:#e0ddd2}
+  .pill.future{background:#e2eef5;color:#155273;border-color:#c3dced}
+  .pill.open{background:#fff;color:var(--primary);border-color:#c3ddc1}
+  .pill.gap{background:var(--warn-soft);color:#7a5406;border-color:#e6cd8f}
+  .pill.ghost{background:transparent;color:var(--muted);border-color:var(--line)}
+  .muted{color:var(--muted)} .meta{font-size:.6875rem;line-height:1rem;color:var(--muted)}
+  .hr{height:1px;background:var(--line);margin:14px 0;border:0}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:start;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.6875rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:#fbfaf7}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.is-now{background:#f4f9f3}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+
+  .note{border-inline-start:3px solid var(--accent);background:#f2f7fa;padding:10px 14px;border-radius:0 .375rem .375rem 0;font-size:.8125rem}
+  .note.warn{border-color:var(--warn);background:#fdf7e9}
+  .note.bad{border-color:var(--crit);background:#fcf1ee}
+  .note.good{border-color:var(--good);background:#f1f7f0}
+
+  /* ---- timeline ---- */
+  .tl{position:relative;border:1px solid var(--line);border-radius:var(--radius);background:#fbfaf7;padding:14px 14px 8px}
+  .tl-track{position:relative;height:38px;border-radius:.5rem;background:repeating-linear-gradient(90deg,#efeee8,#efeee8 1px,transparent 1px,transparent 64px);overflow:hidden}
+  .tl-seg{position:absolute;top:4px;bottom:4px;border-radius:.375rem;display:flex;align-items:center;padding:0 8px;font-size:.6875rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden}
+  .tl-seg.now{background:var(--primary)}
+  .tl-seg.past{background:#a9ada4}
+  .tl-seg.future{background:var(--accent)}
+  .tl-seg.gapseg{background:repeating-linear-gradient(45deg,#f3e3bf,#f3e3bf 6px,#f8efd8 6px,#f8efd8 12px);color:#7a5406;border:1px dashed #dfc389}
+  .tl-seg.open:after{content:"";position:absolute;inset-block:0;inset-inline-end:0;width:14px;
+    background:linear-gradient(90deg,rgba(53,107,48,0),var(--primary))}
+  .tl-axis{display:flex;justify-content:space-between;margin-top:6px}
+  .tl-axis span{font-size:.625rem;color:var(--muted)}
+  .tl-today{position:absolute;top:0;bottom:0;width:2px;background:var(--crit)}
+  .tl-today:after{content:"today";position:absolute;top:-14px;inset-inline-start:-14px;font-size:.5625rem;color:var(--crit);font-weight:700}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:.8125rem}
+  .kv dt{color:var(--muted);font-size:.75rem}
+  .kv dd{margin:0}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:#fbfaf7;border-radius:999px;padding:3px 10px;font-size:.6875rem}
+  .chip b{font-weight:600}
+  .checkline{display:inline-flex;align-items:center;gap:7px;font-size:.8125rem;cursor:pointer;user-select:none}
+  .arrow{color:var(--muted);padding:0 5px}
+  .fields{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  @media(max-width:640px){.fields{grid-template-columns:minmax(0,1fr)}}
+  .wide{grid-column:1/-1}
+  .patt{border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:var(--panel);margin-bottom:14px}
+  .patt h4{font-size:.875rem;margin-bottom:6px}
+  .patt .why{font-size:.8125rem;color:var(--muted);margin-top:6px}
+  pre.code{background:#1f2420;color:#e6e4dc;padding:14px 16px;border-radius:.5rem;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.75rem;line-height:1.6;margin:0}
+  .k{color:#9dc7f0}.v{color:#c7e6a8}.c{color:#7d8578;font-style:italic}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand"><div class="brand-dot">AP</div><div class="page-title">Crop → block assignment with validity dates</div></div>
+    <span class="mockbadge">Mockup — not wired to the API</span>
+  </div>
+  <p class="sub">Every assignment gets a <b>from → to</b> range. “Current” stops being a stored flag and becomes
+    <em>the assignment whose range contains today</em>. Data below is real: farm <code>agrosina-suez</code>,
+    blocks <code>AG-R02-C01</code> and <code>AG-R05-B02</code>.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  onclick="showTab(0)">1 · The experience</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(1)">2 · Edge cases</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="showTab(2)">3 · Model &amp; patterns</button>
+  </div>
+
+  <!-- ================= TAB 1 ================= -->
+  <section class="panelview" id="view0">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-bd" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <div>
+          <label class="label">Block</label>
+          <select class="input" id="blockPick" onchange="render()" style="min-width:280px"></select>
+        </div>
+        <div style="align-self:end">
+          <label class="checkline"><input type="checkbox" id="showHistory" onchange="render()" /> Show history</label>
+          <div class="meta" id="histHint"></div>
+        </div>
+        <div class="spacer"></div>
+        <div class="meta" style="text-align:end">Today<br /><b id="todayLbl"></b></div>
+      </div>
+    </div>
+
+    <div class="grid cols-side">
+      <div>
+        <!-- CURRENT -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd">
+            <h3>Current assignment</h3>
+            <span class="pill now" id="curBadge">active now</span>
+            <div class="spacer"></div>
+            <button class="btn sm" onclick="alert('Mockup: opens the crop-fields editor')">Edit crop fields</button>
+            <button class="btn sm danger" onclick="endNow()">End now</button>
+          </div>
+          <div class="card-bd" id="currentBox"></div>
+        </div>
+
+        <!-- HISTORY -->
+        <div id="historyWrap"></div>
+
+        <!-- ASSIGN -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>Assign a new crop</h3><div class="spacer"></div>
+            <span class="meta">the previous assignment closes automatically</span></div>
+          <div class="card-bd">
+            <div class="fields">
+              <div>
+                <label class="label">Crop</label>
+                <select class="input" id="newCrop"></select>
+              </div>
+              <div>
+                <label class="label">Valid from <span style="color:var(--crit)">*</span></label>
+                <input class="input" type="date" id="newFrom" onchange="render()" />
+              </div>
+              <div>
+                <label class="label">Valid to <span class="muted">— leave empty for ongoing</span></label>
+                <input class="input" type="date" id="newTo" onchange="render()" />
+              </div>
+              <div>
+                <label class="label">Planting date <span class="muted">— agronomic event</span></label>
+                <input class="input" type="date" id="newPlanting" />
+              </div>
+            </div>
+            <div id="assignFeedback" style="margin-top:12px"></div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn primary" id="assignBtn" onclick="doAssign()">Assign crop</button>
+              <button class="btn" onclick="resetDemo()">Reset mockup</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDE -->
+      <div style="align-self:start">
+        <div class="card">
+          <div class="card-hd"><h3>What changed</h3></div>
+          <div class="card-bd">
+            <p style="margin:0 0 10px">Requirement <b>A</b> — the current assignment, its crop fields and its
+              from → to are all on screen <em>while</em> you assign, so you can see what you are about to replace.</p>
+            <p style="margin:0 0 10px">Requirement <b>B</b> — <b>Show history</b> is off by default: one card, no
+              clutter. On, you get every assignment with its range, plus a timeline that makes gaps and
+              adjacency obvious at a glance.</p>
+            <div class="note warn" style="margin:0">Today <code>is_current</code> is a stored boolean, flipped
+              only when someone assigns a new crop. A potato assignment that finished in March still reads as
+              current in August. Deriving it from the range fixes that without a data migration of its own.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2 ================= -->
+  <section class="panelview" id="view1" hidden>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+      <div class="card"><div class="card-hd"><h3>Overlap is rejected</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">One crop at a time per block, enforced by an exclusion constraint —
+          not by application code that a bulk import could bypass.</p>
+        <div class="note bad" style="margin:0">Potato · Spunta cannot start <b>2026-01-15</b>: block AG-R05-B02
+          is under <b>Tomato</b> until <b>2026-03-10</b>.<br />
+          <span class="meta">Fix: end tomato on 2026-01-14, or start potato on 2026-03-11.</span></div>
+      </div></div>
+
+      <div class="card"><div class="card-hd"><h3>Gaps are allowed, and shown</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">A fallow block is legitimate. It is not an error — but it should be
+          visible rather than inferred from two dates that don't touch.</p>
+        <div class="note warn" style="margin:0">Fallow <b>2025-04-11 → 2025-10-31</b> · 203 days<br />
+          <span class="meta">Rendered as a hatched segment on the timeline and a muted row in the table.</span></div>
+      </div></div>
+
+      <div class="card"><div class="card-hd"><h3>Open-ended perennial</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">A mango orchard has no end date until it is grubbed up. <code>to</code>
+          stays NULL and the timeline segment fades out rather than stopping.</p>
+        <div class="note good" style="margin:0">Mango · Alphonso · Short — <b>2019-03-04 → ongoing</b> · 7y 5m<br />
+          <span class="meta">Crop fields (transplant date, age at transplant, rootstock) were entered once in 2019
+          and stay true; they describe the planting, not the year.</span></div>
+      </div></div>
+
+      <div class="card"><div class="card-hd"><h3>Backdating a correction</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">Valid time is editable; it records what was true in the field, which
+          is often learned late.</p>
+        <div class="note" style="margin:0">Moving tomato's start from 2025-11-01 to <b>2025-10-20</b> would overlap
+          the previous assignment by 12 days.<br />
+          <span class="meta">The form offers to pull the previous <code>to</code> back to 2025-10-19 in the same
+          save, rather than making the user edit two rows.</span></div>
+      </div></div>
+
+      <div class="card"><div class="card-hd"><h3>A future planting</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">Assigning next season ahead of time is normal. It is not “current”,
+          so it must not drive alerts, recommendations or the crop shown on the map.</p>
+        <div class="note" style="margin:0">Wheat — <b>2026-11-15 → 2027-04-30</b> <span class="pill future">scheduled</span><br />
+          <span class="meta">Decision trees and the block drawer keep reading the assignment that contains today.</span></div>
+      </div></div>
+
+      <div class="card"><div class="card-hd"><h3>Block with no crop</h3></div><div class="card-bd">
+        <p class="meta" style="margin:0 0 8px">Either never assigned, or the last assignment has ended.</p>
+        <div class="note" style="margin:0">No current assignment. <span class="meta">The crop-fields section is
+          absent entirely — it hangs off an assignment. History may still list past crops.</span></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3 ================= -->
+  <section class="panelview" id="view2" hidden>
+    <div class="grid cols-side">
+      <div>
+        <div class="patt">
+          <h4>Pattern 1 · Valid time, not a flag</h4>
+          <p style="margin:0">Add <code>effective_from</code> (NOT NULL) and <code>effective_to</code>
+            (NULL = ongoing) to <code>block_crops</code>. Derive “current” as
+            <code>effective_from &lt;= today AND (effective_to IS NULL OR effective_to &gt; today)</code>.</p>
+          <p class="why">This is the pattern <code>grid_configs</code> already uses (tenant 0054) and the reason its
+            docstring gives: “when did we change this” and “what period does it describe” are different questions.
+            <code>block_crops</code> currently conflates them in <code>is_current</code>, which is why a finished
+            crop still reads as current.</p>
+        </div>
+
+        <div class="patt">
+          <h4>Pattern 2 · The database owns non-overlap</h4>
+          <p style="margin:0">An <code>EXCLUDE USING gist</code> constraint over
+            <code>(block_id WITH =, daterange(effective_from, effective_to) WITH &amp;&amp;)</code>.</p>
+          <p class="why">Service-layer checks are bypassed by bulk import, backfills and any future writer. The
+            bulk AOI upload and the grid rezone both already write assignments-adjacent data. A constraint cannot be
+            forgotten; it needs the <code>btree_gist</code> extension, which the migration adds.</p>
+        </div>
+
+        <div class="patt">
+          <h4>Pattern 3 · Closing is a consequence, not a chore</h4>
+          <p style="margin:0">Assigning a crop sets the previous assignment's <code>effective_to</code> to the new
+            <code>effective_from</code> in the same transaction, and says so before you commit.</p>
+          <p class="why">Two-step “end then assign” is where gaps and overlaps come from. Showing the consequence
+            inline — “this ends Tomato on 10 Mar 2026” — keeps the automatic behaviour from being a surprise, which
+            is the same reason the crop-fields form warns before a gate clears a value.</p>
+        </div>
+
+        <div class="patt">
+          <h4>Pattern 4 · History is a disclosure, not a page</h4>
+          <p style="margin:0">One checkbox on the same panel. Off → the current card only. On → timeline + table,
+            in place.</p>
+          <p class="why">A separate history screen loses the comparison that makes history useful: what is on the
+            block now versus what was. The checkbox state is worth persisting per user, not per block.</p>
+        </div>
+      </div>
+
+      <div style="align-self:start">
+        <div class="card">
+          <div class="card-hd"><h3>Migration sketch</h3></div>
+          <div class="card-bd">
+<pre class="code"><span class="c">-- tenant migration</span>
+<span class="k">ALTER TABLE</span> block_crops
+  <span class="k">ADD</span> effective_from <span class="v">date</span>,
+  <span class="k">ADD</span> effective_to   <span class="v">date</span>;
+
+<span class="c">-- backfill: never lose a row</span>
+<span class="c">-- from := planting_date, else created_at</span>
+<span class="c">-- to   := next assignment's from,</span>
+<span class="c">--         else actual_harvest_date,</span>
+<span class="c">--         else NULL when is_current</span>
+
+<span class="k">CREATE EXTENSION IF NOT EXISTS</span> btree_gist;
+<span class="k">ALTER TABLE</span> block_crops <span class="k">ADD CONSTRAINT</span>
+  ex_block_crops_no_overlap <span class="k">EXCLUDE USING</span> gist (
+    block_id <span class="k">WITH</span> =,
+    daterange(effective_from, effective_to) <span class="k">WITH</span> &amp;&amp;
+  ) <span class="k">WHERE</span> (deleted_at <span class="k">IS NULL</span>);</pre>
+            <div class="note warn" style="margin-top:12px">The backfill is the risky half, not the columns.
+              Real data may already contain two rows that overlap under any rule we pick — the constraint would then
+              refuse to be created. The migration must <b>report</b> those blocks rather than guess.</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd"><h3>Open questions</h3></div>
+          <div class="card-bd">
+            <ul style="margin:0;padding-inline-start:18px;font-size:.8125rem">
+              <li><code>season_label</code> is NOT NULL today. With real dates it is derivable — keep, make optional,
+                or auto-fill from the year?</li>
+              <li>Does <code>effective_to</code> exclude its end date (half-open <code>[from, to)</code>)? The
+                exclusion constraint assumes so; the UI should say “until” rather than “to”.</li>
+              <li>Should ending an assignment be blocked while its season plan is still open?</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const TODAY = "2026-08-06";
+const fmt = d => d ? new Date(d+"T00:00:00").toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}) : null;
+const days = (a,b) => Math.round((new Date(b) - new Date(a))/86400000);
+function human(a,b){
+  const n = days(a, b || TODAY);
+  if (n < 60) return n + "d";
+  const y = Math.floor(n/365), m = Math.round((n%365)/30);
+  return (y? y+"y " : "") + (m? m+"m" : (y?"":n+"d"));
+}
+
+const CROPS = ["mango.alphonso.short","mango.sukkary","potato.spunta","potato.diamant","tomato","wheat","citrus_orange"];
+
+const ATTRS = {
+  "mango.alphonso.short": [["Establishment method","Grafted tree"],["Transplant date","04 Mar 2019"],
+    ["Age at transplant","24 months"],["Height at transplant","165 cm"],["Rootstock","Sukkary seedling"]],
+  "potato.spunta": [["Seed material","Certified seed tuber"],["Seed tuber grade","35–45 mm"],
+    ["Seed generation","G2"],["Sprouting status","Sprouted 1–3 mm"]],
+  "potato.diamant": [["Seed material","Farm-saved tuber"],["Sprouting status","Dormant"]],
+  "tomato": [["Planting material","Grafted seedling"],["Seedling age at transplant","32 days"],
+    ["Rootstock cultivar","Maxifort"]],
+};
+
+const SEED = {
+  "AG-R02-C01": { label:"AG-R02-C01 · perennial orchard", rows:[
+    { crop:"mango.alphonso.short", from:"2019-03-04", to:null,        planting:"2019-03-04" },
+    { crop:"potato.spunta",        from:"2018-11-05", to:"2019-03-04", planting:"2018-11-05" },
+    { crop:"potato.diamant",       from:"2017-11-12", to:"2018-03-20", planting:"2017-11-12" },
+  ]},
+  "AG-R05-B02": { label:"AG-R05-B02 · annual rotation", rows:[
+    { crop:"tomato",         from:"2025-11-01", to:"2026-03-10", planting:"2025-11-01" },
+    { crop:"potato.spunta",  from:"2024-11-08", to:"2025-04-11", planting:"2024-11-08" },
+    { crop:"wheat",          from:"2023-11-20", to:"2024-04-28", planting:"2023-11-20" },
+  ]},
+};
+let DATA = structuredClone(SEED);
+
+function showTab(i){
+  document.querySelectorAll('[role="tab"]').forEach((t,n)=>t.setAttribute("aria-selected", n===i));
+  document.querySelectorAll(".panelview").forEach((p,n)=>p.hidden = n!==i);
+}
+function rows(){ return DATA[document.getElementById("blockPick").value].rows
+  .slice().sort((a,b)=> a.from < b.from ? 1 : -1); }
+function currentRow(){ return rows().find(r => r.from <= TODAY && (!r.to || r.to > TODAY)) || null; }
+function state(r){
+  if (r.from > TODAY) return "future";
+  if (!r.to || r.to > TODAY) return "now";
+  return "past";
+}
+
+function attrChips(crop){
+  const list = ATTRS[crop] || [];
+  if (!list.length) return `<span class="meta">No crop fields defined for this crop.</span>`;
+  return `<div class="chips">${list.map(([k,v])=>`<span class="chip">${k} <b>${v}</b></span>`).join("")}</div>`;
+}
+
+function renderCurrent(){
+  const box = document.getElementById("currentBox");
+  const badge = document.getElementById("curBadge");
+  const cur = currentRow();
+  if (!cur){
+    badge.style.display="none";
+    box.innerHTML = `<p class="muted" style="margin:0">No crop is assigned to this block today.</p>
+      <p class="meta" style="margin:6px 0 0">Crop fields hang off an assignment, so there is nothing to edit until one exists.</p>`;
+    return;
+  }
+  badge.style.display="";
+  box.innerHTML = `
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">
+      <div style="font-size:1.05rem;font-weight:600">${cur.crop}</div>
+      <span class="pill ${cur.to?"past":"open"}">${cur.to ? "ends "+fmt(cur.to) : "ongoing"}</span>
+    </div>
+    <dl class="kv" style="margin:10px 0 12px">
+      <dt>Valid from</dt><dd><b>${fmt(cur.from)}</b></dd>
+      <dt>Valid until</dt><dd>${cur.to ? "<b>"+fmt(cur.to)+"</b>" : '<span class="muted">— ongoing</span>'}</dd>
+      <dt>Duration</dt><dd>${human(cur.from, cur.to)}${cur.to?"":" so far"}</dd>
+      <dt>Planting date</dt><dd>${fmt(cur.planting) || '<span class="muted">—</span>'}</dd>
+    </dl>
+    <div class="label">Crop fields</div>
+    ${attrChips(cur.crop)}`;
+}
+
+function renderHistory(){
+  const wrap = document.getElementById("historyWrap");
+  const on = document.getElementById("showHistory").checked;
+  document.getElementById("histHint").textContent = on
+    ? "showing every assignment with its range" : "showing the current assignment only";
+  if (!on){ wrap.innerHTML = ""; return; }
+
+  const rs = rows();
+  const all = [...rs].sort((a,b)=> a.from < b.from ? -1 : 1);
+  const min = all[0].from, max = TODAY > (all[all.length-1].to || TODAY) ? TODAY : (all[all.length-1].to || TODAY);
+  const span = Math.max(days(min, max), 1);
+  const pos = d => Math.max(0, Math.min(100, days(min, d) / span * 100));
+
+  // Segments + fallow gaps between consecutive assignments.
+  let segs = "";
+  all.forEach((r,i)=>{
+    const end = r.to || max;
+    const st = state(r);
+    segs += `<div class="tl-seg ${st} ${r.to?"":"open"}" style="inset-inline-start:${pos(r.from)}%;width:${Math.max(pos(end)-pos(r.from),3)}%"
+      title="${r.crop} · ${fmt(r.from)} → ${r.to?fmt(r.to):"ongoing"}">${r.crop.split(".")[0]}</div>`;
+    const nxt = all[i+1];
+    if (nxt && r.to && nxt.from > r.to){
+      segs += `<div class="tl-seg gapseg" style="inset-inline-start:${pos(r.to)}%;width:${Math.max(pos(nxt.from)-pos(r.to),2)}%"
+        title="Fallow ${fmt(r.to)} → ${fmt(nxt.from)}">fallow</div>`;
+    }
+  });
+
+  const body = rs.map(r=>{
+    const st = state(r);
+    const lbl = st==="now" ? '<span class="pill now">current</span>'
+              : st==="future" ? '<span class="pill future">scheduled</span>'
+              : '<span class="pill past">ended</span>';
+    return `<tr class="${st==="now"?"is-now":""}">
+      <td>${lbl}</td>
+      <td><b>${r.crop}</b><div class="meta">${(ATTRS[r.crop]||[]).length} crop field(s) recorded</div></td>
+      <td class="mono">${fmt(r.from)}<span class="arrow">→</span>${r.to?fmt(r.to):'<span class="muted">ongoing</span>'}</td>
+      <td>${human(r.from, r.to)}</td>
+    </tr>`;
+  }).join("");
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-hd"><h3>History</h3><span class="meta">${rs.length} assignment(s)</span></div>
+      <div class="card-bd">
+        <div class="tl">
+          <div class="tl-track">${segs}<div class="tl-today" style="inset-inline-start:${pos(TODAY)}%"></div></div>
+          <div class="tl-axis"><span>${fmt(min)}</span><span>${fmt(max)}</span></div>
+        </div>
+        <div class="tablewrap" style="margin-top:12px">
+          <table><thead><tr><th>State</th><th>Crop</th><th>Valid from → until</th><th>Duration</th></tr></thead>
+          <tbody>${body}</tbody></table>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderAssign(){
+  const from = document.getElementById("newFrom").value;
+  const to   = document.getElementById("newTo").value;
+  const fb   = document.getElementById("assignFeedback");
+  const btn  = document.getElementById("assignBtn");
+  const rs   = rows();
+  if (!from){ fb.innerHTML = `<div class="note">Pick a <b>valid from</b> date to see what this will change.</div>`;
+    btn.disabled = true; return; }
+  if (to && to <= from){ fb.innerHTML = `<div class="note bad"><b>Valid until</b> must be after <b>valid from</b>.</div>`;
+    btn.disabled = true; return; }
+
+  // Overlap against anything that isn't the row we'd auto-close.
+  const clash = rs.find(r => r.to && r.from < (to || "9999-12-31") && from < r.to);
+  if (clash){
+    fb.innerHTML = `<div class="note bad">Overlaps <b>${clash.crop}</b>
+      (${fmt(clash.from)} → ${fmt(clash.to)}). One crop at a time per block.<br />
+      <span class="meta">Start on ${fmt(clash.to)} or later, or shorten that assignment first.</span></div>`;
+    btn.disabled = true; return;
+  }
+  const open = rs.find(r => !r.to && r.from <= from);
+  btn.disabled = false;
+  fb.innerHTML = open
+    ? `<div class="note warn">This will end <b>${open.crop}</b> on <b>${fmt(from)}</b>
+         (open since ${fmt(open.from)}, ${human(open.from,null)}).<br />
+         <span class="meta">Its crop fields stay on that assignment as history — they are not copied forward.</span></div>`
+    : `<div class="note good">No open assignment to close. This block will be
+         <b>${fmt(from)} → ${to?fmt(to):"ongoing"}</b>.</div>`;
+}
+
+function doAssign(){
+  const b = document.getElementById("blockPick").value;
+  const from = document.getElementById("newFrom").value;
+  const to = document.getElementById("newTo").value || null;
+  const open = DATA[b].rows.find(r => !r.to && r.from <= from);
+  if (open) open.to = from;                        // auto-close, one transaction
+  DATA[b].rows.push({ crop: document.getElementById("newCrop").value, from, to,
+                      planting: document.getElementById("newPlanting").value || null });
+  document.getElementById("showHistory").checked = true;
+  render();
+}
+function endNow(){
+  const cur = currentRow(); if (!cur) return;
+  cur.to = TODAY; render();
+}
+function resetDemo(){ DATA = structuredClone(SEED); render(); }
+
+function render(){ renderCurrent(); renderHistory(); renderAssign(); }
+
+// boot
+document.getElementById("todayLbl").textContent = fmt(TODAY);
+document.getElementById("blockPick").innerHTML =
+  Object.entries(SEED).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+document.getElementById("newCrop").innerHTML = CROPS.map(c=>`<option>${c}</option>`).join("");
+document.getElementById("newFrom").value = TODAY;
+render();
+</script>
+</body>
+</html>

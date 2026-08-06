@@ -21,6 +21,14 @@ export interface BlockCropAssignment {
   plant_spacing_m: number | null;
   growth_stage: string | null;
   growth_stage_updated_at: string | null;
+  /** Valid time, half-open `[from, to)`. `effective_to === null` = ongoing. */
+  effective_from: string;
+  effective_to: string | null;
+  /** Derived server-side from the range against today. Prefer this over
+   *  `is_current`, which is a stored flag that only moves when someone assigns
+   *  a crop — a finished season still reads as current under it. */
+  is_active_now: boolean;
+  validity_state: "past" | "current" | "scheduled";
   is_current: boolean;
   status: BlockCropStatus;
   notes: string | null;
@@ -40,6 +48,11 @@ export interface BlockCropAssignPayload {
   row_spacing_m?: number | null;
   plant_spacing_m?: number | null;
   notes?: string | null;
+  /** Defaults to `planting_date`, else today. */
+  effective_from?: string | null;
+  /** Omit or null for an ongoing assignment (the normal perennial case).
+   *  Assigning auto-closes the block's open assignment at `effective_from`. */
+  effective_to?: string | null;
   make_current?: boolean;
 }
 

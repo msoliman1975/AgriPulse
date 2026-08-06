@@ -14,8 +14,7 @@ import {
   type SalinityClass,
   type SoilTexture,
 } from "@/api/blocks";
-import { CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
-import { BlockCropAssignCard } from "../map/BlockCropAssignCard";
+import { CropAssignmentPanel } from "@/modules/farms/components/CropAssignmentPanel";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
 
 export type ManageMode = "edit" | "crop" | "grid";
@@ -29,10 +28,6 @@ interface Props {
   mode: ManageMode;
   blockId: string;
   farmId: string;
-  hasCurrentCrop: boolean;
-  /** `block_crops.id` of the current assignment, if any — the key for the
-   *  crop-attributes endpoints. */
-  blockCropId: string | null;
   gridProductId: string | null;
   onDone: () => void; // return to monitor view + invalidate caches
 }
@@ -41,8 +36,6 @@ export function ManagePanel({
   mode,
   blockId,
   farmId,
-  hasCurrentCrop,
-  blockCropId,
   gridProductId,
   onDone,
 }: Props): ReactNode {
@@ -52,10 +45,10 @@ export function ManagePanel({
       {mode === "edit" ? <EditForm blockId={blockId} onDone={onDone} /> : null}
       {mode === "crop" ? (
         <div className="rounded-xl border border-ap-line p-3">
-          <BlockCropAssignCard blockId={blockId} farmId={farmId} hasCurrentCrop={hasCurrentCrop} onAssigned={onDone} />
-          {/* Crop fields hang off the assignment, so they appear only once
-              this block has one. */}
-          {blockCropId ? <CropAttributesCard blockCropId={blockCropId} farmId={farmId} /> : null}
+          {/* Current assignment + its crop fields + history + the assign form,
+              on one panel: they are one decision, and assigning without seeing
+              what you are replacing is how the dates drift. */}
+          <CropAssignmentPanel blockId={blockId} farmId={farmId} onAssigned={onDone} />
         </div>
       ) : null}
       {mode === "grid" ? (
