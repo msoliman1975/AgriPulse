@@ -187,6 +187,29 @@ class GridSnapshot(BaseModel):
     effective_to: datetime | None
 
 
+class CalcRun(BaseModel):
+    """One execution of compute_indices for this scene (tenant 0058)."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    job_id: UUID | None
+    calc_version: str
+    mask_ruleset: str
+    trigger: str
+    outcome: str
+    error: str | None
+    aoi_pixel_count: int | None
+    masked_pixel_count: int | None
+    cell_count: int | None
+    grid_config_id: UUID | None
+    band_order: list[str] | None
+    per_index: dict[str, Any]
+    started_at: datetime | None
+    completed_at: datetime | None
+    duration_ms: int | None
+    created_at: datetime
+
+
 class SceneDetail(BaseModel):
     # /v1/config is tenant-scoped and an Observer user has no tenant, so the
     # tile-server origin and bucket travel with the scene that needs them.
@@ -224,6 +247,10 @@ class SceneDetail(BaseModel):
     mask_ruleset: str
     mask_classes: list[int]
     grid: GridSnapshot | None
+    # Every recorded execution for this scene, newest first. Two entries with
+    # different calc_versions means an aggregate row was overwritten by a
+    # different build — which the upserted row itself cannot show.
+    calc_runs: list[CalcRun]
 
 
 class PixelIndexResult(BaseModel):

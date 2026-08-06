@@ -726,7 +726,16 @@
       "cellCount": "{{n}} cells",
       "blockMean": "Block mean",
       "validOf": "{{valid}} of {{total}} px",
-      "rollupNote": "Cell means and the block mean are computed over different lattices, so they reconcile approximately rather than exactly — the block mean covers every pixel in the boundary, while cells partition it on a fixed grid."
+      "rollupNote": "Cell means and the block mean are computed over different lattices, so they reconcile approximately rather than exactly — the block mean covers every pixel in the boundary, while cells partition it on a fixed grid.",
+      "history": "Calculation history",
+      "overwritten": "This scene was recomputed under a different calculation version",
+      "noHistory": "No calculation runs recorded for this scene. Lineage is only written for scenes computed after this feature shipped.",
+      "when": "When",
+      "trigger": "Trigger",
+      "calcVersion": "Calc version",
+      "maskedPx": "Masked px",
+      "durationMs": "Duration (ms)",
+      "outcome": "Outcome"
     }
   }
 }

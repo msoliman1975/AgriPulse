@@ -291,6 +291,32 @@ export interface SceneDetail {
   mask_classes: number[];
   /** Null when no grid config governed this scene's time. */
   grid: GridSnapshot | null;
+  /**
+   * Every recorded execution for this scene, newest first. Two entries with
+   * different calc_versions means an aggregate row was overwritten by a
+   * different build — which the upserted row itself cannot show.
+   */
+  calc_runs: CalcRun[];
+}
+
+export interface CalcRun {
+  id: string;
+  job_id: string | null;
+  calc_version: string;
+  mask_ruleset: string;
+  trigger: string;
+  outcome: string;
+  error: string | null;
+  aoi_pixel_count: number | null;
+  masked_pixel_count: number | null;
+  cell_count: number | null;
+  grid_config_id: string | null;
+  band_order: string[] | null;
+  per_index: Record<string, Record<string, number | null>>;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  created_at: string;
 }
 
 export interface PixelIndexResult {

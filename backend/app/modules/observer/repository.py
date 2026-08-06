@@ -400,16 +400,67 @@ class ObserverRepository:
         window_from: datetime,
         window_to: datetime,
     ) -> list[dict[str, Any]]:
-        """Distinct calc versions over the window, newest first.
+        """Distinct calc versions over the window, most-used first.
 
-        Until OBS-5 lands there is no `calc_version` column, so this returns
-        an empty list. It exists now so the API shape does not change when the
-        lineage table arrives, and so the frontend can render the
-        "two methodologies in one trend line" warning from day one against a
-        stub rather than being rewritten later.
+        More than one version in a window means the trend line mixes
+        methodologies — the pre-SCL-mask rows are the worked example, since
+        they were averaged over cloud and so read high. Nothing else in the
+        product can tell those rows apart from current ones.
         """
-        del block_ids, product_id, window_from, window_to
-        return []
+        prod = "AND r.product_id = :pid" if product_id else ""
+        sql = f"""
+            SELECT r.calc_version,
+                   r.mask_ruleset,
+                   count(*) AS runs,
+                   min(r.scene_time) AS first_scene_time,
+                   max(r.scene_time) AS last_scene_time
+              FROM indices_calc_runs r
+             WHERE r.block_id IN :bids
+               {prod}
+               AND r.outcome = 'ok'
+               AND r.scene_time >= {_ts(window_from)}
+               AND r.scene_time < {_ts(window_to)}
+             GROUP BY r.calc_version, r.mask_ruleset
+             ORDER BY count(*) DESC
+        """
+        rows = await self._all(sql, block_ids=block_ids, product_id=product_id)
+        return [dict(r) for r in rows]
+
+    async def scene_calc_history(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        scene_time: datetime,
+    ) -> list[dict[str, Any]]:
+        """Every recorded execution for one scene, newest first.
+
+        This is what makes a silent overwrite visible. Aggregate rows are
+        upserted on their composite key, so a recompute replaces the numbers
+        with no trace; the run rows accumulate instead, and two of them with
+        different `calc_version` values is the signature of exactly that.
+        """
+        sql = f"""
+            SELECT r.id, r.job_id, r.calc_version, r.mask_ruleset,
+                   r.trigger, r.outcome, r.error,
+                   r.aoi_pixel_count, r.masked_pixel_count,
+                   r.cell_count, r.grid_config_id, r.band_order,
+                   r.per_index, r.started_at, r.completed_at, r.duration_ms,
+                   r.created_at
+              FROM indices_calc_runs r
+             WHERE r.block_id = :bid
+               AND r.product_id = :pid
+               AND r.scene_time = {_ts(scene_time)}
+             -- `id` breaks the tie: `created_at` defaults to now(), which is
+             -- the *transaction* timestamp, so two runs recorded in one
+             -- transaction share it exactly. uuid_generate_v7 is
+             -- time-ordered, which makes this ordering total.
+             ORDER BY r.created_at DESC, r.id DESC
+        """
+        rows = (
+            await self._s.execute(text(sql), {"bid": str(block_id), "pid": str(product_id)})
+        ).mappings()
+        return [dict(r) for r in rows]
 
     # ---- L0: histogram ---------------------------------------------------
 
