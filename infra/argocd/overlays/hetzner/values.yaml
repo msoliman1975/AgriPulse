@@ -584,13 +584,26 @@ global:
   #   api + workers + frontend move together (view rewrite + the summary
   #   endpoint + the new admin page). tile-server stays 9d140cc. Rollback
   #   is all three back to 03293ea.
+  # 7ce68a0 = crop fields surfaced where users look. The attributes editor
+  #   shipped only under Manage -> Crop, three clicks deep in an edit
+  #   sub-view; the Field tab's "Crop & plan" column -- where a user goes to
+  #   see what a block is planted with -- showed crop name, growth stage and
+  #   season and nothing else, so establishment method / transplant date /
+  #   age at transplant were invisible and the feature read as unshipped.
+  #   Now the *set* values render there as read-only rows, sharing the
+  #   editor's query cache. Only attributes holding a value produce a row, so
+  #   blocks on a crop with no definitions (wheat, olive, cotton) look exactly
+  #   as they did. Option codes render as their localised label.
+  #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
+  #   cfc0751, tile-server stays 9d140cc. Rollback is this tag back to
+  #   cfc0751.
   images:
     api:
       tag: "cfc0751"
     workers:
       tag: "cfc0751"
     frontend:
-      tag: "cfc0751"
+      tag: "7ce68a0"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
