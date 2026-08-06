@@ -736,6 +736,50 @@
       "maskedPx": "Masked px",
       "durationMs": "Duration (ms)",
       "outcome": "Outcome"
+    },
+    "verify": {
+      "title": "Verify this scene",
+      "mode": "Verification mode",
+      "modeFull": "Full — re-run masking and formulas",
+      "modeFast": "Fast — aggregation only",
+      "run": "Verify",
+      "running": "Verifying…",
+      "failed": "Verification could not run. The scene's raster may be unreadable.",
+      "explainFull": "Reads the raw bands and re-runs the AOI mask, the cloud mask and every formula, then compares against the stored numbers. The only mode that can catch a masking-rule change.",
+      "explainFast": "Recomputes from the per-index rasters the pipeline already wrote. Cheaper, but masking is baked into those files — a match here confirms the summary, not the masking.",
+      "tookMs": "{{ms}} ms",
+      "storedBy": "stored by {{version}}",
+      "stored": "Stored mean",
+      "recomputed": "Recomputed",
+      "storedValid": "Stored valid px",
+      "recomputedValid": "Recomputed valid px",
+      "verdictCol": "Verdict",
+      "verdict": {
+        "match": "Match",
+        "drift": "Drift",
+        "source_missing": "Source missing",
+        "error": "Error"
+      },
+      "neverRepairs": "Observer never repairs. Nothing was written to the pipeline's tables — a drift verdict is a signal, and the fix is a re-run from the Backfill Console, which owns provider quota and progress reporting.",
+      "runs": {
+        "title": "Verification runs",
+        "explain": "Anything wider than one scene is a named run: a year across 36 blocks is roughly 2,500 recomputations. One run per farm, with progress and a cancel.",
+        "start": "New verification run",
+        "starting": "Queuing…",
+        "conflict": "This farm already has a verification in progress. Cancel it first, or wait for it to finish.",
+        "empty": "No verification runs for this farm yet.",
+        "scope": "Scope",
+        "mode": "Mode",
+        "progress": "Progress",
+        "findings": "Findings",
+        "started": "Started",
+        "cancel": "Cancel",
+        "of": "{{done}} / {{total}} scenes",
+        "matched": "{{n}} match",
+        "drifted": "{{n}} drift",
+        "errored": "{{n}} error",
+        "openReport": "Open report"
+      }
     }
   }
 }

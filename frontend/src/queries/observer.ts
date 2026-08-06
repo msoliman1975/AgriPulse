@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import type { UseQueryResult } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 
 import {
   getObserverHistogram,
@@ -9,9 +9,15 @@ import {
   listObserverProducts,
   listObserverScenes,
   listObserverTenants,
+  verifyScene,
+  cancelVerifyRun,
+  createVerifyRun,
   explainPixel,
   getPixelBudget,
   getSceneDetail,
+  isVerifyRunActive,
+  listVerifyResults,
+  listVerifyRuns,
   type HistogramBucket,
   type HistogramBucketSize,
   type ObserverFarm,
@@ -24,6 +30,10 @@ import {
   type PixelBudget,
   type PixelExplain,
   type SceneDetail,
+  type VerificationRow,
+  type VerifyMode,
+  type VerifyRun,
+  type Verdict,
   type SceneFilters,
 } from "@/api/observer";
 
@@ -184,5 +194,65 @@ export function usePixelExplain(
     enabled: Boolean(tenantId && jobId && point),
     staleTime: Infinity,
     retry: false,
+  });
+}
+
+// ---- L3: verify ----------------------------------------------------------
+
+export function useVerifyRuns(
+  tenantId: string | null,
+  farmId: string | null,
+): UseQueryResult<VerifyRun[]> {
+  return useQuery({
+    queryKey: [ROOT, "verifyRuns", tenantId, farmId],
+    queryFn: () => listVerifyRuns(tenantId as string, farmId ?? undefined),
+    enabled: Boolean(tenantId),
+    // Polls only while something is in flight — a console left open on a
+    // settled list should not hammer the API.
+    refetchInterval: (query) => (query.state.data?.some(isVerifyRunActive) ? 5_000 : false),
+  });
+}
+
+export function useVerifyResults(
+  tenantId: string | null,
+  runId: string | null,
+  verdict: Verdict | undefined,
+): UseQueryResult<VerificationRow[]> {
+  return useQuery({
+    queryKey: [ROOT, "verifyResults", tenantId, runId, verdict ?? ""],
+    queryFn: () => listVerifyResults(tenantId as string, runId as string, verdict),
+    enabled: Boolean(tenantId && runId),
+  });
+}
+
+export function useVerifyScene(
+  tenantId: string | null,
+): UseMutationResult<VerificationRow, unknown, { jobId: string; mode: VerifyMode }> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, mode }) => verifyScene(tenantId as string, jobId, mode),
+    // A verification never changes a pipeline number, so nothing else needs
+    // invalidating — only the scene's own detail, which carries lineage.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [ROOT, "sceneDetail"] }),
+  });
+}
+
+export function useCreateVerifyRun(
+  tenantId: string | null,
+): UseMutationResult<VerifyRun, unknown, Parameters<typeof createVerifyRun>[1]> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => createVerifyRun(tenantId as string, payload),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [ROOT, "verifyRuns"] }),
+  });
+}
+
+export function useCancelVerifyRun(
+  tenantId: string | null,
+): UseMutationResult<VerifyRun, unknown, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId) => cancelVerifyRun(tenantId as string, runId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [ROOT, "verifyRuns"] }),
   });
 }
