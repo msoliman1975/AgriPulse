@@ -554,13 +554,43 @@ global:
   #   api + workers + frontend all move together (the editor needs the new
   #   endpoints). tile-server stays 9d140cc. Rollback is api/workers back
   #   to 2861fe0 and frontend back to 92e093e.
+  # cfc0751 = #367 (farm-console load latency) + #368 (crop-attribute
+  #   authoring UI).
+  #   #367: opening a farm took ~7.3 s, worst on the 36-block Bashier
+  #   Elkhier farm, and was getting worse every ingest cycle. Two causes.
+  #   (a) `v_block_integration_health` LEFT JOINs a block out to two
+  #   independent one-to-many branches and de-duplicates afterwards with
+  #   COUNT(DISTINCT ...), so it materialised attempts x attempts x jobs
+  #   per block -- 4,672,512 rows collapsed to 36, spilling a 28 MB sort to
+  #   disk. (b) "latest index value per block" had no time bound, so
+  #   TimescaleDB could not exclude chunks and spent 645-1039 ms PLANNING
+  #   all 494 of them. Measured after: block health 7280 -> 7.8 ms, farm
+  #   rollup 10418 -> 5.1 ms, blocks/summary 875 -> 36 ms.
+  #   #368: /platform/crops/:cropId/attributes -- definition authoring with
+  #   a live preview of the assignment form. FRONTEND-ONLY half; every
+  #   endpoint it calls already shipped in 03293ea.
+  #   MIGRATIONS -- tenant 0056 (rewrites the two integration-health views)
+  #   and 0057 (re-chunks block_index_aggregates + block_grid_aggregates to
+  #   30-day chunks, 1 space partition).
+  #   BOTH ARE SAFE TO LEAVE BEHIND ON A ROLLBACK. 0056 keeps the view
+  #   columns, types and values byte-identical (diffed both directions
+  #   against the live tenant before merge), so the previous api image
+  #   reads the new views unchanged. 0057 only affects chunks created from
+  #   now on; no data moves and no long lock is taken. Both have tested
+  #   downgrade() paths, but neither needs to run to roll the tag back.
+  #   User-visible change: farms open fast again. Nothing moves on screen
+  #   except the block panel's two integration rows, which now fill in a
+  #   moment after the map rather than holding it up.
+  #   api + workers + frontend move together (view rewrite + the summary
+  #   endpoint + the new admin page). tile-server stays 9d140cc. Rollback
+  #   is all three back to 03293ea.
   images:
     api:
-      tag: "03293ea"
+      tag: "cfc0751"
     workers:
-      tag: "03293ea"
+      tag: "cfc0751"
     frontend:
-      tag: "03293ea"
+      tag: "cfc0751"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
