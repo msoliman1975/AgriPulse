@@ -8,11 +8,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { SceneHistogram } from "@/modules/admin/components/observer/SceneHistogram";
 import { SceneTable } from "@/modules/admin/components/observer/SceneTable";
 import { StageRibbon } from "@/modules/admin/components/observer/StageRibbon";
 import { VerifyRunsCard } from "@/modules/admin/components/observer/VerifyRunsCard";
+import { WeatherLane } from "@/modules/admin/components/observer/WeatherLane";
 import {
   useObserverFarms,
   useObserverHistogram,
@@ -59,6 +61,7 @@ export function PlatformObserverPage(): ReactNode {
   const from = params.get("from") ?? isoDaysAgo(DEFAULT_WINDOW_DAYS);
   const to = params.get("to") ?? todayIso();
   const bucket = (params.get("bucket") as HistogramBucketSize | null) ?? "week";
+  const source = params.get("src") === "weather" ? "weather" : "imagery";
 
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
@@ -127,6 +130,20 @@ export function PlatformObserverPage(): ReactNode {
 
       <Card title={t("observer.rail.title")}>
         <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <span className="mb-1 block text-xs font-medium text-ap-muted">
+              {t("observer.rail.source")}
+            </span>
+            <SegmentedControl
+              ariaLabel={t("observer.rail.source")}
+              value={source}
+              onChange={(v) => patch({ src: v })}
+              items={[
+                { value: "imagery", label: t("observer.rail.imagery") },
+                { value: "weather", label: t("observer.rail.weather") },
+              ]}
+            />
+          </div>
           <label className="min-w-[10rem] flex-1">
             <span className="mb-1 block text-xs font-medium text-ap-muted">
               {t("observer.rail.tenant")}
@@ -166,24 +183,26 @@ export function PlatformObserverPage(): ReactNode {
             </select>
           </label>
 
-          <label className="min-w-[9rem] flex-1">
-            <span className="mb-1 block text-xs font-medium text-ap-muted">
-              {t("observer.rail.product")}
-            </span>
-            <select
-              className="w-full rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
-              value={productId ?? ""}
-              disabled={!farmId}
-              onChange={(e) => patch({ product: e.target.value })}
-            >
-              <option value="">{t("observer.rail.allProducts")}</option>
-              {(products.data ?? []).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.resolution_m} m)
-                </option>
-              ))}
-            </select>
-          </label>
+          {source === "imagery" ? (
+            <label className="min-w-[9rem] flex-1">
+              <span className="mb-1 block text-xs font-medium text-ap-muted">
+                {t("observer.rail.product")}
+              </span>
+              <select
+                className="w-full rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
+                value={productId ?? ""}
+                disabled={!farmId}
+                onChange={(e) => patch({ product: e.target.value })}
+              >
+                <option value="">{t("observer.rail.allProducts")}</option>
+                {(products.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.resolution_m} m)
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label className="min-w-[8rem]">
             <span className="mb-1 block text-xs font-medium text-ap-muted">
@@ -249,6 +268,13 @@ export function PlatformObserverPage(): ReactNode {
 
       {!farmId ? (
         <EmptyState message={t("observer.pickFarmFirst")} />
+      ) : source === "weather" ? (
+        <WeatherLane
+          tenantId={tenantId as string}
+          farmId={farmId}
+          windowFrom={dayToInstant(from, false)}
+          windowTo={dayToInstant(to, true)}
+        />
       ) : (
         <>
           {overview.isPending ? (

@@ -10,7 +10,7 @@ would drift the first time a denominator changed.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -19,6 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observer.repository import BUCKETS, ObserverRepository
 from app.modules.observer.verify_store import VerifyStore
+from app.modules.observer.weather import (
+    COVERAGE_WARN_HOURS as WEATHER_COVERAGE_WARN_HOURS,
+)
+from app.modules.observer.weather import ObserverWeatherRepository
 from app.shared.storage import get_storage_client
 
 # Widest window the overview will scan in one request. The overview fires
@@ -39,6 +43,10 @@ class TenantNotFoundError(Exception):
 
 class FarmNotFoundError(Exception):
     """Farm does not exist in this tenant schema."""
+
+
+class WeatherDayNotFoundError(Exception):
+    """No `weather_index_daily` row for that (farm, index, day)."""
 
 
 class SceneNotFoundError(Exception):
@@ -62,6 +70,7 @@ class ObserverService:
         self._s = session
         self._repo = ObserverRepository(session)
         self._store = VerifyStore(session)
+        self._weather = ObserverWeatherRepository(session)
 
     # ---- tenant plumbing -------------------------------------------------
 
@@ -387,6 +396,118 @@ class ObserverService:
                 f"scene status is {ctx['status']!r}; no raw-bands COG exists for it"
             )
         return ctx, formulas
+
+    # ---- weather lane ----------------------------------------------------
+
+    async def weather_overview(
+        self,
+        *,
+        tenant_schema: str,
+        farm_id: UUID,
+        window_from: datetime,
+        window_to: datetime,
+    ) -> dict[str, Any]:
+        """The weather ribbon: fetch → observations → derived → indices.
+
+        Farm-scoped by nature — weather is measured at one centroid, so there
+        is no block dimension to narrow by, and pretending otherwise would
+        invite an operator to select blocks that change nothing.
+        """
+        _check_window(window_from, window_to)
+        await self._scope(tenant_schema)
+        try:
+            counts = await self._weather.stage_counts(
+                farm_id=farm_id, window_from=window_from, window_to=window_to
+            )
+            coverage = await self._weather.hour_coverage(
+                farm_id=farm_id, window_from=window_from, window_to=window_to
+            )
+            subscribed = await self._weather.farm_has_weather(farm_id)
+        finally:
+            await self._unscope()
+
+        thin = [d for d in coverage if int(d["hours"]) < WEATHER_COVERAGE_WARN_HOURS]
+        return {
+            "farm_id": farm_id,
+            "window_from": window_from,
+            "window_to": window_to,
+            "subscribed": subscribed,
+            "stages": _build_weather_stages(counts),
+            "coverage": coverage,
+            # Days that produced a derived row from too few hours. The number
+            # exists, looks authoritative, and was computed from a fraction of
+            # the day — and nothing else in the product distinguishes them.
+            "thin_days": [d for d in thin if d["has_derived"]],
+            "coverage_floor_hours": WEATHER_COVERAGE_WARN_HOURS,
+            # There is no coverage floor in the derivation itself; Observer
+            # only reports. Said explicitly so the number is not read as a
+            # guarantee that thin days were rejected.
+            "derivation_enforces_floor": False,
+        }
+
+    async def weather_attempts(
+        self,
+        *,
+        tenant_schema: str,
+        farm_id: UUID,
+        window_from: datetime,
+        window_to: datetime,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        _check_window(window_from, window_to)
+        await self._scope(tenant_schema)
+        try:
+            return await self._weather.recent_attempts(
+                farm_id=farm_id,
+                window_from=window_from,
+                window_to=window_to,
+                limit=limit,
+            )
+        finally:
+            await self._unscope()
+
+    async def weather_index_days(
+        self,
+        *,
+        tenant_schema: str,
+        farm_id: UUID,
+        index_code: str,
+        window_from: datetime,
+        window_to: datetime,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        _check_window(window_from, window_to)
+        await self._scope(tenant_schema)
+        try:
+            return await self._weather.index_days(
+                farm_id=farm_id,
+                index_code=index_code,
+                window_from=window_from,
+                window_to=window_to,
+                limit=limit,
+            )
+        finally:
+            await self._unscope()
+
+    async def explain_weather_day(
+        self,
+        *,
+        tenant_schema: str,
+        farm_id: UUID,
+        index_code: str,
+        day: date,
+    ) -> dict[str, Any]:
+        """The weather counterpart of the pixel inspector."""
+        await self._scope(tenant_schema)
+        try:
+            found = await self._weather.explain_index_day(
+                farm_id=farm_id, index_code=index_code, day=day
+            )
+        finally:
+            await self._unscope()
+        if found is None:
+            raise WeatherDayNotFoundError(f"{index_code} on {day.isoformat()}")
+        return found
 
     # ---- L3: verify ------------------------------------------------------
 
@@ -794,6 +915,69 @@ def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
             else None
         ),
     }
+
+
+def _build_weather_stages(counts: dict[str, Any]) -> list[dict[str, Any]]:
+    """The weather ribbon, with denominators that mean something.
+
+    `observations` is denominated by the window's own hour count rather than
+    by anything stored: comparing what arrived against what should have is
+    the whole point, and a denominator derived from the data could never show
+    a gap. Everything downstream is denominated by the stage above it.
+    """
+    attempts = counts["attempts"]
+    observations = counts["observations"]
+    derived = counts["derived_days"]
+    return [
+        _stage(
+            "attempts",
+            "Fetch attempts",
+            attempts,
+            expected=None,
+            detail={"providers_ok": counts["attempts_ok"]},
+        ),
+        _stage(
+            "attempts_ok",
+            "Succeeded",
+            counts["attempts_ok"],
+            expected=attempts,
+            detail={},
+        ),
+        _stage(
+            "observations",
+            "Hourly observations",
+            observations,
+            expected=counts["hours_expected"],
+            detail={"unit": "hours"},
+        ),
+        _stage(
+            "derived",
+            "Derived daily",
+            derived,
+            expected=counts["days_expected"],
+            detail={},
+        ),
+        _stage(
+            "indices",
+            "Index daily",
+            counts["index_rows"],
+            # One row per (day, index). A derived day that produced fewer
+            # index rows than the catalog has codes is a real gap, and
+            # denominating by the catalog is what surfaces it.
+            expected=derived * counts["catalog_codes"],
+            detail={
+                "index_codes": counts["index_codes"],
+                "catalog_codes": counts["catalog_codes"],
+            },
+        ),
+        _stage(
+            "baselines",
+            "Baselines",
+            counts["baseline_codes"],
+            expected=counts["catalog_codes"],
+            detail={},
+        ),
+    ]
 
 
 def _check_window(window_from: datetime, window_to: datetime) -> None:

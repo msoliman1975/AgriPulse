@@ -24,6 +24,17 @@ const tenants = [{ id: "t1", name: "Agrosina", slug: "agrosina", schema_name: "t
 
 const farms = [
   {
+    id: "f2",
+    name: "Bashayer",
+    code: "BSH",
+    block_count: 36,
+    blocks_with_imagery_sub: 36,
+    blocks_with_grid: 12,
+    has_weather_sub: true,
+    first_scene_at: null,
+    last_scene_at: null,
+  },
+  {
     id: "f1",
     name: "Suez",
     code: "SUEZ",
@@ -122,10 +133,41 @@ const scenes: ObserverScene[] = [
   },
 ];
 
+/** f1 has no weather subscription; f2 has one, with a thin day in it. */
+const weatherOverview = (farmId: string) => ({
+  farm_id: farmId,
+  window_from: "2026-01-01T00:00:00Z",
+  window_to: "2026-08-06T00:00:00Z",
+  subscribed: farmId === "f2",
+  stages: [
+    {
+      key: "observations",
+      label: "Hourly observations",
+      count: 33,
+      expected: 744,
+      shortfall: 711,
+      verdict: "bad" as const,
+      detail: {},
+    },
+  ],
+  coverage: [
+    { day: "2026-05-02", hours: 9, has_derived: true, index_rows: 1 },
+    { day: "2026-05-03", hours: 24, has_derived: true, index_rows: 8 },
+  ],
+  thin_days: [{ day: "2026-05-02", hours: 9, has_derived: true, index_rows: 1 }],
+  coverage_floor_hours: 18,
+  derivation_enforces_floor: false,
+});
+
 vi.mock("@/api/observer", async () => {
   const actual = await vi.importActual<typeof import("@/api/observer")>("@/api/observer");
   return {
     ...actual,
+    getWeatherOverview: vi.fn((_t: string, farmId: string) =>
+      Promise.resolve(weatherOverview(farmId)),
+    ),
+    getWeatherAttempts: vi.fn(() => Promise.resolve([])),
+    explainWeatherDay: vi.fn(() => Promise.reject(new Error("not requested"))),
     listObserverTenants: vi.fn(() => Promise.resolve(tenants)),
     listObserverFarms: vi.fn(() => Promise.resolve(farms)),
     listObserverProducts: vi.fn(() => Promise.resolve([])),
@@ -192,5 +234,33 @@ describe("PlatformObserverPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("option", { name: /Suez/i })).toBeInTheDocument();
     });
+  });
+});
+
+describe("PlatformObserverPage — weather lane", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+  });
+
+  it("says a farm with no weather subscription was never configured", async () => {
+    renderPage("/platform/observer?src=weather&tenant=t1&farm=f1&from=2026-01-01&to=2026-08-06");
+    // The distinction that stops a wall of zeros reading as an outage.
+    await waitFor(() => expect(screen.getByText(/no weather subscription/i)).toBeInTheDocument());
+  });
+
+  it("flags a day whose daily value came from a partial day", async () => {
+    renderPage("/platform/observer?src=weather&tenant=t1&farm=f2&from=2026-01-01&to=2026-08-06");
+    await waitFor(() => expect(screen.getByText(/Hour coverage/i)).toBeInTheDocument());
+    expect(screen.getByText("9 / 24")).toBeInTheDocument();
+    expect(screen.getByText(/computed from a partial day/i)).toBeInTheDocument();
+    // And it says nothing rejected it — the derivation has no floor.
+    expect(screen.getByText(/no coverage floor of its own/i)).toBeInTheDocument();
+  });
+
+  it("does not offer a product picker on the weather lane", async () => {
+    renderPage("/platform/observer?src=weather&tenant=t1&farm=f2&from=2026-01-01&to=2026-08-06");
+    await waitFor(() => expect(screen.getByText(/Hour coverage/i)).toBeInTheDocument());
+    // Weather has no products; a picker that changed nothing would mislead.
+    expect(screen.queryByLabelText(/^Product$/i)).not.toBeInTheDocument();
   });
 });

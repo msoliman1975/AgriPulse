@@ -596,7 +596,9 @@
       "gridded": "Gridded",
       "weather": "Weather",
       "sceneRange": "Scenes",
-      "noScenes": "No scenes have ever been ingested for this farm."
+      "noScenes": "No scenes have ever been ingested for this farm.",
+      "imagery": "Imagery",
+      "source": "Source"
     },
     "ribbon": {
       "title": "Pipeline stages",
@@ -780,6 +782,34 @@
         "errored": "{{n}} error",
         "openReport": "Open report"
       }
+    },
+    "weather": {
+      "notice": "Weather lane",
+      "farmScoped": "Weather is measured at one point per farm, so blocks do not apply here. The block picker is disabled rather than silently ignored.",
+      "title": "Weather",
+      "notSubscribed": "This farm has no weather subscription, so every count below would be zero because nothing was ever configured — not because anything is broken.",
+      "coverage": "Hour coverage",
+      "coverageExplain": "How many of each day's 24 hours actually arrived. This is the weather equivalent of valid-pixel percentage: a day below {{floor}} hours produces a confident-looking daily value computed from a fraction of the day.",
+      "noFloor": "The derivation applies no coverage floor of its own — thin days below are reported, not rejected. Nothing downstream knows the difference.",
+      "noObservations": "No hourly observations in this window.",
+      "thinDays": "{{count}} thin day",
+      "thinDays_other": "{{count}} thin days",
+      "day": "Day",
+      "hours": "Hours",
+      "hoursCount": "Present",
+      "derived": "Derived",
+      "derivedOk": "computed",
+      "derivedThin": "computed from a partial day",
+      "indexRows": "Index rows",
+      "explain": "Explain",
+      "explainTitle": "How {{day}} was computed",
+      "builtFrom": "built from {{present}} of {{expected}} hours",
+      "noIndexRow": "No daily index row for that day.",
+      "attempts": "Fetch attempts",
+      "noAttempts": "No fetch attempts in this window.",
+      "started": "Started",
+      "provider": "Provider",
+      "rows": "Rows"
     }
   }
 }

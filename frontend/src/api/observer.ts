@@ -506,3 +506,126 @@ export async function cancelVerifyRun(tenantId: string, runId: string): Promise<
 export function isVerifyRunActive(run: VerifyRun): boolean {
   return run.status === "queued" || run.status === "running";
 }
+
+// ---- weather lane --------------------------------------------------------
+
+export interface WeatherCoverageDay {
+  day: string;
+  /** Distinct hours with an observation, out of 24. */
+  hours: number;
+  has_derived: boolean;
+  index_rows: number;
+}
+
+export interface WeatherOverview {
+  farm_id: string;
+  window_from: string;
+  window_to: string;
+  /** False = never configured, so every zero below means that, not "broken". */
+  subscribed: boolean;
+  stages: ObserverStage[];
+  coverage: WeatherCoverageDay[];
+  /** Days that produced a derived row from fewer hours than the floor. */
+  thin_days: WeatherCoverageDay[];
+  coverage_floor_hours: number;
+  /** The derivation applies no floor of its own — Observer only reports. */
+  derivation_enforces_floor: boolean;
+}
+
+export interface WeatherAttempt {
+  id: string;
+  provider_code: string;
+  status: string;
+  rows_ingested: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  block_id: string;
+}
+
+export interface WeatherIndexDay {
+  date: string;
+  index_code: string;
+  value: number | null;
+  value_min: number | null;
+  value_max: number | null;
+  value_aux: Record<string, unknown>;
+  baseline_deviation: number | null;
+  computed_at: string;
+  /** How many hours this day's value was actually computed from. */
+  source_hours: number;
+}
+
+export interface WeatherDayExplain {
+  index: Record<string, unknown>;
+  derived: Record<string, unknown> | null;
+  hourly: Array<{
+    time: string;
+    provider_code: string;
+    air_temp_c: number | null;
+    humidity_pct: number | null;
+    precipitation_mm: number | null;
+    wind_speed_m_s: number | null;
+    solar_radiation_w_m2: number | null;
+    et0_mm: number | null;
+  }>;
+  catalog: Record<string, unknown> | null;
+  hours_present: number;
+  hours_expected: number;
+  coverage_sufficient: boolean;
+}
+
+export async function getWeatherOverview(
+  tenantId: string,
+  farmId: string,
+  from: string,
+  to: string,
+): Promise<WeatherOverview> {
+  const { data } = await apiClient.get<WeatherOverview>(
+    `${BASE}/tenants/${tenantId}/weather/overview`,
+    { params: { farm_id: farmId, from, to } },
+  );
+  return data;
+}
+
+export async function getWeatherAttempts(
+  tenantId: string,
+  farmId: string,
+  from: string,
+  to: string,
+): Promise<WeatherAttempt[]> {
+  const { data } = await apiClient.get<WeatherAttempt[]>(
+    `${BASE}/tenants/${tenantId}/weather/attempts`,
+    { params: { farm_id: farmId, from, to } },
+  );
+  return data;
+}
+
+export async function getWeatherIndexDays(
+  tenantId: string,
+  farmId: string,
+  indexCode: string,
+  from: string,
+  to: string,
+): Promise<WeatherIndexDay[]> {
+  const { data } = await apiClient.get<WeatherIndexDay[]>(
+    `${BASE}/tenants/${tenantId}/weather/index-days`,
+    { params: { farm_id: farmId, index_code: indexCode, from, to } },
+  );
+  return data;
+}
+
+export async function explainWeatherDay(
+  tenantId: string,
+  farmId: string,
+  indexCode: string,
+  day: string,
+): Promise<WeatherDayExplain> {
+  const { data } = await apiClient.get<WeatherDayExplain>(
+    `${BASE}/tenants/${tenantId}/weather/explain`,
+    { params: { farm_id: farmId, index_code: indexCode, day } },
+  );
+  return data;
+}

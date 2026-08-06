@@ -19,12 +19,14 @@ to spend the shared CDSE allowance recomputing it.
   POST /tenants/{tenant_id}/verify-runs                — L3 named multi-scene run
   GET  /tenants/{tenant_id}/verify-runs[/{id}[/results]]
   POST /tenants/{tenant_id}/verify-runs/{id}:cancel
+  GET  /tenants/{tenant_id}/weather/overview           — weather ribbon + coverage
+  GET  /tenants/{tenant_id}/weather/attempts|index-days|explain
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -40,6 +42,7 @@ from app.modules.observer.service import (
     SceneNotFoundError,
     SceneRasterUnavailableError,
     TenantNotFoundError,
+    WeatherDayNotFoundError,
     WindowTooWideError,
     get_observer_service,
 )
@@ -360,6 +363,86 @@ class VerifyRunRequest(BaseModel):
     mode: Literal["fast", "full"] = "full"
     block_ids: list[UUID] | None = None
     product_id: UUID | None = None
+
+
+class WeatherCoverageDay(BaseModel):
+    day: date
+    # Distinct hours with an observation, out of 24.
+    hours: int
+    has_derived: bool
+    index_rows: int
+
+
+class WeatherOverviewResponse(BaseModel):
+    farm_id: UUID
+    window_from: datetime
+    window_to: datetime
+    # False = the farm has no weather subscription at all, so every zero
+    # below is "never configured" rather than "broken".
+    subscribed: bool
+    stages: list[Stage]
+    coverage: list[WeatherCoverageDay]
+    # Days that produced a derived row from fewer hours than the floor. The
+    # number exists, reads as authoritative, and came from part of a day.
+    thin_days: list[WeatherCoverageDay]
+    coverage_floor_hours: int
+    # The derivation applies no floor of its own — Observer only reports. Said
+    # explicitly so `thin_days` is never read as "these were rejected".
+    derivation_enforces_floor: bool
+
+
+class WeatherAttemptRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    provider_code: str
+    status: str
+    rows_ingested: int | None
+    error_code: str | None
+    error_message: str | None
+    started_at: datetime
+    completed_at: datetime | None
+    duration_ms: int | None
+    block_id: UUID
+
+
+class WeatherIndexDayRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    date: date
+    index_code: str
+    value: float | None
+    value_min: float | None
+    value_max: float | None
+    value_aux: dict[str, Any]
+    baseline_deviation: float | None
+    computed_at: datetime
+    # How many hours this day's value was actually computed from.
+    source_hours: int
+
+
+class WeatherHourlyRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    time: datetime
+    provider_code: str
+    air_temp_c: float | None
+    humidity_pct: float | None
+    precipitation_mm: float | None
+    wind_speed_m_s: float | None
+    solar_radiation_w_m2: float | None
+    et0_mm: float | None
+
+
+class WeatherDayExplain(BaseModel):
+    """The weather counterpart of the pixel inspector."""
+
+    index: dict[str, Any]
+    derived: dict[str, Any] | None
+    hourly: list[WeatherHourlyRow]
+    catalog: dict[str, Any] | None
+    hours_present: int
+    hours_expected: int
+    # The qualifier that belongs next to every number here: a day built from a
+    # third of its hours is not comparable to a full one.
+    coverage_sufficient: bool
 
 
 # --- shared query params ---------------------------------------------------
@@ -831,6 +914,111 @@ async def _audit_verify(
         subject_id=subject_id,
         details=details,
     )
+
+
+# --- weather lane -----------------------------------------------------------
+
+
+@router.get("/tenants/{tenant_id}/weather/overview", response_model=WeatherOverviewResponse)
+async def weather_overview(
+    tenant_id: UUID,
+    farm_id: UUID = Query(description="Weather is farm-scoped; blocks do not apply."),
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """The weather ribbon plus per-day hour coverage.
+
+    No `blocks` parameter: weather is measured at one farm centroid, and
+    accepting a block filter that changed nothing would be worse than not
+    offering one.
+    """
+    del context
+    try:
+        return await service.weather_overview(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            window_from=window_from,
+            window_to=window_to,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/attempts", response_model=list[WeatherAttemptRow])
+async def weather_attempts(
+    tenant_id: UUID,
+    farm_id: UUID,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    limit: int = Query(default=100, ge=1, le=500),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """Fetch attempts — the weather lane's scene table."""
+    del context
+    try:
+        return await service.weather_attempts(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            window_from=window_from,
+            window_to=window_to,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/index-days", response_model=list[WeatherIndexDayRow])
+async def weather_index_days(
+    tenant_id: UUID,
+    farm_id: UUID,
+    index_code: str,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    limit: int = Query(default=200, ge=1, le=1000),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    try:
+        return await service.weather_index_days(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            index_code=index_code,
+            window_from=window_from,
+            window_to=window_to,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/explain", response_model=WeatherDayExplain)
+async def explain_weather_day(
+    tenant_id: UUID,
+    farm_id: UUID,
+    index_code: str,
+    day: date,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Everything that produced one daily index value.
+
+    The hourly rows that fed it, the derived-daily intermediate, the catalog
+    definition, and the coverage that qualifies all three.
+    """
+    del context
+    try:
+        return await service.explain_weather_day(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            index_code=index_code,
+            day=day,
+        )
+    except WeatherDayNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no weather index row for {exc}") from exc
 
 
 # --- helpers ---------------------------------------------------------------
