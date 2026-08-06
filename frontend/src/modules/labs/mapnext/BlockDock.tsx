@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
 import { clearDetailCache } from "../map/api";
-import type { UnitDetail } from "../map/types";
+import type { UnitDetail, UnitIntegration } from "../map/types";
 import {
   HEALTH_DOT,
   INDEX_FAMILIES,
@@ -86,6 +86,9 @@ function clampHeight(h: number): number {
 
 interface Props {
   detail: UnitDetail | undefined;
+  // Loads on its own clock, off the map's critical path — may still be
+  // null after `detail` has arrived.
+  integration: UnitIntegration | null;
   loading: boolean;
   error: boolean;
   activeIndex: ApiIndexCode;
@@ -158,6 +161,7 @@ const COLS_2 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:gri
 
 export function BlockDock({
   detail,
+  integration,
   loading,
   error,
   activeIndex,
@@ -621,11 +625,11 @@ export function BlockDock({
                   ) : (
                     <p className="text-sm text-ap-muted">{t("dock.noSignals")}</p>
                   )}
-                  {detail.integration ? (
+                  {integration ? (
                     <Rows
                       items={[
-                        [t("dock.imagerySubs"), String(detail.integration.imagery.active_subs)],
-                        [t("dock.weatherSubs"), String(detail.integration.weather.active_subs)],
+                        [t("dock.imagerySubs"), String(integration.imagery.active_subs)],
+                        [t("dock.weatherSubs"), String(integration.weather.active_subs)],
                       ]}
                     />
                   ) : null}

@@ -73,7 +73,6 @@ const DETAIL: UnitDetail = {
     status: "active",
   },
   signals: [],
-  integration: null,
 };
 
 function renderDock(detail: UnitDetail = DETAIL): void {
@@ -81,6 +80,7 @@ function renderDock(detail: UnitDetail = DETAIL): void {
   const node: ReactNode = (
     <BlockDock
       detail={detail}
+      integration={null}
       loading={false}
       error={false}
       activeIndex="ndvi"

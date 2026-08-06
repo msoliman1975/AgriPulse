@@ -27,7 +27,7 @@ import {
   type FarmInactivationPreview,
   type FarmUpdatePayload,
 } from "@/api/farms";
-import { loadMapSummary, loadUnitDetail } from "./api";
+import { loadBlockHealth, loadMapSummary, loadUnitDetail, toUnitIntegration } from "./api";
 import type { UnitFeatureProps } from "./types";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
@@ -369,11 +369,22 @@ function MapForFarm({ farmId }: { farmId: string }) {
         blockId: selectedId!,
         blocksById,
         activePlan: summaryQ.data?.activePlan ?? null,
-        blockHealth: selectedId ? (summaryQ.data?.blockHealth[selectedId] ?? null) : null,
       }),
     enabled: Boolean(farmId && selectedId && blocksById.size > 0),
     staleTime: 30_000,
   });
+
+  // Integration health loads separately so it can't gate the map — see
+  // loadMapSummary. Feeds only the panel's Integrations rows.
+  const blockHealthQ = useQuery({
+    queryKey: ["labs/map/blockHealth", farmId],
+    queryFn: () => loadBlockHealth(farmId),
+    enabled: Boolean(farmId),
+    staleTime: 60_000,
+  });
+  const selectedIntegration = toUnitIntegration(
+    selectedId ? (blockHealthQ.data?.[selectedId] ?? null) : null,
+  );
 
   // ---- Selection helpers --------------------------------------------------
 
@@ -1087,6 +1098,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
           {selectedId && farmDrawerMode === null ? (
             <DetailPanel
               detail={detailQ.data ?? null}
+              integration={selectedIntegration}
               isLoading={detailQ.isLoading}
               risks={selectedBlockRisks}
               onClose={closePanel}
