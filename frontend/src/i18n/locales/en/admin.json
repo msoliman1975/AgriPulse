@@ -810,6 +810,27 @@
       "started": "Started",
       "provider": "Provider",
       "rows": "Rows"
+    },
+    "lineage": {
+      "title": "What {{index}} produced",
+      "explain": "Alerts and recommendations whose conditions actually read this index, with the value each one saw. These are stored edges recorded by the decision engine, not decisions that merely happened nearby in time.",
+      "exact": "Exact lineage",
+      "none": "Nothing on this block read this index in this window.",
+      "what": "Kind",
+      "source": "Rule / tree",
+      "outcome": "Outcome",
+      "readKey": "Read",
+      "readValue": "Value seen",
+      "scope": "Scope",
+      "when": "When",
+      "block": "block",
+      "perCell": "per cell",
+      "kind": {
+        "recommendation": "Recommendation",
+        "alert": "Alert"
+      },
+      "anomalies": "{{n}} cell(s) flagged as low outliers",
+      "threshold": "Threshold z = {{k}} (source: {{source}}). The tenant-level setting is not re-resolved here, so a module default is not necessarily the number the nightly sweep used."
     }
   }
 }

@@ -629,3 +629,67 @@ export async function explainWeatherDay(
   );
   return data;
 }
+
+// ---- L4: forward lineage -------------------------------------------------
+
+export interface LineageConsumer {
+  id: string;
+  created_at: string;
+  cell_id: string | null;
+  severity: string | null;
+  status: string | null;
+  /** `indices.ndmi.mean` vs `grid.ndmi.mean` — block-level vs per-cell. */
+  snapshot_key: string;
+  /** The value the tree actually saw, frozen at decision time. */
+  observed_value: string | null;
+  tree_code?: string | null;
+  tree_version?: number | null;
+  action_type?: string | null;
+  rule_code?: string | null;
+}
+
+export interface Lineage {
+  block_id: string;
+  index_code: string;
+  window_from: string;
+  window_to: string;
+  recommendations: LineageConsumer[];
+  alerts: LineageConsumer[];
+  cell_anomalies: Array<{
+    cell_id: string;
+    mean: number;
+    z: number;
+    threshold: number;
+    row_idx: number;
+    col_idx: number;
+  }>;
+  anomaly_threshold: number | null;
+  anomaly_threshold_source: string | null;
+  /** These edges are stored in the decision's snapshot, not inferred. */
+  exact: boolean;
+  consumer_count: number;
+}
+
+export async function getIndexLineage(
+  tenantId: string,
+  args: {
+    blockId: string;
+    indexCode: string;
+    from: string;
+    to: string;
+    productId?: string | null;
+    sceneTime?: string | null;
+  },
+): Promise<Lineage> {
+  const { data } = await apiClient.get<Lineage>(`${BASE}/tenants/${tenantId}/lineage`, {
+    params: {
+      block_id: args.blockId,
+      index_code: args.indexCode,
+      from: args.from,
+      to: args.to,
+      product: args.productId || undefined,
+      scene_time: args.sceneTime || undefined,
+    },
+  });
+  return data;
+}

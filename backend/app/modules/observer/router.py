@@ -21,6 +21,8 @@ to spend the shared CDSE allowance recomputing it.
   POST /tenants/{tenant_id}/verify-runs/{id}:cancel
   GET  /tenants/{tenant_id}/weather/overview           — weather ribbon + coverage
   GET  /tenants/{tenant_id}/weather/attempts|index-days|explain
+  GET  /tenants/{tenant_id}/lineage                    — L4 what an index caused
+  GET  /tenants/{tenant_id}/lineage/source             — L4 reverse: decision -> row
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.observer.pixels import PixelOutsideRasterError
 from app.modules.observer.repository import JOB_STATUSES
 from app.modules.observer.service import (
+    DecisionNotFoundError,
     ObserverService,
     SceneNotFoundError,
     SceneRasterUnavailableError,
@@ -443,6 +446,70 @@ class WeatherDayExplain(BaseModel):
     # The qualifier that belongs next to every number here: a day built from a
     # third of its hours is not comparable to a full one.
     coverage_sufficient: bool
+
+
+class LineageConsumer(BaseModel):
+    """A decision that recorded reading this index."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    created_at: datetime
+    cell_id: UUID | None
+    severity: str | None
+    status: str | None
+    # Which snapshot key matched — `indices.ndmi.mean` vs `grid.ndmi.mean`
+    # is the difference between a block-level and a per-cell decision.
+    snapshot_key: str
+    # The value the tree actually saw, frozen at decision time.
+    observed_value: str | None
+    tree_code: str | None = None
+    tree_version: int | None = None
+    action_type: str | None = None
+    rule_code: str | None = None
+
+
+class CellAnomaly(BaseModel):
+    cell_id: UUID
+    mean: float
+    # Standard deviations *below* the block mean (positive = below).
+    z: float
+    threshold: float
+    row_idx: int
+    col_idx: int
+
+
+class LineageResponse(BaseModel):
+    block_id: UUID
+    index_code: str
+    window_from: datetime
+    window_to: datetime
+    recommendations: list[LineageConsumer]
+    alerts: list[LineageConsumer]
+    cell_anomalies: list[CellAnomaly]
+    anomaly_threshold: float | None
+    anomaly_threshold_source: str | None
+    # These edges are stored in the decision's own snapshot, not inferred
+    # from timestamps — unlike the overview's consumer count.
+    exact: bool
+    consumer_count: int
+
+
+class DecisionSourceResponse(BaseModel):
+    kind: Literal["recommendation", "alert"]
+    decision_id: UUID
+    block_id: UUID
+    cell_id: UUID | None
+    created_at: datetime
+    source_code: str | None
+    index_code: str
+    # What the decision recorded reading, frozen at the time.
+    observed_value: float | None
+    source_row: dict[str, Any] | None
+    # What that row holds now.
+    current_value: float | None
+    # None when either side is missing: "cannot tell" is not "agrees". False
+    # means the row was recomputed after the decision was made.
+    values_agree: bool | None
 
 
 # --- shared query params ---------------------------------------------------
@@ -1019,6 +1086,72 @@ async def explain_weather_day(
         )
     except WeatherDayNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no weather index row for {exc}") from exc
+
+
+# --- L4: forward lineage ----------------------------------------------------
+
+
+@router.get("/tenants/{tenant_id}/lineage", response_model=LineageResponse)
+async def index_lineage(
+    tenant_id: UUID,
+    block_id: UUID,
+    index_code: str,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    product_id: UUID | None = Query(default=None, alias="product"),
+    scene_time: datetime | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """What this index produced: alerts, recommendations, cell anomalies.
+
+    Exact rather than time-proximate — every consumer listed recorded reading
+    this index in its evaluation snapshot, and comes back with the value it
+    saw. Pass `scene_time` and `product` to include the per-cell anomaly pass
+    for that scene.
+    """
+    del context
+    try:
+        return await service.index_lineage(
+            tenant_schema=await _schema(service, tenant_id),
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            window_from=window_from,
+            window_to=window_to,
+            scene_time=scene_time,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/lineage/source", response_model=DecisionSourceResponse)
+async def decision_source(
+    tenant_id: UUID,
+    kind: Literal["recommendation", "alert"],
+    decision_id: UUID,
+    index_code: str,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Reverse lineage: from a decision back to the row it read.
+
+    `values_agree = false` means the aggregate was recomputed after the
+    decision was made, so the recommendation is standing on a number that no
+    longer exists.
+    """
+    del context
+    try:
+        return await service.decision_source(
+            tenant_schema=await _schema(service, tenant_id),
+            kind=kind,
+            decision_id=decision_id,
+            index_code=index_code,
+        )
+    except DecisionNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "decision not found") from exc
 
 
 # --- helpers ---------------------------------------------------------------

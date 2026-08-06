@@ -14,6 +14,7 @@ import {
   createVerifyRun,
   explainPixel,
   getPixelBudget,
+  getIndexLineage,
   getSceneDetail,
   getWeatherAttempts,
   getWeatherOverview,
@@ -32,6 +33,7 @@ import {
   type ObserverTenant,
   type PixelBudget,
   type PixelExplain,
+  type Lineage,
   type SceneDetail,
   type WeatherAttempt,
   type WeatherDayExplain,
@@ -306,5 +308,26 @@ export function useWeatherDayExplain(
     enabled: Boolean(tenantId && farmId && day),
     staleTime: STALE,
     retry: false,
+  });
+}
+
+export function useIndexLineage(
+  tenantId: string | null,
+  args: Parameters<typeof getIndexLineage>[1] | null,
+): UseQueryResult<Lineage> {
+  return useQuery({
+    queryKey: [
+      ROOT,
+      "lineage",
+      tenantId,
+      args?.blockId,
+      args?.indexCode,
+      args?.from,
+      args?.to,
+      args?.sceneTime ?? "",
+    ],
+    queryFn: () => getIndexLineage(tenantId as string, args as NonNullable<typeof args>),
+    enabled: Boolean(tenantId && args),
+    staleTime: STALE,
   });
 }

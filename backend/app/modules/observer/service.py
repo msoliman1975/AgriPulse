@@ -9,14 +9,17 @@ would drift the first time a denominator changed.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.observer.lineage import ObserverLineageRepository
 from app.modules.observer.repository import BUCKETS, ObserverRepository
 from app.modules.observer.verify_store import VerifyStore
 from app.modules.observer.weather import (
@@ -45,6 +48,10 @@ class FarmNotFoundError(Exception):
     """Farm does not exist in this tenant schema."""
 
 
+class DecisionNotFoundError(Exception):
+    """No recommendation or alert with that id in this tenant."""
+
+
 class WeatherDayNotFoundError(Exception):
     """No `weather_index_daily` row for that (farm, index, day)."""
 
@@ -71,6 +78,7 @@ class ObserverService:
         self._repo = ObserverRepository(session)
         self._store = VerifyStore(session)
         self._weather = ObserverWeatherRepository(session)
+        self._lineage = ObserverLineageRepository(session)
 
     # ---- tenant plumbing -------------------------------------------------
 
@@ -115,7 +123,19 @@ class ObserverService:
         await self._s.execute(text(f'SET LOCAL search_path TO "{tenant_schema}", public'))
 
     async def _unscope(self) -> None:
-        await self._s.execute(text("SET LOCAL search_path TO public"))
+        """Reset search_path, tolerating an already-aborted transaction.
+
+        `_scope`/`_unscope` bracket every read in a try/finally. When the read
+        itself fails, the transaction is aborted and this `SET LOCAL` raises
+        `InFailedSQLTransactionError` *from the finally block* — which replaces
+        the real error with a useless one. The same shape cost us #347/#348.
+
+        Swallowing is safe here specifically because `SET LOCAL` dies with the
+        transaction anyway: there is nothing to reset on a connection that is
+        about to roll back.
+        """
+        with contextlib.suppress(SQLAlchemyError):
+            await self._s.execute(text("SET LOCAL search_path TO public"))
 
     # ---- pickers ---------------------------------------------------------
 
@@ -396,6 +416,131 @@ class ObserverService:
                 f"scene status is {ctx['status']!r}; no raw-bands COG exists for it"
             )
         return ctx, formulas
+
+    # ---- L4: forward lineage ---------------------------------------------
+
+    async def index_lineage(
+        self,
+        *,
+        tenant_schema: str,
+        block_id: UUID,
+        product_id: UUID | None,
+        index_code: str,
+        window_from: datetime,
+        window_to: datetime,
+        scene_time: datetime | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        """What this index went on to cause on this block.
+
+        Exact, not a time proxy: every consumer here recorded reading this
+        index in its evaluation snapshot, and comes back with the value it
+        read. The overview's consumer count remains a proxy — it spans a whole
+        farm and every index — and is labelled as one.
+        """
+        _check_window(window_from, window_to)
+        await self._scope(tenant_schema)
+        try:
+            consumers = await self._lineage.consumers_of_index(
+                block_id=block_id,
+                index_code=index_code,
+                window_from=window_from,
+                window_to=window_to,
+                limit=limit,
+            )
+            anomalies: list[dict[str, Any]] = []
+            threshold: float | None = None
+            effective_threshold: float | None = None
+            threshold_source: str | None = None
+            if scene_time is not None and product_id is not None:
+                cells = await self._lineage.cell_values_for_scene(
+                    block_id=block_id,
+                    product_id=product_id,
+                    index_code=index_code,
+                    scene_time=scene_time,
+                )
+                threshold = await self._lineage.anomaly_threshold(
+                    block_id=block_id, product_id=product_id
+                )
+                anomalies, effective_threshold, threshold_source = _detect_anomalies(
+                    cells, threshold
+                )
+        finally:
+            await self._unscope()
+
+        stale = [
+            c
+            for c in consumers["recommendations"] + consumers["alerts"]
+            if c.get("observed_value") is not None
+        ]
+        return {
+            "block_id": block_id,
+            "index_code": index_code,
+            "window_from": window_from,
+            "window_to": window_to,
+            "recommendations": consumers["recommendations"],
+            "alerts": consumers["alerts"],
+            "cell_anomalies": anomalies,
+            "anomaly_threshold": effective_threshold,
+            # Which tier the threshold came from. The tenant-tier setting is
+            # not re-resolved here, so this must not read as the sweep's
+            # exact number when it says `module_default`.
+            "anomaly_threshold_source": threshold_source,
+            # These edges are stored, not inferred from timing — the caller
+            # can present them as fact.
+            "exact": True,
+            "consumer_count": len(stale),
+        }
+
+    async def decision_source(
+        self,
+        *,
+        tenant_schema: str,
+        kind: Literal["recommendation", "alert"],
+        decision_id: UUID,
+        index_code: str,
+    ) -> dict[str, Any]:
+        """Reverse lineage: the stored row behind one decision.
+
+        Returns the frozen snapshot value alongside the aggregate row the
+        evaluator would have read. When the two disagree the row was
+        recomputed *after* the decision, which means the recommendation now
+        rests on a number that no longer exists — and no other surface in the
+        product can show that.
+        """
+        await self._scope(tenant_schema)
+        try:
+            decision = await self._lineage.decision_snapshot(kind=kind, decision_id=decision_id)
+            if decision is None:
+                raise DecisionNotFoundError(str(decision_id))
+            source = await self._lineage.source_row_for_decision(
+                block_id=decision["block_id"],
+                index_code=index_code,
+                at=decision["created_at"],
+            )
+        finally:
+            await self._unscope()
+
+        observed = _snapshot_value(decision["snapshot"], index_code)
+        current = float(source["mean"]) if source and source["mean"] is not None else None
+        return {
+            "kind": kind,
+            "decision_id": decision["id"],
+            "block_id": decision["block_id"],
+            "cell_id": decision["cell_id"],
+            "created_at": decision["created_at"],
+            "source_code": decision["source_code"],
+            "index_code": index_code,
+            "observed_value": observed,
+            "source_row": source,
+            "current_value": current,
+            # None when either side is missing — "cannot tell" is not "agrees".
+            "values_agree": (
+                None
+                if observed is None or current is None
+                else abs(observed - current) <= _SNAPSHOT_TOLERANCE
+            ),
+        }
 
     # ---- weather lane ----------------------------------------------------
 
@@ -978,6 +1123,90 @@ def _build_weather_stages(counts: dict[str, Any]) -> list[dict[str, Any]]:
             detail={},
         ),
     ]
+
+
+# The snapshot froze a string; the aggregate is NUMERIC(7,4). Compare at the
+# stored precision — anything tighter would report rounding as disagreement.
+_SNAPSHOT_TOLERANCE = 0.0001
+
+
+def _snapshot_value(snapshot: Any, index_code: str) -> float | None:
+    """The value this decision recorded reading for one index.
+
+    Prefers the block aggregate over the per-cell one when a tree read both:
+    the block number is the one a reader is looking at when they ask "where
+    did this come from".
+    """
+    if not isinstance(snapshot, dict):
+        return None
+    values = snapshot.get("values")
+    if not isinstance(values, dict):
+        return None
+    for prefix in (f"indices.{index_code}.", f"grid.{index_code}."):
+        for key, raw in values.items():
+            if not key.startswith(prefix):
+                continue
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                # Snapshot values are stringified and not all are numeric
+                # (a crop path, a stage name). Skip rather than fail.
+                continue
+    return None
+
+
+def _detect_anomalies(
+    cells: list[dict[str, Any]], threshold: float | None
+) -> tuple[list[dict[str, Any]], float, str]:
+    """Flag low-outlier cells using the grid module's own detector.
+
+    Re-implementing the z-score maths here would be a second answer to the
+    same question, and the one Observer showed would be the one nobody tested
+    against production.
+
+    The threshold is the block override when it has one, otherwise the
+    module default. The *tenant-tier* setting is deliberately not re-resolved
+    here — that needs a public session and the settings resolver mid-scope —
+    so the payload reports which source was used rather than implying the
+    sweep's exact number.
+    """
+    from decimal import Decimal
+
+    from app.modules.grid.anomaly import DEFAULT_K, CellMean, detect_low_outliers, effective_k
+
+    k = effective_k(block_override=threshold, tenant_default=DEFAULT_K)
+    source = "block_override" if threshold is not None else "module_default"
+
+    usable = [
+        CellMean(
+            cell_id=c["cell_id"],
+            row_idx=int(c["row_idx"]),
+            col_idx=int(c["col_idx"]),
+            mean=Decimal(str(c["mean"])),
+            centroid_lon=float(c["centroid_lon"]),
+            centroid_lat=float(c["centroid_lat"]),
+        )
+        for c in cells
+        if c.get("mean") is not None
+    ]
+    result = detect_low_outliers(usable, k=k)
+    if result is None:
+        return [], k, source
+    return (
+        [
+            {
+                "cell_id": f.cell_id,
+                "mean": f.mean,
+                "z": f.z,
+                "threshold": k,
+                "row_idx": f.row_idx,
+                "col_idx": f.col_idx,
+            }
+            for f in result.flagged
+        ],
+        k,
+        source,
+    )
 
 
 def _check_window(window_from: datetime, window_to: datetime) -> None:

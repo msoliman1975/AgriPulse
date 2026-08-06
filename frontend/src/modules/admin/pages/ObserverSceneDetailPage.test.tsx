@@ -152,6 +152,21 @@ vi.mock("@/api/observer", async () => {
     getSceneDetail: (...args: unknown[]) => getSceneDetail(...(args as [])),
     explainPixel: (...args: unknown[]) => explainPixel(...(args as [])),
     getPixelBudget: (...args: unknown[]) => getPixelBudget(...(args as [])),
+    getIndexLineage: vi.fn(() =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: "ndvi",
+        window_from: "2026-06-14T08:37:00Z",
+        window_to: "2026-06-28T08:37:00Z",
+        recommendations: [],
+        alerts: [],
+        cell_anomalies: [],
+        anomaly_threshold: null,
+        anomaly_threshold_source: null,
+        exact: true,
+        consumer_count: 0,
+      }),
+    ),
     getSceneIndices: vi.fn(() =>
       Promise.resolve([
         {
