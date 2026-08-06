@@ -531,13 +531,36 @@ global:
   #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
   #   2861fe0, tile-server stays 9d140cc. Rollback is this tag back to
   #   3537f12.
+  # 03293ea = #366, custom crop attributes on the crop -> block assignment.
+  #   Some crops are not established from seed: a mango block is planted as
+  #   a grafted nursery tree, a date palm from an offshoot, a tomato from a
+  #   nursery seedling. Each needs facts `block_crops` has no column for,
+  #   and the shape differs per crop. Adds a platform-curated, typed field
+  #   catalog attached to the crop taxonomy, per-assignment values with an
+  #   append-only history, a `crop_attribute` decision-tree condition
+  #   source, and the block-drawer editor.
+  #   MIGRATIONS -- public 0050 (crop_attribute_definitions) + 0051 (seeds
+  #   43 definitions across mango, orange, mandarin, date palm, potato,
+  #   tomato) and tenant 0055 (block_crop_attribute_values + _log). All
+  #   three are PURELY ADDITIVE: three new tables and rows in one of them.
+  #   No existing table is altered, so rolling the tags back leaves three
+  #   unused tables behind and nothing else. Migrations do NOT roll back
+  #   with the tag.
+  #   User-visible change: a block whose crop is one of the six seeded
+  #   crops gains a "Crop fields" section in its drawer. Blocks on any
+  #   other crop render nothing new -- the section is omitted entirely when
+  #   the crop has no definitions, so wheat/cotton/rice blocks are
+  #   untouched. No existing field moves.
+  #   api + workers + frontend all move together (the editor needs the new
+  #   endpoints). tile-server stays 9d140cc. Rollback is api/workers back
+  #   to 2861fe0 and frontend back to 92e093e.
   images:
     api:
-      tag: "2861fe0"
+      tag: "03293ea"
     workers:
-      tag: "2861fe0"
+      tag: "03293ea"
     frontend:
-      tag: "92e093e"
+      tag: "03293ea"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
