@@ -62,6 +62,7 @@ const DETAIL: UnitDetail = {
   weather_3d: [],
   plan: null,
   crop_assignment: {
+    id: "00000000-0000-0000-0000-0000000000bc",
     crop_name: "Mango",
     variety_name: "Alphonso",
     strain_name: null,

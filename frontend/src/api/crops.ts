@@ -109,7 +109,9 @@ export interface ResolvedCropAttributes {
 
 /** Flat catalog across every crop — the decision-tree condition builder. */
 export async function listCropAttributeCatalog(): Promise<CropAttributeDefinition[]> {
-  const { data } = await apiClient.get<CropAttributeDefinition[]>("/v1/crops/attribute-definitions");
+  const { data } = await apiClient.get<CropAttributeDefinition[]>(
+    "/v1/crops/attribute-definitions",
+  );
   return data;
 }
 
