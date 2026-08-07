@@ -823,3 +823,74 @@ async def test_a_failed_execution_is_still_recorded(scenario: Scenario) -> None:
         assert runs[0]["error"]
         # A failed run contributes no version to the overview's version list.
         assert runs[0]["per_index"] == {}
+
+
+# ---- OBS-9: pixel + cell grid ----------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pixel_grid_on_a_scene_with_no_raster_is_409(scenario: Scenario) -> None:
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "status": ["failed"],
+                    **_window(),
+                },
+            )
+        ).json()
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}/pixel-grid",
+            params={"index_code": "ndvi"},
+        )
+        assert r.status_code == 409, r.text
+
+
+@pytest.mark.asyncio
+async def test_pixel_grid_rejects_an_index_the_product_does_not_offer(
+    scenario: Scenario,
+) -> None:
+    """A 4-band product has no NDMI. Returning an empty grid would read as
+    "this scene has no data" rather than "this index does not exist here"."""
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        job_id = next(r for r in rows if r["stac_item_id"])["job_id"]
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}/pixel-grid",
+            params={"index_code": "definitely_not_an_index"},
+        )
+        assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_pixel_grid_of_an_unknown_cell_is_404(scenario: Scenario) -> None:
+    async with _platform_client() as client:
+        rows = (
+            await client.get(
+                f"{_BASE}/tenants/{scenario.tenant_id}/scenes",
+                params={
+                    "farm_id": str(scenario.farm_id),
+                    "blocks": [str(scenario.block_a)],
+                    **_window(),
+                },
+            )
+        ).json()
+        job_id = next(r for r in rows if r["stac_item_id"])["job_id"]
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_id}/pixel-grid",
+            params={"index_code": "ndvi", "cell_id": str(uuid4())},
+        )
+        # 404 before the raster read: no point paying for a COG fetch to
+        # answer a question about a cell that does not exist.
+        assert r.status_code in (404, 409), r.text

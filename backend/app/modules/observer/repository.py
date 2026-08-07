@@ -720,6 +720,72 @@ class ObserverRepository:
         rows = await self._all(sql, block_ids=block_ids, product_id=product_id)
         return dict(rows[0])
 
+    async def cells_for_scene(
+        self,
+        *,
+        block_id: UUID,
+        product_id: UUID,
+        index_code: str,
+        scene_time: datetime,
+    ) -> list[dict[str, Any]]:
+        """Grid cells governing this scene's time, with their stored aggregate.
+
+        LEFT JOIN on the aggregate: a cell that exists but produced no row is
+        the interesting case — it means the zonal pass skipped it — and an
+        inner join would hide exactly that.
+
+        Geometry comes back in WGS84 for the map, and the WKT stays in the
+        cell's own UTM so the drill-down can hand it to `geometry_mask`
+        against a raster in the same projection, which is how the pipeline
+        does it.
+        """
+        sql = f"""
+            SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx,
+                   ST_AsGeoJSON(ST_Transform(gc.geom, 4326))::text AS geometry,
+                   ST_AsText(gc.geom) AS geom_wkt,
+                   gc.area_m2,
+                   a.mean, a.min, a.max, a.std_dev,
+                   a.valid_pixel_count, a.total_pixel_count
+              FROM grid_cells gc
+              JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+              LEFT JOIN block_grid_aggregates a
+                     ON a.cell_id = gc.id
+                    AND a.index_code = :code
+                    AND a.product_id = :pid
+                    AND a.time = {_ts(scene_time)}
+             WHERE cfg.block_id = :bid
+               AND cfg.product_id = :pid
+               AND cfg.deleted_at IS NULL
+               AND cfg.superseded_at IS NULL
+               AND tstzrange(cfg.effective_from, cfg.effective_to) @> {_ts(scene_time)}
+             ORDER BY gc.row_idx, gc.col_idx
+        """
+        rows = (
+            await self._s.execute(
+                text(sql),
+                {"bid": str(block_id), "pid": str(product_id), "code": index_code},
+            )
+        ).mappings()
+        return [dict(r) for r in rows]
+
+    async def cell_by_id(self, cell_id: UUID) -> dict[str, Any] | None:
+        rows = (
+            await self._s.execute(
+                text(
+                    """
+                    SELECT gc.id AS cell_id, gc.row_idx, gc.col_idx,
+                           ST_AsText(gc.geom) AS geom_wkt,
+                           ST_AsGeoJSON(ST_Transform(gc.geom, 4326))::text AS geometry
+                      FROM grid_cells gc
+                     WHERE gc.id = :cid
+                    """
+                ),
+                {"cid": str(cell_id)},
+            )
+        ).mappings()
+        found = rows.first()
+        return dict(found) if found else None
+
 
 def get_observer_repository(session: AsyncSession) -> ObserverRepository:
     return ObserverRepository(session)

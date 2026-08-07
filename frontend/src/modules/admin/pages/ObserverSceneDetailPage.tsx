@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 import type { Geometry } from "geojson";
@@ -10,18 +10,16 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
-import {
-  buildTileUrlTemplate,
-  indexAssetKey,
-  visualizationDefaults,
-} from "@/modules/imagery/components/tileUrl";
+import { visualizationDefaults } from "@/modules/imagery/components/tileUrl";
 import type { IndexCode } from "@/api/indices";
 import { PixelBudgetCard } from "@/modules/admin/components/observer/PixelBudgetCard";
+import { CellDrillPanel } from "@/modules/admin/components/observer/CellDrillPanel";
 import { LineagePanel } from "@/modules/admin/components/observer/LineagePanel";
 import { PixelInspector } from "@/modules/admin/components/observer/PixelInspector";
 import { VerifyPanel } from "@/modules/admin/components/observer/VerifyPanel";
 import {
   usePixelBudget,
+  usePixelGrid,
   usePixelExplain,
   useSceneDetail,
   useSceneIndices,
@@ -39,6 +37,12 @@ const ObserverSceneMap = lazy(() =>
  * One scene, explained: what went in, what the maths did, what came out, and
  * how a single pixel rolls up into the cell and block numbers.
  */
+/** Value window for the pixel ramp — imagery's own per-index defaults. */
+function rescaleFor(indexCode: string): [number, number] {
+  const vis = visualizationDefaults(indexCode as IndexCode);
+  return [vis.rescaleMin, vis.rescaleMax];
+}
+
 export function ObserverSceneDetailPage(): ReactNode {
   const { t, i18n } = useTranslation("admin");
   const { jobId } = useParams<{ jobId: string }>();
@@ -49,10 +53,12 @@ export function ObserverSceneDetailPage(): ReactNode {
 
   const [picked, setPicked] = useState<{ lon: number; lat: number } | null>(null);
   const [budgetRequested, setBudgetRequested] = useState(false);
+  const [selectedCell, setSelectedCell] = useState<string | null>(null);
 
   const detail = useSceneDetail(tenantId, jobId ?? null);
   const pixel = usePixelExplain(tenantId, jobId ?? null, picked);
   const budget = usePixelBudget(tenantId, jobId ?? null, budgetRequested);
+  const grid = usePixelGrid(tenantId, jobId ?? null, selectedIndex, selectedCell);
   const indices = useSceneIndices(
     tenantId,
     detail.data
@@ -63,27 +69,6 @@ export function ObserverSceneDetailPage(): ReactNode {
         }
       : null,
   );
-
-  const tileUrl = useMemo(() => {
-    const d = detail.data;
-    if (!d || !d.raw_asset_key) return null;
-    if (!d.supported_indices.includes(selectedIndex)) return null;
-    const vis = visualizationDefaults(selectedIndex as IndexCode);
-    return buildTileUrlTemplate({
-      tileServerBaseUrl: d.tile_server_base_url,
-      s3Bucket: d.s3_bucket,
-      assetKey: indexAssetKey({
-        providerCode: d.provider_code,
-        productCode: d.product_code,
-        sceneId: d.scene_id,
-        aoiHash: d.aoi_hash,
-        indexCode: selectedIndex as IndexCode,
-      }),
-      rescaleMin: vis.rescaleMin,
-      rescaleMax: vis.rescaleMax,
-      colormap: vis.colormap,
-    });
-  }, [detail.data, selectedIndex]);
 
   if (detail.isPending) return <Skeleton className="h-96 w-full" />;
   if (!detail.data) return <Page>{t("observer.detail.notFound")}</Page>;
@@ -128,28 +113,58 @@ export function ObserverSceneDetailPage(): ReactNode {
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <Card title={t("observer.detail.raster")} noPadding>
+        <Card
+          title={t("observer.detail.raster")}
+          actions={
+            grid.data ? (
+              <span className="text-xs text-ap-muted">
+                {grid.data.returned_pixel_count} px · {grid.data.cells.length} cells
+              </span>
+            ) : null
+          }
+          noPadding
+        >
           {d.raw_asset_key ? (
-            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-              <ObserverSceneMap
-                geometry={d.boundary_geojson as unknown as Geometry}
-                tileUrlTemplate={tileUrl}
-                picked={picked}
-                onPick={setPicked}
-                className="h-96 w-full rounded-b-card"
-              />
+            <Suspense fallback={<Skeleton className="h-[28rem] w-full" />}>
+              {grid.data ? (
+                <>
+                  <ObserverSceneMap
+                    boundary={d.boundary_geojson as unknown as Geometry}
+                    pixels={grid.data.pixels}
+                    cells={grid.data.cells}
+                    selectedCellId={selectedCell}
+                    onSelectCell={setSelectedCell}
+                    onPickPixel={setPicked}
+                    rescale={rescaleFor(selectedIndex)}
+                    className="h-[28rem] w-full"
+                  />
+                  <p className="border-t border-ap-line p-3 text-xs text-ap-muted">
+                    {t("observer.cells.legend")}
+                  </p>
+                </>
+              ) : (
+                <Skeleton className="h-[28rem] w-full" />
+              )}
             </Suspense>
           ) : (
             <p className="p-4 text-sm text-ap-muted">{t("observer.detail.noRaster")}</p>
           )}
         </Card>
 
-        <PixelInspector
-          data={pixel.data}
-          isPending={pixel.isFetching}
-          error={pixel.error}
-          selectedIndex={selectedIndex}
-        />
+        <div className="space-y-4">
+          <CellDrillPanel
+            grid={grid.data}
+            selectedCellId={selectedCell}
+            onClear={() => setSelectedCell(null)}
+            isFetching={grid.isFetching}
+          />
+          <PixelInspector
+            data={pixel.data}
+            isPending={pixel.isFetching}
+            error={pixel.error}
+            selectedIndex={selectedIndex}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

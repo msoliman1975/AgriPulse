@@ -831,6 +831,31 @@
       },
       "anomalies": "{{n}} cell(s) flagged as low outliers",
       "threshold": "Threshold z = {{k}} (source: {{source}}). The tenant-level setting is not re-resolved here, so a module default is not necessarily the number the nightly sweep used."
+    },
+    "cells": {
+      "title": "Cells",
+      "titleSelected": "Cell {{label}}",
+      "prompt": "Click a cell on the map to see the pixels it was aggregated from. Click anywhere else to inspect a single pixel.",
+      "loading": "reading raster…",
+      "clear": "Clear selection",
+      "blockMean": "Block mean",
+      "blockPixels": "Block pixels (valid / total)",
+      "cellCount": "Cells on this scene",
+      "resolution": "Pixel size",
+      "truncated": "Showing {{shown}} of {{total}} pixels — the block is larger than the map cap, so this is a prefix, not the whole field.",
+      "pixelsIn": "The {{n}} pixels in this cell",
+      "howAggregated": "How the cell value is computed",
+      "meanOf": "mean of {{n}} valid pixels",
+      "storedCell": "Stored cell mean:",
+      "agrees": "matches the stored value",
+      "disagrees": "differs from the stored value",
+      "noStoredRow": "no stored aggregate for this cell",
+      "rollsUp": "Rolls up",
+      "pixels": "Pixels",
+      "cell": "Cell",
+      "block": "Block",
+      "membership": "Cell and block counts do not sum, by design: a cell claims a pixel when the pixel's centre falls inside it, while the block claims a pixel when its footprint touches the boundary. Edge pixels therefore count for the block but for no cell.",
+      "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
     }
   }
 }
