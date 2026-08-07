@@ -640,13 +640,42 @@ global:
   #   does not. It ships a tested downgrade(), but running it is a deliberate
   #   act. Rolling back the images alone is safe: cfc0751's api simply never
   #   reads the two new columns.
+  # 671ecbe = AgriPulse Observer, the whole capability in one rollout (#374,
+  #   #373, #375). A platform-admin-only surface at /platform/observer that
+  #   answers "is this index number right, and where did it come from?" --
+  #   distinct from Integration health, which only answers "did the fetch
+  #   work?". Pipeline stages with verdicts, per-scene histograms, a pixel
+  #   inspector that reads the actual COG and shows the arithmetic, queued
+  #   verification runs, a weather lane with hour-coverage, forward lineage to
+  #   the recommendations and alerts that consumed a value, and a scene map
+  #   drawing every pixel footprint and grid cell so a cell's value can be
+  #   traced to the pixels it was aggregated from.
+  #
+  #   Read-only against tenant data: every query runs under SET LOCAL
+  #   search_path and the module writes nothing outside its own two tables.
+  #   Gated on a new capability, platform.observe_pipeline, so no existing
+  #   role gains anything by this rollout.
+  #
+  #   MIGRATION: tenant 0059 + 0060 (indices_calc_runs, observer_verify_runs,
+  #   observer_verifications). Purely additive -- three CREATE TABLEs and their
+  #   indexes, no ALTER of an existing table, no backfill, nothing to guess at.
+  #   0058 was already applied under 1095505. Round-trip tested both ways, and
+  #   the CHECK constraint names are bare suffixes so the downgrade actually
+  #   finds them. Rolling the tags back is safe on its own: 1095505's api never
+  #   looks for these tables.
+  #
+  #   NOT BROWSER-VERIFIED. The API surface was smoke-tested end to end against
+  #   real local data (17/17 checks, including a pixel explain that reproduced
+  #   a stored NDVI from the raster and a cell mean that matched its pixels),
+  #   but the rendered UI has never been opened in a browser -- Playwright held
+  #   a stale lock for the whole build. Expect to look at it after the rollout.
   images:
     api:
-      tag: "1095505"
+      tag: "671ecbe"
     workers:
-      tag: "1095505"
+      tag: "671ecbe"
     frontend:
-      tag: "1095505"
+      tag: "671ecbe"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
