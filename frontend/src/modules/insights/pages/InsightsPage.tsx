@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import { getFarm } from "@/api/farms";
+import type { SeasonContextCrop } from "@/api/insights";
 import { ErrorState } from "@/components/ErrorState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
@@ -16,7 +17,7 @@ import { DEFAULT_SPAN, presetRange, type TimeRange } from "../lib/timeRange";
 import { BlockHealthScorecard } from "../components/BlockHealthScorecard";
 import { FarmTrendChart } from "../components/FarmTrendChart";
 import { KPICards } from "../components/KPICards";
-import { SeasonContextBar } from "../components/SeasonContextBar";
+import { blocksForCrops, SeasonContextBar } from "../components/SeasonContextBar";
 import { TimeRangeBar } from "../components/TimeRangeBar";
 import { WeatherSection } from "../components/WeatherSection";
 
@@ -52,6 +53,16 @@ export function InsightsPage(): ReactNode {
   // control, so two of them could sit on different windows with nothing on
   // screen saying so.
   const [range, setRange] = useState<TimeRange>(() => presetRange(DEFAULT_SPAN));
+
+  // Crop filter. Empty selection is "All". The page resolves crops → block
+  // ids once and hands the ids down, so the cards never learn what a crop is.
+  const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
+  const [crops, setCrops] = useState<readonly SeasonContextCrop[]>();
+  const onCropsLoaded = useCallback((next: readonly SeasonContextCrop[]) => setCrops(next), []);
+  const blockIds = useMemo(
+    () => blocksForCrops(crops, selectedCrops),
+    [crops, selectedCrops],
+  );
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -99,21 +110,31 @@ export function InsightsPage(): ReactNode {
 
       <KPICards farmId={farmId} />
 
-      <SeasonContextBar farmId={farmId} />
+      <SeasonContextBar
+        farmId={farmId}
+        selected={selectedCrops}
+        onChange={setSelectedCrops}
+        onCropsLoaded={onCropsLoaded}
+      />
 
       {/* One control, every graph below it. KPI tiles stay current-state and
           deliberately do not follow the range. */}
       <TimeRangeBar value={range} onChange={setRange} />
 
-      <FarmTrendChart farmId={farmId} range={range} />
+      <FarmTrendChart farmId={farmId} range={range} blockIds={blockIds} />
 
       {/* One section for all of it: now → trend → outlook → risk. These were
           four sibling cards saying "weather" four times over the same data. */}
       {canReadWeather ? (
-        <WeatherSection farmId={farmId} range={range} showRisk={canReadRisk} />
+        <WeatherSection
+          farmId={farmId}
+          range={range}
+          showRisk={canReadRisk}
+          blockIds={blockIds}
+        />
       ) : null}
 
-      <BlockHealthScorecard farmId={farmId} />
+      <BlockHealthScorecard farmId={farmId} blockIds={blockIds} />
     </Page>
   );
 }

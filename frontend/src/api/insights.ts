@@ -96,6 +96,9 @@ export interface SeasonContextCrop {
   name_en: string;
   name_ar: string | null;
   block_count: number;
+  /** Which blocks carry this crop. A block with two crops appears under
+   *  both, so these lists overlap and must be unioned, never summed. */
+  block_ids: string[];
 }
 
 export interface FarmSeasonContextResponse {

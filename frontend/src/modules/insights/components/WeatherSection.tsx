@@ -24,6 +24,10 @@ interface Props {
   range: TimeRange;
   /** Caller has `weather_risk.read`; the risk row is a separate capability. */
   showRisk: boolean;
+  /** Crop-filtered blocks, or null for the whole farm. Only the risk row can
+   *  honour this: everything above it is farm-centroid data, one point for
+   *  the whole farm, so there is no per-crop version of it to show. */
+  blockIds?: readonly string[] | null;
 }
 
 // The outlook's past slice is a stitched daily chart, so "all" would render
@@ -44,7 +48,7 @@ const OUTLOOK_MAX_PAST_DAYS = 90;
  * The catalog and summary queries live here because the strip and the trend
  * panel both need them, and a farm should not pay for them twice.
  */
-export function WeatherSection({ farmId, range, showRisk }: Props): ReactNode {
+export function WeatherSection({ farmId, range, showRisk, blockIds = null }: Props): ReactNode {
   const { t } = useTranslation("weatherIndices");
   const isAr = i18n.language === "ar";
   const [selected, setSelected] = useState<string | null>(null);
@@ -151,7 +155,7 @@ export function WeatherSection({ farmId, range, showRisk }: Props): ReactNode {
             <WeatherOutlookPanel blockId={firstBlock.id} pastDays={pastDays} />
           ) : null}
 
-          {showRisk ? <WeatherRiskRow farmId={farmId} /> : null}
+          {showRisk ? <WeatherRiskRow farmId={farmId} blockIds={blockIds} /> : null}
         </div>
       )}
     </Card>
