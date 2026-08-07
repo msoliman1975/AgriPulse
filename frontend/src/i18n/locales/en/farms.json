@@ -279,5 +279,28 @@
     "statMin": "Min",
     "statMax": "Max",
     "latestScene": "Latest scene: {{date}}"
+  },
+  "cropAttributes": {
+    "title": "Crop fields",
+    "loading": "Loading…",
+    "save": "Save fields",
+    "saving": "Saving…",
+    "reset": "Reset",
+    "close": "Close",
+    "history": "history",
+    "historyFor": "Change history — {{code}}",
+    "noHistory": "No changes recorded yet.",
+    "selectPlaceholder": "— select —",
+    "otherGroup": "Other",
+    "requiredForThis": "Required for this option",
+    "missingRequired": "Required: {{fields}}",
+    "willClear": "Saving will clear {{fields}} — those fields no longer apply to the selected option.",
+    "saveFailed": "Couldn't save the crop fields.",
+    "changeKind": {
+      "set": "set",
+      "updated": "updated",
+      "cleared": "cleared",
+      "cleared_by_gate": "cleared — no longer applies"
+    }
   }
 }

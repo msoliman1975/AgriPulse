@@ -51,6 +51,7 @@ import { PlatformLayout } from "@/modules/admin/pages/PlatformLayout";
 import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/TenantListPage";
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
+import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAttributesPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
@@ -281,6 +282,10 @@ export function App(): ReactNode {
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
+                <Route
+                  path="crops/:cropId/attributes"
+                  element={<PlatformCropAttributesPage />}
+                />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />

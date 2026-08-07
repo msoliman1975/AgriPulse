@@ -10,10 +10,13 @@ import type {
 } from "@/api/blocks";
 
 import { IndexChart } from "./IndexChart";
-import type { IndexCode, IntegrationKindStatus, UnitDetail } from "./types";
+import type { IndexCode, IntegrationKindStatus, UnitDetail, UnitIntegration } from "./types";
 
 interface Props {
   detail: UnitDetail | null;
+  // Loads on its own clock, off the map's critical path — may still be
+  // null after `detail` has arrived.
+  integration: UnitIntegration | null;
   isLoading: boolean;
   onClose: () => void;
   width: number;
@@ -89,6 +92,7 @@ const HEALTH_TEXT = {
 
 export function DetailPanel({
   detail,
+  integration,
   isLoading,
   onClose,
   width,
@@ -467,11 +471,11 @@ export function DetailPanel({
         </Section>
       ) : null}
 
-      {detail.integration ? (
+      {integration ? (
         <Section title="Integrations">
           <div className="mt-1 grid grid-cols-2 gap-2">
-            <IntegrationRow label="Weather" status={detail.integration.weather} />
-            <IntegrationRow label="Imagery" status={detail.integration.imagery} />
+            <IntegrationRow label="Weather" status={integration.weather} />
+            <IntegrationRow label="Imagery" status={integration.imagery} />
           </div>
         </Section>
       ) : null}

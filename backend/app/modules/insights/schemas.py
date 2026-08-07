@@ -119,6 +119,10 @@ class SeasonContextCrop(BaseModel):
     # by the FE to order the bar (most-planted first) and surface
     # mixed-crop farms.
     block_count: int
+    # WHICH blocks, so the overview can filter its block-scoped cards to a
+    # crop without asking per block. A block planted with two crops appears
+    # under both, so these lists may overlap and must be unioned, not summed.
+    block_ids: list[UUID] = []
 
 
 class FarmSeasonContextResponse(BaseModel):

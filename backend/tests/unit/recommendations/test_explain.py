@@ -110,6 +110,7 @@ def _setup(
         weather_risks={},
         signals={},
         grid={},
+        crop_attributes={},
         ctx=ctx,
         block_trees=block_trees if block_trees is not None else [],
         cell_trees=cell_trees or [],

@@ -3,7 +3,15 @@
 // retire via { is_active: false } on the update endpoints.
 
 import { apiClient } from "./client";
-import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "./crops";
+import type {
+  ClassificationDepth,
+  Crop,
+  CropAttributeDefinition,
+  CropAttributeGate,
+  CropAttributeOption,
+  CropVariety,
+  CropVarietyStrain,
+} from "./crops";
 
 export interface CropCreatePayload {
   code: string;
@@ -122,6 +130,85 @@ export async function updateStrain(
 ): Promise<CropVarietyStrain> {
   const { data } = await apiClient.patch<CropVarietyStrain>(
     `/v1/admin/crop-variety-strains/${strainId}`,
+    payload,
+  );
+  return data;
+}
+
+// ---- Attribute definitions ------------------------------------------------
+//
+// The typed fields that appear on a crop → block assignment. Platform-curated
+// like the rest of this file: tenants read them (via /v1/crops/…) but only a
+// platform admin authors them.
+
+export interface CropAttributeDefinitionCreate {
+  /** Absent → attaches to the crop itself. A strain implies its variety. */
+  crop_variety_id?: string | null;
+  crop_variety_strain_id?: string | null;
+  code: string;
+  name_en: string;
+  name_ar: string;
+  description_en?: string | null;
+  description_ar?: string | null;
+  value_type: CropAttributeDefinition["value_type"];
+  unit_en?: string | null;
+  unit_ar?: string | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  decimal_places?: number | null;
+  text_max_length?: number | null;
+  options?: CropAttributeOption[] | null;
+  is_required?: boolean;
+  required_when?: CropAttributeGate | null;
+  show_when?: CropAttributeGate | null;
+  group_code?: string | null;
+  group_name_en?: string | null;
+  group_name_ar?: string | null;
+  sort_order?: number;
+  is_reportable?: boolean;
+}
+
+/**
+ * Everything a definition can change after creation.
+ *
+ * `code` and the taxonomy attachment are absent on purpose — both are part of
+ * the identity stored values point at, and the PATCH schema forbids extra
+ * keys, so sending them back is a 422 rather than a no-op. Retiring is
+ * `is_active: false`; there is no DELETE.
+ */
+export type CropAttributeDefinitionUpdate = Partial<
+  Omit<CropAttributeDefinitionCreate, "code" | "crop_variety_id" | "crop_variety_strain_id">
+> & { is_active?: boolean };
+
+/** Every definition on a crop, at every taxonomy level. */
+export async function listAdminCropAttributes(
+  cropId: string,
+  includeInactive = false,
+): Promise<CropAttributeDefinition[]> {
+  const { data } = await apiClient.get<CropAttributeDefinition[]>(
+    `/v1/admin/crops/${cropId}/attribute-definitions`,
+    { params: includeInactive ? { include_inactive: true } : undefined },
+  );
+  return data;
+}
+
+export async function createCropAttribute(
+  cropId: string,
+  payload: CropAttributeDefinitionCreate,
+): Promise<CropAttributeDefinition> {
+  const { data } = await apiClient.post<CropAttributeDefinition>(
+    `/v1/admin/crops/${cropId}/attribute-definitions`,
+    payload,
+  );
+  return data;
+}
+
+export async function updateCropAttribute(
+  definitionId: string,
+  payload: CropAttributeDefinitionUpdate,
+): Promise<CropAttributeDefinition> {
+  const { data } = await apiClient.patch<CropAttributeDefinition>(
+    `/v1/admin/crop-attribute-definitions/${definitionId}`,
     payload,
   );
   return data;

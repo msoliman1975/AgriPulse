@@ -113,3 +113,5 @@ scripts/.dev-stack-state.json
 AOIs/
 # Playwright MCP browser cache (driven by Claude Code's MCP server).
 .playwright-mcp/
+# Renewed GitHub PAT, kept locally so agents can auth without gh keyring.
+github-token.txt

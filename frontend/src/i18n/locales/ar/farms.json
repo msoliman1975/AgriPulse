@@ -279,5 +279,28 @@
     "statMin": "الأدنى",
     "statMax": "الأعلى",
     "latestScene": "أحدث مشهد: {{date}}"
+  },
+  "cropAttributes": {
+    "title": "حقول المحصول",
+    "loading": "جارٍ التحميل…",
+    "save": "حفظ الحقول",
+    "saving": "جارٍ الحفظ…",
+    "reset": "إعادة تعيين",
+    "close": "إغلاق",
+    "history": "السجل",
+    "historyFor": "سجل التغييرات — {{code}}",
+    "noHistory": "لا توجد تغييرات مسجلة بعد.",
+    "selectPlaceholder": "— اختر —",
+    "otherGroup": "أخرى",
+    "requiredForThis": "مطلوب لهذا الاختيار",
+    "missingRequired": "مطلوب: {{fields}}",
+    "willClear": "سيؤدي الحفظ إلى مسح {{fields}} — لم تعد هذه الحقول تنطبق على الاختيار الحالي.",
+    "saveFailed": "تعذّر حفظ حقول المحصول.",
+    "changeKind": {
+      "set": "تم التعيين",
+      "updated": "تم التحديث",
+      "cleared": "تم المسح",
+      "cleared_by_gate": "تم المسح — لم يعد ينطبق"
+    }
   }
 }

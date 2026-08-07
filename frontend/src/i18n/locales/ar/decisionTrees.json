@@ -333,6 +333,7 @@
       "weatherRiskCode": "المُمْرِض / الآفة",
       "signalCode": "رمز الإشارة",
       "gridField": "حقل الشبكة",
+      "cropAttributeCode": "كود حقل المحصول",
       "paramName": "اسم المعامل",
       "rightNumber": "رقم",
       "rightString": "نص",
@@ -348,6 +349,7 @@
         "weather_risk": "خطر الأمراض/الآفات",
         "signals": "إشارة مخصصة",
         "grid": "شذوذ الشبكة",
+        "crop_attribute": "حقل المحصول",
         "params": "معامل الشجرة"
       }
     },

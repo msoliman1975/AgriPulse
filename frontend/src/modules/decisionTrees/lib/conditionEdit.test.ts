@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLOCK_FIELDS,
+  CROP_ATTRIBUTE_KEYS,
   INDICES_KEYS,
   SIGNAL_KEYS,
   changeTermOp,
+  defaultValueRef,
   parseConditionTree,
   serializeCondition,
   serializeNode,
@@ -212,6 +214,74 @@ describe("constants stay in lock-step with the backend", () => {
   it("still rejects a field the backend does not resolve", () => {
     const raw = { op: "eq", left: { source: "block", field: "invented_field" }, right: 1 };
     expect(parseConditionTree(raw).kind).toBe("unsupported");
+  });
+});
+
+// The crop_attribute source is the first whose vocabulary is *data* — the
+// codes come from the platform crop catalog, so unlike every other source
+// there is no closed list in conditionEdit.ts to validate against. These
+// tests pin the parts that ARE fixed: the key list, the round trip, and the
+// fact that an unknown code stays editable rather than dropping to YAML.
+describe("crop_attribute source", () => {
+  it("parses and round-trips a crop attribute ref", () => {
+    const raw = {
+      op: "lt",
+      left: { source: "crop_attribute", code: "age_at_transplant_months", key: "value" },
+      right: 36,
+    };
+    const t = term(parseConditionTree(raw));
+    expect(t.left).toEqual({
+      source: "crop_attribute",
+      code: "age_at_transplant_months",
+      key: "value",
+    });
+    expect(serializeCondition(parseConditionTree(raw))).toEqual(raw);
+  });
+
+  it("defaults the key to 'value' like the backend parser", () => {
+    const t = term(
+      parseConditionTree({
+        op: "eq",
+        left: { source: "crop_attribute", code: "establishment_method" },
+        right: "grafted_tree",
+      }),
+    );
+    expect(t.left).toEqual({
+      source: "crop_attribute",
+      code: "establishment_method",
+      key: "value",
+    });
+  });
+
+  it("keeps an unknown code editable — the catalog is data, not a constant", () => {
+    // A code the tenant's catalog no longer defines must still parse, or
+    // editing an old tree drops the whole condition into the YAML fallback.
+    expect(
+      parseConditionTree({
+        op: "eq",
+        left: { source: "crop_attribute", code: "a_code_no_longer_in_the_catalog" },
+        right: "x",
+      }).kind,
+    ).toBe("node");
+  });
+
+  it("rejects an unknown key", () => {
+    expect(CROP_ATTRIBUTE_KEYS).toEqual(["value"]);
+    expect(
+      parseConditionTree({
+        op: "eq",
+        left: { source: "crop_attribute", code: "establishment_method", key: "days_since" },
+        right: 1,
+      }).kind,
+    ).toBe("unsupported");
+  });
+
+  it("has a default ref for the source picker", () => {
+    expect(defaultValueRef("crop_attribute")).toEqual({
+      source: "crop_attribute",
+      code: "",
+      key: "value",
+    });
   });
 });
 

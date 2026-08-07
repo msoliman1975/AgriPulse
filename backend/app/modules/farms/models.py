@@ -159,6 +159,87 @@ class CropVarietyStrain(Base, TimestampedMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
+class CropAttributeDefinition(Base, TimestampedMixin):
+    """Platform-curated typed field on the crop → block assignment.
+
+    Attaches at any level of the taxonomy (``crop_id`` always set; plus
+    ``crop_variety_id`` and/or ``crop_variety_strain_id`` for deeper rows) and
+    resolves **deepest-wins by ``code``** — see
+    ``app.modules.farms.crop_attributes.resolve_definitions``. A deeper row
+    with the same ``code`` replaces the inherited one wholesale (unlike
+    ``default_thresholds``, which shallow-merges): narrowing a range or an
+    option list only reads correctly if the whole definition is replaced.
+
+    ``show_when`` / ``required_when`` are one-level, non-recursive gates —
+    ``{"code": <other definition code>, "in": [...]}`` against another
+    attribute on the same assignment. Deliberately not a general expression
+    language; the decision-tree evaluator is the place for those.
+    """
+
+    __tablename__ = "crop_attribute_definitions"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crops.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    crop_variety_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crop_varieties.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    crop_variety_strain_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.crop_variety_strains.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    # Canonical path of the attachment node ("mango", "mango.sukkary",
+    # "mango.alphonso.short"). Denormalised so the resolve is a prefix match.
+    path: Mapped[str] = mapped_column(Text, nullable=False)
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_type: Mapped[str] = mapped_column(Text, nullable=False)
+    unit_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_min: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_max: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    decimal_places: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    text_max_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # ``[{"code", "name_en", "name_ar", "sort_order"}, ...]`` for select types.
+    #
+    # ``none_as_null=True`` on all three JSONB columns, deliberately. By
+    # default SQLAlchemy serialises Python ``None`` into JSON ``null`` rather
+    # than SQL NULL, so an absent value would be stored as ``'null'::jsonb``
+    # — which ``IS NOT NULL`` reports as present. That breaks the
+    # ``options`` CHECK (a text attribute would look like it carries options)
+    # and would make any future "has a gate" query wrong.
+    options: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
+    required_when: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    show_when: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    group_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    group_name_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    group_name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    is_reportable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("TRUE")
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+
+
 class Farm(Base, TimestampedMixin):
     """Tenant-schema table; resolved via search_path."""
 
@@ -406,6 +487,88 @@ class BlockCrop(Base, TimestampedMixin):
     is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'planned'"))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BlockCropAttributeValue(Base, TimestampedMixin):
+    """One crop-attribute value on one crop → block assignment.
+
+    Typed columns rather than a JSONB blob: the report column picker and the
+    decision-tree evaluator both *compare* these, and JSONB would force a CAST
+    on every comparison — the failure family behind #331/#332/#335. Exactly
+    one ``value_*`` column is non-null, enforced by a CHECK in tenant
+    migration 0055.
+
+    ``definition_id`` / ``definition_code`` are logical cross-schema refs to
+    ``public.crop_attribute_definitions`` (no DB FK — same arrangement as
+    ``block_crops.crop_id``). The code is denormalised because every consumer
+    keys by code, and because it keeps history readable after a definition is
+    retired.
+    """
+
+    __tablename__ = "block_crop_attribute_values"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("block_crops.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    definition_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    definition_code: Mapped[str] = mapped_column(Text, nullable=False)
+    value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+
+
+class BlockCropAttributeValueLog(Base):
+    """Append-only history of one attribute's value on one assignment.
+
+    Written by the service in the same transaction as the value write — a DB
+    trigger has no access to the acting user. Carries both the previous and
+    the new value so a row is self-describing, and distinguishes
+    ``cleared_by_gate`` from a user clearing a field: "who deleted the
+    transplant date?" has an answer when the real cause was someone switching
+    the establishment method back to Seed.
+
+    This is also what lets a report resolve a value **as of the period end**
+    rather than silently back-dating today's number onto a Q1 report.
+    """
+
+    __tablename__ = "block_crop_attribute_value_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_crop_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("block_crops.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    definition_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    definition_code: Mapped[str] = mapped_column(Text, nullable=False)
+    value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    prev_value_numeric: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    prev_value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prev_value_boolean: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    prev_value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    prev_value_option: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prev_value_options: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # set | updated | cleared | cleared_by_gate
+    change_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    changed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class GrowthStageLog(Base, TimestampedMixin):

@@ -51,6 +51,14 @@ function legend() {
   return screen.getByRole("group", { name: /blocks shown/i });
 }
 
+function showAll() {
+  return screen.getByRole("button", { name: "Show all blocks" });
+}
+
+function hideAll() {
+  return screen.getByRole("button", { name: "Hide all blocks" });
+}
+
 function swatchColor(name: string): string | undefined {
   const btn = within(legend()).getByRole("button", { name: new RegExp(name) });
   return btn.querySelector("span[aria-hidden='true']")?.getAttribute("style") ?? undefined;
@@ -98,17 +106,39 @@ describe("FarmTrendChart legend selection", () => {
 
     await user.click(within(legend()).getByRole("button", { name: /North/ }));
     await user.click(within(legend()).getByRole("button", { name: /South/ }));
-    await user.click(screen.getByText("Show all blocks"));
+    await user.click(showAll());
 
     expect(
       within(legend())
         .getAllByRole("button")
         .every((b) => b.getAttribute("aria-pressed") === "true"),
     ).toBe(true);
-    expect(screen.queryByText("Show all blocks")).toBeNull();
+    // Always mounted, disabled instead of unmounted — an appearing/vanishing
+    // control shifts the legend entries under the reader's cursor mid-click.
+    expect(showAll()).toBeDisabled();
+    expect(hideAll()).toBeEnabled();
   });
 
-  it("refuses to mute the last visible block", async () => {
+  it("mutes every block from one control, and says so", async () => {
+    const user = userEvent.setup();
+    renderChart();
+    await waitFor(() => expect(within(legend()).getAllByRole("button")).toHaveLength(4));
+
+    await user.click(hideAll());
+
+    expect(
+      within(legend())
+        .getAllByRole("button")
+        .every((b) => b.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+    // The plot must say the reader hid them, not repeat the "no observations
+    // yet" empty state — the farm's data is there, it is just muted.
+    expect(screen.getByText("All blocks are hidden.")).toBeTruthy();
+    expect(screen.queryByText(/No observations yet/)).toBeNull();
+    expect(hideAll()).toBeDisabled();
+  });
+
+  it("lets the reader mute the last visible block", async () => {
     const user = userEvent.setup();
     renderChart();
     await waitFor(() => expect(within(legend()).getAllByRole("button")).toHaveLength(4));
@@ -116,12 +146,30 @@ describe("FarmTrendChart legend selection", () => {
     for (const name of BLOCKS) {
       await user.click(within(legend()).getByRole("button", { name: new RegExp(name) }));
     }
-    // An empty plot under a full legend reads as "no data", which is a
-    // different and more alarming message than "you hid everything".
+    // Clicking the fourth block must not silently no-op just because it is
+    // the last one left; the all-hidden message is what keeps that readable.
     const pressed = within(legend())
       .getAllByRole("button")
       .filter((b) => b.getAttribute("aria-pressed") === "true");
-    expect(pressed).toHaveLength(1);
+    expect(pressed).toHaveLength(0);
+    expect(screen.getByText("All blocks are hidden.")).toBeTruthy();
+  });
+
+  it("shows every index as a chip instead of hiding them in a dropdown", async () => {
+    const user = userEvent.setup();
+    renderChart();
+    await waitFor(() => expect(within(legend()).getAllByRole("button")).toHaveLength(4));
+
+    const picker = screen.getByRole("radiogroup", { name: /index/i });
+    // A dropdown makes the reader already know NDRE exists to go find it.
+    for (const code of ["NDVI", "NDWI", "EVI", "SAVI", "NDRE", "GNDVI"]) {
+      expect(within(picker).getByRole("radio", { name: code })).toBeTruthy();
+    }
+    expect(within(picker).getByRole("radio", { name: "NDVI" })).toBeChecked();
+
+    await user.click(within(picker).getByRole("radio", { name: "NDRE" }));
+    expect(within(picker).getByRole("radio", { name: "NDRE" })).toBeChecked();
+    expect(within(picker).getByRole("radio", { name: "NDVI" })).not.toBeChecked();
   });
 
   it("drops filtered-out blocks from the legend entirely", async () => {

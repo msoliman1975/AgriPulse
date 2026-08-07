@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.shared.conditions.context import (
+    CROP_ATTRIBUTE_KEYS,
     GRID_FIELDS,
     SIGNAL_KEYS,
     WEATHER_INDEX_KEYS,
@@ -179,6 +180,36 @@ class ParamsValueRef:
     name: str
 
 
+@dataclass(frozen=True, slots=True)
+class CropAttributeValueRef:
+    """``{"source":"crop_attribute","code":"age_at_transplant_months","key":"value"}``
+
+    Reads a platform-curated crop attribute recorded on the block's *current*
+    crop assignment — establishment method, transplant date, age at
+    transplant, seed-tuber grade, and whatever else the catalog defines for
+    that crop.
+
+    Unlike every other source, the set of valid ``code`` values is **data**,
+    not a constant: it comes from ``public.crop_attribute_definitions`` and
+    grows as the catalog does. So ``code`` is not validated against a closed
+    list here — an unknown code resolves to ``None`` and the comparison fails
+    closed, matching ``weather``'s treatment of ``field``. The authoring-time
+    check that a tree's referenced codes exist for its target crop paths lives
+    in the tree validator, where the targeting is known.
+
+    ``key`` is ``value`` (the only key today; declared as a list so a future
+    ``days_since`` derivation can be added without changing the ref shape).
+    The resolved Python type follows the definition's ``value_type``:
+    ``Decimal`` for numerics, ``date`` for dates, ``str`` for text and
+    single-select, ``list[str]`` for multi-select — so a multi-select is
+    only meaningfully compared with ``in`` / ``eq`` / ``ne``.
+    """
+
+    source: Literal["crop_attribute"]
+    code: str
+    key: str  # one of CROP_ATTRIBUTE_KEYS
+
+
 ValueRef = (
     IndicesValueRef
     | BlockValueRef
@@ -187,6 +218,7 @@ ValueRef = (
     | WeatherRiskValueRef
     | SignalsValueRef
     | GridValueRef
+    | CropAttributeValueRef
     | ParamsValueRef
 )
 
@@ -258,6 +290,16 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - 
         if field_ not in GRID_FIELDS:
             raise ConditionParseError(f"grid ref 'field' must be one of {GRID_FIELDS}")
         return GridValueRef(source="grid", index_code=index_code, field=field_)
+    if source == "crop_attribute":
+        code = raw.get("code")
+        if not isinstance(code, str) or not code:
+            raise ConditionParseError("crop_attribute ref missing 'code'")
+        key = raw.get("key", "value")
+        if key not in CROP_ATTRIBUTE_KEYS:
+            raise ConditionParseError(
+                f"crop_attribute ref 'key' must be one of {CROP_ATTRIBUTE_KEYS}"
+            )
+        return CropAttributeValueRef(source="crop_attribute", code=code, key=key)
     if source == "params":
         name = raw.get("name")
         if not isinstance(name, str) or not name:

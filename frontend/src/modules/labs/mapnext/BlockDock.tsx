@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
 import { clearDetailCache } from "../map/api";
-import type { UnitDetail } from "../map/types";
+import type { UnitDetail, UnitIntegration } from "../map/types";
 import {
   HEALTH_DOT,
   INDEX_FAMILIES,
@@ -40,6 +40,7 @@ import {
 import { DockConditionsView } from "./DockConditionsView";
 import { DockFamilyView } from "./DockFamilyView";
 import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate } from "./dockFormat";
+import { useCropAttributeRows } from "@/modules/farms/lib/useCropAttributeRows";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
 
@@ -86,6 +87,9 @@ function clampHeight(h: number): number {
 
 interface Props {
   detail: UnitDetail | undefined;
+  // Loads on its own clock, off the map's critical path — may still be
+  // null after `detail` has arrived.
+  integration: UnitIntegration | null;
   loading: boolean;
   error: boolean;
   activeIndex: ApiIndexCode;
@@ -158,6 +162,7 @@ const COLS_2 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:gri
 
 export function BlockDock({
   detail,
+  integration,
   loading,
   error,
   activeIndex,
@@ -174,6 +179,12 @@ export function BlockDock({
   const [tab, setTab] = useState<DockTab>("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [manageMode, setManageMode] = useState<ManageMode | null>(null);
+  // Crop-attribute values for the read-only "Crop & plan" column. Shares the
+  // Manage → Crop editor's query key, so the two never disagree and opening
+  // the editor after viewing the summary costs no extra request. `detail` is
+  // undefined while the dock loads, so guard rather than assert — the hook
+  // just stays disabled until an assignment exists.
+  const cropAttributeRows = useCropAttributeRows(detail?.crop_assignment?.id ?? null);
   const [failingCount, setFailingCount] = useState<number | null>(null);
   const [height, setHeight] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_H;
@@ -566,7 +577,7 @@ export function BlockDock({
                     all: crop, growth stage and season had no home after the
                     drawer's Plan section was dropped. This is that home. */}
                 <Col title={t("dock.cropAndPlan")}>
-                  {detail.crop_assignment || detail.plan ? (
+                  {detail.crop_assignment || detail.plan || cropAttributeRows.length ? (
                     <Rows
                       items={[
                         ...(detail.crop_assignment
@@ -578,6 +589,10 @@ export function BlockDock({
                               ],
                             ] as [ReactNode, ReactNode][])
                           : []),
+                        // Platform-curated crop fields that hold a value. Empty
+                        // for crops with no definitions, so this column is
+                        // unchanged for anything outside the seeded set.
+                        ...cropAttributeRows,
                         ...(detail.plan
                           ? ([
                               [
@@ -621,11 +636,11 @@ export function BlockDock({
                   ) : (
                     <p className="text-sm text-ap-muted">{t("dock.noSignals")}</p>
                   )}
-                  {detail.integration ? (
+                  {integration ? (
                     <Rows
                       items={[
-                        [t("dock.imagerySubs"), String(detail.integration.imagery.active_subs)],
-                        [t("dock.weatherSubs"), String(detail.integration.weather.active_subs)],
+                        [t("dock.imagerySubs"), String(integration.imagery.active_subs)],
+                        [t("dock.weatherSubs"), String(integration.weather.active_subs)],
                       ]}
                     />
                   ) : null}
@@ -648,6 +663,7 @@ export function BlockDock({
                     blockId={detail.id}
                     farmId={farmId}
                     hasCurrentCrop={detail.crop_assignment != null}
+                    blockCropId={detail.crop_assignment?.id ?? null}
                     gridProductId={gridProductId}
                     onDone={afterManage}
                   />

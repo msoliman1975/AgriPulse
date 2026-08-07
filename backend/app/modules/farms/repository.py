@@ -37,8 +37,11 @@ from app.modules.farms.models import (
     Block,
     BlockAttachment,
     BlockCrop,
+    BlockCropAttributeValue,
+    BlockCropAttributeValueLog,
     Country,
     Crop,
+    CropAttributeDefinition,
     CropVariety,
     CropVarietyStrain,
     Farm,
@@ -981,6 +984,78 @@ class FarmsRepository:
         rows = (await self._public.execute(stmt)).scalars().all()
         return [_strain_dict(r) for r in rows]
 
+    # ---- Crop attribute definitions (public catalog) --------------------
+
+    async def list_crop_attribute_definitions(
+        self, *, crop_id: UUID, include_inactive: bool = True
+    ) -> list[CropAttributeDefinition]:
+        """Every definition attached anywhere under a crop.
+
+        Returns ORM rows, not dicts: the caller resolves deepest-wins over
+        them (``crop_attributes.resolve_definitions``) and inactive rows must
+        survive that walk so a deeper ``is_active = false`` can suppress an
+        inherited attribute. Filtering happens after resolution, not here.
+        """
+        stmt = select(CropAttributeDefinition).where(CropAttributeDefinition.crop_id == crop_id)
+        if not include_inactive:
+            stmt = stmt.where(CropAttributeDefinition.is_active.is_(True))
+        stmt = stmt.order_by(CropAttributeDefinition.sort_order, CropAttributeDefinition.code)
+        return list((await self._public.execute(stmt)).scalars().all())
+
+    async def list_all_crop_attribute_definitions(
+        self, *, include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        """Flat catalog across every crop — the decision-tree condition builder.
+
+        Every other condition source is a closed constant list in the
+        frontend; this one is data, so the builder fetches it.
+        """
+        stmt = select(CropAttributeDefinition)
+        if not include_inactive:
+            stmt = stmt.where(CropAttributeDefinition.is_active.is_(True))
+        stmt = stmt.order_by(
+            CropAttributeDefinition.path,
+            CropAttributeDefinition.sort_order,
+            CropAttributeDefinition.code,
+        )
+        rows = (await self._public.execute(stmt)).scalars().all()
+        return [crop_attribute_dict(r) for r in rows]
+
+    async def get_crop_attribute_definition(
+        self, *, definition_id: UUID
+    ) -> CropAttributeDefinition | None:
+        return (
+            await self._public.execute(
+                select(CropAttributeDefinition).where(CropAttributeDefinition.id == definition_id)
+            )
+        ).scalar_one_or_none()
+
+    async def crop_attribute_code_exists(self, *, path: str, code: str) -> bool:
+        return (
+            await self._public.execute(
+                select(CropAttributeDefinition.id).where(
+                    CropAttributeDefinition.path == path,
+                    CropAttributeDefinition.code == code,
+                )
+            )
+        ).first() is not None
+
+    async def create_crop_attribute_definition(self, *, fields: dict[str, Any]) -> dict[str, Any]:
+        row = CropAttributeDefinition(**fields)
+        self._public.add(row)
+        await self._public.flush()
+        await self._public.refresh(row)
+        return crop_attribute_dict(row)
+
+    async def update_crop_attribute_definition(
+        self, *, definition: CropAttributeDefinition, fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        for key, value in fields.items():
+            setattr(definition, key, value)
+        await self._public.flush()
+        await self._public.refresh(definition)
+        return crop_attribute_dict(definition)
+
     # ---- Crop catalog authoring (platform) -----------------------------
 
     async def get_crop(self, *, crop_id: UUID) -> Crop | None:
@@ -1151,6 +1226,74 @@ class FarmsRepository:
         )
         rows = (await self._tenant.execute(stmt)).scalars().all()
         return [_block_crop_to_dict(r) for r in rows]
+
+    async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID | None:
+        """Owning farm of an assignment, in one join — the capability check."""
+        return (
+            await self._tenant.execute(
+                select(Block.farm_id)
+                .join(BlockCrop, BlockCrop.block_id == Block.id)
+                .where(BlockCrop.id == block_crop_id, BlockCrop.deleted_at.is_(None))
+            )
+        ).scalar_one_or_none()
+
+    # ---- Crop attribute values (tenant) ---------------------------------
+
+    async def list_attribute_values(
+        self, *, block_crop_ids: Sequence[UUID]
+    ) -> list[BlockCropAttributeValue]:
+        """Values for many assignments in **one** query.
+
+        Batched deliberately: the map surface already died once on an N+1 that
+        exhausted the connection pool (#311), and this is read per block on
+        every farm-console load.
+        """
+        if not block_crop_ids:
+            return []
+        stmt = select(BlockCropAttributeValue).where(
+            BlockCropAttributeValue.block_crop_id.in_(list(block_crop_ids)),
+            BlockCropAttributeValue.deleted_at.is_(None),
+        )
+        return list((await self._tenant.execute(stmt)).scalars().all())
+
+    async def replace_attribute_values(
+        self,
+        *,
+        block_crop_id: UUID,
+        writes: Sequence[dict[str, Any]],
+        deletes: Sequence[BlockCropAttributeValue],
+        log_rows: Sequence[dict[str, Any]],
+    ) -> None:
+        """Apply one save: upserts, gate-clears and history in one transaction.
+
+        The caller has already resolved which definitions are visible and
+        coerced every value, so this is pure persistence. History rows are
+        written here rather than by a trigger because a trigger cannot see the
+        acting user.
+        """
+        for row in deletes:
+            await self._tenant.delete(row)
+        for payload in writes:
+            existing = payload.pop("_existing", None)
+            if existing is not None:
+                for key, value in payload.items():
+                    setattr(existing, key, value)
+            else:
+                self._tenant.add(BlockCropAttributeValue(block_crop_id=block_crop_id, **payload))
+        for log_payload in log_rows:
+            self._tenant.add(BlockCropAttributeValueLog(block_crop_id=block_crop_id, **log_payload))
+        await self._tenant.flush()
+
+    async def list_attribute_value_log(
+        self, *, block_crop_id: UUID, definition_code: str | None = None
+    ) -> list[BlockCropAttributeValueLog]:
+        stmt = select(BlockCropAttributeValueLog).where(
+            BlockCropAttributeValueLog.block_crop_id == block_crop_id
+        )
+        if definition_code is not None:
+            stmt = stmt.where(BlockCropAttributeValueLog.definition_code == definition_code)
+        stmt = stmt.order_by(BlockCropAttributeValueLog.changed_at.desc())
+        return list((await self._tenant.execute(stmt)).scalars().all())
 
     async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
         return (
@@ -1942,6 +2085,40 @@ def _crop_dict(r: Crop) -> dict[str, Any]:
     }
 
 
+def crop_attribute_dict(r: CropAttributeDefinition) -> dict[str, Any]:
+    """Public: the service resolves deepest-wins over ORM rows and serialises
+    the winners itself, so this one serializer is shared rather than duplicated."""
+    return {
+        "id": r.id,
+        "crop_id": r.crop_id,
+        "crop_variety_id": r.crop_variety_id,
+        "crop_variety_strain_id": r.crop_variety_strain_id,
+        "path": r.path,
+        "code": r.code,
+        "name_en": r.name_en,
+        "name_ar": r.name_ar,
+        "description_en": r.description_en,
+        "description_ar": r.description_ar,
+        "value_type": r.value_type,
+        "unit_en": r.unit_en,
+        "unit_ar": r.unit_ar,
+        "value_min": r.value_min,
+        "value_max": r.value_max,
+        "decimal_places": r.decimal_places,
+        "text_max_length": r.text_max_length,
+        "options": list(r.options) if r.options is not None else None,
+        "is_required": r.is_required,
+        "required_when": r.required_when,
+        "show_when": r.show_when,
+        "group_code": r.group_code,
+        "group_name_en": r.group_name_en,
+        "group_name_ar": r.group_name_ar,
+        "sort_order": r.sort_order,
+        "is_reportable": r.is_reportable,
+        "is_active": r.is_active,
+    }
+
+
 def _variety_dict(r: CropVariety) -> dict[str, Any]:
     return {
         "id": r.id,
@@ -1977,7 +2154,9 @@ def _strain_dict(r: CropVarietyStrain) -> dict[str, Any]:
 __all__ = [
     "BlockAttachment",
     "Crop",
+    "CropAttributeDefinition",
     "CropVariety",
     "FarmAttachment",
     "FarmsRepository",
+    "crop_attribute_dict",
 ]

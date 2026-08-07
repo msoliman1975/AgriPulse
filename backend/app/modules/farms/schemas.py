@@ -18,7 +18,9 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.modules.farms.crop_attributes import validate_type_consistency
 
 # Codes are ASCII, alnum + dash + underscore, 1-32 chars.
 _CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]{0,31}$")
@@ -267,6 +269,240 @@ class CropStrainUpdateRequest(BaseModel):
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
     is_active: bool | None = None
+
+
+# ---------- Crop attribute definitions --------------------------------------
+#
+# Platform-curated typed fields on the crop → block assignment. The DB CHECKs
+# pin the coarse invariants (value_type vocabulary, options present iff a
+# select type, numeric facets numeric-only); everything cross-field or
+# shape-dependent is validated here so the author gets a 422 naming the field
+# rather than an opaque IntegrityError.
+
+CropAttributeValueType = Literal[
+    "integer", "decimal", "text", "boolean", "date", "single_select", "multi_select"
+]
+
+
+class CropAttributeOption(BaseModel):
+    """One choice in a ``single_select`` / ``multi_select``.
+
+    Bilingual by construction: an option list authored EN-only renders as
+    English inside an otherwise-Arabic form, which is the exact failure the
+    catalog's ``name_en`` / ``name_ar`` pairs exist to prevent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str = Field(min_length=1, max_length=255)
+    sort_order: int = 0
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+
+class CropAttributeGate(BaseModel):
+    """One-level, non-recursive gate: ``{"code": ..., "in": [...] | "eq": ...}``.
+
+    Exactly one of ``in`` / ``eq`` must be given. No nesting, no boolean
+    groups — see ``farms/crop_attributes.py`` for why this stays small.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    code: str
+    # ``in`` is a Python keyword, so the field is ``in_`` with an alias. The
+    # stored JSON keeps the wire name; see ``gate_matches``.
+    in_: list[str | bool] | None = Field(default=None, alias="in", serialization_alias="in")
+    eq: str | bool | None = None
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+    @model_validator(mode="after")
+    def _exactly_one_operand(self) -> CropAttributeGate:
+        if (self.in_ is None) == (self.eq is None):
+            raise ValueError("gate needs exactly one of 'in' or 'eq'")
+        if self.in_ is not None and not self.in_:
+            raise ValueError("gate 'in' must list at least one value")
+        return self
+
+
+class CropAttributeDefinitionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    crop_id: UUID
+    crop_variety_id: UUID | None = None
+    crop_variety_strain_id: UUID | None = None
+    # Canonical path of the node this definition attaches to.
+    path: str
+    code: str
+    name_en: str
+    name_ar: str
+    description_en: str | None = None
+    description_ar: str | None = None
+    value_type: CropAttributeValueType
+    unit_en: str | None = None
+    unit_ar: str | None = None
+    value_min: Decimal | None = None
+    value_max: Decimal | None = None
+    decimal_places: int | None = None
+    text_max_length: int | None = None
+    options: list[dict[str, Any]] | None = None
+    is_required: bool = False
+    required_when: dict[str, Any] | None = None
+    show_when: dict[str, Any] | None = None
+    group_code: str | None = None
+    group_name_en: str | None = None
+    group_name_ar: str | None = None
+    sort_order: int = 0
+    is_reportable: bool = True
+    is_active: bool = True
+
+
+class ResolvedCropAttributesResponse(BaseModel):
+    """Definitions resolved deepest-wins for a crop path.
+
+    ``shadowed_codes`` names the inherited definitions that a deeper level
+    replaced. The platform authoring UI needs it — without it an author edits
+    the crop-level row, sees the variety unchanged, and concludes the save
+    failed.
+    """
+
+    crop_path: str
+    definitions: list[CropAttributeDefinitionResponse]
+    shadowed_codes: list[str] = Field(default_factory=list)
+
+
+class _CropAttributeWriteBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CropAttributeDefinitionCreateRequest(_CropAttributeWriteBase):
+    # Which taxonomy node this attaches to. Absent → the crop itself.
+    # A strain id implies its variety; the service resolves and validates that
+    # the node actually belongs to the crop in the path.
+    crop_variety_id: UUID | None = None
+    crop_variety_strain_id: UUID | None = None
+
+    code: str
+    name_en: str = Field(min_length=1, max_length=255)
+    name_ar: str = Field(min_length=1, max_length=255)
+    description_en: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
+    value_type: CropAttributeValueType
+    unit_en: str | None = Field(default=None, max_length=32)
+    unit_ar: str | None = Field(default=None, max_length=32)
+    value_min: Decimal | None = None
+    value_max: Decimal | None = None
+    decimal_places: int | None = Field(default=None, ge=0, le=4)
+    text_max_length: int | None = Field(default=None, ge=1, le=4000)
+    options: list[CropAttributeOption] | None = None
+    is_required: bool = False
+    required_when: CropAttributeGate | None = None
+    show_when: CropAttributeGate | None = None
+    group_code: str | None = Field(default=None, max_length=64)
+    group_name_en: str | None = Field(default=None, max_length=255)
+    group_name_ar: str | None = Field(default=None, max_length=255)
+    sort_order: int = Field(default=0, ge=0, le=9999)
+    is_reportable: bool = True
+
+    @field_validator("code")
+    @classmethod
+    def _code_pattern(cls, value: str) -> str:
+        return _validate_code(value)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> CropAttributeDefinitionCreateRequest:
+        # Shared with the PATCH path in the service — see
+        # ``farms/crop_attributes.validate_type_consistency``.
+        validate_type_consistency(
+            value_type=self.value_type,
+            options=self.options,
+            value_min=self.value_min,
+            value_max=self.value_max,
+            decimal_places=self.decimal_places,
+            unit_en=self.unit_en,
+            unit_ar=self.unit_ar,
+            text_max_length=self.text_max_length,
+        )
+        if self.crop_variety_strain_id is not None and self.crop_variety_id is None:
+            raise ValueError("crop_variety_strain_id requires crop_variety_id")
+        return self
+
+
+class CropAttributeDefinitionUpdateRequest(_CropAttributeWriteBase):
+    # ``code`` and the taxonomy attachment are immutable: both are part of the
+    # identity that stored values point at. Re-pointing a definition would
+    # silently re-interpret every value already recorded against it.
+    name_en: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, min_length=1, max_length=255)
+    description_en: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
+    unit_en: str | None = Field(default=None, max_length=32)
+    unit_ar: str | None = Field(default=None, max_length=32)
+    value_min: Decimal | None = None
+    value_max: Decimal | None = None
+    decimal_places: int | None = Field(default=None, ge=0, le=4)
+    text_max_length: int | None = Field(default=None, ge=1, le=4000)
+    options: list[CropAttributeOption] | None = None
+    is_required: bool | None = None
+    required_when: CropAttributeGate | None = None
+    show_when: CropAttributeGate | None = None
+    group_code: str | None = Field(default=None, max_length=64)
+    group_name_en: str | None = Field(default=None, max_length=255)
+    group_name_ar: str | None = Field(default=None, max_length=255)
+    sort_order: int | None = Field(default=None, ge=0, le=9999)
+    is_reportable: bool | None = None
+    is_active: bool | None = None
+
+
+class BlockCropAttributesResponse(BaseModel):
+    """Resolved definitions + current values for one crop → block assignment.
+
+    Definitions ship with the values so the form can render, gate and validate
+    from a single response — a second round trip to the catalog is how the
+    form and the server end up disagreeing about which fields are required.
+    """
+
+    block_crop_id: UUID
+    crop_path: str
+    definitions: list[CropAttributeDefinitionResponse]
+    values: dict[str, Any] = Field(default_factory=dict)
+
+
+class BlockCropAttributesWriteRequest(BaseModel):
+    """PUT body — the whole visible form, not one field.
+
+    Requiredness depends on a gate, and the gate depends on a sibling field's
+    value, so a per-field write could land a state the form itself rejects.
+    Omitted codes keep their stored value; a code sent as ``null`` clears it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class BlockCropAttributeHistoryEntry(BaseModel):
+    id: UUID
+    block_crop_id: UUID
+    definition_id: UUID
+    definition_code: str
+    value: Any = None
+    previous_value: Any = None
+    # set | updated | cleared | cleared_by_gate — the last distinguishes a
+    # value dropped because its gate closed from one a user cleared.
+    change_kind: str
+    changed_at: datetime
+    changed_by: UUID | None = None
 
 
 # ---------- Farms -----------------------------------------------------------

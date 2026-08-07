@@ -531,13 +531,96 @@ global:
   #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
   #   2861fe0, tile-server stays 9d140cc. Rollback is this tag back to
   #   3537f12.
+  # 03293ea = #366, custom crop attributes on the crop -> block assignment.
+  #   Some crops are not established from seed: a mango block is planted as
+  #   a grafted nursery tree, a date palm from an offshoot, a tomato from a
+  #   nursery seedling. Each needs facts `block_crops` has no column for,
+  #   and the shape differs per crop. Adds a platform-curated, typed field
+  #   catalog attached to the crop taxonomy, per-assignment values with an
+  #   append-only history, a `crop_attribute` decision-tree condition
+  #   source, and the block-drawer editor.
+  #   MIGRATIONS -- public 0050 (crop_attribute_definitions) + 0051 (seeds
+  #   43 definitions across mango, orange, mandarin, date palm, potato,
+  #   tomato) and tenant 0055 (block_crop_attribute_values + _log). All
+  #   three are PURELY ADDITIVE: three new tables and rows in one of them.
+  #   No existing table is altered, so rolling the tags back leaves three
+  #   unused tables behind and nothing else. Migrations do NOT roll back
+  #   with the tag.
+  #   User-visible change: a block whose crop is one of the six seeded
+  #   crops gains a "Crop fields" section in its drawer. Blocks on any
+  #   other crop render nothing new -- the section is omitted entirely when
+  #   the crop has no definitions, so wheat/cotton/rice blocks are
+  #   untouched. No existing field moves.
+  #   api + workers + frontend all move together (the editor needs the new
+  #   endpoints). tile-server stays 9d140cc. Rollback is api/workers back
+  #   to 2861fe0 and frontend back to 92e093e.
+  # cfc0751 = #367 (farm-console load latency) + #368 (crop-attribute
+  #   authoring UI).
+  #   #367: opening a farm took ~7.3 s, worst on the 36-block Bashier
+  #   Elkhier farm, and was getting worse every ingest cycle. Two causes.
+  #   (a) `v_block_integration_health` LEFT JOINs a block out to two
+  #   independent one-to-many branches and de-duplicates afterwards with
+  #   COUNT(DISTINCT ...), so it materialised attempts x attempts x jobs
+  #   per block -- 4,672,512 rows collapsed to 36, spilling a 28 MB sort to
+  #   disk. (b) "latest index value per block" had no time bound, so
+  #   TimescaleDB could not exclude chunks and spent 645-1039 ms PLANNING
+  #   all 494 of them. Measured after: block health 7280 -> 7.8 ms, farm
+  #   rollup 10418 -> 5.1 ms, blocks/summary 875 -> 36 ms.
+  #   #368: /platform/crops/:cropId/attributes -- definition authoring with
+  #   a live preview of the assignment form. FRONTEND-ONLY half; every
+  #   endpoint it calls already shipped in 03293ea.
+  #   MIGRATIONS -- tenant 0056 (rewrites the two integration-health views)
+  #   and 0057 (re-chunks block_index_aggregates + block_grid_aggregates to
+  #   30-day chunks, 1 space partition).
+  #   BOTH ARE SAFE TO LEAVE BEHIND ON A ROLLBACK. 0056 keeps the view
+  #   columns, types and values byte-identical (diffed both directions
+  #   against the live tenant before merge), so the previous api image
+  #   reads the new views unchanged. 0057 only affects chunks created from
+  #   now on; no data moves and no long lock is taken. Both have tested
+  #   downgrade() paths, but neither needs to run to roll the tag back.
+  #   User-visible change: farms open fast again. Nothing moves on screen
+  #   except the block panel's two integration rows, which now fill in a
+  #   moment after the map rather than holding it up.
+  #   api + workers + frontend move together (view rewrite + the summary
+  #   endpoint + the new admin page). tile-server stays 9d140cc. Rollback
+  #   is all three back to 03293ea.
+  # 7ce68a0 = crop fields surfaced where users look. The attributes editor
+  #   shipped only under Manage -> Crop, three clicks deep in an edit
+  #   sub-view; the Field tab's "Crop & plan" column -- where a user goes to
+  #   see what a block is planted with -- showed crop name, growth stage and
+  #   season and nothing else, so establishment method / transplant date /
+  #   age at transplant were invisible and the feature read as unshipped.
+  #   Now the *set* values render there as read-only rows, sharing the
+  #   editor's query cache. Only attributes holding a value produce a row, so
+  #   blocks on a crop with no definitions (wheat, olive, cotton) look exactly
+  #   as they did. Option codes render as their localised label.
+  #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
+  #   cfc0751, tile-server stays 9d140cc. Rollback is this tag back to
+  #   cfc0751.
+  # 7a87da1 = the Insights "Vegetation index trend" card, plus an agronomic
+  #   copy fix. The six indices moved out of a <select> into a chip row, so
+  #   NDRE/GNDVI are visible rather than needing to be known about; the block
+  #   legend gained Hide all to pair with Show all. The "never mute the last
+  #   block" guard went with it -- an all-hidden plot now says so in words
+  #   ("All blocks are hidden.") instead, which is what made the guard's job
+  #   redundant. The copy fix matters more than the layout: the card called
+  #   NDWI "canopy and leaf water content", which is NDMI's job. NDWI is
+  #   McFeeters' SURFACE water -- so on a trend chart a line climbing toward
+  #   zero read as improving canopy water when it actually means water
+  #   pooling. That inverted the story the series told, and would have read a
+  #   flooded block as well-watered. The dock was corrected on this point in
+  #   #356; this card was the last surface still contradicting it.
+  #   FRONTEND-ONLY -- zero backend files changed between cfc0751 and 7a87da1,
+  #   and no migration. api + workers stay cfc0751, tile-server stays 9d140cc;
+  #   bumping them would restart pods on byte-identical code. Rollback is this
+  #   tag back to 7ce68a0, with nothing to unwind.
   images:
     api:
-      tag: "2861fe0"
+      tag: "cfc0751"
     workers:
-      tag: "2861fe0"
+      tag: "cfc0751"
     frontend:
-      tag: "92e093e"
+      tag: "7a87da1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
