@@ -15,6 +15,7 @@ to spend the shared CDSE allowance recomputing it.
   GET /tenants/{tenant_id}/scenes/{job_id}      — L2 scene detail
   GET /tenants/{tenant_id}/scenes/{job_id}/pixel        — L2 explain one pixel
   GET /tenants/{tenant_id}/scenes/{job_id}/pixel-budget — L2 pixel reconciliation
+  GET /tenants/{tenant_id}/scenes/{job_id}/pixel-grid   — L2 map: pixel + cell footprints
   POST /tenants/{tenant_id}/scenes/{job_id}:verify     — L3 verify one scene (sync)
   POST /tenants/{tenant_id}/verify-runs                — L3 named multi-scene run
   GET  /tenants/{tenant_id}/verify-runs[/{id}[/results]]
@@ -40,7 +41,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.observer.pixels import PixelOutsideRasterError
 from app.modules.observer.repository import JOB_STATUSES
 from app.modules.observer.service import (
+    CellNotFoundError,
     DecisionNotFoundError,
+    IndexNotSupportedError,
     ObserverService,
     SceneNotFoundError,
     SceneRasterUnavailableError,
@@ -510,6 +513,64 @@ class DecisionSourceResponse(BaseModel):
     # None when either side is missing: "cannot tell" is not "agrees". False
     # means the row was recomputed after the decision was made.
     values_agree: bool | None
+
+
+class PixelFeatureRow(BaseModel):
+    row: int
+    col: int
+    # None when the pixel produced no usable number (cloud-masked, sensor gap,
+    # or divide-by-zero in this index's formula).
+    value: float | None
+    masked: bool
+    geometry: dict[str, Any]
+    lon: float
+    lat: float
+
+
+class CellFeatureRow(BaseModel):
+    cell_id: UUID
+    row_idx: int
+    col_idx: int
+    geometry: dict[str, Any]
+    area_m2: float | None
+    # Null mean with a non-null count means the cell existed and the zonal
+    # pass found nothing usable in it — different from no row at all.
+    mean: float | None
+    min: float | None
+    max: float | None
+    std_dev: float | None
+    valid_pixel_count: int | None
+    total_pixel_count: int | None
+
+
+class PixelGridResponse(BaseModel):
+    job_id: UUID
+    block_id: UUID
+    index_code: str
+    scene_datetime: datetime
+    resolution_m: float
+    boundary_geojson: dict[str, Any]
+    selected_cell_id: UUID | None
+    pixels: list[PixelFeatureRow]
+    cells: list[CellFeatureRow]
+    aoi_pixel_count: int
+    returned_pixel_count: int
+    # True when the AOI holds more pixels than the cap; the map is showing a
+    # prefix, not the whole block.
+    truncated: bool
+    # Recomputed from exactly the pixels returned, so the panel can show the
+    # arithmetic instead of asserting it.
+    recomputed_mean: float | None
+    recomputed_valid: int
+    stored_cell_mean: float | None
+    stored_cell_valid: int | None
+    block_mean: float | None
+    block_valid: int | None
+    block_total: int | None
+    # Cells claim a pixel by its centre; the block AOI by footprint touch. The
+    # per-cell counts therefore do not sum to the block count, by design.
+    cell_membership: Literal["centre"]
+    block_membership: Literal["footprint_touch"]
 
 
 # --- shared query params ---------------------------------------------------
@@ -1152,6 +1213,46 @@ async def decision_source(
         )
     except DecisionNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "decision not found") from exc
+
+
+@router.get("/tenants/{tenant_id}/scenes/{job_id}/pixel-grid", response_model=PixelGridResponse)
+async def pixel_grid(
+    tenant_id: UUID,
+    job_id: UUID,
+    index_code: str = Query(default="ndvi"),
+    cell_id: UUID | None = Query(default=None),
+    max_pixels: int = Query(default=4000, ge=1, le=20000),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Pixel and cell footprints for one scene, with the aggregates they feed.
+
+    Drives the scene-detail map: every pixel as a polygon with its value,
+    every grid cell with its stored aggregate, and the block value they roll
+    up into. Pass `cell_id` to narrow to one cell — the pixels returned are
+    then exactly the pixels that cell's stored mean was computed from, because
+    the same `all_touched=False` centre rule is applied.
+    """
+    del context
+    try:
+        return await service.pixel_grid(
+            tenant_schema=await _schema(service, tenant_id),
+            job_id=job_id,
+            index_code=index_code,
+            cell_id=cell_id,
+            max_pixels=max_pixels,
+        )
+    except SceneNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
+    except CellNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "cell not found") from exc
+    except IndexNotSupportedError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"{exc} is not supported by this scene's product",
+        ) from exc
+    except SceneRasterUnavailableError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 # --- helpers ---------------------------------------------------------------

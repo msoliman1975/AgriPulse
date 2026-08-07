@@ -56,6 +56,14 @@ class WeatherDayNotFoundError(Exception):
     """No `weather_index_daily` row for that (farm, index, day)."""
 
 
+class CellNotFoundError(Exception):
+    """No grid cell with that id in this tenant."""
+
+
+class IndexNotSupportedError(Exception):
+    """The scene's product does not offer that index."""
+
+
 class SceneNotFoundError(Exception):
     """No ingestion job with that id in this tenant."""
 
@@ -810,6 +818,115 @@ class ObserverService:
         finally:
             await self._unscope()
 
+    async def pixel_grid(
+        self,
+        *,
+        tenant_schema: str,
+        job_id: UUID,
+        index_code: str,
+        cell_id: UUID | None,
+        max_pixels: int,
+    ) -> dict[str, Any]:
+        """Pixel footprints, cell footprints and the aggregates they roll into.
+
+        The whole pixel -> cell -> block chain in one payload, so the map can
+        draw it and the panel can show the arithmetic rather than asserting
+        it. Passing `cell_id` narrows the pixels to that cell using the
+        pipeline's own cell membership rule.
+        """
+        from app.modules.observer.pixel_grid import build_pixel_grid
+
+        ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
+        if index_code not in ctx["supported_indices"]:
+            raise IndexNotSupportedError(index_code)
+
+        await self._scope(tenant_schema)
+        try:
+            cells = await self._repo.cells_for_scene(
+                block_id=ctx["block_id"],
+                product_id=ctx["product_id"],
+                index_code=index_code,
+                scene_time=ctx["scene_datetime"],
+            )
+            selected = await self._repo.cell_by_id(cell_id) if cell_id else None
+            block_rows = await self._repo.scene_index_rows(
+                block_id=ctx["block_id"],
+                product_id=ctx["product_id"],
+                scene_time=ctx["scene_datetime"],
+            )
+        finally:
+            await self._unscope()
+
+        if cell_id is not None and selected is None:
+            raise CellNotFoundError(str(cell_id))
+
+        grid = build_pixel_grid(
+            raw_uri=_raw_bands_uri(ctx),
+            band_names=tuple(ctx["bands"]),
+            aoi_geojson_utm=json.loads(ctx["boundary_utm_geojson"]),
+            index_code=index_code,
+            cell_polygon_wkt=selected["geom_wkt"] if selected else None,
+            max_pixels=max_pixels,
+        )
+
+        block = next((r for r in block_rows if r["index_code"] == index_code), None)
+        stored_cell = (
+            next((c for c in cells if str(c["cell_id"]) == str(cell_id)), None) if cell_id else None
+        )
+
+        return {
+            "job_id": job_id,
+            "block_id": ctx["block_id"],
+            "index_code": index_code,
+            "scene_datetime": ctx["scene_datetime"],
+            "resolution_m": grid.resolution_m,
+            "boundary_geojson": json.loads(ctx["boundary_geojson"]),
+            "selected_cell_id": cell_id,
+            "pixels": [
+                {
+                    "row": p.row,
+                    "col": p.col,
+                    "value": p.value,
+                    "masked": p.masked,
+                    "geometry": p.geometry,
+                    "lon": p.lon,
+                    "lat": p.lat,
+                }
+                for p in grid.pixels
+            ],
+            "cells": [
+                {
+                    "cell_id": c["cell_id"],
+                    "row_idx": c["row_idx"],
+                    "col_idx": c["col_idx"],
+                    "geometry": json.loads(c["geometry"]),
+                    "area_m2": _f(c["area_m2"]),
+                    "mean": _f(c["mean"]),
+                    "min": _f(c["min"]),
+                    "max": _f(c["max"]),
+                    "std_dev": _f(c["std_dev"]),
+                    "valid_pixel_count": c["valid_pixel_count"],
+                    "total_pixel_count": c["total_pixel_count"],
+                }
+                for c in cells
+            ],
+            "aoi_pixel_count": grid.aoi_pixel_count,
+            "returned_pixel_count": grid.returned_pixel_count,
+            "truncated": grid.truncated,
+            "recomputed_mean": grid.recomputed_mean,
+            "recomputed_valid": grid.recomputed_valid,
+            "stored_cell_mean": _f(stored_cell["mean"]) if stored_cell else None,
+            "stored_cell_valid": stored_cell["valid_pixel_count"] if stored_cell else None,
+            "block_mean": _f(block["mean"]) if block else None,
+            "block_valid": block["valid_pixel_count"] if block else None,
+            "block_total": block["total_pixel_count"] if block else None,
+            # Cells claim a pixel by its CENTRE, the block AOI by footprint
+            # touch. Per-cell counts therefore do not sum to the block count,
+            # and an operator comparing them needs to know that is by design.
+            "cell_membership": "centre",
+            "block_membership": "footprint_touch",
+        }
+
     async def scene_indices(
         self,
         *,
@@ -1207,6 +1324,11 @@ def _detect_anomalies(
         k,
         source,
     )
+
+
+def _f(value: Any) -> float | None:
+    """Decimal -> float for JSON. NUMERIC columns arrive as Decimal."""
+    return None if value is None else float(value)
 
 
 def _check_window(window_from: datetime, window_to: datetime) -> None:

@@ -693,3 +693,75 @@ export async function getIndexLineage(
   });
   return data;
 }
+
+// ---- pixel + cell grid (map) ---------------------------------------------
+
+export interface PixelFeature {
+  row: number;
+  col: number;
+  /** Null when the pixel produced no usable number (cloud, gap, div-by-zero). */
+  value: number | null;
+  masked: boolean;
+  geometry: Record<string, unknown>;
+  lon: number;
+  lat: number;
+}
+
+export interface CellFeature {
+  cell_id: string;
+  row_idx: number;
+  col_idx: number;
+  geometry: Record<string, unknown>;
+  area_m2: number | null;
+  mean: number | null;
+  min: number | null;
+  max: number | null;
+  std_dev: number | null;
+  valid_pixel_count: number | null;
+  total_pixel_count: number | null;
+}
+
+export interface PixelGrid {
+  job_id: string;
+  block_id: string;
+  index_code: string;
+  scene_datetime: string;
+  resolution_m: number;
+  boundary_geojson: Record<string, unknown>;
+  selected_cell_id: string | null;
+  pixels: PixelFeature[];
+  cells: CellFeature[];
+  aoi_pixel_count: number;
+  returned_pixel_count: number;
+  /** True when the AOI has more pixels than the cap — showing a prefix. */
+  truncated: boolean;
+  /** Recomputed from exactly the pixels returned, so the panel shows the maths. */
+  recomputed_mean: number | null;
+  recomputed_valid: number;
+  stored_cell_mean: number | null;
+  stored_cell_valid: number | null;
+  block_mean: number | null;
+  block_valid: number | null;
+  block_total: number | null;
+  /** Cells claim a pixel by centre; the block AOI by footprint touch. */
+  cell_membership: "centre";
+  block_membership: "footprint_touch";
+}
+
+export async function getPixelGrid(
+  tenantId: string,
+  jobId: string,
+  args: { indexCode: string; cellId?: string | null; maxPixels?: number },
+): Promise<PixelGrid> {
+  const { data } = await apiClient.get<PixelGrid>(
+    `${BASE}/tenants/${tenantId}/scenes/${jobId}/pixel-grid`,
+    {
+      params: {
+        index_code: args.indexCode,
+        cell_id: args.cellId || undefined,
+        max_pixels: args.maxPixels,
+      },
+    },
+  );
+  return data;
+}

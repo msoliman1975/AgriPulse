@@ -15,6 +15,7 @@ import {
   explainPixel,
   getPixelBudget,
   getIndexLineage,
+  getPixelGrid,
   getSceneDetail,
   getWeatherAttempts,
   getWeatherOverview,
@@ -34,6 +35,7 @@ import {
   type PixelBudget,
   type PixelExplain,
   type Lineage,
+  type PixelGrid,
   type SceneDetail,
   type WeatherAttempt,
   type WeatherDayExplain,
@@ -329,5 +331,26 @@ export function useIndexLineage(
     queryFn: () => getIndexLineage(tenantId as string, args as NonNullable<typeof args>),
     enabled: Boolean(tenantId && args),
     staleTime: STALE,
+  });
+}
+/**
+ * Pixel + cell footprints for the map.
+ *
+ * Reads the COG, so it is cached hard: a scene's pixels never change unless
+ * the scene is recomputed, and re-reading a raster on every cell click would
+ * make the map feel broken.
+ */
+export function usePixelGrid(
+  tenantId: string | null,
+  jobId: string | null,
+  indexCode: string,
+  cellId: string | null,
+): UseQueryResult<PixelGrid> {
+  return useQuery({
+    queryKey: [ROOT, "pixelGrid", tenantId, jobId, indexCode, cellId ?? ""],
+    queryFn: () => getPixelGrid(tenantId as string, jobId as string, { indexCode, cellId }),
+    enabled: Boolean(tenantId && jobId),
+    staleTime: Infinity,
+    retry: false,
   });
 }
