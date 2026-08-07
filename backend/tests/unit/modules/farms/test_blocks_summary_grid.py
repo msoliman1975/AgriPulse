@@ -39,6 +39,24 @@ class _Result:
 
 
 def _session(*result_sets: list[Any]) -> AsyncMock:
+    """Feed `execute` a fixed sequence of results, in call order:
+
+    1. open alerts per block
+    2. current grid config per block
+    3. the block-id roster
+    4. latest index values, bounded to the recent window
+    5. latest index values, unbounded — issued ONLY for blocks the recent
+       window returned nothing for (see `_latest_indices`)
+
+    Order matters and is positional, so this breaks silently if the endpoint
+    gains or reorders a query: the rows land on the wrong reader and surface
+    as a shape error rather than a missing stub. #367 added the two-pass
+    index lookup and moved the roster, which is exactly how that happened.
+
+    Pass only as many sets as the endpoint will actually consume — a test
+    whose blocks all have recent readings must NOT supply (5), so that an
+    unexpected fallback sweep fails loudly instead of silently passing.
+    """
     session = AsyncMock()
     session.execute = AsyncMock(side_effect=[_Result(rows) for rows in result_sets])
     return session
@@ -51,12 +69,14 @@ class TestGridSignal:
         gridded, plain = uuid4(), uuid4()
         product = uuid4()
 
-        # (1) indices, (2) alerts, (3) grid configs, (4) block roster
+        # No indices at all, so both blocks are stale and the unbounded
+        # fallback sweep runs too — hence the fifth set.
         session = _session(
-            [],
-            [],
-            [{"block_id": gridded, "product_id": product}],
-            [gridded, plain],
+            [],  # alerts
+            [{"block_id": gridded, "product_id": product}],  # grid configs
+            [gridded, plain],  # roster
+            [],  # indices, recent window
+            [],  # indices, unbounded fallback
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -69,7 +89,7 @@ class TestGridSignal:
 
     async def test_a_farm_with_no_zoning_reports_no_products(self) -> None:
         farm_id, b1 = uuid4(), uuid4()
-        session = _session([], [], [], [b1])
+        session = _session([], [], [b1], [], [])
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
 
@@ -82,11 +102,13 @@ class TestGridSignal:
         product = uuid4()
         now = datetime.now(UTC)
 
+        # b1 has a recent reading, so no unbounded fallback sweep: four sets,
+        # not five. A fifth call here would exhaust side_effect and fail.
         session = _session(
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.3, "time": now}],
             [{"block_id": b1, "alert_count": 2, "has_critical": True, "has_warning": False}],
-            [{"block_id": b1, "product_id": product}],
-            [b1],
+            [{"block_id": b1, "product_id": product}],  # grid configs
+            [b1],  # roster
+            [{"block_id": b1, "index_code": "ndvi", "mean": 0.3, "time": now}],  # recent
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
