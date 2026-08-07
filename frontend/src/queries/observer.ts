@@ -14,7 +14,11 @@ import {
   createVerifyRun,
   explainPixel,
   getPixelBudget,
+  getIndexLineage,
   getSceneDetail,
+  getWeatherAttempts,
+  getWeatherOverview,
+  explainWeatherDay,
   isVerifyRunActive,
   listVerifyResults,
   listVerifyRuns,
@@ -29,7 +33,11 @@ import {
   type ObserverTenant,
   type PixelBudget,
   type PixelExplain,
+  type Lineage,
   type SceneDetail,
+  type WeatherAttempt,
+  type WeatherDayExplain,
+  type WeatherOverview,
   type VerificationRow,
   type VerifyMode,
   type VerifyRun,
@@ -254,5 +262,72 @@ export function useCancelVerifyRun(
   return useMutation({
     mutationFn: (runId) => cancelVerifyRun(tenantId as string, runId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: [ROOT, "verifyRuns"] }),
+  });
+}
+
+// ---- weather lane --------------------------------------------------------
+
+export function useWeatherOverview(
+  tenantId: string | null,
+  farmId: string | null,
+  from: string,
+  to: string,
+): UseQueryResult<WeatherOverview> {
+  return useQuery({
+    queryKey: [ROOT, "weatherOverview", tenantId, farmId, from, to],
+    queryFn: () => getWeatherOverview(tenantId as string, farmId as string, from, to),
+    enabled: Boolean(tenantId && farmId),
+    staleTime: STALE,
+  });
+}
+
+export function useWeatherAttempts(
+  tenantId: string | null,
+  farmId: string | null,
+  from: string,
+  to: string,
+): UseQueryResult<WeatherAttempt[]> {
+  return useQuery({
+    queryKey: [ROOT, "weatherAttempts", tenantId, farmId, from, to],
+    queryFn: () => getWeatherAttempts(tenantId as string, farmId as string, from, to),
+    enabled: Boolean(tenantId && farmId),
+    staleTime: STALE,
+  });
+}
+
+export function useWeatherDayExplain(
+  tenantId: string | null,
+  farmId: string | null,
+  indexCode: string,
+  day: string | null,
+): UseQueryResult<WeatherDayExplain> {
+  return useQuery({
+    queryKey: [ROOT, "weatherExplain", tenantId, farmId, indexCode, day],
+    queryFn: () =>
+      explainWeatherDay(tenantId as string, farmId as string, indexCode, day as string),
+    enabled: Boolean(tenantId && farmId && day),
+    staleTime: STALE,
+    retry: false,
+  });
+}
+
+export function useIndexLineage(
+  tenantId: string | null,
+  args: Parameters<typeof getIndexLineage>[1] | null,
+): UseQueryResult<Lineage> {
+  return useQuery({
+    queryKey: [
+      ROOT,
+      "lineage",
+      tenantId,
+      args?.blockId,
+      args?.indexCode,
+      args?.from,
+      args?.to,
+      args?.sceneTime ?? "",
+    ],
+    queryFn: () => getIndexLineage(tenantId as string, args as NonNullable<typeof args>),
+    enabled: Boolean(tenantId && args),
+    staleTime: STALE,
   });
 }

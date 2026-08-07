@@ -19,12 +19,16 @@ to spend the shared CDSE allowance recomputing it.
   POST /tenants/{tenant_id}/verify-runs                — L3 named multi-scene run
   GET  /tenants/{tenant_id}/verify-runs[/{id}[/results]]
   POST /tenants/{tenant_id}/verify-runs/{id}:cancel
+  GET  /tenants/{tenant_id}/weather/overview           — weather ribbon + coverage
+  GET  /tenants/{tenant_id}/weather/attempts|index-days|explain
+  GET  /tenants/{tenant_id}/lineage                    — L4 what an index caused
+  GET  /tenants/{tenant_id}/lineage/source             — L4 reverse: decision -> row
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -36,10 +40,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.observer.pixels import PixelOutsideRasterError
 from app.modules.observer.repository import JOB_STATUSES
 from app.modules.observer.service import (
+    DecisionNotFoundError,
     ObserverService,
     SceneNotFoundError,
     SceneRasterUnavailableError,
     TenantNotFoundError,
+    WeatherDayNotFoundError,
     WindowTooWideError,
     get_observer_service,
 )
@@ -360,6 +366,150 @@ class VerifyRunRequest(BaseModel):
     mode: Literal["fast", "full"] = "full"
     block_ids: list[UUID] | None = None
     product_id: UUID | None = None
+
+
+class WeatherCoverageDay(BaseModel):
+    day: date
+    # Distinct hours with an observation, out of 24.
+    hours: int
+    has_derived: bool
+    index_rows: int
+
+
+class WeatherOverviewResponse(BaseModel):
+    farm_id: UUID
+    window_from: datetime
+    window_to: datetime
+    # False = the farm has no weather subscription at all, so every zero
+    # below is "never configured" rather than "broken".
+    subscribed: bool
+    stages: list[Stage]
+    coverage: list[WeatherCoverageDay]
+    # Days that produced a derived row from fewer hours than the floor. The
+    # number exists, reads as authoritative, and came from part of a day.
+    thin_days: list[WeatherCoverageDay]
+    coverage_floor_hours: int
+    # The derivation applies no floor of its own — Observer only reports. Said
+    # explicitly so `thin_days` is never read as "these were rejected".
+    derivation_enforces_floor: bool
+
+
+class WeatherAttemptRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    provider_code: str
+    status: str
+    rows_ingested: int | None
+    error_code: str | None
+    error_message: str | None
+    started_at: datetime
+    completed_at: datetime | None
+    duration_ms: int | None
+    block_id: UUID
+
+
+class WeatherIndexDayRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    date: date
+    index_code: str
+    value: float | None
+    value_min: float | None
+    value_max: float | None
+    value_aux: dict[str, Any]
+    baseline_deviation: float | None
+    computed_at: datetime
+    # How many hours this day's value was actually computed from.
+    source_hours: int
+
+
+class WeatherHourlyRow(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    time: datetime
+    provider_code: str
+    air_temp_c: float | None
+    humidity_pct: float | None
+    precipitation_mm: float | None
+    wind_speed_m_s: float | None
+    solar_radiation_w_m2: float | None
+    et0_mm: float | None
+
+
+class WeatherDayExplain(BaseModel):
+    """The weather counterpart of the pixel inspector."""
+
+    index: dict[str, Any]
+    derived: dict[str, Any] | None
+    hourly: list[WeatherHourlyRow]
+    catalog: dict[str, Any] | None
+    hours_present: int
+    hours_expected: int
+    # The qualifier that belongs next to every number here: a day built from a
+    # third of its hours is not comparable to a full one.
+    coverage_sufficient: bool
+
+
+class LineageConsumer(BaseModel):
+    """A decision that recorded reading this index."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    created_at: datetime
+    cell_id: UUID | None
+    severity: str | None
+    status: str | None
+    # Which snapshot key matched — `indices.ndmi.mean` vs `grid.ndmi.mean`
+    # is the difference between a block-level and a per-cell decision.
+    snapshot_key: str
+    # The value the tree actually saw, frozen at decision time.
+    observed_value: str | None
+    tree_code: str | None = None
+    tree_version: int | None = None
+    action_type: str | None = None
+    rule_code: str | None = None
+
+
+class CellAnomaly(BaseModel):
+    cell_id: UUID
+    mean: float
+    # Standard deviations *below* the block mean (positive = below).
+    z: float
+    threshold: float
+    row_idx: int
+    col_idx: int
+
+
+class LineageResponse(BaseModel):
+    block_id: UUID
+    index_code: str
+    window_from: datetime
+    window_to: datetime
+    recommendations: list[LineageConsumer]
+    alerts: list[LineageConsumer]
+    cell_anomalies: list[CellAnomaly]
+    anomaly_threshold: float | None
+    anomaly_threshold_source: str | None
+    # These edges are stored in the decision's own snapshot, not inferred
+    # from timestamps — unlike the overview's consumer count.
+    exact: bool
+    consumer_count: int
+
+
+class DecisionSourceResponse(BaseModel):
+    kind: Literal["recommendation", "alert"]
+    decision_id: UUID
+    block_id: UUID
+    cell_id: UUID | None
+    created_at: datetime
+    source_code: str | None
+    index_code: str
+    # What the decision recorded reading, frozen at the time.
+    observed_value: float | None
+    source_row: dict[str, Any] | None
+    # What that row holds now.
+    current_value: float | None
+    # None when either side is missing: "cannot tell" is not "agrees". False
+    # means the row was recomputed after the decision was made.
+    values_agree: bool | None
 
 
 # --- shared query params ---------------------------------------------------
@@ -831,6 +981,177 @@ async def _audit_verify(
         subject_id=subject_id,
         details=details,
     )
+
+
+# --- weather lane -----------------------------------------------------------
+
+
+@router.get("/tenants/{tenant_id}/weather/overview", response_model=WeatherOverviewResponse)
+async def weather_overview(
+    tenant_id: UUID,
+    farm_id: UUID = Query(description="Weather is farm-scoped; blocks do not apply."),
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """The weather ribbon plus per-day hour coverage.
+
+    No `blocks` parameter: weather is measured at one farm centroid, and
+    accepting a block filter that changed nothing would be worse than not
+    offering one.
+    """
+    del context
+    try:
+        return await service.weather_overview(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            window_from=window_from,
+            window_to=window_to,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/attempts", response_model=list[WeatherAttemptRow])
+async def weather_attempts(
+    tenant_id: UUID,
+    farm_id: UUID,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    limit: int = Query(default=100, ge=1, le=500),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """Fetch attempts — the weather lane's scene table."""
+    del context
+    try:
+        return await service.weather_attempts(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            window_from=window_from,
+            window_to=window_to,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/index-days", response_model=list[WeatherIndexDayRow])
+async def weather_index_days(
+    tenant_id: UUID,
+    farm_id: UUID,
+    index_code: str,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    limit: int = Query(default=200, ge=1, le=1000),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> list[dict[str, Any]]:
+    del context
+    try:
+        return await service.weather_index_days(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            index_code=index_code,
+            window_from=window_from,
+            window_to=window_to,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/weather/explain", response_model=WeatherDayExplain)
+async def explain_weather_day(
+    tenant_id: UUID,
+    farm_id: UUID,
+    index_code: str,
+    day: date,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Everything that produced one daily index value.
+
+    The hourly rows that fed it, the derived-daily intermediate, the catalog
+    definition, and the coverage that qualifies all three.
+    """
+    del context
+    try:
+        return await service.explain_weather_day(
+            tenant_schema=await _schema(service, tenant_id),
+            farm_id=farm_id,
+            index_code=index_code,
+            day=day,
+        )
+    except WeatherDayNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no weather index row for {exc}") from exc
+
+
+# --- L4: forward lineage ----------------------------------------------------
+
+
+@router.get("/tenants/{tenant_id}/lineage", response_model=LineageResponse)
+async def index_lineage(
+    tenant_id: UUID,
+    block_id: UUID,
+    index_code: str,
+    window_from: datetime = Query(alias="from"),
+    window_to: datetime = Query(alias="to"),
+    product_id: UUID | None = Query(default=None, alias="product"),
+    scene_time: datetime | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """What this index produced: alerts, recommendations, cell anomalies.
+
+    Exact rather than time-proximate — every consumer listed recorded reading
+    this index in its evaluation snapshot, and comes back with the value it
+    saw. Pass `scene_time` and `product` to include the per-cell anomaly pass
+    for that scene.
+    """
+    del context
+    try:
+        return await service.index_lineage(
+            tenant_schema=await _schema(service, tenant_id),
+            block_id=block_id,
+            product_id=product_id,
+            index_code=index_code,
+            window_from=window_from,
+            window_to=window_to,
+            scene_time=scene_time,
+            limit=limit,
+        )
+    except (WindowTooWideError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.get("/tenants/{tenant_id}/lineage/source", response_model=DecisionSourceResponse)
+async def decision_source(
+    tenant_id: UUID,
+    kind: Literal["recommendation", "alert"],
+    decision_id: UUID,
+    index_code: str,
+    context: RequestContext = Depends(requires_capability(_CAP)),
+    service: ObserverService = Depends(_service),
+) -> dict[str, Any]:
+    """Reverse lineage: from a decision back to the row it read.
+
+    `values_agree = false` means the aggregate was recomputed after the
+    decision was made, so the recommendation is standing on a number that no
+    longer exists.
+    """
+    del context
+    try:
+        return await service.decision_source(
+            tenant_schema=await _schema(service, tenant_id),
+            kind=kind,
+            decision_id=decision_id,
+            index_code=index_code,
+        )
+    except DecisionNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "decision not found") from exc
 
 
 # --- helpers ---------------------------------------------------------------

@@ -17,6 +17,7 @@ import {
 } from "@/modules/imagery/components/tileUrl";
 import type { IndexCode } from "@/api/indices";
 import { PixelBudgetCard } from "@/modules/admin/components/observer/PixelBudgetCard";
+import { LineagePanel } from "@/modules/admin/components/observer/LineagePanel";
 import { PixelInspector } from "@/modules/admin/components/observer/PixelInspector";
 import { VerifyPanel } from "@/modules/admin/components/observer/VerifyPanel";
 import {
@@ -206,6 +207,21 @@ export function ObserverSceneDetailPage(): ReactNode {
       </div>
 
       <VerifyPanel tenantId={tenantId as string} jobId={jobId as string} />
+
+      <LineagePanel
+        tenantId={tenantId as string}
+        blockId={d.block_id}
+        indexCode={selectedIndex}
+        productId={d.product_id}
+        sceneTime={d.scene_datetime}
+        // A scene's consumers are what fired in the days after it, so the
+        // window opens at the scene and runs a fortnight forward rather than
+        // spanning the operator's whole selection.
+        windowFrom={d.scene_datetime}
+        windowTo={new Date(
+          new Date(d.scene_datetime).getTime() + 14 * 24 * 3600 * 1000,
+        ).toISOString()}
+      />
 
       <Card
         title={t("observer.detail.history")}

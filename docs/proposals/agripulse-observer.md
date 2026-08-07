@@ -1,6 +1,6 @@
 # AgriPulse Observer — pipeline transparency for platform admins
 
-**Status:** design / for review
+**Status:** BUILT — OBS-1..8 on `feat/agripulse-observer`, unpushed
 **Date:** 2026-08-06
 **Surface:** `/platform/observer` (Platform portal, new top-level nav entry)
 **Capability:** `platform.observe_pipeline` (new, read-only)
@@ -390,7 +390,7 @@ conversion to a hypertable is not blocked by shipping it flat first.
 | **OBS-3** | L2 backend: scene detail, pixel-explain endpoint (raw-COG window read reusing `computation.py`), live pixel-budget breakdown, product-driven band/index degradation. | — |
 | **OBS-4** | L2 frontend: raster viewer via TiTiler, pixel inspector, pixel-budget waterfall, roll-up chain. | — |
 | **OBS-5** | `indices_calc_runs` + `calc_version` constant; `compute_indices` writes a run row; Observer reads real history. | tenant 0059 |
-| **OBS-6** | L3 verify: single-scene synchronous (fast + full) + `observer_verify_runs` named runs with progress, cancel, one-per-farm guard, `observer_verifications` results, diff panel, audit events. | tenant 0060 |
+| **OBS-6** | L3 verify (built as tenant 0059; fast mode reads the index COGs directly rather than TiTiler statistics — rasterio is already in-process): single-scene synchronous (fast + full) + `observer_verify_runs` named runs with progress, cancel, one-per-farm guard, `observer_verifications` results, diff panel, audit events. | tenant 0060 |
 | **OBS-7** | Weather lane: backend spine + hour-coverage strip + daily-index explain, frontend source switch. | — |
 | **OBS-8** | L4 forward lineage into alerts / recommendations / anomalies, bidirectional links. | — |
 
