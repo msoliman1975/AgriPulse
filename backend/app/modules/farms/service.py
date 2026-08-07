@@ -358,6 +358,9 @@ class FarmService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
         canopy_size_class: str | None = None,
+        effective_from: Any = None,
+        effective_to: Any = None,
+        attributes: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -1707,6 +1710,7 @@ class FarmServiceImpl:
         canopy_size_class: str | None = None,
         effective_from: Any = None,
         effective_to: Any = None,
+        attributes: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
         # Valid time. `from` defaults to the planting date — they coincide in
@@ -1768,6 +1772,19 @@ class FarmServiceImpl:
             actor_user_id=actor_user_id,
         )
         await self._tenant_session.flush()
+
+        # Crop fields, same transaction. Deliberately after the flush (the
+        # values reference the assignment row) and deliberately *not* a
+        # separate request: a missing required attribute raises here, which
+        # rolls the assignment back rather than leaving one half-configured
+        # for someone to discover later. Re-uses the editor's write path, so
+        # gating, coercion and history are identical either way.
+        if attributes:
+            await self.set_block_crop_attributes(
+                block_crop_id=bc_id,
+                submitted=attributes,
+                actor_user_id=actor_user_id,
+            )
 
         # Fetch farm_id for audit.farm_id (the block_id alone is not enough).
         block = await self._repo.get_block_by_id(block_id, with_boundary=False)

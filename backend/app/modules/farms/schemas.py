@@ -962,6 +962,14 @@ class BlockCropAssignRequest(BaseModel):
     # One of the crop's resolved ``size_classes`` codes (validated server-side).
     canopy_size_class: str | None = None
     notes: str | None = None
+    # Crop fields for the assignment being created, `{code: value}`.
+    #
+    # Sent with the assignment rather than in a follow-up PUT so the whole
+    # thing is one transaction: a required attribute that fails validation
+    # rolls the assignment back instead of leaving a half-configured one
+    # behind. The definitions come from the crop's catalog entry, which the
+    # form resolves from the chosen crop path before the assignment exists.
+    attributes: dict[str, Any] = Field(default_factory=dict)
     make_current: bool = True
 
 

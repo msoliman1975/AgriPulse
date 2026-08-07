@@ -53,6 +53,12 @@ export interface BlockCropAssignPayload {
   /** Omit or null for an ongoing assignment (the normal perennial case).
    *  Assigning auto-closes the block's open assignment at `effective_from`. */
   effective_to?: string | null;
+  /** Crop fields for the assignment being created, `{code: value}`.
+   *
+   *  Sent with the assignment, not in a follow-up PUT: the server writes both
+   *  in one transaction, so a rejected attribute rolls the assignment back
+   *  instead of leaving one half-configured. */
+  attributes?: Record<string, unknown>;
   make_current?: boolean;
 }
 

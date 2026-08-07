@@ -717,6 +717,7 @@ async def assign_block_crop(
         season_label=payload.season_label,
         effective_from=payload.effective_from,
         effective_to=payload.effective_to,
+        attributes=payload.attributes,
         planting_date=payload.planting_date,
         expected_harvest_start=payload.expected_harvest_start,
         expected_harvest_end=payload.expected_harvest_end,

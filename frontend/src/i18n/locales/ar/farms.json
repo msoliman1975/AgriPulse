@@ -336,6 +336,8 @@
       "current": "حالي",
       "past": "منتهٍ",
       "scheduled": "مجدول"
-    }
+    },
+    "cropFields": "حقول المحصول",
+    "fieldRequired": "مطلوب لهذا الاختيار"
   }
 }

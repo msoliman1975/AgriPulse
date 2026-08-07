@@ -23,6 +23,12 @@ interface Props {
   // required classification depth, so callers can gate the submit button and
   // avoid a guaranteed 422 from the backend's exact-depth validation.
   onValidityChange?: (complete: boolean) => void;
+  // The canonical crop path for the current selection ("mango.sukkary"), or
+  // null until it reaches the crop's required depth. Callers need it to resolve
+  // the crop's attribute definitions *before* an assignment exists — the
+  // picker already holds the catalog rows, so deriving it here avoids a second
+  // fetch and a second place that knows how a path is built.
+  onCropPathChange?: (cropPath: string | null) => void;
 }
 
 export function CropPicker({
@@ -31,6 +37,7 @@ export function CropPicker({
   cropVarietyStrainId,
   onChange,
   onValidityChange,
+  onCropPathChange,
 }: Props): JSX.Element {
   const { t, i18n } = useTranslation("farms");
   const [crops, setCrops] = useState<Crop[]>([]);
@@ -103,14 +110,28 @@ export function CropPicker({
   const showVariety = depth === "variety" || depth === "variety_strain";
   const showStrain = depth === "variety_strain";
 
+  const complete =
+    Boolean(cropId) &&
+    (depth !== "variety" || Boolean(cropVarietyId)) &&
+    (depth !== "variety_strain" || Boolean(cropVarietyId && cropVarietyStrainId));
+
   useEffect(() => {
-    if (!onValidityChange) return;
-    const complete =
-      Boolean(cropId) &&
-      (depth !== "variety" || Boolean(cropVarietyId)) &&
-      (depth !== "variety_strain" || Boolean(cropVarietyId && cropVarietyStrainId));
-    onValidityChange(complete);
-  }, [onValidityChange, depth, cropId, cropVarietyId, cropVarietyStrainId]);
+    onValidityChange?.(complete);
+  }, [onValidityChange, complete]);
+
+  // `path` is denormalised onto the variety/strain rows by the catalog, so the
+  // deepest selected node already carries it.
+  const cropPath = !complete
+    ? null
+    : depth === "variety_strain"
+      ? (strains.find((s) => s.id === cropVarietyStrainId)?.path ?? null)
+      : depth === "variety"
+        ? (varieties.find((v) => v.id === cropVarietyId)?.path ?? null)
+        : (selectedCrop?.code ?? null);
+
+  useEffect(() => {
+    onCropPathChange?.(cropPath);
+  }, [onCropPathChange, cropPath]);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

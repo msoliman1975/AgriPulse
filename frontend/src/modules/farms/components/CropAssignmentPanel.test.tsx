@@ -19,9 +19,34 @@ vi.mock("@/api/cropAssignments", () => ({
   putBlockCropAttributes: () => Promise.resolve({}),
 }));
 vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
+
+const resolveCropAttributes = vi.fn();
+vi.mock("@/api/crops", () => ({
+  resolveCropAttributes: (...a: unknown[]) => resolveCropAttributes(...a),
+}));
 // The cascading picker fetches the catalog; the panel is what's under test.
 vi.mock("@/modules/farms/components/CropPicker", () => ({
-  CropPicker: () => <div data-testid="crop-picker" />,
+  CropPicker: ({
+    onChange,
+    onValidityChange,
+    onCropPathChange,
+  }: {
+    onChange: (c: string | null, v: string | null, s: string | null) => void;
+    onValidityChange?: (ok: boolean) => void;
+    onCropPathChange?: (p: string | null) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="crop-picker"
+      onClick={() => {
+        onChange("crop-1", null, null);
+        onValidityChange?.(true);
+        onCropPathChange?.("tomato");
+      }}
+    >
+      pick tomato
+    </button>
+  ),
 }));
 
 const TODAY = new Date();
@@ -53,6 +78,27 @@ describe("<CropAssignmentPanel>", () => {
     listBlockCrops.mockReset();
     assignBlockCrop.mockReset();
     assignBlockCrop.mockResolvedValue({});
+    resolveCropAttributes.mockReset();
+    resolveCropAttributes.mockResolvedValue({
+      crop_path: "tomato",
+      shadowed_codes: [],
+      definitions: [
+        {
+          code: "planting_material",
+          name_en: "Planting material",
+          name_ar: "x",
+          value_type: "single_select",
+          unit_en: null,
+          unit_ar: null,
+          is_required: true,
+          show_when: null,
+          required_when: null,
+          options: [
+            { code: "nursery_seedling", name_en: "Nursery seedling", name_ar: "x", sort_order: 1 },
+          ],
+        },
+      ],
+    });
   });
 
   it("shows the assignment whose range contains today, with its dates", async () => {
@@ -121,5 +167,50 @@ describe("<CropAssignmentPanel>", () => {
     await user.clear(screen.getByLabelText(/Valid from/));
     await user.type(screen.getByLabelText(/Valid from/), iso(60));
     await waitFor(() => expect(screen.queryByText(/Overlaps tomato/)).not.toBeInTheDocument());
+  });
+});
+
+describe("<CropAssignmentPanel> crop fields on the same screen", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    listBlockCrops.mockResolvedValue([]);
+  });
+
+  it("shows the crop's fields as soon as a crop is picked, before any save", async () => {
+    // The whole point: no assign → save → come back and fill in.
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByTestId("crop-picker"));
+    expect(await screen.findByText("Crop fields")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Planting material/)).toBeInTheDocument();
+    expect(resolveCropAttributes).toHaveBeenCalledWith("tomato");
+    // Nothing was saved to get here.
+    expect(assignBlockCrop).not.toHaveBeenCalled();
+  });
+
+  it("blocks the save while a required crop field is empty", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByTestId("crop-picker"));
+    await screen.findByLabelText(/Planting material/);
+    await user.type(screen.getByLabelText(/Season/), "2026");
+    // The server would reject the whole transaction, so the form does too.
+    expect(screen.getByRole("button", { name: /Assign crop/ })).toBeDisabled();
+  });
+
+  it("sends the crop fields with the assignment, in one request", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByTestId("crop-picker"));
+    await screen.findByLabelText(/Planting material/);
+    await user.type(screen.getByLabelText(/Season/), "2026");
+    await user.selectOptions(screen.getByLabelText(/Planting material/), "nursery_seedling");
+
+    await user.click(screen.getByRole("button", { name: /Assign crop/ }));
+
+    await waitFor(() => expect(assignBlockCrop).toHaveBeenCalledTimes(1));
+    expect(assignBlockCrop.mock.calls[0][1].attributes).toEqual({
+      planting_material: "nursery_seedling",
+    });
   });
 });

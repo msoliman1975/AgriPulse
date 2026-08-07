@@ -336,6 +336,8 @@
       "current": "current",
       "past": "ended",
       "scheduled": "scheduled"
-    }
+    },
+    "cropFields": "Crop fields",
+    "fieldRequired": "Required for this option"
   }
 }

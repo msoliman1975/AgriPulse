@@ -207,3 +207,66 @@ async def test_the_exclusion_constraint_exists_and_bites(
         "the non-overlap guard is missing — service-layer checks alone are "
         "bypassable by bulk writers"
     )
+
+
+@pytest.mark.asyncio
+async def test_crop_fields_are_saved_with_the_assignment(
+    admin_session: AsyncSession,
+) -> None:
+    """One request, not two: the form collects the crop fields before the
+    assignment exists, so they must ride along with it."""
+    async with await _client(admin_session, f"cv-i-{uuid4().hex[:6]}") as c:
+        block_id = await _block(c)
+        r = await _assign(
+            c,
+            block_id,
+            "tomato",
+            effective_from="2026-01-15",
+            attributes={"planting_material": "nursery_seedling", "seedling_age_days": 32},
+        )
+        assert r.status_code == 201, r.text
+
+        got = await c.get(f"/api/v1/crop-assignments/{r.json()['id']}/attributes")
+        assert got.status_code == 200, got.text
+        values = got.json()["values"]
+        assert values["planting_material"] == "nursery_seedling"
+        assert float(values["seedling_age_days"]) == 32
+
+
+@pytest.mark.asyncio
+async def test_a_bad_crop_field_rolls_the_whole_assignment_back(
+    admin_session: AsyncSession,
+) -> None:
+    """The reason this is one transaction. A rejected attribute must not leave
+    a half-configured assignment for someone to find later."""
+    async with await _client(admin_session, f"cv-j-{uuid4().hex[:6]}") as c:
+        block_id = await _block(c)
+        r = await _assign(
+            c,
+            block_id,
+            "tomato",
+            effective_from="2026-01-15",
+            # seedling_age_days is capped at 60 by the catalog.
+            attributes={"planting_material": "nursery_seedling", "seedling_age_days": 9999},
+        )
+        assert r.status_code == 422, r.text
+        assert "above the maximum" in r.json()["detail"]
+
+        rows = (await c.get(f"/api/v1/blocks/{block_id}/crop-assignments")).json()
+        assert rows == [], "the assignment was created despite the attribute being rejected"
+
+
+@pytest.mark.asyncio
+async def test_a_missing_required_crop_field_blocks_the_assignment(
+    admin_session: AsyncSession,
+) -> None:
+    async with await _client(admin_session, f"cv-k-{uuid4().hex[:6]}") as c:
+        block_id = await _block(c)
+        # `planting_material` is required for tomato; sending only the gated
+        # child field leaves it unset.
+        r = await _assign(
+            c, block_id, "tomato", effective_from="2026-01-15", attributes={"nursery_name": "X"}
+        )
+        assert r.status_code == 422, r.text
+        assert "required" in r.json()["detail"]
+        assert (await c.get(f"/api/v1/blocks/{block_id}/crop-assignments")).json() == []

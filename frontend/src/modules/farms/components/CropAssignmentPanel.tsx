@@ -3,12 +3,21 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { assignBlockCrop, listBlockCrops } from "@/api/cropAssignments";
+import { resolveCropAttributes } from "@/api/crops";
 import { isApiError } from "@/api/errors";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { CropPicker } from "@/modules/farms/components/CropPicker";
-import { CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
+import { AttributeInput, CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
+import {
+  buildPayload,
+  isRequired as attributeRequired,
+  label as attributeLabel,
+  missingRequired,
+  visibleDefinitions,
+  type AttributeValues,
+} from "@/modules/farms/lib/cropAttributeForm";
 import {
   currentAssignment,
   findConflict,
@@ -51,7 +60,8 @@ const STATE_PILL: Record<ValidityState, string> = {
  * so a finished season used to keep reading as the block's crop for months.
  */
 export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): ReactNode {
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
+  const lang = i18n.language;
   const canAssign = useCapability("crop_assignment.create", { farmId });
   const queryClient = useQueryClient();
   const today = todayIso();
@@ -71,6 +81,24 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
   const [to, setTo] = useState("");
   const [planting, setPlanting] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Crop fields for the assignment being created. Resolved from the chosen
+  // crop path *before* the assignment exists, which is what makes this one
+  // screen instead of assign-then-come-back-and-fill-in.
+  const [cropPath, setCropPath] = useState<string | null>(null);
+  const [attrValues, setAttrValues] = useState<AttributeValues>({});
+
+  const attrQuery = useQuery({
+    queryKey: ["crop_attributes", "resolved", cropPath] as const,
+    queryFn: () => resolveCropAttributes(cropPath as string),
+    enabled: cropPath !== null,
+    staleTime: 60_000,
+  });
+  const attrDefs = useMemo(() => attrQuery.data?.definitions ?? [], [attrQuery.data]);
+  const attrVisible = useMemo(
+    () => visibleDefinitions(attrDefs, attrValues),
+    [attrDefs, attrValues],
+  );
+  const attrMissing = useMemo(() => missingRequired(attrDefs, attrValues), [attrDefs, attrValues]);
 
   const rows = useMemo(
     () => [...(query.data ?? [])].sort((a, b) => (a.effective_from < b.effective_from ? 1 : -1)),
@@ -92,7 +120,11 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
     Boolean(season) &&
     Boolean(from) &&
     !conflict &&
-    !invertedRange;
+    !invertedRange &&
+    // A required crop field blocks the save here rather than after it: the
+    // server writes the assignment and its fields in one transaction and
+    // would reject the whole thing.
+    attrMissing.length === 0;
 
   const assign = useMutation({
     mutationFn: () =>
@@ -104,6 +136,7 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
         effective_from: from,
         effective_to: to || null,
         planting_date: planting || null,
+        attributes: buildPayload(attrDefs, attrValues),
         make_current: true,
       }),
     onSuccess: () => {
@@ -114,6 +147,8 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
       setSeason("");
       setTo("");
       setPlanting("");
+      setCropPath(null);
+      setAttrValues({});
       setShowHistory(true);
       void queryClient.invalidateQueries({ queryKey: ["block_crops", blockId] });
       onAssigned();
@@ -249,6 +284,12 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
                 setStrainId(s);
               }}
               onValidityChange={setDepthComplete}
+              onCropPathChange={(path) => {
+                setCropPath(path);
+                // Definitions differ per crop, so values from a previous
+                // selection would be codes this crop has never heard of.
+                setAttrValues({});
+              }}
             />
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label={t("assignment.season")} required>
@@ -300,6 +341,50 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
                 )}
               </Field>
             </div>
+
+            {/* Crop fields for the crop being assigned. They appear as soon as
+                a crop is chosen and are saved with the assignment, so this is
+                one screen rather than assign → save → come back and fill in. */}
+            {attrVisible.length > 0 ? (
+              <div className="mt-3 rounded-card border border-ap-line">
+                <header className="border-b border-ap-line bg-ap-bg px-3 py-1.5">
+                  <h5 className="text-[11px] font-semibold text-ap-ink">
+                    {t("assignment.cropFields")}
+                  </h5>
+                </header>
+                <div className="grid gap-3 p-3 sm:grid-cols-2">
+                  {attrVisible.map((def) => {
+                    const unit = lang.startsWith("ar") ? def.unit_ar : def.unit_en;
+                    return (
+                      <Field
+                        key={def.code}
+                        label={
+                          <span>
+                            {attributeLabel(def, lang)}
+                            {unit ? <span className="ms-1 text-ap-muted">({unit})</span> : null}
+                          </span>
+                        }
+                        required={attributeRequired(def, attrValues)}
+                        error={
+                          attrMissing.includes(def.code) ? t("assignment.fieldRequired") : undefined
+                        }
+                      >
+                        {(a11y) => (
+                          <AttributeInput
+                            def={def}
+                            value={attrValues[def.code]}
+                            readOnly={false}
+                            lang={lang}
+                            a11y={a11y}
+                            onChange={(v) => setAttrValues((prev) => ({ ...prev, [def.code]: v }))}
+                          />
+                        )}
+                      </Field>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {conflict ? (
               <p className="mt-3 rounded border-s-4 border-ap-crit bg-ap-crit-soft px-2 py-1 text-[11px]">
