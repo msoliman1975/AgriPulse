@@ -43,6 +43,7 @@ roles:
       - decision_tree.read
       - analytics.read
       - tenant.read_integration_health
+      - platform.observe_pipeline
 
   # ---- Tenant-scoped --------------------------------------------------
 

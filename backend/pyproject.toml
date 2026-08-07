@@ -287,6 +287,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.tenancy.repository",
@@ -313,6 +314,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.iam.repository",
@@ -338,6 +340,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.audit.models",
@@ -371,6 +374,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.farms.repository",
@@ -400,6 +404,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.imagery.repository",
@@ -431,6 +436,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.indices.repository",
@@ -456,6 +462,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.weather.repository",
@@ -486,6 +493,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.signals.repository",
@@ -512,6 +520,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.alerts.repository",
@@ -545,6 +554,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.plans.repository",
@@ -571,6 +581,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.irrigation.repository",
@@ -596,6 +607,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.recommendations.repository",
@@ -621,6 +633,7 @@ source_modules = [
   "app.modules.recommendations",
   "app.modules.analytics",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.notifications.repository",
@@ -646,6 +659,7 @@ source_modules = [
   "app.modules.recommendations",
   "app.modules.notifications",
   "app.modules.forecasting",
+  "app.modules.observer",
 ]
 forbidden_modules = [
   "app.modules.analytics.repository",

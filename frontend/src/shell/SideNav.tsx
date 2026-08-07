@@ -214,6 +214,13 @@ export function SideNav(): ReactNode {
           collapsed={collapsed}
         />
         <SideNavItem
+          to="/platform/observer"
+          label={t("nav.observer")}
+          icon={<AlertsIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/observer"
+          collapsed={collapsed}
+        />
+        <SideNavItem
           to="/platform/admins"
           label={t("nav.platformAdmins")}
           icon={<UsersIcon className="h-4 w-4" />}

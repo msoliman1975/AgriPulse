@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgriPulse Observer — mockup</title>
+<style>
+  :root{
+    --bg:#f7f6f1; --panel:#fff; --line:#e8e5db; --ink:#1f2420; --muted:#6c7268;
+    --primary:#356b30; --primary-soft:#dceadb; --good:#4f8e4a; --accent:#1f6f9a;
+    --accent-soft:#e2eef5;
+    --warn:#c98a18; --warn-soft:#f7e7c2; --crit:#b24430; --crit-soft:#f3d2c9;
+    --radius:.75rem; --shadow:0 1px 2px rgba(31,36,32,.04), 0 4px 14px rgba(31,36,32,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Cairo,Tahoma,Arial,sans-serif;
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{margin:0;font-weight:600}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8125rem}
+  .shell{max-width:1240px;margin:0 auto;padding:24px 20px 72px}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand-dot{width:26px;height:26px;border-radius:8px;background:var(--primary);display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
+  .page-title{font-size:1.5rem;line-height:2rem;letter-spacing:-.015em}
+  .sub{color:var(--muted);font-size:.8125rem;margin:4px 0 18px}
+  .spacer{flex:1}
+  .mockbadge{font-size:.6875rem;text-transform:uppercase;letter-spacing:.06em;background:var(--warn-soft);color:#7a5406;border:1px solid #e6cd8f;padding:3px 8px;border-radius:999px;font-weight:600}
+
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
+  .tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font:inherit;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary)}
+  .panelview[hidden]{display:none}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-hd{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card-hd h3{font-size:.875rem}
+  .card-bd{padding:16px}
+  .grid{display:grid;gap:16px}
+  .cols-side{grid-template-columns:minmax(0,1fr) 360px}
+  .cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media(max-width:1020px){.cols-side,.cols-2,.cols-3{grid-template-columns:minmax(0,1fr)}}
+
+  .label{display:block;font-size:.75rem;font-weight:500;color:var(--muted);margin-block-end:4px}
+  .input,.select{display:block;width:100%;border-radius:.375rem;border:1px solid var(--line);padding:7px 10px;font:inherit;font-size:.8125rem;color:var(--ink);background:var(--panel)}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:.375rem;padding:7px 12px;font:inherit;font-size:.8125rem;font-weight:500;cursor:pointer}
+  .btn:hover{background:#fbfaf7}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.sm{padding:4px 9px;font-size:.75rem}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:.6875rem;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .pill.ok{background:var(--primary-soft);color:#24501f;border-color:#c3ddc1}
+  .pill.info{background:var(--accent-soft);color:#155273;border-color:#c3dced}
+  .pill.warn{background:var(--warn-soft);color:#7a5406;border-color:#e6cd8f}
+  .pill.bad{background:var(--crit-soft);color:#7d2b1c;border-color:#e6bdb1}
+  .pill.ghost{background:transparent;color:var(--muted);border-color:var(--line)}
+  .muted{color:var(--muted)} .meta{font-size:.6875rem;line-height:1rem;color:var(--muted)}
+  .hr{height:1px;background:var(--line);margin:14px 0;border:0}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:start;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.6875rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:#fbfaf7;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.sel{background:#f4f9f3}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  td.num,th.num{text-align:end;font-variant-numeric:tabular-nums}
+
+  .note{border-inline-start:3px solid var(--accent);background:#f2f7fa;padding:10px 14px;border-radius:0 .375rem .375rem 0;font-size:.8125rem}
+  .note.warn{border-color:var(--warn);background:#fdf7e9}
+  .note.bad{border-color:var(--crit);background:#fcf1ee}
+  .note.good{border-color:var(--good);background:#f1f7f0}
+
+  /* ---- selection rail ---- */
+  .rail{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:18px}
+  .rail-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+  .rail-f{min-width:130px;flex:1 1 130px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:.5rem;overflow:hidden;background:#fbfaf7}
+  .seg button{appearance:none;border:0;background:none;padding:7px 14px;font:inherit;font-size:.8125rem;font-weight:600;color:var(--muted);cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--primary);color:#fff}
+  .railurl{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);word-break:break-all}
+
+  /* ---- stage ribbon ---- */
+  .ribbon{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding:4px 0 10px}
+  .stage{flex:1 1 0;min-width:132px;background:#fbfaf7;border:1px solid var(--line);padding:11px 12px 12px;position:relative}
+  .stage:first-child{border-radius:.5rem 0 0 .5rem}
+  .stage:last-child{border-radius:0 .5rem .5rem 0}
+  .stage + .stage{border-inline-start:0}
+  .stage .st-name{font-size:.6875rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+  .stage .st-n{font-size:1.375rem;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stage .st-sub{font-size:.6875rem;color:var(--muted);margin-top:1px}
+  .stage.good{background:#f4f9f3;border-color:#cfe3cd}
+  .stage.warn{background:#fdf7e9;border-color:#e6cd8f}
+  .stage.bad{background:#fcf1ee;border-color:#e6bdb1}
+  .stage.na{background:#f5f4ef;color:var(--muted)}
+  .drop{position:absolute;top:-9px;inset-inline-end:-1px;font-size:.625rem;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--crit-soft);color:#7d2b1c;border:1px solid #e6bdb1}
+  .drop.none{background:var(--primary-soft);color:#24501f;border-color:#c3ddc1}
+
+  /* ---- histogram ---- */
+  .hist{display:flex;align-items:flex-end;gap:3px;height:150px;padding:8px 4px 0;border-bottom:1px solid var(--line)}
+  .hbar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;cursor:pointer;min-width:8px}
+  .hbar:hover{filter:brightness(1.06)}
+  .hseg{border-radius:2px 2px 0 0}
+  .hseg.okc{background:#5c9a55} .hseg.failc{background:#c1614c} .hseg.cloudc{background:#d9bd72} .hseg.pendc{background:#b9bdb3}
+  .hax{display:flex;gap:3px;padding:6px 4px 0}
+  .hax span{flex:1;text-align:center;font-size:.625rem;color:var(--muted);min-width:8px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;color:var(--muted);margin-top:10px}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:5px;vertical-align:-1px}
+
+  /* ---- raster ---- */
+  .raster{display:grid;grid-template-columns:repeat(16,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:.5rem;overflow:hidden;aspect-ratio:1}
+  .px{aspect-ratio:1;position:relative;cursor:crosshair}
+  .px:hover{outline:2px solid #1f2420;outline-offset:-2px;z-index:2}
+  .px.on{outline:3px solid #1f6f9a;outline-offset:-3px;z-index:3}
+  .px.cell-edge-r{box-shadow:inset -1px 0 0 rgba(255,255,255,.85)}
+  .px.cell-edge-b{box-shadow:inset 0 -1px 0 rgba(255,255,255,.85)}
+  .px.cell-edge-r.cell-edge-b{box-shadow:inset -1px 0 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(255,255,255,.85)}
+  .rlegend{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.6875rem;color:var(--muted)}
+  .ramp{height:9px;flex:1;border-radius:999px;background:linear-gradient(90deg,#f7f7f2,#dbe8cf,#9ec78a,#5c9a55,#2f6b2c)}
+
+  /* ---- calc block ---- */
+  .calc{background:#fbfaf7;border:1px solid var(--line);border-radius:.5rem;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8125rem;line-height:1.75;white-space:pre-wrap}
+  .calc .k{color:var(--muted)}
+  .calc .v{font-weight:650}
+  .calc .res{color:var(--primary);font-weight:700}
+
+  /* ---- waterfall ---- */
+  .wf{display:flex;flex-direction:column;gap:7px}
+  .wfrow{display:grid;grid-template-columns:150px 1fr 92px;align-items:center;gap:10px;font-size:.8125rem}
+  .wftrack{height:20px;background:#f1f0ea;border-radius:.25rem;position:relative;overflow:hidden}
+  .wffill{position:absolute;top:0;bottom:0;border-radius:.25rem}
+  .wffill.total{background:#b9bdb3} .wffill.mask{background:#d9bd72} .wffill.nod{background:#c1614c} .wffill.valid{background:#5c9a55}
+  .wfnum{text-align:end;font-variant-numeric:tabular-nums;font-weight:600}
+
+  /* ---- chain ---- */
+  .chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{background:#fbfaf7;border:1px solid var(--line);border-radius:.5rem;padding:8px 12px;min-width:120px}
+  .chip .cl{font-size:.625rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+  .chip .cv{font-size:1rem;font-weight:650;font-variant-numeric:tabular-nums}
+  .arrow{color:var(--muted);font-size:1.1rem}
+
+  /* ---- hour coverage strip ---- */
+  .hours{display:grid;grid-template-columns:80px repeat(24,1fr);gap:2px;align-items:center;font-size:.6875rem}
+  .hcell{aspect-ratio:1;border-radius:2px;background:#5c9a55}
+  .hcell.miss{background:#eceae2;border:1px dashed #d6d3c8}
+  .hcell.part{background:#d9bd72}
+  .hlabel{color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .term{border-bottom:1px dotted var(--muted);cursor:help}
+  .gsec[hidden]{display:none}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.8125rem}
+  .kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500}
+  .sechd{font-size:.6875rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:0 0 8px}
+  .stack{display:flex;flex-direction:column;gap:16px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand"><div class="brand-dot">A</div><div>
+      <div class="page-title">Observer</div>
+      <div class="meta">Platform → Observer · pipeline transparency</div>
+    </div></div>
+    <div class="spacer"></div>
+    <span class="mockbadge">Mockup</span>
+  </div>
+  <p class="sub">End-to-end view of the indices pipeline: raw scenes → pixels → cells → blocks → trends → consumers. Read-only, with an on-demand verify. Requires <code>platform.observe_pipeline</code>.</p>
+
+  <!-- ============ SELECTION RAIL ============ -->
+  <div class="rail">
+    <div class="rail-row">
+      <div>
+        <span class="label">Source</span>
+        <div class="seg">
+          <button aria-pressed="true">Imagery</button>
+          <button aria-pressed="false">Weather</button>
+        </div>
+      </div>
+      <div class="rail-f"><label class="label">Tenant</label><select class="select"><option>Bashayer Agri</option><option>Agrosina</option></select></div>
+      <div class="rail-f"><label class="label">Farm</label><select class="select"><option>Bashayer — Suez (36 blocks)</option></select></div>
+      <div class="rail-f"><label class="label">Blocks</label><select class="select"><option>All 36 blocks</option><option>B-07, B-12 (2)</option></select></div>
+      <div class="rail-f"><label class="label">Window</label><select class="select"><option>2026-01-01 → 2026-08-06</option></select></div>
+      <div class="rail-f"><label class="label">Product</label><select class="select"><option>Sentinel-2 L2A (10 m)</option></select></div>
+      <div class="rail-f"><label class="label">Index</label><select class="select"><option>NDVI</option><option>NDMI</option></select></div>
+    </div>
+    <div class="railurl meta mono">/platform/observer?src=imagery&amp;tenant=bashayer&amp;farm=8f3a…&amp;blocks=all&amp;from=2026-01-01&amp;to=2026-08-06&amp;product=s2_l2a&amp;index=ndvi</div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-panel="p-overview">Overview</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-scenes">Scenes</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-detail">Scene detail</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-verify">Verify</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-lineage">Lineage</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-weather">Weather lane</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="p-glossary">Glossary</button>
+  </div>
+
+  <!-- ================= OVERVIEW ================= -->
+  <section class="panelview stack" id="p-overview">
+
+    <div class="card">
+      <div class="card-hd">
+        <h3>Pipeline stages</h3>
+        <span class="meta">36 blocks · 2026-01-01 → 2026-08-06 · Sentinel-2 L2A</span>
+        <div class="spacer"></div>
+        <span class="meta">click a stage to filter the scene list</span>
+      </div>
+      <div class="card-bd">
+        <div class="ribbon">
+          <div class="stage good">
+            <div class="st-name">Discovered</div><div class="st-n">1,284</div>
+            <div class="st-sub">ingestion jobs</div>
+          </div>
+          <div class="stage good">
+            <span class="drop">−38</span>
+            <div class="st-name">Acquired</div><div class="st-n">1,246</div>
+            <div class="st-sub">97.0% · 38 provider fails</div>
+          </div>
+          <div class="stage good">
+            <span class="drop none">0</span>
+            <div class="st-name">STAC</div><div class="st-n">1,246</div>
+            <div class="st-sub">pgstac items</div>
+          </div>
+          <div class="stage warn">
+            <span class="drop">−31</span>
+            <div class="st-name">Indices</div><div class="st-n">1,215</div>
+            <div class="st-sub">97.5% · 31 compute fails</div>
+          </div>
+          <div class="stage good">
+            <span class="drop none">0</span>
+            <div class="st-name">Block aggs</div><div class="st-n">8,505</div>
+            <div class="st-sub">1,215 × 7 indices</div>
+          </div>
+          <div class="stage na">
+            <div class="st-name">Cell aggs</div><div class="st-n">402</div>
+            <div class="st-sub">of 402 gridded · 813 n/a</div>
+          </div>
+          <div class="stage bad">
+            <span class="drop">−97</span>
+            <div class="st-name">Trend (CAGG)</div><div class="st-n">118</div>
+            <div class="st-sub">of 215 scene-days</div>
+          </div>
+          <div class="stage good">
+            <div class="st-name">Consumers</div><div class="st-n">64</div>
+            <div class="st-sub">41 alerts · 23 recs</div>
+          </div>
+        </div>
+
+        <div class="note bad" style="margin-top:6px">
+          <strong>Trend coverage is 55%.</strong> 97 scene-days have block aggregates but no
+          <code>block_index_daily</code> bucket. Every missing day is before 2026-04-11 — the signature of a
+          backfill written outside the rolling refresh window. Suggested action:
+          <code>CALL refresh_continuous_aggregate('tenant_bashayer.block_index_daily', NULL, NULL)</code>.
+        </div>
+        <div class="note warn" style="margin-top:10px">
+          <strong>31 scenes acquired but never computed.</strong> All 31 carry
+          <code>error_code = compute_failed</code> between 2026-03-02 and 2026-03-04 — a single incident,
+          not a scatter. Open the Scenes tab filtered to <code>compute_failed</code>.
+        </div>
+        <div class="note" style="margin-top:10px">
+          <strong>“Cell aggs 402 of 402” is not a 68% failure.</strong> 813 scenes belong to blocks with no
+          <code>grid_config</code> active at scene time, so no cell rows are expected. The denominator is
+          computed from valid-time grid configs, not from the scene count.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-side">
+      <div class="card">
+        <div class="card-hd"><h3>Scenes by date</h3>
+          <div class="seg" style="margin-inline-start:auto"><button aria-pressed="false">Day</button><button aria-pressed="true">Week</button><button aria-pressed="false">Month</button></div>
+        </div>
+        <div class="card-bd">
+          <div class="hist" id="hist"></div>
+          <div class="hax" id="hax"></div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#5c9a55"></i>Indices computed</span>
+            <span><i class="swatch" style="background:#d9bd72"></i>Skipped — cloud over threshold</span>
+            <span><i class="swatch" style="background:#c1614c"></i>Failed</span>
+            <span><i class="swatch" style="background:#b9bdb3"></i>Pending</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Scope health</h3></div>
+        <div class="card-bd stack" style="gap:12px">
+          <dl class="kv">
+            <dt>Blocks in farm</dt><dd>36</dd>
+            <dt>With active imagery sub</dt><dd>36 <span class="pill ok">all</span></dd>
+            <dt>With grid config</dt><dd>12 <span class="pill ghost">24 ungridded</span></dd>
+            <dt>Weather subscription</dt><dd>1 (farm centroid) <span class="pill ok">active</span></dd>
+            <dt>First scene</dt><dd class="mono">2015-08-19</dd>
+            <dt>Last scene</dt><dd class="mono">2026-08-04 10:41Z</dd>
+            <dt>Calc versions seen</dt><dd><span class="pill ok">idx-2026.08</span> <span class="pill warn">idx-2026.03</span></dd>
+          </dl>
+          <hr class="hr" />
+          <div>
+            <p class="sechd">Median valid-pixel %</p>
+            <div class="wf">
+              <div class="wfrow"><span>NDVI</span><div class="wftrack"><span class="wffill valid" style="width:88%"></span></div><span class="wfnum">88.4%</span></div>
+              <div class="wfrow"><span>NDMI</span><div class="wftrack"><span class="wffill valid" style="width:88%"></span></div><span class="wfnum">88.4%</span></div>
+              <div class="wfrow"><span>EVI</span><div class="wftrack"><span class="wffill valid" style="width:86%"></span></div><span class="wfnum">86.1%</span></div>
+            </div>
+          </div>
+          <div class="note warn">
+            <strong>2 calc versions in this window.</strong> 214 rows still carry
+            <code>idx-2026.03</code> (pre-SCL-mask fix). Verify a sample before trusting the
+            early-season trend.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCENES ================= -->
+  <section class="panelview stack" id="p-scenes" hidden>
+    <div class="card">
+      <div class="card-hd">
+        <h3>Scenes</h3>
+        <span class="pill info">filter: all stages</span>
+        <div class="spacer"></div>
+        <button class="btn sm">valid % &lt; 40</button>
+        <button class="btn sm">has error</button>
+        <button class="btn sm">calc version ≠ current</button>
+        <button class="btn sm">export CSV</button>
+      </div>
+      <div class="tablewrap" style="border:0;border-radius:0">
+        <table>
+          <thead><tr>
+            <th>Scene datetime</th><th>Block</th><th>Scene id</th><th>Status</th>
+            <th class="num"><span class="term" title="Fraction of the whole scene under cloud as reported by the provider - not measured for your block specifically.">Cloud %</span></th><th class="num"><span class="term" title="Valid pixels divided by the AOI footprint. Low values mean the number came from a fraction of the field.">Valid %</span></th><th><span class="term" title="How many of the product supported indices were written for this scene.">Indices</span></th><th>Cells</th>
+            <th><span class="term" title="Which release of the formulas and masking rules produced the stored row.">Calc version</span></th><th class="num">Duration</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr class="sel">
+              <td class="mono">2026-06-14 08:37Z</td><td>B-07 “North Mango”</td>
+              <td class="mono">S2B_MSIL2A_20260614T083709</td>
+              <td><span class="pill ok">computed</span></td>
+              <td class="num">4.2</td><td class="num">91.6</td>
+              <td><span class="pill ok">7/7</span></td><td><span class="pill ok">24/24</span></td>
+              <td class="mono">idx-2026.08</td><td class="num">18.4 s</td>
+              <td><button class="btn sm" data-goto="p-detail">Open</button></td>
+            </tr>
+            <tr>
+              <td class="mono">2026-06-14 08:37Z</td><td>B-12 “South Citrus”</td>
+              <td class="mono">S2B_MSIL2A_20260614T083709</td>
+              <td><span class="pill ok">computed</span></td>
+              <td class="num">4.2</td><td class="num">43.1</td>
+              <td><span class="pill ok">7/7</span></td><td><span class="pill ghost">n/a</span></td>
+              <td class="mono">idx-2026.08</td><td class="num">11.2 s</td>
+              <td><button class="btn sm">Open</button></td>
+            </tr>
+            <tr>
+              <td class="mono">2026-06-09 08:37Z</td><td>B-07 “North Mango”</td>
+              <td class="mono">S2A_MSIL2A_20260609T083711</td>
+              <td><span class="pill warn">skipped</span></td>
+              <td class="num">68.9</td><td class="num">—</td>
+              <td><span class="pill ghost">0/7</span></td><td><span class="pill ghost">—</span></td>
+              <td class="mono muted">—</td><td class="num">—</td>
+              <td><button class="btn sm">Open</button></td>
+            </tr>
+            <tr>
+              <td class="mono">2026-03-03 08:39Z</td><td>B-07 “North Mango”</td>
+              <td class="mono">S2A_MSIL2A_20260303T083901</td>
+              <td><span class="pill bad">compute_failed</span></td>
+              <td class="num">2.1</td><td class="num">—</td>
+              <td><span class="pill bad">0/7</span></td><td><span class="pill ghost">—</span></td>
+              <td class="mono muted">—</td><td class="num">9.1 s</td>
+              <td><button class="btn sm">Open</button></td>
+            </tr>
+            <tr>
+              <td class="mono">2026-02-11 08:41Z</td><td>B-07 “North Mango”</td>
+              <td class="mono">S2B_MSIL2A_20260211T084109</td>
+              <td><span class="pill ok">computed</span></td>
+              <td class="num">1.4</td><td class="num">93.8</td>
+              <td><span class="pill ok">7/7</span></td><td><span class="pill ok">24/24</span></td>
+              <td class="mono">idx-2026.03</td><td class="num">17.9 s</td>
+              <td><button class="btn sm">Open</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-bd" style="border-top:1px solid var(--line)">
+        <p class="sechd">Expanded — B-07, 2026-06-14 08:37Z</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Index</th><th class="num">Mean</th><th class="num">Min</th><th class="num">P10</th><th class="num">P50</th><th class="num">P90</th><th class="num">Max</th><th class="num">Std</th><th class="num">Valid px</th><th class="num">Total px</th><th class="num">Baseline z</th></tr></thead>
+            <tbody>
+              <tr><td><strong>NDVI</strong></td><td class="num">0.5123</td><td class="num">0.0412</td><td class="num">0.3110</td><td class="num">0.5240</td><td class="num">0.6902</td><td class="num">0.8104</td><td class="num">0.1284</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">+0.42</td></tr>
+              <tr><td>NDMI</td><td class="num">0.2871</td><td class="num">−0.1120</td><td class="num">0.1044</td><td class="num">0.2910</td><td class="num">0.4402</td><td class="num">0.5510</td><td class="num">0.1130</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">−1.84</td></tr>
+              <tr><td>EVI</td><td class="num">0.3902</td><td class="num">0.0210</td><td class="num">0.2001</td><td class="num">0.3980</td><td class="num">0.5602</td><td class="num">0.7011</td><td class="num">0.1102</td><td class="num">3,209</td><td class="num">3,508</td><td class="num">+0.31</td></tr>
+              <tr><td>SAVI</td><td class="num">0.4610</td><td class="num">0.0330</td><td class="num">0.2802</td><td class="num">0.4701</td><td class="num">0.6210</td><td class="num">0.7402</td><td class="num">0.1155</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">+0.38</td></tr>
+              <tr><td>NDRE</td><td class="num">0.3011</td><td class="num">0.0104</td><td class="num">0.1602</td><td class="num">0.3050</td><td class="num">0.4408</td><td class="num">0.5301</td><td class="num">0.0982</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">+0.12</td></tr>
+              <tr><td>GNDVI</td><td class="num">0.4402</td><td class="num">0.0288</td><td class="num">0.2610</td><td class="num">0.4480</td><td class="num">0.6002</td><td class="num">0.7108</td><td class="num">0.1201</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">+0.29</td></tr>
+              <tr><td>NDWI</td><td class="num">−0.4108</td><td class="num">−0.7202</td><td class="num">−0.5610</td><td class="num">−0.4150</td><td class="num">−0.2604</td><td class="num">0.0801</td><td class="num">0.1104</td><td class="num">3,214</td><td class="num">3,508</td><td class="num">−0.08</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="meta" style="margin-top:8px">NDWI is McFeeters <em>surface water</em> — negative over healthy canopy is expected. Canopy moisture is NDMI.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCENE DETAIL ================= -->
+  <section class="panelview stack" id="p-detail" hidden>
+    <div class="card">
+      <div class="card-hd">
+        <h3>B-07 “North Mango” · 2026-06-14 08:37Z · NDVI</h3>
+        <span class="pill ok">computed</span><span class="pill info mono">idx-2026.08</span>
+        <div class="spacer"></div>
+        <button class="btn sm">← prev scene</button><button class="btn sm">next scene →</button>
+        <button class="btn sm primary" data-goto="p-verify">Verify</button>
+      </div>
+    </div>
+
+    <div class="grid cols-side">
+      <div class="card">
+        <div class="card-hd"><h3>Index raster — click a pixel to explain it</h3>
+          <div class="spacer"></div>
+          <label class="meta"><input type="checkbox" checked /> grid cells</label>
+        </div>
+        <div class="card-bd">
+          <div class="raster" id="raster"></div>
+          <div class="rlegend"><span>−0.2</span><div class="ramp"></div><span>0.9</span><span class="pill ghost" style="margin-inline-start:8px">cloud-masked</span></div>
+          <p class="meta" style="margin-top:8px">Rendered by TiTiler from
+            <code class="mono">s3://…/sentinel_hub/s2_l2a/S2B_MSIL2A_20260614T083709/a41f9c/ndvi.tif</code>.
+            Cell boundaries from <code>grid_cells</code> for the config active at scene time (24 cells, 40 m).</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Pixel inspector</h3><span class="pill info" id="pxid">row 11 · col 13</span></div>
+        <div class="card-bd stack" style="gap:12px">
+          <div id="pxbody">
+            <div class="calc"><span class="k">bands (surface reflectance)</span>
+blue  <span class="v">0.0412</span>   green <span class="v">0.0655</span>
+red   <span class="v">0.0871</span>   nir   <span class="v">0.3140</span>
+swir1 <span class="v">0.1802</span>   swir2 <span class="v">0.1104</span>
+red_edge_1 <span class="v">0.1509</span>
+
+<span class="k">masking</span>
+SCL = <span class="v">4</span> (vegetation) → <span class="res">not masked</span>
+inside AOI <span class="res">✓</span>    cell <span class="v">R3C4</span>
+
+<span class="k">formula — ndvi</span>
+NDVI = (nir − red) / (nir + red)
+     = (0.3140 − 0.0871) / (0.3140 + 0.0871)
+     = 0.2269 / 0.4011
+     = <span class="res">0.5657</span>
+</div>
+          </div>
+          <div class="chain">
+            <div class="chip"><div class="cl">pixel</div><div class="cv">0.5657</div></div>
+            <span class="arrow">→</span>
+            <div class="chip"><div class="cl">cell R3C4</div><div class="cv">0.5490</div><div class="meta">146 valid px</div></div>
+            <span class="arrow">→</span>
+            <div class="chip"><div class="cl">block mean</div><div class="cv">0.5123</div><div class="meta">3,214 valid px</div></div>
+          </div>
+          <div class="note">The pixel inspector calls the same <code>scl_cloud_mask</code> and
+            <code>indices/computation.py</code> functions the Celery task uses, so it cannot drift from the pipeline.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-hd"><h3>Pixel budget</h3><span class="meta">why valid % is 91.6</span></div>
+        <div class="card-bd">
+          <div class="wf">
+            <div class="wfrow"><span>AOI footprint</span><div class="wftrack"><span class="wffill total" style="width:100%"></span></div><span class="wfnum">3,508</span></div>
+            <div class="wfrow"><span>− SCL masked</span><div class="wftrack"><span class="wffill mask" style="left:91.6%;width:6.8%"></span></div><span class="wfnum">−239</span></div>
+            <div class="wfrow"><span>− no-data / NaN</span><div class="wftrack"><span class="wffill nod" style="left:98.4%;width:1.6%"></span></div><span class="wfnum">−55</span></div>
+            <div class="wfrow"><span><strong>Valid</strong></span><div class="wftrack"><span class="wffill valid" style="width:91.6%"></span></div><span class="wfnum">3,214</span></div>
+          </div>
+          <hr class="hr" />
+          <p class="sechd">SCL breakdown of the 239</p>
+          <div class="tablewrap"><table>
+            <thead><tr><th>SCL class</th><th>Meaning</th><th class="num">Pixels</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">9</td><td>Cloud, high probability</td><td class="num">158</td></tr>
+              <tr><td class="mono">3</td><td>Cloud shadow</td><td class="num">61</td></tr>
+              <tr><td class="mono">10</td><td>Thin cirrus</td><td class="num">20</td></tr>
+            </tbody>
+          </table></div>
+          <div class="note warn" style="margin-top:12px">
+            <strong>Not stored today.</strong> The database keeps only <code>valid_pixel_count</code> and
+            <code>total_pixel_count</code>. This breakdown is recomputed live from the COG — OBS-5 persists it
+            in <code>indices_calc_runs</code> so it is available without a raster read.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Inputs &amp; lineage</h3></div>
+        <div class="card-bd stack" style="gap:14px">
+          <dl class="kv">
+            <dt>Ingestion job</dt><dd class="mono">0193f2a1-…-8c41 <span class="pill ok">succeeded</span></dd>
+            <dt>Raw COG</dt><dd class="mono">…/S2B_…20260614T083709/a41f9c/raw_bands.tif</dd>
+            <dt>Size / shape</dt><dd>7.4 MB · 8 bands · 256 × 256</dd>
+            <dt>AOI hash</dt><dd class="mono">a41f9c</dd>
+            <dt>Mask ruleset</dt><dd class="mono">s2_scl_v1 <span class="meta">(0,1,3,8,9,10,11)</span></dd>
+            <dt>Grid config</dt><dd>40 m · UTM 36N · 24 cells <span class="meta">valid from 2026-04-02</span></dd>
+            <dt>STAC item</dt><dd class="mono">S2B_MSIL2A_20260614T083709_a41f9c</dd>
+          </dl>
+          <hr class="hr" />
+          <p class="sechd">Calculation history</p>
+          <div class="tablewrap"><table>
+            <thead><tr><th>When</th><th>Trigger</th><th>Version</th><th class="num">Valid px</th><th class="num">NDVI mean</th><th>Outcome</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">2026-06-14 09:02Z</td><td>live</td><td class="mono">idx-2026.08</td><td class="num">3,214</td><td class="num">0.5123</td><td><span class="pill ok">ok</span></td></tr>
+              <tr><td class="mono">2026-06-14 08:58Z</td><td>live</td><td class="mono">idx-2026.08</td><td class="num">—</td><td class="num">—</td><td><span class="pill bad">failed</span></td></tr>
+            </tbody>
+          </table></div>
+          <div class="note">Sourced from <code>indices_calc_runs</code> (OBS-5). Aggregate rows are upserts —
+            without this table a re-run silently replaces history and the overwrite is invisible.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h3>Same inspector, different product</h3>
+        <span class="pill info">PlanetScope 3 m</span>
+        <span class="meta">4 bands · no SWIR · no scene-classification band</span>
+      </div>
+      <div class="card-bd grid cols-2">
+        <div class="calc"><span class="k">bands (surface reflectance)</span>
+blue  <span class="v">0.0388</span>   green <span class="v">0.0611</span>
+red   <span class="v">0.0802</span>   nir   <span class="v">0.2971</span>
+<span class="k">swir1  — not provided by this product</span>
+
+<span class="k">masking</span>
+SCL <span class="k">n/a — product has no scene-classification band</span>
+inside AOI <span class="res">✓</span>    cell <span class="v">R2C3</span>
+
+<span class="k">formula — ndvi</span>
+NDVI = (0.2971 − 0.0802) / (0.2971 + 0.0802)
+     = <span class="res">0.5749</span>
+</div>
+        <div class="stack" style="gap:10px">
+          <div>
+            <p class="sechd">Indices available on this product</p>
+            <span class="pill ok">NDVI</span> <span class="pill ok">GNDVI</span>
+            <span class="pill ok">EVI</span> <span class="pill ok">SAVI</span>
+            <span class="pill ghost">NDRE — no red edge</span>
+            <span class="pill ghost">NDMI — requires SWIR1</span>
+            <span class="pill ghost">NDWI — no green/NIR pair on this SKU</span>
+          </div>
+          <div class="note">
+            The inspector is driven by <code>imagery_products.bands</code> and
+            <code>supported_indices</code>, never hard-coded to Sentinel-2. It shows the bands that exist,
+            greys the indices that cannot be computed <em>with the reason</em>, and reports masking as
+            <code>n/a</code> rather than implying a decision was made when none was possible.
+          </div>
+          <div class="note warn">
+            No SCL means no cloud masking — so a PlanetScope <code>valid_pixel_pct</code> is not comparable to
+            a Sentinel-2 one. Observer labels the difference instead of letting the two sit in the same column
+            looking alike.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= VERIFY ================= -->
+  <section class="panelview stack" id="p-verify" hidden>
+    <div class="card">
+      <div class="card-hd"><h3>Single scene — B-07, 2026-06-14 08:37Z</h3>
+        <span class="pill ghost">synchronous</span>
+        <div class="spacer"></div>
+        <button class="btn sm">Fast check <span class="meta">(COG statistics, ~1 s)</span></button>
+        <button class="btn sm primary">Full recompute <span class="meta" style="color:#dbeada">(heavy task, ~20 s)</span></button>
+      </div>
+      <div class="card-bd stack" style="gap:14px">
+        <div class="note good"><strong>Full recompute completed in 19.2 s.</strong> Read from the raw COG,
+          re-ran masking and all 7 formulas. <strong>Nothing was written to <code>block_index_aggregates</code>.</strong></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Index</th><th class="num">Stored mean</th><th class="num">Recomputed</th><th class="num">Δ</th><th class="num">Stored valid px</th><th class="num">Recomputed</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>NDVI</td><td class="num">0.5123</td><td class="num">0.5123</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>NDMI</td><td class="num">0.2871</td><td class="num">0.2871</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>EVI</td><td class="num">0.3902</td><td class="num">0.3902</td><td class="num">0.0000</td><td class="num">3,209</td><td class="num">3,209</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>SAVI</td><td class="num">0.4610</td><td class="num">0.4610</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>NDRE</td><td class="num">0.3011</td><td class="num">0.3011</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>GNDVI</td><td class="num">0.4402</td><td class="num">0.4402</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+            <tr><td>NDWI</td><td class="num">−0.4108</td><td class="num">−0.4108</td><td class="num">0.0000</td><td class="num">3,214</td><td class="num">3,214</td><td><span class="pill ok">match</span></td></tr>
+          </tbody>
+        </table></div>
+
+        <p class="sechd" style="margin-top:6px">Same verify against a row from the old calc version</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Index</th><th class="num">Stored mean</th><th class="num">Recomputed</th><th class="num">Δ</th><th class="num">Stored valid px</th><th class="num">Recomputed</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>NDVI</td><td class="num">0.6031</td><td class="num">0.5488</td><td class="num">−0.0543</td><td class="num">3,508</td><td class="num">3,102</td><td><span class="pill bad">drift</span></td></tr>
+            <tr><td>NDMI</td><td class="num">0.3610</td><td class="num">0.3102</td><td class="num">−0.0508</td><td class="num">3,508</td><td class="num">3,102</td><td><span class="pill bad">drift</span></td></tr>
+          </tbody>
+        </table></div>
+        <div class="note bad">
+          <strong>2026-02-11 was computed with <code>idx-2026.03</code>, before SCL masking.</strong> Stored
+          valid px equals the full AOI footprint — 406 cloud pixels were averaged into the mean, biasing NDVI
+          up by 0.054. Every row on this calc version in this farm (214) is affected.
+          <div style="margin-top:8px"><button class="btn sm">Open Backfill Console for this farm →</button></div>
+        </div>
+        <div class="note">Observer never repairs. A drift verdict is a signal; the fix is a re-run from the
+          Backfill Console, which owns quota and progress reporting.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h3>Verify runs</h3>
+        <span class="pill ghost">anything wider than one scene</span>
+        <div class="spacer"></div>
+        <button class="btn sm primary">New verify run…</button>
+      </div>
+      <div class="card-bd stack" style="gap:14px">
+        <div class="note">A full verify of one year across 36 blocks is ~2,500 heavy-task executions — not a
+          button that returns a response. Multi-scene verify is a <strong>named run</strong> with progress,
+          cancel, and a one-run-per-farm guard, exactly like the Backfill Console.</div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Run</th><th>Scope</th><th>Mode</th><th>Progress</th><th>Findings</th><th>Started</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="mono">vr-0193f8…</td>
+              <td>Bashayer — Suez · all blocks<br /><span class="meta">2026-01-01 → 2026-08-06</span></td>
+              <td>full</td>
+              <td>
+                <div class="wftrack" style="width:150px"><span class="wffill valid" style="width:46%"></span></div>
+                <span class="meta">1,142 / 2,486 scenes</span>
+              </td>
+              <td><span class="pill ok">1,098 match</span> <span class="pill bad">44 drift</span></td>
+              <td class="mono">09:12Z</td>
+              <td><button class="btn sm">Cancel</button></td>
+            </tr>
+            <tr>
+              <td class="mono">vr-0193e1…</td>
+              <td>Bashayer — Suez · B-07, B-12<br /><span class="meta">2026-02-01 → 2026-03-01</span></td>
+              <td>fast</td>
+              <td><span class="pill ok">complete</span></td>
+              <td><span class="pill ok">96 match</span> <span class="pill bad">14 drift</span></td>
+              <td class="mono">2026-08-05</td>
+              <td><button class="btn sm">Open report</button></td>
+            </tr>
+          </tbody>
+        </table></div>
+        <div class="note warn">
+          One active run per farm, enforced by a partial unique index — and
+          <code>POST /runs/{id}:cancel</code> from day one. The lesson from #332 is that any run which can hang
+          needs an operator escape hatch that is not “edit the table”.
+        </div>
+        <div class="note good">
+          Verify is the only part of Observer that consumes worker time, so it is the only part that is
+          audited: <code>platform.observer_verify_started</code> / <code>…_completed</code> with tenant, farm,
+          window, mode and scene count. Drill-down views are not audited — a row per pixel click would bury
+          the events that matter.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LINEAGE ================= -->
+  <section class="panelview stack" id="p-lineage" hidden>
+    <div class="card">
+      <div class="card-hd"><h3>Forward lineage — what this number produced</h3>
+        <span class="meta">B-07 · 2026-06-14 · NDMI = 0.2871 (z = −1.84)</span></div>
+      <div class="card-bd stack" style="gap:14px">
+        <div class="chain">
+          <div class="chip"><div class="cl">scene</div><div class="cv">2026-06-14</div><div class="meta">S2B_…3709</div></div>
+          <span class="arrow">→</span>
+          <div class="chip"><div class="cl">block agg</div><div class="cv">0.2871</div><div class="meta">NDMI</div></div>
+          <span class="arrow">→</span>
+          <div class="chip"><div class="cl">baseline z</div><div class="cv">−1.84</div><div class="meta">vs doy 165</div></div>
+          <span class="arrow">→</span>
+          <div class="chip"><div class="cl">cell anomalies</div><div class="cv">3</div><div class="meta">z &lt; −2.0</div></div>
+          <span class="arrow">→</span>
+          <div class="chip"><div class="cl">alerts</div><div class="cv">1</div></div>
+          <span class="arrow">→</span>
+          <div class="chip"><div class="cl">recommendations</div><div class="cv">1</div></div>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Consumer</th><th>What</th><th>When</th><th>Source</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill warn">alert</span></td><td>Canopy moisture below seasonal baseline — B-07</td><td class="mono">2026-06-14 09:05Z</td><td>tree <em>Mango · water stress</em> v4</td><td><button class="btn sm">Open alert</button></td></tr>
+            <tr><td><span class="pill info">recommendation</span></td><td>Increase irrigation 15% for 5 days</td><td class="mono">2026-06-14 09:05Z</td><td>tree <em>Mango · water stress</em> v4, node <code>ndmi_z_low</code></td><td><button class="btn sm">Open rec</button></td></tr>
+            <tr><td><span class="pill ghost">cell anomaly</span></td><td>R3C4, R3C5, R4C4 flagged (z ≤ −2.0)</td><td class="mono">2026-06-14 09:04Z</td><td><code>block_grid_aggregates</code></td><td><button class="btn sm">Show on raster</button></td></tr>
+          </tbody>
+        </table></div>
+        <div class="note">Reverse direction works too: from an alert, “explain this number” lands on the scene detail
+          with the contributing pixels highlighted.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= WEATHER ================= -->
+  <section class="panelview stack" id="p-weather" hidden>
+    <div class="card">
+      <div class="card-hd"><h3>Weather lane</h3><span class="pill ghost">block picker disabled — weather is farm-centroid</span></div>
+      <div class="card-bd">
+        <div class="ribbon">
+          <div class="stage good"><div class="st-name">Fetch attempts</div><div class="st-n">1,462</div><div class="st-sub">open-meteo · ERA5</div></div>
+          <div class="stage good"><span class="drop">−7</span><div class="st-name">Succeeded</div><div class="st-n">1,455</div><div class="st-sub">99.5%</div></div>
+          <div class="stage warn"><div class="st-name">Hourly obs</div><div class="st-n">5,038</div><div class="st-sub">of 5,208 hours · 96.7%</div></div>
+          <div class="stage warn"><span class="drop">−4</span><div class="st-name">Derived daily</div><div class="st-n">213</div><div class="st-sub">of 217 days</div></div>
+          <div class="stage warn"><div class="st-name">Index daily</div><div class="st-n">1,704</div><div class="st-sub">213 × 8 indices</div></div>
+          <div class="stage good"><div class="st-name">Baselines</div><div class="st-n">8/8</div><div class="st-sub">indices covered</div></div>
+          <div class="stage good"><div class="st-name">Consumers</div><div class="st-n">19</div><div class="st-sub">12 alerts · 7 recs</div></div>
+        </div>
+        <div class="note warn" style="margin-top:6px">
+          <strong>4 days have derived rows built from partial hours.</strong> 2026-05-02 was computed from
+          9 of 24 hourly observations — ET₀ and GDD for that day are confident-looking and wrong. There is no
+          coverage floor in the derivation today.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-side">
+      <div class="card">
+        <div class="card-hd"><h3>Hour coverage</h3><span class="meta">the weather analogue of valid-pixel %</span></div>
+        <div class="card-bd stack" style="gap:6px" id="hours"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Explain — ET₀, 2026-05-02</h3></div>
+        <div class="card-bd stack" style="gap:12px">
+          <div class="calc"><span class="k">inputs — weather_observations (9 of 24 h)</span>
+temp_mean  <span class="v">27.4 °C</span>   temp_min <span class="v">21.1</span>  temp_max <span class="v">33.8</span>
+humidity   <span class="v">41.2 %</span>    wind     <span class="v">2.8 m/s</span>
+radiation  <span class="v">248 W/m²</span> → insolation <span class="v">21.4 MJ/m²</span>
+
+<span class="k">intermediate — weather_derived_daily</span>
+et0_mm_daily = <span class="v">6.82</span>   precip_mm_daily = <span class="v">0.0</span>
+
+<span class="k">projection — weather_index_daily.evapotranspiration</span>
+value = et0_mm_daily = <span class="res">6.82 mm</span>
+baseline (doy 122) = 5.91 ± 0.74  →  z = <span class="res">+1.23</span>
+</div>
+          <div class="note bad">Radiation is the mean of 9 samples, all between 06:00 and 15:00 —
+            the missing night hours bias the daily mean upward, which inflates ET₀. Coverage is
+            <strong>37.5%</strong>, and nothing downstream knows that.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= GLOSSARY ================= -->
+  <section class="panelview stack" id="p-glossary" hidden>
+    <div class="card">
+      <div class="card-hd"><h3>Glossary</h3>
+        <span class="meta">every abbreviation used in Observer</span>
+        <div class="spacer"></div>
+        <input class="input" id="gsearch" placeholder="Filter — try “swir”, “cagg”, “z-score”…" style="max-width:280px" />
+      </div>
+      <div class="card-bd">
+        <div class="note">These definitions ship <strong>inside the product</strong> as info popovers on the
+          labels that use them — not only in the design doc. Observer's audience includes agronomy and
+          support, not just the people who wrote the pipeline.</div>
+        <div id="glossary" class="stack" style="gap:18px;margin-top:16px"></div>
+        <p class="meta" id="gempty" hidden>No term matches that filter.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="meta" style="margin-top:26px">Design doc: <code>docs/proposals/agripulse-observer.md</code> (§ 9 is the full glossary) · numbers in this mockup are illustrative.</p>
+</div>
+
+<script>
+  // tabs
+  const tabs = [...document.querySelectorAll('.tab')];
+  function show(id){
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.panel === id)));
+    document.querySelectorAll('.panelview').forEach(p => { p.hidden = p.id !== id; });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.panel)));
+  document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => show(b.dataset.goto)));
+
+  // segmented buttons
+  document.querySelectorAll('.seg').forEach(seg => {
+    seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true');
+    }));
+  });
+
+  // histogram — 31 weekly buckets
+  const weeks = [
+    [4,0,1,0],[5,1,0,0],[6,0,0,0],[4,2,0,0],[5,0,0,0],[6,1,0,0],[5,0,0,0],[4,1,0,0],
+    [3,0,4,0],[2,0,5,0],[5,1,0,0],[6,0,0,0],[6,0,0,0],[5,1,0,0],[6,0,0,0],[6,0,0,0],
+    [7,0,0,0],[6,1,0,0],[7,0,0,0],[6,0,0,0],[7,0,0,0],[6,1,0,0],[7,0,0,0],[7,0,0,0],
+    [6,0,0,0],[7,0,0,0],[6,1,0,0],[7,0,0,0],[6,0,0,0],[5,0,0,2],[3,0,0,3]
+  ];
+  const labels = ['Jan','','','','Feb','','','','Mar','','','','Apr','','','','May','','','','Jun','','','','Jul','','','','Aug','',''];
+  const max = Math.max(...weeks.map(w => w.reduce((a,b)=>a+b,0)));
+  const cls = ['okc','cloudc','failc','pendc'];
+  const hist = document.getElementById('hist'), hax = document.getElementById('hax');
+  weeks.forEach((w,i) => {
+    const bar = document.createElement('div'); bar.className = 'hbar';
+    bar.title = `week ${i+1}: ${w[0]} computed · ${w[1]} cloud-skipped · ${w[2]} failed · ${w[3]} pending`;
+    w.forEach((n,j) => { if(!n) return;
+      const s = document.createElement('div'); s.className = 'hseg ' + cls[j];
+      s.style.height = (n / max * 138) + 'px'; bar.appendChild(s);
+    });
+    hist.appendChild(bar);
+    const sp = document.createElement('span'); sp.textContent = labels[i] || ''; hax.appendChild(sp);
+  });
+
+  // raster — 16x16 NDVI-ish field with a cloud patch
+  const raster = document.getElementById('raster');
+  const bands = {blue:0.0412, green:0.0655, red:0.0871, nir:0.3140, swir1:0.1802};
+  function ramp(v){ // -0.2 .. 0.9 → green ramp
+    const t = Math.max(0, Math.min(1, (v + 0.2) / 1.1));
+    const stops = [[247,247,242],[219,232,207],[158,199,138],[92,154,85],[47,107,44]];
+    const p = t * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(p)), f = p - i;
+    const c = stops[i].map((s,k) => Math.round(s + (stops[i+1][k] - s) * f));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+  const px = [];
+  for(let r=0;r<16;r++) for(let c=0;c<16;c++){
+    const cloud = (r>=2 && r<=4 && c>=10 && c<=13) || (r===5 && c>=11 && c<=12);
+    const base = 0.34 + 0.30*Math.sin(r/3.1) * Math.cos(c/4.3) + 0.16*Math.sin((r+c)/2.6);
+    const v = Math.max(0.02, Math.min(0.86, base + 0.24));
+    px.push({r,c,cloud,v});
+  }
+  px.forEach((p,i) => {
+    const d = document.createElement('div');
+    d.className = 'px' + (p.c % 4 === 3 ? ' cell-edge-r' : '') + (p.r % 4 === 3 ? ' cell-edge-b' : '');
+    d.style.background = p.cloud ? 'repeating-linear-gradient(45deg,#dad7cc,#dad7cc 2px,#eceae2 2px,#eceae2 4px)' : ramp(p.v);
+    d.title = p.cloud ? `r${p.r} c${p.c} — cloud-masked` : `r${p.r} c${p.c} — NDVI ${p.v.toFixed(4)}`;
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.px.on').forEach(e => e.classList.remove('on'));
+      d.classList.add('on');
+      document.getElementById('pxid').textContent = `row ${p.r} · col ${p.c}`;
+      const body = document.getElementById('pxbody');
+      if(p.cloud){
+        body.innerHTML = `<div class="calc"><span class="k">masking</span>
+SCL = <span class="v">9</span> (cloud, high probability) → <span class="res" style="color:#b24430">masked</span>
+inside AOI <span class="res">✓</span>    cell <span class="v">R${Math.floor(p.r/4)+1}C${Math.floor(p.c/4)+1}</span>
+
+<span class="k">result</span>
+This pixel was set to NaN before aggregation.
+It is excluded from every statistic on this scene
+and counts toward <span class="v">masked_pixel_count</span> (239).
+</div>`;
+      } else {
+        const nir = 0.24 + p.v * 0.22, red = nir * (1 - p.v) / (1 + p.v);
+        body.innerHTML = `<div class="calc"><span class="k">bands (surface reflectance)</span>
+blue  <span class="v">${(bands.blue*(0.8+p.v*0.4)).toFixed(4)}</span>   green <span class="v">${(bands.green*(0.8+p.v*0.4)).toFixed(4)}</span>
+red   <span class="v">${red.toFixed(4)}</span>   nir   <span class="v">${nir.toFixed(4)}</span>
+swir1 <span class="v">${(bands.swir1*(0.9+p.v*0.3)).toFixed(4)}</span>
+
+<span class="k">masking</span>
+SCL = <span class="v">4</span> (vegetation) → <span class="res">not masked</span>
+inside AOI <span class="res">✓</span>    cell <span class="v">R${Math.floor(p.r/4)+1}C${Math.floor(p.c/4)+1}</span>
+
+<span class="k">formula — ndvi</span>
+NDVI = (nir − red) / (nir + red)
+     = (${nir.toFixed(4)} − ${red.toFixed(4)}) / (${nir.toFixed(4)} + ${red.toFixed(4)})
+     = ${(nir-red).toFixed(4)} / ${(nir+red).toFixed(4)}
+     = <span class="res">${p.v.toFixed(4)}</span>
+</div>`;
+      }
+    });
+    raster.appendChild(d);
+    if(p.r === 11 && p.c === 13) d.classList.add('on');
+  });
+
+  // glossary
+  const GLOSSARY = [
+    ['Satellite imagery', [
+      ['Scene', 'One satellite pass over one place at one moment. The unit everything else hangs off.'],
+      ['Scene ID', "The provider's name for that pass, e.g. S2B_MSIL2A_20260614T083709 — satellite, product level, timestamp."],
+      ['Revisit', 'How often the satellite comes back to the same spot. Sentinel-2 averages ~5 days; more revisits means a denser trend line.'],
+      ['Band', 'One slice of the light spectrum the sensor records. Each band is a separate greyscale image of the same patch of ground.'],
+      ['Blue / Green / Red', 'Visible light — what a normal camera sees.'],
+      ['Red edge', 'The narrow slice between red and near-infrared where healthy leaves brighten sharply. Sensitive to chlorophyll and early stress.'],
+      ['NIR — near-infrared', 'Invisible to the eye; healthy leaf tissue reflects it strongly. The workhorse band for vegetation.'],
+      ['SWIR — short-wave infrared', 'Longer infrared, absorbed by water. SWIR1 falling means leaf water content is falling. PlanetScope has no SWIR, which is why NDMI is impossible on it.'],
+      ['Surface reflectance', 'The fraction of light the ground actually reflects (0–1), after the atmosphere’s effect is removed. Comparable across dates; raw brightness is not.'],
+      ['L2A', "Sentinel-2's atmospherically-corrected product level — i.e. surface reflectance. L1C is the uncorrected one."],
+      ['SCL — Scene Classification Layer', 'A per-pixel label Sentinel-2 ships alongside the bands: cloud, shadow, cirrus, snow, water, vegetation, bare soil. We drop classes 0, 1, 3, 8, 9, 10, 11 before doing any maths.'],
+      ['Cloud cover %', 'Fraction of the scene under cloud as reported by the provider for the whole scene — not for your block specifically.'],
+      ['AOI — area of interest', 'The polygon we actually care about; here, one block boundary. Pixels outside it are ignored.'],
+      ['AOI hash', 'A short fingerprint of that polygon (e.g. a41f9c). It is part of the stored file path, so redrawing a block cannot silently overwrite the old block’s imagery.'],
+      ['Pixel', 'One ground cell of the image. At Sentinel-2’s 10 m resolution one pixel is a 10 × 10 m square — one tenth of a feddan.'],
+      ['Resolution', 'The ground size of one pixel. 10 m for Sentinel-2, 3 m for PlanetScope. Smaller is more detail and more cost.'],
+      ['Raster', 'A grid of pixels — an image with geographic coordinates attached.'],
+      ['COG — Cloud-Optimized GeoTIFF', 'The image file format we store. Structured so a reader can fetch just the kilobytes covering one block instead of the whole file.'],
+      ['GDAL / /vsis3/', 'The library that reads rasters, and its mode for reading them straight out of object storage without downloading first.'],
+      ['STAC / pgstac', 'SpatioTemporal Asset Catalog — the standard index of what imagery exists, and the Postgres implementation we run. Separate from the imagery itself.'],
+      ['STAC item', 'One catalogue entry: one scene over one block, listing where each band and index file lives.'],
+      ['TiTiler', 'The service that turns a COG into map tiles the browser can display, and answers “what is the value at this coordinate”. Already deployed.'],
+      ['CDSE', "Copernicus Data Space Ecosystem — the EU's free Sentinel-2 source. Its processing allowance is shared across all tenants, which is why backfill is capability-gated."],
+      ['Sentinel Hub / PlanetScope', 'Commercial imagery providers. Sentinel Hub served our 10 m subscription (expired); PlanetScope is 3 m, 4 bands, no SWIR.']
+    ]],
+    ['Indices — a formula combining bands into one agronomic number per pixel', [
+      ['NDVI — Normalized Difference Vegetation Index', 'Overall greenness / biomass. The default health signal. (NIR − Red) / (NIR + Red).'],
+      ['NDRE — Normalized Difference Red Edge', 'Like NDVI but via red edge — saturates later, so it still discriminates in a dense mature canopy where NDVI has flattened.'],
+      ['GNDVI — Green NDVI', 'Greenness via the green band; more responsive to chlorophyll and nitrogen status.'],
+      ['EVI — Enhanced Vegetation Index', 'NDVI corrected for atmosphere and soil background; better in dense canopy.'],
+      ['SAVI — Soil-Adjusted Vegetation Index', 'NDVI with a soil-brightness correction, for sparse canopy where bare ground dominates the pixel.'],
+      ['NDMI — Normalized Difference Moisture Index', 'Leaf and canopy WATER content. Falls as tissue dries — an early water-stress signal. Needs SWIR.'],
+      ['NDWI — Normalized Difference Water Index (McFeeters)', 'Open SURFACE water, not leaf moisture. Negative over healthy canopy is normal. Do not read it as “canopy water” — that is NDMI’s job.']
+    ]],
+    ['Statistics', [
+      ['Aggregate', 'The reduction of thousands of pixel values to a handful of numbers for a block or a cell.'],
+      ['Mean / min / max', 'Average, lowest and highest pixel value inside the AOI.'],
+      ['P10 / P50 / P90 — percentiles', '10% of pixels sit below P10; P50 is the median; 90% sit below P90. The P10–P90 spread shows in-field variability a mean hides.'],
+      ['Std dev', 'How spread out the pixel values are. High std dev on a uniform block means something is patchy.'],
+      ['Valid pixel count', 'Pixels that produced a usable number — inside the AOI, not cloud-masked, not no-data.'],
+      ['Total pixel count', 'The AOI footprint: every pixel inside the block boundary, usable or not.'],
+      ['Valid pixel %', 'valid ÷ total. Low values mean the number came from a fraction of the field and should be trusted less.'],
+      ['No-data / NaN', '“Not a number” — a pixel with no usable value, from a sensor gap or a division by zero. Excluded from every statistic.'],
+      ['Baseline', 'The long-run normal for this block, this index, this day of the year, built from history.'],
+      ['Day of year', '1–366. Baselines are keyed on it so 14 June is compared against mid-Junes, not against last month.'],
+      ['Baseline deviation / z-score', 'How far today sits from that normal, in standard deviations. −2.0 is “unusually low for this date”; ±1 is ordinary variation.'],
+      ['Anomaly threshold', 'The z-score at which a cell is flagged. Configurable per block.']
+    ]],
+    ['Structure', [
+      ['Tenant', 'One customer organisation. Each has its own isolated database schema (tenant_<id>).'],
+      ['Farm', 'A customer site. Weather is measured at farm level, from one centroid.'],
+      ['Block', 'A managed parcel inside a farm — the unit imagery, indices and crops attach to.'],
+      ['Cell / grid', 'An optional finer subdivision of a block into a square lattice (e.g. 40 m cells), for spotting where INSIDE a block a problem sits.'],
+      ['Grid config', 'The definition of that lattice. Versioned by valid time, so a 2025 scene is gridded on the 2025 geometry, not today’s.'],
+      ['Zonal statistics', 'Computing an aggregate over an arbitrary polygon — how a cell mean is derived from the pixels falling inside it.'],
+      ['UTM / SRID / EPSG', 'Coordinate systems. Areas and distances use a metre-based projection (UTM 36N for Egypt); display uses lat/long (WGS 84 / EPSG 4326). SRID is just its numeric ID.'],
+      ['Subscription', 'The standing instruction “fetch this product for this block at this cadence”. No subscription, no imagery.'],
+      ['Ingestion job', 'One attempt to fetch and process one scene for one block. Carries status, timings and any error.']
+    ]],
+    ['Pipeline & storage', [
+      ['Celery', 'The background job system. Anything slow runs there, not in the web request.'],
+      ['Beat', "Celery's scheduler — the clock that kicks off recurring sweeps like scene discovery."],
+      ['Queue (default / heavy)', 'Work is split so a long raster computation cannot starve quick tasks. Index computation runs on heavy.'],
+      ['Worker', 'A process that pulls jobs off a queue and runs them.'],
+      ['Idempotent', 'Safe to run twice — a re-run overwrites the same row rather than creating a duplicate. True of the whole imagery pipeline, which is what makes retries safe.'],
+      ['Upsert', 'Insert, or update in place if the row already exists. Why a recompute leaves no trace without indices_calc_runs.'],
+      ['Backfill', 'Loading historical data for a past window, rather than the live daily flow.'],
+      ['Object storage / R2', 'Where the image files live (Cloudflare R2, S3-compatible). The database stores paths, never pixels.'],
+      ['Timescale / hypertable', 'The time-series extension of Postgres, and a table it partitions by time under the hood.'],
+      ['Chunk', 'One of those time partitions. A query naming an explicit time range can skip whole chunks; one hiding the range in a bound parameter cannot — which is why Observer interpolates its intervals.'],
+      ['CAGG — continuous aggregate', 'A pre-computed rollup that refreshes on a policy. How daily and weekly trend lines are served fast.'],
+      ['Refresh policy / watermark', 'The rolling window a CAGG keeps current, and the boundary below which it serves only pre-computed results. Data written outside it stays invisible until a manual refresh.'],
+      ['Migration', 'A versioned, ordered schema change. Numbered per chain (public, tenant).'],
+      ['Capability', 'A named permission, e.g. platform.observe_pipeline. Roles grant capabilities; endpoints require them.']
+    ]],
+    ['Weather', [
+      ['Observation', 'One measured hour at the farm — temperature, humidity, wind, rain, radiation.'],
+      ['Hour coverage', 'How many of a day’s 24 hours actually arrived. The weather equivalent of valid-pixel %.'],
+      ['ET₀ — reference evapotranspiration', 'How much water a reference grass surface would lose in a day, in mm. The basis of irrigation demand.'],
+      ['GDD — growing degree days', "Accumulated warmth above a crop's base temperature — the clock crops actually grow on, rather than the calendar."],
+      ['Solar radiation / insolation', 'Instantaneous energy arriving (W/m²) and the day’s total (MJ/m²). Drives ET₀.'],
+      ['Derived daily', 'The per-day rollup computed from hourly observations, before it becomes an index.'],
+      ['ERA5 / Open-Meteo', 'Weather data sources. ERA5 is the ECMWF reanalysis archive reaching back to 1940, used for deep history.']
+    ]],
+    ['Observer’s own terms', [
+      ['Stage ribbon', 'The row of pipeline stages with counts and the drop-off between them. Where work is being lost, at a glance.'],
+      ['Pixel budget', 'The reconciliation of AOI footprint → masked → no-data → valid. Answers “why is valid % low”.'],
+      ['Roll-up chain', 'Pixel → cell → block, shown together so a number can be traced to what produced it.'],
+      ['Calc version', 'Which release of the formulas and masking rules produced a stored row. Two versions in one window means the trend line mixes methodologies.'],
+      ['Mask ruleset', 'The named, versioned set of SCL classes treated as unusable (s2_scl_v1).'],
+      ['Verify', 'Recompute from the stored image and compare against the stored number. Never writes.'],
+      ['Drift', 'A verify result where stored and recomputed disagree beyond tolerance.'],
+      ['Forward lineage', 'What a number went on to cause — the alerts and recommendations downstream of it.']
+    ]]
+  ];
+  const gRoot = document.getElementById('glossary');
+  GLOSSARY.forEach(([section, rows]) => {
+    const wrap = document.createElement('div'); wrap.className = 'gsec';
+    const h = document.createElement('p'); h.className = 'sechd'; h.textContent = section; wrap.appendChild(h);
+    const tw = document.createElement('div'); tw.className = 'tablewrap';
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th style="width:270px">Term</th><th>Means</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    rows.forEach(([term, def]) => {
+      const tr = document.createElement('tr');
+      tr.dataset.q = (term + ' ' + def).toLowerCase();
+      const a = document.createElement('td'); a.innerHTML = '<strong>' + term + '</strong>';
+      const b = document.createElement('td'); b.textContent = def;
+      tr.append(a, b); tb.appendChild(tr);
+    });
+    t.appendChild(tb); tw.appendChild(t); wrap.appendChild(tw); gRoot.appendChild(wrap);
+  });
+  document.getElementById('gsearch').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    let hits = 0;
+    document.querySelectorAll('.gsec').forEach(sec => {
+      let shown = 0;
+      sec.querySelectorAll('tbody tr').forEach(tr => {
+        const on = !q || tr.dataset.q.includes(q);
+        tr.hidden = !on; if(on) shown++;
+      });
+      sec.hidden = shown === 0; hits += shown;
+    });
+    document.getElementById('gempty').hidden = hits > 0;
+  });
+
+  // hour coverage strip
+  const days = [
+    ['2026-04-28', 24],['2026-04-29', 24],['2026-04-30', 24],['2026-05-01', 22],
+    ['2026-05-02', 9],['2026-05-03', 24],['2026-05-04', 24],['2026-05-05', 24]
+  ];
+  const hostEl = document.getElementById('hours');
+  days.forEach(([d,n]) => {
+    const row = document.createElement('div'); row.className = 'hours';
+    const lab = document.createElement('span'); lab.className = 'hlabel';
+    lab.innerHTML = n === 24 ? d.slice(5) : `${d.slice(5)} <span class="pill ${n < 18 ? 'bad' : 'warn'}" style="padding:0 5px">${n}h</span>`;
+    row.appendChild(lab);
+    for(let h=0;h<24;h++){
+      const c = document.createElement('div');
+      const present = n === 24 ? true : (n === 9 ? (h >= 6 && h <= 14) : h < n);
+      c.className = 'hcell' + (present ? '' : ' miss');
+      c.title = `${d} ${String(h).padStart(2,'0')}:00 — ${present ? 'present' : 'missing'}`;
+      row.appendChild(c);
+    }
+    hostEl.appendChild(row);
+  });
+</script>
+</body>
+</html>
