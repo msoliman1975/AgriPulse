@@ -165,8 +165,8 @@ async def _seed_block_with_crop_and_weather(
     await admin_session.execute(
         text(
             "INSERT INTO block_crops "
-            "(id, block_id, crop_id, season_label, growth_stage, is_current, status) "
-            "VALUES (:aid, :bid, :cid, '2026-summer', :stage, TRUE, 'growing')"
+            "(id, block_id, crop_id, season_label, growth_stage, effective_from, is_current, status) "
+            "VALUES (:aid, :bid, :cid, '2026-summer', :stage, CURRENT_DATE - 30, TRUE, 'growing')"
         ).bindparams(
             bindparam("aid", type_=PG_UUID(as_uuid=True)),
             bindparam("bid", type_=PG_UUID(as_uuid=True)),

@@ -95,9 +95,12 @@ async def _seed_block(session: AsyncSession, schema: str) -> tuple:
     await session.execute(
         text(
             "INSERT INTO block_crops (id, block_id, crop_id, crop_variety_id, "
-            " crop_variety_strain_id, crop_path, season_label, planting_date, is_current, status) "
+            " crop_variety_strain_id, crop_path, season_label, planting_date, effective_from, "
+            " is_current, status) "
             "VALUES (:id, :block, :crop, :variety, :strain, 'mango.alphonso.short', '2026', "
-            " '2020-06-01', TRUE, 'growing')"
+            # Open-ended from the planting date: a perennial assignment that
+            # is still current, which is what the phenology sweep looks for.
+            " '2020-06-01', '2020-06-01', TRUE, 'growing')"
         ).bindparams(
             bindparam("id", type_=PG_UUID(as_uuid=True)),
             bindparam("block", type_=PG_UUID(as_uuid=True)),

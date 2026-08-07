@@ -208,6 +208,45 @@ class CropAttributeValidationError(APIError):
         )
 
 
+class CropAssignmentOverlapError(APIError):
+    """A block may hold one crop at a time; the proposed range collides. 409.
+
+    Named deliberately: the DB's exclusion constraint would reject this as an
+    opaque IntegrityError, and "which crop, from when to when" is the only
+    thing that lets a user fix it without going hunting.
+    """
+
+    def __init__(self, *, crop_path: str, existing_from: Any, existing_to: Any) -> None:
+        until = str(existing_to) if existing_to else "ongoing"
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Crop assignment overlaps an existing one",
+            detail=(
+                f"This block is already under {crop_path!r} from {existing_from} "
+                f"to {until}. One crop at a time per block — end that assignment "
+                "first, or start this one after it."
+            ),
+            type_=f"{_TYPE_BASE}/crop-assignment-overlap",
+            extras={
+                "crop_path": crop_path,
+                "effective_from": str(existing_from),
+                "effective_to": str(existing_to) if existing_to else None,
+            },
+        )
+
+
+class CropAssignmentRangeError(APIError):
+    """`valid to` is not after `valid from`. 422."""
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid assignment date range",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/crop-assignment-range",
+        )
+
+
 class FarmCodeConflictError(APIError):
     def __init__(self, code: str) -> None:
         super().__init__(

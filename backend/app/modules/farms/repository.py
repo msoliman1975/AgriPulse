@@ -48,6 +48,7 @@ from app.modules.farms.models import (
     FarmAttachment,
     GrowthStageLog,
 )
+from app.modules.farms.validity import is_active_on, state_on
 
 # Allowlists for dynamic UPDATE clauses — every column name interpolated
 # into an UPDATE … SET list MUST be in one of these sets. The router only
@@ -808,6 +809,10 @@ class FarmsRepository:
         crop_variety_id: UUID | None,
         crop_variety_strain_id: UUID | None = None,
         season_label: str,
+        # Valid time. `effective_to=None` means ongoing; the service resolves
+        # the default (`planting_date`, else today) before calling.
+        effective_from: Any,
+        effective_to: Any,
         planting_date: Any,
         expected_harvest_start: Any,
         expected_harvest_end: Any,
@@ -881,9 +886,24 @@ class FarmsRepository:
             strain_path=strain_path,
         )
 
-        # Two-phase: flip prior current to FALSE, then insert. The unique
-        # partial index on (block_id) WHERE is_current = TRUE makes the
-        # flip-and-insert atomic within the transaction.
+        # Close the open-ended assignment at the new one's start, in the same
+        # transaction. Two-step "end then assign" is where gaps and overlaps
+        # come from; the exclusion constraint would reject the insert anyway,
+        # so doing it here turns a 409 into the behaviour the user wanted.
+        # A *bounded* assignment is never touched — the user set that end date
+        # deliberately and rewriting it would be silent data loss.
+        await self._tenant.execute(
+            update(BlockCrop)
+            .where(
+                BlockCrop.block_id == block_id,
+                BlockCrop.deleted_at.is_(None),
+                BlockCrop.effective_to.is_(None),
+                BlockCrop.effective_from <= effective_from,
+            )
+            .values(effective_to=effective_from, is_current=False, updated_by=actor_user_id)
+        )
+        # `is_current` is derived from the range now; the stored column is kept
+        # in step for the partial unique index and any consumer still reading it.
         if make_current:
             await self._tenant.execute(
                 update(BlockCrop)
@@ -899,6 +919,8 @@ class FarmsRepository:
             crop_variety_strain_id=crop_variety_strain_id,
             crop_path=crop_path,
             season_label=season_label,
+            effective_from=effective_from,
+            effective_to=effective_to,
             planting_date=planting_date,
             expected_harvest_start=expected_harvest_start,
             expected_harvest_end=expected_harvest_end,
@@ -1295,6 +1317,26 @@ class FarmsRepository:
         stmt = stmt.order_by(BlockCropAttributeValueLog.changed_at.desc())
         return list((await self._tenant.execute(stmt)).scalars().all())
 
+    async def list_block_crop_rows(self, *, block_id: UUID) -> list[BlockCrop]:
+        """ORM rows for one block, for the pure validity helpers.
+
+        `list_block_crops` returns dicts for the API; the overlap/auto-close
+        logic works on attributes, and round-tripping through dicts just to
+        read three date fields would invite the two to drift.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    select(BlockCrop)
+                    .where(BlockCrop.block_id == block_id, BlockCrop.deleted_at.is_(None))
+                    .order_by(BlockCrop.effective_from.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return list(rows)
+
     async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
         return (
             await self._tenant.execute(
@@ -1305,14 +1347,23 @@ class FarmsRepository:
         ).scalar_one_or_none()
 
     async def list_block_crops_for_advance(self) -> list[BlockCrop]:
-        """Current, non-locked, live block_crops eligible for phenology
-        auto-advance: ``is_current`` + not deleted + lock off + a crop path
-        set + an in-progress lifecycle status."""
+        """Live block_crops eligible for phenology auto-advance.
+
+        "Current" is the *validity range containing today*, not the stored
+        ``is_current`` flag: the sweep runs daily, and a flag that only moves
+        when someone assigns a crop would keep advancing the growth stage of an
+        assignment that ended months ago.
+        """
+        today = _date.today()
         rows = (
             (
                 await self._tenant.execute(
                     select(BlockCrop).where(
-                        BlockCrop.is_current.is_(True),
+                        BlockCrop.effective_from <= today,
+                        or_(
+                            BlockCrop.effective_to.is_(None),
+                            BlockCrop.effective_to > today,
+                        ),
                         BlockCrop.deleted_at.is_(None),
                         BlockCrop.growth_stage_locked.is_(False),
                         BlockCrop.crop_path != "",
@@ -2013,6 +2064,11 @@ def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
         "growth_stage": bc.growth_stage,
         "growth_stage_updated_at": bc.growth_stage_updated_at,
         "growth_stage_locked": bc.growth_stage_locked,
+        "effective_from": bc.effective_from,
+        "effective_to": bc.effective_to,
+        # Derived here, once, so no consumer re-implements the half-open rule.
+        "is_active_now": is_active_on(bc, _date.today()),
+        "validity_state": state_on(bc, _date.today()),
         "is_current": bc.is_current,
         "status": bc.status,
         "notes": bc.notes,

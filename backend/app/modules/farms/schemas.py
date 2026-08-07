@@ -946,6 +946,13 @@ class BlockCropAssignRequest(BaseModel):
     crop_variety_id: UUID | None = None
     crop_variety_strain_id: UUID | None = None
     season_label: str = Field(min_length=1, max_length=64)
+    # Valid time. `effective_from` defaults to `planting_date`, else today —
+    # they coincide in the common case, so the form need not ask twice.
+    # `effective_to = None` means ongoing, which is the normal state for a
+    # perennial. Assigning a crop auto-closes the block's open assignment at
+    # `effective_from`; a bounded one is never rewritten.
+    effective_from: date | None = None
+    effective_to: date | None = None
     planting_date: date | None = None
     expected_harvest_start: date | None = None
     expected_harvest_end: date | None = None
@@ -955,6 +962,14 @@ class BlockCropAssignRequest(BaseModel):
     # One of the crop's resolved ``size_classes`` codes (validated server-side).
     canopy_size_class: str | None = None
     notes: str | None = None
+    # Crop fields for the assignment being created, `{code: value}`.
+    #
+    # Sent with the assignment rather than in a follow-up PUT so the whole
+    # thing is one transaction: a required attribute that fails validation
+    # rolls the assignment back instead of leaving a half-configured one
+    # behind. The definitions come from the crop's catalog entry, which the
+    # form resolves from the chosen crop path before the assignment exists.
+    attributes: dict[str, Any] = Field(default_factory=dict)
     make_current: bool = True
 
 
@@ -983,6 +998,14 @@ class BlockCropResponse(BaseModel):
     crop_variety_strain_id: UUID | None = None
     crop_path: str = ""
     season_label: str
+    # Valid time, half-open [from, to). `effective_to = None` means ongoing.
+    effective_from: date
+    effective_to: date | None = None
+    # Derived from the range against today — NOT the stored `is_current`
+    # column, which only moves when someone assigns a crop.
+    is_active_now: bool = False
+    # past | current | scheduled
+    validity_state: str = "past"
     planting_date: date | None
     expected_harvest_start: date | None
     expected_harvest_end: date | None

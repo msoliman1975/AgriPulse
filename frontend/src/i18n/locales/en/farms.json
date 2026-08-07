@@ -302,5 +302,42 @@
       "cleared": "cleared",
       "cleared_by_gate": "cleared — no longer applies"
     }
+  },
+  "assignment": {
+    "loading": "Loading assignments…",
+    "current": "Current assignment",
+    "none": "No crop is assigned to this block today.",
+    "showHistory": "Show history",
+    "history": "History",
+    "noHistory": "No assignments recorded.",
+    "count": "{{count}} assignment",
+    "count_other": "{{count}} assignments",
+    "state": "State",
+    "crop": "Crop",
+    "range": "Valid from → until",
+    "duration": "Duration",
+    "ongoing": "ongoing",
+    "soFar": "so far",
+    "fallow": "Fallow {{from}} → {{to}} · {{days}}",
+    "assignNew": "Assign a new crop",
+    "season": "Season",
+    "from": "Valid from",
+    "to": "Valid until",
+    "toHelp": "Leave empty for an ongoing assignment.",
+    "planting": "Planting date",
+    "plantingHelp": "The agronomic event. Defaults 'valid from' when that is empty.",
+    "inverted": "Must be after 'valid from'.",
+    "willClose": "This will end {{crop}} on {{date}}.",
+    "conflict": "Overlaps {{crop}} ({{from}} → {{to}}). One crop at a time per block.",
+    "assign": "Assign crop",
+    "assigning": "Assigning…",
+    "failed": "Couldn't assign the crop.",
+    "stateLabel": {
+      "current": "current",
+      "past": "ended",
+      "scheduled": "scheduled"
+    },
+    "cropFields": "Crop fields",
+    "fieldRequired": "Required for this option"
   }
 }

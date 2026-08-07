@@ -330,7 +330,10 @@ export async function loadUnitDetail(args: {
     temp_c_max: num(d.high_c),
   }));
 
-  const currentCrop = cropAssignments.find((c) => c.is_current) ?? null;
+  // The assignment whose validity range contains today. `is_current` is a
+  // stored flag that only moves on assignment, so a finished season would
+  // otherwise keep showing as the block's crop.
+  const currentCrop = cropAssignments.find((c) => c.is_active_now) ?? null;
   const cropAssignmentSummary = await resolveCropAssignment(currentCrop);
   const signals = condenseSignals(signalObs);
 

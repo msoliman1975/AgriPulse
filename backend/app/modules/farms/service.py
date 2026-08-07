@@ -48,6 +48,8 @@ from app.modules.farms.errors import (
     CountryCodeConflictError,
     CountryNotFoundError,
     CropAssignmentNotFoundError,
+    CropAssignmentOverlapError,
+    CropAssignmentRangeError,
     CropAttributeCodeConflictError,
     CropAttributeDefinitionNotFoundError,
     CropAttributeReservedCodeError,
@@ -87,6 +89,10 @@ from app.modules.farms.phenology import (
 )
 from app.modules.farms.phenology_advance import needs_gdd, stage_for_date
 from app.modules.farms.repository import FarmsRepository, crop_attribute_dict
+from app.modules.farms.validity import (
+    find_conflict,
+    open_assignment_to_close,
+)
 from app.modules.weather.snapshot import load_gdd_since
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
@@ -352,6 +358,9 @@ class FarmService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
         canopy_size_class: str | None = None,
+        effective_from: Any = None,
+        effective_to: Any = None,
+        attributes: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
@@ -1699,8 +1708,41 @@ class FarmServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         canopy_size_class: str | None = None,
+        effective_from: Any = None,
+        effective_to: Any = None,
+        attributes: dict[str, Any] | None = None,
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]:
+        # Valid time. `from` defaults to the planting date — they coincide in
+        # the common case — and to today when even that is absent, so an
+        # assignment always governs a real period.
+        effective_from = effective_from or planting_date or _date.today()
+        if effective_to is not None and effective_to <= effective_from:
+            raise CropAssignmentRangeError(
+                reason=(
+                    f"'valid to' ({effective_to}) must be after 'valid from' "
+                    f"({effective_from}). The range is half-open, so an assignment "
+                    "ending on a date is not active on that date."
+                )
+            )
+
+        # Pre-check the overlap the DB constraint would reject anyway, so the
+        # user gets the conflicting crop and dates instead of an IntegrityError.
+        existing = await self._repo.list_block_crop_rows(block_id=block_id)
+        closing = open_assignment_to_close(existing, effective_from)
+        clash = find_conflict(
+            existing,
+            new_from=effective_from,
+            new_to=effective_to,
+            closing_id=closing.id if closing else None,
+        )
+        if clash is not None:
+            raise CropAssignmentOverlapError(
+                crop_path=clash.crop_path,
+                existing_from=clash.effective_from,
+                existing_to=clash.effective_to,
+            )
+
         if canopy_size_class is not None:
             await self._validate_canopy_size_class(
                 canopy_size_class,
@@ -1716,6 +1758,8 @@ class FarmServiceImpl:
             crop_variety_id=crop_variety_id,
             crop_variety_strain_id=crop_variety_strain_id,
             season_label=season_label,
+            effective_from=effective_from,
+            effective_to=effective_to,
             planting_date=planting_date,
             expected_harvest_start=expected_harvest_start,
             expected_harvest_end=expected_harvest_end,
@@ -1728,6 +1772,19 @@ class FarmServiceImpl:
             actor_user_id=actor_user_id,
         )
         await self._tenant_session.flush()
+
+        # Crop fields, same transaction. Deliberately after the flush (the
+        # values reference the assignment row) and deliberately *not* a
+        # separate request: a missing required attribute raises here, which
+        # rolls the assignment back rather than leaving one half-configured
+        # for someone to discover later. Re-uses the editor's write path, so
+        # gating, coercion and history are identical either way.
+        if attributes:
+            await self.set_block_crop_attributes(
+                block_crop_id=bc_id,
+                submitted=attributes,
+                actor_user_id=actor_user_id,
+            )
 
         # Fetch farm_id for audit.farm_id (the block_id alone is not enough).
         block = await self._repo.get_block_by_id(block_id, with_boundary=False)
@@ -1745,6 +1802,11 @@ class FarmServiceImpl:
                 "crop_id": str(crop_id),
                 "season_label": season_label,
                 "is_current": make_current,
+                "effective_from": str(effective_from),
+                "effective_to": str(effective_to) if effective_to else None,
+                # Named so the audit trail explains why a previous assignment
+                # suddenly acquired an end date.
+                "auto_closed_block_crop_id": str(closing.id) if closing else None,
             },
             correlation_id=correlation_id,
         )
@@ -1948,12 +2010,14 @@ class FarmServiceImpl:
         linked to any assignment, and the canonical "current stage" on
         block_crops is left untouched.
         """
-        # Resolve the target block_crop. If caller didn't pin one,
-        # use whichever assignment is `is_current`.
+        # Resolve the target block_crop. If the caller didn't pin one, use the
+        # assignment whose validity range contains today — not the stored
+        # `is_current` flag, which would attach a stage transition to a crop
+        # that finished months ago.
         target_block_crop_id: UUID | None = block_crop_id
         if target_block_crop_id is None:
             assignments = await self._repo.list_block_crops(block_id=block_id)
-            current = next((bc for bc in assignments if bc["is_current"]), None)
+            current = next((bc for bc in assignments if bc["is_active_now"]), None)
             if current is not None:
                 target_block_crop_id = current["id"]
 
