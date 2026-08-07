@@ -1,4 +1,4 @@
-"""Persistence for Observer's own two tables (tenant migration 0059).
+"""Persistence for Observer's own two tables (tenant migration 0060).
 
 Kept separate from ``repository.py`` on purpose: that module is a read-only
 window onto other modules' pipeline tables, and this one owns rows. Mixing

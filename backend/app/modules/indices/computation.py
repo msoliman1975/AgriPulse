@@ -56,7 +56,7 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
 # the leaf/canopy-moisture index the water-stress catalog needs, distinct
 # from McFeeters ``ndwi`` (surface water) above.
 # Identifies the code that produced a stored aggregate row, recorded on every
-# `indices_calc_runs` row (tenant migration 0058).
+# `indices_calc_runs` row (tenant migration 0060).
 #
 # **Bump this whenever anything below changes the numbers**: a formula, the
 # band set a formula consumes, or `S2_SCL_MASKED_CLASSES`. It lives in this

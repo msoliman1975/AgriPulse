@@ -1,4 +1,4 @@
-"""Migration 0058 must survive downgrade and re-upgrade.
+"""Migration 0059 must survive downgrade and re-upgrade.
 
 Named constraints and indexes are the classic way a downgrade breaks: the
 create side works, the drop side names something that was never created, and
@@ -86,8 +86,8 @@ async def _table_exists(session: Any, schema: str) -> bool:
 
 
 @pytest.mark.asyncio
-async def test_0058_creates_the_names_downgrade_drops(admin_session: Any) -> None:
-    slug = f"mig58-{uuid4().hex[:8]}"
+async def test_0059_creates_the_names_downgrade_drops(admin_session: Any) -> None:
+    slug = f"mig59-{uuid4().hex[:8]}"
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
     schema = tenant.schema_name
@@ -105,16 +105,16 @@ async def test_0058_creates_the_names_downgrade_drops(admin_session: Any) -> Non
 
 
 @pytest.mark.asyncio
-async def test_0058_round_trips(admin_session: Any) -> None:
+async def test_0059_round_trips(admin_session: Any) -> None:
     """down to 0057, back up to head, and the table is whole again."""
-    slug = f"mig58r-{uuid4().hex[:8]}"
+    slug = f"mig59r-{uuid4().hex[:8]}"
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
     schema = tenant.schema_name
     await admin_session.commit()
 
     cfg = _alembic_cfg(schema)
-    command.downgrade(cfg, "0057")
+    command.downgrade(cfg, "0058")
     assert not await _table_exists(admin_session, schema)
 
     command.upgrade(cfg, "head")
@@ -133,7 +133,7 @@ async def test_the_trigger_and_outcome_vocabularies_are_enforced(
     """
     from sqlalchemy.exc import DBAPIError
 
-    slug = f"mig58c-{uuid4().hex[:8]}"
+    slug = f"mig59c-{uuid4().hex[:8]}"
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
     await admin_session.commit()
@@ -160,7 +160,7 @@ async def test_masked_pixels_cannot_exceed_the_aoi_footprint(admin_session: Any)
     """A masked count above the footprint would make the budget unreconcilable."""
     from sqlalchemy.exc import DBAPIError
 
-    slug = f"mig58m-{uuid4().hex[:8]}"
+    slug = f"mig59m-{uuid4().hex[:8]}"
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
     await admin_session.commit()

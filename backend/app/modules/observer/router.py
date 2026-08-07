@@ -194,7 +194,7 @@ class GridSnapshot(BaseModel):
 
 
 class CalcRun(BaseModel):
-    """One execution of compute_indices for this scene (tenant 0058)."""
+    """One execution of compute_indices for this scene (tenant 0059)."""
 
     model_config = ConfigDict(from_attributes=True)
     id: UUID

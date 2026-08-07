@@ -373,7 +373,7 @@ class IndicesRepository:
         started_at: datetime,
         completed_at: datetime,
     ) -> None:
-        """Append one row to `indices_calc_runs` (tenant migration 0058).
+        """Append one row to `indices_calc_runs` (tenant migration 0060).
 
         `per_index` is serialised with `json.dumps` and cast on the SQL side.
         Handing asyncpg a dict for a jsonb parameter is the CAST-plus-bind

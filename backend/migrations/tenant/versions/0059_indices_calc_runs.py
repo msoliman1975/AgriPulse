@@ -34,8 +34,8 @@ makes "why is this scene 43% valid?" unanswerable today: the aggregate row
 stores valid and total counts and nothing that separates a cloud-masked pixel
 from a sensor gap.
 
-Revision ID: 0058
-Revises: 0057
+Revision ID: 0059
+Revises: 0058
 Create Date: 2026-08-06
 """
 
@@ -47,8 +47,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0058"
-down_revision: str | Sequence[str] | None = "0057"
+revision: str = "0059"
+down_revision: str | Sequence[str] | None = "0058"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

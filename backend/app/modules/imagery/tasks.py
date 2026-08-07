@@ -1304,7 +1304,7 @@ async def _record_calc_run(
     error: str | None,
     started_at: datetime,
 ) -> None:
-    """Append one `indices_calc_runs` row (tenant migration 0058).
+    """Append one `indices_calc_runs` row (tenant migration 0060).
 
     Best-effort on purpose. Lineage is what lets Observer tell a fresh
     computation from a silent overwrite, but it is *about* the pipeline, not

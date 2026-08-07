@@ -376,7 +376,7 @@ async def _insert_calc_run(
     error: str | None = None,
     per_index: str = '{"ndvi": {"valid": 3214, "total": 3508, "nodata": 55, "mean": 0.5123}}',
 ) -> None:
-    """One `indices_calc_runs` row (tenant migration 0058)."""
+    """One `indices_calc_runs` row (tenant migration 0060)."""
     await session.execute(
         text(
             """
