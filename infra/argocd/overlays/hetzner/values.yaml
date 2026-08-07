@@ -614,13 +614,39 @@ global:
   #   and no migration. api + workers stay cfc0751, tile-server stays 9d140cc;
   #   bumping them would restart pods on byte-identical code. Rollback is this
   #   tag back to 7ce68a0, with nothing to unwind.
+  # 1095505 = four merged PRs promoted together rather than in four rollouts:
+  #   #364 the Insights crop chips become the overview's filter (frontend, plus
+  #     two insights schema/service fields).
+  #   #370 crop assignments get validity dates and "current" follows the
+  #     calendar. THIS ONE CARRIES MIGRATION 0058 -- see below.
+  #   #365 the farm-console shows the sub-block grid by default on a zoned
+  #     farm, via a new grid_product_id on the blocks-summary response.
+  #   (#369 was already promoted as 7a87da1; it rides along unchanged.)
+  #
+  #   api + workers move off cfc0751 for the first time since the farm-console
+  #   latency work. tile-server stays 9d140cc -- zero files changed under
+  #   tile-server/ since that tag, so there is nothing to rebuild.
+  #
+  #   MIGRATION: tenant 0058 (block_crops.effective_from / effective_to).
+  #   0056 and 0057 were already applied under cfc0751, so 0058 is the only
+  #   new one. It backfills effective_from from planting_date (falling back to
+  #   created_at), derives effective_to from the next assignment via LEAD(),
+  #   and then REFUSES TO GUESS: if any overlapping assignments survive the
+  #   backfill it raises with the offending pairs listed rather than picking a
+  #   winner. Postgres transactional DDL rolls the whole migration back in that
+  #   case and the PreSync job fails closed, so the outcome is a blocked
+  #   rollout with prod still serving cfc0751/7a87da1 -- not damaged data.
+  #   ROLLBACK IS NOT SYMMETRIC HERE. The tags roll back on their own; 0058
+  #   does not. It ships a tested downgrade(), but running it is a deliberate
+  #   act. Rolling back the images alone is safe: cfc0751's api simply never
+  #   reads the two new columns.
   images:
     api:
-      tag: "cfc0751"
+      tag: "1095505"
     workers:
-      tag: "cfc0751"
+      tag: "1095505"
     frontend:
-      tag: "7a87da1"
+      tag: "1095505"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
