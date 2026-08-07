@@ -88,9 +88,9 @@ async def _assign_mango_crop(admin_session: AsyncSession, schema: str, block_id:
         text(
             f'INSERT INTO "{schema}".block_crops '
             f"(id, block_id, crop_id, crop_path, season_label, is_current, status, "
-            f" growth_stage, canopy_size_class) "
+            f" growth_stage, canopy_size_class, effective_from, effective_to) "
             f"VALUES (:id, :block, :crop, 'mango.keitt.large', '2026', TRUE, 'growing', "
-            f" 'fruit_set', 'large')"
+            f" 'fruit_set', 'large', CURRENT_DATE, NULL)"
         ),
         {"id": uuid4(), "block": UUID(block_id), "crop": uuid4()},
     )
