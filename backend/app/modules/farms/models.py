@@ -465,6 +465,17 @@ class BlockCrop(Base, TimestampedMixin):
     # crop's classification depth — the cross-consumer targeting key.
     crop_path: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
     season_label: Mapped[str] = mapped_column(Text, nullable=False)
+    # Valid time (tenant 0058): the period this assignment governs, half-open
+    # `[from, to)`. `effective_to IS NULL` means ongoing — a perennial orchard
+    # has no end until it is grubbed up. Distinct from the agronomic dates
+    # below: planting and harvest are events, this is the record's validity,
+    # and for a perennial the harvest is not the end of occupancy.
+    #
+    # `is_current` is now DERIVED from this range on read (see
+    # `farms.validity.is_active_on`); the stored column is kept in step on
+    # write for the partial unique index and any consumer not yet migrated.
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     planting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     expected_harvest_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     expected_harvest_end: Mapped[date | None] = mapped_column(Date, nullable=True)

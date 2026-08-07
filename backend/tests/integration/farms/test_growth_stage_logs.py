@@ -77,8 +77,10 @@ async def _seed_crop_assignment(
     await admin_session.execute(
         text(
             "INSERT INTO block_crops "
-            "(id, block_id, crop_id, season_label, is_current, status) "
-            "VALUES (:aid, :bid, :cid, '2026-summer', TRUE, 'growing')"
+            "(id, block_id, crop_id, season_label, effective_from, is_current, status) "
+            # effective_from in the past + no effective_to = ongoing, so this
+            # fixture stays the block's current assignment under valid time.
+            "VALUES (:aid, :bid, :cid, '2026-summer', CURRENT_DATE - 30, TRUE, 'growing')"
         ).bindparams(
             bindparam("aid", type_=PG_UUID(as_uuid=True)),
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
