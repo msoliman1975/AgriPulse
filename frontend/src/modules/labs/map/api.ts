@@ -155,6 +155,7 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
       ndvi_current: apiSummary?.ndvi_current ?? null,
       ndre_current: apiSummary?.ndre_current ?? null,
       ndwi_current: apiSummary?.ndwi_current ?? null,
+      grid_product_id: apiSummary?.grid_product_id ?? null,
     };
     if (!isLogicalPivot) summaries[b.id] = summary;
 

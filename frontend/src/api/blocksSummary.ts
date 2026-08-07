@@ -14,6 +14,9 @@ export interface BlockSummary {
   ndre_current: number | null;
   ndwi_current: number | null;
   last_index_at: string | null;
+  /** Imagery product this block's sub-block grid is configured against, or
+   *  null when it has no grid. Drives the map's default grid overlay. */
+  grid_product_id: string | null;
 }
 
 export interface BlocksSummaryResponse {

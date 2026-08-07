@@ -15,6 +15,8 @@ export interface UnitSummary {
   ndvi_current: number | null;
   ndre_current: number | null;
   ndwi_current: number | null;
+  /** Product the block's sub-block grid is configured against, if gridded. */
+  grid_product_id: string | null;
 }
 
 export interface IndexSeries {

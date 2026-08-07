@@ -6,7 +6,7 @@
 // it can be iterated and A/B'd before replacing /labs/map. Reuses the
 // existing data loaders (loadMapSummary / loadUnitDetail) and MapCanvas.
 // See docs/proposals/farm-management-redesign.md.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -35,6 +35,7 @@ import {
   type BlockDetail,
 } from "@/api/blocks";
 import { getGridCells } from "@/api/grid";
+import { griddedBlocks } from "./gridOverlay";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
@@ -116,8 +117,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     borderOpacity: 0.6,
     fillOpacity: 1,
   });
-  // Grid overlay
+  // Grid overlay. Defaults ON for a farm that has any sub-block grid
+  // configured — someone who went to the trouble of zoning a block wants to
+  // see the zones without hunting through the Layers popover. Latched after
+  // the first summary so a later toggle-off is not undone by a refetch, and
+  // per farm so switching farms re-evaluates.
   const [showGrid, setShowGrid] = useState(false);
+  const gridDefaultedFor = useRef<string | null>(null);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
   // Signal observation overlay
@@ -224,25 +230,36 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   });
   const gridProductId = subsQ.data?.[0]?.product_id ?? null;
 
-  // Farm-wide grid: no farm-level cells endpoint, so fan out per gridded block
-  // (each via its first active subscription) and merge client-side. Lazy.
-  const overlayBlocks = summaryQ.data?.blocks ?? [];
-  const overlayKey = overlayBlocks.map((b) => b.id).join(",");
+  // Farm-wide grid: no farm-level cells endpoint, so fan out per gridded
+  // block and merge client-side. The summary now says WHICH blocks are
+  // gridded and against which product, so this asks only those blocks and
+  // skips the per-block subscription lookup that used to precede every
+  // fetch — the overlay is on by default now, and 2N requests on every
+  // console load is how the map exhausted the connection pool once before.
+  const gridded = useMemo(
+    () => griddedBlocks(summaryQ.data?.blocks, summaryQ.data?.summaries),
+    [summaryQ.data],
+  );
+  const overlayKey = gridded.map((g) => g.blockId).join(",");
+
+  useEffect(() => {
+    if (!summaryQ.data || gridDefaultedFor.current === farmId) return;
+    gridDefaultedFor.current = farmId;
+    setShowGrid(gridded.length > 0);
+  }, [summaryQ.data, farmId, gridded.length]);
+
   const farmGridQ = useQuery({
     queryKey: ["labs/mapnext/farmGrid", farmId, activeIndex, overlayKey],
     queryFn: async () => {
       const groups = await Promise.all(
-        overlayBlocks.map(async (b) => {
-          const subs = await listSubscriptions(b.id, { include_inactive: false });
-          const productId = subs[0]?.product_id;
-          if (!productId) return null;
-          const res = await getGridCells(b.id, productId, activeIndex);
-          return { blockId: b.id, productId, cells: res.cells };
+        gridded.map(async ({ blockId, productId }) => {
+          const res = await getGridCells(blockId, productId, activeIndex);
+          return { blockId, productId, cells: res.cells };
         }),
       );
-      return groups.filter((g): g is NonNullable<typeof g> => g !== null);
+      return groups;
     },
-    enabled: Boolean(showGrid && overlayBlocks.length > 0),
+    enabled: Boolean(showGrid && gridded.length > 0),
     staleTime: 30_000,
   });
 
