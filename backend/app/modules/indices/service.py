@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ from app.modules.indices.baselines import (
     compute_baseline_deviation,
     compute_block_baselines,
 )
+from app.modules.indices.computation import CALC_VERSION, MASK_RULESET
 from app.modules.indices.repository import IndicesRepository
 from app.modules.indices.schemas import (
     IndexCatalogEntry,
@@ -64,6 +65,29 @@ class IndicesService(Protocol):
         valid_pixel_count: int,
         total_pixel_count: int,
         cloud_cover_pct: Decimal | None,
+    ) -> None: ...
+
+    async def record_calc_run(
+        self,
+        *,
+        job_id: UUID | None,
+        scene_time: datetime,
+        scene_id: str,
+        stac_item_id: str | None,
+        block_id: UUID,
+        product_id: UUID,
+        aoi_hash: str | None,
+        grid_config_id: UUID | None,
+        cell_count: int | None,
+        band_order: list[str] | None,
+        aoi_pixel_count: int | None,
+        masked_pixel_count: int | None,
+        per_index: dict[str, Any],
+        trigger: str,
+        outcome: str,
+        error: str | None,
+        started_at: datetime,
+        completed_at: datetime,
     ) -> None: ...
 
     async def recompute_block_index_baselines(
@@ -172,6 +196,59 @@ class IndicesServiceImpl:
             total_pixel_count=total_pixel_count,
             cloud_cover_pct=cloud_cover_pct,
             baseline_deviation=baseline_deviation,
+        )
+
+    async def record_calc_run(
+        self,
+        *,
+        job_id: UUID | None,
+        scene_time: datetime,
+        scene_id: str,
+        stac_item_id: str | None,
+        block_id: UUID,
+        product_id: UUID,
+        aoi_hash: str | None,
+        grid_config_id: UUID | None,
+        cell_count: int | None,
+        band_order: list[str] | None,
+        aoi_pixel_count: int | None,
+        masked_pixel_count: int | None,
+        per_index: dict[str, Any],
+        trigger: str,
+        outcome: str,
+        error: str | None,
+        started_at: datetime,
+        completed_at: datetime,
+    ) -> None:
+        """Append one lineage row for a `compute_indices` execution.
+
+        Append-only, and deliberately outside the aggregate upsert: the
+        aggregate row records the *current* answer, this records that an
+        answer was produced, by which code, from how many pixels. A recompute
+        overwrites the former and adds to the latter, which is what makes a
+        silent overwrite visible at all.
+        """
+        await self._repo.insert_calc_run(
+            job_id=job_id,
+            scene_time=scene_time,
+            scene_id=scene_id,
+            stac_item_id=stac_item_id,
+            block_id=block_id,
+            product_id=product_id,
+            aoi_hash=aoi_hash,
+            grid_config_id=grid_config_id,
+            cell_count=cell_count,
+            calc_version=CALC_VERSION,
+            mask_ruleset=MASK_RULESET,
+            band_order=band_order,
+            aoi_pixel_count=aoi_pixel_count,
+            masked_pixel_count=masked_pixel_count,
+            per_index=per_index,
+            trigger=trigger,
+            outcome=outcome,
+            error=error,
+            started_at=started_at,
+            completed_at=completed_at,
         )
 
     async def recompute_block_index_baselines(

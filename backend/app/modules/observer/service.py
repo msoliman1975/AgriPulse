@@ -10,7 +10,7 @@ would drift the first time a denominator changed.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observer.repository import BUCKETS, ObserverRepository
+from app.modules.observer.verify_store import VerifyStore
 from app.shared.storage import get_storage_client
 
 # Widest window the overview will scan in one request. The overview fires
@@ -60,6 +61,7 @@ class ObserverService:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
         self._repo = ObserverRepository(session)
+        self._store = VerifyStore(session)
 
     # ---- tenant plumbing -------------------------------------------------
 
@@ -273,11 +275,22 @@ class ObserverService:
         await self._scope(tenant_schema)
         try:
             ctx = await self._repo.scene_context(job_id)
+            history = (
+                await self._repo.scene_calc_history(
+                    block_id=ctx["block_id"],
+                    product_id=ctx["product_id"],
+                    scene_time=ctx["scene_datetime"],
+                )
+                if ctx is not None
+                else []
+            )
         finally:
             await self._unscope()
         if ctx is None:
             raise SceneNotFoundError(str(job_id))
-        return _scene_detail_payload(ctx)
+        payload = _scene_detail_payload(ctx)
+        payload["calc_runs"] = history
+        return payload
 
     async def explain_pixel(
         self,
@@ -374,6 +387,162 @@ class ObserverService:
                 f"scene status is {ctx['status']!r}; no raw-bands COG exists for it"
             )
         return ctx, formulas
+
+    # ---- L3: verify ------------------------------------------------------
+
+    async def verify_scene(
+        self,
+        *,
+        tenant_schema: str,
+        job_id: UUID,
+        mode: Literal["fast", "full"],
+        run_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Recompute one scene from its raster and diff against the store.
+
+        Synchronous: it is one task and the operator is already looking at
+        that scene. Anything wider is a named run (`create_verify_run`),
+        because a year across 36 blocks is ~2,500 of these.
+
+        Writes only to `observer_verifications`. `block_index_aggregates` is
+        never touched — a drift verdict is a signal to open the Backfill
+        Console, not a licence to repair.
+        """
+        from app.modules.observer.verify import verify_scene_fast, verify_scene_full
+
+        started = datetime.now(UTC)
+        ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
+
+        await self._scope(tenant_schema)
+        try:
+            stored_rows = await self._repo.scene_index_rows(
+                block_id=ctx["block_id"],
+                product_id=ctx["product_id"],
+                scene_time=ctx["scene_datetime"],
+            )
+            history = await self._repo.scene_calc_history(
+                block_id=ctx["block_id"],
+                product_id=ctx["product_id"],
+                scene_time=ctx["scene_datetime"],
+            )
+        finally:
+            await self._unscope()
+
+        stored = {
+            r["index_code"]: {
+                "mean": r["mean"],
+                "valid_pixel_count": r["valid_pixel_count"],
+            }
+            for r in stored_rows
+        }
+        aoi = json.loads(ctx["boundary_utm_geojson"])
+        supported = tuple(ctx["supported_indices"])
+
+        if mode == "full":
+            result = verify_scene_full(
+                raw_uri=_raw_bands_uri(ctx),
+                band_names=tuple(ctx["bands"]),
+                supported_indices=supported,
+                aoi_geojson_utm=aoi,
+                stored=stored,
+            )
+        else:
+            result = verify_scene_fast(
+                index_uris=_index_uris(ctx),
+                aoi_geojson_utm=aoi,
+                stored=stored,
+            )
+
+        duration_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+        await self._scope(tenant_schema)
+        try:
+            row = await self._store.insert_verification(
+                run_id=run_id,
+                job_id=job_id,
+                block_id=ctx["block_id"],
+                product_id=ctx["product_id"],
+                scene_time=ctx["scene_datetime"],
+                scene_id=ctx["scene_id"],
+                mode=mode,
+                verdict=result.verdict,
+                per_index=result.per_index,
+                # Which build produced the numbers being checked. A drift
+                # verdict is far more actionable when it can name the version
+                # that wrote them.
+                calc_version_stored=history[0]["calc_version"] if history else None,
+                error=result.error,
+                duration_ms=duration_ms,
+            )
+        finally:
+            await self._unscope()
+        return row
+
+    async def create_verify_run(
+        self,
+        *,
+        tenant_schema: str,
+        farm_id: UUID,
+        block_ids: list[UUID] | None,
+        product_id: UUID | None,
+        window_from: datetime,
+        window_to: datetime,
+        mode: Literal["fast", "full"],
+        created_by_email: str | None,
+    ) -> dict[str, Any]:
+        _check_window(window_from, window_to)
+        await self._scope(tenant_schema)
+        try:
+            run = await self._store.create_run(
+                farm_id=farm_id,
+                block_ids=block_ids,
+                product_id=product_id,
+                window_from=window_from,
+                window_to=window_to,
+                mode=mode,
+                created_by_email=created_by_email,
+            )
+        finally:
+            await self._unscope()
+        return run
+
+    async def list_verify_runs(
+        self, *, tenant_schema: str, farm_id: UUID | None, limit: int
+    ) -> list[dict[str, Any]]:
+        await self._scope(tenant_schema)
+        try:
+            return await self._store.list_runs(farm_id=farm_id, limit=limit)
+        finally:
+            await self._unscope()
+
+    async def get_verify_run(self, *, tenant_schema: str, run_id: UUID) -> dict[str, Any] | None:
+        await self._scope(tenant_schema)
+        try:
+            return await self._store.get_run(run_id)
+        finally:
+            await self._unscope()
+
+    async def list_verifications(
+        self, *, tenant_schema: str, run_id: UUID, verdict: str | None, limit: int
+    ) -> list[dict[str, Any]]:
+        await self._scope(tenant_schema)
+        try:
+            return await self._store.list_verifications(run_id=run_id, verdict=verdict, limit=limit)
+        finally:
+            await self._unscope()
+
+    async def cancel_verify_run(self, *, tenant_schema: str, run_id: UUID) -> dict[str, Any] | None:
+        """Release a stuck run so its farm is free again.
+
+        Ships with the feature, not after it. One run per farm is enforced by
+        a partial unique index, so a run that never settles blocks that farm
+        for good — and #332 is the standing proof that a run which can hang
+        will eventually hang.
+        """
+        await self._scope(tenant_schema)
+        try:
+            return await self._store.cancel_run(run_id)
+        finally:
+            await self._unscope()
 
     async def scene_indices(
         self,
@@ -524,6 +693,33 @@ def _raw_bands_uri(ctx: dict[str, Any]) -> str:
     return f"s3://{get_storage_client().bucket}/{_raw_bands_key(ctx)}"
 
 
+def _index_uris(ctx: dict[str, Any]) -> dict[str, str]:
+    """Object-storage URIs for the per-index COGs the pipeline wrote.
+
+    Built with the pipeline's own key builder for the same reason the raw
+    path is: a second implementation of the layout eventually points at a
+    path nothing ever wrote, and a verify that cannot find its source reports
+    `source_missing` — which reads as a data problem rather than as a bug
+    here.
+    """
+    from app.modules.imagery.storage import build_asset_key
+
+    bucket = get_storage_client().bucket
+    return {
+        code: "s3://{}/{}".format(
+            bucket,
+            build_asset_key(
+                provider_code=ctx["provider_code"],
+                product_code=ctx["product_code"],
+                scene_id=ctx["scene_id"],
+                aoi_hash=ctx["aoi_hash"],
+                band_or_index=code,
+            ),
+        )
+        for code in ctx["supported_indices"]
+    }
+
+
 def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
     from app.core.settings import get_settings
     from app.modules.imagery.storage import build_asset_key
@@ -630,3 +826,36 @@ def _empty_overview(farm_id: UUID, window_from: datetime, window_to: datetime) -
 
 def get_observer_service(session: AsyncSession) -> ObserverService:
     return ObserverService(session)
+
+
+async def audit_observer_action(
+    *,
+    tenant_id: UUID,
+    tenant_schema: str,
+    actor_user_id: UUID | None,
+    event_type: str,
+    subject_id: UUID | None,
+    details: dict[str, Any],
+) -> None:
+    """Audit a verification action into the tenant's own audit log.
+
+    Only verification is audited. It is the one part of Observer that
+    consumes worker time and has a start, an outcome and a cost; a drill-down
+    view is indistinguishable from an admin opening a farm page, and a row per
+    pixel click would bury the events that matter under noise.
+
+    The event lands in the *tenant's* audit stream rather than a platform-only
+    one, so the tenant whose data was recomputed can see that it happened.
+    """
+    from app.modules.audit import get_audit_service
+
+    del tenant_id
+    await get_audit_service().record(
+        tenant_schema=tenant_schema,
+        event_type=event_type,
+        actor_user_id=actor_user_id,
+        actor_kind="user" if actor_user_id else "system",
+        subject_kind="observer_verification",
+        subject_id=subject_id,
+        details=details,
+    )

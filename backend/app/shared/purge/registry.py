@@ -110,6 +110,24 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
     ),
     OwnedTable("block_index_baselines", owner_column="block_id", order=10),
     OwnedTable(
+        "indices_calc_runs",
+        owner_column="block_id",
+        order=10,
+        fk=False,
+        note="calculation lineage for this block's scenes. No FK by design so "
+        "lineage outlives an ingestion-job row — but a purge is the customer "
+        "asking for the block's data to be destroyed, and a record of how its "
+        "numbers were computed is exactly that",
+    ),
+    OwnedTable(
+        "observer_verifications",
+        owner_column="block_id",
+        order=10,
+        fk=False,
+        note="Observer's verification findings for this block's scenes. The "
+        "run row they hang off is farm-owned and cascades separately",
+    ),
+    OwnedTable(
         "block_index_aggregates",
         owner_column="block_id",
         order=10,
@@ -204,6 +222,14 @@ BLOCK_CAGGS: tuple[tuple[str, str], ...] = (
 # recommendation or signal observation can be attached to a farm with no block.
 
 FARM_OWNED: tuple[OwnedTable, ...] = (
+    OwnedTable(
+        "observer_verify_runs",
+        owner_column="farm_id",
+        order=10,
+        fk=False,
+        note="a verification run is scoped to one farm; observer_verifications "
+        "rows referencing it cascade via the run_id FK",
+    ),
     OwnedTable(
         "audit_events",
         owner_column="farm_id",

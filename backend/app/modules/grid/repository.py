@@ -526,7 +526,12 @@ class GridRepository:
                         f"""
                         SELECT gc.id AS cell_id,
                                ST_AsText(gc.geom) AS geom_wkt,
-                               cfg.utm_srid       AS utm_srid
+                               cfg.utm_srid       AS utm_srid,
+                               -- Which geometry this scene was gridded on.
+                               -- Recorded in indices_calc_runs so lineage can
+                               -- still name it once the config has been
+                               -- retired and replaced.
+                               cfg.id             AS grid_config_id
                         FROM grid_cells gc
                         JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
                         WHERE cfg.block_id = :block_id

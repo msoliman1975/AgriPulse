@@ -9,6 +9,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import {
   buildTileUrlTemplate,
   indexAssetKey,
@@ -17,6 +18,7 @@ import {
 import type { IndexCode } from "@/api/indices";
 import { PixelBudgetCard } from "@/modules/admin/components/observer/PixelBudgetCard";
 import { PixelInspector } from "@/modules/admin/components/observer/PixelInspector";
+import { VerifyPanel } from "@/modules/admin/components/observer/VerifyPanel";
 import {
   usePixelBudget,
   usePixelExplain,
@@ -202,6 +204,65 @@ export function ObserverSceneDetailPage(): ReactNode {
           </dl>
         </Card>
       </div>
+
+      <VerifyPanel tenantId={tenantId as string} jobId={jobId as string} />
+
+      <Card
+        title={t("observer.detail.history")}
+        actions={
+          /*
+           * More than one calc version on one scene means the aggregate row
+           * was replaced by a different build. The row itself is an upsert
+           * and cannot show that; only these run records can.
+           */
+          new Set(d.calc_runs.map((r) => r.calc_version)).size > 1 ? (
+            <Pill kind="warn">{t("observer.detail.overwritten")}</Pill>
+          ) : null
+        }
+        noPadding
+      >
+        {d.calc_runs.length === 0 ? (
+          <p className="p-4 text-xs text-ap-muted">{t("observer.detail.noHistory")}</p>
+        ) : (
+          <Table className="text-xs">
+            <Thead>
+              <Tr>
+                <Th>{t("observer.detail.when")}</Th>
+                <Th>{t("observer.detail.trigger")}</Th>
+                <Th>{t("observer.detail.calcVersion")}</Th>
+                <Th className="text-end">{t("observer.detail.maskedPx")}</Th>
+                <Th className="text-end">{t("observer.detail.durationMs")}</Th>
+                <Th>{t("observer.detail.outcome")}</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {d.calc_runs.map((run) => (
+                <Tr key={run.id}>
+                  <Td className="tabular-nums">
+                    {new Date(run.created_at).toLocaleString(i18n.language)}
+                  </Td>
+                  <Td>{run.trigger}</Td>
+                  <Td className="font-mono">{run.calc_version}</Td>
+                  <Td className="text-end tabular-nums">
+                    {run.masked_pixel_count?.toLocaleString() ?? "—"}
+                  </Td>
+                  <Td className="text-end tabular-nums">
+                    {run.duration_ms?.toLocaleString() ?? "—"}
+                  </Td>
+                  <Td>
+                    <Pill kind={run.outcome === "ok" ? "ok" : "crit"}>{run.outcome}</Pill>
+                    {run.error ? (
+                      <span className="ms-2 text-ap-muted" title={run.error}>
+                        {run.error.slice(0, 60)}
+                      </span>
+                    ) : null}
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
+      </Card>
 
       <Card title={t("observer.detail.rollup")}>
         <div className="flex flex-wrap items-center gap-3 text-sm">

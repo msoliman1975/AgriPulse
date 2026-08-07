@@ -291,6 +291,32 @@ export interface SceneDetail {
   mask_classes: number[];
   /** Null when no grid config governed this scene's time. */
   grid: GridSnapshot | null;
+  /**
+   * Every recorded execution for this scene, newest first. Two entries with
+   * different calc_versions means an aggregate row was overwritten by a
+   * different build — which the upserted row itself cannot show.
+   */
+  calc_runs: CalcRun[];
+}
+
+export interface CalcRun {
+  id: string;
+  job_id: string | null;
+  calc_version: string;
+  mask_ruleset: string;
+  trigger: string;
+  outcome: string;
+  error: string | null;
+  aoi_pixel_count: number | null;
+  masked_pixel_count: number | null;
+  cell_count: number | null;
+  grid_config_id: string | null;
+  band_order: string[] | null;
+  per_index: Record<string, Record<string, number | null>>;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  created_at: string;
 }
 
 export interface PixelIndexResult {
@@ -356,4 +382,127 @@ export async function getPixelBudget(tenantId: string, jobId: string): Promise<P
     `${BASE}/tenants/${tenantId}/scenes/${jobId}/pixel-budget`,
   );
   return data;
+}
+
+// ---- L3: verify ----------------------------------------------------------
+
+export type VerifyMode = "fast" | "full";
+export type Verdict = "match" | "drift" | "source_missing" | "error";
+
+export interface VerificationRow {
+  id: string;
+  run_id: string | null;
+  job_id: string | null;
+  block_id: string;
+  product_id: string;
+  scene_time: string;
+  scene_id: string;
+  /**
+   * `fast` checks aggregation only — the index COG already has masking baked
+   * in, so only `full` can catch a masking-rule change. Never read a `fast`
+   * match as more than it is.
+   */
+  mode: VerifyMode;
+  verdict: Verdict;
+  per_index: Record<
+    string,
+    {
+      stored_mean: number | null;
+      recomputed_mean: number | null;
+      delta_mean: number | null;
+      stored_valid: number | null;
+      recomputed_valid: number | null;
+      delta_valid: number | null;
+      verdict: Verdict;
+    }
+  >;
+  calc_version_stored: string | null;
+  error: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface VerifyRun {
+  id: string;
+  farm_id: string;
+  block_ids: string[] | null;
+  product_id: string | null;
+  window_from: string;
+  window_to: string;
+  mode: VerifyMode;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  progress: {
+    scenes_total?: number;
+    scenes_done?: number;
+    match?: number;
+    drift?: number;
+    error?: number;
+  };
+  error: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export async function verifyScene(
+  tenantId: string,
+  jobId: string,
+  mode: VerifyMode,
+): Promise<VerificationRow> {
+  const { data } = await apiClient.post<VerificationRow>(
+    `${BASE}/tenants/${tenantId}/scenes/${jobId}:verify`,
+    null,
+    { params: { mode } },
+  );
+  return data;
+}
+
+export async function createVerifyRun(
+  tenantId: string,
+  payload: {
+    farm_id: string;
+    window_from: string;
+    window_to: string;
+    mode: VerifyMode;
+    block_ids?: string[] | null;
+    product_id?: string | null;
+  },
+): Promise<VerifyRun> {
+  const { data } = await apiClient.post<VerifyRun>(
+    `${BASE}/tenants/${tenantId}/verify-runs`,
+    payload,
+  );
+  return data;
+}
+
+export async function listVerifyRuns(tenantId: string, farmId?: string): Promise<VerifyRun[]> {
+  const { data } = await apiClient.get<VerifyRun[]>(`${BASE}/tenants/${tenantId}/verify-runs`, {
+    params: { farm_id: farmId },
+  });
+  return data;
+}
+
+export async function listVerifyResults(
+  tenantId: string,
+  runId: string,
+  verdict?: Verdict,
+): Promise<VerificationRow[]> {
+  const { data } = await apiClient.get<VerificationRow[]>(
+    `${BASE}/tenants/${tenantId}/verify-runs/${runId}/results`,
+    { params: { verdict } },
+  );
+  return data;
+}
+
+export async function cancelVerifyRun(tenantId: string, runId: string): Promise<VerifyRun> {
+  const { data } = await apiClient.post<VerifyRun>(
+    `${BASE}/tenants/${tenantId}/verify-runs/${runId}:cancel`,
+  );
+  return data;
+}
+
+/** True while a run is still doing work — drives the list's auto-refresh. */
+export function isVerifyRunActive(run: VerifyRun): boolean {
+  return run.status === "queued" || run.status === "running";
 }

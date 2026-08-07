@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,6 +60,48 @@ const s2Detail: SceneDetail = {
     effective_from: "2026-04-02T00:00:00Z",
     effective_to: null,
   },
+  // Two executions of the same scene under different calc versions — the
+  // shape a silent recompute leaves behind.
+  calc_runs: [
+    {
+      id: "r2",
+      job_id: "j1",
+      calc_version: "idx-2026.08",
+      mask_ruleset: "s2_scl_v1",
+      trigger: "live",
+      outcome: "ok",
+      error: null,
+      aoi_pixel_count: 3508,
+      masked_pixel_count: 239,
+      cell_count: 24,
+      grid_config_id: "g1",
+      band_order: ["red", "nir"],
+      per_index: { ndvi: { valid: 3214, nodata: 55 } },
+      started_at: "2026-06-14T09:01:00Z",
+      completed_at: "2026-06-14T09:02:00Z",
+      duration_ms: 18400,
+      created_at: "2026-06-14T09:02:00Z",
+    },
+    {
+      id: "r1",
+      job_id: "j1",
+      calc_version: "idx-2026.03",
+      mask_ruleset: "s2_scl_v1",
+      trigger: "live",
+      outcome: "ok",
+      error: null,
+      aoi_pixel_count: 3508,
+      masked_pixel_count: 0,
+      cell_count: 24,
+      grid_config_id: "g1",
+      band_order: ["red", "nir"],
+      per_index: { ndvi: { valid: 3508, nodata: 0 } },
+      started_at: "2026-03-02T09:01:00Z",
+      completed_at: "2026-03-02T09:02:00Z",
+      duration_ms: 17900,
+      created_at: "2026-03-02T09:02:00Z",
+    },
+  ],
 };
 
 const clearPixel: PixelExplain = {
@@ -191,7 +233,12 @@ describe("ObserverSceneDetailPage", () => {
     renderPage();
     // The block name appears in both the breadcrumb and the title.
     await waitFor(() => expect(screen.getAllByText(/North Mango/).length).toBeGreaterThan(0));
-    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    // Scoped to the index picker: the verify panel has its own mode select,
+    // and an unscoped option query would silently pick up both.
+    const picker = screen.getByLabelText("Index");
+    const options = within(picker)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
     expect(options).toEqual(["NDVI", "NDMI"]);
   });
 });

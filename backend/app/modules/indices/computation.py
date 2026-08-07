@@ -55,6 +55,24 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
 # ``ndmi`` (KB P2 prerequisite) was added after the original six — it is
 # the leaf/canopy-moisture index the water-stress catalog needs, distinct
 # from McFeeters ``ndwi`` (surface water) above.
+# Identifies the code that produced a stored aggregate row, recorded on every
+# `indices_calc_runs` row (tenant migration 0060).
+#
+# **Bump this whenever anything below changes the numbers**: a formula, the
+# band set a formula consumes, or `S2_SCL_MASKED_CLASSES`. It lives in this
+# module rather than in the pipeline task so it sits next to the maths it
+# versions — a formula edit and a forgotten bump are then adjacent lines in
+# the same diff.
+#
+# Without it, two methodologies can share a trend line indistinguishably. The
+# pre-#288 rows are the worked example: they were averaged without SCL
+# masking, so their means run high, and nothing in the database says so.
+CALC_VERSION = "idx-2026.08"
+
+# Names the SCL class set below, so a stored row records *which* masking rules
+# ran rather than just that some did.
+MASK_RULESET = "s2_scl_v1"
+
 STANDARD_INDEX_CODES: tuple[str, ...] = (
     "ndvi",
     "ndwi",

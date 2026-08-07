@@ -13,12 +13,13 @@ Two operations:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import ARRAY, Text, bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -347,3 +348,90 @@ class IndicesRepository:
             .all()
         )
         return tuple(dict(r) for r in rows)
+
+    async def insert_calc_run(
+        self,
+        *,
+        job_id: UUID | None,
+        scene_time: datetime,
+        scene_id: str,
+        stac_item_id: str | None,
+        block_id: UUID,
+        product_id: UUID,
+        aoi_hash: str | None,
+        grid_config_id: UUID | None,
+        cell_count: int | None,
+        calc_version: str,
+        mask_ruleset: str,
+        band_order: list[str] | None,
+        aoi_pixel_count: int | None,
+        masked_pixel_count: int | None,
+        per_index: dict[str, Any],
+        trigger: str,
+        outcome: str,
+        error: str | None,
+        started_at: datetime,
+        completed_at: datetime,
+    ) -> None:
+        """Append one row to `indices_calc_runs` (tenant migration 0060).
+
+        `per_index` is serialised with `json.dumps` and cast on the SQL side.
+        Handing asyncpg a dict for a jsonb parameter is the CAST-plus-bind
+        family that caused three production incidents in one day — the cast
+        has to be explicit and the value has to arrive as text.
+        """
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO indices_calc_runs (
+                    job_id, scene_time, scene_id, stac_item_id,
+                    block_id, product_id, aoi_hash,
+                    grid_config_id, cell_count,
+                    calc_version, mask_ruleset, band_order,
+                    aoi_pixel_count, masked_pixel_count, per_index,
+                    trigger, outcome, error,
+                    started_at, completed_at, duration_ms
+                ) VALUES (
+                    :job_id, :scene_time, :scene_id, :stac_item_id,
+                    :block_id, :product_id, :aoi_hash,
+                    :grid_config_id, :cell_count,
+                    :calc_version, :mask_ruleset, :band_order,
+                    :aoi_pixel_count, :masked_pixel_count,
+                    CAST(:per_index AS jsonb),
+                    :trigger, :outcome, :error,
+                    :started_at, :completed_at,
+                    (EXTRACT(EPOCH FROM (:completed_at - :started_at)) * 1000)::int
+                )
+                """
+            ).bindparams(
+                # asyncpg needs the type on nullable uuid binds; without it a
+                # None arrives untyped and the insert fails at parse time.
+                bindparam("job_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("product_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("grid_config_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("band_order", type_=ARRAY(Text())),
+            ),
+            {
+                "job_id": job_id,
+                "scene_time": scene_time,
+                "scene_id": scene_id,
+                "stac_item_id": stac_item_id,
+                "block_id": block_id,
+                "product_id": product_id,
+                "aoi_hash": aoi_hash,
+                "grid_config_id": grid_config_id,
+                "cell_count": cell_count,
+                "calc_version": calc_version,
+                "mask_ruleset": mask_ruleset,
+                "band_order": band_order,
+                "aoi_pixel_count": aoi_pixel_count,
+                "masked_pixel_count": masked_pixel_count,
+                "per_index": json.dumps(per_index),
+                "trigger": trigger,
+                "outcome": outcome,
+                "error": error,
+                "started_at": started_at,
+                "completed_at": completed_at,
+            },
+        )

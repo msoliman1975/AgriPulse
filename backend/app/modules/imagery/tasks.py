@@ -28,7 +28,7 @@ sync). Errors emit `IngestionFailedV1`, audit, and set `status='failed'`.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Sequence
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -990,12 +990,18 @@ async def _compute_indices_async(
 
     bucket = storage.bucket
     raw_uri = f"s3://{bucket}/{raw_bands_key_str}"
+    # Lineage clock. Started before the raster read so the recorded duration
+    # covers the part of this task that can actually be slow.
+    calc_started_at = datetime.now(UTC)
+    aoi_pixel_count: int | None = None
+    masked_pixel_count: int | None = None
     try:
         bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
             raw_uri,
             band_names=tuple(product["bands"]),
             aoi_geojson_utm36n=block["boundary_utm_geojson"],
         )
+        aoi_pixel_count, masked_pixel_count = _mask_counts(aoi_mask, cloud_mask)
         index_aggregates, index_keys, index_rasters = compute_and_write_indices(
             bands_arrays=bands_arrays,
             aoi_mask=aoi_mask,
@@ -1016,6 +1022,24 @@ async def _compute_indices_async(
             subject_id=job_id,
             farm_id=block["farm_id"],
             details={"reason": "compute_indices_failed", "error": str(exc)},
+        )
+        # A failed execution is still an execution, and the fact that it was
+        # attempted at all is exactly what a stalled pipeline hides. #335 died
+        # nine seconds in and reported nothing, so the console showed a source
+        # with no progress and no error.
+        await _record_calc_run(
+            tenant_schema=tenant_schema,
+            job=job,
+            block=block,
+            product=product,
+            grid_config_id=None,
+            cell_count=None,
+            aoi_pixel_count=aoi_pixel_count,
+            masked_pixel_count=masked_pixel_count,
+            per_index={},
+            outcome="failed",
+            error=str(exc)[:1000],
+            started_at=calc_started_at,
         )
         return {"job_id": str(job_id), "status": "compute_failed"}
 
@@ -1064,16 +1088,12 @@ async def _compute_indices_async(
             at=job["scene_datetime"],
         )
         if cells:
-            per_cell_per_index: dict[Any, dict[str, Any]] = {}
-            for cell in cells:
-                per_index: dict[str, Any] = {}
-                for index_code, raster in index_rasters.items():
-                    per_index[index_code] = compute_cell_aggregates(
-                        raster=raster,
-                        transform=raster_transform,
-                        cell_polygon_wkt=cell["geom_wkt"],
-                    )
-                per_cell_per_index[cell["cell_id"]] = per_index
+            per_cell_per_index = _zonal_by_cell(
+                cells=cells,
+                index_rasters=index_rasters,
+                raster_transform=raster_transform,
+                compute_cell_aggregates=compute_cell_aggregates,
+            )
             await grid_service.record_grid_aggregates(
                 scene_time=job["scene_datetime"],
                 block_id=job["block_id"],
@@ -1082,6 +1102,7 @@ async def _compute_indices_async(
                 cloud_cover_pct=job["cloud_cover_pct"],
                 per_cell_per_index=per_cell_per_index,
             )
+        grid_config_id = cells[0]["grid_config_id"] if cells else None
 
         # Refresh pgstac.items with the merged asset map.
         from app.modules.imagery.pgstac import (
@@ -1090,37 +1111,16 @@ async def _compute_indices_async(
             upsert_item,
         )
 
-        collection_id = collection_id_for(tenant_schema, product["code"])
-        merged_assets = {
-            "raw_bands": {
-                "href": f"s3://{bucket}/{raw_bands_key_str}",
-                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
-                "roles": ["data"],
-                "bands": list(product["bands"]),
-            },
-        }
-        for index_code, key in index_keys.items():
-            merged_assets[index_code] = {
-                "href": f"s3://{bucket}/{key}",
-                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
-                "roles": ["data", "index"],
-                "title": index_code.upper(),
-            }
-        bbox = _bbox_from_geojson(block["boundary_geojson"])
-        item_doc = build_item_doc(
-            collection_id=collection_id,
-            item_id=job["stac_item_id"],
-            geometry_geojson=block["boundary_geojson"],
-            bbox=bbox,
-            scene_datetime_iso=_iso(job["scene_datetime"]),
-            assets=merged_assets,
-            properties={
-                "eo:cloud_cover": (
-                    float(job["cloud_cover_pct"]) if job["cloud_cover_pct"] is not None else None
-                ),
-                "agripulse:scene_id": job["scene_id"],
-                "agripulse:aoi_hash": block["aoi_hash"],
-            },
+        item_doc = _build_scene_item_doc(
+            tenant_schema=tenant_schema,
+            job=job,
+            block=block,
+            product=product,
+            bucket=bucket,
+            raw_bands_key_str=raw_bands_key_str,
+            index_keys=index_keys,
+            collection_id_for=collection_id_for,
+            build_item_doc=build_item_doc,
         )
         await upsert_item(session, item_doc=item_doc)
 
@@ -1144,11 +1144,209 @@ async def _compute_indices_async(
             "indices": list(index_aggregates.keys()),
         },
     )
+
+    # Lineage last, in its own transaction: the aggregates are the product,
+    # this is the record of how they were made. Written after the outputs are
+    # durable so a lineage failure can never cost a scene its numbers.
+    await _record_calc_run(
+        tenant_schema=tenant_schema,
+        job=job,
+        block=block,
+        product=product,
+        grid_config_id=grid_config_id,
+        cell_count=len(cells) if cells else None,
+        aoi_pixel_count=aoi_pixel_count,
+        masked_pixel_count=masked_pixel_count,
+        per_index=_per_index_lineage(index_aggregates, aoi_pixel_count, masked_pixel_count),
+        outcome="ok",
+        error=None,
+        started_at=calc_started_at,
+    )
+
     return {
         "job_id": str(job_id),
         "status": "indices_computed",
         "indices": list(index_aggregates.keys()),
     }
+
+
+def _zonal_by_cell(
+    *,
+    cells: Sequence[dict[str, Any]],
+    index_rasters: dict[str, Any],
+    raster_transform: Any,
+    compute_cell_aggregates: Any,
+) -> dict[Any, dict[str, Any]]:
+    """Zonal statistics for every (cell, index) pair, from the in-memory rasters.
+
+    The zonal helper arrives as an argument for the same reason the pgstac
+    helpers do: keep this module's import graph unchanged for processes that
+    never compute indices.
+    """
+    return {
+        cell["cell_id"]: {
+            index_code: compute_cell_aggregates(
+                raster=raster,
+                transform=raster_transform,
+                cell_polygon_wkt=cell["geom_wkt"],
+            )
+            for index_code, raster in index_rasters.items()
+        }
+        for cell in cells
+    }
+
+
+def _build_scene_item_doc(
+    *,
+    tenant_schema: str,
+    job: dict[str, Any],
+    block: dict[str, Any],
+    product: dict[str, Any],
+    bucket: str,
+    raw_bands_key_str: str,
+    index_keys: dict[str, str],
+    collection_id_for: Any,
+    build_item_doc: Any,
+) -> Any:
+    """Merge the raw-bands and per-index assets into one STAC item document.
+
+    Pulled out of the task body purely for size. The pgstac helpers arrive as
+    arguments rather than being imported here so the module-level import graph
+    stays as it was — this file is loaded by processes that never touch pgstac.
+    """
+    merged_assets: dict[str, Any] = {
+        "raw_bands": {
+            "href": f"s3://{bucket}/{raw_bands_key_str}",
+            "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+            "roles": ["data"],
+            "bands": list(product["bands"]),
+        },
+    }
+    for index_code, key in index_keys.items():
+        merged_assets[index_code] = {
+            "href": f"s3://{bucket}/{key}",
+            "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+            "roles": ["data", "index"],
+            "title": index_code.upper(),
+        }
+    return build_item_doc(
+        collection_id=collection_id_for(tenant_schema, product["code"]),
+        item_id=job["stac_item_id"],
+        geometry_geojson=block["boundary_geojson"],
+        bbox=_bbox_from_geojson(block["boundary_geojson"]),
+        scene_datetime_iso=_iso(job["scene_datetime"]),
+        assets=merged_assets,
+        properties={
+            "eo:cloud_cover": (
+                float(job["cloud_cover_pct"]) if job["cloud_cover_pct"] is not None else None
+            ),
+            "agripulse:scene_id": job["scene_id"],
+            "agripulse:aoi_hash": block["aoi_hash"],
+        },
+    )
+
+
+def _mask_counts(aoi_mask: Any, cloud_mask: Any) -> tuple[int, int]:
+    """AOI footprint and the cloud-masked share of it.
+
+    The pixel accounting `block_index_aggregates` cannot carry: it holds valid
+    and total counts and nothing that separates a cloud-masked pixel from a
+    sensor gap, which is why "why is this scene 43% valid?" has no answer in
+    the database today. Both masks are already in memory, so this is two
+    boolean reductions.
+    """
+    import numpy as np
+
+    return (
+        int(np.count_nonzero(aoi_mask)),
+        int(np.count_nonzero(cloud_mask & aoi_mask)),
+    )
+
+
+def _per_index_lineage(
+    index_aggregates: dict[str, Any],
+    aoi_pixel_count: int | None,
+    masked_pixel_count: int | None,
+) -> dict[str, Any]:
+    """Per-index counts for the lineage row.
+
+    `nodata` is what the aggregate row cannot say: of the pixels inside the
+    AOI that survived masking, how many still produced no number — a sensor
+    gap, or a divide-by-zero in that index's own formula. It differs per index
+    for exactly that second reason.
+    """
+    return {
+        code: {
+            "valid": agg.valid_pixel_count,
+            "total": agg.total_pixel_count,
+            "nodata": max(
+                (aoi_pixel_count or 0) - (masked_pixel_count or 0) - agg.valid_pixel_count,
+                0,
+            ),
+            "mean": float(agg.mean) if agg.mean is not None else None,
+        }
+        for code, agg in index_aggregates.items()
+    }
+
+
+async def _record_calc_run(
+    *,
+    tenant_schema: str,
+    job: dict[str, Any],
+    block: dict[str, Any],
+    product: dict[str, Any],
+    grid_config_id: Any,
+    cell_count: int | None,
+    aoi_pixel_count: int | None,
+    masked_pixel_count: int | None,
+    per_index: dict[str, Any],
+    outcome: str,
+    error: str | None,
+    started_at: datetime,
+) -> None:
+    """Append one `indices_calc_runs` row (tenant migration 0060).
+
+    Best-effort on purpose. Lineage is what lets Observer tell a fresh
+    computation from a silent overwrite, but it is *about* the pipeline, not
+    part of it — a failure to record the history must never turn a scene that
+    computed correctly into a scene that reports as failed.
+    """
+    from app.modules.indices.service import get_indices_service
+
+    factory = AsyncSessionLocal()
+    try:
+        async with factory() as session, session.begin():
+            await _set_tenant_context(session, tenant_schema)
+            await get_indices_service(tenant_session=session).record_calc_run(
+                job_id=job["id"],
+                scene_time=job["scene_datetime"],
+                scene_id=job["scene_id"],
+                stac_item_id=job["stac_item_id"],
+                block_id=job["block_id"],
+                product_id=job["product_id"],
+                aoi_hash=block.get("aoi_hash"),
+                grid_config_id=grid_config_id,
+                cell_count=cell_count,
+                band_order=list(product["bands"]),
+                aoi_pixel_count=aoi_pixel_count,
+                masked_pixel_count=masked_pixel_count,
+                per_index=per_index,
+                # `backfill` vs `live` is not distinguishable from inside this
+                # task — both arrive as the same call. The backfill path can
+                # start passing its own trigger when it needs to.
+                trigger="live",
+                outcome=outcome,
+                error=error,
+                started_at=started_at,
+                completed_at=datetime.now(UTC),
+            )
+    except Exception as exc:  # lineage must never fail the task
+        _log.warning(
+            "indices_calc_run_not_recorded",
+            tenant_schema=tenant_schema,
+            job_id=str(job["id"]),
+            error=str(exc)[:300],
+        )
 
 
 def _valid_pct(agg: Any) -> Decimal | None:
