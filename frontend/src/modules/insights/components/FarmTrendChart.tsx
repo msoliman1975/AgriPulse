@@ -145,13 +145,17 @@ export function FarmTrendChart({
   const { chartData, blockNames } = useMemo(() => _reshapeForRecharts(points), [points]);
 
   const visibleCount = blockNames.filter((n) => !hidden.has(n)).length;
+  // Muting every block used to be blocked, because an empty plot under a full
+  // legend reads as "no data" — a different and more alarming message. The
+  // guard is gone now that the plot says so in words (`trend.allHidden`)
+  // instead: with a bulk "hide all" control, a rule that lets you hide three
+  // of four blocks but silently ignores the fourth click reads as a bug.
+  const allHidden = blockNames.length > 0 && visibleCount === 0;
   const toggle = (name: string): void =>
     setHidden((cur) => {
       const next = new Set(cur);
-      // Never let the reader mute the last line — an empty plot with a full
-      // legend reads as "no data", which is a different and alarming message.
       if (next.has(name)) next.delete(name);
-      else if (visibleCount > 1) next.add(name);
+      else next.add(name);
       return next;
     });
 
@@ -178,6 +182,19 @@ export function FarmTrendChart({
           <p className="py-12 text-center text-sm text-ap-crit">{t("trend.loadFailed")}</p>
         ) : chartData.length === 0 ? (
           <p className="py-12 text-center text-sm text-ap-muted">{t("trend.empty")}</p>
+        ) : allHidden ? (
+          // Distinct from `trend.empty`: the farm HAS observations, the reader
+          // just muted them all. Saying so is what makes hiding everything safe.
+          <div className="py-12 text-center">
+            <p className="text-sm text-ap-muted">{t("trend.allHidden")}</p>
+            <button
+              type="button"
+              onClick={() => setHidden(new Set())}
+              className="mt-1 text-xs font-medium text-ap-primary hover:underline"
+            >
+              {t("trend.showAllBlocks")}
+            </button>
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 16, left: 0 }}>
@@ -260,15 +277,30 @@ export function FarmTrendChart({
               );
             })}
           </ul>
-          {hidden.size > 0 ? (
+          {/* Both controls are always mounted, each disabled when it would be
+              a no-op. Showing/hiding them by state moves the legend's other
+              entries under the reader's cursor mid-click. */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setHidden(new Set())}
-              className="text-[11px] font-medium text-ap-primary hover:underline"
+              disabled={hidden.size === 0}
+              className="text-[11px] font-medium text-ap-primary hover:underline disabled:cursor-default disabled:text-ap-muted/50 disabled:no-underline disabled:hover:no-underline"
             >
               {t("trend.showAllBlocks")}
             </button>
-          ) : null}
+            <span aria-hidden="true" className="text-[11px] text-ap-line">
+              ·
+            </span>
+            <button
+              type="button"
+              onClick={() => setHidden(new Set(blockNames))}
+              disabled={allHidden}
+              className="text-[11px] font-medium text-ap-primary hover:underline disabled:cursor-default disabled:text-ap-muted/50 disabled:no-underline disabled:hover:no-underline"
+            >
+              {t("trend.hideAllBlocks")}
+            </button>
+          </div>
         </div>
       ) : null}
     </Card>

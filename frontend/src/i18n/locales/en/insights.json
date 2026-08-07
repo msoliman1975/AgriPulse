@@ -22,7 +22,7 @@
     },
     "indexDesc": {
       "ndvi": "NDVI — overall vegetation vigour and canopy greenness.",
-      "ndwi": "NDWI — canopy and leaf water content.",
+      "ndwi": "NDWI — standing surface water, not leaf moisture. The scale is inverted against the other indices: a healthy crop reads below −0.15, and anything above 0 is water on the block.",
       "evi": "EVI — vegetation vigour, improved over NDVI in dense canopy.",
       "savi": "SAVI — vegetation vigour, corrected for bare-soil background.",
       "ndre": "NDRE — chlorophyll and nitrogen status (red-edge), sensitive in dense canopy.",
@@ -42,7 +42,9 @@
       "all": "All"
     },
     "legendLabel": "Blocks shown",
-    "showAllBlocks": "Show all blocks"
+    "showAllBlocks": "Show all blocks",
+    "hideAllBlocks": "Hide all blocks",
+    "allHidden": "All blocks are hidden."
   },
   "weather": {
     "title": "Weather (past · forecast)",
