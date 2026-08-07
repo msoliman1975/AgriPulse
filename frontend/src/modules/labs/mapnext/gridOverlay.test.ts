@@ -23,7 +23,7 @@ const summary = (id: string, gridProductId: string | null): UnitSummary =>
     ndre_current: null,
     ndwi_current: null,
     grid_product_id: gridProductId,
-  }) as UnitSummary;
+  });
 
 describe("griddedBlocks", () => {
   it("returns the gridded blocks with the product each is zoned against", () => {
