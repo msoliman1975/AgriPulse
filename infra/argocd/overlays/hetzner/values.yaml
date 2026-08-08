@@ -741,13 +741,40 @@ global:
   #   NO MIGRATION. Backend-only -- zero frontend and zero tile-server files
   #   changed vs fa17e66, so both stay put. Rollback is api + workers back to
   #   fa17e66, with nothing to unwind.
+  # f9afafb = #381 Settings -> Bulk Updates: assign one crop across many blocks
+  #   of a farm in one pass, instead of opening each block's drawer in turn.
+  #   Three new farm routes, all gated by `crop_assignment.create` on the farm:
+  #   .../bulk/crop-assignment/candidates, :preview (dry run, no writes), and
+  #   the apply POST which reports an outcome PER BLOCK.
+  #   Preview and apply share one planning function and take the same body, so
+  #   the dry run cannot promise an outcome the write then contradicts. Each
+  #   block is written inside its own SAVEPOINT -- without it one rejected
+  #   assignment aborts the transaction and every later block reports "current
+  #   transaction is aborted" instead of its own reason.
+  #   Also fixes a latent 500: a field_validator raising ValueError left the
+  #   exception object in pydantic's error ctx, which the problem+json handler
+  #   could not serialize, so those 422s came back as 500s. That handler is
+  #   shared, so this changes the validation-error body on EVERY endpoint --
+  #   non-serializable ctx values are now str()'d rather than exploding.
+  #   NO MIGRATION. Backend + frontend -> api + workers + frontend bumped;
+  #   tile-server unchanged stays 9d140cc. Rollback is api + workers back to
+  #   d79a47b and frontend to fa17e66, with nothing to unwind.
+  #   Images verified present in ghcr at f9afafb before this commit (api
+  #   sha256:05eb17b1..., frontend sha256:70671ab6..., both distinct from
+  #   d79a47b's) -- the merge run shows "cancelled", but that is only its
+  #   backend-integration job; every containers job succeeded. The ddf8b90
+  #   trap is a cancel that lands BEFORE the containers job, so the run's own
+  #   conclusion is not the thing to check -- the manifest is.
+  #   NOT BROWSER-VERIFIED: the new wizard is covered by component tests and an
+  #   API-level smoke test on the local stack, but no one has loaded the
+  #   rendered page. First prod check should be /settings/bulk itself.
   images:
     api:
-      tag: "d79a47b"
+      tag: "f9afafb"
     workers:
-      tag: "d79a47b"
+      tag: "f9afafb"
     frontend:
-      tag: "fa17e66"
+      tag: "f9afafb"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
