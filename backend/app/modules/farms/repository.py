@@ -800,39 +800,21 @@ class FarmsRepository:
 
     # ---- Block crops ----------------------------------------------
 
-    async def insert_block_crop(
+    async def resolve_crop_path(
         self,
         *,
-        block_crop_id: UUID,
-        block_id: UUID,
         crop_id: UUID,
         crop_variety_id: UUID | None,
-        crop_variety_strain_id: UUID | None = None,
-        season_label: str,
-        # Valid time. `effective_to=None` means ongoing; the service resolves
-        # the default (`planting_date`, else today) before calling.
-        effective_from: Any,
-        effective_to: Any,
-        planting_date: Any,
-        expected_harvest_start: Any,
-        expected_harvest_end: Any,
-        plant_density_per_ha: Decimal | None,
-        row_spacing_m: Decimal | None,
-        plant_spacing_m: Decimal | None,
-        notes: str | None,
-        make_current: bool,
-        actor_user_id: UUID | None,
-        canopy_size_class: str | None = None,
-        growth_stage_locked: bool = False,
-    ) -> dict[str, Any]:
-        # Confirm block exists.
-        block_exists = await self._tenant.execute(
-            select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
-        )
-        if block_exists.first() is None:
-            raise BlockNotFoundError(block_id)
+        crop_variety_strain_id: UUID | None,
+    ) -> str:
+        """Validate the crop → variety → strain chain and return the canonical
+        path, without writing anything.
 
-        # Confirm crop exists + read its code + classification depth.
+        Extracted from ``insert_block_crop`` so the bulk *preview* can show the
+        exact path the apply would store. A second implementation for the
+        preview is how a dry run comes to promise something the write does not
+        deliver.
+        """
         crop_row = (
             await self._public.execute(
                 select(Crop.code, Crop.classification_depth).where(
@@ -843,7 +825,6 @@ class FarmsRepository:
         if crop_row is None:
             raise CropNotFoundError(crop_id)
 
-        # Resolve + validate variety / strain containment, collecting paths.
         variety_path: str | None = None
         if crop_variety_id is not None:
             v_row = (
@@ -876,14 +857,51 @@ class FarmsRepository:
                 raise CropNotFoundError(crop_variety_strain_id)
             strain_path = s_row.path
 
-        # Enforce exact classification depth + derive the canonical path.
-        crop_path = _resolve_crop_path(
+        return _resolve_crop_path(
             depth=crop_row.classification_depth,
             crop_code=crop_row.code,
             crop_variety_id=crop_variety_id,
             variety_path=variety_path,
             crop_variety_strain_id=crop_variety_strain_id,
             strain_path=strain_path,
+        )
+
+    async def insert_block_crop(
+        self,
+        *,
+        block_crop_id: UUID,
+        block_id: UUID,
+        crop_id: UUID,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None = None,
+        season_label: str,
+        # Valid time. `effective_to=None` means ongoing; the service resolves
+        # the default (`planting_date`, else today) before calling.
+        effective_from: Any,
+        effective_to: Any,
+        planting_date: Any,
+        expected_harvest_start: Any,
+        expected_harvest_end: Any,
+        plant_density_per_ha: Decimal | None,
+        row_spacing_m: Decimal | None,
+        plant_spacing_m: Decimal | None,
+        notes: str | None,
+        make_current: bool,
+        actor_user_id: UUID | None,
+        canopy_size_class: str | None = None,
+        growth_stage_locked: bool = False,
+    ) -> dict[str, Any]:
+        # Confirm block exists.
+        block_exists = await self._tenant.execute(
+            select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
+        )
+        if block_exists.first() is None:
+            raise BlockNotFoundError(block_id)
+
+        crop_path = await self.resolve_crop_path(
+            crop_id=crop_id,
+            crop_variety_id=crop_variety_id,
+            crop_variety_strain_id=crop_variety_strain_id,
         )
 
         # Close the open-ended assignment at the new one's start, in the same
@@ -1336,6 +1354,35 @@ class FarmsRepository:
             .all()
         )
         return list(rows)
+
+    async def list_block_crop_rows_for_farm(self, *, farm_id: UUID) -> dict[UUID, list[BlockCrop]]:
+        """Every live assignment on a farm's blocks, in ONE query, keyed by block.
+
+        The bulk surface needs the *current* crop of every block on the farm
+        before the user has picked anything. Asking per block is the same N+1
+        that exhausted the connection pool on the map (#311), and here it runs
+        on page load rather than on demand.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    select(BlockCrop)
+                    .join(Block, Block.id == BlockCrop.block_id)
+                    .where(
+                        Block.farm_id == farm_id,
+                        Block.deleted_at.is_(None),
+                        BlockCrop.deleted_at.is_(None),
+                    )
+                    .order_by(BlockCrop.effective_from.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        grouped: dict[UUID, list[BlockCrop]] = {}
+        for row in rows:
+            grouped.setdefault(row.block_id, []).append(row)
+        return grouped
 
     async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
         return (

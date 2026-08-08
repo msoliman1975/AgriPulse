@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulk Updates — Crop Assignment (mockup)</title>
+<style>
+/* ---------------------------------------------------------------------------
+   AgriPulse tokens (frontend/tailwind.config.ts → theme.extend.colors.ap).
+   Light is the product's real palette; dark is derived to keep the sand bias
+   instead of going flat neutral.
+--------------------------------------------------------------------------- */
+:root {
+  --bg: #f7f6f1;
+  --panel: #ffffff;
+  --panel-2: #fbfaf6;
+  --field: #ffffff;
+  --line: #e8e5db;
+  --line-strong: #d6d2c4;
+  --ink: #1f2420;
+  --muted: #6c7268;
+  --primary: #356b30;
+  --primary-ink: #ffffff;
+  --primary-soft: #dceadb;
+  --good: #4f8e4a;
+  --accent: #1f6f9a;
+  --warn: #c98a18;
+  --warn-soft: #f7e7c2;
+  --crit: #b24430;
+  --crit-soft: #f3d2c9;
+  --shadow: 0 1px 2px rgba(31, 36, 32, .06), 0 8px 24px -18px rgba(31, 36, 32, .35);
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141613;
+    --panel: #1c1f1a;
+    --panel-2: #21251d;
+    --field: #171a15;
+    --line: #343a2f;
+    --line-strong: #454c3e;
+    --ink: #e9e7dc;
+    --muted: #9ba095;
+    --primary: #7fb173;
+    --primary-ink: #12170f;
+    --primary-soft: #26331f;
+    --good: #7fb173;
+    --accent: #5aa8d0;
+    --warn: #e0aa4a;
+    --warn-soft: #3a2f16;
+    --crit: #e08268;
+    --crit-soft: #3b211a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -18px rgba(0, 0, 0, .9);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141613;
+  --panel: #1c1f1a;
+  --panel-2: #21251d;
+  --field: #171a15;
+  --line: #343a2f;
+  --line-strong: #454c3e;
+  --ink: #e9e7dc;
+  --muted: #9ba095;
+  --primary: #7fb173;
+  --primary-ink: #12170f;
+  --primary-soft: #26331f;
+  --good: #7fb173;
+  --accent: #5aa8d0;
+  --warn: #e0aa4a;
+  --warn-soft: #3a2f16;
+  --crit: #e08268;
+  --crit-soft: #3b211a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -18px rgba(0, 0, 0, .9);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans Arabic", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; text-wrap: balance; font-weight: 600; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* --- app chrome ---------------------------------------------------------- */
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 20px; height: 52px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 30;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -.01em; }
+.brand .leaf {
+  width: 22px; height: 22px; border-radius: 6px; background: var(--primary);
+  display: grid; place-items: center; color: var(--primary-ink); font-size: 12px; font-weight: 700;
+}
+.topbar nav { display: flex; gap: 2px; margin-inline-start: 14px; }
+.topbar nav a {
+  color: var(--muted); text-decoration: none; padding: 5px 10px; border-radius: 7px; font-size: 13px;
+}
+.topbar nav a:hover { background: color-mix(in srgb, var(--line) 55%, transparent); color: var(--ink); }
+.topbar nav a[aria-current] { color: var(--primary); background: var(--primary-soft); font-weight: 500; }
+.spacer { flex: 1; }
+.mock-chip {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+  color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  padding: 3px 8px; border-radius: 999px;
+}
+.icon-btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  padding: 4px 9px; cursor: pointer; font-size: 12px; color: var(--muted);
+}
+.icon-btn:hover { color: var(--ink); border-color: var(--line-strong); }
+
+.shell { max-width: 1180px; margin: 0 auto; padding: 22px 20px 96px; display: flex; gap: 26px; }
+.sidenav { width: 190px; flex: 0 0 auto; }
+.sidenav h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); padding: 4px 10px 6px;
+}
+.sidenav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sidenav a {
+  display: block; padding: 7px 10px; border-radius: 8px; text-decoration: none;
+  color: var(--ink); font-size: 13.5px;
+}
+.sidenav a:hover { background: color-mix(in srgb, var(--line) 50%, transparent); }
+.sidenav a[aria-current] { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+.sidenav .sep { height: 1px; background: var(--line); margin: 8px 10px; }
+.main { min-width: 0; flex: 1; }
+
+.pagehead { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.pagehead h1 { font-size: 24px; letter-spacing: -.015em; }
+.pagehead p { color: var(--muted); font-size: 13.5px; margin-top: 3px; max-width: 62ch; }
+
+/* --- stepper ------------------------------------------------------------- */
+.stepper { display: flex; align-items: stretch; gap: 0; margin-bottom: 20px; }
+.step {
+  flex: 1; display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-inline-end: 0; cursor: pointer; text-align: start;
+}
+.step:first-child { border-start-start-radius: var(--radius); border-end-start-radius: var(--radius); }
+.step:last-child { border-inline-end: 1px solid var(--line); border-start-end-radius: var(--radius); border-end-end-radius: var(--radius); }
+.step .num {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11.5px; font-weight: 600;
+  background: color-mix(in srgb, var(--line) 70%, transparent); color: var(--muted);
+}
+.step .lbl { font-size: 13px; color: var(--muted); line-height: 1.25; }
+.step .lbl b { display: block; font-weight: 600; color: var(--ink); font-size: 13.5px; }
+.step .lbl span { font-size: 11.5px; }
+.step[data-state="done"] .num { background: var(--primary-soft); color: var(--primary); }
+.step[data-state="active"] { background: var(--panel); box-shadow: inset 0 -2px 0 var(--primary); }
+.step[data-state="active"] .num { background: var(--primary); color: var(--primary-ink); }
+.step[data-state="todo"] .lbl b { color: var(--muted); font-weight: 500; }
+.step[disabled] { cursor: not-allowed; opacity: .72; }
+
+/* --- cards / forms ------------------------------------------------------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 16px; }
+.card > header {
+  padding: 13px 16px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 10px;
+}
+.card > header h3 { font-size: 14px; }
+.card > header .hint { font-size: 12.5px; color: var(--muted); }
+.card .body { padding: 16px; }
+
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+label.f { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+label.f > span.req::after { content: " *"; color: var(--crit); }
+.input, select.input, textarea.input {
+  width: 100%; background: var(--field); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  padding: 7px 9px; font-size: 13.5px;
+}
+.input:disabled { background: var(--panel-2); color: var(--muted); cursor: not-allowed; }
+textarea.input { resize: vertical; min-height: 62px; }
+.helper { font-size: 11.5px; color: var(--muted); }
+
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.choice {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel);
+  cursor: pointer;
+}
+.choice:hover { border-color: var(--primary); }
+.choice input { margin-top: 2px; accent-color: var(--primary); }
+.choice b { display: block; font-size: 13.5px; font-weight: 600; }
+.choice small { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+.choice[aria-checked="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary-soft) 45%, var(--panel)); }
+.choice.disabled { cursor: not-allowed; opacity: .6; }
+.choice.disabled:hover { border-color: var(--line-strong); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap;
+}
+.pill.soon { background: color-mix(in srgb, var(--line) 65%, transparent); color: var(--muted); }
+.pill.ok { background: var(--primary-soft); color: var(--primary); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+.pill.info { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.pill.mute { background: color-mix(in srgb, var(--line) 65%, transparent); color: var(--muted); }
+
+/* --- table --------------------------------------------------------------- */
+.tablewrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th, table.data td { padding: 7px 10px; text-align: start; border-bottom: 1px solid var(--line); }
+table.data thead th {
+  position: sticky; top: 0; background: var(--panel-2); z-index: 2;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--line-strong);
+}
+table.data thead th.sortable { cursor: pointer; user-select: none; }
+table.data thead th.sortable:hover { color: var(--ink); }
+table.data thead th .arrow { opacity: .35; margin-inline-start: 4px; }
+table.data thead th[aria-sort] .arrow { opacity: 1; color: var(--primary); }
+table.data tbody tr:hover { background: var(--panel-2); }
+table.data tbody tr.sel { background: color-mix(in srgb, var(--primary-soft) 40%, var(--panel)); }
+table.data tbody tr.sel:hover { background: color-mix(in srgb, var(--primary-soft) 60%, var(--panel)); }
+table.data td.num { text-align: end; font-variant-numeric: tabular-nums; }
+table.data input[type="checkbox"] { accent-color: var(--primary); width: 15px; height: 15px; }
+.blockname b { font-weight: 600; }
+.blockname small { display: block; color: var(--muted); font-size: 11.5px; }
+.dim { color: var(--muted); }
+.mini {
+  width: 100%; max-width: 132px; background: var(--field); color: var(--ink);
+  border: 1px dashed var(--line-strong); border-radius: 6px; padding: 3px 6px; font-size: 12px;
+}
+.mini.set { border-style: solid; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.scrollbox { max-height: 430px; overflow: auto; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+  border-start-start-radius: var(--radius); border-start-end-radius: var(--radius);
+}
+.search { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
+.search input { padding-inline-start: 30px; }
+.search .mag { position: absolute; inset-inline-start: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; }
+
+/* --- buttons ------------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border-radius: 8px; padding: 7px 14px; font-size: 13.5px; font-weight: 500;
+  border: 1px solid transparent; transition: background .12s ease, border-color .12s ease;
+}
+.btn.primary { background: var(--primary); color: var(--primary-ink); }
+.btn.primary:hover { background: color-mix(in srgb, var(--primary) 88%, black); }
+.btn.secondary { background: var(--panel); border-color: var(--line-strong); color: var(--ink); }
+.btn.secondary:hover { background: color-mix(in srgb, var(--line) 40%, var(--panel)); }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); background: color-mix(in srgb, var(--line) 45%, transparent); }
+.btn.danger { background: var(--crit); color: #fff; }
+.btn.small { padding: 4px 10px; font-size: 12.5px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* --- sticky action bar --------------------------------------------------- */
+.actionbar {
+  position: fixed; inset-inline: 0; bottom: 0; z-index: 25;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(8px); border-top: 1px solid var(--line);
+}
+.actionbar .inner {
+  max-width: 1180px; margin: 0 auto; padding: 11px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.summary { font-size: 13px; color: var(--muted); }
+.summary b { color: var(--ink); font-weight: 600; }
+
+/* --- callouts ------------------------------------------------------------ */
+.callout {
+  display: flex; gap: 10px; padding: 11px 13px; border-radius: 10px; font-size: 13px;
+  border: 1px solid; align-items: flex-start;
+}
+.callout .ico { font-size: 14px; line-height: 1.35; }
+.callout.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
+.callout.info { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: color-mix(in srgb, var(--accent) 32%, transparent); color: color-mix(in srgb, var(--accent) 78%, var(--ink)); }
+.callout.ok { background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 34%, transparent); color: color-mix(in srgb, var(--primary) 82%, var(--ink)); }
+.callout.crit { background: var(--crit-soft); border-color: color-mix(in srgb, var(--crit) 38%, transparent); color: color-mix(in srgb, var(--crit) 76%, var(--ink)); }
+
+/* --- preview diff -------------------------------------------------------- */
+.statrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.stat { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--panel-2); }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.stat .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat.replace .v { color: var(--warn); }
+.stat.skip .v { color: var(--muted); }
+.stat.fail .v { color: var(--crit); }
+.arrowcell { color: var(--muted); text-align: center; width: 26px; }
+.before { color: var(--muted); }
+.after { font-weight: 600; }
+
+.hidden { display: none !important; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.rowgap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .sidenav { width: auto; }
+  .sidenav ul { flex-direction: row; flex-wrap: wrap; }
+  .grid2, .grid3, .choice-grid, .statrow { grid-template-columns: minmax(0, 1fr); }
+  .stepper { flex-wrap: wrap; }
+  .step { flex: 1 1 45%; border: 1px solid var(--line); border-radius: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="leaf">A</span> AgriPulse</div>
+  <nav>
+    <a href="#">Overview</a>
+    <a href="#">Farm Console</a>
+    <a href="#">Insights</a>
+    <a href="#">Board</a>
+    <a href="#" aria-current="page">Settings</a>
+  </nav>
+  <div class="spacer"></div>
+  <span class="mock-chip">Mockup — nothing is saved</span>
+  <button class="icon-btn" id="themeBtn" type="button">Theme</button>
+</div>
+
+<div class="shell">
+  <aside class="sidenav">
+    <h2>Settings</h2>
+    <ul>
+      <li><a href="#">Organisation</a></li>
+      <li><a href="#">Notifications</a></li>
+      <li><a href="#">Integrations</a></li>
+      <li><a href="#">Users</a></li>
+      <li><a href="#">Workers</a></li>
+      <li><a href="#">Equipment</a></li>
+      <li><div class="sep"></div></li>
+      <li><a href="#" aria-current="page">Bulk Updates</a></li>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <div class="pagehead">
+      <div>
+        <h1>Bulk Updates</h1>
+        <p>Change the same setting across many blocks in one pass. Pick a farm, choose what to
+           update, fill it in once, then choose which blocks it lands on.</p>
+      </div>
+    </div>
+
+    <div class="stepper" id="stepper">
+      <button class="step" type="button" data-step="1" data-state="active">
+        <span class="num">1</span>
+        <span class="lbl"><b>Scope</b><span id="s1sub">Farm &amp; what to update</span></span>
+      </button>
+      <button class="step" type="button" data-step="2" data-state="todo">
+        <span class="num">2</span>
+        <span class="lbl"><b>Details</b><span id="s2sub">The values to write</span></span>
+      </button>
+      <button class="step" type="button" data-step="3" data-state="todo">
+        <span class="num">3</span>
+        <span class="lbl"><b>Blocks</b><span id="s3sub">Where it applies</span></span>
+      </button>
+      <button class="step" type="button" data-step="4" data-state="todo">
+        <span class="num">4</span>
+        <span class="lbl"><b>Preview &amp; apply</b><span id="s4sub">Check before writing</span></span>
+      </button>
+    </div>
+
+    <!-- ================= STEP 1 : SCOPE ================= -->
+    <section id="pane1">
+      <div class="card">
+        <header><h3>Farm</h3><span class="hint">Blocks and crops come from this farm.</span></header>
+        <div class="body">
+          <div class="grid2">
+            <label class="f"><span class="req">Farm</span>
+              <select class="input" id="farmSelect"></select>
+            </label>
+            <div class="f">
+              <span>Contents</span>
+              <p id="farmMeta" class="helper" style="padding-top:7px"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>What do you want to update?</h3></header>
+        <div class="body">
+          <div class="choice-grid" id="dataTypes"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STEP 2 : DETAILS ================= -->
+    <section id="pane2" class="hidden">
+      <div class="card">
+        <header>
+          <h3>Crop</h3>
+          <span class="hint">Variety and strain narrow as you choose.</span>
+        </header>
+        <div class="body stack">
+          <div class="grid3">
+            <label class="f"><span class="req">Crop</span>
+              <select class="input" id="cropSel"></select>
+            </label>
+            <label class="f"><span class="req">Variety</span>
+              <select class="input" id="varSel" disabled></select>
+            </label>
+            <label class="f"><span>Strain</span>
+              <select class="input" id="strSel" disabled></select>
+            </label>
+          </div>
+          <p class="helper">Path: <b id="cropPath">—</b></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Season &amp; dates</h3><span class="hint">Per-block overrides for season and planting date come in step 3.</span></header>
+        <div class="body stack">
+          <div class="grid3">
+            <label class="f"><span class="req">Season label</span>
+              <input class="input" id="season" placeholder="2026A" value="2026A" />
+            </label>
+            <label class="f"><span>Planting date</span>
+              <input class="input" type="date" id="planting" value="2026-03-01" />
+            </label>
+            <label class="f"><span>Effective from</span>
+              <input class="input" type="date" id="effFrom" value="2026-03-01" />
+              <span class="helper">Defaults to the planting date.</span>
+            </label>
+          </div>
+          <div class="grid3">
+            <label class="f"><span>Expected harvest — start</span>
+              <input class="input" type="date" id="harvStart" value="2026-07-15" />
+            </label>
+            <label class="f"><span>Expected harvest — end</span>
+              <input class="input" type="date" id="harvEnd" value="2026-09-10" />
+            </label>
+            <label class="f"><span>Status</span>
+              <select class="input" id="status">
+                <option value="planned">Planned</option>
+                <option value="growing" selected>Growing</option>
+                <option value="harvesting">Harvesting</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Spacing &amp; density</h3><span class="hint">Optional — left blank, nothing is written.</span></header>
+        <div class="body">
+          <div class="grid3">
+            <label class="f"><span>Plant density (plants/ha)</span>
+              <input class="input tnum" type="number" id="density" placeholder="e.g. 100" value="100" />
+            </label>
+            <label class="f"><span>Row spacing (m)</span>
+              <input class="input tnum" type="number" step="0.1" id="rowSp" value="10" />
+            </label>
+            <label class="f"><span>Plant spacing (m)</span>
+              <input class="input tnum" type="number" step="0.1" id="plantSp" value="10" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="attrCard">
+        <header>
+          <h3>Crop fields</h3>
+          <span class="hint" id="attrHint">Fields defined for this crop. Some appear only once an earlier answer makes them relevant.</span>
+        </header>
+        <div class="body" id="attrBody"></div>
+      </div>
+
+      <div class="card">
+        <header><h3>Notes</h3></header>
+        <div class="body">
+          <textarea class="input" id="notes" placeholder="Written to every block in this run."></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h3>Blocks that already have a crop</h3></header>
+        <div class="body stack">
+          <div class="choice-grid" id="conflictModes">
+            <label class="choice" data-mode="skip" aria-checked="true">
+              <input type="radio" name="conflict" value="skip" checked />
+              <span>
+                <b>Only blocks without a current crop</b>
+                <small>Blocks already carrying an open assignment are listed but left untouched.</small>
+              </span>
+            </label>
+            <label class="choice" data-mode="replace" aria-checked="false">
+              <input type="radio" name="conflict" value="replace" />
+              <span>
+                <b>Replace the current crop</b>
+                <small>Closes the open assignment on the effective date, then writes the new one. History is kept.</small>
+              </span>
+            </label>
+          </div>
+          <div class="callout info">
+            <span class="ico">↺</span>
+            <span>Replacing never deletes anything — the previous assignment is closed with an end date and stays on the block's crop history.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STEP 3 : BLOCKS ================= -->
+    <section id="pane3" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <div class="search">
+            <span class="mag">⌕</span>
+            <input class="input" id="blockSearch" placeholder="Search block name, code or current crop…" />
+          </div>
+          <button class="btn secondary small" id="selectAllFiltered" type="button">Select all matching</button>
+          <button class="btn ghost small" id="clearSel" type="button">Clear selection</button>
+          <div class="spacer" style="flex:1"></div>
+          <span class="summary"><b id="selCount">0</b> of <span id="filtCount">0</span> shown selected</span>
+        </div>
+        <div class="scrollbox tablewrap">
+          <table class="data" id="blockTable">
+            <thead>
+              <tr>
+                <th style="width:34px"><input type="checkbox" id="headCheck" aria-label="Select all shown" /></th>
+                <th class="sortable" data-sort="name">Block <span class="arrow">↕</span></th>
+                <th class="sortable num" data-sort="area" style="text-align:end">Area (ha) <span class="arrow">↕</span></th>
+                <th class="sortable" data-sort="crop">Current crop <span class="arrow">↕</span></th>
+                <th class="sortable" data-sort="season">Season <span class="arrow">↕</span></th>
+                <th class="sortable" data-sort="planted">Planted <span class="arrow">↕</span></th>
+                <th>Override season</th>
+                <th>Override planting</th>
+              </tr>
+            </thead>
+            <tbody id="blockBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="body">
+          <div class="callout info">
+            <span class="ico">✎</span>
+            <span>Override fields stay empty unless a block genuinely differs — a blank cell means
+                  "use the shared value from step 2". Filled cells are outlined and win for that block only.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STEP 4 : PREVIEW & APPLY ================= -->
+    <section id="pane4" class="hidden">
+      <div id="previewIntro" class="card">
+        <header><h3>Preview</h3><span class="hint">Nothing is written until you apply.</span></header>
+        <div class="body stack">
+          <p class="helper" id="previewBlurb"></p>
+          <div><button class="btn primary" id="runPreview" type="button">Run preview</button></div>
+        </div>
+      </div>
+
+      <div id="previewResult" class="hidden">
+        <div class="statrow" id="previewStats"></div>
+        <div class="card">
+          <header>
+            <h3 id="previewTitle">What will change</h3>
+            <div class="spacer" style="flex:1"></div>
+            <span class="hint" id="previewMode"></span>
+          </header>
+          <div class="scrollbox tablewrap">
+            <table class="data" id="diffTable">
+              <thead>
+                <tr>
+                  <th>Block</th>
+                  <th>Now</th>
+                  <th class="arrowcell"></th>
+                  <th>After</th>
+                  <th>Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="diffBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" id="applyCard">
+          <div class="body rowgap">
+            <button class="btn primary" id="applyBtn" type="button">Apply</button>
+            <button class="btn ghost" id="backToBlocks" type="button">Change selection</button>
+            <span class="summary" id="applyHint"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="resultsPane" class="hidden">
+        <div class="callout ok" id="resultBanner" style="margin-bottom:14px"></div>
+        <div class="card">
+          <header><h3>Result</h3><div class="spacer" style="flex:1"></div>
+            <button class="btn secondary small hidden" id="retryFailed" type="button">Retry failed</button>
+          </header>
+          <div class="scrollbox tablewrap">
+            <table class="data" id="resTable">
+              <thead><tr><th>Block</th><th>Assignment</th><th>Outcome</th><th>Detail</th></tr></thead>
+              <tbody id="resBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card"><div class="body rowgap">
+          <button class="btn secondary" id="startOver" type="button">Start another bulk update</button>
+          <span class="summary">A record of this run is kept under the farm's activity log.</span>
+        </div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <span class="summary" id="barSummary"></span>
+    <div class="spacer" style="flex:1"></div>
+    <button class="btn ghost" id="backBtn" type="button" disabled>Back</button>
+    <button class="btn primary" id="nextBtn" type="button">Continue</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   Demo data
+   ========================================================================= */
+const CROPS = {
+  mango:  { label: "Mango",  varieties: {
+              alphonso: { label: "Alphonso", strains: ["Short", "Tall"] },
+              keitt:    { label: "Keitt",    strains: ["Short"] },
+              zebda:    { label: "Zebda",    strains: [] } } },
+  citrus: { label: "Citrus", varieties: {
+              valencia: { label: "Valencia", strains: [] },
+              navel:    { label: "Navel",    strains: [] } } },
+  olive:  { label: "Olive",  varieties: {
+              picual:     { label: "Picual", strains: [] },
+              manzanillo: { label: "Manzanillo", strains: [] } } },
+  cotton: { label: "Cotton", varieties: {
+              giza94: { label: "Giza 94", strains: [] },
+              giza96: { label: "Giza 96", strains: [] } } },
+  wheat:  { label: "Wheat",  varieties: {
+              sakha95: { label: "Sakha 95", strains: [] },
+              misr3:   { label: "Misr 3",   strains: [] } } },
+};
+
+/* Typed crop fields, keyed by crop. `gate` = show only when another field
+   holds one of the listed values — the same gating the per-block form does. */
+const ATTRS = {
+  mango: [
+    { code: "establishment", label: "Establishment method", type: "select", required: true,
+      options: ["Grafted seedling", "Transplanted sapling", "Direct seedling"] },
+    { code: "rootstock", label: "Rootstock", type: "select",
+      options: ["Sukkary", "Zebda", "Local polyembryonic"] },
+    { code: "transplant_date", label: "Transplant date", type: "date",
+      gate: { code: "establishment", values: ["Transplanted sapling"] } },
+    { code: "age_at_transplant", label: "Age at transplant (months)", type: "number",
+      gate: { code: "establishment", values: ["Transplanted sapling"] } },
+    { code: "irrigation_setup", label: "Irrigation setup", type: "select",
+      options: ["Drip — single line", "Drip — double line", "Bubbler"] },
+  ],
+  citrus: [
+    { code: "establishment", label: "Establishment method", type: "select", required: true,
+      options: ["Grafted seedling", "Transplanted sapling"] },
+    { code: "rootstock", label: "Rootstock", type: "select", options: ["Volkameriana", "Sour orange", "Carrizo"] },
+    { code: "transplant_date", label: "Transplant date", type: "date",
+      gate: { code: "establishment", values: ["Transplanted sapling"] } },
+  ],
+  olive: [
+    { code: "establishment", label: "Establishment method", type: "select", required: true,
+      options: ["Rooted cutting", "Transplanted sapling"] },
+    { code: "training_system", label: "Training system", type: "select", options: ["Vase", "Hedgerow", "Super-high-density"] },
+  ],
+  cotton: [
+    { code: "seed_grade", label: "Seed grade", type: "select", required: true, options: ["Certified", "Registered", "Farm-saved"] },
+    { code: "sowing_method", label: "Sowing method", type: "select", options: ["Ridge — dry", "Ridge — wet", "Flat"] },
+    { code: "seed_rate", label: "Seed rate (kg/ha)", type: "number" },
+  ],
+  wheat: [
+    { code: "seed_grade", label: "Seed grade", type: "select", required: true, options: ["Certified", "Registered", "Farm-saved"] },
+    { code: "seed_rate", label: "Seed rate (kg/ha)", type: "number" },
+    { code: "sowing_method", label: "Sowing method", type: "select", options: ["Broadcast", "Drill", "Raised bed"] },
+  ],
+};
+
+const DATA_TYPES = [
+  { id: "crop", label: "Crop assignment", live: true,
+    desc: "Crop, variety, season, planting and harvest dates, spacing and crop fields." },
+  { id: "irrigation", label: "Irrigation setup", live: false,
+    desc: "Emitter type, flow rate and scheduling defaults per block." },
+  { id: "grid", label: "Grid &amp; zone defaults", live: false,
+    desc: "Sub-block grid size and zone naming used by index sampling." },
+  { id: "subs", label: "Imagery subscriptions", live: false,
+    desc: "Which providers and indices each block is subscribed to." },
+];
+
+/* Deterministic block sets so the mockup looks the same on every open. */
+function lcg(seed) { let s = seed; return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648; }
+function makeBlocks(prefix, zoneNames, count, seed, mix) {
+  const rnd = lcg(seed), out = [];
+  for (let i = 1; i <= count; i++) {
+    const r = rnd(), pick = mix[Math.floor(rnd() * mix.length)];
+    const zone = zoneNames[Math.floor(rnd() * zoneNames.length)];
+    const planted = pick ? `202${3 + Math.floor(rnd() * 3)}-0${1 + Math.floor(rnd() * 8)}-1${Math.floor(rnd() * 9)}` : null;
+    out.push({
+      id: `${prefix}-${String(i).padStart(2, "0")}`,
+      name: `${zone} ${String(i).padStart(2, "0")}`,
+      area: Math.round((1.4 + r * 9.2) * 10) / 10,
+      crop: pick ? pick.crop : null,
+      season: pick ? pick.season : null,
+      planted,
+      /* One block is mid-harvest with an open log — the realistic failure. */
+      locked: false,
+    });
+  }
+  return out;
+}
+const MANGO_A = { crop: "Mango · Alphonso", season: "2024A" };
+const MANGO_K = { crop: "Mango · Keitt", season: "2024A" };
+const CITRUS_V = { crop: "Citrus · Valencia", season: "2025A" };
+const OLIVE_P = { crop: "Olive · Picual", season: "2023A" };
+
+const FARMS = [
+  { id: "bashayer", name: "Bashayer Farm", region: "Suez, Egypt",
+    blocks: makeBlocks("B", ["North", "South", "East"], 36, 7,
+      [MANGO_A, MANGO_A, MANGO_K, CITRUS_V, null, null, OLIVE_P]) },
+  { id: "nubaria", name: "Nubaria West", region: "Beheira, Egypt",
+    blocks: makeBlocks("N", ["Field", "Pivot"], 18, 31,
+      [{ crop: "Wheat · Sakha 95", season: "2025W" }, null, { crop: "Cotton · Giza 94", season: "2025A" }, null]) },
+  { id: "delta", name: "Delta North", region: "Kafr El-Sheikh, Egypt",
+    blocks: makeBlocks("D", ["Plot"], 12, 99, [null, null, { crop: "Citrus · Navel", season: "2025A" }]) },
+];
+FARMS[0].blocks[16].locked = true;   // B-17 — open harvest log
+FARMS[0].blocks[16].crop = FARMS[0].blocks[16].crop || "Mango · Alphonso";
+FARMS[0].blocks[16].season = FARMS[0].blocks[16].season || "2024A";
+
+/* =========================================================================
+   State
+   ========================================================================= */
+const state = {
+  step: 1,
+  farmId: "bashayer",
+  dataType: "crop",
+  crop: null, variety: null, strain: null,
+  attrs: {},
+  conflict: "skip",
+  selected: new Set(),
+  overrides: {},          // blockId -> {season, planted}
+  sort: { key: "name", dir: 1 },
+  query: "",
+  applied: false,
+};
+const $ = (id) => document.getElementById(id);
+const farm = () => FARMS.find((f) => f.id === state.farmId);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function cropPathLabel() {
+  if (!state.crop) return null;
+  const c = CROPS[state.crop];
+  const v = state.variety ? c.varieties[state.variety] : null;
+  return [c.label, v ? v.label : null, state.strain].filter(Boolean).join(" · ");
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const dt = new Date(d + "T00:00:00");
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/* =========================================================================
+   Step 1 — scope
+   ========================================================================= */
+function initFarms() {
+  $("farmSelect").innerHTML = FARMS.map((f) => `<option value="${f.id}">${esc(f.name)} — ${esc(f.region)}</option>`).join("");
+  $("farmSelect").value = state.farmId;
+  $("farmSelect").addEventListener("change", (e) => {
+    state.farmId = e.target.value;
+    state.selected.clear(); state.overrides = {};
+    renderFarmMeta(); renderBlocks(); renderBar();
+  });
+  renderFarmMeta();
+}
+function renderFarmMeta() {
+  const f = farm();
+  const withCrop = f.blocks.filter((b) => b.crop).length;
+  $("farmMeta").innerHTML =
+    `<b>${f.blocks.length}</b> blocks · <b>${withCrop}</b> with a current crop · ` +
+    `<b>${f.blocks.length - withCrop}</b> unassigned · ` +
+    `${f.blocks.reduce((a, b) => a + b.area, 0).toFixed(1)} ha total`;
+}
+function initTypes() {
+  $("dataTypes").innerHTML = DATA_TYPES.map((t) => `
+    <label class="choice ${t.live ? "" : "disabled"}" data-type="${t.id}" aria-checked="${t.id === state.dataType}">
+      <input type="radio" name="dtype" value="${t.id}" ${t.id === state.dataType ? "checked" : ""} ${t.live ? "" : "disabled"} />
+      <span>
+        <b>${t.label} ${t.live ? '<span class="pill ok">Available</span>' : '<span class="pill soon">Planned</span>'}</b>
+        <small>${t.desc}</small>
+      </span>
+    </label>`).join("");
+  $("dataTypes").addEventListener("change", (e) => {
+    state.dataType = e.target.value;
+    document.querySelectorAll("#dataTypes .choice").forEach((c) =>
+      c.setAttribute("aria-checked", String(c.dataset.type === state.dataType)));
+  });
+}
+
+/* =========================================================================
+   Step 2 — details
+   ========================================================================= */
+function initCropPickers() {
+  $("cropSel").innerHTML = `<option value="">Select a crop…</option>` +
+    Object.entries(CROPS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  $("cropSel").addEventListener("change", (e) => {
+    state.crop = e.target.value || null; state.variety = null; state.strain = null; state.attrs = {};
+    fillVarieties(); renderAttrs(); renderPath(); renderBar();
+  });
+  $("varSel").addEventListener("change", (e) => {
+    state.variety = e.target.value || null; state.strain = null;
+    fillStrains(); renderPath(); renderBar();
+  });
+  $("strSel").addEventListener("change", (e) => { state.strain = e.target.value || null; renderPath(); renderBar(); });
+  ["season", "planting", "effFrom", "harvStart", "harvEnd", "notes"].forEach((id) =>
+    $(id).addEventListener("input", () => { renderBar(); if (id === "planting") $("effFrom").value = $("planting").value; }));
+}
+function fillVarieties() {
+  const sel = $("varSel");
+  if (!state.crop) { sel.innerHTML = ""; sel.disabled = true; fillStrains(); return; }
+  const vs = CROPS[state.crop].varieties;
+  sel.disabled = false;
+  sel.innerHTML = `<option value="">Select a variety…</option>` +
+    Object.entries(vs).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  fillStrains();
+}
+function fillStrains() {
+  const sel = $("strSel");
+  const strains = state.crop && state.variety ? CROPS[state.crop].varieties[state.variety].strains : [];
+  if (!strains.length) {
+    sel.disabled = true;
+    sel.innerHTML = `<option value="">${state.variety ? "None defined" : "—"}</option>`;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = `<option value="">Not specified</option>` + strains.map((s) => `<option value="${s}">${s}</option>`).join("");
+}
+function renderPath() { $("cropPath").textContent = cropPathLabel() || "—"; }
+
+function renderAttrs() {
+  const body = $("attrBody");
+  if (!state.crop) {
+    $("attrCard").classList.remove("hidden");
+    body.innerHTML = `<p class="helper">Choose a crop above and its fields appear here.</p>`;
+    return;
+  }
+  const defs = ATTRS[state.crop] || [];
+  const visible = defs.filter((d) => !d.gate || d.gate.values.includes(state.attrs[d.gate.code]));
+  const hiddenCount = defs.length - visible.length;
+  $("attrHint").innerHTML = `Defined for <b>${CROPS[state.crop].label}</b>` +
+    (hiddenCount ? ` · ${hiddenCount} field${hiddenCount > 1 ? "s" : ""} hidden until an earlier answer opens ${hiddenCount > 1 ? "them" : "it"}` : "");
+  body.innerHTML = `<div class="grid3">` + visible.map((d) => {
+    const val = state.attrs[d.code] ?? "";
+    const lbl = `<span class="${d.required ? "req" : ""}">${d.label}</span>`;
+    if (d.type === "select") {
+      return `<label class="f">${lbl}<select class="input" data-attr="${d.code}">
+        <option value="">Not set</option>
+        ${d.options.map((o) => `<option ${o === val ? "selected" : ""}>${o}</option>`).join("")}
+      </select></label>`;
+    }
+    const type = d.type === "number" ? "number" : d.type === "date" ? "date" : "text";
+    return `<label class="f">${lbl}<input class="input${type === "number" ? " tnum" : ""}" type="${type}" data-attr="${d.code}" value="${esc(val)}" /></label>`;
+  }).join("") + `</div>`;
+  body.querySelectorAll("[data-attr]").forEach((el) => {
+    el.addEventListener("change", () => { state.attrs[el.dataset.attr] = el.value; renderAttrs(); renderBar(); });
+  });
+}
+
+function initConflict() {
+  $("conflictModes").addEventListener("change", (e) => {
+    state.conflict = e.target.value;
+    document.querySelectorAll("#conflictModes .choice").forEach((c) =>
+      c.setAttribute("aria-checked", String(c.dataset.mode === state.conflict)));
+    renderBlocks(); renderBar();
+  });
+}
+
+/* =========================================================================
+   Step 3 — blocks
+   ========================================================================= */
+function filteredBlocks() {
+  const q = state.query.trim().toLowerCase();
+  let rows = farm().blocks.filter((b) =>
+    !q || b.id.toLowerCase().includes(q) || b.name.toLowerCase().includes(q) || (b.crop || "").toLowerCase().includes(q));
+  const { key, dir } = state.sort;
+  const val = (b) => key === "area" ? b.area
+    : key === "planted" ? (b.planted || "0000")
+    : key === "crop" ? (b.crop || "￿")
+    : key === "season" ? (b.season || "￿")
+    : b.name;
+  rows = rows.slice().sort((a, b) => {
+    const x = val(a), y = val(b);
+    if (x === y) return a.id.localeCompare(b.id);
+    return (x > y ? 1 : -1) * dir;
+  });
+  return rows;
+}
+function renderBlocks() {
+  const rows = filteredBlocks();
+  $("blockBody").innerHTML = rows.map((b) => {
+    const sel = state.selected.has(b.id);
+    const ov = state.overrides[b.id] || {};
+    const willSkip = sel && b.crop && state.conflict === "skip";
+    return `<tr class="${sel ? "sel" : ""}" data-id="${b.id}">
+      <td><input type="checkbox" ${sel ? "checked" : ""} data-check="${b.id}" aria-label="Select ${b.id}" /></td>
+      <td class="blockname"><b>${b.id}</b><small>${esc(b.name)}</small></td>
+      <td class="num">${b.area.toFixed(1)}</td>
+      <td>${b.crop ? esc(b.crop) : '<span class="pill mute">Unassigned</span>'}
+          ${willSkip ? ' <span class="pill warn">will skip</span>' : ""}
+          ${sel && b.crop && state.conflict === "replace" ? ' <span class="pill info">will replace</span>' : ""}</td>
+      <td class="dim">${b.season || "—"}</td>
+      <td class="dim tnum">${b.planted ? fmtDate(b.planted) : "—"}</td>
+      <td>${sel ? `<input class="mini ${ov.season ? "set" : ""}" data-ov="season" data-id="${b.id}" value="${esc(ov.season || "")}" placeholder="${esc($("season").value || "shared")}" />` : '<span class="dim">—</span>'}</td>
+      <td>${sel ? `<input class="mini ${ov.planted ? "set" : ""}" type="date" data-ov="planted" data-id="${b.id}" value="${esc(ov.planted || "")}" />` : '<span class="dim">—</span>'}</td>
+    </tr>`;
+  }).join("");
+
+  $("blockBody").querySelectorAll("[data-check]").forEach((el) => el.addEventListener("change", () => {
+    const id = el.dataset.check;
+    if (el.checked) state.selected.add(id); else { state.selected.delete(id); delete state.overrides[id]; }
+    renderBlocks(); renderBar();
+  }));
+  $("blockBody").querySelectorAll("[data-ov]").forEach((el) => el.addEventListener("change", () => {
+    const id = el.dataset.id;
+    state.overrides[id] = state.overrides[id] || {};
+    if (el.value) state.overrides[id][el.dataset.ov] = el.value; else delete state.overrides[id][el.dataset.ov];
+    renderBlocks();
+  }));
+
+  $("filtCount").textContent = rows.length;
+  $("selCount").textContent = rows.filter((b) => state.selected.has(b.id)).length;
+  $("selectAllFiltered").textContent = `Select all ${rows.length} matching`;
+  const shownSel = rows.filter((b) => state.selected.has(b.id)).length;
+  $("headCheck").checked = rows.length > 0 && shownSel === rows.length;
+  $("headCheck").indeterminate = shownSel > 0 && shownSel < rows.length;
+  document.querySelectorAll("#blockTable thead th.sortable").forEach((th) => {
+    if (th.dataset.sort === state.sort.key) th.setAttribute("aria-sort", state.sort.dir === 1 ? "ascending" : "descending");
+    else th.removeAttribute("aria-sort");
+    const a = th.querySelector(".arrow");
+    a.textContent = th.dataset.sort === state.sort.key ? (state.sort.dir === 1 ? "↑" : "↓") : "↕";
+  });
+}
+function initBlockControls() {
+  $("blockSearch").addEventListener("input", (e) => { state.query = e.target.value; renderBlocks(); });
+  $("selectAllFiltered").addEventListener("click", () => {
+    filteredBlocks().forEach((b) => state.selected.add(b.id)); renderBlocks(); renderBar();
+  });
+  $("clearSel").addEventListener("click", () => { state.selected.clear(); state.overrides = {}; renderBlocks(); renderBar(); });
+  $("headCheck").addEventListener("change", (e) => {
+    const rows = filteredBlocks();
+    if (e.target.checked) rows.forEach((b) => state.selected.add(b.id));
+    else rows.forEach((b) => { state.selected.delete(b.id); delete state.overrides[b.id]; });
+    renderBlocks(); renderBar();
+  });
+  document.querySelectorAll("#blockTable thead th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.sort;
+      state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : 1 };
+      renderBlocks();
+    });
+  });
+}
+
+/* =========================================================================
+   Step 4 — preview & apply
+   ========================================================================= */
+function planRun() {
+  const path = cropPathLabel();
+  return farm().blocks.filter((b) => state.selected.has(b.id)).map((b) => {
+    const ov = state.overrides[b.id] || {};
+    const season = ov.season || $("season").value;
+    const planted = ov.planted || $("planting").value;
+    const skip = b.crop && state.conflict === "skip";
+    return {
+      block: b, season, planted, path,
+      before: b.crop ? `${b.crop} · ${b.season}` : null,
+      after: skip ? null : `${path} · ${season}`,
+      outcome: skip ? "skipped" : (b.crop ? "replace" : "assign"),
+      overridden: Boolean(ov.season || ov.planted),
+    };
+  });
+}
+function renderPreview() {
+  const plan = planRun();
+  const n = (k) => plan.filter((p) => p.outcome === k).length;
+  $("previewStats").innerHTML = `
+    <div class="stat"><div class="k">Blocks selected</div><div class="v">${plan.length}</div></div>
+    <div class="stat"><div class="k">New assignment</div><div class="v">${n("assign")}</div></div>
+    <div class="stat replace"><div class="k">Crop replaced</div><div class="v">${n("replace")}</div></div>
+    <div class="stat skip"><div class="k">Left untouched</div><div class="v">${n("skipped")}</div></div>`;
+  $("previewMode").innerHTML = state.conflict === "skip"
+    ? 'Mode: <b>only blocks without a current crop</b>'
+    : 'Mode: <b>replace the current crop</b>, closed on ' + fmtDate($("effFrom").value);
+  $("diffBody").innerHTML = plan.map((p) => {
+    const badge = p.outcome === "assign" ? '<span class="pill ok">New assignment</span>'
+      : p.outcome === "replace" ? '<span class="pill warn">Closes current, then assigns</span>'
+      : '<span class="pill mute">Untouched — already has a crop</span>';
+    return `<tr>
+      <td class="blockname"><b>${p.block.id}</b><small>${esc(p.block.name)} · ${p.block.area.toFixed(1)} ha</small></td>
+      <td class="before">${p.before ? esc(p.before) : "Unassigned"}<br><small class="dim">${p.block.planted ? "planted " + fmtDate(p.block.planted) : ""}</small></td>
+      <td class="arrowcell">→</td>
+      <td class="after">${p.after ? esc(p.after) : '<span class="dim">no change</span>'}
+        ${p.after ? `<br><small class="dim">planted ${fmtDate(p.planted)}${p.overridden ? ' <span class="pill info">override</span>' : ""}</small>` : ""}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join("");
+  const writes = plan.length - n("skipped");
+  $("applyBtn").textContent = writes ? `Apply to ${writes} block${writes > 1 ? "s" : ""}` : "Nothing to apply";
+  $("applyBtn").disabled = writes === 0;
+  $("applyHint").innerHTML = writes
+    ? `${n("replace")} block${n("replace") === 1 ? "" : "s"} will have the current crop closed on <b>${fmtDate($("effFrom").value)}</b>.`
+    : `Every selected block already has a crop and the mode is set to leave those alone.`;
+  $("previewIntro").classList.add("hidden");
+  $("previewResult").classList.remove("hidden");
+}
+function applyRun() {
+  const plan = planRun().filter((p) => p.outcome !== "skipped");
+  const skipped = planRun().filter((p) => p.outcome === "skipped");
+  let ok = 0, failed = 0;
+  const rows = plan.map((p) => {
+    if (p.block.locked) {
+      failed++;
+      return { p, status: "failed",
+        detail: "An open harvest log covers this block. Close or end the harvest, then retry." };
+    }
+    ok++;
+    p.block.crop = p.path; p.block.season = p.season; p.block.planted = p.planted;
+    return { p, status: "applied", detail: `Effective ${fmtDate($("effFrom").value)}` };
+  });
+  skipped.forEach((p) => rows.push({ p, status: "skipped", detail: "Already has a current crop; mode left it alone." }));
+
+  $("resBody").innerHTML = rows.map((r) => {
+    const pill = r.status === "applied" ? '<span class="pill ok">Applied</span>'
+      : r.status === "failed" ? '<span class="pill crit">Failed</span>'
+      : '<span class="pill mute">Skipped</span>';
+    return `<tr>
+      <td class="blockname"><b>${r.p.block.id}</b><small>${esc(r.p.block.name)}</small></td>
+      <td>${r.status === "skipped" ? '<span class="dim">unchanged</span>' : esc(`${r.p.path} · ${r.p.season}`)}</td>
+      <td>${pill}</td>
+      <td class="dim">${esc(r.detail)}</td>
+    </tr>`;
+  }).join("");
+
+  const banner = $("resultBanner");
+  banner.className = "callout " + (failed ? "warn" : "ok");
+  banner.innerHTML = `<span class="ico">${failed ? "!" : "✓"}</span>
+    <span><b>${ok} block${ok === 1 ? "" : "s"} updated</b>${failed ? ` · ${failed} failed` : ""}${skipped.length ? ` · ${skipped.length} skipped` : ""}.
+    ${failed ? "Fix the reason below and retry just the failures — the successful blocks are already saved." : "The new assignment is live on every block listed."}</span>`;
+  $("retryFailed").classList.toggle("hidden", failed === 0);
+  $("previewResult").classList.add("hidden");
+  $("resultsPane").classList.remove("hidden");
+  state.applied = true;
+  renderBar();
+}
+
+/* =========================================================================
+   Wizard plumbing
+   ========================================================================= */
+function validity() {
+  if (state.step === 1) return { ok: Boolean(state.farmId && state.dataType), why: "Pick a farm and a data type." };
+  if (state.step === 2) {
+    if (!state.crop) return { ok: false, why: "Choose a crop." };
+    const vs = Object.keys(CROPS[state.crop].varieties);
+    if (vs.length && !state.variety) return { ok: false, why: "Choose a variety." };
+    if (!$("season").value.trim()) return { ok: false, why: "A season label is required." };
+    const missing = (ATTRS[state.crop] || []).filter((d) => d.required &&
+      (!d.gate || d.gate.values.includes(state.attrs[d.gate.code])) && !state.attrs[d.code]);
+    if (missing.length) return { ok: false, why: `Required crop field: ${missing[0].label}.` };
+    return { ok: true, why: "" };
+  }
+  if (state.step === 3) return { ok: state.selected.size > 0, why: "Select at least one block." };
+  return { ok: true, why: "" };
+}
+function renderBar() {
+  const v = validity();
+  const parts = [];
+  parts.push(`<b>${esc(farm().name)}</b>`);
+  if (state.step >= 2) parts.push(cropPathLabel() ? `<b>${esc(cropPathLabel())}</b> · ${esc($("season").value || "no season")}` : "no crop chosen");
+  if (state.step >= 3) parts.push(`<b>${state.selected.size}</b> block${state.selected.size === 1 ? "" : "s"} selected`);
+  $("barSummary").innerHTML = parts.join(" &nbsp;·&nbsp; ") + (v.ok ? "" : ` &nbsp;·&nbsp; <span style="color:var(--muted)">${esc(v.why)}</span>`);
+  $("nextBtn").disabled = !v.ok;
+  $("backBtn").disabled = state.step === 1;
+  $("nextBtn").textContent = state.step === 3 ? "Preview changes" : state.step === 4 ? "Done" : "Continue";
+  $("nextBtn").classList.toggle("hidden", state.step === 4);
+  ["s1sub", "s2sub", "s3sub", "s4sub"].forEach((id, i) => {
+    const el = $(id);
+    if (i === 0) el.textContent = farm().name;
+    if (i === 1) el.textContent = cropPathLabel() || "The values to write";
+    if (i === 2) el.textContent = state.selected.size ? `${state.selected.size} selected` : "Where it applies";
+    if (i === 3) el.textContent = state.applied ? "Applied" : "Check before writing";
+  });
+}
+function goto(step) {
+  if (step > state.step) { const v = validity(); if (!v.ok) return; }
+  state.step = step;
+  [1, 2, 3, 4].forEach((i) => $("pane" + i).classList.toggle("hidden", i !== step));
+  document.querySelectorAll("#stepper .step").forEach((b) => {
+    const n = Number(b.dataset.step);
+    b.dataset.state = n === step ? "active" : n < step ? "done" : "todo";
+  });
+  if (step === 3) renderBlocks();
+  if (step === 4) {
+    $("previewIntro").classList.remove("hidden");
+    $("previewResult").classList.add("hidden");
+    $("resultsPane").classList.add("hidden");
+    const withCrop = farm().blocks.filter((b) => state.selected.has(b.id) && b.crop).length;
+    $("previewBlurb").innerHTML =
+      `<b>${state.selected.size}</b> block${state.selected.size === 1 ? "" : "s"} selected, ` +
+      `<b>${withCrop}</b> of them already carrying a crop. ` +
+      `The preview shows the exact before and after for each one — no writes happen until you apply.`;
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  renderBar();
+}
+
+/* wiring */
+document.querySelectorAll("#stepper .step").forEach((b) =>
+  b.addEventListener("click", () => goto(Number(b.dataset.step))));
+$("nextBtn").addEventListener("click", () => goto(Math.min(4, state.step + 1)));
+$("backBtn").addEventListener("click", () => goto(Math.max(1, state.step - 1)));
+$("runPreview").addEventListener("click", renderPreview);
+$("applyBtn").addEventListener("click", applyRun);
+$("backToBlocks").addEventListener("click", () => goto(3));
+$("retryFailed").addEventListener("click", () => {
+  const banner = $("resultBanner");
+  banner.className = "callout crit";
+  banner.innerHTML = `<span class="ico">!</span><span><b>Retry failed again.</b> B-17 still has an open harvest log — close it from the block's Board entry, then retry.</span>`;
+});
+$("startOver").addEventListener("click", () => {
+  state.selected.clear(); state.overrides = {}; state.applied = false; state.query = "";
+  $("blockSearch").value = "";
+  goto(1);
+});
+$("themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? null : "dark";
+  if (next) document.documentElement.setAttribute("data-theme", next);
+  else document.documentElement.removeAttribute("data-theme");
+});
+
+initFarms(); initTypes(); initCropPickers(); initConflict(); initBlockControls();
+renderAttrs(); renderBlocks(); renderBar();
+</script>
+</body>
+</html>

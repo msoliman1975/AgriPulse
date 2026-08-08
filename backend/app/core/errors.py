@@ -87,6 +87,25 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     return _problem_response(problem)
 
 
+def _jsonable(value: Any) -> Any:
+    """Coerce anything Pydantic put in an error entry into something
+    ``json.dumps`` can render, falling back to ``str``.
+
+    A ``field_validator`` that raises ``ValueError`` leaves the exception
+    *object* in the entry's ``ctx``. Serializing that raises inside the
+    handler, so the 422 became a 500 — the endpoints that validate hardest
+    were the ones that reported worst. The message is already in ``msg``;
+    everything else here is detail, and detail is worth a ``str()``.
+    """
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_jsonable(v) for v in value]
+    return str(value)
+
+
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
@@ -99,7 +118,7 @@ async def validation_exception_handler(
         correlation_id=_correlation_id(request),
     )
     body = problem.model_dump(exclude_none=True)
-    body["errors"] = exc.errors()
+    body["errors"] = [_jsonable(e) for e in exc.errors()]
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=body,

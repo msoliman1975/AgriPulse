@@ -1,0 +1,162 @@
+{
+  "title": "Bulk Updates",
+  "subtitle": "Change the same setting across many blocks in one pass. Pick a farm, choose what to update, fill it in once, then choose which blocks it lands on.",
+  "denied": {
+    "title": "You don't have access to bulk updates",
+    "body": "Assigning crops in bulk needs the crop-assignment permission at the tenant level. A farm manager can still assign crops from the Farm Console."
+  },
+  "steps": {
+    "label": "Bulk update steps",
+    "scope": "Scope",
+    "scopeSub": "Farm and what to update",
+    "details": "Details",
+    "detailsSub": "The values to write",
+    "blocks": "Blocks",
+    "blocksSub": "Where it applies",
+    "blocksCount": "{{count}} selected",
+    "review": "Preview & apply",
+    "reviewSub": "Check before writing",
+    "reviewDone": "Applied"
+  },
+  "nav": {
+    "back": "Back",
+    "continue": "Continue",
+    "toReview": "Preview changes"
+  },
+  "scope": {
+    "farmTitle": "Farm",
+    "farmLabel": "Farm",
+    "farmPlaceholder": "Select a farm…",
+    "typeTitle": "What do you want to update?",
+    "available": "Available",
+    "planned": "Planned",
+    "types": {
+      "crop": {
+        "name": "Crop assignment",
+        "desc": "Crop, variety, season, planting and harvest dates, spacing and crop fields."
+      },
+      "irrigation": {
+        "name": "Irrigation setup",
+        "desc": "Emitter type, flow rate and scheduling defaults per block."
+      },
+      "grid": {
+        "name": "Grid & zone defaults",
+        "desc": "Sub-block grid size and zone naming used by index sampling."
+      },
+      "subscriptions": {
+        "name": "Imagery subscriptions",
+        "desc": "Which providers and indices each block is subscribed to."
+      }
+    },
+    "noFarms": "You have no farms yet. Create one from the Farm Console first."
+  },
+  "details": {
+    "cropTitle": "Crop",
+    "seasonTitle": "Season & dates",
+    "season": "Season label",
+    "planting": "Planting date",
+    "effectiveFrom": "Effective from",
+    "effectiveFromHelp": "Defaults to the planting date, else today.",
+    "harvestStart": "Expected harvest — start",
+    "harvestEnd": "Expected harvest — end",
+    "spacingTitle": "Spacing & density",
+    "density": "Plant density (plants/ha)",
+    "rowSpacing": "Row spacing (m)",
+    "plantSpacing": "Plant spacing (m)",
+    "cropFieldsTitle": "Crop fields",
+    "noCropFields": "This crop has no extra fields defined.",
+    "notesTitle": "Notes"
+  },
+  "conflict": {
+    "title": "Blocks that already have a crop",
+    "skip": {
+      "name": "Only blocks without a current crop",
+      "desc": "Blocks already carrying an open assignment are listed but left untouched."
+    },
+    "replace": {
+      "name": "Replace the current crop",
+      "desc": "Closes the open assignment on the effective date, then writes the new one."
+    },
+    "historyNote": "Replacing never deletes anything — the previous assignment is closed with an end date and stays on the block's crop history."
+  },
+  "blocks": {
+    "none": "This farm has no active blocks to update.",
+    "searchPlaceholder": "Search block name, code or current crop…",
+    "searchLabel": "Search blocks",
+    "selectAllMatching": "Select all {{count}} matching",
+    "selectAllShown": "Select all shown blocks",
+    "selectOne": "Select block {{code}}",
+    "clear": "Clear selection",
+    "countLabel": "{{selected}} of {{shown}} shown selected",
+    "unassigned": "Unassigned",
+    "willSkip": "will skip",
+    "willReplace": "will replace",
+    "shared": "shared",
+    "overrideSeasonFor": "Season override for block {{code}}",
+    "overridePlantingFor": "Planting date override for block {{code}}",
+    "overrideHelp": "Leave an override empty to use the shared value from step 2. A filled cell applies to that block only.",
+    "col": {
+      "block": "Block",
+      "area": "Area",
+      "currentCrop": "Current crop",
+      "season": "Season",
+      "planted": "Planted",
+      "overrideSeason": "Override season",
+      "overridePlanting": "Override planting"
+    }
+  },
+  "review": {
+    "title": "Preview",
+    "blurb": "{{count}} blocks selected, {{assigned}} of them already carrying a crop. The preview shows the exact before and after for each one — nothing is written until you apply.",
+    "run": "Run preview",
+    "running": "Running…",
+    "apply": "Apply to {{count}} blocks",
+    "applying": "Applying…",
+    "changeSelection": "Change selection",
+    "replaceWarning": "{{count}} blocks will have their current crop closed and replaced.",
+    "noReplace": "No block will lose its current crop in this run.",
+    "kpi": {
+      "selected": "Blocks selected",
+      "assign": "New assignment",
+      "replace": "Crop replaced",
+      "skip": "Left untouched"
+    }
+  },
+  "outcome": {
+    "unassigned": "Unassigned",
+    "noChange": "no change",
+    "override": "override",
+    "col": {
+      "block": "Block",
+      "now": "Now",
+      "after": "After",
+      "outcome": "Outcome"
+    },
+    "verb": {
+      "assign": "New assignment",
+      "replace": "Closes current, then assigns",
+      "skip": "Untouched — already has a crop",
+      "assigned": "Assigned",
+      "replaced": "Replaced",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    }
+  },
+  "result": {
+    "summary": "{{applied}} blocks updated, {{failed}} failed, {{skipped}} skipped.",
+    "startAnother": "Start another bulk update",
+    "auditNote": "This run is recorded in the farm's audit trail."
+  },
+  "validation": {
+    "pickFarm": "Pick a farm to continue.",
+    "pickCrop": "Choose a crop, and a variety if the crop needs one.",
+    "season": "A season label is required.",
+    "cropField": "Fill in the required crop fields.",
+    "fieldRequired": "Required",
+    "pickBlocks": "Select at least one block."
+  },
+  "errors": {
+    "preview": "Could not build the preview.",
+    "apply": "Could not apply the bulk update."
+  }
+}

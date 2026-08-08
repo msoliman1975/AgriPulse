@@ -8,7 +8,8 @@
     "workers": "العاملون",
     "equipment": "المعدات",
     "rules": "القواعد والعتبات",
-    "decisionTrees": "أشجار القرار"
+    "decisionTrees": "أشجار القرار",
+    "bulk": "التحديثات المجمّعة"
   },
   "noAccess": {
     "title": "الإعدادات",

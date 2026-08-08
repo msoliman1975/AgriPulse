@@ -16,6 +16,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import APIError
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.farms import auto_grid as _auto_grid
@@ -90,6 +91,7 @@ from app.modules.farms.phenology import (
 from app.modules.farms.phenology_advance import needs_gdd, stage_for_date
 from app.modules.farms.repository import FarmsRepository, crop_attribute_dict
 from app.modules.farms.validity import (
+    current_assignment,
     find_conflict,
     open_assignment_to_close,
 )
@@ -125,6 +127,27 @@ def _stamp_area_unit(item: dict[str, Any], preferred_unit: str) -> dict[str, Any
     item["area_unit"] = preferred_unit
     item["area_value"] = _convert_area(item.get("area_m2"), preferred_unit)
     return item
+
+
+# Ceiling on how many blocks one bulk crop run may touch. Sized well above
+# the largest real farm (Bashayer is 36) so it is a runaway guard, not a
+# limit anyone meets; the request schema caps `targets` at the same number.
+BULK_CROP_TARGET_LIMIT = 500
+
+
+def _bulk_current_summary(assignment: Any | None) -> dict[str, Any] | None:
+    """The 'what this block carries today' shape shared by candidates,
+    preview `before` and apply `before`."""
+    if assignment is None:
+        return None
+    return {
+        "block_crop_id": assignment.id,
+        "crop_path": assignment.crop_path,
+        "season_label": assignment.season_label,
+        "planting_date": assignment.planting_date,
+        "effective_from": assignment.effective_from,
+        "status": assignment.status,
+    }
 
 
 def _bulk_err(index: int, code: str, error_code: str, message: str) -> dict[str, Any]:
@@ -375,6 +398,24 @@ class FarmService(Protocol):
     ) -> dict[str, Any]: ...
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
+
+    async def list_bulk_crop_candidates(
+        self, *, farm_id: UUID, preferred_unit: str
+    ) -> list[dict[str, Any]]: ...
+
+    async def preview_bulk_crop_assignment(
+        self, *, farm_id: UUID, payload: Any
+    ) -> dict[str, Any]: ...
+
+    async def apply_bulk_crop_assignment(
+        self,
+        *,
+        farm_id: UUID,
+        payload: Any,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
 
     async def advance_growth_stages(self, *, tenant_schema: str) -> dict[str, int]: ...
 
@@ -1906,6 +1947,313 @@ class FarmServiceImpl:
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_block_crops(block_id=block_id)
+
+    # ---- Bulk crop assignment ---------------------------------------------
+    #
+    # One set of values across many blocks. The preview and the apply share
+    # `_bulk_crop_plan` so a dry run cannot promise an outcome the write then
+    # contradicts — the only difference between them is that one writes.
+
+    async def list_bulk_crop_candidates(
+        self, *, farm_id: UUID, preferred_unit: str
+    ) -> list[dict[str, Any]]:
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        blocks = await self._repo.list_blocks(
+            farm_id=farm_id,
+            after=None,
+            limit=BULK_CROP_TARGET_LIMIT,
+            irrigation_system=None,
+            include_inactive=False,
+        )
+        by_block = await self._repo.list_block_crop_rows_for_farm(farm_id=farm_id)
+        today = _date.today()
+        out: list[dict[str, Any]] = []
+        for block in blocks:
+            stamped = _stamp_area_unit(dict(block), preferred_unit)
+            current = current_assignment(by_block.get(block["id"], []), today)
+            out.append(
+                {
+                    "block_id": stamped["id"],
+                    "code": stamped["code"],
+                    "name": stamped.get("name"),
+                    "area_value": stamped["area_value"],
+                    "area_unit": stamped["area_unit"],
+                    "unit_type": stamped.get("unit_type") or "block",
+                    "current": _bulk_current_summary(current),
+                }
+            )
+        return out
+
+    async def _bulk_crop_plan(self, *, farm_id: UUID, payload: Any) -> list[dict[str, Any]]:
+        """Decide what happens to each target, without writing.
+
+        Raises for whole-run problems (unknown farm, bad crop path); a problem
+        with one *block* becomes a skip on that block, so one stale row in the
+        picker can't fail a 40-block run.
+        """
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        # Resolves depth + containment, so a bad crop/variety/strain chain
+        # raises here — before any block is touched — rather than failing on
+        # every block one at a time.
+        crop_path = await self._repo.resolve_crop_path(
+            crop_id=payload.crop_id,
+            crop_variety_id=payload.crop_variety_id,
+            crop_variety_strain_id=payload.crop_variety_strain_id,
+        )
+
+        blocks = await self._repo.list_blocks(
+            farm_id=farm_id,
+            after=None,
+            limit=BULK_CROP_TARGET_LIMIT,
+            irrigation_system=None,
+            include_inactive=False,
+        )
+        blocks_by_id = {b["id"]: b for b in blocks}
+        crops_by_block = await self._repo.list_block_crop_rows_for_farm(farm_id=farm_id)
+        today = _date.today()
+
+        plan: list[dict[str, Any]] = []
+        for target in payload.targets:
+            block = blocks_by_id.get(target.block_id)
+            if block is None:
+                # Not on this farm, or deactivated since the picker loaded.
+                # Never a write — the capability was checked against the farm,
+                # so a block outside it must not be reachable through here.
+                plan.append(
+                    {
+                        "block_id": target.block_id,
+                        "code": "—",
+                        "name": None,
+                        "outcome": "skip",
+                        "before": None,
+                        "after": None,
+                        "overridden": False,
+                        "detail": "Not an active block on this farm.",
+                        "_assign": None,
+                    }
+                )
+                continue
+
+            season = target.season_label or payload.season_label
+            planting = target.planting_date or payload.planting_date
+            # Mirrors the single-block default exactly: explicit value, else
+            # the planting date, else today. A per-block planting override
+            # therefore moves that block's validity start too.
+            effective_from = payload.effective_from or planting or today
+            current = current_assignment(crops_by_block.get(block["id"], []), today)
+            overridden = bool(target.season_label or target.planting_date)
+
+            if current is not None and payload.conflict_mode == "skip":
+                outcome = "skip"
+                after = None
+                detail = (
+                    f"Already carries {current.crop_path} ({current.season_label}); "
+                    "this run was set to leave those alone."
+                )
+            else:
+                outcome = "replace" if current is not None else "assign"
+                after = {
+                    "crop_path": crop_path,
+                    "season_label": season,
+                    "planting_date": planting,
+                    "effective_from": effective_from,
+                }
+                detail = None
+
+            plan.append(
+                {
+                    "block_id": block["id"],
+                    "code": block["code"],
+                    "name": block.get("name"),
+                    "outcome": outcome,
+                    "before": _bulk_current_summary(current),
+                    "after": after,
+                    "overridden": overridden,
+                    "detail": detail,
+                    "_assign": (
+                        None
+                        if after is None
+                        else {
+                            "season_label": season,
+                            "planting_date": planting,
+                            "effective_from": effective_from,
+                        }
+                    ),
+                }
+            )
+        return plan
+
+    async def preview_bulk_crop_assignment(self, *, farm_id: UUID, payload: Any) -> dict[str, Any]:
+        plan = await self._bulk_crop_plan(farm_id=farm_id, payload=payload)
+        crop_path = next(
+            (e["after"]["crop_path"] for e in plan if e["after"] is not None),
+            "",
+        )
+        if not crop_path:
+            # Every target skipped — resolve the path anyway so the UI can
+            # still name the crop the user picked.
+            crop_path = await self._repo.resolve_crop_path(
+                crop_id=payload.crop_id,
+                crop_variety_id=payload.crop_variety_id,
+                crop_variety_strain_id=payload.crop_variety_strain_id,
+            )
+        return {
+            "farm_id": farm_id,
+            "conflict_mode": payload.conflict_mode,
+            "crop_path": crop_path,
+            "assign_count": sum(1 for e in plan if e["outcome"] == "assign"),
+            "replace_count": sum(1 for e in plan if e["outcome"] == "replace"),
+            "skip_count": sum(1 for e in plan if e["outcome"] == "skip"),
+            "items": [{k: v for k, v in e.items() if k != "_assign"} for e in plan],
+        }
+
+    async def apply_bulk_crop_assignment(
+        self,
+        *,
+        farm_id: UUID,
+        payload: Any,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        plan = await self._bulk_crop_plan(farm_id=farm_id, payload=payload)
+        crop_path = next((e["after"]["crop_path"] for e in plan if e["after"] is not None), "")
+
+        items: list[dict[str, Any]] = []
+        applied = skipped = failed = 0
+
+        for entry in plan:
+            base = {
+                "block_id": entry["block_id"],
+                "code": entry["code"],
+                "name": entry["name"],
+                "before": entry["before"],
+                "overridden": entry["overridden"],
+            }
+            if entry["_assign"] is None:
+                skipped += 1
+                items.append(
+                    {
+                        **base,
+                        "outcome": "skipped",
+                        "after": None,
+                        "block_crop_id": None,
+                        "detail": entry["detail"],
+                    }
+                )
+                continue
+
+            was_replace = entry["outcome"] == "replace"
+            spec = entry["_assign"]
+            try:
+                # SAVEPOINT per block. Without it one rejected assignment
+                # aborts the transaction and every later block fails with
+                # "current transaction is aborted" instead of its own reason.
+                async with self._tenant_session.begin_nested():
+                    created = await self.assign_block_crop(
+                        block_id=entry["block_id"],
+                        crop_id=payload.crop_id,
+                        crop_variety_id=payload.crop_variety_id,
+                        crop_variety_strain_id=payload.crop_variety_strain_id,
+                        season_label=spec["season_label"],
+                        effective_from=spec["effective_from"],
+                        effective_to=None,
+                        attributes=payload.attributes,
+                        planting_date=spec["planting_date"],
+                        expected_harvest_start=payload.expected_harvest_start,
+                        expected_harvest_end=payload.expected_harvest_end,
+                        plant_density_per_ha=payload.plant_density_per_ha,
+                        row_spacing_m=payload.row_spacing_m,
+                        plant_spacing_m=payload.plant_spacing_m,
+                        canopy_size_class=payload.canopy_size_class,
+                        notes=payload.notes,
+                        make_current=True,
+                        actor_user_id=actor_user_id,
+                        tenant_schema=tenant_schema,
+                        correlation_id=correlation_id,
+                    )
+            except APIError as exc:
+                # A domain error already carries a sentence written for a
+                # person — pass it straight through as the row's reason.
+                failed += 1
+                self._log.warning(
+                    "bulk_crop_assign_block_failed",
+                    farm_id=str(farm_id),
+                    block_id=str(entry["block_id"]),
+                    reason=exc.detail,
+                )
+                items.append(
+                    {
+                        **base,
+                        "outcome": "failed",
+                        "after": entry["after"],
+                        "block_crop_id": None,
+                        "detail": exc.detail or exc.title,
+                    }
+                )
+            except Exception:
+                failed += 1
+                self._log.exception(
+                    "bulk_crop_assign_block_error",
+                    farm_id=str(farm_id),
+                    block_id=str(entry["block_id"]),
+                )
+                items.append(
+                    {
+                        **base,
+                        "outcome": "failed",
+                        "after": entry["after"],
+                        "block_crop_id": None,
+                        "detail": "Could not assign the crop to this block.",
+                    }
+                )
+            else:
+                applied += 1
+                items.append(
+                    {
+                        **base,
+                        "outcome": "replaced" if was_replace else "assigned",
+                        "after": entry["after"],
+                        "block_crop_id": created["id"],
+                        "detail": None,
+                    }
+                )
+
+        # One summary row on top of the per-assignment audit each write already
+        # records — "who ran a bulk change, over what" is the question the
+        # per-row events cannot answer.
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.bulk_crop_assigned",
+            actor_user_id=actor_user_id,
+            subject_kind="farm",
+            subject_id=farm_id,
+            farm_id=farm_id,
+            details={
+                "crop_path": crop_path,
+                "conflict_mode": payload.conflict_mode,
+                "season_label": payload.season_label,
+                "target_count": len(payload.targets),
+                "applied": applied,
+                "skipped": skipped,
+                "failed": failed,
+            },
+            correlation_id=correlation_id,
+        )
+
+        return {
+            "farm_id": farm_id,
+            "conflict_mode": payload.conflict_mode,
+            "crop_path": crop_path,
+            "applied_count": applied,
+            "skipped_count": skipped,
+            "failed_count": failed,
+            "items": items,
+        }
 
     async def advance_growth_stages(self, *, tenant_schema: str) -> dict[str, int]:
         """Move every eligible block to its calendar/age-derived phenology

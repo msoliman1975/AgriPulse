@@ -35,6 +35,10 @@ export function SettingsLayout(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
   const canResources = useCapability("resource.read");
+  // Farm-scoped grants can't be checked without a farm id, so this gates on
+  // the tenant-level grant — which is who the surface is for. A farm-scoped
+  // manager still assigns crops from the Farm Console.
+  const canBulk = useCapability("crop_assignment.create");
   // Org / notifications placeholder pages — gate on the same caps as the
   // V1 settings they will hold.
   const showOrg = canManageIntegrations;
@@ -55,6 +59,7 @@ export function SettingsLayout(): ReactNode {
       prefix: "/settings/integrations",
     },
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
+    { to: "/settings/bulk", labelKey: "nav.bulk", show: canBulk },
     { to: "/settings/workers", labelKey: "nav.workers", show: canResources },
     { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
     // Decision Trees promoted to the top-level /decision-trees surface

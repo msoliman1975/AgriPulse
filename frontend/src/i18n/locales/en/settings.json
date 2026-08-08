@@ -8,7 +8,8 @@
     "workers": "Workers",
     "equipment": "Equipment",
     "rules": "Rules & thresholds",
-    "decisionTrees": "Decision trees"
+    "decisionTrees": "Decision trees",
+    "bulk": "Bulk Updates"
   },
   "noAccess": {
     "title": "Settings",
