@@ -571,13 +571,32 @@ class ObserverRepository:
               j.started_at,
               j.completed_at,
               EXTRACT(EPOCH FROM (j.completed_at - j.started_at)) AS duration_s,
+              -- The two `a.time` bounds below are redundant SEMANTICALLY -- the
+              -- outer WHERE already pins j.scene_datetime to the same window, and
+              -- `a.time = j.scene_datetime` correlates to it. They are here for
+              -- the PLANNER. asyncpg prepares this statement, so after ~5
+              -- executions Postgres switches to a generic plan; under a generic
+              -- plan a correlated column reference folds to nothing at plan time,
+              -- TimescaleDB cannot exclude chunks, and the planner takes a lock on
+              -- every chunk of both hypertables plus their indexes. agrosina has
+              -- 495 chunks each, against max_locks_per_transaction = 64, so this
+              -- 500s with "out of shared memory". Interpolated literals restore
+              -- plan-time chunk exclusion.
+              --
+              -- The symptom is bistable and that is what makes it confusing: the
+              -- first calls get a custom plan and succeed, then every window fails
+              -- until the pod restarts. Do not "verify" this with a single request.
               (SELECT count(*) FROM block_index_aggregates a
                 WHERE a.block_id = j.block_id
                   AND a.product_id = j.product_id
+                  AND a.time >= {_ts(window_from)}
+                  AND a.time < {_ts(window_to)}
                   AND a.time = j.scene_datetime) AS indices_written,
               (SELECT count(DISTINCT a.cell_id) FROM block_grid_aggregates a
                 WHERE a.block_id = j.block_id
                   AND a.product_id = j.product_id
+                  AND a.time >= {_ts(window_from)}
+                  AND a.time < {_ts(window_to)}
                   AND a.time = j.scene_datetime) AS cells_written,
               (SELECT count(*) FROM grid_cells gc
                  JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
