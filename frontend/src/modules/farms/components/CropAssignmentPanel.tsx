@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -125,6 +125,17 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
     // server writes the assignment and its fields in one transaction and
     // would reject the whole thing.
     attrMissing.length === 0;
+
+  // Stable identity, and clears the entered values only when the crop really
+  // changed: definitions differ per crop, so values from a previous selection
+  // would be codes this crop has never heard of — but re-clearing on an
+  // unchanged path would discard whatever the user is currently typing.
+  const handleCropPathChange = useCallback((path: string | null) => {
+    setCropPath((prev) => {
+      if (prev !== path) setAttrValues({});
+      return path;
+    });
+  }, []);
 
   const assign = useMutation({
     mutationFn: () =>
@@ -284,12 +295,7 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
                 setStrainId(s);
               }}
               onValidityChange={setDepthComplete}
-              onCropPathChange={(path) => {
-                setCropPath(path);
-                // Definitions differ per crop, so values from a previous
-                // selection would be codes this crop has never heard of.
-                setAttrValues({});
-              }}
+              onCropPathChange={handleCropPathChange}
             />
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label={t("assignment.season")} required>
