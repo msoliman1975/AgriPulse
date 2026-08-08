@@ -566,12 +566,83 @@ class ObserverRepository:
         if with_error:
             filters += " AND (j.error_code IS NOT NULL OR j.error_message IS NOT NULL)"
 
+        # Page FIRST, then aggregate once per hypertable.
+        #
+        # The previous shape put the two hypertable counts in the SELECT list as
+        # correlated subqueries, so each ran once PER RETURNED ROW -- 200 rows x
+        # 2 hypertables. Every one of those probes had to search the whole
+        # window's chunks to locate a single `a.time = j.scene_datetime`,
+        # because the planner cannot know at plan time which chunk holds that
+        # timestamp. Cost therefore grew with rows x chunks: measured on prod
+        # (agrosina, 36 blocks) at 7d 0.76s, 30d 1.35s, 90d 12.3s -- and 90d is
+        # the UI's default window, so the first thing an operator saw took 12s.
+        #
+        # Restructured, `page` applies LIMIT/OFFSET first, then each hypertable
+        # is scanned ONCE for just that page's (block, product, time) triples.
+        # The window literals stay -- they are what gives plan-time chunk
+        # exclusion under a generic plan, which is the #378 fix and must not be
+        # dropped.
+        #
+        # `cells_expected` stays correlated on purpose: grid_cells/grid_configs
+        # are ordinary tables, not hypertables, so it is a cheap index probe and
+        # not worth the extra CTE.
         sql = f"""
+            WITH page AS (
+              SELECT
+                j.id AS job_id,
+                j.block_id,
+                b.name AS block_name,
+                b.code AS block_code,
+                j.product_id,
+                j.scene_id,
+                j.scene_datetime,
+                j.status,
+                j.cloud_cover_pct,
+                j.valid_pixel_pct,
+                j.error_code,
+                j.error_message,
+                j.stac_item_id,
+                j.started_at,
+                j.completed_at
+                FROM imagery_ingestion_jobs j
+                JOIN blocks b ON b.id = j.block_id
+               WHERE j.block_id IN :bids
+                 {prod}
+                 {filters}
+                 AND j.scene_datetime >= {_ts(window_from)}
+                 AND j.scene_datetime < {_ts(window_to)}
+               ORDER BY j.scene_datetime DESC, b.name
+               LIMIT :limit OFFSET :offset
+            ),
+            idx AS (
+              SELECT a.block_id, a.product_id, a.time, count(*) AS n
+                FROM block_index_aggregates a
+               WHERE a.time >= {_ts(window_from)}
+                 AND a.time < {_ts(window_to)}
+                 AND EXISTS (
+                       SELECT 1 FROM page p
+                        WHERE p.block_id = a.block_id
+                          AND p.product_id = a.product_id
+                          AND p.scene_datetime = a.time)
+               GROUP BY 1, 2, 3
+            ),
+            cells AS (
+              SELECT a.block_id, a.product_id, a.time, count(DISTINCT a.cell_id) AS n
+                FROM block_grid_aggregates a
+               WHERE a.time >= {_ts(window_from)}
+                 AND a.time < {_ts(window_to)}
+                 AND EXISTS (
+                       SELECT 1 FROM page p
+                        WHERE p.block_id = a.block_id
+                          AND p.product_id = a.product_id
+                          AND p.scene_datetime = a.time)
+               GROUP BY 1, 2, 3
+            )
             SELECT
-              j.id AS job_id,
+              j.job_id,
               j.block_id,
-              b.name AS block_name,
-              b.code AS block_code,
+              j.block_name,
+              j.block_code,
               j.product_id,
               j.scene_id,
               j.scene_datetime,
@@ -599,18 +670,8 @@ class ObserverRepository:
               -- The symptom is bistable and that is what makes it confusing: the
               -- first calls get a custom plan and succeed, then every window fails
               -- until the pod restarts. Do not "verify" this with a single request.
-              (SELECT count(*) FROM block_index_aggregates a
-                WHERE a.block_id = j.block_id
-                  AND a.product_id = j.product_id
-                  AND a.time >= {_ts(window_from)}
-                  AND a.time < {_ts(window_to)}
-                  AND a.time = j.scene_datetime) AS indices_written,
-              (SELECT count(DISTINCT a.cell_id) FROM block_grid_aggregates a
-                WHERE a.block_id = j.block_id
-                  AND a.product_id = j.product_id
-                  AND a.time >= {_ts(window_from)}
-                  AND a.time < {_ts(window_to)}
-                  AND a.time = j.scene_datetime) AS cells_written,
+              COALESCE(idx.n, 0) AS indices_written,
+              COALESCE(cells.n, 0) AS cells_written,
               (SELECT count(*) FROM grid_cells gc
                  JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
                 WHERE cfg.block_id = j.block_id
@@ -619,15 +680,16 @@ class ObserverRepository:
                   AND cfg.superseded_at IS NULL
                   AND tstzrange(cfg.effective_from, cfg.effective_to)
                       @> j.scene_datetime) AS cells_expected
-              FROM imagery_ingestion_jobs j
-              JOIN blocks b ON b.id = j.block_id
-             WHERE j.block_id IN :bids
-               {prod}
-               {filters}
-               AND j.scene_datetime >= {_ts(window_from)}
-               AND j.scene_datetime < {_ts(window_to)}
-             ORDER BY j.scene_datetime DESC, b.name
-             LIMIT :limit OFFSET :offset
+              FROM page j
+              LEFT JOIN idx
+                     ON idx.block_id = j.block_id
+                    AND idx.product_id = j.product_id
+                    AND idx.time = j.scene_datetime
+              LEFT JOIN cells
+                     ON cells.block_id = j.block_id
+                    AND cells.product_id = j.product_id
+                    AND cells.time = j.scene_datetime
+             ORDER BY j.scene_datetime DESC, j.block_name
         """  # noqa: S608
         params.update({"limit": limit, "offset": offset})
         stmt = text(sql).bindparams(bindparam("bids", expanding=True))
