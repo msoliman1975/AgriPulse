@@ -28,7 +28,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.observer.repository import _ts
+from app.modules.observer.repository import _d, _ts
 
 # Below this many hourly rows, a derived day is built on too little to trust.
 # 18 of 24 is deliberately generous: the derivation has no coverage floor at
@@ -170,6 +170,8 @@ class ObserverWeatherRepository:
                    (SELECT count(DISTINCT date_trunc('hour', o.time))
                       FROM weather_observations o
                      WHERE o.farm_id = i.farm_id
+                       AND o.time >= {_ts(window_from)}
+                       AND o.time < {_ts(window_to)}
                        AND o.time >= (i.date AT TIME ZONE 'UTC')
                        AND o.time < ((i.date + 1) AT TIME ZONE 'UTC')) AS source_hours
               FROM weather_index_daily i
@@ -246,18 +248,18 @@ class ObserverWeatherRepository:
         hourly = (
             await self._s.execute(
                 text(
-                    """
+                    f"""
                     SELECT o.time, o.provider_code, o.air_temp_c, o.humidity_pct,
                            o.precipitation_mm, o.wind_speed_m_s,
                            o.solar_radiation_w_m2, o.et0_mm
                       FROM weather_observations o
                      WHERE o.farm_id = :fid
-                       AND o.time >= (CAST(:day AS date) AT TIME ZONE 'UTC')
-                       AND o.time < ((CAST(:day AS date) + 1) AT TIME ZONE 'UTC')
+                       AND o.time >= ({_d(day)} AT TIME ZONE 'UTC')
+                       AND o.time < (({_d(day)} + 1) AT TIME ZONE 'UTC')
                      ORDER BY o.time
                     """
                 ),
-                {"fid": str(farm_id), "day": day},
+                {"fid": str(farm_id)},
             )
         ).mappings()
         hourly_rows = [dict(r) for r in hourly]

@@ -24,7 +24,7 @@ run at all rather than being handed an empty `IN ()`.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -60,6 +60,19 @@ def _ts(value: datetime) -> str:
     if not isinstance(value, datetime):
         raise TypeError(f"time bound must be a datetime, got {type(value).__name__}")
     return f"TIMESTAMPTZ '{value.isoformat()}'"
+
+
+def _d(value: date) -> str:
+    """Render a date as a SQL date literal, for the same reason as `_ts`.
+
+    `datetime` is a subclass of `date`, so the check is deliberately ordered
+    to reject it: a datetime reaching a `DATE` literal would silently drop its
+    time component, which is exactly the class of bug this module exists to
+    surface.
+    """
+    if isinstance(value, datetime) or not isinstance(value, date):
+        raise TypeError(f"day bound must be a date, got {type(value).__name__}")
+    return f"DATE '{value.isoformat()}'"
 
 
 class ObserverRepository:
