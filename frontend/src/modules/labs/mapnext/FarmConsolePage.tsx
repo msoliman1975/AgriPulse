@@ -34,7 +34,8 @@ import {
   type Block,
   type BlockDetail,
 } from "@/api/blocks";
-import { getGridCells } from "@/api/grid";
+import { getFarmGridCells, getGridCells } from "@/api/grid";
+import { mapWithConcurrency } from "@/modules/labs/map/api";
 import { griddedBlocks } from "./gridOverlay";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
@@ -230,12 +231,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   });
   const gridProductId = subsQ.data?.[0]?.product_id ?? null;
 
-  // Farm-wide grid: no farm-level cells endpoint, so fan out per gridded
-  // block and merge client-side. The summary now says WHICH blocks are
-  // gridded and against which product, so this asks only those blocks and
-  // skips the per-block subscription lookup that used to precede every
-  // fetch — the overlay is on by default now, and 2N requests on every
-  // console load is how the map exhausted the connection pool once before.
+  // Which blocks carry a grid — read off the summary, which is also what
+  // decides whether the overlay comes up at all.
   const gridded = useMemo(
     () => griddedBlocks(summaryQ.data?.blocks, summaryQ.data?.summaries),
     [summaryQ.data],
@@ -248,16 +245,32 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     setShowGrid(gridded.length > 0);
   }, [summaryQ.data, farmId, gridded.length]);
 
+  // Farm-wide grid in ONE request. This used to fan out per gridded block
+  // and merge client-side — 36 concurrent requests on a 36-block farm,
+  // each re-paying auth, a connection out of the api's 15-slot pool and
+  // two hypertable queries, all serialised through a single-worker pod.
+  // That is what made the overlay take seconds to appear, and it is the
+  // same N+1 shape that exhausted the pool once before (#311).
+  //
+  // The per-block path stays as a fallback: charts deploy independently,
+  // so a new frontend can meet an api that has no farm route yet. It is
+  // bounded to 4 in flight for exactly the reason above — degrade, don't
+  // take the pool down.
   const farmGridQ = useQuery({
     queryKey: ["labs/mapnext/farmGrid", farmId, activeIndex, overlayKey],
     queryFn: async () => {
-      const groups = await Promise.all(
-        gridded.map(async ({ blockId, productId }) => {
-          const res = await getGridCells(blockId, productId, activeIndex);
-          return { blockId, productId, cells: res.cells };
-        }),
-      );
-      return groups;
+      const farmWide = await getFarmGridCells(farmId, activeIndex);
+      if (farmWide) {
+        return farmWide.blocks.map((b) => ({
+          blockId: b.block_id,
+          productId: b.product_id,
+          cells: b.cells,
+        }));
+      }
+      return mapWithConcurrency(gridded, 4, async ({ blockId, productId }) => {
+        const res = await getGridCells(blockId, productId, activeIndex);
+        return { blockId, productId, cells: res.cells };
+      });
     },
     enabled: Boolean(showGrid && gridded.length > 0),
     staleTime: 30_000,

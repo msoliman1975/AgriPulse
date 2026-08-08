@@ -168,6 +168,50 @@ export async function getGridCells(
   return data;
 }
 
+export interface FarmGridBlock {
+  block_id: string;
+  product_id: string;
+  at: string | null;
+  cells: GridCellWithValue[];
+}
+
+export interface FarmGridCellsResponse {
+  farm_id: string;
+  index_code: string;
+  blocks: FarmGridBlock[];
+}
+
+/**
+ * Every gridded block in a farm, in one request.
+ *
+ * Replaces a fan-out of one `getGridCells` per gridded block — 36 of them
+ * on the reference farm, each re-paying auth, a pooled DB connection and
+ * two hypertable queries against a single-worker API pod. That fan-out is
+ * why the overlay took seconds to draw.
+ *
+ * Returns `null` on 404 so the caller can fall back to the per-block path
+ * while an older API is still serving (charts deploy independently, so a
+ * new frontend can meet an old api — see #311).
+ */
+export async function getFarmGridCells(
+  farmId: string,
+  indexCode: IndexCode,
+): Promise<FarmGridCellsResponse | null> {
+  try {
+    const { data } = await apiClient.get<FarmGridCellsResponse>(
+      `/v1/farms/${farmId}/grid-cells`,
+      { params: { index: indexCode } },
+    );
+    return data;
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const resp = (err as { response?: { status?: number } }).response;
+      if (resp?.status === 404) return null;
+    }
+    throw err;
+  }
+}
+
 export async function getWorstGridCells(
   blockId: string,
   productId: string,
