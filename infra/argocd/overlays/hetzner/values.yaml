@@ -680,11 +680,30 @@ global:
   #   clears only on a real crop change.
   #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
   #   671ecbe, tile-server stays 9d140cc. Rollback is this tag back to 671ecbe.
+  # 868be8d = #378 fix: the Observer scenes table 500'd for agrosina at every
+  #   window size with "out of shared memory / increase
+  #   max_locks_per_transaction". `list_scenes` correlated two hypertable
+  #   subqueries with a bare `a.time = j.scene_datetime`; asyncpg prepares the
+  #   statement, Postgres flips to a generic plan after ~5 executions, and under
+  #   a generic plan that column reference folds to nothing at plan time, so
+  #   TimescaleDB cannot exclude chunks and the planner locks all 495 chunks of
+  #   block_index_aggregates AND block_grid_aggregates against a
+  #   max_locks_per_transaction of 64. Interpolating the window as literals
+  #   inside each subquery restores plan-time chunk exclusion. Semantically a
+  #   no-op -- the outer WHERE already pins j.scene_datetime to that window.
+  #   Second production incident from a bind-parameter time bound against a
+  #   hypertable (the farm-console 7s load was the first); treat one as a defect
+  #   on sight.
+  #   NO MIGRATION. Backend-only -- zero frontend and zero tile-server files
+  #   changed, so frontend stays f5fe3cf (#376) and tile-server stays 9d140cc.
+  #   Rollback is api + workers back to 671ecbe, with nothing to unwind.
+  #   VERIFYING THIS NEEDS >5 CONSECUTIVE REQUESTS: the bug is bistable, the
+  #   first calls succeed on a custom plan, so one green request proves nothing.
   images:
     api:
-      tag: "671ecbe"
+      tag: "868be8d"
     workers:
-      tag: "671ecbe"
+      tag: "868be8d"
     frontend:
       tag: "f5fe3cf"
     tileServer:
