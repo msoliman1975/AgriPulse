@@ -1,3 +1,4 @@
+import * as React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -26,6 +27,10 @@ vi.mock("@/api/crops", () => ({
 }));
 // The cascading picker fetches the catalog; the panel is what's under test.
 vi.mock("@/modules/farms/components/CropPicker", () => ({
+  // Mirrors the real picker: it reports the crop path from a `useEffect` whose
+  // dep array includes the callback. The previous mock only emitted on click,
+  // which is exactly why it missed the re-render loop that wiped the form on
+  // every keystroke.
   CropPicker: ({
     onChange,
     onValidityChange,
@@ -34,19 +39,27 @@ vi.mock("@/modules/farms/components/CropPicker", () => ({
     onChange: (c: string | null, v: string | null, s: string | null) => void;
     onValidityChange?: (ok: boolean) => void;
     onCropPathChange?: (p: string | null) => void;
-  }) => (
-    <button
-      type="button"
-      data-testid="crop-picker"
-      onClick={() => {
-        onChange("crop-1", null, null);
-        onValidityChange?.(true);
-        onCropPathChange?.("tomato");
-      }}
-    >
-      pick tomato
-    </button>
-  ),
+  }) => {
+    const [picked, setPicked] = React.useState(false);
+    React.useEffect(() => {
+      onCropPathChange?.(picked ? "tomato" : null);
+    }, [onCropPathChange, picked]);
+    React.useEffect(() => {
+      onValidityChange?.(picked);
+    }, [onValidityChange, picked]);
+    return (
+      <button
+        type="button"
+        data-testid="crop-picker"
+        onClick={() => {
+          onChange("crop-1", null, null);
+          setPicked(true);
+        }}
+      >
+        pick tomato
+      </button>
+    );
+  },
 }));
 
 const TODAY = new Date();
@@ -212,5 +225,32 @@ describe("<CropAssignmentPanel> crop fields on the same screen", () => {
     expect(assignBlockCrop.mock.calls[0][1].attributes).toEqual({
       planting_material: "nursery_seedling",
     });
+  });
+});
+
+describe("<CropAssignmentPanel> crop-field entry survives re-renders", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    listBlockCrops.mockResolvedValue([]);
+  });
+
+  it("keeps a selected crop-field value instead of wiping it on re-render", async () => {
+    // Regression: the picker re-emitted the crop path on every render (its
+    // effect depended on the callback's identity), and the panel cleared the
+    // form in response — so selections and typing vanished immediately.
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByTestId("crop-picker"));
+
+    const select = await screen.findByLabelText(/Planting material/);
+    await user.selectOptions(select, "nursery_seedling");
+    expect((select as HTMLSelectElement).value).toBe("nursery_seedling");
+
+    // Force further renders; the value must still be there.
+    await user.type(screen.getByLabelText(/Season/), "2026");
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Planting material/)).toHaveValue("nursery_seedling"),
+    );
+    expect(screen.getByRole("button", { name: /Assign crop/ })).not.toBeDisabled();
   });
 });

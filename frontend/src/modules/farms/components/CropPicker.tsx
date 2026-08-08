@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -115,7 +115,18 @@ export function CropPicker({
     (depth !== "variety" || Boolean(cropVarietyId)) &&
     (depth !== "variety_strain" || Boolean(cropVarietyId && cropVarietyStrainId));
 
+  // Notify only when the VALUE changes, not when the callback identity does.
+  //
+  // Callers naturally pass an inline arrow, whose identity changes every
+  // render. With the callback in the dep array that fires the effect on every
+  // render, and a parent that sets state in response then re-renders — a loop
+  // that silently wiped the crop-fields form on every keystroke. Comparing
+  // against the last emitted value makes this safe however the caller passes
+  // its handler, which is the caller's reasonable expectation.
+  const lastComplete = useRef<boolean | undefined>(undefined);
   useEffect(() => {
+    if (lastComplete.current === complete) return;
+    lastComplete.current = complete;
     onValidityChange?.(complete);
   }, [onValidityChange, complete]);
 
@@ -129,7 +140,10 @@ export function CropPicker({
         ? (varieties.find((v) => v.id === cropVarietyId)?.path ?? null)
         : (selectedCrop?.code ?? null);
 
+  const lastCropPath = useRef<string | null | undefined>(undefined);
   useEffect(() => {
+    if (lastCropPath.current === cropPath) return;
+    lastCropPath.current = cropPath;
     onCropPathChange?.(cropPath);
   }, [onCropPathChange, cropPath]);
 
