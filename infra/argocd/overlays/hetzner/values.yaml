@@ -723,11 +723,29 @@ global:
   #   immediately after and cancelled its CI before the containers job ran.
   #   fa17e66 is the first SHA after #377 that actually built. Promoting
   #   ddf8b90 would ImagePullBackOff.
+  # d79a47b = #380 perf: the Observer scenes table took 12.3s on the 90-day
+  #   window, which is the UI's DEFAULT, so the first thing an operator saw was
+  #   a 12s wait. Re-measured on prod at fa17e66 immediately before this
+  #   promote: 7d 0.99s / 30d 1.41s / 90d 12.35s (two runs each) -- cost was
+  #   growing with rows x chunks, not rows.
+  #   Cause: the two hypertable counts sat in the SELECT list as correlated
+  #   subqueries, so each ran once per RETURNED ROW (200 rows x 2 hypertables =
+  #   400 probes), and every probe had to search the whole window's chunks to
+  #   locate one `a.time = j.scene_datetime`. Restructured so a `page` CTE
+  #   applies LIMIT/OFFSET first and each hypertable is scanned ONCE for just
+  #   that page's (block, product, time) triples.
+  #   The #378/#377 interpolated window literals are UNCHANGED and must stay --
+  #   they are what buys plan-time chunk exclusion under a generic plan, and
+  #   `test_every_hypertable_read_carries_an_interpolated_time_bound` fails if
+  #   anyone drops them.
+  #   NO MIGRATION. Backend-only -- zero frontend and zero tile-server files
+  #   changed vs fa17e66, so both stay put. Rollback is api + workers back to
+  #   fa17e66, with nothing to unwind.
   images:
     api:
-      tag: "fa17e66"
+      tag: "d79a47b"
     workers:
-      tag: "fa17e66"
+      tag: "d79a47b"
     frontend:
       tag: "fa17e66"
     tileServer:
