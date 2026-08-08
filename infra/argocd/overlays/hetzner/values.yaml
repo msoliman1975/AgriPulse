@@ -669,13 +669,24 @@ global:
   #   a stored NDVI from the raster and a cell mean that matched its pixels),
   #   but the rendered UI has never been opened in a browser -- Playwright held
   #   a stale lock for the whole build. Expect to look at it after the rollout.
+  # f5fe3cf = #376, crop-field entry on the assign screen was wiped on every
+  #   render. #370 shipped the fields onto the assign screen; this fix missed
+  #   that merge, so the fields render in prod but nothing can be selected or
+  #   typed. CropPicker notified its parent from an effect whose dep array
+  #   included the callback identity, so an inline arrow in the panel made it
+  #   fire every render; the panel answered with setAttrValues({}), a fresh
+  #   object, which re-rendered and fired it again. The picker now emits only
+  #   when the VALUE changes, and the panel's handler is useCallback-stable and
+  #   clears only on a real crop change.
+  #   FRONTEND-ONLY -- no migration, no API change. api + workers stay
+  #   671ecbe, tile-server stays 9d140cc. Rollback is this tag back to 671ecbe.
   images:
     api:
       tag: "671ecbe"
     workers:
       tag: "671ecbe"
     frontend:
-      tag: "671ecbe"
+      tag: "f5fe3cf"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
