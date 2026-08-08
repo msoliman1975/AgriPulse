@@ -699,13 +699,37 @@ global:
   #   Rollback is api + workers back to 671ecbe, with nothing to unwind.
   #   VERIFYING THIS NEEDS >5 CONSECUTIVE REQUESTS: the bug is bistable, the
   #   first calls succeed on a custom plan, so one green request proves nothing.
+  # fa17e66 = the rest of the same incident, two PRs promoted together:
+  #   #377 the other two hypertable reads. 868be8d fixed list_scenes, the query
+  #     that was actually failing; auditing the module found weather.index_days
+  #     correlating weather_observations on `i.date` alone and weather.explain
+  #     binding `:day` as a parameter -- the exact thing the module docstring
+  #     says it never does. Neither had been hit yet, but weather_observations
+  #     is at 148 chunks on agrosina and grows every hour, so both were on the
+  #     same trajectory. Adds a test that scans the module's SQL and fails on
+  #     any hypertable read without an interpolated bound, because reviewing
+  #     for this by eye demonstrably does not work: the bounds look redundant
+  #     next to the correlation, which is why they were omitted twice.
+  #   #379 a failed scenes request no longer renders as "No scenes match this
+  #     selection". During the incident prod told the operator the farm had no
+  #     scenes while the endpoint was 500ing -- same class as the trend-card
+  #     "all hidden vs no data" fix in #369.
+  #
+  #   NO MIGRATION. Backend + frontend -> api + workers + frontend bumped;
+  #   tile-server unchanged stays 9d140cc. Rollback is api + workers to
+  #   868be8d and frontend to f5fe3cf, with nothing to unwind.
+  #
+  #   NOTE: ddf8b90 (#377's own merge commit) has NO images -- #379 merged
+  #   immediately after and cancelled its CI before the containers job ran.
+  #   fa17e66 is the first SHA after #377 that actually built. Promoting
+  #   ddf8b90 would ImagePullBackOff.
   images:
     api:
-      tag: "868be8d"
+      tag: "fa17e66"
     workers:
-      tag: "868be8d"
+      tag: "fa17e66"
     frontend:
-      tag: "f5fe3cf"
+      tag: "fa17e66"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
