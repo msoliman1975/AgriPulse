@@ -50,6 +50,10 @@ from app.modules.farms.schemas import (
     BlockUpdateRequest,
     BulkBlockCreateRequest,
     BulkBlockCreateResponse,
+    BulkCropApplyResponse,
+    BulkCropAssignmentRequest,
+    BulkCropCandidateResponse,
+    BulkCropPreviewResponse,
     CountryCreateRequest,
     CountryResponse,
     CountryUpdateRequest,
@@ -780,6 +784,74 @@ async def list_block_crops(
         raise BlockNotFoundError(block_id)
 
     return await service.list_block_crops(block_id=block_id)
+
+
+# ---------- Bulk crop assignment -------------------------------------------
+#
+# Tenant Settings → Bulk Updates. Same capability as assigning one block at a
+# time (`crop_assignment.create` on the farm): doing the same write forty
+# times is not a different permission.
+
+
+@router.get(
+    "/farms/{farm_id}/bulk/crop-assignment/candidates",
+    response_model=list[BulkCropCandidateResponse],
+    summary="Blocks a bulk crop run can target, with the crop each holds today.",
+)
+async def list_bulk_crop_candidates(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("crop_assignment.create", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.list_bulk_crop_candidates(
+        farm_id=farm_id, preferred_unit=context.preferred_unit
+    )
+
+
+@router.post(
+    "/farms/{farm_id}/bulk/crop-assignment:preview",
+    response_model=BulkCropPreviewResponse,
+    summary="Dry run — what a bulk crop assignment would do to each block.",
+)
+async def preview_bulk_crop_assignment(
+    farm_id: UUID,
+    payload: BulkCropAssignmentRequest,
+    context: RequestContext = Depends(
+        requires_capability("crop_assignment.create", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.preview_bulk_crop_assignment(farm_id=farm_id, payload=payload)
+
+
+@router.post(
+    "/farms/{farm_id}/bulk/crop-assignment",
+    response_model=BulkCropApplyResponse,
+    summary="Assign one crop across many blocks, reporting the outcome per block.",
+)
+async def apply_bulk_crop_assignment(
+    farm_id: UUID,
+    payload: BulkCropAssignmentRequest,
+    request: Request,
+    context: RequestContext = Depends(
+        requires_capability("crop_assignment.create", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    # 200, not 201: a run can partially succeed, and the per-block outcomes in
+    # the body are the result — a blanket "created" would misreport that.
+    return await service.apply_bulk_crop_assignment(
+        farm_id=farm_id,
+        payload=payload,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
 
 
 # ---------- Crop attribute values (per assignment) --------------------------

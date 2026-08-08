@@ -14,6 +14,7 @@ import enInsights from "./locales/en/insights.json";
 import enWeatherIndices from "./locales/en/weatherIndices.json";
 import enWeatherRisk from "./locales/en/weatherRisk.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
+import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -27,6 +28,7 @@ import arInsights from "./locales/ar/insights.json";
 import arWeatherIndices from "./locales/ar/weatherIndices.json";
 import arWeatherRisk from "./locales/ar/weatherRisk.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
+import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -53,6 +55,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           weatherIndices: enWeatherIndices,
           weatherRisk: enWeatherRisk,
           decisionTrees: enDecisionTrees,
+          bulkUpdates: enBulkUpdates,
         },
         ar: {
           common: arCommon,
@@ -68,6 +71,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           weatherIndices: arWeatherIndices,
           weatherRisk: arWeatherRisk,
           decisionTrees: arDecisionTrees,
+          bulkUpdates: arBulkUpdates,
         },
       },
       lng: language,
@@ -83,6 +87,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
         "admin",
         "signals",
         "farmConsole",
+        "bulkUpdates",
       ],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },

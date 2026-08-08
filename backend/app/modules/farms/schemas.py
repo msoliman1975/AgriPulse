@@ -1024,6 +1024,158 @@ class BlockCropResponse(BaseModel):
     updated_at: datetime
 
 
+# ---------- Bulk crop assignment -------------------------------------------
+#
+# One set of values written across many blocks of one farm. Three endpoints:
+# candidates (what can be targeted, and what it already carries), preview
+# (what *would* happen, no writes), apply (do it, reporting per block).
+#
+# Preview and apply take the SAME request body deliberately — a preview the
+# user approves and an apply that then behaves differently is the failure this
+# whole surface exists to avoid.
+
+# What to do about a block that already has an open assignment.
+BulkConflictMode = Literal["skip", "replace"]
+
+# Preview verbs are future tense, apply verbs are past tense, so a client can
+# never render "assigned" for something that has not been written yet.
+BulkPreviewOutcome = Literal["assign", "replace", "skip"]
+BulkApplyOutcome = Literal["assigned", "replaced", "skipped", "failed"]
+
+
+class BulkCropCandidateCurrent(BaseModel):
+    """The assignment a candidate block carries today, if any."""
+
+    block_crop_id: UUID
+    crop_path: str
+    season_label: str
+    planting_date: date | None = None
+    effective_from: date
+    status: BlockCropStatus
+
+
+class BulkCropCandidateResponse(BaseModel):
+    """A block the bulk run could target, plus what it already holds."""
+
+    block_id: UUID
+    code: str
+    name: str | None = None
+    area_value: Decimal
+    area_unit: UnitName
+    unit_type: UnitType
+    # Null when the block has no assignment covering today.
+    current: BulkCropCandidateCurrent | None = None
+
+
+class BulkCropAssignmentTarget(BaseModel):
+    """One block in the run, with the fields allowed to differ from the shared
+    values. Everything else is uniform across the run by design — a fully
+    per-block payload is just the single-block endpoint in a loop."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    # Null/omitted means "use the run's shared value".
+    season_label: str | None = Field(default=None, min_length=1, max_length=64)
+    planting_date: date | None = None
+
+
+class BulkCropAssignmentRequest(BaseModel):
+    """Body for both `:preview` and the apply POST."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conflict_mode: BulkConflictMode = "skip"
+    targets: list[BulkCropAssignmentTarget] = Field(min_length=1, max_length=500)
+
+    # ---- shared assignment values (mirror BlockCropAssignRequest) ----
+    crop_id: UUID
+    crop_variety_id: UUID | None = None
+    crop_variety_strain_id: UUID | None = None
+    season_label: str = Field(min_length=1, max_length=64)
+    effective_from: date | None = None
+    planting_date: date | None = None
+    expected_harvest_start: date | None = None
+    expected_harvest_end: date | None = None
+    plant_density_per_ha: Decimal | None = None
+    row_spacing_m: Decimal | None = None
+    plant_spacing_m: Decimal | None = None
+    canopy_size_class: str | None = None
+    notes: str | None = None
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("targets")
+    @classmethod
+    def _no_duplicate_blocks(
+        cls, v: list[BulkCropAssignmentTarget]
+    ) -> list[BulkCropAssignmentTarget]:
+        # Two entries for one block would write two assignments whose ranges
+        # overlap; the second fails on the exclusion constraint and the run
+        # reports a confusing partial failure. Reject it up front instead.
+        seen = {t.block_id for t in v}
+        if len(seen) != len(v):
+            raise ValueError("targets contains the same block more than once")
+        return v
+
+
+class BulkCropAssignmentPlanned(BaseModel):
+    """The assignment a block would receive (or did)."""
+
+    crop_path: str
+    season_label: str
+    planting_date: date | None = None
+    effective_from: date
+
+
+class BulkCropPreviewItem(BaseModel):
+    block_id: UUID
+    code: str
+    name: str | None = None
+    outcome: BulkPreviewOutcome
+    # What the block holds now; null when unassigned.
+    before: BulkCropCandidateCurrent | None = None
+    # What it would hold; null when the run would leave it alone.
+    after: BulkCropAssignmentPlanned | None = None
+    # Set when a per-block override changed season or planting date.
+    overridden: bool = False
+    # Why a block is being skipped, in words the UI can show as-is.
+    detail: str | None = None
+
+
+class BulkCropPreviewResponse(BaseModel):
+    farm_id: UUID
+    conflict_mode: BulkConflictMode
+    crop_path: str
+    assign_count: int
+    replace_count: int
+    skip_count: int
+    items: list[BulkCropPreviewItem]
+
+
+class BulkCropApplyItem(BaseModel):
+    block_id: UUID
+    code: str
+    name: str | None = None
+    outcome: BulkApplyOutcome
+    before: BulkCropCandidateCurrent | None = None
+    after: BulkCropAssignmentPlanned | None = None
+    overridden: bool = False
+    # The new assignment on success; null on skip/failure.
+    block_crop_id: UUID | None = None
+    # Skip reason or failure message.
+    detail: str | None = None
+
+
+class BulkCropApplyResponse(BaseModel):
+    farm_id: UUID
+    conflict_mode: BulkConflictMode
+    crop_path: str
+    applied_count: int
+    skipped_count: int
+    failed_count: int
+    items: list[BulkCropApplyItem]
+
+
 # ---------- Growth-stage logs ----------------------------------------------
 
 GrowthStageSource = Literal["manual", "derived", "imported"]

@@ -36,6 +36,7 @@ import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTr
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
 import { PatternsPage } from "@/modules/labs/patterns/PatternsPage";
+import { BulkUpdatesPage } from "@/modules/settings/pages/BulkUpdatesPage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
@@ -253,6 +254,7 @@ export function App(): ReactNode {
                     />
                   </Route>
                   <Route path="users" element={<UsersConfigPage />} />
+                  <Route path="bulk" element={<BulkUpdatesPage />} />
                   <Route path="workers" element={<ResourcesWorkersPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />

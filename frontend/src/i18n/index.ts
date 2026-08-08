@@ -27,6 +27,7 @@ import enBoard from "./locales/en/board.json";
 import enReports from "./locales/en/reports.json";
 import enFarmConsole from "./locales/en/farmConsole.json";
 import enPlanTemplates from "./locales/en/planTemplates.json";
+import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arFarms from "./locales/ar/farms.json";
@@ -52,6 +53,7 @@ import arBoard from "./locales/ar/board.json";
 import arReports from "./locales/ar/reports.json";
 import arFarmConsole from "./locales/ar/farmConsole.json";
 import arPlanTemplates from "./locales/ar/planTemplates.json";
+import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -88,6 +90,7 @@ const resources = {
     reports: enReports,
     farmConsole: enFarmConsole,
     planTemplates: enPlanTemplates,
+    bulkUpdates: enBulkUpdates,
   },
   ar: {
     common: arCommon,
@@ -115,6 +118,7 @@ const resources = {
     reports: arReports,
     farmConsole: arFarmConsole,
     planTemplates: arPlanTemplates,
+    bulkUpdates: arBulkUpdates,
   },
 } as const;
 
@@ -152,6 +156,7 @@ void i18n
       "reports",
       "farmConsole",
       "planTemplates",
+      "bulkUpdates",
     ],
     interpolation: { escapeValue: false },
     detection: {
