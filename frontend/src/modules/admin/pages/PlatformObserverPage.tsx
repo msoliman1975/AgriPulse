@@ -322,6 +322,7 @@ export function PlatformObserverPage(): ReactNode {
               tenantId={tenantId as string}
               scenes={scenes.data ?? []}
               isLoading={scenes.isPending}
+              isError={scenes.isError}
               expanded={expandedScene}
               onToggleExpand={setExpandedScene}
             />
