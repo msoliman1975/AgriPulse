@@ -89,18 +89,35 @@ export function SceneTable({
   tenantId,
   scenes,
   isLoading,
+  isError = false,
   expanded,
   onToggleExpand,
 }: {
   tenantId: string;
   scenes: ObserverScene[];
   isLoading: boolean;
+  /** The scenes query failed. Must be distinguished from an empty result. */
+  isError?: boolean;
   expanded: string | null;
   onToggleExpand: (jobId: string | null) => void;
 }): ReactNode {
   const { t, i18n } = useTranslation("admin");
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
+  // Before the length check, not after: a failed query has no rows either, so
+  // testing emptiness first reports a dead request as "no scenes match". That
+  // is the worst possible answer here -- an operator reading the Observer to
+  // find out whether the pipeline ran is told, authoritatively, that this farm
+  // has no scenes. It happened in prod: the lock-exhaustion 500 (#378) showed
+  // an empty table for weeks' worth of scenes that were all present.
+  // Deliberately NOT <EmptyState>: that component is the canonical "nothing
+  // here yet" surface (muted text), and its text-ap-muted would collide with a
+  // critical colour passed via className.
+  if (isError) {
+    return (
+      <p className="p-12 text-center text-sm text-ap-crit">{t("observer.scenes.loadFailed")}</p>
+    );
+  }
   if (scenes.length === 0) return <EmptyState message={t("observer.scenes.empty")} />;
 
   return (

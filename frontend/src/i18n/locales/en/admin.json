@@ -646,6 +646,7 @@
     "scenes": {
       "title": "Scenes",
       "empty": "No scenes match this selection.",
+      "loadFailed": "Couldn't load the scenes for this selection. This is a failed request, not an empty result — retry, or narrow the date range.",
       "clearFilter": "Clear stage filter",
       "expand": "Show per-index aggregates",
       "when": "Scene time",
