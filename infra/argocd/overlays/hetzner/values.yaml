@@ -768,13 +768,40 @@ global:
   #   NOT BROWSER-VERIFIED: the new wizard is covered by component tests and an
   #   API-level smoke test on the local stack, but no one has loaded the
   #   rendered page. First prod check should be /settings/bulk itself.
+  # 251a50d = #384 Farm Console block dock kept rendering its CONTENT in the
+  #   previous language after a switch. The dock's chrome was always fine; the
+  #   content was not, from five causes. The root one: `loadUnitDetail` resolves
+  #   bilingual fields (alert diagnosis, recommendation text, crop names) to one
+  #   language while building the detail, then memoises it -- keyed on block id
+  #   ALONE, so a switch replayed the old language for the rest of the 30s TTL.
+  #   The react-query key already carried i18n.language, which is what hid it:
+  #   the query refetched and the memo handed the stale object straight back.
+  #   Also: recommendations were pinned to text_en, crop/variety/strain to
+  #   name_en, forecast heads to "Today" + en-US, activity labels to an English
+  #   humanisation, and every date formatted against the BROWSER locale.
+  #   NO MIGRATION. FRONTEND ONLY -- zero backend files changed vs 7510aa8, so
+  #   api + workers stay at 7510aa8 and tile-server at 9d140cc. Rollback is
+  #   frontend back to 7510aa8, with nothing to unwind.
+  #   Image verified present in ghcr at 251a50d (frontend
+  #   sha256:49e2993a..., distinct from 7510aa8's sha256:300c6ec9...).
+  #   The merge run 31293106983 first completed "cancelled" -- #383 merged 7
+  #   minutes later and killed it, taking the frontend containers job WITH it,
+  #   so at that point no image existed. It was re-run to completion and every
+  #   containers job is green; the manifest above is the actual proof.
+  #   Deliberately NOT promoting 24952c8 (#383): it carries migration 0061,
+  #   which DROPS five block_crops columns. Irreversible, unrelated to this
+  #   fix, and nobody asked for it to ship.
+  #   NOT BROWSER-VERIFIED: covered by a new api-layer test that fails when the
+  #   cache key is reverted, plus three Arabic render tests, but no one has
+  #   loaded the dock in Arabic. First prod check should be a block dock on
+  #   /labs/map with the language switched to Arabic.
   images:
     api:
       tag: "7510aa8"
     workers:
       tag: "7510aa8"
     frontend:
-      tag: "7510aa8"
+      tag: "251a50d"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
