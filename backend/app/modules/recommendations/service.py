@@ -78,7 +78,6 @@ class _BlockEvaluation:
     growth_stage: str | None
     soil_texture: str | None
     salinity_class: str | None
-    canopy_size_class: str | None
     latest: dict[str, Any]
     weather: Any
     weather_indices: Any
@@ -107,7 +106,6 @@ class _BlockEvaluation:
                 "crop_strain": strain_code(self.crop_path),
                 "soil_texture": self.soil_texture,
                 "salinity_class": self.salinity_class,
-                "canopy_size_class": self.canopy_size_class,
             },
             latest_index_aggregates=_merge_cell_means(self.latest, cell_means),
             weather=self.weather,
@@ -375,7 +373,6 @@ class RecommendationsServiceImpl:
             crop_category,
             growth_stage,
             crop_path,
-            canopy_size_class,
         ) = await self._repo.get_block_current_crop(block_id=block_id)
         soil_texture, salinity_class = await self._repo.get_block_soil(block_id=block_id)
 
@@ -420,7 +417,6 @@ class RecommendationsServiceImpl:
                 "crop_strain": strain_code(crop_path),
                 "soil_texture": soil_texture,
                 "salinity_class": salinity_class,
-                "canopy_size_class": canopy_size_class,
             },
             latest_index_aggregates=latest,
             weather=weather,
@@ -468,7 +464,6 @@ class RecommendationsServiceImpl:
             growth_stage=growth_stage,
             soil_texture=soil_texture,
             salinity_class=salinity_class,
-            canopy_size_class=canopy_size_class,
             latest=latest,
             weather=weather,
             weather_indices=weather_indices,
@@ -2009,7 +2004,6 @@ class DecisionTreesAuthorService:
             crop_category,
             growth_stage,
             crop_path,
-            canopy_size_class,
         ) = await repo.get_block_current_crop(block_id=block_id)
         soil_texture, salinity_class = await repo.get_block_soil(block_id=block_id)
         weather = (
@@ -2048,7 +2042,6 @@ class DecisionTreesAuthorService:
                 "crop_strain": strain_code(crop_path),
                 "soil_texture": soil_texture,
                 "salinity_class": salinity_class,
-                "canopy_size_class": canopy_size_class,
             },
             latest_index_aggregates=latest_indices,
             weather=weather,

@@ -116,32 +116,34 @@ def test_growth_stage_in_operator() -> None:
     assert evaluate(tree, _stage_ctx("emergence"))[0] is False
 
 
-# ---- soil + canopy-size block fields (phenology spine D1) -----------------
+# ---- soil block fields (phenology spine D1) -------------------------------
 
 
 def _soilsize_ctx(
     *,
     soil_texture: str | None = None,
     salinity_class: str | None = None,
-    canopy_size_class: str | None = None,
 ) -> ConditionContext:
     return ConditionContext(
         block_id="00000000-0000-0000-0000-000000000001",
         block_attributes={
             "soil_texture": soil_texture,
             "salinity_class": salinity_class,
-            "canopy_size_class": canopy_size_class,
         },
     )
 
 
-def test_parse_block_value_ref_soil_and_size_fields() -> None:
+def test_parse_block_value_ref_soil_fields() -> None:
     assert parse_value_ref({"source": "block", "field": "soil_texture"}).field == "soil_texture"
     assert parse_value_ref({"source": "block", "field": "salinity_class"}).field == "salinity_class"
-    assert (
-        parse_value_ref({"source": "block", "field": "canopy_size_class"}).field
-        == "canopy_size_class"
-    )
+
+
+def test_parse_block_value_ref_rejects_canopy_size_class() -> None:
+    # Removed from BLOCK_FIELDS: nothing in the product ever set the column,
+    # so a predicate against it could never be true. Rejecting it at parse
+    # time is what stops an author reintroducing one.
+    with pytest.raises(ConditionParseError):
+        parse_value_ref({"source": "block", "field": "canopy_size_class"})
 
 
 def test_soil_texture_eq_branches_sandy() -> None:
@@ -150,16 +152,16 @@ def test_soil_texture_eq_branches_sandy() -> None:
     assert evaluate(tree, _soilsize_ctx(soil_texture="clay"))[0] is False
 
 
-def test_canopy_size_in_operator_and_fails_closed() -> None:
+def test_salinity_class_in_operator_and_fails_closed() -> None:
     tree = {
         "op": "in",
-        "left": {"source": "block", "field": "canopy_size_class"},
-        "values": ["small", "medium"],
+        "left": {"source": "block", "field": "salinity_class"},
+        "values": ["saline", "very_saline"],
     }
-    assert evaluate(tree, _soilsize_ctx(canopy_size_class="small"))[0] is True
-    assert evaluate(tree, _soilsize_ctx(canopy_size_class="large"))[0] is False
+    assert evaluate(tree, _soilsize_ctx(salinity_class="saline"))[0] is True
+    assert evaluate(tree, _soilsize_ctx(salinity_class="non_saline"))[0] is False
     # Unset -> None -> fail-closed.
-    assert evaluate(tree, _soilsize_ctx(canopy_size_class=None))[0] is False
+    assert evaluate(tree, _soilsize_ctx(salinity_class=None))[0] is False
 
 
 # ---- crop_path / crop_strain block fields (crop taxonomy) -----------------

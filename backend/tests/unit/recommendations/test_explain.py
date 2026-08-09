@@ -104,7 +104,6 @@ def _setup(
         growth_stage="fruit_set",
         soil_texture=None,
         salinity_class=None,
-        canopy_size_class=None,
         latest=latest,
         weather=None,
         weather_indices={},

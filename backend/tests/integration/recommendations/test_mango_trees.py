@@ -102,47 +102,52 @@ def test_post_harvest_healthy_ndre_silent() -> None:
     assert evaluate_tree(_NITRO, ctx).outcome.action_type == "no_action"
 
 
-# ---- canopy health: SAVI on small/sandy, else NDVI ------------------------
+# ---- canopy health: SAVI on sandy soil, else NDVI -------------------------
+#
+# The tree used to open on a `canopy_size_class == small` node. Nothing ever
+# set that column, so the node always fell through to the soil check — which
+# is now the root.
 
 _HEALTH = _tree("mango_canopy_health_v1.yaml")
-
-
-def test_small_canopy_uses_savi_drop() -> None:
-    ctx = ConditionContext(
-        block_id="b1",
-        block_attributes={"canopy_size_class": "small", "soil_texture": "clay"},
-        indices=_idx_dev("savi", -2.0),
-    )
-    r = evaluate_tree(_HEALTH, ctx)
-    assert r.outcome.action_type == "scout"
-    assert [s.node_id for s in r.path] == ["root", "savi_check", "leaf_scout"]
 
 
 def test_sandy_soil_uses_savi_branch() -> None:
     ctx = ConditionContext(
         block_id="b1",
-        block_attributes={"canopy_size_class": "large", "soil_texture": "sandy"},
+        block_attributes={"soil_texture": "sandy"},
         indices=_idx_dev("savi", -2.0),
     )
     r = evaluate_tree(_HEALTH, ctx)
-    assert [s.node_id for s in r.path] == ["root", "soil_check", "savi_check", "leaf_scout"]
+    assert r.outcome.action_type == "scout"
+    assert [s.node_id for s in r.path] == ["soil_check", "savi_check", "leaf_scout"]
 
 
-def test_large_clay_uses_ndvi_branch() -> None:
+def test_clay_soil_uses_ndvi_branch() -> None:
     ctx = ConditionContext(
         block_id="b1",
-        block_attributes={"canopy_size_class": "large", "soil_texture": "clay"},
+        block_attributes={"soil_texture": "clay"},
         indices=_idx_dev("ndvi", -2.0),
     )
     r = evaluate_tree(_HEALTH, ctx)
     assert r.outcome.action_type == "scout"
-    assert [s.node_id for s in r.path] == ["root", "soil_check", "ndvi_check", "leaf_scout"]
+    assert [s.node_id for s in r.path] == ["soil_check", "ndvi_check", "leaf_scout"]
+
+
+def test_unknown_soil_uses_ndvi_branch() -> None:
+    # No soil texture recorded -> the eq fails closed -> NDVI, same as clay.
+    ctx = ConditionContext(
+        block_id="b1",
+        block_attributes={},
+        indices=_idx_dev("ndvi", -2.0),
+    )
+    r = evaluate_tree(_HEALTH, ctx)
+    assert [s.node_id for s in r.path] == ["soil_check", "ndvi_check", "leaf_scout"]
 
 
 def test_healthy_ndvi_no_action() -> None:
     ctx = ConditionContext(
         block_id="b1",
-        block_attributes={"canopy_size_class": "large", "soil_texture": "clay"},
+        block_attributes={"soil_texture": "clay"},
         indices=_idx_dev("ndvi", -0.4),
     )
     assert evaluate_tree(_HEALTH, ctx).outcome.action_type == "no_action"
