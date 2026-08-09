@@ -19,9 +19,11 @@ through this service.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from time import perf_counter
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -87,9 +89,11 @@ class _BlockEvaluation:
     ctx: ConditionContext
     block_trees: list[dict[str, Any]]
     cell_trees: list[dict[str, Any]]
-    # Trees excluded by multi-axis targeting (crop / country / soil). Kept
-    # so the explain endpoint can answer "why is nothing running here?".
-    skipped_trees: list[dict[str, Any]]
+    # Trees excluded by multi-axis targeting (crop / country / soil), each
+    # paired with the verdict naming the axis that rejected it. Kept so the
+    # explain endpoint and the trace can both answer "why is nothing running
+    # here?" with the axis and both sides of the comparison.
+    skipped_trees: list[tuple[dict[str, Any], TargetingVerdict]]
     param_overrides_per_tree: dict[UUID, dict[str, Any]]
 
     def cell_context(self, cell_means: Any) -> ConditionContext:
@@ -112,6 +116,73 @@ class _BlockEvaluation:
             signals=self.signals,
             grid=self.grid,
             crop_attributes=self.crop_attributes,
+        )
+
+
+# Statuses whose rows carry the full JSONB payload (node path + every resolved
+# ref). `clear` keeps the path but drops the values, and `skipped` never walked
+# at all — see migration 0062 for why the grain is uneven.
+_FULL_PAYLOAD_STATUSES = frozenset({"fired", "error"})
+
+
+@dataclass(slots=True)
+class _TraceBuffer:
+    """Accumulates one block's evaluation traces for a single bulk insert.
+
+    A cell-scoped tree over a 121-cell grid produces 121 rows for one block;
+    inserting them one at a time would put the trace write on the same order
+    as the evaluation itself. Rows are appended during the walk and flushed
+    once, at the end of the block.
+    """
+
+    run_id: UUID
+    rows: list[dict[str, Any]] = field(default_factory=list)
+
+    def add(
+        self,
+        *,
+        tree: dict[str, Any],
+        farm_id: UUID,
+        block_id: UUID,
+        cell_id: UUID | None,
+        status: str,
+        result: EvaluationResult | None = None,
+        verdict: TargetingVerdict | None = None,
+        overrides: dict[str, Any] | None = None,
+        outcome: dict[str, Any] | None = None,
+        recommendation_id: UUID | None = None,
+        alert_id: UUID | None = None,
+        duration_ms: int | None = None,
+    ) -> None:
+        full = status in _FULL_PAYLOAD_STATUSES
+        self.rows.append(
+            {
+                "run_id": self.run_id,
+                "farm_id": farm_id,
+                "block_id": block_id,
+                "cell_id": cell_id,
+                "tree_id": tree["tree_id"],
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "scope": tree.get("scope") or "block",
+                "status": status,
+                "skip_axis": verdict.axis if verdict is not None else None,
+                "skip_detail": (
+                    {"required": list(verdict.required), "actual": verdict.actual}
+                    if verdict is not None and not verdict.matched
+                    else None
+                ),
+                "node_path": _serialize_path(result.path) if result is not None else [],
+                "resolved_values": (
+                    dict(result.evaluation_snapshot) if full and result is not None else {}
+                ),
+                "param_overrides": dict(overrides or {}),
+                "outcome": outcome,
+                "recommendation_id": recommendation_id,
+                "alert_id": alert_id,
+                "duration_ms": duration_ms,
+                "error": result.error if result is not None else None,
+            }
         )
 
 
@@ -180,6 +251,12 @@ class RecommendationsServiceImpl:
         self._bus = event_bus or get_default_bus()
         self._log = get_logger(__name__)
 
+    @property
+    def repo(self) -> RecommendationsRepository:
+        """Read-only handle for callers that need the lineage tables directly
+        (the route that opens and closes an on-demand evaluation run)."""
+        return self._repo
+
     # ---- Engine driver ------------------------------------------------
 
     async def evaluate_block(
@@ -189,6 +266,7 @@ class RecommendationsServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         tenant_id: UUID,
+        run_id: UUID | None = None,
     ) -> dict[str, int]:
         """Run every active tree visible to this tenant against
         ``block_id``; insert new open recommendations.
@@ -196,6 +274,12 @@ class RecommendationsServiceImpl:
         ``tenant_id`` scopes the catalog lookup to platform trees +
         this tenant's own authored trees. The Beat task resolves this
         once per tenant before walking blocks (PR-A).
+
+        ``run_id`` opts this evaluation into trace capture: every tree's
+        verdict — including the ones that came out clear or were excluded by
+        targeting — is recorded against that run. Omitted, nothing is written
+        beyond the recommendations themselves, which keeps the many tests that
+        drive this method directly from needing a run row.
         """
         setup = await self._prepare_block_evaluation(block_id=block_id, tenant_id=tenant_id)
         if setup is None:
@@ -203,6 +287,7 @@ class RecommendationsServiceImpl:
                 "trees_evaluated": 0,
                 "trees_skipped_crop": 0,
                 "recommendations_opened": 0,
+                "traces_written": 0,
             }
 
         farm_id = setup.farm_id
@@ -216,6 +301,20 @@ class RecommendationsServiceImpl:
 
         trees_evaluated = len(block_trees) + len(cell_trees)
         recommendations_opened = 0
+        trace = _TraceBuffer(run_id=run_id) if run_id is not None else None
+
+        # Targeting exclusions first: these never reach the engine, so this is
+        # the only place they can be recorded at all.
+        if trace is not None:
+            for tree, verdict in setup.skipped_trees:
+                trace.add(
+                    tree=tree,
+                    farm_id=farm_id,
+                    block_id=block_id,
+                    cell_id=None,
+                    status="skipped",
+                    verdict=verdict,
+                )
 
         # Block-scoped path.
         for tree in block_trees:
@@ -232,6 +331,7 @@ class RecommendationsServiceImpl:
                     crop_path=crop_path,
                     actor_user_id=actor_user_id,
                     tenant_schema=tenant_schema,
+                    trace=trace,
                 )
                 is not None
             ):
@@ -244,6 +344,7 @@ class RecommendationsServiceImpl:
             trees_evaluated=trees_evaluated,
             trees_skipped_crop=trees_skipped_crop,
             recommendations_opened=recommendations_opened,
+            trace=trace,
         )
 
     async def _prepare_block_evaluation(
@@ -342,19 +443,20 @@ class RecommendationsServiceImpl:
         # over the block's grid cells (cell imagery, inherit everything else).
         block_trees: list[dict[str, Any]] = []
         cell_trees: list[dict[str, Any]] = []
-        skipped_trees: list[dict[str, Any]] = []
+        skipped_trees: list[tuple[dict[str, Any], TargetingVerdict]] = []
         for tree in trees:
             # Multi-axis targeting (PR-3): a tree fires on this block only if
             # its crop / country / soil sets all admit the block (AND across
-            # axes, OR within; empty set = matches any). See tree_targets_block.
-            if not tree_targets_block(
+            # axes, OR within; empty set = matches any). See evaluate_targeting.
+            verdict = evaluate_targeting(
                 tree,
                 crop_path=crop_path,
                 crop_id=crop_id,
                 country_code=country_code,
                 soil_texture=soil_texture,
-            ):
-                skipped_trees.append(tree)
+            )
+            if not verdict.matched:
+                skipped_trees.append((tree, verdict))
                 continue
             (cell_trees if tree.get("scope") == "cell" else block_trees).append(tree)
 
@@ -391,6 +493,7 @@ class RecommendationsServiceImpl:
         trees_evaluated: int,
         trees_skipped_crop: int,
         recommendations_opened: int,
+        trace: _TraceBuffer | None = None,
     ) -> dict[str, int]:
         """Run the cell-scoped trees and emit their digest notifications."""
         farm_id = setup.farm_id
@@ -422,6 +525,7 @@ class RecommendationsServiceImpl:
                         crop_path=crop_path,
                         actor_user_id=actor_user_id,
                         tenant_schema=tenant_schema,
+                        trace=trace,
                     )
                     if opened is None:
                         continue
@@ -474,10 +578,18 @@ class RecommendationsServiceImpl:
                 )
             )
 
+        # One bulk insert for the whole block — see _TraceBuffer. Deliberately
+        # last: a trace describes work that already happened, so a failure here
+        # must not be able to roll back the recommendations it describes.
+        traces_written = 0
+        if trace is not None and trace.rows:
+            traces_written = await self._repo.insert_eval_traces(rows=trace.rows)
+
         return {
             "trees_evaluated": trees_evaluated,
             "trees_skipped_crop": trees_skipped_crop,
             "recommendations_opened": recommendations_opened,
+            "traces_written": traces_written,
         }
 
     # ---- Read-only explain -------------------------------------------
@@ -543,8 +655,15 @@ class RecommendationsServiceImpl:
         for tree in setup.cell_trees:
             trees.append(_explain_entry(tree, status="per_cell", steps=[]))
 
-        for tree in setup.skipped_trees:
-            trees.append(_explain_entry(tree, status="skipped", steps=[]))
+        for tree, verdict in setup.skipped_trees:
+            entry = _explain_entry(tree, status="skipped", steps=[])
+            # Name the axis that rejected it. Without this the console says
+            # "skipped" and the reader has to diff the tree's targeting against
+            # the block by hand — and cannot see at all that the value is unset.
+            entry["skip_axis"] = verdict.axis
+            entry["skip_required"] = list(verdict.required)
+            entry["skip_actual"] = verdict.actual
+            trees.append(entry)
 
         return {
             "block_id": str(block_id),
@@ -566,12 +685,43 @@ class RecommendationsServiceImpl:
         crop_path: str | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        trace: _TraceBuffer | None = None,
     ) -> dict[str, Any] | None:
         """Evaluate one tree against one context (block or cell) and persist its
         output. Returns ``{"kind", "action_type", "severity"}`` for the opened
         rec/alert, or ``None`` when nothing was opened. Shared by the
         block-scoped and cell-scoped (PR-C3) evaluation paths; ``cell_id`` is
-        None for block-scoped output and the grid cell for cell-scoped."""
+        None for block-scoped output and the grid cell for cell-scoped.
+
+        When ``trace`` is supplied every exit below appends exactly one row to
+        it — including the three that return ``None``. Those are the whole
+        point: "nothing was opened" is the state that leaves no other evidence
+        anywhere in the system."""
+        started = perf_counter()
+
+        def _trace(
+            status: str,
+            *,
+            outcome: dict[str, Any] | None = None,
+            recommendation_id: UUID | None = None,
+            alert_id: UUID | None = None,
+        ) -> None:
+            if trace is None:
+                return
+            trace.add(
+                tree=tree,
+                farm_id=farm_id,
+                block_id=block_id,
+                cell_id=cell_id,
+                status=status,
+                result=result,
+                overrides=overrides,
+                outcome=outcome,
+                recommendation_id=recommendation_id,
+                alert_id=alert_id,
+                duration_ms=int((perf_counter() - started) * 1000),
+            )
+
         result = evaluate_tree(tree["tree_compiled"], eval_ctx, param_overrides=overrides)
         if result.error is not None:
             self._log.warning(
@@ -581,11 +731,22 @@ class RecommendationsServiceImpl:
                 cell_id=str(cell_id) if cell_id else None,
                 error=result.error,
             )
+            _trace("error")
             return None
         if result.outcome is None or result.outcome.action_type == "no_action":
             # Either a malformed leaf or an explicit "no action" leaf — record
             # nothing; the daily evaluator re-walks tomorrow as signals change.
+            _trace("clear")
             return None
+
+        leaf_outcome = {
+            "kind": result.outcome.kind,
+            "action_type": result.outcome.action_type,
+            "severity": result.outcome.severity,
+            "confidence": str(result.outcome.confidence),
+            # The last step of the walk is the leaf that produced this outcome.
+            "leaf_node_id": result.path[-1].node_id if result.path else None,
+        }
 
         # PR-E: dispatch on leaf kind. "alert" leaves write to tenant.alerts;
         # "recommendation" leaves take the path below.
@@ -599,8 +760,14 @@ class RecommendationsServiceImpl:
                 actor_user_id=actor_user_id,
                 tenant_schema=tenant_schema,
             )
-            if not opened:
+            if opened is None:
+                # The tree still fired — an open alert for this (block, rule)
+                # already existed and deduped it away. Recording this as
+                # anything but `fired` would misattribute the silence to the
+                # conditions rather than to the dedup.
+                _trace("fired", outcome={**leaf_outcome, "deduped": True})
                 return None
+            _trace("fired", outcome=leaf_outcome, alert_id=opened)
             return {
                 "kind": "alert",
                 "action_type": "alert",
@@ -641,7 +808,11 @@ class RecommendationsServiceImpl:
         )
         if not inserted:
             # An open recommendation for (block[/cell], tree) already exists.
+            # Same reasoning as the alert dedup above: the tree fired, the
+            # idempotency index absorbed it.
+            _trace("fired", outcome={**leaf_outcome, "deduped": True})
             return None
+        _trace("fired", outcome=leaf_outcome, recommendation_id=recommendation_id)
 
         await self._repo.insert_history(
             recommendation_id=recommendation_id,
@@ -713,7 +884,7 @@ class RecommendationsServiceImpl:
         result: Any,
         actor_user_id: UUID | None,
         tenant_schema: str,
-    ) -> bool:
+    ) -> UUID | None:
         """Open an alert produced by a tree-leaf with ``kind: alert``.
 
         PR-E: trees can now emit alerts as well as recommendations.
@@ -724,9 +895,10 @@ class RecommendationsServiceImpl:
         rule-sourced alerts entirely, at which point all rows in
         ``tenant.alerts`` carry tree-shaped rule_codes.
 
-        Returns True iff a row was newly inserted (the partial UNIQUE
-        blocked a duplicate while a prior alert is still
-        open/acknowledged/snoozed).
+        Returns the new alert's id iff a row was newly inserted, else None
+        (the partial UNIQUE blocked a duplicate while a prior alert is still
+        open/acknowledged/snoozed). The id is what lets an evaluation trace
+        link to the alert it produced.
         """
         from app.modules.alerts.events import AlertOpenedV1
         from app.modules.alerts.repository import AlertsRepository
@@ -755,7 +927,7 @@ class RecommendationsServiceImpl:
             actor_user_id=actor_user_id,
         )
         if not inserted:
-            return False
+            return None
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -792,7 +964,7 @@ class RecommendationsServiceImpl:
                 signal_snapshot=result.evaluation_snapshot,
             )
         )
-        return True
+        return alert_id
 
     # ---- Tree parameter overrides (tenant) ----------------------------
 
@@ -1073,6 +1245,27 @@ def _serialize_path(steps: list[TreePathStep]) -> list[dict[str, Any]]:
     return out
 
 
+def _dry_run_fired(result: EvaluationResult) -> bool:
+    """A walk "matched" only if it reached a leaf that would open something —
+    a ``no_action`` leaf is a verdict, not a match."""
+    return result.outcome is not None and result.outcome.action_type != "no_action"
+
+
+def _dry_run_outcome(result: EvaluationResult) -> dict[str, Any] | None:
+    if result.outcome is None:
+        return None
+    return {
+        "action_type": result.outcome.action_type,
+        "severity": result.outcome.severity,
+        "confidence": str(result.outcome.confidence),
+        "parameters": result.outcome.parameters,
+        "text_en": result.outcome.text_en,
+        "text_ar": result.outcome.text_ar,
+        "valid_for_hours": result.outcome.valid_for_hours,
+        "actions": result.outcome.actions,
+    }
+
+
 def _explain_entry(
     tree: dict[str, Any],
     *,
@@ -1097,6 +1290,10 @@ def _explain_entry(
         "text_en": None,
         "text_ar": None,
         "error": None,
+        # Only ever populated on a `skipped` row; see evaluate_targeting.
+        "skip_axis": None,
+        "skip_required": [],
+        "skip_actual": None,
     }
 
 
@@ -1173,6 +1370,84 @@ def _merge_cell_means(
     return merged
 
 
+@dataclass(frozen=True, slots=True)
+class TargetingVerdict:
+    """Why a tree was, or was not, admitted to a block.
+
+    ``matched=False`` always names the ``axis`` that rejected it plus both
+    sides of that comparison, so a trace can answer "the tree wanted EG and
+    this farm has no country set" instead of the bare "skipped" the sweep
+    used to record.
+    """
+
+    matched: bool
+    axis: str | None = None
+    # What the tree demanded on that axis. Empty when the axis is the legacy
+    # single ``crop_id`` rather than a set.
+    required: tuple[str, ...] = ()
+    # What the block (or its farm, for country) actually had. None means the
+    # value is unset — the common cause, and invisible before this existed.
+    actual: str | None = None
+
+
+_MATCHED = TargetingVerdict(matched=True)
+
+
+def evaluate_targeting(
+    tree: dict[str, Any],
+    *,
+    crop_path: str | None,
+    crop_id: UUID | None,
+    country_code: str | None,
+    soil_texture: str | None,
+) -> TargetingVerdict:
+    """``tree_targets_block`` with the rejection reason attached.
+
+    Axis order is crop → country → soil. Since the axes are ANDed the order
+    cannot change the verdict, only which axis gets reported first when more
+    than one would reject; crop is reported first because it is the axis
+    authors set most often and think about first.
+    """
+    crop_paths: list[str] = tree.get("crop_paths") or []
+    if crop_paths:
+        if not any(path_matches(p, crop_path) for p in crop_paths):
+            return TargetingVerdict(
+                matched=False,
+                axis="crop",
+                required=tuple(crop_paths),
+                actual=crop_path,
+            )
+    else:
+        legacy_crop_id = tree.get("crop_id")
+        if legacy_crop_id is not None and legacy_crop_id != crop_id:
+            return TargetingVerdict(
+                matched=False,
+                axis="crop",
+                required=(str(legacy_crop_id),),
+                actual=str(crop_id) if crop_id is not None else None,
+            )
+
+    country_codes: list[str] = tree.get("country_codes") or []
+    if country_codes and (country_code is None or country_code not in country_codes):
+        return TargetingVerdict(
+            matched=False,
+            axis="country",
+            required=tuple(country_codes),
+            actual=country_code,
+        )
+
+    soil_textures: list[str] = tree.get("soil_textures") or []
+    if soil_textures and (soil_texture is None or soil_texture not in soil_textures):
+        return TargetingVerdict(
+            matched=False,
+            axis="soil",
+            required=tuple(soil_textures),
+            actual=soil_texture,
+        )
+
+    return _MATCHED
+
+
 def tree_targets_block(
     tree: dict[str, Any],
     *,
@@ -1198,22 +1473,18 @@ def tree_targets_block(
     matches that axis — e.g. a tree filtered by country won't fire on a
     farm with no country set. This is the coverage guardrail: country is
     net-new, so farms are backfilled to a country before such trees ship.
+
+    Kept as the boolean face of ``evaluate_targeting`` for the callers that
+    only need to filter (the dry-run block picker); the evaluation paths use
+    the verdict so the rejected axis reaches the trace.
     """
-    crop_paths: list[str] = tree.get("crop_paths") or []
-    if crop_paths:
-        if not any(path_matches(p, crop_path) for p in crop_paths):
-            return False
-    else:
-        legacy_crop_id = tree.get("crop_id")
-        if legacy_crop_id is not None and legacy_crop_id != crop_id:
-            return False
-
-    country_codes: list[str] = tree.get("country_codes") or []
-    if country_codes and (country_code is None or country_code not in country_codes):
-        return False
-
-    soil_textures: list[str] = tree.get("soil_textures") or []
-    return not (soil_textures and (soil_texture is None or soil_texture not in soil_textures))
+    return evaluate_targeting(
+        tree,
+        crop_path=crop_path,
+        crop_id=crop_id,
+        country_code=country_code,
+        soil_texture=soil_texture,
+    ).matched
 
 
 def get_recommendations_service(
@@ -1734,7 +2005,7 @@ class DecisionTreesAuthorService:
         farm_id = await repo.get_block_farm_id(block_id=block_id)
         (
             dry_run_block_crop_id,
-            _,
+            dry_run_crop_id,
             crop_category,
             growth_stage,
             crop_path,
@@ -1789,26 +2060,123 @@ class DecisionTreesAuthorService:
                 tenant_session, block_crop_id=dry_run_block_crop_id
             ),
         )
-        result = evaluate_tree(compiled, ctx)
-        outcome_dict: dict[str, Any] | None = None
-        if result.outcome is not None:
-            outcome_dict = {
-                "action_type": result.outcome.action_type,
-                "severity": result.outcome.severity,
-                "confidence": str(result.outcome.confidence),
-                "parameters": result.outcome.parameters,
-                "text_en": result.outcome.text_en,
-                "text_ar": result.outcome.text_ar,
-                "valid_for_hours": result.outcome.valid_for_hours,
-                "actions": result.outcome.actions,
-            }
-        return {
-            "matched": result.outcome is not None and result.outcome.action_type != "no_action",
-            "outcome": outcome_dict,
-            "path": _serialize_path(result.path),
-            "evaluation_snapshot": result.evaluation_snapshot,
-            "error": result.error,
+
+        # Targeting is reported, not enforced. The block picker already filters
+        # to blocks this tree targets, so an author cannot reach a non-matching
+        # block from the UI — but an API caller can, and silently evaluating a
+        # tree against a block the sweep would never run it on is exactly the
+        # kind of "works in the dry-run, does nothing in production" gap this
+        # endpoint exists to close.
+        country_code = (
+            await repo.get_farm_country_code(farm_id=farm_id) if farm_id is not None else None
+        )
+        targeting = evaluate_targeting(
+            compiled,
+            crop_path=crop_path,
+            crop_id=dry_run_crop_id,
+            country_code=country_code,
+            soil_texture=soil_texture,
+        )
+        targeting_dict = {
+            "matched": targeting.matched,
+            "axis": targeting.axis,
+            "required": list(targeting.required),
+            "actual": targeting.actual,
         }
+
+        scope = compiled.get("scope") or "block"
+        if scope != "cell":
+            result = evaluate_tree(compiled, ctx)
+            return {
+                "matched": _dry_run_fired(result),
+                "scope": scope,
+                "targeting": targeting_dict,
+                "outcome": _dry_run_outcome(result),
+                "path": _serialize_path(result.path),
+                "evaluation_snapshot": result.evaluation_snapshot,
+                "error": result.error,
+                "cells_evaluated": 0,
+                "cells_matched": 0,
+                "cells": [],
+            }
+
+        # Cell-scoped tree: the sweep evaluates it once per grid cell with that
+        # cell's imagery means swapped in, so a single block-level walk is not
+        # a preview of it — it is a different evaluation that happens to use
+        # the same tree. Fan out the same way the sweep does.
+        cells, representative = await self._dry_run_cells(
+            compiled=compiled,
+            repo=repo,
+            block_id=block_id,
+            base_ctx=ctx,
+            latest_indices=latest_indices,
+        )
+        matched_count = sum(1 for c in cells if c["matched"])
+        return {
+            "matched": matched_count > 0,
+            "scope": scope,
+            "targeting": targeting_dict,
+            "outcome": _dry_run_outcome(representative) if representative else None,
+            "path": _serialize_path(representative.path) if representative else [],
+            "evaluation_snapshot": (representative.evaluation_snapshot if representative else {}),
+            "error": representative.error if representative else None,
+            "cells_evaluated": len(cells),
+            "cells_matched": matched_count,
+            "cells": cells,
+        }
+
+    async def _dry_run_cells(
+        self,
+        *,
+        compiled: Mapping[str, Any],
+        repo: RecommendationsRepository,
+        block_id: UUID,
+        base_ctx: ConditionContext,
+        latest_indices: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], EvaluationResult | None]:
+        """Walk a ``scope: cell`` tree once per grid cell, as the sweep does.
+
+        Returns every cell's verdict plus the walk that represents the run in
+        the canvas highlight: the first cell that fired, or the first cell
+        evaluated when none did. Empty for an ungridded block — which is the
+        honest answer, since a cell-scoped tree does not fire there either.
+        """
+        cell_aggs = await repo.get_latest_cell_aggregates(block_id=block_id)
+        labels = await repo.get_grid_cell_labels(block_id=block_id)
+        cells: list[dict[str, Any]] = []
+        representative: EvaluationResult | None = None
+
+        for cid, cell_means in cell_aggs.items():
+            # Only the imagery means are per-cell; weather, soil, crop and
+            # signals inherit the block. Same locked fidelity rule as the sweep
+            # (see _merge_cell_means), and swapping just `indices` on the block
+            # context avoids re-loading the inherited snapshots per cell.
+            cell_indices = ConditionContext.from_block_signals(
+                block_id=base_ctx.block_id,
+                crop_category=base_ctx.crop_category,
+                latest_index_aggregates=_merge_cell_means(latest_indices, cell_means),
+            ).indices
+            cell_result = evaluate_tree(compiled, replace(base_ctx, indices=cell_indices))
+            fired = _dry_run_fired(cell_result)
+            row_idx, col_idx = labels.get(cid, (None, None))
+            outcome = cell_result.outcome
+            cells.append(
+                {
+                    "cell_id": str(cid),
+                    "cell_row": row_idx,
+                    "cell_col": col_idx,
+                    "matched": fired,
+                    "action_type": outcome.action_type if outcome is not None else None,
+                    "severity": outcome.severity if outcome is not None else None,
+                    "text_en": outcome.text_en if outcome is not None else None,
+                    "error": cell_result.error,
+                }
+            )
+            if representative is None or (fired and not _dry_run_fired(representative)):
+                representative = cell_result
+
+        cells.sort(key=lambda c: (c["cell_row"] is None, c["cell_row"], c["cell_col"]))
+        return cells, representative
 
     async def candidate_blocks(
         self, *, code: str, tenant_session: AsyncSession
