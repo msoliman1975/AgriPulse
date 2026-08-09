@@ -145,6 +145,42 @@ describe("<ConditionBuilder>", () => {
     expect(screen.getByLabelText("Weather field")).toHaveValue("some_new_column");
   });
 
+  it("retypes the right operand when the left becomes categorical", async () => {
+    const user = userEvent.setup();
+    const onChange = renderBuilder(NDVI_LT_0);
+
+    await user.selectOptions(screen.getByDisplayValue("Index (NDVI, EVI, …)"), "block");
+
+    // Was `number: 0`, which against a stored string could never match.
+    const emitted = onChange.mock.calls[0][0] as { right: unknown; left: unknown };
+    expect(emitted.left).toEqual({ source: "block", field: "crop_category" });
+    expect(emitted.right).toBe("cereal");
+  });
+
+  it("renders a closed vocabulary as a picker, not a text box", () => {
+    renderBuilder({ op: "eq", left: { source: "block", field: "soil_texture" }, right: "clay" });
+    const operand = screen.getByDisplayValue("clay");
+    expect(operand.tagName).toBe("SELECT");
+    const options = within(operand as HTMLSelectElement)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(options).toEqual([
+      "sandy",
+      "sandy_loam",
+      "loam",
+      "clay_loam",
+      "clay",
+      "silty_loam",
+      "silty_clay",
+    ]);
+  });
+
+  it("leaves an open-ended categorical as a text box", () => {
+    renderBuilder({ op: "eq", left: { source: "block", field: "growth_stage" }, right: "kimri" });
+    // Growth stages come from the crop taxonomy — no closed list to offer.
+    expect(screen.getByDisplayValue("kimri").tagName).toBe("INPUT");
+  });
+
   it("wraps a lone term into a group when a second condition is added", async () => {
     const user = userEvent.setup();
     const onChange = renderBuilder(NDVI_LT_0);
