@@ -27,6 +27,7 @@ import {
   SIGNAL_KEYS,
   TERM_OPS,
   WEATHER_INDEX_CODES,
+  WEATHER_FIELDS,
   WEATHER_INDEX_KEYS,
   WEATHER_RISK_CODES,
   WEATHER_RISK_FIELDS,
@@ -563,14 +564,35 @@ function SourceSpecificFields({
     );
   }
   if (value.source === "weather") {
+    // Field names differ per scope (`air_temp_c` hourly, `air_temp_c_max` in a
+    // forecast window, `temp_max_c` in the derived daily row), and the backend
+    // deliberately doesn't validate them — an unknown field resolves to None
+    // and the tree just never fires. This used to be a free-text box with one
+    // placeholder against 28 valid names, so switching scopes was the easy way
+    // to author a dead predicate.
+    const fields = WEATHER_FIELDS[value.scope];
+    // A field authored in YAML that isn't in the list stays selectable rather
+    // than being silently dropped — same as the signals / crop_attribute codes.
+    const fieldOptions =
+      value.field && !fields.includes(value.field) ? [value.field, ...fields] : fields;
+    const onScopeChange = (scope: (typeof WEATHER_SCOPES)[number]): void => {
+      // Carry the field over when the new scope also has it (the two forecast
+      // windows share a vocabulary); otherwise move to that scope's first
+      // field. Keeping a field the new scope can't resolve would leave a term
+      // that looks authored and can never match.
+      const next = WEATHER_FIELDS[scope];
+      onChange({
+        ...value,
+        scope,
+        field: next.includes(value.field) ? value.field : next[0],
+      });
+    };
     return (
       <>
         <select
           disabled={readOnly}
           value={value.scope}
-          onChange={(e) =>
-            onChange({ ...value, scope: e.target.value as (typeof WEATHER_SCOPES)[number] })
-          }
+          onChange={(e) => onScopeChange(e.target.value as (typeof WEATHER_SCOPES)[number])}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         >
           {WEATHER_SCOPES.map((s) => (
@@ -579,15 +601,19 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
-        <input
-          type="text"
+        <select
           disabled={readOnly}
-          placeholder="precipitation_mm_total"
           value={value.field}
           onChange={(e) => onChange({ ...value, field: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
           aria-label={t("editor.condition.weatherField")}
-        />
+        >
+          {fieldOptions.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
       </>
     );
   }

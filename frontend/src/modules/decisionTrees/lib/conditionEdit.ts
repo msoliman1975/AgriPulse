@@ -64,6 +64,57 @@ export const WEATHER_SCOPES = [
   "derived_today",
   "derived_yesterday",
 ] as const;
+// Valid `field` names per weather scope. Unlike every other source these are
+// NOT validated by the backend parser — `WeatherValueRef.field` is free-form
+// because the loader is the source of truth for which fields exist per scope,
+// and an unknown one resolves to None (permissive-on-missing-data). Which
+// means a typo here produces a tree that parses, saves, and silently never
+// fires. So the builder closes the list itself: these mirror the three SELECT
+// lists in backend/app/modules/weather/snapshot.py exactly. If you add a
+// column to one of those queries, add it here in the same PR.
+const FORECAST_FIELDS = [
+  "precipitation_mm_total",
+  "precipitation_probability_pct_max",
+  "air_temp_c_max",
+  "air_temp_c_min",
+  "air_temp_c_mean",
+  "humidity_pct_mean",
+  "et0_mm_total",
+  "wind_speed_m_s_max",
+  // Window coverage, so a rule can require a full window before acting
+  // ("only if we actually have 24h of forecast").
+  "hours_observed",
+] as const;
+const DERIVED_FIELDS = [
+  "gdd_base10",
+  "gdd_base15",
+  "gdd_cumulative_base10_season",
+  "et0_mm_daily",
+  "precip_mm_daily",
+  "precip_mm_7d",
+  "precip_mm_30d",
+  "temp_min_c",
+  "temp_max_c",
+  "temp_mean_c",
+] as const;
+export const WEATHER_FIELDS: Record<(typeof WEATHER_SCOPES)[number], readonly string[]> = {
+  // The latest hourly observation row.
+  latest_observation: [
+    "air_temp_c",
+    "humidity_pct",
+    "precipitation_mm",
+    "wind_speed_m_s",
+    "wind_direction_deg",
+    "pressure_hpa",
+    "solar_radiation_w_m2",
+    "cloud_cover_pct",
+    "et0_mm",
+  ],
+  forecast_24h: FORECAST_FIELDS,
+  forecast_72h: FORECAST_FIELDS,
+  derived_today: DERIVED_FIELDS,
+  derived_yesterday: DERIVED_FIELDS,
+};
 // First-class weather indices (PR-W7). `value` is the farm-level daily
 // value; `baseline_deviation` is its z-score vs the day-of-year
 // climatology. Mirrors WEATHER_INDEX_KEYS in

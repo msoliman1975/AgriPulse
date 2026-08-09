@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,6 +82,67 @@ describe("<ConditionBuilder>", () => {
   it("offers growth_stage as a block field", () => {
     renderBuilder({ op: "eq", left: { source: "block", field: "growth_stage" }, right: "kimri" });
     expect(screen.getByLabelText("Block field")).toHaveValue("growth_stage");
+  });
+
+  it("offers the weather field as a scope-specific dropdown", () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "derived_today", field: "precip_mm_7d" },
+      right: 5,
+    });
+    const field = screen.getByLabelText("Weather field");
+    expect(field).toHaveValue("precip_mm_7d");
+    // The derived-daily vocabulary, not the hourly or forecast one.
+    const options = within(field as HTMLSelectElement)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(options).toContain("gdd_cumulative_base10_season");
+    expect(options).not.toContain("precipitation_mm_total");
+  });
+
+  it("moves the field to the new scope's vocabulary when the scope changes", async () => {
+    const user = userEvent.setup();
+    const onChange = renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" },
+      right: 5,
+    });
+
+    await user.selectOptions(screen.getByDisplayValue("forecast_24h"), "derived_today");
+
+    // `precipitation_mm_total` doesn't exist on the derived daily row, and
+    // keeping it would leave a term that can never match.
+    const emitted = onChange.mock.calls[0][0] as { left: { scope: string; field: string } };
+    expect(emitted.left.scope).toBe("derived_today");
+    expect(emitted.left.field).toBe("gdd_base10");
+  });
+
+  it("carries the field across the two forecast windows, which share a vocabulary", async () => {
+    const user = userEvent.setup();
+    const onChange = renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "forecast_24h", field: "air_temp_c_max" },
+      right: 40,
+    });
+
+    await user.selectOptions(screen.getByDisplayValue("forecast_24h"), "forecast_72h");
+
+    const emitted = onChange.mock.calls[0][0] as { left: { scope: string; field: string } };
+    expect(emitted.left).toEqual({
+      source: "weather",
+      scope: "forecast_72h",
+      field: "air_temp_c_max",
+    });
+  });
+
+  it("keeps a YAML-authored field that isn't in the scope's list selectable", () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "latest_observation", field: "some_new_column" },
+      right: 1,
+    });
+    // Not silently dropped — the author can see what the tree actually says.
+    expect(screen.getByLabelText("Weather field")).toHaveValue("some_new_column");
   });
 
   it("wraps a lone term into a group when a second condition is added", async () => {

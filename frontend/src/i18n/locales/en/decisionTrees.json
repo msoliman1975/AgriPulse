@@ -334,7 +334,7 @@
       "right": "Threshold",
       "operator": "Operator",
       "indexCode": "Index code",
-      "weatherField": "Field",
+      "weatherField": "Weather field",
       "weatherIndexCode": "Weather index",
       "weatherRiskCode": "Pathogen / pest",
       "signalCode": "Signal code",
