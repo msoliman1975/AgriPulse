@@ -497,6 +497,43 @@ def _validate_params_refs(
             _walk(outcome.get("parameters"))
 
 
+def collect_crop_attribute_codes(nodes: dict[str, Any]) -> set[str]:
+    """Every ``{source: crop_attribute, code: x}`` code the tree references.
+
+    Public and pure so the authoring service can check the codes against
+    the catalog without importing the walker's internals. Unlike the params
+    refs above this cannot be validated inside ``compile_tree``: the valid
+    set is data (``public.crop_attribute_definitions``) scoped to the tree's
+    target crops, and compile_tree is sync, DB-free, and runs at startup for
+    the platform seeds.
+
+    Only comparison operands are walked, not ``outcome.parameters`` — a
+    crop_attribute ref is a value ref, and the outcome block holds literals.
+    """
+    codes: set[str] = set()
+
+    def _walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if value.get("source") == "crop_attribute":
+                code = value.get("code")
+                if isinstance(code, str) and code:
+                    codes.add(code)
+                return
+            for child in value.values():
+                _walk(child)
+        elif isinstance(value, list):
+            for item in value:
+                _walk(item)
+
+    for node in nodes.values():
+        if not isinstance(node, dict):
+            continue
+        condition = node.get("condition")
+        if isinstance(condition, dict):
+            _walk(condition.get("tree"))
+    return codes
+
+
 def _validate_reachability(
     nodes: dict[str, Any], root: str, source_path: str, *, max_steps: int = 1024
 ) -> None:
