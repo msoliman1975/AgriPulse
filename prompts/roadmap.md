@@ -360,4 +360,22 @@ Prompts 1–6 are delivered; they remain here as the record of what was built an
 
 ---
 
+## Housekeeping backlog
+
+Small, bounded cleanups that fall out of shipped work. Deliberately **not**
+prompts: they carry no gate and no locked scope, and inventing a slice for a
+two-line deletion would cheapen the contract above. The rule is that an item
+here rides along with the next PR that already touches the same area — a
+cleanup that needs its own build, review and promote cycle is not a cleanup.
+
+An item earns a line here only if it is (a) already understood, (b) safe, and
+(c) currently costing nothing. Anything failing (c) is a bug and belongs in an
+issue instead.
+
+| Item | Where | Why it's safe | Ride along with |
+|---|---|---|---|
+| Delete orphaned `expectedHarvestStart` / `expectedHarvestEnd` keys | `frontend/src/i18n/locales/{en,ar}/farms.json` | Orphaned by #383, which dropped the matching `block_crops` columns in migration 0061. **No component references either key** — nothing renders a broken value; they are dead weight, not a defect. | Any frontend PR touching the farms namespace |
+
+---
+
 *This is a discipline document. Skipping steps invalidates the approach.*
