@@ -1407,18 +1407,22 @@ class RecommendationsRepository:
         never renders. ``get_eval_trace`` fetches them for one row.
         """
         clauses: list[str] = []
-        params: dict[str, Any] = {
-            "limit": limit,
-            "run_id": run_id,
-            "block_id": block_id,
-            "farm_id": farm_id,
-        }
-        if run_id is not None:
-            clauses.append("t.run_id = :run_id")
-        if block_id is not None:
-            clauses.append("t.block_id = :block_id")
-        if farm_id is not None:
-            clauses.append("t.farm_id = :farm_id")
+        params: dict[str, Any] = {"limit": limit}
+        # Built alongside the clauses, never unconditionally: `bindparams`
+        # raises ArgumentError for a parameter the statement does not
+        # mention, so declaring all three up front 500s every call that
+        # omits one.
+        binds: list[Any] = []
+        for name, value in (
+            ("run_id", run_id),
+            ("block_id", block_id),
+            ("farm_id", farm_id),
+        ):
+            if value is None:
+                continue
+            clauses.append(f"t.{name} = :{name}")
+            params[name] = value
+            binds.append(bindparam(name, type_=PG_UUID(as_uuid=True)))
         if tree_code is not None:
             clauses.append("t.tree_code = :tree_code")
             params["tree_code"] = tree_code
@@ -1443,20 +1447,7 @@ class RecommendationsRepository:
             "ORDER BY t.evaluated_at DESC, t.id DESC "
             "LIMIT :limit"
         )
-        rows = (
-            (
-                await self._tenant.execute(
-                    text(sql).bindparams(
-                        bindparam("run_id", type_=PG_UUID(as_uuid=True)),
-                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
-                        bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-                    ),
-                    params,
-                )
-            )
-            .mappings()
-            .all()
-        )
+        rows = (await self._tenant.execute(text(sql).bindparams(*binds), params)).mappings().all()
         return [dict(r) for r in rows]
 
     async def get_eval_trace(self, *, trace_id: UUID) -> dict[str, Any] | None:
