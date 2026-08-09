@@ -30,8 +30,10 @@ import {
   WEATHER_INDEX_CODES,
   WEATHER_INDEX_KEYS,
   WEATHER_RISK_CODES,
+  WEATHER_RISK_CROP_PREFIX,
   WEATHER_RISK_FIELDS,
   WEATHER_SCOPES,
+  attributePathAppliesToCrops,
   changeTermOp,
   defaultGroupNode,
   defaultTermNode,
@@ -39,7 +41,9 @@ import {
   leftOperandType,
   leftOperandValues,
   retypeTermForLeft,
+  riskAppliesToCrops,
   serializeNode,
+  signalKeysForValueKind,
   type ConditionNode,
   type EditableCondition,
   type GroupMode,
@@ -52,6 +56,10 @@ import {
 
 interface ConditionBuilderProps {
   value: EditableCondition;
+  /** The tree's targeted crop paths, when the host knows them. Used to hide
+   *  crop attributes and risk models that can never resolve for the blocks
+   *  this tree runs on. */
+  cropPaths?: string[];
   /** Fires with the new condition AST ready to be written back to
    *  YAML (`condition.tree`). Caller serializes + persists. */
   onChange: (nextTree: unknown) => void;
@@ -61,6 +69,7 @@ interface ConditionBuilderProps {
 export function ConditionBuilder({
   value,
   onChange,
+  cropPaths = [],
   readOnly = false,
 }: ConditionBuilderProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
@@ -105,7 +114,7 @@ export function ConditionBuilder({
 
   return (
     <div className="flex flex-col gap-2 text-xs">
-      <NodeEditor node={root} depth={0} readOnly={readOnly} onChange={emit} />
+      <NodeEditor node={root} depth={0} readOnly={readOnly} cropPaths={cropPaths} onChange={emit} />
       {/* A bare term or NOT at the root has nowhere to put a sibling, so
           offer to wrap it in a group rather than making the author
           rebuild the condition from scratch. */}
@@ -125,17 +134,26 @@ interface NodeEditorProps {
   node: ConditionNode;
   depth: number;
   readOnly: boolean;
+  cropPaths: string[];
   /** `null` means "remove me". */
   onChange: (next: ConditionNode | null) => void;
   onRemove?: () => void;
 }
 
-function NodeEditor({ node, depth, readOnly, onChange, onRemove }: NodeEditorProps): ReactNode {
+function NodeEditor({
+  node,
+  depth,
+  readOnly,
+  cropPaths,
+  onChange,
+  onRemove,
+}: NodeEditorProps): ReactNode {
   if (node.kind === "term") {
     return (
       <TermRow
         term={node.term}
         readOnly={readOnly}
+        cropPaths={cropPaths}
         onChange={(term) => onChange({ kind: "term", term })}
         onRemove={onRemove}
       />
@@ -147,6 +165,7 @@ function NodeEditor({ node, depth, readOnly, onChange, onRemove }: NodeEditorPro
         node={node}
         depth={depth}
         readOnly={readOnly}
+        cropPaths={cropPaths}
         onChange={onChange}
         onRemove={onRemove}
       />
@@ -157,6 +176,7 @@ function NodeEditor({ node, depth, readOnly, onChange, onRemove }: NodeEditorPro
       node={node}
       depth={depth}
       readOnly={readOnly}
+      cropPaths={cropPaths}
       onChange={onChange}
       onRemove={onRemove}
     />
@@ -167,12 +187,14 @@ function GroupBox({
   node,
   depth,
   readOnly,
+  cropPaths,
   onChange,
   onRemove,
 }: {
   node: Extract<ConditionNode, { kind: "group" }>;
   depth: number;
   readOnly: boolean;
+  cropPaths: string[];
   onChange: (next: ConditionNode | null) => void;
   onRemove?: () => void;
 }): ReactNode {
@@ -221,6 +243,7 @@ function GroupBox({
             node={child}
             depth={depth + 1}
             readOnly={readOnly}
+            cropPaths={cropPaths}
             onChange={(next) => replaceChild(idx, next)}
             onRemove={() => replaceChild(idx, null)}
           />
@@ -253,12 +276,14 @@ function NotBox({
   node,
   depth,
   readOnly,
+  cropPaths,
   onChange,
   onRemove,
 }: {
   node: Extract<ConditionNode, { kind: "not" }>;
   depth: number;
   readOnly: boolean;
+  cropPaths: string[];
   onChange: (next: ConditionNode | null) => void;
   onRemove?: () => void;
 }): ReactNode {
@@ -278,6 +303,7 @@ function NotBox({
           node={node.child}
           depth={depth + 1}
           readOnly={readOnly}
+          cropPaths={cropPaths}
           // Removing the inner node removes the whole NOT — a NOT with
           // nothing under it has no meaning.
           onChange={(next) => onChange(next ? { kind: "not", child: next } : null)}
@@ -292,11 +318,12 @@ function NotBox({
 interface TermRowProps {
   term: Term;
   readOnly: boolean;
+  cropPaths: string[];
   onChange: (next: Term) => void;
   onRemove?: () => void;
 }
 
-function TermRow({ term, readOnly, onChange, onRemove }: TermRowProps): ReactNode {
+function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The node details panel is a fixed, narrow (~360px) column, so the
   // comparison fields stack vertically. A previous `sm:grid-cols-[…]`
@@ -313,6 +340,7 @@ function TermRow({ term, readOnly, onChange, onRemove }: TermRowProps): ReactNod
           value={term.left}
           disallowParams
           readOnly={readOnly}
+          cropPaths={cropPaths}
           // Retype rather than assign: the right side follows what the new
           // left actually resolves to, so switching to a categorical field
           // can't silently leave a `= 0` that never matches.
@@ -432,6 +460,7 @@ interface ValueRefEditorProps {
   label: string;
   value: ValueRef;
   readOnly: boolean;
+  cropPaths?: string[];
   /** Params refs are only legal on the right operand — set true for
    *  `left`. */
   disallowParams?: boolean;
@@ -442,6 +471,7 @@ function ValueRefEditor({
   label,
   value,
   readOnly,
+  cropPaths = [],
   disallowParams = false,
   onChange,
 }: ValueRefEditorProps): ReactNode {
@@ -489,7 +519,12 @@ function ValueRefEditor({
           </option>
         ))}
       </select>
-      <SourceSpecificFields value={value} readOnly={readOnly} onChange={onChange} />
+      <SourceSpecificFields
+        value={value}
+        readOnly={readOnly}
+        cropPaths={cropPaths}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -497,10 +532,12 @@ function ValueRefEditor({
 function SourceSpecificFields({
   value,
   readOnly,
+  cropPaths,
   onChange,
 }: {
   value: ValueRef;
   readOnly: boolean;
+  cropPaths: string[];
   onChange: (next: ValueRef) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
@@ -664,6 +701,15 @@ function SourceSpecificFields({
     );
   }
   if (value.source === "weather_risk") {
+    // Every model in the registry is registered for a crop prefix and only
+    // ever scores blocks under it, so a tree targeting citrus branching on
+    // `anthracnose` reads as authored and can never fire. Hide the ones this
+    // tree's crops can't be scored for, and name the crop on the rest.
+    const applicable = WEATHER_RISK_CODES.filter((c) => riskAppliesToCrops(c, cropPaths));
+    const riskOptions =
+      value.risk_code && !applicable.includes(value.risk_code)
+        ? [value.risk_code, ...applicable]
+        : applicable;
     return (
       <>
         <select
@@ -678,9 +724,9 @@ function SourceSpecificFields({
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
           aria-label={t("editor.condition.weatherRiskCode")}
         >
-          {WEATHER_RISK_CODES.map((c) => (
+          {riskOptions.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {WEATHER_RISK_CROP_PREFIX[c] ? `${c} (${WEATHER_RISK_CROP_PREFIX[c]})` : c}
             </option>
           ))}
         </select>
@@ -731,7 +777,11 @@ function SourceSpecificFields({
           }
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         >
-          {SIGNAL_KEYS.map((k) => (
+          {/* Exactly one `value_*` column is populated per definition, so the
+              other six keys are six ways to write a term that never matches. */}
+          {signalKeysForValueKind(
+            (signalDefs.data ?? []).find((d) => d.code === value.code)?.value_kind,
+          ).map((k) => (
             <option key={k} value={k}>
               {k}
             </option>
@@ -779,7 +829,13 @@ function SourceSpecificFields({
     // One entry per distinct code: the same code can be defined at several
     // taxonomy nodes (a variety narrowing a crop-level range), and a tree
     // targets by crop path, so the code is what it branches on.
-    const catalog = cropAttrDefs.data ?? [];
+    // Definitions are inherited down the taxonomy, so a `mango` attribute
+    // resolves for `mango.keitt`. Anything outside the tree's targeted paths
+    // can never resolve for a block this tree runs on — offering it is
+    // offering a predicate that always fails closed.
+    const catalog = (cropAttrDefs.data ?? []).filter((d) =>
+      attributePathAppliesToCrops(d.path, cropPaths),
+    );
     const byCode = new Map<string, (typeof catalog)[number]>();
     for (const def of catalog) if (!byCode.has(def.code)) byCode.set(def.code, def);
     // Keep an out-of-catalog code (authored in YAML, or since retired)

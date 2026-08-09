@@ -137,10 +137,65 @@ export const WEATHER_INDEX_CODES = [
 // 0-100 pressure; `level` its low|moderate|high banding. Mirrors
 // WEATHER_RISK_FIELDS in backend/app/shared/conditions/context.py.
 export const WEATHER_RISK_FIELDS = ["score", "level"] as const;
-// The mango V1 pathogen/pest codes (weather.risk registry). Closed list so
-// the author picks from a dropdown; mirrors REGISTRY in
-// backend/app/modules/weather/risk/registry.py.
+// The mango V1 pathogen/pest codes (weather.risk registry), each with the
+// crop path prefix its model is registered for. Mirrors REGISTRY in
+// backend/app/modules/weather/risk/registry.py — a model only ever scores
+// blocks whose crop path is that prefix or one of its descendants, so a tree
+// targeting citrus can never see one of these. Surfacing the prefix is what
+// stops an author branching on a risk their blocks will never be scored for.
+export const WEATHER_RISK_CROP_PREFIX: Record<string, string> = {
+  powdery_mildew: "mango",
+  anthracnose: "mango",
+  fruit_fly: "mango",
+};
 export const WEATHER_RISK_CODES = ["powdery_mildew", "anthracnose", "fruit_fly"] as const;
+
+/** True when a risk model registered for `prefix` can score a block under any
+ *  of `cropPaths`. Prefix match, mirroring `_crop_applies` on the backend:
+ *  `mango` covers `mango.keitt.large`, and — because a tree targeting the
+ *  broader `mango` runs on every cultivar — a target that is a prefix OF the
+ *  model's own path counts too. An empty target list means "not yet
+ *  targeted", so nothing is hidden. */
+export function riskAppliesToCrops(riskCode: string, cropPaths: string[]): boolean {
+  const prefix = WEATHER_RISK_CROP_PREFIX[riskCode];
+  if (!prefix || cropPaths.length === 0) return true;
+  return cropPaths.some(
+    (path) => path === prefix || path.startsWith(prefix + ".") || prefix.startsWith(path + "."),
+  );
+}
+
+/** True when a crop-attribute definition at `path` can resolve for a block
+ *  under any of `cropPaths`. Definitions are inherited down the taxonomy, so
+ *  a `mango` definition resolves for `mango.keitt`; and a tree targeting
+ *  `mango` runs on blocks that may carry `mango.keitt`, so a definition
+ *  deeper than the target counts too. */
+export function attributePathAppliesToCrops(path: string, cropPaths: string[]): boolean {
+  if (cropPaths.length === 0) return true;
+  return cropPaths.some(
+    (target) => target === path || target.startsWith(path + ".") || path.startsWith(target + "."),
+  );
+}
+
+/** The signal value keys that can be non-null for a definition of
+ *  `value_kind`. Exactly one `value_*` column is populated per kind, so
+ *  offering all seven is offering six ways to write a term that never
+ *  matches. The trend keys ride along with numeric signals only. */
+export function signalKeysForValueKind(kind: string | undefined): readonly string[] {
+  switch (kind) {
+    case "numeric":
+      return ["value_numeric", "value_slope", "value_delta", "value_trend_direction"];
+    case "categorical":
+      return ["value_categorical"];
+    case "event":
+      return ["value_event"];
+    case "boolean":
+      return ["value_boolean"];
+    default:
+      // Unknown / not-yet-picked (and `geopoint`, which no key exposes) —
+      // fall back to the full list rather than emptying the dropdown.
+      return SIGNAL_KEYS;
+  }
+}
 // Crop-attribute keys. Mirrors CROP_ATTRIBUTE_KEYS in
 // backend/app/shared/conditions/context.py. One key today; declared as a list
 // so a future `days_since` derivation slots in without changing the ref shape.

@@ -810,6 +810,7 @@ export function DecisionTreeViewerPage(): ReactNode {
                 onDelete={canManage ? onRequestDelete : undefined}
                 onAddChild={canManage ? onRequestAddChild : undefined}
                 onConditionChange={canManage ? onConditionChange : undefined}
+                cropPaths={targeting.crop_paths}
               />
             ) : (
               <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">

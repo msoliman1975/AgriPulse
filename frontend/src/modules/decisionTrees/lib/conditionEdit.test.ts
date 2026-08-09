@@ -5,14 +5,19 @@ import {
   CROP_ATTRIBUTE_KEYS,
   INDICES_KEYS,
   SIGNAL_KEYS,
+  WEATHER_RISK_CODES,
+  WEATHER_RISK_CROP_PREFIX,
+  attributePathAppliesToCrops,
   changeTermOp,
   defaultValueRef,
   leftOperandType,
   leftOperandValues,
   parseConditionTree,
   retypeTermForLeft,
+  riskAppliesToCrops,
   serializeCondition,
   serializeNode,
+  signalKeysForValueKind,
   type ConditionNode,
   type EditableCondition,
   type Term,
@@ -687,5 +692,55 @@ describe("operand typing", () => {
       { kind: "string", value: "warning" },
       { kind: "string", value: "warning" },
     ]);
+  });
+});
+
+describe("source vocabularies vs the tree's targeting", () => {
+  it("knows a crop prefix for every registered risk code", () => {
+    // The two mirror one registry on the backend; a code with no prefix
+    // would silently become "applies to everything".
+    for (const code of WEATHER_RISK_CODES) {
+      expect(WEATHER_RISK_CROP_PREFIX[code]).toBeTruthy();
+    }
+  });
+
+  it("keeps a risk model whose crop prefix covers a targeted path", () => {
+    expect(riskAppliesToCrops("anthracnose", ["mango"])).toBe(true);
+    expect(riskAppliesToCrops("anthracnose", ["mango.keitt.large"])).toBe(true);
+    // Targeting the broader crop means blocks may carry any cultivar under it.
+    expect(riskAppliesToCrops("anthracnose", ["citrus.valencia", "mango"])).toBe(true);
+  });
+
+  it("drops a risk model no targeted crop can be scored for", () => {
+    expect(riskAppliesToCrops("powdery_mildew", ["citrus.valencia"])).toBe(false);
+    expect(riskAppliesToCrops("fruit_fly", ["potato"])).toBe(false);
+  });
+
+  it("hides nothing while the tree has no crops yet", () => {
+    expect(riskAppliesToCrops("powdery_mildew", [])).toBe(true);
+    expect(attributePathAppliesToCrops("mango", [])).toBe(true);
+  });
+
+  it("matches crop attributes in both inheritance directions", () => {
+    // A mango-level definition resolves for a mango.keitt block...
+    expect(attributePathAppliesToCrops("mango", ["mango.keitt"])).toBe(true);
+    // ...and a tree targeting mango runs on blocks that may carry
+    // mango.keitt, which is where a keitt-level definition lives.
+    expect(attributePathAppliesToCrops("mango.keitt", ["mango"])).toBe(true);
+    expect(attributePathAppliesToCrops("citrus", ["mango"])).toBe(false);
+  });
+
+  it("offers only the value keys a signal's kind can populate", () => {
+    expect(signalKeysForValueKind("numeric")).toEqual([
+      "value_numeric",
+      "value_slope",
+      "value_delta",
+      "value_trend_direction",
+    ]);
+    expect(signalKeysForValueKind("categorical")).toEqual(["value_categorical"]);
+    expect(signalKeysForValueKind("boolean")).toEqual(["value_boolean"]);
+    expect(signalKeysForValueKind("event")).toEqual(["value_event"]);
+    // No definition picked yet — don't empty the dropdown.
+    expect(signalKeysForValueKind(undefined)).toEqual(SIGNAL_KEYS);
   });
 });
