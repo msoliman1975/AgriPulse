@@ -537,5 +537,22 @@
     "low": "low",
     "critical": "critical",
     "unknown": "unknown"
+  },
+  "growthStage": {
+    "germination": "Germination",
+    "establishment": "Establishment",
+    "vegetative": "Vegetative",
+    "development": "Development",
+    "panicle": "Panicle",
+    "pre_flowering": "Pre-flowering",
+    "flowering": "Flowering",
+    "fruit_set": "Fruit set",
+    "fruit_development": "Fruit development",
+    "maturity": "Maturity",
+    "ripening": "Ripening",
+    "harvest": "Harvest",
+    "senescence": "Senescence",
+    "dormancy": "Dormancy",
+    "dormant": "Dormant"
   }
 }

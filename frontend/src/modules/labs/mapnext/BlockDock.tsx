@@ -39,7 +39,7 @@ import {
 } from "./constants";
 import { DockConditionsView } from "./DockConditionsView";
 import { DockFamilyView } from "./DockFamilyView";
-import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate } from "./dockFormat";
+import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate, weekday } from "./dockFormat";
 import { useCropAttributeRows } from "@/modules/farms/lib/useCropAttributeRows";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
@@ -174,7 +174,11 @@ export function BlockDock({
   onInactivate,
   resetKey,
 }: Props): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  // `insights` carries the shared activity-type catalogue and `weather` the
+  // day labels; both are bundled eagerly, so borrowing them costs nothing and
+  // beats keeping a second copy of the same words under `farmConsole`.
+  const { t, i18n } = useTranslation(["farmConsole", "insights", "weather"]);
+  const lang = i18n.language;
   const qc = useQueryClient();
   const [tab, setTab] = useState<DockTab>("overview");
   const [collapsed, setCollapsed] = useState(false);
@@ -250,6 +254,13 @@ export function BlockDock({
     void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
     setManageMode(null);
   }, [qc]);
+
+  // Activity types arrive as raw enum values (`soil_prep`). The catalogue is
+  // the same one the Insights calendar reads; `label` is the server-side
+  // English humanisation, which is the right fallback for a type nobody has
+  // translated yet.
+  const activityLabel = (a: { activity_type: string; label: string }): string =>
+    t(`insights:activityType.${a.activity_type}`, { defaultValue: a.label });
 
   if (error) {
     return (
@@ -327,7 +338,7 @@ export function BlockDock({
           value={crit ? t("dock.title.alertsCrit", { count: detail.alerts.length, crit }) : detail.alerts.length}
           color={crit ? HEALTH_DOT.critical : undefined}
         />
-        <Chip label={t("dock.title.date")} value={longDate(detail.last_updated)} />
+        <Chip label={t("dock.title.date")} value={longDate(detail.last_updated, lang)} />
 
         <span className="ms-auto flex items-center gap-2">
           <span className="text-xs text-ap-muted">
@@ -468,13 +479,13 @@ export function BlockDock({
                       [
                         t("inspector.next"),
                         detail.irrigation.next
-                          ? `${detail.irrigation.next.volume_mm} mm · ${shortDate(detail.irrigation.next.date)}`
+                          ? `${detail.irrigation.next.volume_mm} mm · ${shortDate(detail.irrigation.next.date, lang)}`
                           : t("inspector.none"),
                       ],
                       [
                         t("dock.nextActivity"),
                         detail.activities.length
-                          ? `${detail.activities[0].label} · ${shortDate(detail.activities[0].date)}`
+                          ? `${activityLabel(detail.activities[0])} · ${shortDate(detail.activities[0].date, lang)}`
                           : t("inspector.noActivities"),
                       ],
                     ]}
@@ -501,7 +512,7 @@ export function BlockDock({
                       [
                         t("inspector.last"),
                         detail.irrigation.last
-                          ? `${detail.irrigation.last.volume_mm} mm · ${shortDate(detail.irrigation.last.date)}`
+                          ? `${detail.irrigation.last.volume_mm} mm · ${shortDate(detail.irrigation.last.date, lang)}`
                           : t("inspector.none"),
                       ],
                       [
@@ -520,7 +531,7 @@ export function BlockDock({
                             }
                           >
                             {detail.irrigation.next.volume_mm} mm ·{" "}
-                            {shortDate(detail.irrigation.next.date)}
+                            {shortDate(detail.irrigation.next.date, lang)}
                             {detail.irrigation.next.is_emergency ? " ⚠" : ""}
                           </span>
                         ) : (
@@ -541,12 +552,17 @@ export function BlockDock({
                 <Col title={t("inspector.weather")}>
                   {detail.weather_3d.length ? (
                     <div className="flex gap-2">
-                      {detail.weather_3d.map((w) => (
+                      {detail.weather_3d.map((w, i) => (
                         <div
-                          key={w.day}
+                          key={w.date || w.day}
                           className="flex-1 rounded-lg border border-ap-line px-2 py-1.5 text-center"
                         >
-                          <div className="text-xs text-ap-muted">{w.day}</div>
+                          {/* `w.day` is a pre-rendered en-US weekday; render
+                              from the raw date so the column heads follow the
+                              UI language. */}
+                          <div className="text-xs text-ap-muted">
+                            {i === 0 ? t("weather:day.today") : weekday(w.date, lang)}
+                          </div>
                           <div className="text-sm font-semibold tabular-nums text-ap-ink">
                             {w.temp_c_max == null ? "—" : `${w.temp_c_max}°`}
                           </div>
@@ -585,7 +601,16 @@ export function BlockDock({
                               [t("inspector.cropName"), cropLabel(detail.crop_assignment) ?? "—"],
                               [
                                 t("inspector.growthStage"),
-                                humanize(detail.crop_assignment.growth_stage),
+                                // Stage codes are per-crop phenology, not a
+                                // fixed enum, so a crop with a bespoke stage
+                                // still falls back to the humanised code.
+                                detail.crop_assignment.growth_stage
+                                  ? t(`growthStage.${detail.crop_assignment.growth_stage}`, {
+                                      defaultValue: humanize(
+                                        detail.crop_assignment.growth_stage,
+                                      ),
+                                    })
+                                  : "—",
                               ],
                             ] as [ReactNode, ReactNode][])
                           : []),
@@ -613,7 +638,10 @@ export function BlockDock({
                     <Rows
                       items={detail.activities
                         .slice(0, 6)
-                        .map((a) => [a.label, shortDate(a.date)] as [ReactNode, ReactNode])}
+                        .map(
+                          (a) =>
+                            [activityLabel(a), shortDate(a.date, lang)] as [ReactNode, ReactNode],
+                        )}
                     />
                   ) : (
                     <p className="text-sm text-ap-muted">{t("inspector.noActivities")}</p>
@@ -629,7 +657,7 @@ export function BlockDock({
                           (s) =>
                             [
                               s.code,
-                              `${s.value}${s.unit ? ` ${s.unit}` : ""} · ${shortDate(s.recorded_at)}`,
+                              `${s.value}${s.unit ? ` ${s.unit}` : ""} · ${shortDate(s.recorded_at, lang)}`,
                             ] as [ReactNode, ReactNode],
                         )}
                     />
