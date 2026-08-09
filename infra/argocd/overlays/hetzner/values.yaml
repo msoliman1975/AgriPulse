@@ -878,11 +878,35 @@ global:
   #   NOT EXERCISED IN PROD: driven end-to-end on the local stack only (seed →
   #   preview wrote nothing → remove → re-assign same dates → undo restored the
   #   previously-current crop). Nobody has clicked it against prod data.
+  # 591db3e = #393 save-time validation of crop-attribute condition refs.
+  #   `{source: crop_attribute, code: x}` could name a code the tree's target
+  #   crops never define. That resolves to None for every block the tree runs
+  #   on, and permissive-on-missing-data turns it into a comparison that fails
+  #   closed forever -- a tree that compiles, publishes and never fires, with
+  #   nothing reporting it. shared/conditions/models.py had claimed for months
+  #   that this check "lives in the tree validator"; it did not exist.
+  #   NO MIGRATION. Pure code, api + workers only -- frontend is untouched
+  #   between 45b5a08 and 591db3e (verified with git diff --name-only), so it
+  #   stays on 45b5a08 rather than taking a pointless new build. Rollback is
+  #   api + workers back to 45b5a08, and nothing else moves.
+  #   BEHAVIOUR CHANGE ON WRITE: create/append/update on a decision tree now
+  #   422s when a referenced crop-attribute code is not defined for the tree's
+  #   crop paths. Existing stored trees are untouched and keep evaluating --
+  #   the gate is on the write path only. A tenant that had authored such a
+  #   ref by hand will hit the 422 on their next save of that tree, which is
+  #   the point: the alternative was a branch that silently never matched.
+  #   Ships alongside #387/#388/#390/#391/#392 (already live in 45b5a08),
+  #   which removed the dead `canopy_size_class` field, made the weather field
+  #   and operand types pickers, and filtered the builder's dropdowns by
+  #   targeting -- this is the save-time half of that last one.
+  #   Image verified in ghcr before the bump, not inferred from the run
+  #   conclusion: api:591db3e is a 200 with digest sha256:5cef8472... ,
+  #   distinct from api:45b5a08 (sha256:59fc9d4b...).
   images:
     api:
-      tag: "45b5a08"
+      tag: "591db3e"
     workers:
-      tag: "45b5a08"
+      tag: "591db3e"
     frontend:
       tag: "45b5a08"
     tileServer:
