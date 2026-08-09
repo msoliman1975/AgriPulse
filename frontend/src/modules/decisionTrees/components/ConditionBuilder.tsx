@@ -26,8 +26,8 @@ import {
   MAX_GROUP_DEPTH,
   SIGNAL_KEYS,
   TERM_OPS,
-  WEATHER_INDEX_CODES,
   WEATHER_FIELDS,
+  WEATHER_INDEX_CODES,
   WEATHER_INDEX_KEYS,
   WEATHER_RISK_CODES,
   WEATHER_RISK_FIELDS,
@@ -36,6 +36,9 @@ import {
   defaultGroupNode,
   defaultTermNode,
   defaultValueRef,
+  leftOperandType,
+  leftOperandValues,
+  retypeTermForLeft,
   serializeNode,
   type ConditionNode,
   type EditableCondition,
@@ -310,7 +313,10 @@ function TermRow({ term, readOnly, onChange, onRemove }: TermRowProps): ReactNod
           value={term.left}
           disallowParams
           readOnly={readOnly}
-          onChange={(next) => onChange({ ...term, left: next })}
+          // Retype rather than assign: the right side follows what the new
+          // left actually resolves to, so switching to a categorical field
+          // can't silently leave a `= 0` that never matches.
+          onChange={(next) => onChange(retypeTermForLeft(term, next))}
         />
         <OperatorPicker
           value={term.op}
@@ -353,12 +359,14 @@ function TermOperands({
         <RightEditor
           label={t("editor.condition.low")}
           value={term.low}
+          left={term.left}
           readOnly={readOnly}
           onChange={(low) => onChange({ ...term, low })}
         />
         <RightEditor
           label={t("editor.condition.high")}
           value={term.high}
+          left={term.left}
           readOnly={readOnly}
           onChange={(high) => onChange({ ...term, high })}
         />
@@ -382,6 +390,7 @@ function TermOperands({
               <RightEditor
                 label={`#${idx + 1}`}
                 value={v}
+                left={term.left}
                 readOnly={readOnly}
                 onChange={(next) => setValue(idx, next)}
               />
@@ -399,9 +408,7 @@ function TermOperands({
         {!readOnly ? (
           <AddButton
             label={t("editor.condition.addValue")}
-            onClick={() =>
-              onChange({ ...term, values: [...term.values, { kind: "string", value: "" }] })
-            }
+            onClick={() => onChange({ ...term, values: [...term.values, newInValue(term.left)] })}
           />
         ) : null}
       </div>
@@ -412,6 +419,7 @@ function TermOperands({
     <RightEditor
       label={t("editor.condition.right")}
       value={term.right}
+      left={term.left}
       readOnly={readOnly}
       onChange={(right) => onChange({ ...term, right })}
     />
@@ -883,15 +891,23 @@ function opSymbol(op: TermOp): string {
 interface RightEditorProps {
   label: string;
   value: RightOperand;
+  /** The term's left ref — decides whether this operand is a number, a
+   *  boolean or a categorical, and supplies the vocabulary when there is
+   *  a closed one. */
+  left: ValueRef;
   readOnly: boolean;
   onChange: (next: RightOperand) => void;
 }
 
-function RightEditor({ label, value, readOnly, onChange }: RightEditorProps): ReactNode {
+function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The user picks between "literal" (number/string/boolean) and "ref"
   // (typically a params ref). Number is the default and most common.
   const kindLabel = value.kind === "ref" ? "params ref" : value.kind;
+  // Closed vocabularies (soil texture, risk level, trend direction, …) become
+  // a picker: those are exactly the comparisons an author gets wrong by
+  // typing, and a wrong value fails closed with no error anywhere.
+  const vocabulary = leftOperandValues(left);
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] text-ap-muted">
@@ -920,6 +936,22 @@ function RightEditor({ label, value, readOnly, onChange }: RightEditorProps): Re
           }}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
         />
+      ) : value.kind === "string" && vocabulary ? (
+        <select
+          disabled={readOnly}
+          value={value.value}
+          onChange={(e) => onChange({ kind: "string", value: e.target.value })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+        >
+          {/* An out-of-vocabulary value authored in YAML stays selectable. */}
+          {(vocabulary.includes(value.value) ? vocabulary : [value.value, ...vocabulary]).map(
+            (v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ),
+          )}
+        </select>
       ) : value.kind === "string" ? (
         <input
           type="text"
@@ -952,6 +984,16 @@ function RightEditor({ label, value, readOnly, onChange }: RightEditorProps): Re
       )}
     </div>
   );
+}
+
+/** A fresh `in` entry starts in the left ref's own shape — a number for a
+ *  numeric left, and the first value of a closed vocabulary where there is
+ *  one, rather than an empty string that can never match. */
+function newInValue(left: ValueRef): RightOperand {
+  if (leftOperandType(left) === "number") return { kind: "number", value: 0 };
+  if (leftOperandType(left) === "boolean") return { kind: "boolean", value: true };
+  const vocabulary = leftOperandValues(left);
+  return { kind: "string", value: vocabulary ? vocabulary[0] : "" };
 }
 
 /** Switching the right-operand "kind" from one form to another resets

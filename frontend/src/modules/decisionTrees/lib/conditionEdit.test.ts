@@ -7,7 +7,10 @@ import {
   SIGNAL_KEYS,
   changeTermOp,
   defaultValueRef,
+  leftOperandType,
+  leftOperandValues,
   parseConditionTree,
+  retypeTermForLeft,
   serializeCondition,
   serializeNode,
   type ConditionNode,
@@ -566,5 +569,123 @@ describe("changeTermOp", () => {
 
   it("is a no-op when the operator is unchanged", () => {
     expect(changeTermOp(binary, "gt")).toBe(binary);
+  });
+});
+
+describe("operand typing", () => {
+  it("types each source by what it actually resolves to", () => {
+    expect(leftOperandType({ source: "indices", index_code: "ndvi", key: "mean" })).toBe("number");
+    expect(leftOperandType({ source: "indices", index_code: "ndvi", key: "trend_direction" })).toBe(
+      "categorical",
+    );
+    expect(leftOperandType({ source: "block", field: "soil_texture" })).toBe("categorical");
+    expect(
+      leftOperandType({ source: "weather", scope: "forecast_24h", field: "et0_mm_total" }),
+    ).toBe("number");
+    expect(
+      leftOperandType({ source: "weather_risk", risk_code: "anthracnose", field: "score" }),
+    ).toBe("number");
+    expect(
+      leftOperandType({ source: "weather_risk", risk_code: "anthracnose", field: "level" }),
+    ).toBe("categorical");
+    expect(leftOperandType({ source: "grid", index_code: "ndvi", field: "severity" })).toBe(
+      "categorical",
+    );
+    expect(leftOperandType({ source: "signals", code: "x", key: "value_boolean" })).toBe("boolean");
+    expect(leftOperandType({ source: "signals", code: "x", key: "value_slope" })).toBe("number");
+  });
+
+  it("exposes a vocabulary only where the values are closed", () => {
+    expect(leftOperandValues({ source: "block", field: "soil_texture" })).toContain("clay_loam");
+    expect(leftOperandValues({ source: "grid", index_code: "ndvi", field: "severity" })).toEqual([
+      "warning",
+      "critical",
+    ]);
+    // Growth stages come from the crop taxonomy and a crop path is free text,
+    // so neither can be offered as a closed list.
+    expect(leftOperandValues({ source: "block", field: "growth_stage" })).toBeNull();
+    expect(leftOperandValues({ source: "block", field: "crop_path" })).toBeNull();
+  });
+
+  it("seeds the first vocabulary value when the left becomes categorical", () => {
+    // The regression this guards: the right operand stayed `number: 0`, so
+    // `soil_texture = 0` saved happily and never matched.
+    const term: Term = {
+      op: "eq",
+      left: { source: "indices", index_code: "ndvi", key: "mean" },
+      right: { kind: "number", value: 0 },
+    };
+    const next = retypeTermForLeft(term, { source: "block", field: "soil_texture" });
+    if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
+    expect(next.right).toEqual({ kind: "string", value: "sandy" });
+  });
+
+  it("keeps a value that survives the crossing", () => {
+    const term: Term = {
+      op: "eq",
+      left: { source: "block", field: "soil_texture" },
+      right: { kind: "string", value: "clay" },
+    };
+    const next = retypeTermForLeft(term, { source: "block", field: "crop_path" });
+    if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
+    // crop_path has no closed vocabulary, so the string stands.
+    expect(next.right).toEqual({ kind: "string", value: "clay" });
+  });
+
+  it("converts back to a number when the left becomes numeric", () => {
+    const term: Term = {
+      op: "eq",
+      left: { source: "block", field: "soil_texture" },
+      right: { kind: "string", value: "12.5" },
+    };
+    const next = retypeTermForLeft(term, { source: "indices", index_code: "ndvi", key: "mean" });
+    if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
+    expect(next.right).toEqual({ kind: "number", value: 12.5 });
+  });
+
+  it("leaves a params ref alone", () => {
+    // A params ref resolves at evaluation time; re-typing it would throw
+    // away the parameter name the author picked.
+    const ref = { kind: "ref", ref: { source: "params", name: "drop_sigma" } } as const;
+    const term: Term = {
+      op: "le",
+      left: { source: "indices", index_code: "savi", key: "baseline_deviation" },
+      right: ref,
+    };
+    const next = retypeTermForLeft(term, { source: "block", field: "soil_texture" });
+    if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
+    expect(next.right).toEqual(ref);
+  });
+
+  it("retypes every operand of between and in", () => {
+    const between: Term = {
+      op: "between",
+      left: { source: "indices", index_code: "ndvi", key: "mean" },
+      low: { kind: "number", value: 0.2 },
+      high: { kind: "number", value: 0.8 },
+    };
+    const nextBetween = retypeTermForLeft(between, { source: "block", field: "salinity_class" });
+    if (nextBetween.op !== "between") throw new Error("expected between");
+    expect(nextBetween.low).toEqual({ kind: "string", value: "non_saline" });
+    expect(nextBetween.high).toEqual({ kind: "string", value: "non_saline" });
+
+    const inTerm: Term = {
+      op: "in",
+      left: { source: "indices", index_code: "ndvi", key: "mean" },
+      values: [
+        { kind: "number", value: 1 },
+        { kind: "number", value: 2 },
+      ],
+    };
+    const nextIn = retypeTermForLeft(inTerm, {
+      source: "grid",
+      index_code: "ndvi",
+      field: "severity",
+    });
+    if (nextIn.op !== "in") throw new Error("expected in");
+    expect(nextIn.values).toEqual([
+      { kind: "string", value: "warning" },
+      { kind: "string", value: "warning" },
+    ]);
   });
 });

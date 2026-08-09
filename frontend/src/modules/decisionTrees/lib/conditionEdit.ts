@@ -517,6 +517,133 @@ function serializeRightOperand(rhs: RightOperand): unknown {
  *  seeds the first list entry. Going back keeps the low bound / first
  *  entry. Without this an author loses their threshold every time they
  *  try a different operator. */
+// ---- Operand typing ------------------------------------------------
+//
+// The evaluator compares whatever the left ref resolves to against the
+// right operand, with no type checking: `crop_category = 0` parses, saves,
+// publishes and then never matches, because a string is never equal to a
+// number. The builder used to make that the *default* — every left ref got
+// a `number: 0` on the right — so picking a categorical field and typing
+// nothing else produced a dead term.
+//
+// `leftOperandType` says what a ref actually resolves to, and
+// `retypeTermForLeft` re-shapes the right side to suit when the author
+// changes the left. `leftOperandValues` returns the closed vocabulary when
+// there is one, so the operand becomes a picker rather than a text box.
+
+export type OperandType = "number" | "categorical" | "boolean";
+
+/** Trend keys resolve to rising/falling/stable across sources. */
+const TREND_VALUES = ["rising", "falling", "stable"] as const;
+// Mirrors SoilTexture / SalinityClass in api/blocks.ts (the blocks CHECK
+// constraints), the crops catalog `category` values, and the banding
+// vocabularies in weather/risk + the grid anomaly verdict.
+const SOIL_TEXTURE_VALUES = [
+  "sandy",
+  "sandy_loam",
+  "loam",
+  "clay_loam",
+  "clay",
+  "silty_loam",
+  "silty_clay",
+] as const;
+const SALINITY_VALUES = [
+  "non_saline",
+  "slightly_saline",
+  "moderately_saline",
+  "strongly_saline",
+] as const;
+const CROP_CATEGORY_VALUES = ["cereal", "fiber", "fodder", "fruit_tree", "vegetable"] as const;
+const RISK_LEVEL_VALUES = ["low", "moderate", "high"] as const;
+const GRID_SEVERITY_VALUES = ["warning", "critical"] as const;
+
+export function leftOperandType(ref: ValueRef): OperandType {
+  switch (ref.source) {
+    case "indices":
+      return ref.key === "trend_direction" ? "categorical" : "number";
+    case "block":
+      // Every block field is a stored string (stage, path, strain, texture,
+      // salinity class, crop category).
+      return "categorical";
+    case "signals":
+      if (ref.key === "value_boolean") return "boolean";
+      return ref.key === "value_numeric" || ref.key === "value_slope" || ref.key === "value_delta"
+        ? "number"
+        : "categorical";
+    case "weather_risk":
+      return ref.field === "level" ? "categorical" : "number";
+    case "grid":
+      return ref.field === "severity" ? "categorical" : "number";
+    case "crop_attribute":
+      // The resolved type follows the definition's value_type (numeric, date,
+      // text, single- or multi-select), which the builder doesn't know here.
+      // Treat as categorical: a string compares sanely against a date or a
+      // select, and an author comparing a numeric attribute can still switch
+      // the operand kind by hand.
+      return "categorical";
+    default:
+      // weather / weather_index — every field in those snapshots is a Decimal.
+      return "number";
+  }
+}
+
+/** The closed vocabulary for a categorical ref, or null when the values are
+ *  open-ended (a crop path, a taxonomy-driven growth stage, a tenant's own
+ *  categorical signal). */
+export function leftOperandValues(ref: ValueRef): readonly string[] | null {
+  if (ref.source === "indices" && ref.key === "trend_direction") return TREND_VALUES;
+  if (ref.source === "signals" && ref.key === "value_trend_direction") return TREND_VALUES;
+  if (ref.source === "weather_risk" && ref.field === "level") return RISK_LEVEL_VALUES;
+  if (ref.source === "grid" && ref.field === "severity") return GRID_SEVERITY_VALUES;
+  if (ref.source === "block") {
+    if (ref.field === "soil_texture") return SOIL_TEXTURE_VALUES;
+    if (ref.field === "salinity_class") return SALINITY_VALUES;
+    if (ref.field === "crop_category") return CROP_CATEGORY_VALUES;
+  }
+  return null;
+}
+
+/** Coerce one operand to `type`, keeping the value where it survives the
+ *  crossing. A params ref is left alone — it resolves at evaluation time
+ *  and re-typing it would throw away the author's parameter name. */
+function retypeOperand(operand: RightOperand, type: OperandType): RightOperand {
+  if (operand.kind === "ref") return operand;
+  if (type === "number") {
+    if (operand.kind === "number") return operand;
+    const n = operand.kind === "string" ? Number(operand.value) : NaN;
+    return { kind: "number", value: Number.isFinite(n) && operand.value !== "" ? n : 0 };
+  }
+  if (type === "boolean") {
+    if (operand.kind === "boolean") return operand;
+    return { kind: "boolean", value: operand.kind === "string" && operand.value === "true" };
+  }
+  if (operand.kind === "string") return operand;
+  return { kind: "string", value: operand.kind === "number" ? String(operand.value) : "" };
+}
+
+/** Swap a term's left ref, re-typing the right side to match it. When the
+ *  new left has a closed vocabulary and the carried-over value isn't in it,
+ *  seed the first value rather than leaving an empty string that reads as
+ *  authored. */
+export function retypeTermForLeft(term: Term, left: ValueRef): Term {
+  const type = leftOperandType(left);
+  const values = leftOperandValues(left);
+  const fix = (operand: RightOperand): RightOperand => {
+    const next = retypeOperand(operand, type);
+    if (values && next.kind === "string" && !values.includes(next.value)) {
+      return { kind: "string", value: values[0] };
+    }
+    return next;
+  };
+  if (term.op === "between") {
+    return { ...term, left, low: fix(term.low), high: fix(term.high) };
+  }
+  if (term.op === "in") {
+    return { ...term, left, values: term.values.map(fix) };
+  }
+  return { ...term, left, right: fix(term.right) };
+}
+
 export function changeTermOp(term: Term, op: TermOp): Term {
   if (term.op === op) return term;
   const carried = firstOperand(term);
