@@ -133,6 +133,17 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.recommendations_evaluate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Retention for the evaluation lineage the sweep above writes (tenant
+    # 0062). Deletes runs past the window; their traces follow via the
+    # run_id cascade, so the window is expressed once on the parent. Light
+    # queue — a plain indexed DELETE, unlike the grid cleanup which has to
+    # dig through a compressed hypertable.
+    "recommendations.prune_eval_runs": {
+        "task": "recommendations.prune_eval_runs",
+        "schedule": float(_settings.recommendations_eval_run_prune_seconds),
+        "kwargs": {"retention_days": _settings.recommendations_eval_run_retention_days},
+        "options": {"queue": "light"},
+    },
     # Sub-block grid spatial-anomaly alerting: per tenant, scan each
     # active grid's latest scene for cells doing markedly worse than the
     # field average and open a block-level alert naming the worst cells.

@@ -224,6 +224,17 @@ class Settings(BaseSettings):
     # WHERE state='open' keeps re-runs idempotent.
     recommendations_evaluate_sweep_seconds: int = 3600
 
+    # Cadence for `recommendations.prune_eval_runs`. Daily — the rows it
+    # drops are already past the retention window below, so running it more
+    # often only changes how promptly a day's worth of expiry is reclaimed.
+    recommendations_eval_run_prune_seconds: int = 86400
+    # How long decision-tree evaluation lineage is kept. Deleting a run
+    # cascades to its traces (tenant migration 0062), so this one number
+    # governs the whole table. 100 days spans a full season's worth of
+    # "why did this fire back in March?" without letting ~5k rows/tenant/day
+    # accumulate indefinitely.
+    recommendations_eval_run_retention_days: int = 100
+
     # Per-cell grid observation retention (block_grid_aggregates). None =
     # compress-only, keep everything (the current deliberate policy — see
     # docs/proposals/grid-aggregates-retention.md). Set to a day count

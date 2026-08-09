@@ -6,6 +6,8 @@
   ``(block_id, tree_id) WHERE state='open'`` keeps re-runs from
   duplicating an already-open recommendation.
 * ``recommendations.evaluate_sweep`` — Beat-driven multi-tenant fan-out.
+* ``recommendations.prune_eval_runs`` — retention for the evaluation
+  lineage written by the two above (tenant migration 0062).
 
 Cadence is set in ``workers/beat/main.py`` against
 ``recommendations_evaluate_sweep_seconds``. Daily in production; hourly
@@ -176,3 +178,93 @@ async def _evaluate_sweep_async() -> dict[str, int]:
         evaluate_for_tenant.delay(schema)
         enqueued += 1
     return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="recommendations.prune_eval_runs",
+    bind=False,
+    ignore_result=True,
+)
+def prune_eval_runs(retention_days: int = 100) -> dict[str, int]:
+    """Delete evaluation runs older than ``retention_days``, in every tenant.
+
+    Traces are removed by the ``run_id`` FK's ON DELETE CASCADE rather than
+    by a second statement — that is what the cascade was put there for, and
+    it means the retention window is expressed once, on the parent, instead
+    of two windows that can drift apart.
+
+    The cutoff is measured from ``started_at``, not ``finished_at``: a run
+    that never settled has no finish time, and leaving those undeletable
+    would make a crashed worker's run immortal.
+
+    One transaction per tenant so a schema that fails (dropped mid-sweep,
+    permissions changed) costs only its own rows. Returns totals rather than
+    a per-tenant breakdown; the per-tenant numbers go to the log.
+    """
+    return _run_task(_prune_eval_runs_async(retention_days=retention_days))
+
+
+async def _prune_eval_runs_async(*, retention_days: int) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    tenants_pruned = 0
+    runs_deleted = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        try:
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, schema)
+                # RETURNING + len rather than `.rowcount`: the async Result
+                # type does not expose the latter.
+                deleted = len(
+                    (
+                        await session.execute(
+                            text(
+                                """
+                                DELETE FROM decision_tree_eval_runs
+                                 WHERE started_at
+                                       < now() - make_interval(days => :days)
+                                RETURNING id
+                                """
+                            ),
+                            {"days": retention_days},
+                        )
+                    ).all()
+                )
+        except Exception:
+            # A tenant whose schema is mid-purge (or otherwise unreadable)
+            # must not stop the remaining tenants from being pruned.
+            _log.warning(
+                "recommendations_eval_run_prune_tenant_failed",
+                tenant_schema=schema,
+                exc_info=True,
+            )
+            continue
+        tenants_pruned += 1
+        runs_deleted += deleted
+        if deleted:
+            _log.info(
+                "recommendations_eval_runs_pruned",
+                tenant_schema=schema,
+                runs_deleted=deleted,
+                retention_days=retention_days,
+            )
+
+    return {
+        "tenants_scanned": len(schemas),
+        "tenants_pruned": tenants_pruned,
+        "runs_deleted": runs_deleted,
+    }
