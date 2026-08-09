@@ -24,13 +24,23 @@ pytestmark = [pytest.mark.integration]
 _RETENTION_DAYS = 100
 
 
-async def _new_tenant_schema(admin_session: Any, prefix: str) -> str:
-    slug = f"{prefix}-{uuid4().hex[:8]}"
-    tenancy = get_tenant_service(admin_session)
-    tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
-    await admin_session.commit()
-    await admin_session.execute(text(f'SET search_path TO "{tenant.schema_name}", public'))
-    return str(tenant.schema_name)
+# One tenant for the whole module. Creating a tenant replays every tenant
+# migration — seconds each in CI — and a schema per test here is what pushed
+# the integration job past its 20-minute budget. Safe to share: the prune is
+# tenant-wide by design, and each test seeds and asserts on its own run ids.
+_SCHEMA: dict[str, str] = {}
+
+
+async def _shared_schema(admin_session: Any) -> str:
+    if "name" not in _SCHEMA:
+        slug = f"prune-{uuid4().hex[:8]}"
+        tenancy = get_tenant_service(admin_session)
+        tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
+        await admin_session.commit()
+        _SCHEMA["name"] = str(tenant.schema_name)
+    schema = _SCHEMA["name"]
+    await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
+    return schema
 
 
 async def _seed_run_with_trace(session: Any, *, age_days: int) -> str:
@@ -83,7 +93,7 @@ async def _counts(session: Any, run_id: str) -> tuple[int, int]:
 async def test_prune_drops_old_runs_with_their_traces_and_keeps_recent_ones(
     admin_session: Any,
 ) -> None:
-    schema = await _new_tenant_schema(admin_session, "prune")
+    schema = await _shared_schema(admin_session)
 
     stale = await _seed_run_with_trace(admin_session, age_days=_RETENTION_DAYS + 1)
     fresh = await _seed_run_with_trace(admin_session, age_days=_RETENTION_DAYS - 1)
@@ -111,7 +121,7 @@ async def test_an_unfinished_run_is_still_prunable(admin_session: Any) -> None:
     """The cutoff reads ``started_at``, not ``finished_at``. A run whose
     worker died never gets a finish time, and keying retention off that
     column would make exactly the runs you least want to keep immortal."""
-    schema = await _new_tenant_schema(admin_session, "prunestuck")
+    schema = await _shared_schema(admin_session)
 
     stuck = await _seed_run_with_trace(admin_session, age_days=_RETENTION_DAYS + 5)
     await admin_session.execute(
@@ -130,7 +140,7 @@ async def test_an_unfinished_run_is_still_prunable(admin_session: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_prune_reports_what_it_scanned(admin_session: Any) -> None:
-    schema = await _new_tenant_schema(admin_session, "prunecount")
+    schema = await _shared_schema(admin_session)
     await _seed_run_with_trace(admin_session, age_days=_RETENTION_DAYS + 2)
     await admin_session.commit()
     await admin_session.execute(text(f'SET search_path TO "{schema}", public'))

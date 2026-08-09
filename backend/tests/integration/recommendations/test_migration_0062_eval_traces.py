@@ -61,11 +61,26 @@ def _alembic_cfg(schema: str) -> Config:
 
 
 async def _new_tenant_schema(admin_session: Any, prefix: str) -> str:
+    """A fresh schema. Costly — it replays every tenant migration — so only
+    the round-trip test, which deliberately downgrades the schema it runs
+    against, gets one of its own."""
     slug = f"{prefix}-{uuid4().hex[:8]}"
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"o@{slug}.test")
     await admin_session.commit()
     return str(tenant.schema_name)
+
+
+# Shared by every test that only *reads* the schema or writes rows to it.
+# A schema per test is what pushed the integration job past its 20-minute
+# budget; these tests are independent of each other's rows.
+_SHARED: dict[str, str] = {}
+
+
+async def _shared_schema(admin_session: Any) -> str:
+    if "name" not in _SHARED:
+        _SHARED["name"] = await _new_tenant_schema(admin_session, "mig62")
+    return _SHARED["name"]
 
 
 async def _table_exists(session: Any, schema: str, table: str) -> bool:
@@ -155,7 +170,7 @@ def _insert_trace(**overrides: Any) -> tuple[str, dict[str, Any]]:
 
 @pytest.mark.asyncio
 async def test_0062_creates_the_names_its_downgrade_drops(admin_session: Any) -> None:
-    schema = await _new_tenant_schema(admin_session, "mig62")
+    schema = await _shared_schema(admin_session)
 
     for table in _TABLES:
         assert await _table_exists(admin_session, schema, table), f"{table} missing"
@@ -189,7 +204,7 @@ async def test_a_skipped_trace_must_name_the_axis_that_rejected_it(
     admin_session: Any,
 ) -> None:
     """ "skipped" with no axis is the non-answer the table exists to replace."""
-    schema = await _new_tenant_schema(admin_session, "mig62a")
+    schema = await _shared_schema(admin_session)
     run_id = await _seed_run(admin_session, schema)
 
     sql, params = _insert_trace(run_id=run_id, status="skipped", skip_axis=None)
@@ -206,7 +221,7 @@ async def test_a_skipped_trace_must_name_the_axis_that_rejected_it(
 
 @pytest.mark.asyncio
 async def test_status_and_axis_vocabularies_are_enforced(admin_session: Any) -> None:
-    schema = await _new_tenant_schema(admin_session, "mig62v")
+    schema = await _shared_schema(admin_session)
     run_id = await _seed_run(admin_session, schema)
 
     sql, params = _insert_trace(run_id=run_id, status="definitely_not_a_status")
@@ -225,7 +240,7 @@ async def test_status_and_axis_vocabularies_are_enforced(admin_session: Any) -> 
 async def test_a_cell_id_cannot_ride_on_a_block_scoped_trace(admin_session: Any) -> None:
     """A block-scoped walk has no cell. Storing one would attribute a
     block-level verdict to a zone that never had its own evaluation."""
-    schema = await _new_tenant_schema(admin_session, "mig62c")
+    schema = await _shared_schema(admin_session)
     run_id = await _seed_run(admin_session, schema)
 
     sql, params = _insert_trace(run_id=run_id, scope="block", cell_id=str(uuid4()))
@@ -238,7 +253,7 @@ async def test_a_cell_id_cannot_ride_on_a_block_scoped_trace(admin_session: Any)
 async def test_traces_cascade_when_their_run_is_deleted(admin_session: Any) -> None:
     """Retention is deferred, but it will be expressed as "delete old runs" —
     which only works if the traces follow."""
-    schema = await _new_tenant_schema(admin_session, "mig62x")
+    schema = await _shared_schema(admin_session)
     run_id = await _seed_run(admin_session, schema)
 
     sql, params = _insert_trace(run_id=run_id)
