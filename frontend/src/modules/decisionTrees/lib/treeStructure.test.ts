@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyAddNode,
+  applyCodeToYaml,
   applyDeleteNode,
   applyDeleteUnreachable,
   applyRewireBranch,
@@ -261,5 +262,44 @@ nodes:
 `;
     const errors = validateTreeStructure(partial);
     expect(errors.some((e) => e.message.includes("ghost"))).toBe(true);
+  });
+});
+
+describe("applyCodeToYaml", () => {
+  it("rewrites the placeholder code line", () => {
+    expect(applyCodeToYaml("code: REPLACE_ME\nname_en: X\n", "newttt")).toBe(
+      "code: newttt\nname_en: X\n",
+    );
+  });
+
+  it("rewrites a code line that already holds a real-looking code", () => {
+    // The regression: the create page's seeded body carried
+    // `code: my_tree_v1`, which the old REPLACE_ME-only replace left
+    // alone, so the first save always failed the backend's mismatch check.
+    expect(applyCodeToYaml("code: my_tree_v1\nname_en: X\n", "newttt")).toBe(
+      "code: newttt\nname_en: X\n",
+    );
+  });
+
+  it("inserts a code line when the body has none", () => {
+    expect(applyCodeToYaml("name_en: X\n", "newttt")).toBe("code: newttt\nname_en: X\n");
+  });
+
+  it("leaves an indented code key alone", () => {
+    const yaml = `code: REPLACE_ME
+nodes:
+  root:
+    condition:
+      tree:
+        left: { source: signals, code: soil_moisture, key: value_numeric }
+`;
+    const out = applyCodeToYaml(yaml, "newttt");
+    expect(out.startsWith("code: newttt\n")).toBe(true);
+    expect(out).toContain("source: signals, code: soil_moisture");
+  });
+
+  it("trims the code and ignores an empty one", () => {
+    expect(applyCodeToYaml("code: REPLACE_ME\n", "  spaced  ")).toBe("code: spaced\n");
+    expect(applyCodeToYaml("code: REPLACE_ME\n", "   ")).toBe("code: REPLACE_ME\n");
   });
 });

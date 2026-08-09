@@ -65,8 +65,8 @@ name_ar: شجرة جديدة
 description_en: One-paragraph what + why.
 description_ar: ""
 
-crop_code: null
-applicable_regions: []
+# Targeting (crops / countries / soils / execution scope) is form-driven —
+# whatever the pickers say is written onto the tree when it is saved.
 
 root: root
 nodes:
@@ -98,6 +98,32 @@ nodes:
       text_en: Replace this leaf with a real action.
       text_ar: ""
 `;
+
+/** Rewrite the top-level `code:` line so the YAML body always carries the
+ *  code typed into the create form.
+ *
+ *  The form field owns the code — the backend compiles the YAML and then
+ *  rejects the save outright when `code:` in the body disagrees with the
+ *  code on the request ("YAML body has code X but the URL says Y"). The
+ *  seeded body used to carry a placeholder code that nothing rewrote, so
+ *  the very first save of a hand-authored tree always failed that check.
+ *
+ *  Text surgery rather than parse-and-dump on purpose: templates use
+ *  folded block scalars and authors leave comments, and js-yaml's dump
+ *  would rewrite the whole document to normalize one scalar.
+ *
+ *  An empty `code` leaves the body untouched — there is nothing to sync
+ *  to yet, and the create buttons are disabled until the field is filled.
+ */
+export function applyCodeToYaml(yaml: string, code: string): string {
+  const trimmed = code.trim();
+  if (!trimmed) return yaml;
+  const line = `code: ${trimmed}`;
+  // Top-level key only: `^code:` anchors at column 0, so a nested `code:`
+  // (a signals ref inside a condition, say) is indented and never matches.
+  if (/^code:.*$/m.test(yaml)) return yaml.replace(/^code:.*$/m, line);
+  return `${line}\n${yaml}`;
+}
 
 // ---- Read helpers -----------------------------------------------------
 

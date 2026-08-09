@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
-import { STARTER_TREE_YAML } from "../lib/treeStructure";
+import { STARTER_TREE_YAML, applyCodeToYaml } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
 import { Card } from "@/components/Card";
@@ -15,14 +15,20 @@ import { PageHeader } from "@/components/PageHeader";
 // Default for the YAML textarea when the page first loads. Authors who
 // want to start clean can pick "Empty" from the template picker and
 // click Start from scratch instead of touching this body at all.
-const DEFAULT_YAML = `code: my_tree_v1
+//
+// `code:` is REPLACE_ME like every template: the form field owns the code
+// and `applyCodeToYaml` writes it in as the author types. It used to be a
+// realistic-looking `my_tree_v1`, which nothing rewrote — so the first
+// save of a from-scratch tree always died on the backend's code-mismatch
+// check with no hint that the form field was the thing to reconcile.
+const DEFAULT_YAML = `code: REPLACE_ME
 name_en: My new tree
 name_ar: شجرتي الجديدة
 description_en: One-paragraph what + why.
 description_ar: ...
 
-crop_code: null
-applicable_regions: []
+# Targeting (crops / countries / soils / execution scope) is form-driven —
+# whatever the pickers above say is written onto the tree when it is saved.
 
 root: root
 nodes:
@@ -79,13 +85,22 @@ export function DecisionTreeCreatePage(): ReactNode {
     return <Navigate to="/decision-trees" replace />;
   }
 
+  // The code field is the source of truth for `code:` in the body, so
+  // every keystroke rewrites that one line. Without this the author sees
+  // the form and the YAML disagree and the save fails on the backend's
+  // code-mismatch check.
+  const onCodeChange = (next: string): void => {
+    setCode(next);
+    setYamlBody((prev) => applyCodeToYaml(prev, next));
+  };
+
   // Swap the YAML body when the user picks a different template. We
   // also reset the template id to "custom" if the author then edits
   // the YAML by hand, so the dropdown reflects the divergence.
   const onTemplateChange = (id: string): void => {
     setTemplateId(id);
     const tpl = getTemplate(id);
-    if (tpl) setYamlBody(tpl.yaml);
+    if (tpl) setYamlBody(applyCodeToYaml(tpl.yaml, code));
   };
   const onYamlEdit = (next: string): void => {
     setYamlBody(next);
@@ -103,7 +118,7 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   const onStartFromScratch = (): void => {
     if (!code.trim() || !targetingReady) return;
-    const yaml = STARTER_TREE_YAML.replace("REPLACE_ME", code.trim());
+    const yaml = applyCodeToYaml(STARTER_TREE_YAML, code);
     create.mutate(
       {
         code: code.trim(),
@@ -121,10 +136,10 @@ export function DecisionTreeCreatePage(): ReactNode {
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
     if (!targetingReady) return;
-    // If a template is selected (other than "custom"), make sure the
-    // code in the YAML matches the form field — otherwise the
-    // backend stores the wrong code on the tree row.
-    const yaml = yamlBody.replace(/^code:\s*REPLACE_ME$/m, `code: ${code.trim()}`);
+    // Re-apply on submit as well as on keystroke: the author may have
+    // hand-edited the `code:` line in the textarea, and the form field is
+    // what the backend compares against.
+    const yaml = applyCodeToYaml(yamlBody, code);
     create.mutate(
       {
         code: code.trim(),
@@ -154,7 +169,7 @@ export function DecisionTreeCreatePage(): ReactNode {
                 {...props}
                 required
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => onCodeChange(e.target.value)}
                 placeholder={t("create.fields.codePlaceholder")}
                 pattern="^[a-z0-9][a-z0-9_-]*$"
                 className={`${FIELD_CONTROL_CLASS} sm:max-w-sm`}
