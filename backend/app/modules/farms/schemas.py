@@ -1159,6 +1159,79 @@ class BulkCropApplyResponse(BaseModel):
     items: list[BulkCropApplyItem]
 
 
+# ---------- Bulk crop-assignment removal ------------------------------------
+#
+# Erasing assignments entered by mistake. This is a HARD delete: the rows are
+# gone, and `deleted_at` is deliberately not used. There is therefore no undo,
+# which is precisely why `:remove-preview` exists and why the response counts
+# the dependent rows that go with them.
+
+
+class BulkCropRemovalRequest(BaseModel):
+    """Body for both `:remove-preview` and `:remove`.
+
+    Exactly one selector. ``block_ids`` is the blunt instrument — every
+    assignment on those blocks, history included. ``block_crop_ids`` is the
+    surgical one behind "undo this run", which knows the ids it just created
+    and must not touch anything else on the same block.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_ids: list[UUID] | None = Field(default=None, max_length=500)
+    block_crop_ids: list[UUID] | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _exactly_one_selector(self) -> BulkCropRemovalRequest:
+        chosen = [s for s in (self.block_ids, self.block_crop_ids) if s is not None]
+        if len(chosen) != 1:
+            raise ValueError("provide exactly one of block_ids or block_crop_ids")
+        if not chosen[0]:
+            raise ValueError("the selector must not be empty")
+        if len(set(chosen[0])) != len(chosen[0]):
+            raise ValueError("the selector contains duplicates")
+        return self
+
+
+class BulkCropRemovalAssignment(BaseModel):
+    """One assignment that would be (or was) destroyed."""
+
+    block_crop_id: UUID
+    crop_path: str
+    season_label: str
+    effective_from: date
+    effective_to: date | None = None
+    is_current: bool
+
+
+class BulkCropRemovalItem(BaseModel):
+    block_id: UUID
+    code: str
+    name: str | None = None
+    # Named so a client cannot mistake a preview for a result.
+    assignments: list[BulkCropRemovalAssignment]
+    removed_count: int = 0
+    detail: str | None = None
+
+
+class BulkCropRemovalResponse(BaseModel):
+    farm_id: UUID
+    block_count: int
+    assignment_count: int
+    # Cascade fallout, spelled out because a hard delete cannot be undone and
+    # these rows would otherwise disappear silently.
+    attribute_value_count: int
+    attribute_value_log_count: int
+    growth_stage_log_count: int
+    # Not a cascade — `recommendations.block_crop_id` has no FK, so these are
+    # nulled explicitly rather than deleted.
+    recommendation_unlink_count: int
+    # Assignments a `replace` run auto-closed that this removal un-closes, so
+    # undoing a run restores the crop the block had before it.
+    reopened_count: int = 0
+    items: list[BulkCropRemovalItem]
+
+
 # ---------- Growth-stage logs ----------------------------------------------
 
 GrowthStageSource = Literal["manual", "derived", "imported"]

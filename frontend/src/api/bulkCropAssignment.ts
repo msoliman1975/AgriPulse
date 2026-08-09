@@ -136,3 +136,70 @@ export async function applyBulkCropAssignment(
   );
   return data;
 }
+
+// ---- Removal (HARD delete) --------------------------------------------------
+//
+// Permanently erases assignments entered by mistake. There is no undo behind
+// this, which is why `previewBulkCropRemoval` exists and why the response
+// counts the dependent rows that go with them.
+
+export interface BulkCropRemovalAssignment {
+  block_crop_id: string;
+  crop_path: string;
+  season_label: string;
+  effective_from: string;
+  effective_to: string | null;
+  is_current: boolean;
+}
+
+export interface BulkCropRemovalItem {
+  block_id: string;
+  code: string;
+  name: string | null;
+  assignments: BulkCropRemovalAssignment[];
+  removed_count: number;
+  detail: string | null;
+}
+
+export interface BulkCropRemoval {
+  farm_id: string;
+  block_count: number;
+  assignment_count: number;
+  attribute_value_count: number;
+  attribute_value_log_count: number;
+  growth_stage_log_count: number;
+  recommendation_unlink_count: number;
+  /** Assignments a `replace` run auto-closed that this removal un-closes. */
+  reopened_count: number;
+  items: BulkCropRemovalItem[];
+}
+
+/** Exactly one selector. `block_ids` wipes those blocks entirely, history
+ *  included; `block_crop_ids` removes only those rows, which is what "undo
+ *  this run" needs so it cannot touch the block's earlier seasons. */
+export interface BulkCropRemovalPayload {
+  block_ids?: string[];
+  block_crop_ids?: string[];
+}
+
+export async function previewBulkCropRemoval(
+  farmId: string,
+  payload: BulkCropRemovalPayload,
+): Promise<BulkCropRemoval> {
+  const { data } = await apiClient.post<BulkCropRemoval>(
+    `/v1/farms/${farmId}/bulk/crop-assignment:remove-preview`,
+    payload,
+  );
+  return data;
+}
+
+export async function removeBulkCropAssignments(
+  farmId: string,
+  payload: BulkCropRemovalPayload,
+): Promise<BulkCropRemoval> {
+  const { data } = await apiClient.post<BulkCropRemoval>(
+    `/v1/farms/${farmId}/bulk/crop-assignment:remove`,
+    payload,
+  );
+  return data;
+}

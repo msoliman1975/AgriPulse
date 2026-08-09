@@ -247,6 +247,24 @@ class CropAssignmentRangeError(APIError):
         )
 
 
+class CropAssignmentRemovalError(APIError):
+    """A hard delete removed a different number of rows than it selected. 409.
+
+    Only reachable if something changed the rows between the SELECT and the
+    DELETE inside one transaction. Raised rather than swallowed so the run
+    rolls back instead of reporting a count that was never true — with no undo
+    behind it, a wrong number here is worse than an error.
+    """
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Crop assignment removal did not match its preview",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/crop-assignment-removal",
+        )
+
+
 class FarmCodeConflictError(APIError):
     def __init__(self, code: str) -> None:
         super().__init__(

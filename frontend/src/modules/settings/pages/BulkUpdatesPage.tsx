@@ -10,6 +10,7 @@ import {
   type BulkCropApplyResult,
   type BulkCropAssignmentPayload,
   type BulkCropPreview,
+  type BulkCropRemoval,
 } from "@/api/bulkCropAssignment";
 import { resolveCropAttributes } from "@/api/crops";
 import { isApiError } from "@/api/errors";
@@ -37,6 +38,7 @@ import {
 } from "@/modules/farms/lib/cropAttributeForm";
 import { BulkBlockPicker, type BlockOverride } from "@/modules/settings/components/BulkBlockPicker";
 import { BulkCropOutcomeTable } from "@/modules/settings/components/BulkCropOutcomeTable";
+import { BulkCropRemovalPanel } from "@/modules/settings/components/BulkCropRemovalPanel";
 import { useCapability } from "@/rbac/useCapability";
 
 const INPUT =
@@ -50,6 +52,7 @@ type StepId = 1 | 2 | 3 | 4;
  *  a crop screen that will need renaming when the second arrives. */
 const DATA_TYPES = [
   { id: "crop", live: true },
+  { id: "removeCrop", live: true },
   { id: "irrigation", live: false },
   { id: "grid", live: false },
   { id: "subscriptions", live: false },
@@ -93,6 +96,12 @@ export function BulkUpdatesPage(): ReactNode {
   const [preview, setPreview] = useState<BulkCropPreview | null>(null);
   const [result, setResult] = useState<BulkCropApplyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [removal, setRemoval] = useState<BulkCropRemoval | null>(null);
+  const [undoing, setUndoing] = useState(false);
+
+  // Removal skips the whole crop form: there are no values to write, only
+  // blocks to pick and a destruction to confirm.
+  const removing = dataType === "removeCrop";
 
   const farmsQuery = useQuery({ queryKey: ["farms", "bulk"], queryFn: () => listFarms({}) });
   const farms = useMemo(() => farmsQuery.data?.items ?? [], [farmsQuery.data]);
@@ -188,6 +197,7 @@ export function BulkUpdatesPage(): ReactNode {
   const blockingReason = ((): string | null => {
     if (step === 1) return farmId ? null : t("validation.pickFarm");
     if (step === 2) {
+      if (removing) return null;
       if (!cropId || !depthComplete) return t("validation.pickCrop");
       if (!season.trim()) return t("validation.season");
       if (attrMissing.length > 0) return t("validation.cropField");
@@ -205,6 +215,7 @@ export function BulkUpdatesPage(): ReactNode {
     if (next !== 4) {
       setPreview(null);
       setResult(null);
+      setRemoval(null);
     }
     setStep(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -213,6 +224,7 @@ export function BulkUpdatesPage(): ReactNode {
   const resetRun = (): void => {
     setPreview(null);
     setResult(null);
+    setRemoval(null);
     setSelected(new Set());
     setOverrides({});
     setStep(1);
@@ -365,7 +377,14 @@ export function BulkUpdatesPage(): ReactNode {
       ) : null}
 
       {/* ================= step 2 — values ================= */}
-      {step === 2 ? (
+      {step === 2 && removing ? (
+        <Card title={t("remove.stepTitle")}>
+          <StatusBanner kind="warn">{t("remove.warning")}</StatusBanner>
+          <p className="mt-3 text-sm text-ap-muted">{t("remove.stepBody")}</p>
+        </Card>
+      ) : null}
+
+      {step === 2 && !removing ? (
         <>
           <Card title={t("details.cropTitle")}>
             <CropPicker
@@ -528,7 +547,40 @@ export function BulkUpdatesPage(): ReactNode {
       ) : null}
 
       {/* ================= step 4 — preview & apply ================= */}
-      {step === 4 ? (
+      {step === 4 && removing ? (
+        removal === null ? (
+          <BulkCropRemovalPanel
+            farmId={farmId as string}
+            payload={{ block_ids: [...selected] }}
+            onRemoved={(r) => {
+              setRemoval(r);
+              void queryClient.invalidateQueries({
+                queryKey: ["bulk_crop_candidates", farmId],
+              });
+            }}
+            onCancel={() => goTo(3)}
+          />
+        ) : (
+          <>
+            <StatusBanner kind="info">
+              {t("remove.done", {
+                assignments: removal.assignment_count,
+                blocks: removal.block_count,
+              })}
+            </StatusBanner>
+            <Card>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="secondary" onClick={resetRun}>
+                  {t("result.startAnother")}
+                </Button>
+                <span className="text-sm text-ap-muted">{t("result.auditNote")}</span>
+              </div>
+            </Card>
+          </>
+        )
+      ) : null}
+
+      {step === 4 && !removing ? (
         <>
           {result === null && preview === null ? (
             <Card title={t("review.title")}>
@@ -595,8 +647,40 @@ export function BulkUpdatesPage(): ReactNode {
                 })}
               </StatusBanner>
               <BulkCropOutcomeTable items={result.items} />
+              {/* Undo removes exactly the assignments this run created --
+                  never the block's earlier seasons -- and un-closes whatever
+                  a `replace` had closed, so the block goes back to the crop it
+                  was carrying rather than to nothing. */}
+              {undoing ? (
+                <BulkCropRemovalPanel
+                  farmId={farmId as string}
+                  payload={{
+                    block_crop_ids: result.items
+                      .map((i) => i.block_crop_id)
+                      .filter((id): id is string => Boolean(id)),
+                  }}
+                  onRemoved={(r) => {
+                    setRemoval(r);
+                    setUndoing(false);
+                    void queryClient.invalidateQueries({
+                      queryKey: ["bulk_crop_candidates", farmId],
+                    });
+                  }}
+                  onCancel={() => setUndoing(false)}
+                />
+              ) : null}
+              {removal !== null ? (
+                <StatusBanner kind="info">
+                  {t("remove.undone", { assignments: removal.assignment_count })}
+                </StatusBanner>
+              ) : null}
               <Card>
                 <div className="flex flex-wrap items-center gap-3">
+                  {!undoing && removal === null && result.applied_count > 0 ? (
+                    <Button variant="danger" onClick={() => setUndoing(true)}>
+                      {t("remove.undoRun", { count: result.applied_count })}
+                    </Button>
+                  ) : null}
                   <Button variant="secondary" onClick={resetRun}>
                     {t("result.startAnother")}
                   </Button>

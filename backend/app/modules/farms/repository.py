@@ -16,7 +16,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, or_, select, text, update
+from sqlalchemy import and_, case, func, or_, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
@@ -1374,6 +1374,181 @@ class FarmsRepository:
             grouped.setdefault(row.block_id, []).append(row)
         return grouped
 
+    # ---- Removal (hard delete) -------------------------------------------
+    #
+    # Deliberately NOT soft delete. `deleted_at` exists and would have been the
+    # safer default, but the ask was an actual erase for assignments entered by
+    # mistake, so these rows really go. The preview counts below exist because
+    # of that: with no undo, the only protection is telling the user exactly
+    # what is about to be destroyed.
+
+    async def list_block_crops_for_removal(
+        self,
+        *,
+        farm_id: UUID,
+        block_ids: Sequence[UUID] | None = None,
+        block_crop_ids: Sequence[UUID] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Assignments eligible for removal, joined to their block.
+
+        Always scoped to ``farm_id`` even when selecting by ``block_crop_ids``:
+        the capability was checked against the farm, so an id from another farm
+        must not be reachable here. It simply does not come back, and the
+        service reports it as skipped.
+        """
+        stmt = (
+            select(
+                BlockCrop.id,
+                BlockCrop.block_id,
+                BlockCrop.crop_path,
+                BlockCrop.season_label,
+                BlockCrop.effective_from,
+                BlockCrop.effective_to,
+                BlockCrop.is_current,
+                Block.code.label("block_code"),
+                Block.name.label("block_name"),
+            )
+            .join(Block, Block.id == BlockCrop.block_id)
+            .where(Block.farm_id == farm_id, Block.deleted_at.is_(None))
+        )
+        if block_ids is not None:
+            stmt = stmt.where(BlockCrop.block_id.in_(list(block_ids)))
+        if block_crop_ids is not None:
+            stmt = stmt.where(BlockCrop.id.in_(list(block_crop_ids)))
+        stmt = stmt.order_by(Block.code.asc(), BlockCrop.effective_from.desc())
+        rows = (await self._tenant.execute(stmt)).all()
+        return [dict(r._mapping) for r in rows]
+
+    async def count_removal_dependents(self, *, block_crop_ids: Sequence[UUID]) -> dict[str, int]:
+        """What a hard delete would take with it.
+
+        The first three cascade (``ON DELETE CASCADE`` on their FKs) and would
+        vanish without the user ever being told. ``recommendations`` is the odd
+        one out: it carries ``block_crop_id`` with **no** foreign key, so a
+        delete leaves a dangling pointer rather than cascading — which is why
+        the service nulls those explicitly instead of relying on the database.
+        """
+        if not block_crop_ids:
+            return {
+                "attribute_values": 0,
+                "attribute_value_logs": 0,
+                "growth_stage_logs": 0,
+                "recommendations": 0,
+            }
+        ids = list(block_crop_ids)
+
+        async def _count(model: Any) -> int:
+            return int(
+                (
+                    await self._tenant.execute(
+                        select(func.count()).select_from(model).where(model.block_crop_id.in_(ids))
+                    )
+                ).scalar_one()
+            )
+
+        recs = int(
+            (
+                await self._tenant.execute(
+                    text(
+                        "SELECT count(*) FROM recommendations "
+                        "WHERE block_crop_id = ANY(CAST(:ids AS uuid[]))"
+                    ),
+                    {"ids": [str(i) for i in ids]},
+                )
+            ).scalar_one()
+        )
+        return {
+            "attribute_values": await _count(BlockCropAttributeValue),
+            "attribute_value_logs": await _count(BlockCropAttributeValueLog),
+            "growth_stage_logs": await _count(GrowthStageLog),
+            "recommendations": recs,
+        }
+
+    async def unlink_recommendations(self, *, block_crop_ids: Sequence[UUID]) -> int:
+        """Null ``recommendations.block_crop_id`` for assignments about to go.
+
+        There is no FK, so nothing would clean these up. A dangling id is worse
+        than a null: a null reads as "no crop context", while a dangling one
+        looks resolvable and silently resolves to nothing.
+        """
+        if not block_crop_ids:
+            return 0
+        result = await self._tenant.execute(
+            text(
+                "UPDATE recommendations SET block_crop_id = NULL "
+                "WHERE block_crop_id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": [str(i) for i in block_crop_ids]},
+        )
+        return _rowcount(result)
+
+    async def find_auto_closed_siblings(
+        self,
+        *,
+        pairs: Sequence[tuple[UUID, Any]],
+        exclude_ids: Sequence[UUID],
+    ) -> list[UUID]:
+        """Assignments that were closed exactly where a departing one started.
+
+        When a run assigns with ``conflict_mode: replace``, the block's open
+        assignment is auto-closed at the new one's ``effective_from``. Deleting
+        the new row alone would leave the old one closed and the block with no
+        crop at all — a worse state than the mistake being undone. Matching on
+        ``effective_to == effective_from`` is exactly the auto-close's own
+        signature, so nothing else gets swept up.
+        """
+        if not pairs:
+            return []
+        stmt = select(BlockCrop.id).where(
+            BlockCrop.deleted_at.is_(None),
+            tuple_(BlockCrop.block_id, BlockCrop.effective_to).in_(list(pairs)),
+        )
+        if exclude_ids:
+            stmt = stmt.where(BlockCrop.id.not_in(list(exclude_ids)))
+        return list((await self._tenant.execute(stmt)).scalars().all())
+
+    async def reopen_assignments(self, *, block_crop_ids: Sequence[UUID]) -> int:
+        """Un-close them, and make one current again where that is unambiguous.
+
+        Must run AFTER the delete: `uq_block_crops_current` is partial on
+        `is_current = TRUE` and does not exclude anything, so flipping the flag
+        while the removed row still holds it would violate the index. The NOT
+        EXISTS guard covers the remaining case — a block that somehow still has
+        another current row keeps it, and this one reopens without the flag.
+        """
+        if not block_crop_ids:
+            return 0
+        result = await self._tenant.execute(
+            text(
+                """
+                UPDATE block_crops b
+                   SET effective_to = NULL,
+                       is_current = (
+                           b.effective_from <= CURRENT_DATE
+                           AND NOT EXISTS (
+                               SELECT 1 FROM block_crops o
+                                WHERE o.block_id = b.block_id
+                                  AND o.id <> b.id
+                                  AND o.is_current
+                                  AND o.deleted_at IS NULL
+                           )
+                       )
+                 WHERE b.id = ANY(CAST(:ids AS uuid[]))
+                """
+            ),
+            {"ids": [str(i) for i in block_crop_ids]},
+        )
+        return _rowcount(result)
+
+    async def hard_delete_block_crops(self, *, block_crop_ids: Sequence[UUID]) -> int:
+        if not block_crop_ids:
+            return 0
+        result = await self._tenant.execute(
+            text("DELETE FROM block_crops WHERE id = ANY(CAST(:ids AS uuid[]))"),
+            {"ids": [str(i) for i in block_crop_ids]},
+        )
+        return _rowcount(result)
+
     async def get_block_crop(self, *, block_crop_id: UUID) -> BlockCrop | None:
         return (
             await self._tenant.execute(
@@ -2050,6 +2225,20 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
     if with_boundary:
         out["boundary"] = _decode_geojson(row.boundary_geojson)
     return out
+
+
+def _rowcount(result: Any) -> int:
+    """Affected-row count from a DML result.
+
+    `Result` does not declare `rowcount` — only `CursorResult` does — so the
+    cast is what keeps mypy strict happy. Same shape as the attachment
+    soft-delete below; kept as a helper because the removal path needs it
+    twice and a wrong count there would misreport a destructive operation.
+    """
+    from sqlalchemy.engine import CursorResult
+
+    cursor_result: CursorResult[Any] = result
+    return int(cursor_result.rowcount or 0)
 
 
 def _resolve_crop_path(

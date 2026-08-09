@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { assignBlockCrop } from "@/api/cropAssignments";
 import { isApiError } from "@/api/errors";
 import { CropPicker } from "@/modules/farms/components/CropPicker";
+import { BulkCropRemovalPanel } from "@/modules/settings/components/BulkCropRemovalPanel";
 import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
@@ -30,7 +31,11 @@ export function BlockCropAssignCard({
   onAssigned,
 }: Props): ReactNode {
   const canAssign = useCapability("crop_assignment.create", { farmId });
+  // Erasing a block's crop history is a strictly bigger power than assigning
+  // one, so it has its own capability rather than riding on `create`.
+  const canRemove = useCapability("crop_assignment.delete", { farmId });
   const [open, setOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [cropId, setCropId] = useState<string | null>(null);
   const [varietyId, setVarietyId] = useState<string | null>(null);
   const [strainId, setStrainId] = useState<string | null>(null);
@@ -40,7 +45,7 @@ export function BlockCropAssignCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!canAssign) return null;
+  if (!canAssign && !canRemove) return null;
 
   const reset = (): void => {
     setCropId(null);
@@ -74,15 +79,47 @@ export function BlockCropAssignCard({
     }
   };
 
+  if (removing) {
+    // Wipes every assignment on this block, history included -- the same
+    // panel (and the same typed confirmation) as the bulk surface, so the
+    // dangerous path has one implementation rather than two.
+    return (
+      <div className="mt-2">
+        <BulkCropRemovalPanel
+          farmId={farmId}
+          payload={{ block_ids: [blockId] }}
+          onRemoved={() => {
+            setRemoving(false);
+            onAssigned();
+          }}
+          onCancel={() => setRemoving(false)}
+        />
+      </div>
+    );
+  }
+
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-1 rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
-      >
-        {hasCurrentCrop ? "Change crop" : "Assign crop"}
-      </button>
+      <div className="mt-1 flex flex-wrap gap-2">
+        {canAssign ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+          >
+            {hasCurrentCrop ? "Change crop" : "Assign crop"}
+          </button>
+        ) : null}
+        {canRemove && hasCurrentCrop ? (
+          <button
+            type="button"
+            onClick={() => setRemoving(true)}
+            className="rounded border border-ap-crit/40 px-2 py-0.5 text-[11px] text-ap-crit hover:bg-ap-crit-soft"
+          >
+            Remove crop
+          </button>
+        ) : null}
+      </div>
     );
   }
 
