@@ -82,11 +82,6 @@ export function BulkUpdatesPage(): ReactNode {
   const [season, setSeason] = useState("");
   const [planting, setPlanting] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState("");
-  const [harvestStart, setHarvestStart] = useState("");
-  const [harvestEnd, setHarvestEnd] = useState("");
-  const [density, setDensity] = useState("");
-  const [rowSpacing, setRowSpacing] = useState("");
-  const [plantSpacing, setPlantSpacing] = useState("");
   const [notes, setNotes] = useState("");
   const [conflictMode, setConflictMode] = useState<BulkConflictMode>("skip");
 
@@ -132,8 +127,6 @@ export function BulkUpdatesPage(): ReactNode {
     });
   }, []);
 
-  const numeric = (value: string): number | null => (value === "" ? null : Number(value));
-
   const payload = useMemo((): BulkCropAssignmentPayload | null => {
     if (!cropId || !season) return null;
     return {
@@ -149,11 +142,6 @@ export function BulkUpdatesPage(): ReactNode {
       season_label: season,
       effective_from: effectiveFrom || null,
       planting_date: planting || null,
-      expected_harvest_start: harvestStart || null,
-      expected_harvest_end: harvestEnd || null,
-      plant_density_per_ha: numeric(density),
-      row_spacing_m: numeric(rowSpacing),
-      plant_spacing_m: numeric(plantSpacing),
       notes: notes || null,
       attributes: buildPayload(attrDefs, attrValues),
     };
@@ -167,11 +155,6 @@ export function BulkUpdatesPage(): ReactNode {
     season,
     effectiveFrom,
     planting,
-    harvestStart,
-    harvestEnd,
-    density,
-    rowSpacing,
-    plantSpacing,
     notes,
     attrDefs,
     attrValues,
@@ -431,68 +414,6 @@ export function BulkUpdatesPage(): ReactNode {
                     className={INPUT}
                     value={effectiveFrom}
                     onChange={(e) => setEffectiveFrom(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={t("details.harvestStart")}>
-                {(a11y) => (
-                  <input
-                    {...a11y}
-                    type="date"
-                    className={INPUT}
-                    value={harvestStart}
-                    onChange={(e) => setHarvestStart(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={t("details.harvestEnd")}>
-                {(a11y) => (
-                  <input
-                    {...a11y}
-                    type="date"
-                    className={INPUT}
-                    value={harvestEnd}
-                    onChange={(e) => setHarvestEnd(e.target.value)}
-                  />
-                )}
-              </Field>
-            </div>
-          </Card>
-
-          <Card title={t("details.spacingTitle")}>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label={t("details.density")}>
-                {(a11y) => (
-                  <input
-                    {...a11y}
-                    type="number"
-                    className={INPUT}
-                    value={density}
-                    onChange={(e) => setDensity(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={t("details.rowSpacing")}>
-                {(a11y) => (
-                  <input
-                    {...a11y}
-                    type="number"
-                    step="0.1"
-                    className={INPUT}
-                    value={rowSpacing}
-                    onChange={(e) => setRowSpacing(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={t("details.plantSpacing")}>
-                {(a11y) => (
-                  <input
-                    {...a11y}
-                    type="number"
-                    step="0.1"
-                    className={INPUT}
-                    value={plantSpacing}
-                    onChange={(e) => setPlantSpacing(e.target.value)}
                   />
                 )}
               </Field>

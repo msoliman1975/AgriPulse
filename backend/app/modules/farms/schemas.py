@@ -954,11 +954,6 @@ class BlockCropAssignRequest(BaseModel):
     effective_from: date | None = None
     effective_to: date | None = None
     planting_date: date | None = None
-    expected_harvest_start: date | None = None
-    expected_harvest_end: date | None = None
-    plant_density_per_ha: Decimal | None = None
-    row_spacing_m: Decimal | None = None
-    plant_spacing_m: Decimal | None = None
     # One of the crop's resolved ``size_classes`` codes (validated server-side).
     canopy_size_class: str | None = None
     notes: str | None = None
@@ -981,8 +976,6 @@ class BlockCropUpdateRequest(BaseModel):
 
     canopy_size_class: str | None = None
     growth_stage_locked: bool | None = None
-    expected_harvest_start: date | None = None
-    expected_harvest_end: date | None = None
     actual_harvest_date: date | None = None
     status: BlockCropStatus | None = None
     notes: str | None = None
@@ -1007,12 +1000,7 @@ class BlockCropResponse(BaseModel):
     # past | current | scheduled
     validity_state: str = "past"
     planting_date: date | None
-    expected_harvest_start: date | None
-    expected_harvest_end: date | None
     actual_harvest_date: date | None
-    plant_density_per_ha: Decimal | None
-    row_spacing_m: Decimal | None
-    plant_spacing_m: Decimal | None
     canopy_size_class: str | None = None
     growth_stage: str | None
     growth_stage_updated_at: datetime | None
@@ -1095,11 +1083,6 @@ class BulkCropAssignmentRequest(BaseModel):
     season_label: str = Field(min_length=1, max_length=64)
     effective_from: date | None = None
     planting_date: date | None = None
-    expected_harvest_start: date | None = None
-    expected_harvest_end: date | None = None
-    plant_density_per_ha: Decimal | None = None
-    row_spacing_m: Decimal | None = None
-    plant_spacing_m: Decimal | None = None
     canopy_size_class: str | None = None
     notes: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)

@@ -57,12 +57,6 @@
     "planting": "تاريخ الزراعة",
     "effectiveFrom": "ساري من",
     "effectiveFromHelp": "الافتراضي هو تاريخ الزراعة، وإلا فاليوم.",
-    "harvestStart": "بداية الحصاد المتوقعة",
-    "harvestEnd": "نهاية الحصاد المتوقعة",
-    "spacingTitle": "المسافات والكثافة",
-    "density": "كثافة النباتات (نبات/هكتار)",
-    "rowSpacing": "المسافة بين الخطوط (م)",
-    "plantSpacing": "المسافة بين النباتات (م)",
     "cropFieldsTitle": "حقول المحصول",
     "noCropFields": "لا توجد حقول إضافية معرّفة لهذا المحصول.",
     "notesTitle": "ملاحظات"

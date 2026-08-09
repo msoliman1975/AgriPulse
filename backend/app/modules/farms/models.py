@@ -477,12 +477,7 @@ class BlockCrop(Base, TimestampedMixin):
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     planting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    expected_harvest_start: Mapped[date | None] = mapped_column(Date, nullable=True)
-    expected_harvest_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     actual_harvest_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    plant_density_per_ha: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    row_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
-    plant_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     # Canopy size pick from the crop's resolved ``size_classes`` lookup; a
     # block-source field for the recommendation engine (small -> SAVI path).
     canopy_size_class: Mapped[str | None] = mapped_column(Text, nullable=True)

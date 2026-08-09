@@ -13,12 +13,7 @@ export interface BlockCropAssignment {
   crop_path: string;
   season_label: string;
   planting_date: string | null;
-  expected_harvest_start: string | null;
-  expected_harvest_end: string | null;
   actual_harvest_date: string | null;
-  plant_density_per_ha: number | null;
-  row_spacing_m: number | null;
-  plant_spacing_m: number | null;
   growth_stage: string | null;
   growth_stage_updated_at: string | null;
   /** Valid time, half-open `[from, to)`. `effective_to === null` = ongoing. */
@@ -42,11 +37,6 @@ export interface BlockCropAssignPayload {
   crop_variety_strain_id?: string | null;
   season_label: string;
   planting_date?: string | null;
-  expected_harvest_start?: string | null;
-  expected_harvest_end?: string | null;
-  plant_density_per_ha?: number | null;
-  row_spacing_m?: number | null;
-  plant_spacing_m?: number | null;
   notes?: string | null;
   /** Defaults to `planting_date`, else today. */
   effective_from?: string | null;
