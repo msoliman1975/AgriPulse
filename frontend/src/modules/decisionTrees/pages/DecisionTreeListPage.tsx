@@ -100,7 +100,14 @@ export function DecisionTreeListPage(): ReactNode {
         title={t("list.title")}
         subtitle={t("list.subtitle")}
         actions={
-          canManage ? <LinkButton to="/decision-trees/new">{t("list.newButton")}</LinkButton> : null
+          <span className="flex items-center gap-2">
+            <LinkButton to="/decision-tree-traces" variant="secondary">
+              {t("list.tracesButton")}
+            </LinkButton>
+            {canManage ? (
+              <LinkButton to="/decision-trees/new">{t("list.newButton")}</LinkButton>
+            ) : null}
+          </span>
         }
       />
 

@@ -1203,3 +1203,277 @@ class RecommendationsRepository:
             .all()
         )
         return [dict(r) for r in rows]
+
+    async def get_grid_cell_labels(self, *, block_id: UUID) -> dict[UUID, tuple[int, int]]:
+        """``{cell_id: (row_idx, col_idx)}`` for the block's live grid.
+
+        The dry-run needs the zone label for every cell it reports, and joining
+        per cell in the response loop would be one query per cell.
+
+        ``grid_cells`` carries no ``block_id`` — a cell belongs to a *grid
+        config*, and the config is what belongs to the block. Ownership has to
+        be reached through the join.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT gc.id, gc.row_idx, gc.col_idx
+                        FROM grid_cells gc
+                        JOIN grid_configs cfg
+                          ON cfg.id = gc.grid_config_id
+                         AND cfg.deleted_at IS NULL
+                         AND cfg.superseded_at IS NULL
+                        WHERE cfg.block_id = :block_id
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return {r["id"]: (r["row_idx"], r["col_idx"]) for r in rows}
+
+    # ---- Evaluation lineage (tenant 0062) ------------------------------
+
+    async def open_eval_run(self, *, kind: str, actor_user_id: UUID | None) -> UUID:
+        """Start a run and return its id. Counters are filled in by
+        ``close_eval_run`` once the work is done."""
+        run_id = (
+            await self._tenant.execute(
+                text(
+                    """
+                    INSERT INTO decision_tree_eval_runs (kind, actor_user_id)
+                    VALUES (:kind, :actor)
+                    RETURNING id
+                    """
+                ),
+                {"kind": kind, "actor": actor_user_id},
+            )
+        ).scalar_one()
+        return cast(UUID, run_id)
+
+    async def close_eval_run(
+        self,
+        *,
+        run_id: UUID,
+        blocks_evaluated: int,
+        trees_evaluated: int,
+        trees_skipped: int,
+        recommendations_opened: int,
+        alerts_opened: int,
+        traces_written: int,
+        outcome: str = "ok",
+        error: str | None = None,
+    ) -> None:
+        """Stamp the run's totals and finish time.
+
+        ``duration_ms`` is derived in SQL from ``started_at`` rather than timed
+        in Python: the sweep runs each block in its own transaction, so a
+        wall-clock measured around the loop would not survive a worker restart
+        mid-run, and the row already knows when it opened.
+        """
+        await self._tenant.execute(
+            text(
+                """
+                UPDATE decision_tree_eval_runs
+                   SET finished_at = now(),
+                       duration_ms =
+                           (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::int,
+                       blocks_evaluated = :blocks,
+                       trees_evaluated = :trees,
+                       trees_skipped = :skipped,
+                       recommendations_opened = :recs,
+                       alerts_opened = :alerts,
+                       traces_written = :traces,
+                       outcome = :outcome,
+                       error = :error
+                 WHERE id = :run_id
+                """
+            ).bindparams(bindparam("run_id", type_=PG_UUID(as_uuid=True))),
+            {
+                "run_id": run_id,
+                "blocks": blocks_evaluated,
+                "trees": trees_evaluated,
+                "skipped": trees_skipped,
+                "recs": recommendations_opened,
+                "alerts": alerts_opened,
+                "traces": traces_written,
+                "outcome": outcome,
+                "error": error,
+            },
+        )
+
+    async def insert_eval_traces(self, *, rows: list[dict[str, Any]]) -> int:
+        """Bulk-insert one block's traces; returns the number written.
+
+        One multi-row statement rather than a loop: a 121-cell grid with a
+        cell-scoped tree contributes 121 rows for a single block, and a round
+        trip per row would make the lineage cost more than the evaluation it
+        describes.
+        """
+        if not rows:
+            return 0
+        params = [
+            {
+                "run_id": r["run_id"],
+                "farm_id": r["farm_id"],
+                "block_id": r["block_id"],
+                "cell_id": r["cell_id"],
+                "tree_id": r["tree_id"],
+                "tree_code": r["tree_code"],
+                "tree_version": r["tree_version"],
+                "scope": r["scope"],
+                "status": r["status"],
+                "skip_axis": r["skip_axis"],
+                "skip_detail": _serialize_jsonb(r["skip_detail"]),
+                "node_path": _serialize_jsonb(r["node_path"]),
+                "resolved_values": _serialize_jsonb(r["resolved_values"]),
+                "param_overrides": _serialize_jsonb(r["param_overrides"]),
+                "outcome": _serialize_jsonb(r["outcome"]),
+                "recommendation_id": r["recommendation_id"],
+                "alert_id": r["alert_id"],
+                "duration_ms": r["duration_ms"],
+                "error": r["error"],
+            }
+            for r in rows
+        ]
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO decision_tree_eval_traces (
+                    run_id, farm_id, block_id, cell_id,
+                    tree_id, tree_code, tree_version, scope, status,
+                    skip_axis, skip_detail, node_path, resolved_values,
+                    param_overrides, outcome, recommendation_id, alert_id,
+                    duration_ms, error
+                ) VALUES (
+                    :run_id, :farm_id, :block_id, :cell_id,
+                    :tree_id, :tree_code, :tree_version, :scope, :status,
+                    :skip_axis, CAST(:skip_detail AS jsonb),
+                    CAST(:node_path AS jsonb), CAST(:resolved_values AS jsonb),
+                    CAST(:param_overrides AS jsonb), CAST(:outcome AS jsonb),
+                    :recommendation_id, :alert_id, :duration_ms, :error
+                )
+                """
+            ).bindparams(
+                bindparam("run_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("recommendation_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("alert_id", type_=PG_UUID(as_uuid=True)),
+            ),
+            params,
+        )
+        return len(params)
+
+    async def list_eval_runs(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                    SELECT id, kind, actor_user_id, started_at, finished_at,
+                           duration_ms, blocks_evaluated, trees_evaluated,
+                           trees_skipped, recommendations_opened, alerts_opened,
+                           traces_written, outcome, error
+                    FROM decision_tree_eval_runs
+                    ORDER BY started_at DESC, id DESC
+                    LIMIT :limit
+                    """
+                    ),
+                    {"limit": limit},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def list_eval_traces(
+        self,
+        *,
+        run_id: UUID | None = None,
+        block_id: UUID | None = None,
+        farm_id: UUID | None = None,
+        tree_code: str | None = None,
+        status_filter: tuple[str, ...] = (),
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Trace rows newest-first, with block and cell labels resolved.
+
+        ``node_path`` and ``resolved_values`` are deliberately **not** selected
+        here — a 200-row page of full walks is megabytes of JSONB the list view
+        never renders. ``get_eval_trace`` fetches them for one row.
+        """
+        clauses: list[str] = []
+        params: dict[str, Any] = {"limit": limit}
+        # Built alongside the clauses, never unconditionally: `bindparams`
+        # raises ArgumentError for a parameter the statement does not
+        # mention, so declaring all three up front 500s every call that
+        # omits one.
+        binds: list[Any] = []
+        for name, value in (
+            ("run_id", run_id),
+            ("block_id", block_id),
+            ("farm_id", farm_id),
+        ):
+            if value is None:
+                continue
+            clauses.append(f"t.{name} = :{name}")
+            params[name] = value
+            binds.append(bindparam(name, type_=PG_UUID(as_uuid=True)))
+        if tree_code is not None:
+            clauses.append("t.tree_code = :tree_code")
+            params["tree_code"] = tree_code
+        if status_filter:
+            clauses.append("t.status = ANY(:statuses)")
+            params["statuses"] = list(status_filter)
+        where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        # S608: every fragment above is a literal from the closed set of
+        # conditions; all values travel as bind parameters.
+        sql = (
+            "SELECT t.id, t.run_id, t.evaluated_at, t.farm_id, t.block_id, "  # noqa: S608
+            "       t.cell_id, t.tree_id, t.tree_code, t.tree_version, "
+            "       t.scope, t.status, t.skip_axis, t.skip_detail, "
+            "       t.outcome, t.recommendation_id, t.alert_id, "
+            "       t.duration_ms, t.error, "
+            "       COALESCE(b.name, b.code) AS block_name, "
+            "       c.row_idx AS cell_row, c.col_idx AS cell_col "
+            "FROM decision_tree_eval_traces t "
+            "LEFT JOIN blocks b ON b.id = t.block_id "
+            "LEFT JOIN grid_cells c ON c.id = t.cell_id"
+            f"{where_sql} "
+            "ORDER BY t.evaluated_at DESC, t.id DESC "
+            "LIMIT :limit"
+        )
+        rows = (await self._tenant.execute(text(sql).bindparams(*binds), params)).mappings().all()
+        return [dict(r) for r in rows]
+
+    async def get_eval_trace(self, *, trace_id: UUID) -> dict[str, Any] | None:
+        """One trace with its full walk — the drill-down payload."""
+        row = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                    SELECT t.*,
+                           COALESCE(b.name, b.code) AS block_name,
+                           c.row_idx AS cell_row, c.col_idx AS cell_col
+                    FROM decision_tree_eval_traces t
+                    LEFT JOIN blocks b ON b.id = t.block_id
+                    LEFT JOIN grid_cells c ON c.id = t.cell_id
+                    WHERE t.id = :trace_id
+                    """
+                    ).bindparams(bindparam("trace_id", type_=PG_UUID(as_uuid=True))),
+                    {"trace_id": trace_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None

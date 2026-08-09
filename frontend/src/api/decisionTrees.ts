@@ -161,8 +161,35 @@ export interface TreePathStepDTO {
   values: Record<string, unknown>;
 }
 
+/** One grid cell's verdict in a `scope: cell` dry-run. */
+export interface DryRunCell {
+  cell_id: string;
+  cell_row: number | null;
+  cell_col: number | null;
+  matched: boolean;
+  action_type: string | null;
+  severity: string | null;
+  text_en: string | null;
+  error: string | null;
+}
+
+/**
+ * Whether the tree's crop / country / soil filters admit this block.
+ * Reported, never enforced — the dry-run evaluates either way, but a tree the
+ * sweep would skip here no longer looks like one that runs.
+ */
+export interface DryRunTargeting {
+  matched: boolean;
+  axis: "crop" | "country" | "soil" | null;
+  required: string[];
+  /** null = the block (or its farm, for country) has no value on that axis. */
+  actual: string | null;
+}
+
 export interface DryRunResponse {
   matched: boolean;
+  scope: "block" | "cell";
+  targeting: DryRunTargeting | null;
   outcome: {
     action_type: string;
     severity: string;
@@ -172,9 +199,86 @@ export interface DryRunResponse {
     text_ar: string | null;
     valid_for_hours: number | null;
   } | null;
+  // For a cell-scoped tree these describe one representative cell (the first
+  // that fired, else the first evaluated) — a cell-scoped tree has no single
+  // block-level verdict. `cells` carries every cell's answer.
   path: TreePathStepDTO[];
   evaluation_snapshot: Record<string, unknown>;
   error: string | null;
+  cells_evaluated: number;
+  cells_matched: number;
+  cells: DryRunCell[];
+}
+
+// --- Evaluation lineage (tenant 0062) --------------------------------------
+
+export type EvalRunKind = "sweep" | "on_demand";
+export type EvalTraceStatus = "fired" | "clear" | "skipped" | "error";
+
+export interface EvalRun {
+  id: string;
+  kind: EvalRunKind;
+  actor_user_id: string | null;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  blocks_evaluated: number;
+  trees_evaluated: number;
+  trees_skipped: number;
+  recommendations_opened: number;
+  alerts_opened: number;
+  traces_written: number;
+  outcome: string;
+  error: string | null;
+}
+
+export interface EvalTrace {
+  id: string;
+  run_id: string;
+  evaluated_at: string;
+  farm_id: string;
+  block_id: string;
+  block_name: string | null;
+  cell_id: string | null;
+  cell_row: number | null;
+  cell_col: number | null;
+  tree_id: string;
+  tree_code: string;
+  tree_version: number;
+  scope: "block" | "cell";
+  status: EvalTraceStatus;
+  /** Which targeting axis excluded the tree; only set when status=skipped. */
+  skip_axis: "crop" | "country" | "soil" | null;
+  skip_detail: { required?: string[]; actual?: string | null } | null;
+  outcome: {
+    kind?: string;
+    action_type?: string;
+    severity?: string;
+    confidence?: string;
+    leaf_node_id?: string | null;
+    /** The tree fired but an open rec/alert already existed for this target. */
+    deduped?: boolean;
+  } | null;
+  recommendation_id: string | null;
+  alert_id: string | null;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+export interface EvalTraceDetail extends EvalTrace {
+  node_path: TreePathStepDTO[];
+  /** Empty on a `clear` row by design — the walk is kept, the values are not. */
+  resolved_values: Record<string, unknown>;
+  param_overrides: Record<string, unknown>;
+}
+
+export interface EvalTraceFilters {
+  run_id?: string;
+  block_id?: string;
+  farm_id?: string;
+  tree_code?: string;
+  status?: EvalTraceStatus[];
+  limit?: number;
 }
 
 export async function listDecisionTrees(
@@ -257,6 +361,36 @@ export async function dryRunDecisionTree(
   const { data } = await apiClient.post<DryRunResponse>(
     `/v1/decision-trees/${code}:dry-run`,
     payload,
+  );
+  return data;
+}
+
+export async function listEvalRuns(limit = 50): Promise<EvalRun[]> {
+  const { data } = await apiClient.get<EvalRun[]>("/v1/decision-tree-runs", {
+    params: { limit },
+  });
+  return data;
+}
+
+export async function listEvalTraces(filters: EvalTraceFilters = {}): Promise<EvalTrace[]> {
+  const { data } = await apiClient.get<EvalTrace[]>("/v1/decision-tree-traces", {
+    params: {
+      run_id: filters.run_id,
+      block_id: filters.block_id,
+      farm_id: filters.farm_id,
+      tree_code: filters.tree_code,
+      status: filters.status,
+      limit: filters.limit ?? 200,
+    },
+  });
+  return data;
+}
+
+// The drill-down. Separate from the list because the node walk and the
+// resolved values are megabytes per page and only ever read one row at a time.
+export async function getEvalTrace(traceId: string): Promise<EvalTraceDetail> {
+  const { data } = await apiClient.get<EvalTraceDetail>(
+    `/v1/decision-tree-traces/${traceId}`,
   );
   return data;
 }

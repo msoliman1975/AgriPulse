@@ -20,6 +20,7 @@ import pytest
 from app.modules.recommendations.errors import BlockNotInFarmError
 from app.modules.recommendations.service import (
     RecommendationsServiceImpl,
+    TargetingVerdict,
     _BlockEvaluation,
     _explain_steps,
 )
@@ -86,7 +87,7 @@ def _setup(
     ndvi_mean: float,
     block_trees: list[dict] | None = None,
     cell_trees: list[dict] | None = None,
-    skipped_trees: list[dict] | None = None,
+    skipped_trees: list[tuple[dict, TargetingVerdict]] | None = None,
 ) -> _BlockEvaluation:
     latest = {"ndvi": {"time": _T, "mean": ndvi_mean, "baseline_deviation": -1.0}}
     ctx = ConditionContext.from_block_signals(
@@ -202,10 +203,52 @@ async def test_cell_scoped_trees_are_listed_but_not_given_a_block_verdict() -> N
 
 @pytest.mark.asyncio
 async def test_targeting_skips_are_reported_so_empty_blocks_can_explain_themselves() -> None:
-    out = await _explain(_setup(ndvi_mean=0.39, skipped_trees=[_tree("mango_only_v1")]))
+    out = await _explain(
+        _setup(
+            ndvi_mean=0.39,
+            skipped_trees=[
+                (
+                    _tree("mango_only_v1"),
+                    TargetingVerdict(
+                        matched=False,
+                        axis="crop",
+                        required=("mango",),
+                        actual="citrus.valencia",
+                    ),
+                )
+            ],
+        )
+    )
     (tree,) = out["trees"]
     assert tree["status"] == "skipped"
     assert tree["steps"] == []
+    # "skipped" alone is the non-answer the reader already had. The axis and
+    # both sides of the comparison are the point of reporting it at all.
+    assert tree["skip_axis"] == "crop"
+    assert tree["skip_required"] == ["mango"]
+    assert tree["skip_actual"] == "citrus.valencia"
+
+
+@pytest.mark.asyncio
+async def test_skip_on_an_unset_value_says_so_rather_than_looking_like_a_mismatch() -> None:
+    """A farm with no country set is the most common cause of "nothing fires",
+    and before the verdict carried ``actual`` it was indistinguishable from a
+    country that genuinely did not match."""
+    out = await _explain(
+        _setup(
+            ndvi_mean=0.39,
+            skipped_trees=[
+                (
+                    _tree("egypt_only_v1"),
+                    TargetingVerdict(matched=False, axis="country", required=("EG",), actual=None),
+                )
+            ],
+        )
+    )
+    (tree,) = out["trees"]
+    assert tree["skip_axis"] == "country"
+    assert tree["skip_required"] == ["EG"]
+    assert tree["skip_actual"] is None
 
 
 @pytest.mark.asyncio

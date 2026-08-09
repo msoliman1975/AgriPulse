@@ -41,6 +41,9 @@ from app.modules.recommendations.schemas import (
     DecisionTreeVersionPublishResponse,
     DecisionTreeVersionResponse,
     DryRunCandidateBlock,
+    EvalRunResponse,
+    EvalTraceDetailResponse,
+    EvalTraceResponse,
     EvaluateBlockResponse,
     ExplainBlockResponse,
     RecommendationResponse,
@@ -371,17 +374,34 @@ async def evaluate_block(
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
     assert context.tenant_id is not None  # _ensure_tenant guarantees
+    # A single-block run, traced like the sweep. This is the debug path, so it
+    # is the one an author reaches for first — leaving it untraced would mean
+    # the button labelled "run this now" produced less evidence than the
+    # unattended nightly job.
+    run_id = await service.repo.open_eval_run(kind="on_demand", actor_user_id=context.user_id)
     summary = await service.evaluate_block(
         block_id=block_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         tenant_id=context.tenant_id,
+        run_id=run_id,
+    )
+    await service.repo.close_eval_run(
+        run_id=run_id,
+        blocks_evaluated=1,
+        trees_evaluated=summary["trees_evaluated"],
+        trees_skipped=summary["trees_skipped_crop"],
+        recommendations_opened=summary["recommendations_opened"],
+        alerts_opened=0,
+        traces_written=summary.get("traces_written", 0),
     )
     return {
         "block_id": str(block_id),
+        "run_id": str(run_id),
         "trees_evaluated": summary["trees_evaluated"],
         "trees_skipped_crop": summary["trees_skipped_crop"],
         "recommendations_opened": summary["recommendations_opened"],
+        "traces_written": summary.get("traces_written", 0),
     }
 
 
@@ -429,6 +449,83 @@ async def explain_block(
     return await service.explain_block(
         block_id=block_id, tenant_id=context.tenant_id, farm_id=farm_id
     )
+
+
+# =====================================================================
+# Evaluation lineage (tenant 0062)
+# =====================================================================
+#
+# Registered under their own `/decision-tree-*` paths rather than under
+# `/decision-trees/…`, where a literal segment would have to be declared
+# ahead of the existing `/decision-trees/{code}` routes to avoid being
+# swallowed by them — a route-ordering dependency that breaks silently the
+# next time someone reorders this file.
+
+
+@router.get(
+    "/decision-tree-runs",
+    response_model=list[EvalRunResponse],
+    summary="Recorded decision-tree evaluation runs, newest first.",
+)
+async def list_eval_runs(
+    limit: int = Query(default=50, ge=1, le=200),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    return await service.repo.list_eval_runs(limit=limit)
+
+
+@router.get(
+    "/decision-tree-traces",
+    response_model=list[EvalTraceResponse],
+    summary="Per-tree verdicts from recorded runs (why a tree did or didn't fire).",
+)
+async def list_eval_traces(
+    run_id: UUID | None = Query(default=None),
+    block_id: UUID | None = Query(default=None),
+    farm_id: UUID | None = Query(default=None),
+    tree_code: str | None = Query(default=None),
+    status_filter: list[str] | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=1000),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    """The list view. Excludes the node walk and the resolved values — those
+    are megabytes per page and only ever read one row at a time."""
+    _ensure_tenant(context)
+    return await service.repo.list_eval_traces(
+        run_id=run_id,
+        block_id=block_id,
+        farm_id=farm_id,
+        tree_code=tree_code,
+        status_filter=tuple(status_filter or ()),
+        limit=limit,
+    )
+
+
+@router.get(
+    "/decision-tree-traces/{trace_id}",
+    response_model=EvalTraceDetailResponse,
+    summary="One evaluation trace with its full node walk and resolved values.",
+)
+async def get_eval_trace(
+    trace_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    from app.core.errors import APIError
+
+    _ensure_tenant(context)
+    row = await service.repo.get_eval_trace(trace_id=trace_id)
+    if row is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Evaluation trace not found",
+            detail=f"No evaluation trace {trace_id} in this tenant.",
+            type_="https://agripulse.cloud/problems/eval-trace-not-found",
+        )
+    return row
 
 
 # =====================================================================

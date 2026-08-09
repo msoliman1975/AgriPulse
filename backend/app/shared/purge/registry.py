@@ -128,6 +128,17 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         "run row they hang off is farm-owned and cascades separately",
     ),
     OwnedTable(
+        "decision_tree_eval_traces",
+        owner_column="block_id",
+        order=10,
+        fk=False,
+        note="why each decision tree did or did not fire on this block. The FK "
+        "reaches only decision_tree_eval_runs (which owns no block), so "
+        "block_id is unenforced and would orphan without this entry. The run "
+        "row survives the purge on purpose — it stays an honest record that "
+        "the run covered blocks that no longer exist",
+    ),
+    OwnedTable(
         "block_index_aggregates",
         owner_column="block_id",
         order=10,
@@ -268,6 +279,14 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     ),
     OwnedTable("weather_ingestion_attempts", owner_column="farm_id", order=10, fk=False),
     OwnedTable("recommendations_history", owner_column="farm_id", order=10, fk=False),
+    OwnedTable(
+        "decision_tree_eval_traces",
+        owner_column="farm_id",
+        order=10,
+        fk=False,
+        note="also registered under block_id; a farm purge takes the traces of "
+        "blocks it owns without walking every block first",
+    ),
     OwnedTable(
         "signal_observations",
         owner_column="farm_id",

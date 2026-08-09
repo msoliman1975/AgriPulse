@@ -152,9 +152,15 @@ class EvaluateBlockResponse(BaseModel):
     """POST /api/v1/blocks/{block_id}/recommendations:evaluate response."""
 
     block_id: UUID
+    # The lineage run this evaluation was recorded under; query its traces at
+    # GET /decision-trees/eval-traces?run_id=…
+    run_id: UUID | None = None
     trees_evaluated: int
+    # Counts every targeting exclusion — country and soil as well as crop,
+    # despite the name, which predates the other two axes.
     trees_skipped_crop: int
     recommendations_opened: int
+    traces_written: int = 0
 
 
 class ExplainStep(BaseModel):
@@ -199,6 +205,14 @@ class ExplainTree(BaseModel):
     text_en: str | None = None
     text_ar: str | None = None
     error: str | None = None
+    # Populated only when ``status == 'skipped'``: which targeting axis
+    # rejected the tree ('crop' | 'country' | 'soil'), what the tree demanded,
+    # and what the block (or its farm, for country) actually had. ``None``
+    # actual = the value is unset, which is the usual cause and was previously
+    # indistinguishable from a genuine mismatch.
+    skip_axis: str | None = None
+    skip_required: list[str] = Field(default_factory=list)
+    skip_actual: str | None = None
 
 
 class ExplainBlockResponse(BaseModel):
@@ -343,14 +357,132 @@ class DryRunCandidateBlock(BaseModel):
     label: str
 
 
-class DecisionTreeDryRunResponse(BaseModel):
-    """Result of a dry-run. Mirrors `EvaluationResult` shape."""
+class DryRunCell(BaseModel):
+    """One grid cell's verdict in a ``scope: cell`` dry-run."""
+
+    cell_id: UUID
+    cell_row: int | None = None
+    cell_col: int | None = None
+    matched: bool
+    action_type: str | None = None
+    severity: str | None = None
+    text_en: str | None = None
+    error: str | None = None
+
+
+class DryRunTargeting(BaseModel):
+    """Whether the tree's crop / country / soil filters admit this block.
+
+    Reported, never enforced: the dry-run evaluates regardless so an author
+    can see what *would* happen, but a tree the sweep would skip here no
+    longer looks like one that runs.
+    """
 
     matched: bool
+    axis: str | None = None
+    required: list[str] = Field(default_factory=list)
+    actual: str | None = None
+
+
+class DecisionTreeDryRunResponse(BaseModel):
+    """Result of a dry-run. Mirrors `EvaluationResult` shape.
+
+    For a ``scope: cell`` tree the top-level ``path`` / ``outcome`` /
+    ``evaluation_snapshot`` describe one **representative** cell — the first
+    that fired, else the first evaluated — because a cell-scoped tree has no
+    single block-level verdict. ``cells`` carries every cell's answer.
+    """
+
+    matched: bool
+    scope: str = "block"
+    targeting: DryRunTargeting | None = None
     outcome: dict[str, Any] | None
     path: list[dict[str, Any]]
     evaluation_snapshot: dict[str, Any]
     error: str | None
+    # Zero on a block-scoped run; the block itself is the unit there.
+    cells_evaluated: int = 0
+    cells_matched: int = 0
+    cells: list[DryRunCell] = Field(default_factory=list)
+
+
+# =====================================================================
+# Evaluation lineage (tenant 0062)
+# =====================================================================
+
+
+class EvalRunResponse(BaseModel):
+    """One recorded evaluation pass.
+
+    ``kind='sweep'`` is the nightly Beat run over every block;
+    ``'on_demand'`` is a single block evaluated through the API. Dry-runs
+    never produce a run — they write nothing.
+    """
+
+    id: UUID
+    kind: str
+    actor_user_id: UUID | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    duration_ms: int | None = None
+    blocks_evaluated: int
+    trees_evaluated: int
+    trees_skipped: int
+    recommendations_opened: int
+    alerts_opened: int
+    traces_written: int
+    outcome: str
+    error: str | None = None
+
+
+class EvalTraceResponse(BaseModel):
+    """One (tree x block[/cell]) verdict from a run — list view.
+
+    Deliberately without ``node_path`` / ``resolved_values``: a page of full
+    walks is megabytes the list never renders. Fetch one trace by id for those.
+
+    ``status``:
+      * ``fired``   — reached a leaf that opens a recommendation/alert
+      * ``clear``   — evaluated to no_action
+      * ``skipped`` — targeting excluded it; ``skip_axis`` says which axis
+      * ``error``   — the walk hit a malformed node
+    """
+
+    id: UUID
+    run_id: UUID
+    evaluated_at: datetime
+    farm_id: UUID
+    block_id: UUID
+    block_name: str | None = None
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
+    tree_id: UUID
+    tree_code: str
+    tree_version: int
+    scope: str
+    status: str
+    skip_axis: str | None = None
+    # {"required": [...], "actual": "..."} — `actual: null` means the block or
+    # its farm has no value on that axis at all.
+    skip_detail: dict[str, Any] | None = None
+    outcome: dict[str, Any] | None = None
+    recommendation_id: UUID | None = None
+    alert_id: UUID | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+
+
+class EvalTraceDetailResponse(EvalTraceResponse):
+    """One trace with the walk attached — the drill-down payload.
+
+    ``resolved_values`` is empty on a ``clear`` row by design: the walk is
+    kept, the value dump is not (see tenant migration 0062).
+    """
+
+    node_path: list[dict[str, Any]] = Field(default_factory=list)
+    resolved_values: dict[str, Any] = Field(default_factory=dict)
+    param_overrides: dict[str, Any] = Field(default_factory=dict)
 
 
 # =====================================================================

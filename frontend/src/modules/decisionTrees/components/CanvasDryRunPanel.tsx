@@ -120,8 +120,40 @@ export function CanvasDryRunPanel({
 
       {result ? (
         <div className="flex flex-col gap-2 border-t border-ap-line pt-2">
+          {/* A tree the sweep would not run on this block used to dry-run as
+              though it did. The picker filters to targeted blocks, so this
+              only shows for a block reached some other way — but silence here
+              was the bug. */}
+          {result.targeting && !result.targeting.matched ? (
+            <p className="rounded-md bg-ap-warn-soft p-2 text-xs text-ap-warn">
+              {t("editor.dryRun.notTargeted", {
+                axis: t(`traces.skipAxis.${result.targeting.axis ?? "crop"}`),
+                required: result.targeting.required.join(", ") || "—",
+                actual: result.targeting.actual ?? t("traces.unset"),
+              })}
+            </p>
+          ) : null}
+
+          {/* Cell-scoped trees have no single block-level verdict: the sweep
+              runs them once per zone. Reporting one walk without saying which
+              zone it came from is what made this preview misleading. */}
+          {result.scope === "cell" ? (
+            <p className="text-xs text-ap-muted">
+              {result.cells_evaluated === 0
+                ? t("editor.dryRun.cellNoGrid")
+                : t("editor.dryRun.cellSummary", {
+                    matched: result.cells_matched,
+                    total: result.cells_evaluated,
+                  })}
+            </p>
+          ) : null}
+
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-ap-muted">{t("editor.dryRun.outcome")}</span>
+            <span className="text-ap-muted">
+              {result.scope === "cell"
+                ? t("editor.dryRun.outcomeRepresentative")
+                : t("editor.dryRun.outcome")}
+            </span>
             {matched ? (
               <Pill kind="ok">{t("editor.dryRun.matched")}</Pill>
             ) : (
@@ -142,6 +174,34 @@ export function CanvasDryRunPanel({
               {t("editor.dryRun.error")}: {result.error}
             </p>
           ) : null}
+          {result.scope === "cell" && result.cells.length > 0 ? (
+            <details>
+              <summary className="cursor-pointer text-[11px] font-medium text-ap-primary">
+                {t("editor.dryRun.perZone")}
+              </summary>
+              <ul className="mt-1 flex flex-col gap-0.5">
+                {result.cells.map((cell) => (
+                  <li key={cell.cell_id} className="flex items-center gap-2 text-[11px]">
+                    <span className="font-mono text-ap-muted">
+                      {cell.cell_row === null || cell.cell_col === null
+                        ? cell.cell_id.slice(0, 8)
+                        : `R${cell.cell_row}·C${cell.cell_col}`}
+                    </span>
+                    {cell.matched ? (
+                      <Pill kind="ok">{t("editor.dryRun.matched")}</Pill>
+                    ) : (
+                      <Pill kind="neutral">{t("editor.dryRun.noMatch")}</Pill>
+                    )}
+                    {cell.action_type ? (
+                      <span className="font-mono text-ap-ink">{cell.action_type}</span>
+                    ) : null}
+                    {cell.error ? <span className="text-ap-crit">{cell.error}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           {Object.keys(result.evaluation_snapshot).length > 0 ? (
             <details>
               <summary className="cursor-pointer text-[11px] font-medium text-ap-primary">

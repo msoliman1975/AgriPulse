@@ -9,17 +9,53 @@ import {
   type DecisionTreeVersionCreatePayload,
   type DryRunPayload,
   type DryRunResponse,
+  type EvalTraceFilters,
   appendDecisionTreeVersion,
   archiveDecisionTree,
   createDecisionTree,
   dryRunDecisionTree,
   getDecisionTree,
   getDecisionTreeCandidateBlocks,
+  getEvalTrace,
   listDecisionTrees,
+  listEvalRuns,
+  listEvalTraces,
   publishDecisionTreeVersion,
   restoreDecisionTree,
   updateDecisionTree,
 } from "@/api/decisionTrees";
+
+// --- Evaluation lineage ----------------------------------------------------
+//
+// Runs are append-only history: once a run has finished nothing about it
+// changes, so these are cached long and never invalidated by tree edits.
+
+export function useEvalRuns(limit = 50) {
+  return useQuery({
+    queryKey: ["decision_trees", "eval_runs", limit] as const,
+    queryFn: () => listEvalRuns(limit),
+    staleTime: 30_000,
+  });
+}
+
+export function useEvalTraces(filters: EvalTraceFilters, enabled = true) {
+  return useQuery({
+    queryKey: ["decision_trees", "eval_traces", filters] as const,
+    queryFn: () => listEvalTraces(filters),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useEvalTrace(traceId: string | undefined) {
+  return useQuery({
+    queryKey: ["decision_trees", "eval_trace", traceId] as const,
+    queryFn: () => getEvalTrace(traceId!),
+    enabled: Boolean(traceId),
+    // A finished trace is immutable — never refetch one the user reopens.
+    staleTime: Infinity,
+  });
+}
 
 export function useDecisionTrees(status: DecisionTreeListStatus = "active") {
   return useQuery({
