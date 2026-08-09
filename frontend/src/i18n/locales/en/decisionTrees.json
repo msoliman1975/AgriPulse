@@ -76,7 +76,8 @@
       "cancel": "Cancel",
       "failed": "Archive failed."
     },
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "tracesButton": "Evaluation traces"
   },
   "create": {
     "title": "New decision tree",
@@ -286,7 +287,12 @@
       "matched": "matched",
       "noMatch": "no match",
       "snapshot": "Values resolved",
-      "error": "Error"
+      "error": "Error",
+      "notTargeted": "This tree would not run on this block: its {{axis}} targeting requires {{required}} and the block has {{actual}}. Shown anyway so you can see what it would do.",
+      "cellSummary": "Cell-scoped tree — evaluated per grid zone: {{matched}} of {{total}} zones matched.",
+      "cellNoGrid": "Cell-scoped tree, but this block has no grid — it evaluates nothing here, exactly as the nightly sweep would.",
+      "outcomeRepresentative": "Outcome (first matching zone)",
+      "perZone": "Per-zone results"
     },
     "addChild": {
       "title": "Add child node",
@@ -439,6 +445,73 @@
       "current": "Current",
       "newValue": "New value",
       "usingDefault": "(using default)"
+    }
+  },
+  "traces": {
+    "title": "Evaluation traces",
+    "subtitle": "Why each decision tree did or didn't fire, for a run that already happened.",
+    "missingCapability": "You need the {{capability}} capability to read evaluation traces.",
+    "run": "Run",
+    "loadingRuns": "Loading runs…",
+    "runInFlight": "This run has not finished yet — more traces may still arrive.",
+    "noRuns": "No evaluation runs recorded yet. The nightly sweep records one per tenant; running an evaluation on a block records one too.",
+    "noTraces": "No traces match. Every tree that was evaluated in this run leaves a row, including the ones that came out clear.",
+    "loadFailed": "Couldn't load evaluation traces.",
+    "search": "Search tree code or block",
+    "searchAria": "Search traces by tree code or block name",
+    "unset": "not set",
+    "filters": {
+      "status": "Status"
+    },
+    "status": {
+      "fired": "Fired",
+      "clear": "Clear",
+      "skipped": "Skipped",
+      "error": "Error"
+    },
+    "skipAxis": {
+      "crop": "Crop",
+      "country": "Country",
+      "soil": "Soil texture"
+    },
+    "runKind": {
+      "sweep": "Nightly sweep",
+      "on_demand": "On demand"
+    },
+    "runStats": {
+      "blocks": "Blocks",
+      "evaluated": "Trees evaluated",
+      "skipped": "Trees skipped",
+      "opened": "Recommendations opened",
+      "traces": "Traces",
+      "duration": "Duration"
+    },
+    "table": {
+      "caption": "Per-tree evaluation verdicts for the selected run",
+      "tree": "Tree",
+      "target": "Block",
+      "status": "Verdict",
+      "why": "Why",
+      "duration": "Time",
+      "zone": "Zone {{zone}}",
+      "deduped": "already open"
+    },
+    "detail": {
+      "title": "Evaluation trace",
+      "loading": "Loading trace…",
+      "tree": "Tree",
+      "block": "Block",
+      "zone": "Zone",
+      "status": "Verdict",
+      "walk": "Nodes visited",
+      "resolved": "Values resolved",
+      "overrides": "Parameter overrides in force",
+      "matched": "matched",
+      "notMatched": "not matched",
+      "leaf": "leaf",
+      "noData": "no data",
+      "clearNoValues": "Resolved values are not stored for a clear verdict — the node walk above shows which branch was taken.",
+      "skippedExplainer": "Excluded before evaluation: the tree's {{axis}} targeting requires {{required}}, and this block has {{actual}}."
     }
   }
 }

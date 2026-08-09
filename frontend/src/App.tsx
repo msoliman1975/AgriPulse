@@ -33,6 +33,7 @@ import { UsersConfigPage } from "@/modules/config/pages/UsersConfigPage";
 import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTreeListPage";
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
 import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
+import { DecisionTreeTracesPage } from "@/modules/decisionTrees/pages/DecisionTreeTracesPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
 import { PatternsPage } from "@/modules/labs/patterns/PatternsPage";
@@ -211,6 +212,10 @@ export function App(): ReactNode {
                 <Route path="/decision-trees" element={<DecisionTreeListPage />} />
                 <Route path="/decision-trees/new" element={<DecisionTreeCreatePage />} />
                 <Route path="/decision-trees/:code" element={<DecisionTreeViewerPage />} />
+                {/* Evaluation traces sit outside /decision-trees/ on purpose:
+                  a literal segment there would shadow a tree whose code
+                  happened to be "traces", and the API paths match this. */}
+                <Route path="/decision-tree-traces" element={<DecisionTreeTracesPage />} />
                 {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
                 <Route path="/settings" element={<SettingsLayout />}>
