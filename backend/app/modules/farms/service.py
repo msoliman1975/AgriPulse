@@ -51,6 +51,7 @@ from app.modules.farms.errors import (
     CropAssignmentNotFoundError,
     CropAssignmentOverlapError,
     CropAssignmentRangeError,
+    CropAssignmentRemovalError,
     CropAttributeCodeConflictError,
     CropAttributeDefinitionNotFoundError,
     CropAttributeReservedCodeError,
@@ -403,6 +404,18 @@ class FarmService(Protocol):
     ) -> dict[str, Any]: ...
 
     async def apply_bulk_crop_assignment(
+        self,
+        *,
+        farm_id: UUID,
+        payload: Any,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
+    async def preview_bulk_crop_removal(self, *, farm_id: UUID, payload: Any) -> dict[str, Any]: ...
+
+    async def remove_bulk_crop_assignments(
         self,
         *,
         farm_id: UUID,
@@ -2234,6 +2247,179 @@ class FarmServiceImpl:
             "failed_count": failed,
             "items": items,
         }
+
+    # ---- Bulk crop-assignment removal (HARD delete) -----------------------
+
+    async def _bulk_removal_scope(self, *, farm_id: UUID, payload: Any) -> dict[str, Any]:
+        """Resolve the selector to concrete assignments + their fallout.
+
+        Shared by preview and apply so the dry run cannot understate what the
+        delete takes. With no undo, that symmetry is the only safety net.
+        """
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        rows = await self._repo.list_block_crops_for_removal(
+            farm_id=farm_id,
+            block_ids=payload.block_ids,
+            block_crop_ids=payload.block_crop_ids,
+        )
+        ids = [r["id"] for r in rows]
+        dependents = await self._repo.count_removal_dependents(block_crop_ids=ids)
+        # A `replace` run auto-closed whatever the block was carrying. Removing
+        # only the row it wrote would leave the block with no crop at all, so
+        # the assignments closed exactly at a departing one's start come back.
+        reopen_ids = await self._repo.find_auto_closed_siblings(
+            pairs=[(r["block_id"], r["effective_from"]) for r in rows],
+            exclude_ids=ids,
+        )
+
+        by_block: dict[UUID, dict[str, Any]] = {}
+        for r in rows:
+            entry = by_block.setdefault(
+                r["block_id"],
+                {
+                    "block_id": r["block_id"],
+                    "code": r["block_code"],
+                    "name": r["block_name"],
+                    "assignments": [],
+                    "removed_count": 0,
+                    "detail": None,
+                },
+            )
+            entry["assignments"].append(
+                {
+                    "block_crop_id": r["id"],
+                    "crop_path": r["crop_path"],
+                    "season_label": r["season_label"],
+                    "effective_from": r["effective_from"],
+                    "effective_to": r["effective_to"],
+                    "is_current": r["is_current"],
+                }
+            )
+
+        # A selected block with nothing on it still gets a row: "nothing to
+        # remove" is an answer the user needs, not an omission to puzzle over.
+        if payload.block_ids:
+            known = {
+                b["id"]: b
+                for b in await self._repo.list_blocks(
+                    farm_id=farm_id,
+                    after=None,
+                    limit=BULK_CROP_TARGET_LIMIT,
+                    irrigation_system=None,
+                    include_inactive=True,
+                )
+            }
+            for block_id in payload.block_ids:
+                if block_id in by_block:
+                    continue
+                block = known.get(block_id)
+                by_block[block_id] = {
+                    "block_id": block_id,
+                    "code": block["code"] if block else "—",
+                    "name": block.get("name") if block else None,
+                    "assignments": [],
+                    "removed_count": 0,
+                    "detail": (
+                        "No crop assignments on this block."
+                        if block
+                        else "Not a block on this farm."
+                    ),
+                }
+
+        items = sorted(by_block.values(), key=lambda e: str(e["code"]))
+        return {
+            "ids": ids,
+            "items": items,
+            "dependents": dependents,
+            "reopen_ids": reopen_ids,
+        }
+
+    def _removal_response(
+        self, *, farm_id: UUID, scope: dict[str, Any], removed: bool
+    ) -> dict[str, Any]:
+        items = scope["items"]
+        if removed:
+            for entry in items:
+                entry["removed_count"] = len(entry["assignments"])
+        d = scope["dependents"]
+        return {
+            "farm_id": farm_id,
+            "block_count": len(items),
+            "assignment_count": len(scope["ids"]),
+            "attribute_value_count": d["attribute_values"],
+            "attribute_value_log_count": d["attribute_value_logs"],
+            "growth_stage_log_count": d["growth_stage_logs"],
+            "recommendation_unlink_count": d["recommendations"],
+            "reopened_count": len(scope["reopen_ids"]),
+            "items": items,
+        }
+
+    async def preview_bulk_crop_removal(self, *, farm_id: UUID, payload: Any) -> dict[str, Any]:
+        scope = await self._bulk_removal_scope(farm_id=farm_id, payload=payload)
+        return self._removal_response(farm_id=farm_id, scope=scope, removed=False)
+
+    async def remove_bulk_crop_assignments(
+        self,
+        *,
+        farm_id: UUID,
+        payload: Any,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        scope = await self._bulk_removal_scope(farm_id=farm_id, payload=payload)
+        ids = scope["ids"]
+
+        if ids:
+            # Order matters. Null the FK-less recommendation pointers FIRST:
+            # after the delete there is no way to find which ones referred to
+            # the departed rows, and they would sit there resolving to nothing.
+            await self._repo.unlink_recommendations(block_crop_ids=ids)
+            deleted = await self._repo.hard_delete_block_crops(block_crop_ids=ids)
+            if deleted != len(ids):
+                # Every id came from a SELECT in this same transaction, so a
+                # mismatch means something raced us. Fail loudly rather than
+                # report a count that was never true.
+                raise CropAssignmentRemovalError(
+                    reason=(
+                        f"expected to remove {len(ids)} assignment(s) but the database "
+                        f"removed {deleted}; nothing has been committed"
+                    )
+                )
+            await self._repo.reopen_assignments(block_crop_ids=scope["reopen_ids"])
+            await self._tenant_session.flush()
+
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_crops_removed",
+            actor_user_id=actor_user_id,
+            subject_kind="farm",
+            subject_id=farm_id,
+            farm_id=farm_id,
+            details={
+                "selector": "block_ids" if payload.block_ids else "block_crop_ids",
+                "assignment_count": len(ids),
+                # The rows are gone; without this the audit trail cannot say
+                # WHAT was destroyed, only how much.
+                "removed": [
+                    {
+                        "block_crop_id": str(a["block_crop_id"]),
+                        "block": entry["code"],
+                        "crop_path": a["crop_path"],
+                        "season_label": a["season_label"],
+                        "effective_from": str(a["effective_from"]),
+                    }
+                    for entry in scope["items"]
+                    for a in entry["assignments"]
+                ],
+                "cascaded": scope["dependents"],
+                "reopened": [str(i) for i in scope["reopen_ids"]],
+            },
+            correlation_id=correlation_id,
+        )
+        return self._removal_response(farm_id=farm_id, scope=scope, removed=True)
 
     async def advance_growth_stages(self, *, tenant_schema: str) -> dict[str, int]:
         """Move every eligible block to its calendar/age-derived phenology

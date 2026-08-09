@@ -46,6 +46,10 @@
       "subscriptions": {
         "name": "Imagery subscriptions",
         "desc": "Which providers and indices each block is subscribed to."
+      },
+      "removeCrop": {
+        "name": "Remove crop assignments",
+        "desc": "Permanently delete the crop assignments on chosen blocks. Use this to erase an assignment entered by mistake."
       }
     },
     "noFarms": "You have no farms yet. Create one from the Farm Console first."
@@ -151,6 +155,39 @@
   },
   "errors": {
     "preview": "Could not build the preview.",
-    "apply": "Could not apply the bulk update."
+    "apply": "Could not apply the bulk update.",
+    "remove": "Could not delete the assignments."
+  },
+  "remove": {
+    "stepTitle": "Remove crop assignments",
+    "warning": "This permanently deletes crop assignments. There is no undo — the rows are erased, not hidden.",
+    "stepBody": "There is nothing to fill in for a removal. Continue to pick the blocks, then review exactly what will be destroyed before confirming.",
+    "title": "Remove crop assignments",
+    "check": "Check what would be removed",
+    "checking": "Checking…",
+    "cancel": "Cancel",
+    "nothing": "Nothing to remove — none of the selected blocks has a crop assignment.",
+    "summary": "This will permanently delete {{assignments}} crop assignment(s) across {{blocks}} block(s).",
+    "alsoGoes": "Deleted with them",
+    "cascade": {
+      "attributes": "{{count}} crop field value(s)",
+      "history": "{{count}} crop field history entries",
+      "stages": "{{count}} growth-stage log entries",
+      "recommendations": "{{count}} recommendation(s) lose their crop link (the recommendations themselves are kept)"
+    },
+    "reopen": "{{count}} earlier assignment(s) that a replace had closed will become current again.",
+    "col": {
+      "assignments": "Assignments to delete"
+    },
+    "none": "No assignments",
+    "current": "current",
+    "confirmLabel": "Type {{word}} to confirm",
+    "confirm": "Permanently delete {{count}} assignment(s)",
+    "removing": "Deleting…",
+    "back": "Back",
+    "close": "Close",
+    "done": "Deleted {{assignments}} assignment(s) across {{blocks}} block(s).",
+    "undoRun": "Undo this run ({{count}} assignments)",
+    "undone": "Undone — {{assignments}} assignment(s) created by this run were deleted."
   }
 }

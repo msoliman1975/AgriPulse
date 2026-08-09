@@ -54,6 +54,8 @@ from app.modules.farms.schemas import (
     BulkCropAssignmentRequest,
     BulkCropCandidateResponse,
     BulkCropPreviewResponse,
+    BulkCropRemovalRequest,
+    BulkCropRemovalResponse,
     CountryCreateRequest,
     CountryResponse,
     CountryUpdateRequest,
@@ -841,6 +843,55 @@ async def apply_bulk_crop_assignment(
     # 200, not 201: a run can partially succeed, and the per-block outcomes in
     # the body are the result — a blanket "created" would misreport that.
     return await service.apply_bulk_crop_assignment(
+        farm_id=farm_id,
+        payload=payload,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        correlation_id=_correlation_id(request),
+    )
+
+
+# ---------- Bulk crop-assignment removal ------------------------------------
+#
+# HARD delete, gated by `crop_assignment.delete` on the farm -- a capability
+# that existed with no route until now. Separate from `crop_assignment.create`
+# on purpose: being allowed to assign a crop is not the same as being allowed
+# to erase the block's history.
+
+
+@router.post(
+    "/farms/{farm_id}/bulk/crop-assignment:remove-preview",
+    response_model=BulkCropRemovalResponse,
+    summary="Dry run -- exactly what removing these assignments would destroy.",
+)
+async def preview_bulk_crop_removal(
+    farm_id: UUID,
+    payload: BulkCropRemovalRequest,
+    context: RequestContext = Depends(
+        requires_capability("crop_assignment.delete", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    return await service.preview_bulk_crop_removal(farm_id=farm_id, payload=payload)
+
+
+@router.post(
+    "/farms/{farm_id}/bulk/crop-assignment:remove",
+    response_model=BulkCropRemovalResponse,
+    summary="Permanently delete crop assignments. There is no undo.",
+)
+async def remove_bulk_crop_assignments(
+    farm_id: UUID,
+    payload: BulkCropRemovalRequest,
+    request: Request,
+    context: RequestContext = Depends(
+        requires_capability("crop_assignment.delete", farm_id_param="farm_id")
+    ),
+    service: FarmService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    return await service.remove_bulk_crop_assignments(
         farm_id=farm_id,
         payload=payload,
         actor_user_id=context.user_id,
