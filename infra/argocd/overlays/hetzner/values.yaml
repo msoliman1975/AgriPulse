@@ -795,13 +795,41 @@ global:
   #   cache key is reverted, plus three Arabic render tests, but no one has
   #   loaded the dock in Arabic. First prod check should be a block dock on
   #   /labs/map with the language switched to Arabic.
+  # 24952c8 = #383 drop five dead `block_crops` columns + #384 farm-console
+  #   block-dock i18n.
+  #   #383: expected_harvest_start/_end and the plant_density/row_spacing/
+  #   plant_spacing trio shipped in migration 0002 and NO surface ever wrote
+  #   them -- reachable only by hand-written JSON on the assign payload. The
+  #   bulk wizard (#381) was the first UI to render them, which is how they
+  #   were noticed. They are also the wrong shape: a fixed column that means
+  #   something for an orchard and nothing for wheat is what the crop-attribute
+  #   system replaces, so the five codes are also released from
+  #   RESERVED_ATTRIBUTE_CODES and can now be authored as crop attributes.
+  #   `actual_harvest_date` is KEPT -- it records a real event.
+  #   MIGRATION 0061 -- DESTRUCTIVE AND EFFECTIVELY IRREVERSIBLE. It DROPs the
+  #   five columns. downgrade() re-adds them empty, so the schema shape rolls
+  #   back but values would not. Safe here only because every crop-assignment
+  #   row in prod was read through the API first: 8 rows across 3 farms / 76
+  #   blocks, ZERO non-null in all five. Re-check that before any rollback
+  #   plan assumes data is recoverable -- tags roll back, migrations do not.
+  #   #384 rides along: frontend-only, the block dock stayed English after a
+  #   language switch. Green on its own CI. Prod was at 7510aa8, so promoting
+  #   #383 necessarily ships it too.
+  #   Backend + frontend -> api + workers + frontend bumped; tile-server
+  #   unchanged stays 9d140cc. Rollback is all three back to 7510aa8, but see
+  #   the migration note above -- the columns do NOT come back with the tags.
+  #   SUPERSEDES the "deliberately NOT promoting 24952c8" note above: that
+  #   was right when written -- nobody had asked for 0061 to ship. The repo
+  #   owner has since explicitly authorised merging and promoting #383, so
+  #   the column drop is intentional here, not collateral. Everything that
+  #   note says about 0061 being irreversible still holds; see below.
   images:
     api:
-      tag: "7510aa8"
+      tag: "24952c8"
     workers:
-      tag: "7510aa8"
+      tag: "24952c8"
     frontend:
-      tag: "251a50d"
+      tag: "24952c8"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
