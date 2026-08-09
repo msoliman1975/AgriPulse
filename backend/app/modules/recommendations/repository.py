@@ -1209,6 +1209,10 @@ class RecommendationsRepository:
 
         The dry-run needs the zone label for every cell it reports, and joining
         per cell in the response loop would be one query per cell.
+
+        ``grid_cells`` carries no ``block_id`` — a cell belongs to a *grid
+        config*, and the config is what belongs to the block. Ownership has to
+        be reached through the join.
         """
         rows = (
             (
@@ -1221,7 +1225,7 @@ class RecommendationsRepository:
                           ON cfg.id = gc.grid_config_id
                          AND cfg.deleted_at IS NULL
                          AND cfg.superseded_at IS NULL
-                        WHERE gc.block_id = :block_id
+                        WHERE cfg.block_id = :block_id
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},

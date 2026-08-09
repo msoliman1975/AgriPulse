@@ -123,6 +123,26 @@ async def test_status_filter_narrows(admin_session: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_grid_cell_labels_reaches_the_block_through_its_grid_config(
+    admin_session: Any,
+) -> None:
+    """``grid_cells`` has no ``block_id`` — a cell belongs to a grid *config*,
+    and the config belongs to the block. Filtering the cell table directly is
+    a column that does not exist, which only surfaces when the cell-scoped
+    dry-run actually runs against a database.
+
+    Asserts the query executes and scopes correctly, not that a particular
+    grid exists: an ungridded block legitimately returns nothing.
+    """
+    repo, _ = await _tenant_repo(admin_session, "tqlabels")
+
+    labels = await repo.get_grid_cell_labels(block_id=uuid4())
+
+    assert labels == {}
+    await admin_session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_a_run_from_another_filter_returns_nothing_rather_than_everything(
     admin_session: Any,
 ) -> None:
