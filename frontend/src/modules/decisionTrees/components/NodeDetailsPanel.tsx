@@ -46,6 +46,10 @@ interface NodeDetailsPanelProps {
   /** PR-D5: rewrite this decision's condition.tree. Caller commits the
    *  change to the draft YAML and re-validates. */
   onConditionChange?: (nodeId: string, nextTree: unknown) => void;
+  /** The tree's targeted crop paths. The condition builder uses them to
+   *  offer only the crop attributes and risk models that can actually
+   *  resolve for the blocks this tree runs on. */
+  cropPaths?: string[];
 }
 
 export function NodeDetailsPanel({
@@ -58,6 +62,7 @@ export function NodeDetailsPanel({
   onDelete,
   onAddChild,
   onConditionChange,
+  cropPaths,
 }: NodeDetailsPanelProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -103,6 +108,7 @@ export function NodeDetailsPanel({
           mode={mode}
           canEdit={canEdit}
           onConditionChange={onConditionChange}
+          cropPaths={cropPaths}
         />
       )}
 
@@ -220,11 +226,13 @@ function DecisionConditionSection({
   mode,
   canEdit,
   onConditionChange,
+  cropPaths,
 }: {
   node: PositionedNode;
   mode: "view" | "edit";
   canEdit: boolean;
   onConditionChange?: (nodeId: string, nextTree: unknown) => void;
+  cropPaths?: string[];
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const condition = (node.data as { condition?: { tree?: unknown } }).condition;
@@ -238,13 +246,13 @@ function DecisionConditionSection({
   return (
     <Section title={t("editor.panel.condition.heading")}>
       {mode === "edit" && canEdit && onConditionChange ? (
-        <ConditionBuilder value={editable} onChange={handleChange} />
+        <ConditionBuilder value={editable} onChange={handleChange} cropPaths={cropPaths} />
       ) : (
         <>
           {editable.kind === "unsupported" ? (
             <p className="text-xs text-ap-muted">{t("editor.panel.condition.unsupportedNote")}</p>
           ) : null}
-          <ConditionBuilder value={editable} onChange={() => {}} readOnly />
+          <ConditionBuilder value={editable} onChange={() => {}} cropPaths={cropPaths} readOnly />
         </>
       )}
       <KeyValue
