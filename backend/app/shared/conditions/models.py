@@ -45,8 +45,15 @@ INDICES_KEYS: tuple[str, ...] = (
 # block has no crop / no strain level. Compare with eq/ne/in to branch a
 # tree on a specific variety or strain.
 # ``soil_texture`` (sandy/loam/clay variants) + ``salinity_class`` come from
-# the block; ``canopy_size_class`` from the current block_crop's resolved
-# size-class pick — used e.g. to branch small/sandy onto the SAVI path.
+# the block.
+#
+# ``canopy_size_class`` was removed from this vocabulary: the column and its
+# per-crop validation exist on block_crops, but no surface in the product ever
+# rendered an input for it, so every block evaluated null and any tree that
+# branched on it took the same branch forever. 77 of 77 production
+# crop-assignment rows were null. The column stays (it is API-settable and
+# still a reserved attribute code); it is only the *condition* vocabulary that
+# drops it, so authors can't build a predicate that can never be true.
 BLOCK_FIELDS: tuple[str, ...] = (
     "crop_category",
     "growth_stage",
@@ -54,7 +61,6 @@ BLOCK_FIELDS: tuple[str, ...] = (
     "crop_strain",
     "soil_texture",
     "salinity_class",
-    "canopy_size_class",
 )
 
 

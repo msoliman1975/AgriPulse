@@ -5,23 +5,29 @@
 # soil between trees (young orchards, high-density foreign varieties, sandy
 # reclamation land). SAVI (soil-adjusted, L=0.5) suppresses that soil
 # background. So this tree branches:
-#   * small canopy OR sandy soil -> evaluate SAVI's baseline deviation
-#   * otherwise                  -> evaluate NDVI's baseline deviation
+#   * sandy soil -> evaluate SAVI's baseline deviation
+#   * otherwise  -> evaluate NDVI's baseline deviation
 # and scouts when the chosen index drops sharply below the block's own
 # day-of-year baseline (self-calibrating z-score — no absolute per-variety
 # matrix needed).
+#
+# v4 dropped a `canopy_size_class == small` node that used to sit above the
+# soil check. Nothing in the product ever set that field, so the node took its
+# on_miss branch for every block that has ever been evaluated: removing it
+# changes no outcome, it just stops the tree from asking a question no block
+# can answer.
 
 code: mango_canopy_health_v1
-name_en: Mango — canopy health drop (SAVI on sparse/sandy, else NDVI)
-name_ar: المانجو — هبوط صحة المجموع (SAVI للمتناثر/الرملي، وإلا NDVI)
+name_en: Mango — canopy health drop (SAVI on sandy soil, else NDVI)
+name_ar: المانجو — هبوط صحة المجموع (SAVI للتربة الرملية، وإلا NDVI)
 description_en: >-
   Scouts a mango block when its greenness drops sharply below its own
-  seasonal baseline. Uses SAVI for small canopies or sandy soil (where
-  bare-soil background makes NDVI noisy) and NDVI otherwise.
+  seasonal baseline. Uses SAVI on sandy soil (where bare-soil background
+  makes NDVI noisy) and NDVI otherwise.
 description_ar: >-
   يطلب استكشاف قطعة المانجو عند هبوط الاخضرار بحدّة دون خط الأساس الموسمي
-  الخاص بها. يستخدم SAVI للمجاميع الصغيرة أو التربة الرملية (حيث تجعل خلفية
-  التربة العارية NDVI مشوّشًا) وNDVI فيما عدا ذلك.
+  الخاص بها. يستخدم SAVI للتربة الرملية (حيث تجعل خلفية التربة العارية NDVI
+  مشوّشًا) وNDVI فيما عدا ذلك.
 
 crop_path: mango
 applicable_regions: []
@@ -31,8 +37,7 @@ evidence:
   notes: >-
     SAVI (L=0.5) was designed to minimise soil-brightness influence in
     sparse/low-cover canopies and bright soils without per-soil
-    recalibration — well suited to young/high-density mango and desert
-    reclamation soils. NDVI saturates/destabilises over exposed soil. The
+    recalibration — well suited to desert reclamation soils. NDVI saturates/destabilises over exposed soil. The
     drop is measured as a baseline_deviation z-score against the block's
     own day-of-year history, so it self-calibrates across varieties and
     soils (no absolute value matrix).
@@ -61,21 +66,8 @@ parameters:
       Baseline-deviation (z-score) at/below which the chosen greenness
       index counts as a sharp drop worth scouting.
 
-root: root
+root: soil_check
 nodes:
-  root:
-    label_en: Is the canopy small?
-    label_ar: هل المجموع الخضري صغير؟
-    condition:
-      tree:
-        op: eq
-        left:
-          source: block
-          field: canopy_size_class
-        right: small
-    on_match: savi_check
-    on_miss: soil_check
-
   soil_check:
     label_en: Is the soil sandy?
     label_ar: هل التربة رملية؟
@@ -135,11 +127,11 @@ nodes:
         Canopy greenness has dropped sharply below this block's seasonal
         baseline. Scout for stress (water, pest/disease, nutrient) and
         confirm on the ground. The soil-adjusted SAVI was used where the
-        canopy is small or the soil is sandy.
+        the soil is sandy.
       text_ar: >-
         هبط اخضرار المجموع بحدّة دون خط الأساس الموسمي لهذه القطعة. استكشف
         الإجهاد (ماء، آفات/أمراض، تغذية) وأكّد ميدانيًا. استُخدم SAVI المعدّل
-        للتربة حيث المجموع صغير أو التربة رملية.
+        للتربة حيث التربة رملية.
       actions:
         immediate:
           - text_en: Walk the block and inspect the trees showing the drop.

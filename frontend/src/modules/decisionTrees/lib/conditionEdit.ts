@@ -42,7 +42,10 @@ export const BLOCK_FIELDS = [
   "crop_strain",
   "soil_texture",
   "salinity_class",
-  "canopy_size_class",
+  // NOTE: no `canopy_size_class`. The column exists on block_crops but no
+  // surface in the product ever rendered an input for it, so a predicate
+  // against it could never be true. Dropped from the backend BLOCK_FIELDS in
+  // the same change — keep the two lists identical.
 ] as const;
 export const SIGNAL_KEYS = [
   "value_numeric",

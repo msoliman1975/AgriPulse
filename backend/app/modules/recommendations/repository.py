@@ -1101,13 +1101,12 @@ class RecommendationsRepository:
 
     async def get_block_current_crop(
         self, *, block_id: UUID
-    ) -> tuple[UUID | None, UUID | None, str | None, str | None, str | None, str | None]:
+    ) -> tuple[UUID | None, UUID | None, str | None, str | None, str | None]:
         """Return (block_crop_id, crop_id, crop_category, growth_stage,
-        crop_path, canopy_size_class) for the active assignment, or all-None
-        if none.
+        crop_path) for the active assignment, or all-None if none.
 
         ``growth_stage`` (KB P3) is the stored phenological stage on the
-        block_crops row — manually set today via the farms UX; conditions
+        block_crops row, advanced daily by the phenology task; conditions
         read it as ``{source: block, field: growth_stage}``.
 
         ``crop_path`` is the denormalized hierarchical taxonomy code
@@ -1118,8 +1117,7 @@ class RecommendationsRepository:
             await self._tenant.execute(
                 text(
                     """
-                    SELECT id AS block_crop_id, crop_id, growth_stage, crop_path,
-                           canopy_size_class
+                    SELECT id AS block_crop_id, crop_id, growth_stage, crop_path
                     FROM block_crops
                     WHERE block_id = :block_id
                       AND is_current = TRUE
@@ -1131,7 +1129,7 @@ class RecommendationsRepository:
             )
         ).first()
         if row is None:
-            return None, None, None, None, None, None
+            return None, None, None, None, None
         crop_row = (
             await self._public.execute(
                 text("SELECT category FROM public.crops WHERE id = :crop_id").bindparams(
@@ -1147,7 +1145,6 @@ class RecommendationsRepository:
             category,
             row.growth_stage,
             row.crop_path,
-            row.canopy_size_class,
         )
 
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
