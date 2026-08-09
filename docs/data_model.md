@@ -506,12 +506,7 @@ The current and historical crop assignments for a block. One row per season-on-b
 | `crop_variety_id` | UUID | | FK → `public.crop_varieties.id` |
 | `season_label` | TEXT | NOT NULL | e.g. `2026-summer`, `2025-2026`, or `Y3` for perennials |
 | `planting_date` | DATE | | |
-| `expected_harvest_start` | DATE | | |
-| `expected_harvest_end` | DATE | | |
 | `actual_harvest_date` | DATE | | |
-| `plant_density_per_ha` | NUMERIC(8,2) | | |
-| `row_spacing_m` | NUMERIC(5,2) | | Orchards |
-| `plant_spacing_m` | NUMERIC(5,2) | | Orchards |
 | `growth_stage` | TEXT | | Phenology stage; auto-derived where models exist |
 | `growth_stage_updated_at` | TIMESTAMPTZ | | |
 | `is_current` | BOOLEAN | NOT NULL, DEFAULT FALSE | Exactly one current per block |
@@ -523,6 +518,16 @@ The current and historical crop assignments for a block. One row per season-on-b
 - `UNIQUE (block_id) WHERE is_current = TRUE`
 - `INDEX (block_id, planting_date DESC)`
 - `INDEX (crop_id)`
+
+**Removed in 0061:** `expected_harvest_start`, `expected_harvest_end`,
+`plant_density_per_ha`, `row_spacing_m`, `plant_spacing_m`. They shipped with
+0002 and no surface ever wrote them — reachable only by hand-written JSON on
+the assign payload. A tenant that needs any of them authors it as a **crop
+attribute** (`block_crop_attribute_values`, migration 0055), which is
+per-crop, typed and gated, rather than as a fixed column that is right for
+orchards and meaningless for field crops. The
+five codes were released from `RESERVED_ATTRIBUTE_CODES` at the same time.
+`actual_harvest_date` was kept: it records a real event.
 
 ### 5.6.1 `growth_stage_logs` (tenant schema)
 

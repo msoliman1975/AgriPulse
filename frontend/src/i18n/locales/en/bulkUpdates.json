@@ -57,12 +57,6 @@
     "planting": "Planting date",
     "effectiveFrom": "Effective from",
     "effectiveFromHelp": "Defaults to the planting date, else today.",
-    "harvestStart": "Expected harvest — start",
-    "harvestEnd": "Expected harvest — end",
-    "spacingTitle": "Spacing & density",
-    "density": "Plant density (plants/ha)",
-    "rowSpacing": "Row spacing (m)",
-    "plantSpacing": "Plant spacing (m)",
     "cropFieldsTitle": "Crop fields",
     "noCropFields": "This crop has no extra fields defined.",
     "notesTitle": "Notes"

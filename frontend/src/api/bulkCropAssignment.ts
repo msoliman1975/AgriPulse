@@ -62,11 +62,6 @@ export interface BulkCropAssignmentPayload {
   season_label: string;
   effective_from?: string | null;
   planting_date?: string | null;
-  expected_harvest_start?: string | null;
-  expected_harvest_end?: string | null;
-  plant_density_per_ha?: number | null;
-  row_spacing_m?: number | null;
-  plant_spacing_m?: number | null;
   canopy_size_class?: string | null;
   notes?: string | null;
   attributes?: Record<string, unknown>;

@@ -57,14 +57,15 @@ GATEABLE_VALUE_TYPES: frozenset[str] = frozenset({"single_select", "boolean"})
 RESERVED_ATTRIBUTE_CODES: frozenset[str] = frozenset(
     {
         # block_crops columns
+        #
+        # The expected-harvest window and the spacing/density trio used to be
+        # here too. They were dropped from `block_crops` (migration 0061) as
+        # columns no surface ever wrote, so they no longer shadow anything --
+        # and a tenant that does want "row spacing" can now author it as a
+        # crop attribute, where it belongs.
         "season_label",
         "planting_date",
-        "expected_harvest_start",
-        "expected_harvest_end",
         "actual_harvest_date",
-        "plant_density_per_ha",
-        "row_spacing_m",
-        "plant_spacing_m",
         "canopy_size_class",
         "growth_stage",
         "is_current",

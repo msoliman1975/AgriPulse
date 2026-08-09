@@ -49,12 +49,7 @@ const GATEABLE_TYPES = new Set<CropAttributeValueType>(["single_select", "boolea
 const RESERVED_CODES = new Set([
   "season_label",
   "planting_date",
-  "expected_harvest_start",
-  "expected_harvest_end",
   "actual_harvest_date",
-  "plant_density_per_ha",
-  "row_spacing_m",
-  "plant_spacing_m",
   "canopy_size_class",
   "growth_stage",
   "is_current",
