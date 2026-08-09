@@ -347,4 +347,74 @@ describe("BlockDock", () => {
     expect(screen.getByText("Fruit set")).toBeTruthy();
     expect(screen.getByText("Summer (2026)")).toBeTruthy();
   });
+
+  it("translates the activity type rather than humanising the enum", async () => {
+    renderDock({
+      ...DETAIL,
+      activities: [
+        { date: "2026-07-02", label: "Soil prep", activity_type: "soil_prep", phase: "next7d" },
+      ],
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /Field & plan/ }));
+    expect(screen.getByText("Soil prep")).toBeTruthy();
+  });
+});
+
+// Everything the dock renders has to follow the UI language, not just the
+// chrome. These are the fields that were frozen in English: the ones the dock
+// derives itself (weekday heads, activity types, growth stage) and the dates,
+// which formatted against the BROWSER locale instead of the app's.
+describe("BlockDock — Arabic", () => {
+  beforeEach(async () => {
+    await setupTestI18n("ar");
+    caps.value = true;
+    getCropAttrs.mockReset();
+    getCropAttrs.mockResolvedValue({
+      block_crop_id: "00000000-0000-0000-0000-0000000000bc",
+      crop_path: "mango.alphonso",
+      definitions: [],
+      values: {},
+    });
+  });
+
+  it("labels the growth stage and the activity type in Arabic", async () => {
+    renderDock({
+      ...DETAIL,
+      activities: [
+        { date: "2026-07-02", label: "Soil prep", activity_type: "soil_prep", phase: "next7d" },
+      ],
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /الحقل/ }));
+    // `fruit_set` / `soil_prep`, not the English humanisation of either.
+    expect(await screen.findByText("عقد الثمار")).toBeTruthy();
+    expect(screen.getByText("تحضير التربة")).toBeTruthy();
+    expect(screen.queryByText("Fruit set")).toBeNull();
+    expect(screen.queryByText("Soil prep")).toBeNull();
+  });
+
+  it("heads the forecast columns in Arabic instead of an en-US weekday", async () => {
+    renderDock({
+      ...DETAIL,
+      weather_3d: [
+        { day: "Today", date: "2026-06-30", temp_c_max: 38 },
+        { day: "Wed", date: "2026-07-01", temp_c_max: 39 },
+        { day: "Thu", date: "2026-07-02", temp_c_max: 37 },
+      ],
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /المياه/ }));
+    expect(screen.getByText("اليوم")).toBeTruthy();
+    expect(screen.queryByText("Wed")).toBeNull();
+    expect(screen.queryByText("Thu")).toBeNull();
+  });
+
+  it("formats the observation date against the UI language, not the browser", async () => {
+    renderDock();
+    // longDate() passed `undefined` as the locale, so an Arabic UI on an
+    // en-US browser kept printing "Jun 30, 2026" beside Arabic chip labels.
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.queryByText(/Jun 30, 2026/)).toBeNull();
+  });
 });

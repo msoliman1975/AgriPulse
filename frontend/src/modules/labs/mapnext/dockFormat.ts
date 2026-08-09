@@ -3,6 +3,7 @@
 // are unit-testable without rendering anything.
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import type { ExplainStep } from "@/api/recommendations";
+import { chartDateLocale } from "@/lib/chartFormat";
 
 import { HEALTH_DOT, INDEX_BANDS, type IndexBand } from "./constants";
 
@@ -43,18 +44,26 @@ export function bandFor(code: ApiIndexCode, value: number | null | undefined): I
   return bands.find((b) => value <= b.max) ?? bands[bands.length - 1];
 }
 
-/** `fruit_set` → `Fruit set`. Growth stages and activity types arrive as raw
- * enum values; neither has a translated catalogue on the client yet. */
+/** `fruit_set` → `Fruit set`. Last-resort rendering for a raw enum value with
+ * no entry in a translated catalogue — always English, so pass a `t()` lookup
+ * through `defaultValue` rather than calling this directly where a catalogue
+ * exists (see `activityLabel`). */
 export function humanize(raw: string | null | undefined): string {
   if (!raw) return "—";
   const s = raw.replace(/_/g, " ").trim();
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
 }
 
-export function shortDate(iso: string | null | undefined): string {
+/** Every date in the dock formats against the UI language, not the browser's.
+ * `undefined` here meant an Arabic UI on an English-locale browser kept
+ * printing "Jun 15" next to Arabic labels. */
+export function shortDate(iso: string | null | undefined, lang?: string): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return new Date(iso).toLocaleDateString(chartDateLocale(lang), {
+      month: "short",
+      day: "numeric",
+    });
   } catch {
     return iso;
   }
@@ -62,14 +71,24 @@ export function shortDate(iso: string | null | undefined): string {
 
 /** Observation dates in the title bar carry the year — a block last seen in
  * a previous season should not read as a recent one. */
-export function longDate(iso: string | null | undefined): string {
+export function longDate(iso: string | null | undefined, lang?: string): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(chartDateLocale(lang), {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
+  } catch {
+    return iso;
+  }
+}
+
+/** Weekday chip over a 3-day forecast column. */
+export function weekday(iso: string | null | undefined, lang?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString(chartDateLocale(lang), { weekday: "short" });
   } catch {
     return iso;
   }

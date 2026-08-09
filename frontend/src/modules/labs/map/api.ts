@@ -237,13 +237,24 @@ export function toUnitIntegration(h: BlockIntegrationHealth | null): UnitIntegra
 const detailCache = new Map<string, { at: number; value: UnitDetail }>();
 const DETAIL_TTL_MS = 30_000;
 
+// Alert text, recommendations and crop names are resolved to ONE language
+// while the detail is built, so the cache entry belongs to that language.
+// Keyed on the block alone, switching to Arabic replayed the English payload
+// for up to DETAIL_TTL_MS — the react-query key already carries `i18n.language`,
+// so it refetched and this cache handed the stale object straight back.
+function detailCacheKey(blockId: string, lang: string | undefined): string {
+  return `${blockId}|${lang ?? "en"}`;
+}
+
 export async function loadUnitDetail(args: {
   farmId: string;
   blockId: string;
   blocksById: Map<string, Block>;
   activePlan?: Plan | null;
 }): Promise<UnitDetail> {
-  const cached = detailCache.get(args.blockId);
+  const lang = i18n.language;
+  const cacheKey = detailCacheKey(args.blockId, lang);
+  const cached = detailCache.get(cacheKey);
   if (cached && Date.now() - cached.at < DETAIL_TTL_MS) return cached.value;
 
   const block = args.blocksById.get(args.blockId);
@@ -293,8 +304,8 @@ export async function loadUnitDetail(args: {
       severity: sev,
       code: a.rule_code,
       message:
-        localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar) ??
-        localizedField(i18n.language, a.prescription_en, a.prescription_ar) ??
+        localizedField(lang, a.diagnosis_en, a.diagnosis_ar) ??
+        localizedField(lang, a.prescription_en, a.prescription_ar) ??
         a.rule_code,
       raised_at: a.created_at,
     };
@@ -319,6 +330,9 @@ export async function loadUnitDetail(args: {
     .map((a) => ({
       date: a.scheduled_date,
       label: a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1).replace(/_/g, " "),
+      // The raw enum, so a caller can run it through the `activityType.*`
+      // catalogue instead of the English humanisation above.
+      activity_type: a.activity_type,
       phase:
         a.scheduled_date >= todayStr && a.scheduled_date <= next7dCutoff
           ? ("next7d" as const)
@@ -327,6 +341,7 @@ export async function loadUnitDetail(args: {
 
   const weatherDays = (weather?.days ?? []).slice(0, 3).map((d, i) => ({
     day: i === 0 ? "Today" : new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }),
+    date: d.date,
     temp_c_max: num(d.high_c),
   }));
 
@@ -334,7 +349,7 @@ export async function loadUnitDetail(args: {
   // stored flag that only moves on assignment, so a finished season would
   // otherwise keep showing as the block's crop.
   const currentCrop = cropAssignments.find((c) => c.is_active_now) ?? null;
-  const cropAssignmentSummary = await resolveCropAssignment(currentCrop);
+  const cropAssignmentSummary = await resolveCropAssignment(currentCrop, lang);
   const signals = condenseSignals(signalObs);
 
   const detail: UnitDetail = {
@@ -362,8 +377,8 @@ export async function loadUnitDetail(args: {
           severity: sev,
           code: a.rule_code,
           message:
-            localizedField(i18n.language, a.diagnosis_en, a.diagnosis_ar) ??
-            localizedField(i18n.language, a.prescription_en, a.prescription_ar) ??
+            localizedField(lang, a.diagnosis_en, a.diagnosis_ar) ??
+            localizedField(lang, a.prescription_en, a.prescription_ar) ??
             a.rule_code,
           raised_at: a.created_at,
         };
@@ -387,7 +402,12 @@ export async function loadUnitDetail(args: {
       soil_moisture_pct: num(next?.soil_moisture_pct ?? last?.soil_moisture_pct ?? null),
       soil_status: classifySoil(num(next?.soil_moisture_pct ?? last?.soil_moisture_pct ?? null)),
     },
-    recommendations: recs.map((r) => r.text_en).slice(0, 5),
+    // Sits directly under the alerts in the dock's Overview column, so it has
+    // to follow the same language as they do — `text_en` alone left the whole
+    // column half-translated in Arabic.
+    recommendations: recs
+      .map((r) => localizedField(lang, r.text_en, r.text_ar) ?? r.text_en)
+      .slice(0, 5),
     activities: acts,
     weather_3d: weatherDays,
     plan: args.activePlan
@@ -402,7 +422,7 @@ export async function loadUnitDetail(args: {
     signals,
   };
 
-  detailCache.set(args.blockId, { at: Date.now(), value: detail });
+  detailCache.set(cacheKey, { at: Date.now(), value: detail });
   return detail;
 }
 
@@ -512,32 +532,43 @@ const cropCache = new Map<string, Crop>();
 const varietyCache = new Map<string, CropVariety>();
 const strainCache = new Map<string, CropVarietyStrain>();
 
+/** Catalogue rows are cached by id with BOTH names on them, so the language
+ * is picked at read time — the caches survive a language switch untouched. */
+function catalogName(
+  row: { name_en: string; name_ar: string | null } | undefined,
+  lang: string | undefined,
+): string | null {
+  if (!row) return null;
+  return localizedField(lang, row.name_en, row.name_ar);
+}
+
 async function resolveCropAssignment(
   c: BlockCropAssignment | null,
+  lang: string | undefined,
 ): Promise<UnitDetail["crop_assignment"]> {
   if (!c) return null;
   let cropName = "—";
   let varietyName: string | null = null;
   let strainName: string | null = null;
   const cached = cropCache.get(c.crop_id);
-  if (cached) cropName = cached.name_en;
+  if (cached) cropName = catalogName(cached, lang) ?? "—";
   else {
     try {
       const crops = await listCrops();
       for (const crop of crops) cropCache.set(crop.id, crop);
-      cropName = cropCache.get(c.crop_id)?.name_en ?? "—";
+      cropName = catalogName(cropCache.get(c.crop_id), lang) ?? "—";
     } catch {
       // fall through with placeholder
     }
   }
   if (c.crop_variety_id) {
     const v = varietyCache.get(c.crop_variety_id);
-    if (v) varietyName = v.name_en;
+    if (v) varietyName = catalogName(v, lang);
     else {
       try {
         const vs = await listCropVarieties(c.crop_id);
         for (const variety of vs) varietyCache.set(variety.id, variety);
-        varietyName = varietyCache.get(c.crop_variety_id)?.name_en ?? null;
+        varietyName = catalogName(varietyCache.get(c.crop_variety_id), lang);
       } catch {
         varietyName = null;
       }
@@ -545,12 +576,12 @@ async function resolveCropAssignment(
   }
   if (c.crop_variety_strain_id && c.crop_variety_id) {
     const s = strainCache.get(c.crop_variety_strain_id);
-    if (s) strainName = s.name_en;
+    if (s) strainName = catalogName(s, lang);
     else {
       try {
         const ss = await listVarietyStrains(c.crop_variety_id);
         for (const strain of ss) strainCache.set(strain.id, strain);
-        strainName = strainCache.get(c.crop_variety_strain_id)?.name_en ?? null;
+        strainName = catalogName(strainCache.get(c.crop_variety_strain_id), lang);
       } catch {
         strainName = null;
       }

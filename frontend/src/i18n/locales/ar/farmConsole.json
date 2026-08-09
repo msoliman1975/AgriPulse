@@ -537,5 +537,22 @@
     "low": "منخفضة",
     "critical": "حرجة",
     "unknown": "غير معروفة"
+  },
+  "growthStage": {
+    "germination": "الإنبات",
+    "establishment": "التأسيس",
+    "vegetative": "النمو الخضري",
+    "development": "التطور",
+    "panicle": "النورات",
+    "pre_flowering": "ما قبل الإزهار",
+    "flowering": "الإزهار",
+    "fruit_set": "عقد الثمار",
+    "fruit_development": "نمو الثمار",
+    "maturity": "النضج",
+    "ripening": "الاستواء",
+    "harvest": "الحصاد",
+    "senescence": "الشيخوخة",
+    "dormancy": "السكون",
+    "dormant": "ساكن"
   }
 }

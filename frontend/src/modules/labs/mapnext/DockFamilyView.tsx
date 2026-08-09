@@ -41,7 +41,8 @@ interface Point {
 }
 
 function Chart({ points }: { points: Point[] }): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
+  const lang = i18n.language;
   if (points.length < 2) {
     return (
       <div className="flex h-[168px] items-center justify-center rounded-xl border border-ap-line text-sm text-ap-muted">
@@ -96,7 +97,7 @@ function Chart({ points }: { points: Point[] }): ReactNode {
           textAnchor={k === 0 ? "start" : k === 2 ? "end" : "middle"}
           className="fill-ap-muted text-[9px]"
         >
-          {shortDate(points[i].time)}
+          {shortDate(points[i].time, lang)}
         </text>
       ))}
     </svg>

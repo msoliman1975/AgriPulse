@@ -57,8 +57,18 @@ export interface UnitDetail {
     soil_status: "optimal" | "low" | "critical" | "unknown";
   };
   recommendations: string[];
-  activities: { date: string; label: string; phase: "next7d" | "later" }[];
-  weather_3d: { day: string; temp_c_max: number | null }[];
+  // `label` is the English humanised activity type, kept for the legacy
+  // DetailPanel. New surfaces read `activity_type` and translate it, so the
+  // label switches with the UI language instead of being frozen at fetch time.
+  activities: {
+    date: string;
+    label: string;
+    activity_type: string;
+    phase: "next7d" | "later";
+  }[];
+  // Same split: `day` is a pre-rendered en-US weekday, `date` is the raw ISO
+  // day so a locale-aware caller can format it itself.
+  weather_3d: { day: string; date: string; temp_c_max: number | null }[];
   // Season plan summary (farm-level active plan, mirrored on each block).
   plan: {
     season_label: string;
