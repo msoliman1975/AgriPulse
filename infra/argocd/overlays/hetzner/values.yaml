@@ -823,13 +823,36 @@ global:
   #   owner has since explicitly authorised merging and promoting #383, so
   #   the column drop is intentional here, not collateral. Everything that
   #   note says about 0061 being irreversible still holds; see below.
+  # c1ed645 = #386 decision-tree evaluation lineage.
+  #   Records why every tree fired or did not, for a run that already
+  #   happened -- the question `:explain` cannot answer, because it
+  #   re-evaluates live against today's signals.
+  #   MIGRATION 0062 -- ADDITIVE AND REVERSIBLE, unlike 0061 above. Creates
+  #   two new tenant tables (decision_tree_eval_runs + _traces); touches no
+  #   existing table, column or index, so a rollback to 24952c8 loses the
+  #   lineage rows and nothing else. Round-trip (0062 -> 0061 -> head) is
+  #   covered by an integration test against a real schema.
+  #   Applied by the api chart's PreSync job, which runs the public upgrade
+  #   then `scripts.migrate_tenants` across every active tenant -- the new
+  #   tables are per-tenant, so a public-only migration would leave every
+  #   trace write failing.
+  #   COST: 0062 adds ~0.23s to each tenant-schema creation (measured
+  #   against ~1.39s for 0001..0061) and ~7% to the CI integration job.
+  #   Real, small, and accounted for; it is not the reason that job timed
+  #   out twice before merge (overlapping cancelled runs were).
+  #   RETENTION: `recommendations.prune_eval_runs` deletes runs older than
+  #   100 days daily on the light queue; traces follow via the run_id
+  #   cascade. At ~5k rows/tenant/day that bounds the table at roughly half
+  #   a million trace rows per tenant.
+  #   Backend + frontend -> api + workers + frontend bumped; tile-server
+  #   unchanged stays 9d140cc. Rollback is all three back to 24952c8.
   images:
     api:
-      tag: "24952c8"
+      tag: "c1ed645"
     workers:
-      tag: "24952c8"
+      tag: "c1ed645"
     frontend:
-      tag: "24952c8"
+      tag: "c1ed645"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
