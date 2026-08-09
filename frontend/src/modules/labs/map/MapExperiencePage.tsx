@@ -27,11 +27,17 @@ import {
   type FarmInactivationPreview,
   type FarmUpdatePayload,
 } from "@/api/farms";
-import { loadBlockHealth, loadMapSummary, loadUnitDetail, toUnitIntegration } from "./api";
+import {
+  loadBlockHealth,
+  loadMapSummary,
+  loadUnitDetail,
+  mapWithConcurrency,
+  toUnitIntegration,
+} from "./api";
 import type { UnitFeatureProps } from "./types";
 import { MapCanvas, type DrawProgress, type DrawTarget, type GridCellProps } from "./MapCanvas";
 import { SignalObservationPanel } from "./SignalObservationPanel";
-import { getGridCells, type GridWorstCell } from "@/api/grid";
+import { getFarmGridCells, getGridCells, type GridWorstCell } from "@/api/grid";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode } from "@/api/indices";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
@@ -649,25 +655,35 @@ function MapForFarm({ farmId }: { farmId: string }) {
   });
   const gridProductId = subscriptionsQ.data?.[0]?.product_id ?? null;
 
-  // Farm-wide overlay: there's no farm-level cells endpoint, so fan out
-  // per gridded block (each carries its own imagery product = its first
-  // active subscription) and merge client-side. Lazy — only fetched while
-  // the overlay is on. One query with an internal Promise.all keeps the
-  // hook count stable regardless of block count.
+  // Farm-wide overlay in one request. This used to fan out *twice* per
+  // block — a subscriptions lookup to find the imagery product, then the
+  // cells — as an unbounded Promise.all, i.e. 2N concurrent requests
+  // against a 15-slot connection pool. The farm route answers both halves
+  // server-side in a single query.
+  //
+  // Fallback keeps the old shape for an api that predates the route, but
+  // bounded to 4 in flight: the unbounded version is what took the pool
+  // down in #311.
   const overlayBlocks = summaryQ.data?.blocks ?? [];
   const overlayBlockKey = overlayBlocks.map((b) => b.id).join(",");
   const farmGridQ = useQuery({
     queryKey: ["labs/map/farmGrid", farmId, gridIndex, overlayBlockKey],
     queryFn: async () => {
-      const groups = await Promise.all(
-        overlayBlocks.map(async (b) => {
-          const subs = await listSubscriptions(b.id, { include_inactive: false });
-          const productId = subs[0]?.product_id;
-          if (!productId) return null;
-          const res = await getGridCells(b.id, productId, gridIndex);
-          return { blockId: b.id, productId, cells: res.cells };
-        }),
-      );
+      const farmWide = await getFarmGridCells(farmId, gridIndex);
+      if (farmWide) {
+        return farmWide.blocks.map((b) => ({
+          blockId: b.block_id,
+          productId: b.product_id,
+          cells: b.cells,
+        }));
+      }
+      const groups = await mapWithConcurrency(overlayBlocks, 4, async (b) => {
+        const subs = await listSubscriptions(b.id, { include_inactive: false });
+        const productId = subs[0]?.product_id;
+        if (!productId) return null;
+        const res = await getGridCells(b.id, productId, gridIndex);
+        return { blockId: b.id, productId, cells: res.cells };
+      });
       return groups.filter((g): g is NonNullable<typeof g> => g !== null);
     },
     enabled: Boolean(showGrid && overlayBlocks.length > 0),

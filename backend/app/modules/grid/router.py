@@ -23,6 +23,7 @@ from app.modules.grid.errors import GridConfigNotFoundError
 from app.modules.grid.schemas import (
     CellSizePreviewRequest,
     CellSizePreviewResponse,
+    FarmGridCellsResponse,
     GridBackfillRequest,
     GridBackfillResponse,
     GridCellHistoryResponse,
@@ -37,7 +38,7 @@ from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.blocks import read_block_context
 from app.shared.db.session import get_db_session
-from app.shared.rbac.check import has_capability
+from app.shared.rbac.check import has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["grid"])
 
@@ -225,6 +226,36 @@ async def get_grid_cells(
         index_code=index_code,
         at=at,
     )
+
+
+@router.get(
+    "/farms/{farm_id}/grid-cells",
+    response_model=FarmGridCellsResponse,
+    summary="Cells + latest values for every gridded block in a farm.",
+)
+async def get_farm_grid_cells(
+    farm_id: UUID,
+    index_code: str = Query(..., alias="index"),
+    context: RequestContext = Depends(requires_capability("index.read", farm_id_param="farm_id")),
+    service: GridService = Depends(_service),
+) -> FarmGridCellsResponse:
+    """The whole farm's grid overlay in one request.
+
+    The map draws every gridded block at once, and used to get there
+    with one ``/blocks/{id}/grid-cells`` call per block — 36 concurrent
+    requests on the reference farm, each paying JWT verification, a
+    connection from a 15-slot pool, a block lookup and an RBAC check
+    before touching any data, all against a single-worker API pod. That
+    fan-out is why the overlay took seconds to appear, and it is the
+    same shape that exhausted the pool in #311.
+
+    RBAC is farm-scoped ``index.read`` — the capability the per-block
+    route arrives at the long way round (block -> farm) — declared the
+    way the sibling farm-level route ``/farms/{id}/blocks/summary``
+    declares it.
+    """
+    del context  # the capability check's side-effect is the only consumer
+    return await service.get_farm_cells_with_values(farm_id=farm_id, index_code=index_code)
 
 
 @router.get(

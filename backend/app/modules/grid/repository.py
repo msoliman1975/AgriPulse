@@ -633,19 +633,46 @@ class GridRepository:
         against a different geometry — an all-NULL heatmap and a silently
         dead anomaly sweep (§2.2). A scene time is only useful here if the
         geometry that produced it can still be read back.
+
+        Phrased as "walk newest-first, stop at the first governed row"
+        rather than ``MAX(obs.time)`` over a config join. Both answer the
+        same question — verified identical over every (block, product,
+        index) triple in a 580k-observation tenant — but ``MAX`` has to
+        aggregate the block's *entire* history before it can name the
+        newest scene, joining every one of those rows out to
+        ``grid_cells``/``grid_configs`` on the way. Newest-first with a
+        LIMIT touches one row for any grid the pipeline is still feeding.
+
+        The ordering rides ``ix_block_grid_aggregates_block_time_index``
+        (block_id, time DESC, index_code), so the governance test moves
+        into an EXISTS that is evaluated per candidate row instead of a
+        join that has to be materialised for all of them.
+
+        Neither form can exclude chunks — "newest scene" has no time
+        bound to exclude on, which is the cost tenant migration 0057
+        addresses from the other side by making chunks fewer. A bounded
+        first pass was tried and rejected: it doubles the work for a
+        block that has no observations at all, which is the common case
+        on a freshly gridded farm.
         """
-        row = (
+        return (
             await self._session.execute(
                 text(
                     f"""
-                    SELECT MAX(obs.time) AS t
+                    SELECT obs.time AS t
                     FROM block_grid_aggregates obs
-                    JOIN grid_cells gc   ON gc.id = obs.cell_id
-                    JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
                     WHERE obs.block_id   = :block
                       AND obs.product_id = :product
                       AND obs.index_code = :code
-                      {_GOVERNS_AT.format(ts="obs.time")}
+                      AND EXISTS (
+                          SELECT 1
+                          FROM grid_cells gc
+                          JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                          WHERE gc.id = obs.cell_id
+                            {_GOVERNS_AT.format(ts="obs.time")}
+                      )
+                    ORDER BY obs.time DESC
+                    LIMIT 1
                     """  # noqa: S608 - only _GOVERNS_AT interpolates
                 ).bindparams(
                     bindparam("block", type_=PG_UUID(as_uuid=True)),
@@ -654,7 +681,6 @@ class GridRepository:
                 {"block": block_id, "product": product_id, "code": index_code},
             )
         ).scalar_one_or_none()
-        return row
 
     async def list_active_configs(self) -> tuple[dict[str, Any], ...]:
         """Every non-retired grid config in the tenant: (block_id, product_id).
@@ -818,14 +844,192 @@ class GridRepository:
         made a rezone render the whole block as "no data" (§2.2).
 
         ``at IS NULL`` means "the live grid" — no scene time to resolve
-        against, so fall back to the open-ended config.
+        against, so fall back to the open-ended config, and every cell
+        comes back valueless. There is no scene to read a value *from*.
+
+        The two cases are separate statements on purpose. Folding them
+        into one with ``(:at IS NULL OR obs.time = :at)`` was wrong twice
+        over:
+
+        * **Correctness.** When ``:at`` is NULL that disjunct is TRUE for
+          every row, so the LEFT JOIN matched the cell's *entire*
+          observation history and emitted one output row per (cell,
+          scene) — duplicate cells, each carrying an arbitrary historical
+          value. Reachable whenever a grid holds observations that no
+          config governs, which is exactly the window between a rezone
+          backfill and the settle sweep that widens the new config's
+          range (``tasks.settle_grid_rezones``).
+        * **Latency.** An OR against a parameter is not an indexable
+          qual, so TimescaleDB excluded no chunk and planned every one of
+          them — measured at 283 chunk scan nodes for a single 70-cell
+          block. Written as a plain equality it is a one-chunk lookup.
+
+        The valued branch also constrains ``obs.block_id``, which
+        ``list_cell_means`` has always done and this query never did:
+        it is the hypertable's space-partition key *and* the leading
+        compression ``segmentby`` column, so without it neither
+        partition pruning nor segment exclusion can fire.
+        """
+        if at is None:
+            sql = text(
+                """
+                SELECT
+                    gc.id              AS cell_id,
+                    gc.row_idx,
+                    gc.col_idx,
+                    gc.area_m2,
+                    ST_X(gc.centroid) AS centroid_lon,
+                    ST_Y(gc.centroid) AS centroid_lat,
+                    ST_AsGeoJSON(ST_Transform(gc.geom, 4326)) AS geometry_json,
+                    NULL::numeric     AS mean,
+                    NULL::numeric     AS valid_pixel_pct,
+                    NULL::timestamptz AS time
+                FROM grid_cells gc
+                JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                WHERE cfg.block_id   = :block
+                  AND cfg.product_id = :product
+                  AND cfg.deleted_at IS NULL
+                  AND cfg.superseded_at IS NULL
+                  AND cfg.effective_to IS NULL
+                ORDER BY gc.row_idx, gc.col_idx
+                """
+            ).bindparams(
+                bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+            )
+            params: dict[str, Any] = {"block": block_id, "product": product_id}
+        else:
+            sql = text(
+                f"""
+                SELECT
+                    gc.id              AS cell_id,
+                    gc.row_idx,
+                    gc.col_idx,
+                    gc.area_m2,
+                    ST_X(gc.centroid) AS centroid_lon,
+                    ST_Y(gc.centroid) AS centroid_lat,
+                    ST_AsGeoJSON(ST_Transform(gc.geom, 4326)) AS geometry_json,
+                    obs.mean,
+                    obs.valid_pixel_pct,
+                    obs.time
+                FROM grid_cells gc
+                JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                LEFT JOIN block_grid_aggregates obs
+                  ON obs.cell_id    = gc.id
+                 AND obs.block_id   = cfg.block_id
+                 AND obs.product_id = cfg.product_id
+                 AND obs.index_code = :code
+                 AND obs.time       = :at
+                WHERE cfg.block_id   = :block
+                  AND cfg.product_id = :product
+                  {_GOVERNS_AT.format(ts="CAST(:at AS timestamptz)")}
+                ORDER BY gc.row_idx, gc.col_idx
+                """
+            ).bindparams(
+                bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+                bindparam("at", type_=DateTime(timezone=True)),
+            )
+            params = {
+                "block": block_id,
+                "product": product_id,
+                "code": index_code,
+                "at": at,
+            }
+
+        rows = (await self._session.execute(sql, params)).mappings().all()
+        return tuple(dict(r) for r in rows)
+
+    async def list_farm_cells_with_values(
+        self,
+        *,
+        farm_id: UUID,
+        index_code: str,
+    ) -> tuple[dict[str, Any], ...]:
+        """Every gridded block's cells + latest values, for one farm, in
+        one statement.
+
+        The map overlay wants the whole farm, and it used to get there by
+        asking :meth:`list_cells_with_values` once per gridded block — 36
+        HTTP requests on the reference farm, each re-doing JWT
+        verification, a tenant session checkout from a 15-connection
+        pool, a block lookup, an RBAC check and two hypertable queries,
+        all funnelled through a single-worker API pod. Same shape as the
+        per-block boundary fetch that took the pool down in #311.
+
+        Three CTEs, each the set-based form of a step the per-block path
+        does one block at a time — deliberately, so the two cannot drift:
+
+        * ``live`` — which blocks are gridded and against which product.
+          Same ``DISTINCT ON (block_id) … ORDER BY created_at DESC`` that
+          ``blocks_summary_router`` uses to publish ``grid_product_id``,
+          so the overlay draws exactly the blocks the summary advertised.
+        * ``latest`` — the newest *governed* scene per block, the
+          set-based :meth:`get_latest_scene_time`. ``DISTINCT ON`` walks
+          (block_id, time DESC) and stops at each block's first governed
+          row.
+        * ``draw`` — the geometry to render, chosen by that scene time
+          rather than by "which config is current". A scene predating a
+          rezone is served from the grid that produced it, and a block
+          whose scene time is NULL falls back to the open-ended config —
+          the §2.2 rule, matching :meth:`list_cells_with_values`.
+
+        Blocks with no observation still return their cells with NULL
+        values: the overlay draws them as "no data" tiles, and dropping
+        them would silently shrink the map.
         """
         rows = (
             (
                 await self._session.execute(
                     text(
-                        """
+                        f"""
+                        WITH live AS (
+                            SELECT DISTINCT ON (cfg.block_id)
+                                   cfg.block_id, cfg.product_id
+                            FROM grid_configs cfg
+                            JOIN blocks b ON b.id = cfg.block_id
+                            WHERE b.farm_id = :farm
+                              AND cfg.retired_at IS NULL
+                              AND cfg.deleted_at IS NULL
+                              AND cfg.superseded_at IS NULL
+                            ORDER BY cfg.block_id, cfg.created_at DESC
+                        ),
+                        latest AS (
+                            SELECT DISTINCT ON (obs.block_id)
+                                   obs.block_id, obs.time AS at
+                            FROM block_grid_aggregates obs
+                            JOIN live lv
+                              ON lv.block_id   = obs.block_id
+                             AND lv.product_id = obs.product_id
+                            WHERE obs.index_code = :code
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM grid_cells gc
+                                  JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                                  WHERE gc.id = obs.cell_id
+                                    {_GOVERNS_AT.format(ts="obs.time")}
+                              )
+                            ORDER BY obs.block_id, obs.time DESC
+                        ),
+                        draw AS (
+                            SELECT lv.block_id, lv.product_id, cfg.id AS config_id, l.at
+                            FROM live lv
+                            LEFT JOIN latest l ON l.block_id = lv.block_id
+                            JOIN grid_configs cfg
+                              ON cfg.block_id   = lv.block_id
+                             AND cfg.product_id = lv.product_id
+                             AND cfg.deleted_at IS NULL
+                             AND cfg.superseded_at IS NULL
+                             AND CASE
+                                   WHEN l.at IS NULL THEN cfg.effective_to IS NULL
+                                   ELSE tstzrange(cfg.effective_from, cfg.effective_to)
+                                        @> l.at
+                                 END
+                        )
                         SELECT
+                            d.block_id,
+                            d.product_id,
+                            d.at               AS block_at,
                             gc.id              AS cell_id,
                             gc.row_idx,
                             gc.col_idx,
@@ -836,39 +1040,18 @@ class GridRepository:
                             obs.mean,
                             obs.valid_pixel_pct,
                             obs.time
-                        FROM grid_cells gc
-                        JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                        FROM draw d
+                        JOIN grid_cells gc ON gc.grid_config_id = d.config_id
                         LEFT JOIN block_grid_aggregates obs
                           ON obs.cell_id    = gc.id
-                         AND obs.product_id = cfg.product_id
+                         AND obs.block_id   = d.block_id
+                         AND obs.product_id = d.product_id
                          AND obs.index_code = :code
-                         AND (:at IS NULL OR obs.time = :at)
-                        WHERE cfg.block_id   = :block
-                          AND cfg.product_id = :product
-                          AND cfg.deleted_at IS NULL
-                          AND cfg.superseded_at IS NULL
-                          AND CASE
-                                WHEN CAST(:at AS timestamptz) IS NULL
-                                  THEN cfg.effective_to IS NULL
-                                ELSE tstzrange(cfg.effective_from, cfg.effective_to)
-                                     @> CAST(:at AS timestamptz)
-                              END
-                        ORDER BY gc.row_idx, gc.col_idx
-                        """
-                    ).bindparams(
-                        bindparam("block", type_=PG_UUID(as_uuid=True)),
-                        bindparam("product", type_=PG_UUID(as_uuid=True)),
-                        # asyncpg can't infer the type of a bare NULL used in
-                        # ":at IS NULL"; pin it to timestamptz so the prepared
-                        # statement type-checks when no scene time is given.
-                        bindparam("at", type_=DateTime(timezone=True)),
-                    ),
-                    {
-                        "block": block_id,
-                        "product": product_id,
-                        "code": index_code,
-                        "at": at,
-                    },
+                         AND obs.time       = d.at
+                        ORDER BY d.block_id, gc.row_idx, gc.col_idx
+                        """  # noqa: S608 - only _GOVERNS_AT interpolates
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id, "code": index_code},
                 )
             )
             .mappings()

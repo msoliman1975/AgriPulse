@@ -51,6 +51,8 @@ from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.repository import GridRepository
 from app.modules.grid.schemas import (
     CellSizePreviewResponse,
+    FarmGridBlock,
+    FarmGridCellsResponse,
     GridCellHistoryPoint,
     GridCellHistoryResponse,
     GridCellsResponse,
@@ -124,6 +126,13 @@ class GridService(Protocol):
         index_code: str,
         at: datetime | None,
     ) -> GridCellsResponse: ...
+
+    async def get_farm_cells_with_values(
+        self,
+        *,
+        farm_id: UUID,
+        index_code: str,
+    ) -> FarmGridCellsResponse: ...
 
     async def get_worst_cells(
         self,
@@ -476,6 +485,65 @@ class GridServiceImpl:
             cells=cells,
             at=resolved_at,
         )
+
+    async def get_farm_cells_with_values(
+        self,
+        *,
+        farm_id: UUID,
+        index_code: str,
+    ) -> FarmGridCellsResponse:
+        """Every gridded block in the farm, in one round trip.
+
+        No ``at`` parameter: the farm overlay only ever wants "latest per
+        block", and each block resolves its own scene time inside the
+        query. A caller that wants a specific scene is asking about one
+        block and should use :meth:`get_cells_with_values`.
+        """
+        import json
+
+        rows = await self._repo.list_farm_cells_with_values(farm_id=farm_id, index_code=index_code)
+
+        # Rows arrive ordered by (block_id, row_idx, col_idx), so grouping
+        # is a single pass — no dict-of-lists shuffle for what may be
+        # several thousand cells.
+        blocks: list[FarmGridBlock] = []
+        current: list[GridCellWithValue] = []
+        key: tuple[UUID, UUID] | None = None
+        block_at: datetime | None = None
+
+        def flush() -> None:
+            if key is not None:
+                blocks.append(
+                    FarmGridBlock(
+                        block_id=key[0],
+                        product_id=key[1],
+                        at=block_at,
+                        cells=tuple(current),
+                    )
+                )
+
+        for r in rows:
+            row_key = (r["block_id"], r["product_id"])
+            if row_key != key:
+                flush()
+                key, block_at, current = row_key, r["block_at"], []
+            current.append(
+                GridCellWithValue(
+                    cell_id=r["cell_id"],
+                    row_idx=r["row_idx"],
+                    col_idx=r["col_idx"],
+                    area_m2=r["area_m2"],
+                    centroid_lon=float(r["centroid_lon"]),
+                    centroid_lat=float(r["centroid_lat"]),
+                    geometry=json.loads(r["geometry_json"]),
+                    mean=r["mean"],
+                    valid_pixel_pct=r["valid_pixel_pct"],
+                    time=r["time"],
+                )
+            )
+        flush()
+
+        return FarmGridCellsResponse(farm_id=farm_id, index_code=index_code, blocks=tuple(blocks))
 
     async def get_worst_cells(
         self,

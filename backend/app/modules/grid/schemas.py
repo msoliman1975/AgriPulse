@@ -98,6 +98,36 @@ class GridCellsResponse(BaseModel):
     )
 
 
+class FarmGridBlock(BaseModel):
+    """One gridded block's cells inside a farm-wide grid response.
+
+    Shaped as a list of per-block groups rather than a flat cell list
+    because every consumer needs the grouping: the popup resolves a cell
+    back to its block and product, and the block-average baseline is
+    computed within a block.
+    """
+
+    block_id: UUID
+    product_id: UUID
+    at: datetime | None = Field(
+        description="Scene time these cells' values are pulled from; null if the block has none."
+    )
+    cells: tuple[GridCellWithValue, ...]
+
+
+class FarmGridCellsResponse(BaseModel):
+    """GET /api/v1/farms/{farm_id}/grid-cells response.
+
+    The whole farm's sub-block grid in one round trip. Blocks with no
+    grid are absent; a block with a grid but no observations is present
+    with valueless cells, so the overlay can draw it as "no data".
+    """
+
+    farm_id: UUID
+    index_code: str
+    blocks: tuple[FarmGridBlock, ...]
+
+
 class GridWorstCell(BaseModel):
     """A single under-performing cell, for the worst-N list.
 

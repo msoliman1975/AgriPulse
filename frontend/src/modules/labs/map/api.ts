@@ -470,8 +470,8 @@ async function safeBlock(blockId: string): Promise<BlockDetail | null> {
  * Guards the fallback path above: an unbounded Promise.all over every block
  * is what took the API's connection pool down in the first place.
  */
-async function mapWithConcurrency<T, R>(
-  items: T[],
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
   limit: number,
   fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
