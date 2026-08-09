@@ -64,6 +64,7 @@ from app.modules.recommendations.service import (
     _DecisionTreeCodeMismatchError,
     _DecisionTreeNoPublishedVersionError,
     _DecisionTreeNotFoundError,
+    _DecisionTreeUnknownCropAttributeError,
     _DecisionTreeVersionNotFoundError,
     _ParamNameUnknownError,
     _ParamValueCoercionError,
@@ -547,7 +548,7 @@ def _author_service(
     )
 
 
-def _map_authoring_error(exc: Exception) -> Exception | None:
+def _map_authoring_error(exc: Exception) -> Exception | None:  # noqa: PLR0911 - dispatch
     """Map authoring-service errors to APIError, return one to raise.
 
     Centralised so each endpoint stays focused on the happy path."""
@@ -576,6 +577,17 @@ def _map_authoring_error(exc: Exception) -> Exception | None:
             detail=f"A decision tree with code {exc.code!r} already exists.",
             type_="https://agripulse.cloud/problems/recommendations/decision-tree-code-conflict",
             extras={"code": exc.code},
+        )
+    if isinstance(exc, _DecisionTreeUnknownCropAttributeError):
+        return APIError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Unknown crop attribute",
+            detail=(
+                f"{exc} — the tree would branch on a value none of its blocks "
+                "can carry, so the comparison would never match."
+            ),
+            type_="https://agripulse.cloud/problems/recommendations/unknown-crop-attribute",
+            extras={"codes": exc.codes, "crop_paths": exc.crop_paths},
         )
     if isinstance(exc, _DecisionTreeCodeMismatchError):
         return APIError(

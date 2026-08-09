@@ -1585,6 +1585,64 @@ class DecisionTreesAuthorService:
 
     # ---- Writes -------------------------------------------------------
 
+    async def _versions_to_check(self, tree: dict[str, Any]) -> list[dict[str, Any]]:
+        """The compiled bodies a targeting change could invalidate: the
+        published version (what runs now) and the newest one (what the author
+        is about to publish). Usually the same row, so this returns one body;
+        two when a draft is pending, none on a tree with no versions yet.
+        """
+        bodies: list[dict[str, Any]] = []
+        seen: set[UUID] = set()
+        current_id = tree.get("current_version_id")
+        if current_id is not None:
+            current = await self._repo.get_version(current_id)
+            if current is not None:
+                seen.add(current["id"])
+                bodies.append(current.get("tree_compiled") or {})
+        latest_number = await self._repo.get_latest_version_number(tree_id=tree["id"])
+        if latest_number > 0:
+            latest = await self._repo.get_version_by_number(
+                tree_id=tree["id"], version=latest_number
+            )
+            if latest is not None and latest["id"] not in seen:
+                bodies.append(latest.get("tree_compiled") or {})
+        return bodies
+
+    async def _assert_crop_attribute_refs_resolve(
+        self,
+        compiled: dict[str, Any],
+        *,
+        crop_paths: list[str] | None = None,
+    ) -> None:
+        """Reject a tree that branches on a crop attribute its target crops
+        never define.
+
+        `{source: crop_attribute}` is the one condition source whose valid
+        codes are data rather than a constant, so `compile_tree` cannot check
+        them: the catalog lives in `public.crop_attribute_definitions` and the
+        valid subset depends on the tree's targeting. The result of skipping
+        the check is a ref that resolves to None for every block the tree runs
+        on — permissive-on-missing-data means the comparison fails closed
+        forever and nothing anywhere reports it.
+
+        Skipped when the tree targets no crop: with no targeting there is no
+        subset to check against, and "matches any crop" would make every code
+        in the catalog legal anyway. Create requires at least one path, so in
+        practice this only spares trees seeded before targeting existed.
+        """
+        from app.modules.recommendations.loader import collect_crop_attribute_codes
+
+        referenced = collect_crop_attribute_codes(compiled.get("nodes") or {})
+        if not referenced:
+            return
+        paths = crop_paths if crop_paths is not None else list(compiled.get("crop_paths") or [])
+        if not paths:
+            return
+        available = await self._repo.list_crop_attribute_codes_for_paths(paths=paths)
+        unknown = sorted(referenced - available)
+        if unknown:
+            raise _DecisionTreeUnknownCropAttributeError(codes=unknown, crop_paths=paths)
+
     async def create_tree(
         self,
         *,
@@ -1637,6 +1695,7 @@ class DecisionTreesAuthorService:
         # against a typo where the YAML says one thing and the URL another.
         if compiled.get("code") != code:
             raise _DecisionTreeCodeMismatchError(expected=code, got=str(compiled.get("code")))
+        await self._assert_crop_attribute_refs_resolve(compiled)
         compiled_hash = _hash_compiled(compiled)
         crop_path = compiled.get("crop_path")
         # crop_code from the request takes precedence; otherwise derive it
@@ -1721,6 +1780,11 @@ class DecisionTreesAuthorService:
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         if compiled.get("code") != code:
             raise _DecisionTreeCodeMismatchError(expected=code, got=str(compiled.get("code")))
+        # Targeting is not in the version payload — it lives on the tree row
+        # and the pickers edit it separately, so check against the stored set.
+        await self._assert_crop_attribute_refs_resolve(
+            compiled, crop_paths=list(tree.get("crop_paths") or [])
+        )
         compiled_hash = _hash_compiled(compiled)
         # No-op when the new YAML hashes identical — the editor can
         # call save liberally; we only insert when there's actually a
@@ -1851,6 +1915,18 @@ class DecisionTreesAuthorService:
         tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
         if tree is None:
             raise _DecisionTreeNotFoundError(code)
+        # Retargeting is the other way a crop-attribute ref goes dead: the
+        # YAML never changes, but narrowing the crop set can leave the body
+        # branching on an attribute the new crops don't define.
+        #
+        # Both the published version and the newest draft are checked. The
+        # published one is what runs today; the draft is what the author is
+        # about to publish, and on a tree created but never published there
+        # is no current version at all — checking only that would let the
+        # common case (author sets up a tree, then fixes its targeting)
+        # through unvalidated.
+        for body in await self._versions_to_check(tree):
+            await self._assert_crop_attribute_refs_resolve(body, crop_paths=crop_paths)
         # Keep the legacy single-prefix `crop_path` + denormalised
         # `crop_id` populated from the first crop path so the engine's
         # crop resolution and existing reads stay consistent.
@@ -2245,6 +2321,25 @@ class _DecisionTreeCodeAlreadyExistsError(_DecisionTreeAuthoringError):
     def __init__(self, code: str) -> None:
         super().__init__(f"Decision tree {code!r} already exists")
         self.code = code
+
+
+class _DecisionTreeUnknownCropAttributeError(_DecisionTreeAuthoringError):
+    """The tree branches on a crop attribute its target crops don't define.
+
+    Such a ref resolves to None for every block the tree runs on, so the
+    comparison fails closed forever — a tree that looks authored and can
+    never fire. The condition builder already filters the dropdown by
+    targeting; this is the save-time half, for YAML authored by hand or a
+    tree whose targeting was narrowed after the fact.
+    """
+
+    def __init__(self, *, codes: list[str], crop_paths: list[str]) -> None:
+        super().__init__(
+            f"crop attribute(s) {', '.join(codes)} are not defined for "
+            f"crop path(s) {', '.join(crop_paths)}"
+        )
+        self.codes = codes
+        self.crop_paths = crop_paths
 
 
 class _DecisionTreeCodeMismatchError(_DecisionTreeAuthoringError):

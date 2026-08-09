@@ -1147,6 +1147,43 @@ class RecommendationsRepository:
             row.crop_path,
         )
 
+    async def list_crop_attribute_codes_for_paths(self, *, paths: list[str]) -> set[str]:
+        """Active crop-attribute codes reachable from any of ``paths``.
+
+        Matches the taxonomy in both directions, which is what "reachable"
+        means for a decision tree: a definition at ``mango`` resolves for a
+        ``mango.keitt`` block, and a tree targeting ``mango`` runs on blocks
+        that may carry ``mango.keitt``, so a definition one level deeper is
+        reachable too.
+
+        ``starts_with`` rather than ``LIKE`` on purpose: crop paths contain
+        underscores (``sugar_beet``), and ``_`` is a single-character
+        wildcard in LIKE — ``path LIKE 'sugar_beet.%'`` would also match
+        ``sugarXbeet.something``.
+        """
+        if not paths:
+            return set()
+        rows = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT DISTINCT d.code
+                    FROM public.crop_attribute_definitions d
+                    WHERE d.is_active = TRUE
+                      AND EXISTS (
+                          SELECT 1
+                          FROM unnest(CAST(:paths AS text[])) AS t(p)
+                          WHERE d.path = t.p
+                             OR starts_with(t.p, d.path || '.')
+                             OR starts_with(d.path, t.p || '.')
+                      )
+                    """
+                ),
+                {"paths": list(paths)},
+            )
+        ).all()
+        return {r.code for r in rows}
+
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
         rows = (
             await self._tenant.execute(
