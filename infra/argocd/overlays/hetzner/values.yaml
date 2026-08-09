@@ -770,11 +770,11 @@ global:
   #   rendered page. First prod check should be /settings/bulk itself.
   images:
     api:
-      tag: "f9afafb"
+      tag: "7510aa8"
     workers:
-      tag: "f9afafb"
+      tag: "7510aa8"
     frontend:
-      tag: "f9afafb"
+      tag: "7510aa8"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
