@@ -32,8 +32,7 @@ description_en: >-
   for moderate drops.
 description_ar: ""
 
-crop_code: null
-applicable_regions: []
+# Targeting (crops / countries / soils / execution scope) is form-driven.
 
 root: root
 nodes:
@@ -105,8 +104,7 @@ description_en: >-
   the magnitude of the drop so an oncall workflow can triage by urgency.
 description_ar: ""
 
-crop_code: null
-applicable_regions: []
+# Targeting (crops / countries / soils / execution scope) is form-driven.
 
 root: root
 nodes:
@@ -172,8 +170,7 @@ description_en: >-
   is expected, defer irrigation; otherwise schedule it.
 description_ar: ""
 
-crop_code: null
-applicable_regions: []
+# Targeting (crops / countries / soils / execution scope) is form-driven.
 
 root: root
 nodes:
