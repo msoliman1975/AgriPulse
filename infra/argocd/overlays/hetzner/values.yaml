@@ -846,13 +846,45 @@ global:
   #   a million trace rows per tenant.
   #   Backend + frontend -> api + workers + frontend bumped; tile-server
   #   unchanged stays 9d140cc. Rollback is all three back to 24952c8.
+  # 45b5a08 = #389 crop assignments can finally be DELETED, plus four
+  #   FIVE decision-tree changes (#387 #388 #390 #391 #392) already merged and
+  #   green on main -- prod was at c1ed645, so they ship with this or not at all.
+  #   #389: `crop_assignment.delete` had existed as a capability with NO route,
+  #   so an assignment entered by mistake could only be unwound by assigning
+  #   over it or by SQL. Three surfaces now: a "Remove crop assignments" type in
+  #   Bulk Updates, "Undo this run" on a bulk result, and "Remove crop" in the
+  #   Farm Console drawer -- all going through ONE panel, so the dangerous path
+  #   is written once.
+  #   HARD delete: the rows are erased, not soft-deleted. Crop-field values,
+  #   their change history and growth-stage logs cascade away with them. The
+  #   preview posts the same body as the delete and itemises all of that, and
+  #   the UI requires typing REMOVE, because none of it comes back.
+  #   `recommendations.block_crop_id` has NO foreign key, so those are nulled
+  #   explicitly first -- a dangling id looks resolvable and silently resolves
+  #   to nothing. And `uq_block_crops_current` is partial on `is_current = TRUE`
+  #   and excludes nothing, so the block is only re-assignable because the row
+  #   genuinely goes; a test re-assigns the same dates to prove it.
+  #   NO MIGRATION anywhere in c1ed645..45b5a08 -- this promote is tags only,
+  #   so rollback is all three back to c1ed645 with nothing to unwind. That is
+  #   the opposite of the 0061 promote, and worth noting: the DATA this feature
+  #   destroys is still gone on rollback, but the schema is untouched.
+  #   Promoting 45b5a08 rather than #389's own merge commit 2a36ba9: that run
+  #   was cancelled by #392 merging seconds later (CI's cancel-in-progress
+  #   group is keyed on the ref, so every push to main shares one slot), which
+  #   left 2a36ba9 with NO images at all. 45b5a08 is its descendant, contains
+  #   #389 whole, and actually built. Images verified in ghcr BEFORE this
+  #   commit: api sha256:59fc9d4b..., frontend sha256:716c4e3a..., both
+  #   distinct from c1ed645's. The run conclusion is never the check.
+  #   NOT EXERCISED IN PROD: driven end-to-end on the local stack only (seed →
+  #   preview wrote nothing → remove → re-assign same dates → undo restored the
+  #   previously-current crop). Nobody has clicked it against prod data.
   images:
     api:
-      tag: "c1ed645"
+      tag: "45b5a08"
     workers:
-      tag: "c1ed645"
+      tag: "45b5a08"
     frontend:
-      tag: "c1ed645"
+      tag: "45b5a08"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
