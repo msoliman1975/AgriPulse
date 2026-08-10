@@ -973,13 +973,42 @@ global:
   #
   #   Still NOT browser-verified -- this fix exists because the previous
   #   promote was not either.
+  # 143c9cb -- Action Center filters + a closed action-type vocabulary (#398).
+  #
+  #   The severity filter was never sent. Axios serialises an array query param
+  #   as `severity[]=critical`; FastAPI binds `list[X]` from REPEATED keys and
+  #   ignores the bracket form, so it bound None and returned everything. The
+  #   request succeeded, so nothing surfaced. Fixed with one
+  #   `paramsSerializer: { indexes: null }` on the shared axios client.
+  #
+  #   READ THIS BEFORE BLAMING THIS TAG FOR A BEHAVIOUR CHANGE: that fix is
+  #   app-wide, not Action-Center-local. The type filter here, and the observer
+  #   scene/block, irrigation-status and eval-trace-status filters, were ALL
+  #   silently unfiltered before this. They now filter. Screens that appeared
+  #   to "show everything" will start showing less -- that is the correction,
+  #   not a regression.
+  #
+  #   Also: decision-tree `action_type` is a dropdown instead of a free-text
+  #   box (it is CHECK-constrained at persist, so a typo used to save and
+  #   publish cleanly and fail only when the tree fired), groups start
+  #   collapsed, and the assigned-to + clear-all filters exist.
+  #
+  #   FRONTEND-DOMINANT but api moves too: #399 (b7bfb93) landed just before
+  #   this and its CI run was CANCELLED, so b7bfb93 has NO images. 143c9cb
+  #   supersedes it and is the first SHA since a51c72a that has a full set.
+  #
+  #   No migration. Rollback is these three back to a51c72a; the serializer
+  #   fix goes with the frontend tag.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:143c9cb sha256:d7deec01,
+  #   workers:143c9cb sha256:19e70b84, frontend:143c9cb sha256:f18e7f39.
   images:
     api:
-      tag: "a51c72a"
+      tag: "143c9cb"
     workers:
-      tag: "a51c72a"
+      tag: "143c9cb"
     frontend:
-      tag: "a51c72a"
+      tag: "143c9cb"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
