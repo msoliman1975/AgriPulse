@@ -33,20 +33,18 @@ export const INDICES_KEYS = [
 // backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
 export const INDEX_CODES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"] as const;
 export const BLOCK_FIELDS = [
-  "crop_category",
   // KB P3: the block's current phenological stage, resolved from the crop
   // taxonomy and auto-advanced daily.
   "growth_stage",
-  // Crop taxonomy: hierarchical path (`mango.alphonso.short`) + strain leaf.
-  "crop_path",
-  "crop_strain",
   "soil_texture",
   "salinity_class",
-  // NOTE: no `canopy_size_class`. The column exists on block_crops but no
-  // surface in the product ever rendered an input for it, so a predicate
-  // against it could never be true. Dropped from the backend BLOCK_FIELDS in
-  // the same change — keep the two lists identical.
+  // NOTE: no `crop_category`, `crop_path` or `crop_strain`. All three restate
+  // the tree's own targeting — it already declares which crop paths it runs
+  // on — so branching on them asks a question the targeting has answered. No
+  // tree ever used one. Also no `canopy_size_class`: nothing writes it.
+  // Keep identical to BLOCK_FIELDS in backend/app/shared/conditions/models.py.
 ] as const;
+
 export const SIGNAL_KEYS = [
   "value_numeric",
   "value_categorical",
@@ -575,7 +573,7 @@ function serializeRightOperand(rhs: RightOperand): unknown {
 // ---- Operand typing ------------------------------------------------
 //
 // The evaluator compares whatever the left ref resolves to against the
-// right operand, with no type checking: `crop_category = 0` parses, saves,
+// right operand, with no type checking: `soil_texture = 0` parses, saves,
 // publishes and then never matches, because a string is never equal to a
 // number. The builder used to make that the *default* — every left ref got
 // a `number: 0` on the right — so picking a categorical field and typing
@@ -608,7 +606,6 @@ const SALINITY_VALUES = [
   "moderately_saline",
   "strongly_saline",
 ] as const;
-const CROP_CATEGORY_VALUES = ["cereal", "fiber", "fodder", "fruit_tree", "vegetable"] as const;
 const RISK_LEVEL_VALUES = ["low", "moderate", "high"] as const;
 const GRID_SEVERITY_VALUES = ["warning", "critical"] as const;
 
@@ -653,7 +650,6 @@ export function leftOperandValues(ref: ValueRef): readonly string[] | null {
   if (ref.source === "block") {
     if (ref.field === "soil_texture") return SOIL_TEXTURE_VALUES;
     if (ref.field === "salinity_class") return SALINITY_VALUES;
-    if (ref.field === "crop_category") return CROP_CATEGORY_VALUES;
   }
   return null;
 }
@@ -673,7 +669,11 @@ function retypeOperand(operand: RightOperand, type: OperandType): RightOperand {
     return { kind: "boolean", value: operand.kind === "string" && operand.value === "true" };
   }
   if (operand.kind === "string") return operand;
-  return { kind: "string", value: operand.kind === "number" ? String(operand.value) : "" };
+  // A number crossing into a categorical slot is dropped rather than
+  // stringified. `growth_stage = "0"` is a filled-in box that can never match;
+  // an empty one reads as unfinished, which is what it is. Where the field has
+  // a closed vocabulary, retypeTermForLeft seeds a real value over this.
+  return { kind: "string", value: "" };
 }
 
 /** Swap a term's left ref, re-typing the right side to match it. When the
@@ -740,7 +740,7 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
     case "indices":
       return { source: "indices", index_code: "ndvi", key: "baseline_deviation" };
     case "block":
-      return { source: "block", field: "crop_category" };
+      return { source: "block", field: "growth_stage" };
     case "weather":
       return { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" };
     case "weather_index":

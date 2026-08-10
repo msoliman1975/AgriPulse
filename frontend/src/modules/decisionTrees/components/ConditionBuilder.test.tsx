@@ -153,8 +153,8 @@ describe("<ConditionBuilder>", () => {
 
     // Was `number: 0`, which against a stored string could never match.
     const emitted = onChange.mock.calls[0][0] as { right: unknown; left: unknown };
-    expect(emitted.left).toEqual({ source: "block", field: "crop_category" });
-    expect(emitted.right).toBe("cereal");
+    expect(emitted.left).toEqual({ source: "block", field: "growth_stage" });
+    expect(emitted.right).toBe("");
   });
 
   it("renders a closed vocabulary as a picker, not a text box", () => {

@@ -198,7 +198,7 @@ describe("constants stay in lock-step with the backend", () => {
   });
 
   it("accepts the crop-taxonomy block fields", () => {
-    for (const field of ["crop_path", "crop_strain", "soil_texture", "salinity_class"]) {
+    for (const field of ["growth_stage", "soil_texture", "salinity_class"]) {
       expect(BLOCK_FIELDS).toContain(field);
       expect(
         parseConditionTree({ op: "eq", left: { source: "block", field }, right: "x" }).kind,
@@ -609,7 +609,7 @@ describe("operand typing", () => {
     // Growth stages come from the crop taxonomy and a crop path is free text,
     // so neither can be offered as a closed list.
     expect(leftOperandValues({ source: "block", field: "growth_stage" })).toBeNull();
-    expect(leftOperandValues({ source: "block", field: "crop_path" })).toBeNull();
+    expect(leftOperandValues({ source: "block", field: "growth_stage" })).toBeNull();
   });
 
   it("seeds the first vocabulary value when the left becomes categorical", () => {
@@ -631,9 +631,9 @@ describe("operand typing", () => {
       left: { source: "block", field: "soil_texture" },
       right: { kind: "string", value: "clay" },
     };
-    const next = retypeTermForLeft(term, { source: "block", field: "crop_path" });
+    const next = retypeTermForLeft(term, { source: "block", field: "growth_stage" });
     if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
-    // crop_path has no closed vocabulary, so the string stands.
+    // growth_stage has no closed vocabulary here, so the string stands.
     expect(next.right).toEqual({ kind: "string", value: "clay" });
   });
 

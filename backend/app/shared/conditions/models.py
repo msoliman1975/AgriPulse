@@ -39,26 +39,19 @@ INDICES_KEYS: tuple[str, ...] = (
 # current block_crops row (categorical, e.g. tuber_bulking). Compare with
 # eq/ne/in. Resolves via ``block_attributes`` and is None until a stage is
 # set, so stage-gated rules fail closed.
-# ``crop_path`` / ``crop_strain`` (crop taxonomy) carry the block's current
-# hierarchical path (``mango.alphonso.short``) and its strain segment
-# (``short``); both resolve via ``block_attributes`` and are None when the
-# block has no crop / no strain level. Compare with eq/ne/in to branch a
-# tree on a specific variety or strain.
 # ``soil_texture`` (sandy/loam/clay variants) + ``salinity_class`` come from
 # the block.
 #
-# ``canopy_size_class`` was removed from this vocabulary: the column and its
-# per-crop validation exist on block_crops, but no surface in the product ever
-# rendered an input for it, so every block evaluated null and any tree that
-# branched on it took the same branch forever. 77 of 77 production
-# crop-assignment rows were null. The column stays (it is API-settable and
-# still a reserved attribute code); it is only the *condition* vocabulary that
-# drops it, so authors can't build a predicate that can never be true.
+# Three identity fields were removed from this vocabulary: ``crop_category``,
+# ``crop_path`` and ``crop_strain``. All three restate the tree's own targeting
+# — a tree already declares which crop paths it runs on, and crop_category is
+# just the catalog's grouping of that same crop — so branching on them inside
+# the tree asks a question the targeting has already answered. No tree in the
+# catalog ever used one in a condition. ``crop_path`` is still loaded and still
+# drives targeting and the crop stamped on each recommendation; it simply is no
+# longer something a *condition* can read.
 BLOCK_FIELDS: tuple[str, ...] = (
-    "crop_category",
     "growth_stage",
-    "crop_path",
-    "crop_strain",
     "soil_texture",
     "salinity_class",
 )
@@ -75,7 +68,7 @@ class IndicesValueRef:
 
 @dataclass(frozen=True, slots=True)
 class BlockValueRef:
-    """``{"source":"block","field":"crop_category"}``"""
+    """``{"source":"block","field":"growth_stage"}``"""
 
     source: Literal["block"]
     field: str  # one of BLOCK_FIELDS

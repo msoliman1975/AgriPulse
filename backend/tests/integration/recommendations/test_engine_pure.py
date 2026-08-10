@@ -101,7 +101,6 @@ def _ctx_with_deviation(value: Decimal | None) -> ConditionContext:
     )
     return ConditionContext(
         block_id="b1",
-        crop_category="vegetables",
         indices=indices,
     )
 
