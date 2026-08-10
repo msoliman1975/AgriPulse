@@ -35,18 +35,22 @@ import {
   WEATHER_SCOPES,
   attributePathAppliesToCrops,
   changeTermOp,
+  cropAttributeOperandSpec,
   defaultGroupNode,
   defaultTermNode,
   defaultValueRef,
   leftOperandType,
   leftOperandValues,
+  operandOutOfRange,
   retypeTermForLeft,
   riskAppliesToCrops,
   serializeNode,
   signalKeysForValueKind,
+  signalOperandSpec,
   type ConditionNode,
   type EditableCondition,
   type GroupMode,
+  type OperandSpec,
   type RightOperand,
   type Term,
   type TermOp,
@@ -313,6 +317,37 @@ function NotBox({
   );
 }
 
+// ---- Definition-driven operand shape --------------------------------
+
+/** Resolve the right-hand operand's shape from the definition behind a
+ *  `signals` / `crop_attribute` left ref. Returns null for every other source,
+ *  where the ref alone is enough. */
+function useOperandSpec(left: ValueRef): OperandSpec | null {
+  const isSignal = left.source === "signals";
+  const isCropAttr = left.source === "crop_attribute";
+  const signalDefs = useQuery({
+    queryKey: ["signal_definitions", "list"] as const,
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 60_000,
+    enabled: isSignal,
+  });
+  const cropAttrDefs = useQuery({
+    queryKey: ["crop_attribute_definitions", "catalog"] as const,
+    queryFn: () => listCropAttributeCatalog(),
+    staleTime: 60_000,
+    enabled: isCropAttr,
+  });
+  if (isSignal) {
+    return signalOperandSpec((signalDefs.data ?? []).find((d) => d.code === left.code));
+  }
+  if (isCropAttr) {
+    // The same code can be defined at several taxonomy depths; they share a
+    // value type, so the first match is representative.
+    return cropAttributeOperandSpec((cropAttrDefs.data ?? []).find((d) => d.code === left.code));
+  }
+  return null;
+}
+
 // ---- Term row ------------------------------------------------------
 
 interface TermRowProps {
@@ -325,6 +360,12 @@ interface TermRowProps {
 
 function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  // `signals` and `crop_attribute` get their operand shape from the definition
+  // rather than from the ref: the tenant's signal and the platform's crop
+  // attribute already declare the type, the legal values, the bounds and the
+  // unit. Both queries are the ones the code dropdowns run, so react-query
+  // serves them from cache.
+  const spec = useOperandSpec(term.left);
   // The node details panel is a fixed, narrow (~360px) column, so the
   // comparison fields stack vertically. A previous `sm:grid-cols-[…]`
   // 4-column layout keyed off the *viewport* width (≥640px), not the
@@ -351,7 +392,7 @@ function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps
           readOnly={readOnly}
           onChange={(next) => onChange(changeTermOp(term, next))}
         />
-        <TermOperands term={term} readOnly={readOnly} onChange={onChange} />
+        <TermOperands term={term} readOnly={readOnly} spec={spec} onChange={onChange} />
         {onRemove && !readOnly ? (
           <button
             type="button"
@@ -373,10 +414,12 @@ function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps
 function TermOperands({
   term,
   readOnly,
+  spec,
   onChange,
 }: {
   term: Term;
   readOnly: boolean;
+  spec: OperandSpec | null;
   onChange: (next: Term) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
@@ -388,6 +431,7 @@ function TermOperands({
           label={t("editor.condition.low")}
           value={term.low}
           left={term.left}
+          spec={spec}
           readOnly={readOnly}
           onChange={(low) => onChange({ ...term, low })}
         />
@@ -395,6 +439,7 @@ function TermOperands({
           label={t("editor.condition.high")}
           value={term.high}
           left={term.left}
+          spec={spec}
           readOnly={readOnly}
           onChange={(high) => onChange({ ...term, high })}
         />
@@ -419,6 +464,7 @@ function TermOperands({
                 label={`#${idx + 1}`}
                 value={v}
                 left={term.left}
+                spec={spec}
                 readOnly={readOnly}
                 onChange={(next) => setValue(idx, next)}
               />
@@ -436,7 +482,9 @@ function TermOperands({
         {!readOnly ? (
           <AddButton
             label={t("editor.condition.addValue")}
-            onClick={() => onChange({ ...term, values: [...term.values, newInValue(term.left)] })}
+            onClick={() =>
+              onChange({ ...term, values: [...term.values, newInValue(term.left, spec)] })
+            }
           />
         ) : null}
       </div>
@@ -448,6 +496,7 @@ function TermOperands({
       label={t("editor.condition.right")}
       value={term.right}
       left={term.left}
+      spec={spec}
       readOnly={readOnly}
       onChange={(right) => onChange({ ...term, right })}
     />
@@ -951,19 +1000,31 @@ interface RightEditorProps {
    *  boolean or a categorical, and supplies the vocabulary when there is
    *  a closed one. */
   left: ValueRef;
+  /** Definition-driven shape, when the left ref is a signal or crop attribute.
+   *  Takes precedence over anything derived from `left`. */
+  spec: OperandSpec | null;
   readOnly: boolean;
   onChange: (next: RightOperand) => void;
 }
 
-function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProps): ReactNode {
+function RightEditor({
+  label,
+  value,
+  left,
+  spec,
+  readOnly,
+  onChange,
+}: RightEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The user picks between "literal" (number/string/boolean) and "ref"
   // (typically a params ref). Number is the default and most common.
-  const kindLabel = value.kind === "ref" ? "params ref" : value.kind;
+  const kindLabel = value.kind === "ref" ? "params ref" : (spec?.unit ?? value.kind);
   // Closed vocabularies (soil texture, risk level, trend direction, …) become
   // a picker: those are exactly the comparisons an author gets wrong by
   // typing, and a wrong value fails closed with no error anywhere.
-  const vocabulary = leftOperandValues(left);
+  // A definition's own option list wins over the static per-ref vocabulary.
+  const vocabulary = spec ? (spec.values ?? null) : leftOperandValues(left);
+  const outOfRange = operandOutOfRange(spec, value);
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] text-ap-muted">
@@ -990,6 +1051,14 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
             const n = Number(e.target.value);
             if (!Number.isNaN(n)) onChange({ kind: "number", value: n });
           }}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
+        />
+      ) : value.kind === "string" && spec?.control === "date" ? (
+        <input
+          type="date"
+          disabled={readOnly}
+          value={value.value}
+          onChange={(e) => onChange({ kind: "string", value: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
         />
       ) : value.kind === "string" && vocabulary ? (
@@ -1038,6 +1107,13 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         />
       )}
+      {/* Advisory, never blocking: a threshold outside the recorded range is
+          often the point of the rule. */}
+      {outOfRange ? (
+        <span className="text-[11px] text-ap-warn">
+          {t("editor.condition.outOfRange", { min: spec?.min ?? "—", max: spec?.max ?? "—" })}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -1045,7 +1121,12 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
 /** A fresh `in` entry starts in the left ref's own shape — a number for a
  *  numeric left, and the first value of a closed vocabulary where there is
  *  one, rather than an empty string that can never match. */
-function newInValue(left: ValueRef): RightOperand {
+function newInValue(left: ValueRef, spec: OperandSpec | null): RightOperand {
+  if (spec) {
+    if (spec.control === "number") return { kind: "number", value: 0 };
+    if (spec.control === "boolean") return { kind: "boolean", value: true };
+    return { kind: "string", value: spec.values?.[0] ?? "" };
+  }
   if (leftOperandType(left) === "number") return { kind: "number", value: 0 };
   if (leftOperandType(left) === "boolean") return { kind: "boolean", value: true };
   const vocabulary = leftOperandValues(left);

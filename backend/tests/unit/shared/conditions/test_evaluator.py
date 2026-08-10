@@ -538,3 +538,55 @@ def test_weather_risk_missing_pathogen_fails_closed() -> None:
     }
     # Context only carries a powdery_mildew entry → fruit_fly is None → no match.
     assert evaluate(tree, _wr_ctx(score=90))[0] is False
+
+
+# ---- date-typed crop attributes -------------------------------------------
+
+
+def _date_attr_ctx(value: object) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        crop_attributes={"transplant_date": value},
+    )
+
+
+def _date_tree(op: str, right: str) -> dict:
+    return {
+        "op": op,
+        "left": {"source": "crop_attribute", "code": "transplant_date"},
+        "right": right,
+    }
+
+
+def test_date_attribute_compares_against_an_iso_string() -> None:
+    # The regression: crop_attribute resolves dates as real `date` objects while
+    # a YAML threshold is text. `date < str` raises TypeError, which _compare
+    # swallows into False — so every comparison against the four seeded date
+    # attributes silently never matched.
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("lt", "2025-01-01"), ctx)[0] is True
+    assert evaluate(_date_tree("gt", "2025-01-01"), ctx)[0] is False
+    assert evaluate(_date_tree("eq", "2024-03-01"), ctx)[0] is True
+    assert evaluate(_date_tree("ge", "2024-03-01"), ctx)[0] is True
+
+
+def test_date_attribute_accepts_a_timestamp_threshold() -> None:
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("eq", "2024-03-01T00:00:00"), ctx)[0] is True
+
+
+def test_datetime_value_is_compared_by_its_date() -> None:
+    ctx = _date_attr_ctx(datetime(2024, 3, 1, 14, 30, tzinfo=UTC))
+    assert evaluate(_date_tree("eq", "2024-03-01"), ctx)[0] is True
+
+
+def test_unparseable_threshold_still_fails_closed() -> None:
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("lt", "not-a-date"), ctx)[0] is False
+
+
+def test_a_numeric_string_pair_is_still_compared_numerically() -> None:
+    # The date arm must not intercept the numeric path: "9" > "10" as text.
+    ctx = ConditionContext(block_id="b1", crop_attributes={"tree_age": Decimal("9")})
+    tree = {"op": "lt", "left": {"source": "crop_attribute", "code": "tree_age"}, "right": "10"}
+    assert evaluate(tree, ctx)[0] is True

@@ -31,6 +31,7 @@ preserve precision through the JSONB roundtrip.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -245,12 +246,48 @@ def _compare(op: str, left: Any, right: Any) -> bool:
 
 
 def _coerce_pair(left: Any, right: Any) -> tuple[Any, Any]:
-    """If both sides look numeric, coerce to Decimal for stable compare."""
+    """Coerce both sides to a comparable pair: Decimal when both look numeric,
+    ``date`` when one side is a date and the other an ISO date string.
+
+    The date arm exists because ``crop_attribute`` resolves date-typed values as
+    real ``date`` objects while a tree's threshold is written in YAML as text.
+    Without it, ``date < str`` raises TypeError, which ``_compare`` catches and
+    turns into False — so every comparison against a date attribute silently
+    never matched. Four seeded attributes (transplant and implantation dates)
+    were affected.
+    """
     if isinstance(left, bool) or isinstance(right, bool):
         return left, right
     if _looks_numeric(left) and _looks_numeric(right):
         return _to_decimal(left), _to_decimal(right)
+    if _is_temporal(left) or _is_temporal(right):
+        as_dates = (_to_date(left), _to_date(right))
+        if as_dates[0] is not None and as_dates[1] is not None:
+            return as_dates
     return left, right
+
+
+def _is_temporal(value: Any) -> bool:
+    return isinstance(value, date | datetime)
+
+
+def _to_date(value: Any) -> date | None:
+    """A ``date`` for anything date-shaped, else None (leave the pair alone)."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            # `fromisoformat` accepts a full timestamp too, so a rule written
+            # against either "2026-03-01" or "2026-03-01T00:00:00" resolves.
+            return datetime.fromisoformat(value).date()
+        except ValueError:
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+    return None
 
 
 def _looks_numeric(value: Any) -> bool:

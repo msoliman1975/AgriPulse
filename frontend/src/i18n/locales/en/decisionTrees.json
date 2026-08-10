@@ -334,6 +334,7 @@
       "right": "Threshold",
       "operator": "Operator",
       "indexCode": "Index code",
+      "outOfRange": "Outside the recorded range ({{min}}–{{max}}). This will still save.",
       "weatherField": "Weather field",
       "weatherIndexCode": "Weather index",
       "weatherRiskCode": "Pathogen / pest",
