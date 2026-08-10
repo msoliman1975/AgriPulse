@@ -902,13 +902,31 @@ global:
   #   Image verified in ghcr before the bump, not inferred from the run
   #   conclusion: api:591db3e is a 200 with digest sha256:5cef8472... ,
   #   distinct from api:45b5a08 (sha256:59fc9d4b...).
+  # 0bf2cc1 = #394 two authoring-UI defects found by clicking through prod.
+  #   Both were invisible to the test suite: one needs a real browser's regex
+  #   engine, the other a real server error.
+  #   1. The create form's `pattern` did not compile under the `v` flag, which
+  #      is how Chrome parses that attribute. An uncompilable pattern is
+  #      IGNORED, not failing -- so the code field validated nothing and threw
+  #      on every page load. Backend enforced the same rule in Pydantic
+  #      throughout, so nothing invalid was ever stored.
+  #   2. The three save/publish/update banners rendered fixed strings and threw
+  #      away the RFC 7807 `detail`. One of them pointed at the YAML editor for
+  #      detail it never had. Now one shared MutationErrorBanner shows the
+  #      server's own words -- which is what makes #393's validator usable.
+  #   FRONTEND ONLY. No backend file changed between 591db3e and 0bf2cc1, so
+  #   api + workers stay on 591db3e and only the frontend tag moves. Rollback
+  #   is frontend back to 45b5a08 alone; no migration, nothing to strand.
+  #   Image verified in ghcr before the bump: frontend:0bf2cc1 is a 200 with
+  #   digest sha256:e3274cb5..., distinct from frontend:45b5a08
+  #   (sha256:716c4e3a...).
   images:
     api:
       tag: "591db3e"
     workers:
       tag: "591db3e"
     frontend:
-      tag: "45b5a08"
+      tag: "0bf2cc1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
