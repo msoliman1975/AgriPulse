@@ -440,16 +440,16 @@ async def test_dispatching_the_same_item_to_a_scout_twice_does_not_duplicate_it(
     """
     seeded = await _seed(admin_session)
     svc = _service(admin_session)
-    kwargs: dict[str, Any] = dict(
-        farm_id=seeded["farm_id"],
-        item_ids=[seeded["alert_id"]],
-        assigned_membership_id=None,
-        scheduled_date=None,
-        notes=None,
-        actor_user_id=None,
-        tenant_schema=seeded["schema"],
-        target="scout",
-    )
+    kwargs: dict[str, Any] = {
+        "farm_id": seeded["farm_id"],
+        "item_ids": [seeded["alert_id"]],
+        "assigned_membership_id": None,
+        "scheduled_date": None,
+        "notes": None,
+        "actor_user_id": None,
+        "tenant_schema": seeded["schema"],
+        "target": "scout",
+    }
     first = await svc.dispatch(**kwargs)
     assert first.results[0].visit_id is not None
 
