@@ -18,12 +18,39 @@ export interface Crop {
   /** Base temperature for growing-degree-day accumulation. A stage that
    *  advances on GDD is only valid when the crop sets this. */
   gdd_base_temp_c?: string | null;
+  /** Upper cutoff for GDD accumulation. Optional even when a base is set. */
+  gdd_upper_temp_c?: string | null;
   /** The crop's stage calendar. Null for most crops today — a block whose crop
    *  has none can never advance a growth stage on its own. */
   phenology_stages?: { stages: PhenologyStage[] } | null;
+  /** Canopy size classes offered on a block assignment. */
+  size_classes?: { classes: SizeClass[] } | null;
+  /** Opaque per-key JSON, shallow-merged down the taxonomy. Nothing reads it
+   *  yet — `resolve_thresholds()` has no callers. */
+  default_thresholds?: Record<string, unknown> | null;
 }
 
-export interface CropVariety {
+/** One canopy size class. Mirrors `farms/phenology.py:SizeClass`. */
+export interface SizeClass {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  order: number;
+}
+
+/**
+ * Phenology and size classes a variety or strain defines *instead of* the
+ * level above it — never merged with it. `null` (or absent) means the node
+ * inherits, and the nearest ancestor with a non-null value wins: a strain
+ * falls back to its variety, not straight to the crop.
+ */
+export interface TaxonomyOverrides {
+  phenology_stages_override?: { stages: PhenologyStage[] } | null;
+  size_classes_override?: { classes: SizeClass[] } | null;
+  default_thresholds?: Record<string, unknown> | null;
+}
+
+export interface CropVariety extends TaxonomyOverrides {
   id: string;
   crop_id: string;
   code: string;
@@ -34,7 +61,7 @@ export interface CropVariety {
   is_active: boolean;
 }
 
-export interface CropVarietyStrain {
+export interface CropVarietyStrain extends TaxonomyOverrides {
   id: string;
   crop_variety_id: string;
   code: string;

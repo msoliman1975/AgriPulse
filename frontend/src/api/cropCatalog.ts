@@ -14,15 +14,31 @@ import type {
   CropVarietyStrain,
 } from "./crops";
 
-export interface CropCreatePayload {
-  code: string;
-  name_en: string;
-  name_ar: string;
-  category: string;
+// Crop-level agronomic settings shared by create and update.
+//
+// The GDD temperatures read back as strings (JSON has no decimal type) but are
+// written as numbers, which is what a numeric input yields; pydantic accepts
+// either. Ranges are the server's: base 0–40 °C, upper 0–60 °C.
+interface CropSettingsPayload {
   is_perennial?: boolean;
   scientific_name?: string | null;
   classification_depth?: ClassificationDepth;
   default_growing_season_days?: number | null;
+  /** Required before any stage may advance on `gdd_from_planting`. */
+  gdd_base_temp_c?: number | null;
+  gdd_upper_temp_c?: number | null;
+  relevant_indices?: string[];
+  /** Replaced wholesale, like the stage calendar. */
+  size_classes?: { classes: SizeClassPayload[] } | null;
+  /** Shallow-merged per key by the resolver — and read by nothing today. */
+  default_thresholds?: Record<string, unknown> | null;
+}
+
+export interface CropCreatePayload extends CropSettingsPayload {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  category: string;
 }
 
 // --- Phenology stage calendar ---------------------------------------------
@@ -41,27 +57,56 @@ export type { AdvanceRule } from "./crops";
 /** What the update endpoint accepts — identical to the read shape. */
 export type PhenologyStagePayload = PhenologyStage;
 
-export interface CropUpdatePayload {
+export interface CropUpdatePayload extends CropSettingsPayload {
   name_en?: string;
   name_ar?: string;
   category?: string;
-  is_perennial?: boolean;
-  scientific_name?: string | null;
-  classification_depth?: ClassificationDepth;
-  default_growing_season_days?: number | null;
   is_active?: boolean;
   /** The whole calendar is replaced at once — the array is too interdependent
    *  (unique codes, unique orders) to patch a stage at a time. */
   phenology_stages?: { stages: PhenologyStagePayload[] } | null;
 }
 
-export interface VarietyCreatePayload {
+// --- Size classes ----------------------------------------------------------
+//
+// The block canopy-size dropdown. Same shape rules as the stage calendar
+// (`farms/phenology.py:SizeClasses`) minus the advance rule: unique codes,
+// unique orders, both names required.
+
+export interface SizeClassPayload {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  order: number;
+}
+
+// --- Taxonomy-level overrides ----------------------------------------------
+//
+// Phenology and size classes resolve **deepest non-NULL wins** (strain →
+// variety → crop) and are replaced *wholesale*, never merged — see
+// `farms/crop_thresholds.resolve_phenology_stages`. So a variety may define a
+// different number of stages than its crop, and a strain different again from
+// its variety.
+//
+// Sending `null` clears the override, and the node inherits from its parent
+// again. That is the only way back: there is no separate delete endpoint.
+//
+// `default_thresholds` is the odd one out — it shallow-merges per key rather
+// than replacing. It is also, today, read by nothing: `resolve_thresholds()`
+// has no callers anywhere in the backend.
+export interface TaxonomyOverridePayload {
+  phenology_stages_override?: { stages: PhenologyStagePayload[] } | null;
+  size_classes_override?: { classes: SizeClassPayload[] } | null;
+  default_thresholds?: Record<string, unknown> | null;
+}
+
+export interface VarietyCreatePayload extends TaxonomyOverridePayload {
   code: string;
   name_en: string;
   name_ar?: string | null;
 }
 
-export interface NodeUpdatePayload {
+export interface NodeUpdatePayload extends TaxonomyOverridePayload {
   name_en?: string;
   name_ar?: string | null;
   is_active?: boolean;
