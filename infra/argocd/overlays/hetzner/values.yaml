@@ -1002,13 +1002,42 @@ global:
   #
   #   Images verified in ghcr BEFORE this commit: api:143c9cb sha256:d7deec01,
   #   workers:143c9cb sha256:19e70b84, frontend:143c9cb sha256:f18e7f39.
+  # e7a9341 -- Action Center dispatch picker (#403), plus three PRs that merged
+  #   on top of 143c9cb and cannot be left behind: a tag is a point on the
+  #   trunk, not a cherry-pick.
+  #
+  #     #403 dispatch offers the same people who can own a block. The block
+  #          form picks an owner from the TENANT USER list; this dialog was
+  #          offering FARM MEMBERS. So an owner who was not also a farm member
+  #          had no option to render, and a farm with no farm_scopes rows got
+  #          an empty dropdown while block assignment worked fine. Also: the
+  #          select is always rendered now -- a roster failure used to remove
+  #          the control outright, which made such a farm undispatchable even
+  #          though the server resolves an assignee per block regardless.
+  #     #402 block growth stage from the crop assignment (farms).
+  #     #401 decision trees: explain every condition code inline.
+  #     #400 decision trees: operand values follow the signal / crop-field
+  #          definition. The ONLY backend change in this whole range --
+  #          `shared/conditions/evaluator.py`. Everything else is frontend.
+  #
+  #   NO MIGRATION anywhere in 143c9cb..e7a9341, checked rather than assumed,
+  #   so the PreSync hook has nothing to run and rollback strands nothing.
+  #
+  #   #402's own CI run was CANCELLED, so 6f7ab85 has no images and could only
+  #   ever reach prod inside a later SHA. This is that SHA. (Third cancelled
+  #   merge build tonight -- the concurrency group keys on ref.)
+  #
+  #   Rollback: all three back to 143c9cb. That also reverts #400-#402.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:e7a9341 sha256:444baf02,
+  #   workers:e7a9341 sha256:68af7569, frontend:e7a9341 sha256:9c4a84c4.
   images:
     api:
-      tag: "143c9cb"
+      tag: "e7a9341"
     workers:
-      tag: "143c9cb"
+      tag: "e7a9341"
     frontend:
-      tag: "143c9cb"
+      tag: "e7a9341"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
