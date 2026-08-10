@@ -1089,13 +1089,53 @@ global:
   #
   #   Images verified in ghcr BEFORE this commit: api sha256:d42dca15,
   #   workers sha256:cb280c02, frontend sha256:9bb00d88.
+  #
+  # 7889d95 -- #408: AgriPulse Scout. The Android field app plus the backend it
+  #   needs -- signal catalog promoted to a platform tier, scouting visits, and
+  #   push dispatch. This is the FIRST deploy of the `scouting` module: prod had
+  #   no such module and no field-PIN code at all, so nothing here replaces a
+  #   working path.
+  #
+  #   ALL THREE MOVE. Migrations: public **0052-0055**, tenant **0065-0069**.
+  #   PreSync runs both before the api rolls, so api + workers cannot lag.
+  #   Frontend moves too and is NOT optional: `rbac/capabilities.ts` gained the
+  #   scouting capabilities and there is a new platform Signals page. A stale
+  #   frontend against this api is the silent FE/BE constant drift that #345
+  #   added lock-step tests for.
+  #
+  #   ROLLBACK IS ASYMMETRIC. Tags roll back; migrations do not. Reverting to
+  #   7b7f7ba leaves the new tenant tables (scouting_visits, device_tokens) and
+  #   -- the part that matters -- leaves the signal catalog MOVED to
+  #   public.signal_definitions, because 0065 copies tenant rows up and drops
+  #   the tenant tables. The old api reads the tenant tables, so a tag-only
+  #   rollback would break signals. Roll the migrations back first, or don't
+  #   roll back.
+  #
+  #   api CORS also gains `https://localhost` (infra/helm/api/values.yaml) --
+  #   that is the Capacitor WebView origin of the Scout APK, not a developer
+  #   machine. It ships with the chart, not the tag.
+  #
+  #   FCM stays inert: `fcm_enabled` defaults false and no values file sets it,
+  #   so push is dark in prod until a Firebase service account is wired in. The
+  #   app is built to degrade quietly when registration fails.
+  #
+  #   TAG IS 7 CHARS -- git prints 7889d950 (8); ghcr has 7889d95. See the note
+  #   on 7b7f7ba above.
+  #
+  #   Rollback: all three back to 7b7f7ba, migrations permitting (see above).
+  #
+  #   Images verified in ghcr BEFORE this commit, by manifest not by run
+  #   conclusion: api sha256:ff67ad57, workers sha256:a14e00d6,
+  #   frontend sha256:00c72d56. frontend 404'd for ~4 minutes after api and
+  #   workers were already up -- bumping on the first check would have been an
+  #   ImagePullBackOff.
   images:
     api:
-      tag: "7b7f7ba"
+      tag: "7889d95"
     workers:
-      tag: "7b7f7ba"
+      tag: "7889d95"
     frontend:
-      tag: "7b7f7ba"
+      tag: "7889d95"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
