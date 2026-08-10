@@ -60,6 +60,26 @@ describe("DecisionTreeCreatePage code ↔ YAML sync", () => {
     expect(body.value).not.toContain("REPLACE_ME");
   });
 
+  it("uses a code pattern the browser can actually compile", () => {
+    renderPage();
+    const pattern = screen.getByLabelText(/Code \(stable identifier\)/).getAttribute("pattern");
+
+    // Chrome parses the `pattern` attribute with the `v` flag, where a bare
+    // `-` inside a character class is a syntax error — and an uncompilable
+    // pattern is silently IGNORED, so the field validated nothing and threw
+    // on every page load. `u` is checked too, since older engines use it.
+    expect(pattern).toBeTruthy();
+    for (const flag of ["u", "v"]) {
+      expect(() => new RegExp(pattern as string, flag)).not.toThrow();
+    }
+
+    const re = new RegExp(pattern as string, "v");
+    expect(re.test("scout_for_stress_v1")).toBe(true);
+    expect(re.test("a-b_c9")).toBe(true);
+    expect(re.test("Bad Code!")).toBe(false);
+    expect(re.test("-leading")).toBe(false);
+  });
+
   it("posts a YAML body whose code matches the form field", async () => {
     const user = userEvent.setup();
     renderPage();

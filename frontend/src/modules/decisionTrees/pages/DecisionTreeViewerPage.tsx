@@ -53,6 +53,7 @@ import {
 
 import { AddChildDialog } from "../components/AddChildDialog";
 import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
+import { MutationErrorBanner } from "../components/MutationErrorBanner";
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
 import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
 import { ParametersPanel } from "../components/ParametersPanel";
@@ -666,14 +667,10 @@ export function DecisionTreeViewerPage(): ReactNode {
       />
 
       {append.isError ? (
-        <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
-          {t("editor.header.saveFailed")}
-        </p>
+        <MutationErrorBanner error={append.error} fallback={t("editor.header.saveFailed")} />
       ) : null}
       {publish.isError ? (
-        <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
-          {t("editor.header.publishFailed")}
-        </p>
+        <MutationErrorBanner error={publish.error} fallback={t("editor.header.publishFailed")} />
       ) : null}
       {structuralError ? (
         <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
@@ -681,9 +678,7 @@ export function DecisionTreeViewerPage(): ReactNode {
         </p>
       ) : null}
       {update.isError ? (
-        <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
-          {t("workspace.metadata.saveFailed")}
-        </p>
+        <MutationErrorBanner error={update.error} fallback={t("workspace.metadata.saveFailed")} />
       ) : null}
 
       <TreeMetadataPanel

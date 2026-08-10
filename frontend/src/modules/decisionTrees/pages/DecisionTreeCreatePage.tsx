@@ -171,7 +171,11 @@ export function DecisionTreeCreatePage(): ReactNode {
                 value={code}
                 onChange={(e) => onCodeChange(e.target.value)}
                 placeholder={t("create.fields.codePlaceholder")}
-                pattern="^[a-z0-9][a-z0-9_-]*$"
+                // The hyphen is escaped because Chrome parses the `pattern`
+                // attribute with the `v` flag, where a bare `-` inside a class is
+                // a syntax error. An uncompilable pattern is *ignored*, so this
+                // silently validated nothing and logged on every page load.
+                pattern="^[a-z0-9][a-z0-9_\-]*$"
                 className={`${FIELD_CONTROL_CLASS} sm:max-w-sm`}
               />
             )}
