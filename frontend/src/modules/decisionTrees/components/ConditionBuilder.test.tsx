@@ -13,14 +13,36 @@ import { ConditionBuilder } from "./ConditionBuilder";
 vi.mock("@/api/signals", () => ({
   listSignalDefinitions: () =>
     Promise.resolve([
-      { code: "leaf_colour", value_kind: "categorical", categorical_values: ["pale", "normal"] },
+      {
+        code: "leaf_colour",
+        value_kind: "categorical",
+        categorical_values: ["pale", "normal"],
+        description: "Visual leaf colour scored by the scout.",
+      },
       { code: "soil_ph", value_kind: "numeric", value_min: "0", value_max: "14", unit: "pH" },
+    ]),
+}));
+vi.mock("@/api/weatherIndices", () => ({
+  getWeatherIndexCatalog: () =>
+    Promise.resolve([
+      {
+        code: "rain_et_balance",
+        unit: "mm",
+        description_en: "Daily water balance: rainfall minus ET0.",
+        description_ar: "الميزان المائي اليومي",
+      },
     ]),
 }));
 vi.mock("@/api/crops", () => ({
   listCropAttributeCatalog: () =>
     Promise.resolve([
-      { code: "transplant_date", path: "mango", name_en: "Transplant date", value_type: "date" },
+      {
+        code: "transplant_date",
+        path: "mango",
+        name_en: "Transplant date",
+        value_type: "date",
+        description_en: "When the block was transplanted.",
+      },
       {
         code: "rootstock_type",
         path: "mango",
@@ -264,6 +286,60 @@ describe("<ConditionBuilder>", () => {
         .getAllByRole("option")
         .map((o) => o.textContent),
     ).toEqual(["seedling", "grafted"]);
+  });
+
+  it("explains the selected code with a hint from the i18n catalogue", () => {
+    renderBuilder(NDVI_LT_0);
+    // A code is only self-explanatory to whoever named it.
+    expect(screen.getByText(/Canopy greenness and vigour/)).toBeInTheDocument();
+    expect(screen.getByText(/Standard deviations from this block/)).toBeInTheDocument();
+  });
+
+  it("explains a weather field, which differs per scope", () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "derived_today", field: "gdd_cumulative_base10_season" },
+      right: 500,
+    });
+    expect(screen.getByText(/Season-to-date accumulated degree days/)).toBeInTheDocument();
+  });
+
+  it("uses the tenant's own description for a custom signal", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "signals", code: "leaf_colour", key: "value_categorical" },
+      right: "pale",
+    });
+    // Written by the tenant when they defined the signal — not restated here.
+    expect(await screen.findByText(/Visual leaf colour scored by the scout/)).toBeInTheDocument();
+  });
+
+  it("uses the platform catalog's description for a weather index", async () => {
+    renderBuilder({
+      op: "lt",
+      left: { source: "weather_index", index_code: "rain_et_balance", key: "value" },
+      right: -5,
+    });
+    expect(await screen.findByText(/Daily water balance/)).toBeInTheDocument();
+  });
+
+  it("uses the definition's description for a crop field", async () => {
+    renderBuilder({
+      op: "lt",
+      left: { source: "crop_attribute", code: "transplant_date", key: "value" },
+      right: "2024-03-01",
+    });
+    expect(await screen.findByText(/When the block was transplanted/)).toBeInTheDocument();
+  });
+
+  it("renders no hint line at all when a code has no description", () => {
+    // An empty muted line under a dropdown is worse than none.
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "latest_observation", field: "some_unknown_column" },
+      right: 1,
+    });
+    expect(screen.queryByText(/editor\.condition\.hint/)).not.toBeInTheDocument();
   });
 
   it("wraps a lone term into a group when a second condition is added", async () => {

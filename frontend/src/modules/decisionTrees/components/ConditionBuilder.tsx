@@ -17,6 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listCropAttributeCatalog } from "@/api/crops";
 import { listSignalDefinitions } from "@/api/signals";
+import { getWeatherIndexCatalog } from "@/api/weatherIndices";
+
+import { FieldHint } from "./FieldHint";
 import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
@@ -317,6 +320,18 @@ function NotBox({
   );
 }
 
+/** Look up a hint, returning undefined rather than the key itself when the
+ *  string is missing — FieldHint then renders nothing at all. */
+function useHint(): (group: string, code: string | undefined) => string | undefined {
+  const { t } = useTranslation("decisionTrees");
+  return (group, code) => {
+    if (!code) return undefined;
+    const key = `editor.condition.hint.${group}.${code}`;
+    const value = t(key, { defaultValue: "" });
+    return value || undefined;
+  };
+}
+
 // ---- Definition-driven operand shape --------------------------------
 
 /** Resolve the right-hand operand's shape from the definition behind a
@@ -525,6 +540,7 @@ function ValueRefEditor({
   onChange,
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  const hint = useHint();
   const sources: ValueRefSource[] = disallowParams
     ? [
         "indices",
@@ -568,6 +584,7 @@ function ValueRefEditor({
           </option>
         ))}
       </select>
+      <FieldHint text={hint("source", value.source)} />
       <SourceSpecificFields
         value={value}
         readOnly={readOnly}
@@ -590,6 +607,9 @@ function SourceSpecificFields({
   onChange: (next: ValueRef) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  const hint = useHint();
+  const { i18n } = useTranslation();
+  const arabic = i18n.language?.startsWith("ar") ?? false;
   // Tenant signal definitions for the signals-source code dropdown. Loaded
   // once and shared across every condition row via react-query dedupe.
   const signalDefs = useQuery({
@@ -606,6 +626,29 @@ function SourceSpecificFields({
     queryFn: () => listCropAttributeCatalog(),
     staleTime: 60_000,
   });
+  // Bilingual descriptions for the eight curated weather indices, straight
+  // from the platform catalog rather than restated here.
+  const weatherIndexCatalog = useQuery({
+    queryKey: ["weather_index_catalog"] as const,
+    queryFn: () => getWeatherIndexCatalog(),
+    staleTime: 300_000,
+  });
+  const signalDef =
+    value.source === "signals"
+      ? (signalDefs.data ?? []).find((d) => d.code === value.code)
+      : undefined;
+  const weatherIndexEntry =
+    value.source === "weather_index"
+      ? (weatherIndexCatalog.data ?? []).find((e) => e.code === value.index_code)
+      : undefined;
+  const weatherIndexHint = weatherIndexEntry
+    ? {
+        text: arabic
+          ? (weatherIndexEntry.description_ar ?? weatherIndexEntry.description_en)
+          : weatherIndexEntry.description_en,
+        unit: weatherIndexEntry.unit,
+      }
+    : undefined;
   if (value.source === "indices") {
     return (
       <>
@@ -623,6 +666,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("indexCode", value.index_code)} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -637,24 +681,28 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("indicesKey", value.key)} />
       </>
     );
   }
   if (value.source === "block") {
     return (
-      <select
-        disabled={readOnly}
-        value={value.field}
-        onChange={(e) => onChange({ ...value, field: e.target.value as typeof value.field })}
-        className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
-        aria-label={t("editor.condition.blockField")}
-      >
-        {BLOCK_FIELDS.map((f) => (
-          <option key={f} value={f}>
-            {f}
-          </option>
-        ))}
-      </select>
+      <>
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) => onChange({ ...value, field: e.target.value as typeof value.field })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.blockField")}
+        >
+          {BLOCK_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <FieldHint text={hint("blockField", value.field)} />
+      </>
     );
   }
   if (value.source === "weather") {
@@ -695,6 +743,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherScope", value.scope)} />
         <select
           disabled={readOnly}
           value={value.field}
@@ -708,6 +757,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherField", value.field)} />
       </>
     );
   }
@@ -732,6 +782,9 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        {/* The catalog carries the agronomists own bilingual description, so
+            use it rather than restating it in the frontend. */}
+        <FieldHint text={weatherIndexHint?.text} unit={weatherIndexHint?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -746,6 +799,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherIndexKey", value.key)} />
       </>
     );
   }
@@ -779,6 +833,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("riskCode", value.risk_code)} />
         <select
           disabled={readOnly}
           value={value.field}
@@ -793,6 +848,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("riskField", value.field)} />
       </>
     );
   }
@@ -818,6 +874,8 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        {/* Written by the tenant when they defined the signal. */}
+        <FieldHint text={signalDef?.description} unit={signalDef?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -836,6 +894,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("signalKey", value.key)} />
       </>
     );
   }
@@ -871,6 +930,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("gridField", value.field)} />
       </>
     );
   }
@@ -891,6 +951,16 @@ function SourceSpecificFields({
     // selectable so switching to the dropdown never silently drops it.
     const codes = [...byCode.keys()];
     const codeOptions = value.code && !codes.includes(value.code) ? [value.code, ...codes] : codes;
+    // The platform authored this description on the attribute definition.
+    const attrDef = byCode.get(value.code);
+    const attrHint = attrDef
+      ? {
+          text: arabic
+            ? (attrDef.description_ar ?? attrDef.description_en)
+            : attrDef.description_en,
+          unit: arabic ? attrDef.unit_ar : attrDef.unit_en,
+        }
+      : undefined;
     return (
       <>
         <select
@@ -910,6 +980,7 @@ function SourceSpecificFields({
             );
           })}
         </select>
+        <FieldHint text={attrHint?.text} unit={attrHint?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -924,6 +995,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("cropAttributeKey", value.key)} />
       </>
     );
   }
