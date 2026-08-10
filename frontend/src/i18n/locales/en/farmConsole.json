@@ -554,5 +554,13 @@
     "senescence": "Senescence",
     "dormancy": "Dormancy",
     "dormant": "Dormant"
+  },
+  "responsible": {
+    "title": "Responsible",
+    "label": "Responsible member",
+    "none": "— No one —",
+    "hint": "Dispatch from the Action Center defaults to this person.",
+    "hiddenName": "Assigned (name hidden)",
+    "saveFailed": "Could not save. The previous value is still in effect."
   }
 }

@@ -76,6 +76,10 @@ export interface UnitDetail {
     name: string | null;
     status: string;
   } | null;
+  // The member responsible for this block — `blocks.agronomist_membership_id`.
+  // Surfaced here because it is what dispatch defaults to, and until now it was
+  // only settable on a legacy form that nothing in the console linked to.
+  responsible_membership_id: string | null;
   // Current crop assignment for this block.
   crop_assignment: {
     // block_crops.id — the key for the crop-attributes endpoints.
