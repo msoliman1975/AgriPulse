@@ -141,3 +141,30 @@ export async function listVarietyStrains(cropVarietyId: string): Promise<CropVar
   );
   return data;
 }
+
+// --- Resolved taxonomy (phenology stages + size classes) ------------------
+
+export interface PhenologyStage {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  order: number;
+  advance?: Record<string, unknown>;
+}
+
+export interface ResolvedTaxonomy {
+  crop_path: string;
+  phenology_stages: { stages: PhenologyStage[] } | null;
+  size_classes: { classes?: { code: string }[] } | null;
+}
+
+/** Deepest-wins resolution for a crop path: a variety's own stage calendar
+ *  overrides the crop's. `phenology_stages` is null when no level of the
+ *  taxonomy defines one — which is most crops today, and is why the stage
+ *  control has an explicit empty state. */
+export async function getResolvedTaxonomy(cropPath: string): Promise<ResolvedTaxonomy> {
+  const { data } = await apiClient.get<ResolvedTaxonomy>("/v1/crops/resolved-taxonomy", {
+    params: { crop_path: cropPath },
+  });
+  return data;
+}

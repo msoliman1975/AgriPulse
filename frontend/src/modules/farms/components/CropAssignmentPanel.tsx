@@ -10,6 +10,7 @@ import { Field } from "@/components/Field";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { CropPicker } from "@/modules/farms/components/CropPicker";
 import { AttributeInput, CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
+import { GrowthStageControl } from "@/modules/farms/components/GrowthStageControl";
 import {
   buildPayload,
   isRequired as attributeRequired,
@@ -205,6 +206,9 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
                   {current.effective_to ? "" : ` ${t("assignment.soFar")}`}
                 </span>
               </div>
+              {/* The stage belongs to this assignment too, and it is the gate
+                  most decision trees branch on — seven of them today. */}
+              <GrowthStageControl blockId={blockId} farmId={farmId} assignment={current} />
               {/* Crop fields belong to *this* assignment, which is why they sit
                   inside the current card rather than beside the block. */}
               <CropAttributesCard blockCropId={current.id} farmId={farmId} />
