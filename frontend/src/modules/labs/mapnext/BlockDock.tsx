@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
+import { ResponsibleMember } from "./ResponsibleMember";
 import { clearDetailCache } from "../map/api";
 import type { UnitDetail, UnitIntegration } from "../map/types";
 import {
@@ -79,7 +80,9 @@ const MIN_H = 160;
 const COLLAPSED_H = 52;
 /** Never let the dock squeeze the map to nothing. */
 function maxHeight(): number {
-  return typeof window === "undefined" ? 640 : Math.max(MIN_H, Math.round(window.innerHeight * 0.72));
+  return typeof window === "undefined"
+    ? 640
+    : Math.max(MIN_H, Math.round(window.innerHeight * 0.72));
 }
 function clampHeight(h: number): number {
   return Math.min(maxHeight(), Math.max(MIN_H, h));
@@ -99,6 +102,9 @@ interface Props {
   gridProductId: string | null;
   onReshape: () => void;
   onInactivate: () => void;
+  /** Refetch the detail after the responsible member changes, so the dock and
+   *  the Action Center's dispatch default do not disagree. */
+  onResponsibleChanged: () => void;
   resetKey?: number;
 }
 
@@ -157,8 +163,10 @@ function Rows({ items }: { items: [ReactNode, ReactNode][] }): ReactNode {
 
 // Columns are sized, not stretched: on a wide screen three equal fractions
 // left most of each one empty.
-const COLS_3 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,360px)_minmax(220px,320px)]";
-const COLS_2 = "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,400px)]";
+const COLS_3 =
+  "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,360px)_minmax(220px,320px)]";
+const COLS_2 =
+  "grid h-full grid-cols-1 content-start justify-start gap-8 lg:grid-cols-[minmax(240px,360px)_minmax(240px,400px)]";
 
 export function BlockDock({
   detail,
@@ -172,6 +180,7 @@ export function BlockDock({
   gridProductId,
   onReshape,
   onInactivate,
+  onResponsibleChanged,
   resetKey,
 }: Props): ReactNode {
   // `insights` carries the shared activity-type catalogue and `weather` the
@@ -322,7 +331,10 @@ export function BlockDock({
       {/* ---- title bar ---- */}
       <div className="flex flex-none flex-wrap items-center gap-2 border-b border-ap-line px-4 py-2">
         <Chip label={t("dock.title.block")} value={detail.name} />
-        <Chip label={t("dock.title.crop")} value={cropLabel(detail.crop_assignment) ?? t("dock.noCrop")} />
+        <Chip
+          label={t("dock.title.crop")}
+          value={cropLabel(detail.crop_assignment) ?? t("dock.noCrop")}
+        />
         <Chip
           label={t("dock.title.health")}
           value={
@@ -335,7 +347,11 @@ export function BlockDock({
         />
         <Chip
           label={t("dock.title.alerts")}
-          value={crit ? t("dock.title.alertsCrit", { count: detail.alerts.length, crit }) : detail.alerts.length}
+          value={
+            crit
+              ? t("dock.title.alertsCrit", { count: detail.alerts.length, crit })
+              : detail.alerts.length
+          }
           color={crit ? HEALTH_DOT.critical : undefined}
         />
         <Chip label={t("dock.title.date")} value={longDate(detail.last_updated, lang)} />
@@ -411,6 +427,14 @@ export function BlockDock({
           <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
             {tab === "overview" ? (
               <div className={COLS_3}>
+                <Col title={t("responsible.title")}>
+                  <ResponsibleMember
+                    farmId={farmId}
+                    blockId={detail.id}
+                    value={detail.responsible_membership_id}
+                    onChanged={onResponsibleChanged}
+                  />
+                </Col>
                 <Col title={t("inspector.alertsTitle")}>
                   {detail.alerts.length ? (
                     <div className="flex flex-col gap-1.5">
@@ -436,7 +460,10 @@ export function BlockDock({
                   {detail.recommendations.length ? (
                     <div className="flex flex-col gap-1.5">
                       {detail.recommendations.slice(0, 2).map((r, i) => (
-                        <div key={i} className="rounded-lg bg-ap-bg/60 px-2.5 py-1.5 text-sm text-ap-ink">
+                        <div
+                          key={i}
+                          className="rounded-lg bg-ap-bg/60 px-2.5 py-1.5 text-sm text-ap-ink"
+                        >
                           {r}
                         </div>
                       ))}
@@ -606,9 +633,7 @@ export function BlockDock({
                                 // still falls back to the humanised code.
                                 detail.crop_assignment.growth_stage
                                   ? t(`growthStage.${detail.crop_assignment.growth_stage}`, {
-                                      defaultValue: humanize(
-                                        detail.crop_assignment.growth_stage,
-                                      ),
+                                      defaultValue: humanize(detail.crop_assignment.growth_stage),
                                     })
                                   : "—",
                               ],
