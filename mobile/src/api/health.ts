@@ -41,13 +41,25 @@ async function reachable(url: string): Promise<boolean> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    // Any HTTP answer proves the host is there and routable, which is the
-    // question being asked — a 401 or a 404 still means something replied.
-    // Only a transport failure (DNS, refused, blocked, timed out) counts as
-    // unreachable.
-    await fetch(url, { method: "GET", signal: abort.signal, cache: "no-store" });
+    // 2xx, not merely "something answered". Both probes hit endpoints that are
+    // public and expected to return 200, so anything else means the host is
+    // there but the service behind it is not the one we want — an ingress
+    // serving a SPA or a 404 where the API should be. Treating that as
+    // reachable is how a green dot ends up next to an app that cannot work:
+    // https://api.agripulse.cloud/health currently answers 404, and the old
+    // "any reply counts" rule would have called that connected.
+    const resp = await fetch(url, { method: "GET", signal: abort.signal, cache: "no-store" });
+    if (!resp.ok) {
+      console.warn(`health: ${url} answered ${resp.status}`);
+      return false;
+    }
     return true;
-  } catch {
+  } catch (err) {
+    // Logged, not swallowed. "Cannot reach the server" is the right thing to
+    // show a scout, but whoever is debugging the build needs to know whether it
+    // was DNS, a refused connection, a CORS rejection or a timeout — and those
+    // are indistinguishable from the pill alone.
+    console.warn(`health: ${url} unreachable`, err);
     return false;
   } finally {
     clearTimeout(timer);
