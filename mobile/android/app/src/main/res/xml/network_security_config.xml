@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  targetSdk 36 means Android denies cleartext HTTP by default, so the dev api on
+  http://10.0.2.2:8000 and Keycloak on :8080 would fail with a bare
+  CLEARTEXT_NOT_PERMITTED and no other clue.
+
+  Scoped to the dev hosts on purpose rather than setting
+  android:usesCleartextTraffic="true" on the whole application: that flag would
+  also permit cleartext against production, where the api is https and any
+  plaintext request is a bug worth failing loudly.
+
+  10.0.2.2 is the emulator's alias for the host machine. A physical handset
+  reaches the dev box by its LAN address instead — add that IP here (and to
+  CORS_ALLOWED_ORIGINS and mobile/.env.local) when testing on real hardware.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
