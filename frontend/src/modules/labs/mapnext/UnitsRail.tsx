@@ -56,13 +56,27 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
         <div className="flex-1 overflow-auto p-2">
           {realBlocks.length > 0 ? <Group label={t("rail.blocks")} /> : null}
           {realBlocks.map((b) => (
-            <Row key={b.id} block={b} summary={summaries[b.id]} active={b.id === selectedId} onSelect={onSelect} />
+            <Row
+              key={b.id}
+              block={b}
+              summary={summaries[b.id]}
+              active={b.id === selectedId}
+              onSelect={onSelect}
+            />
           ))}
           {pivots.length > 0 ? <Group label={t("rail.pivots")} /> : null}
           {pivots.map((b) => (
-            <Row key={b.id} block={b} summary={summaries[b.id]} active={b.id === selectedId} onSelect={onSelect} />
+            <Row
+              key={b.id}
+              block={b}
+              summary={summaries[b.id]}
+              active={b.id === selectedId}
+              onSelect={onSelect}
+            />
           ))}
-          {units.length === 0 ? <div className="px-2 py-6 text-center text-xs text-ap-muted">{t("rail.empty")}</div> : null}
+          {units.length === 0 ? (
+            <div className="px-2 py-6 text-center text-xs text-ap-muted">{t("rail.empty")}</div>
+          ) : null}
         </div>
       ) : null}
     </aside>
@@ -70,7 +84,11 @@ export function UnitsRail({ blocks, summaries, selectedId, onSelect }: Props): R
 }
 
 function Group({ label }: { label: string }): ReactNode {
-  return <div className="px-2 pb-1 pt-2.5 text-xs font-bold uppercase tracking-wide text-ap-muted">{label}</div>;
+  return (
+    <div className="px-2 pb-1 pt-2.5 text-xs font-bold uppercase tracking-wide text-ap-muted">
+      {label}
+    </div>
+  );
 }
 
 function Row({
@@ -91,7 +109,9 @@ function Row({
       onClick={() => onSelect(block.id)}
       className={clsx(
         "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors",
-        active ? "bg-ap-primary-soft shadow-[inset_2px_0_0_var(--tw-shadow-color)] shadow-ap-primary" : "hover:bg-ap-bg/60",
+        active
+          ? "bg-ap-primary-soft shadow-[inset_2px_0_0_var(--tw-shadow-color)] shadow-ap-primary"
+          : "hover:bg-ap-bg/60",
       )}
     >
       <Dot color={HEALTH_DOT[summary.health]} />

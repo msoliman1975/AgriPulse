@@ -103,10 +103,18 @@ export function ViewBar({
       <Chip innerRef={indexRef} onClick={() => setOpen(open === "index" ? null : "index")}>
         🎨 {t("viewbar.index")}: <b>{INDEX_META[activeIndex].label}</b> ▾
       </Chip>
-      <Chip innerRef={layersRef} onClick={() => setOpen(open === "layers" ? null : "layers")} active={showGrid}>
+      <Chip
+        innerRef={layersRef}
+        onClick={() => setOpen(open === "layers" ? null : "layers")}
+        active={showGrid}
+      >
         ▥ {t("viewbar.layers")} ▾
       </Chip>
-      <Chip innerRef={signalsRef} onClick={() => setOpen(open === "signals" ? null : "signals")} active={Boolean(signalDefId)}>
+      <Chip
+        innerRef={signalsRef}
+        onClick={() => setOpen(open === "signals" ? null : "signals")}
+        active={Boolean(signalDefId)}
+      >
         📡 {activeSignalName ?? t("layers.signals")} ▾
       </Chip>
 
@@ -140,26 +148,65 @@ export function ViewBar({
       {/* Layers popover — visibility, opacity + sub-block grid toggle */}
       <Popover open={open === "layers"} onClose={close} anchorRef={layersRef}>
         <PopHeading>{t("viewbar.mapLayers")}</PopHeading>
-        <Toggle label={`🟦 ${t("layers.aoi")}`} on={layers.aoi} onClick={() => onLayersChange({ aoi: !layers.aoi })} />
-        <Toggle label={`▦ ${t("layers.blocks")}`} on={layers.blocks} onClick={() => onLayersChange({ blocks: !layers.blocks })} />
-        <Toggle label={`▢ ${t("layers.borders")}`} on={layers.borders} onClick={() => onLayersChange({ borders: !layers.borders })} />
-        <Toggle label={`🅰 ${t("layers.labels")}`} on={layers.labels} onClick={() => onLayersChange({ labels: !layers.labels })} />
+        <Toggle
+          label={`🟦 ${t("layers.aoi")}`}
+          on={layers.aoi}
+          onClick={() => onLayersChange({ aoi: !layers.aoi })}
+        />
+        <Toggle
+          label={`▦ ${t("layers.blocks")}`}
+          on={layers.blocks}
+          onClick={() => onLayersChange({ blocks: !layers.blocks })}
+        />
+        <Toggle
+          label={`▢ ${t("layers.borders")}`}
+          on={layers.borders}
+          onClick={() => onLayersChange({ borders: !layers.borders })}
+        />
+        <Toggle
+          label={`🅰 ${t("layers.labels")}`}
+          on={layers.labels}
+          onClick={() => onLayersChange({ labels: !layers.labels })}
+        />
         <PopDivider />
         <Toggle label={`◫ ${t("layers.grid")}`} on={showGrid} onClick={onToggleGrid} />
-        <div className="px-2.5 pb-1 pt-0.5 text-xs text-ap-muted">{t("layers.gridUsesIndex", { code: INDEX_META[activeIndex].label })}</div>
+        <div className="px-2.5 pb-1 pt-0.5 text-xs text-ap-muted">
+          {t("layers.gridUsesIndex", { code: INDEX_META[activeIndex].label })}
+        </div>
         <PopDivider />
-        <Slider label={t("layers.borderOpacity")} value={layers.borderOpacity} onChange={(v) => onLayersChange({ borderOpacity: v })} />
-        <Slider label={t("layers.fillOpacity")} value={layers.fillOpacity} onChange={(v) => onLayersChange({ fillOpacity: v })} />
+        <Slider
+          label={t("layers.borderOpacity")}
+          value={layers.borderOpacity}
+          onChange={(v) => onLayersChange({ borderOpacity: v })}
+        />
+        <Slider
+          label={t("layers.fillOpacity")}
+          value={layers.fillOpacity}
+          onChange={(v) => onLayersChange({ fillOpacity: v })}
+        />
       </Popover>
 
       {/* Signals popover — pick a signal to overlay its observations */}
       <Popover open={open === "signals"} onClose={close} anchorRef={signalsRef}>
         <PopHeading>{t("layers.signals")}</PopHeading>
-        <PopItem icon={signalDefId == null ? "✓" : ""} onClick={() => { close(); onSignalDefChange(null); }}>
+        <PopItem
+          icon={signalDefId == null ? "✓" : ""}
+          onClick={() => {
+            close();
+            onSignalDefChange(null);
+          }}
+        >
           {t("layers.signalsNone")}
         </PopItem>
         {signalDefs.map((d) => (
-          <PopItem key={d.id} icon={d.id === signalDefId ? "✓" : ""} onClick={() => { close(); onSignalDefChange(d.id); }}>
+          <PopItem
+            key={d.id}
+            icon={d.id === signalDefId ? "✓" : ""}
+            onClick={() => {
+              close();
+              onSignalDefChange(d.id);
+            }}
+          >
             {d.name}
           </PopItem>
         ))}
@@ -172,24 +219,59 @@ export function ViewBar({
         {onAddFarm ? (
           <>
             <PopHeading>{t("viewbar.addNew")}</PopHeading>
-            <PopItem icon="🌾" onClick={() => { close(); onAddFarm(); }} hint={t("add.viaDrawOrUpload")}>
+            <PopItem
+              icon="🌾"
+              onClick={() => {
+                close();
+                onAddFarm();
+              }}
+              hint={t("add.viaDrawOrUpload")}
+            >
               {t("add.farm")}
             </PopItem>
             <PopDivider />
           </>
         ) : null}
         <PopHeading>{t("viewbar.addToFarm")}</PopHeading>
-        <PopItem icon="▦" onClick={() => { close(); onAddBlock(); }} hint={t("add.viaDraw")}>
+        <PopItem
+          icon="▦"
+          onClick={() => {
+            close();
+            onAddBlock();
+          }}
+          hint={t("add.viaDraw")}
+        >
           {t("add.block")}
         </PopItem>
-        <PopItem icon="◎" onClick={() => { close(); onAddPivot(); }} hint={t("add.viaDraw")}>
+        <PopItem
+          icon="◎"
+          onClick={() => {
+            close();
+            onAddPivot();
+          }}
+          hint={t("add.viaDraw")}
+        >
           {t("add.pivot")}
         </PopItem>
-        <PopItem icon="▩" onClick={() => { close(); onAutoBlock(); }} hint={t("add.viaGrid")}>
+        <PopItem
+          icon="▩"
+          onClick={() => {
+            close();
+            onAutoBlock();
+          }}
+          hint={t("add.viaGrid")}
+        >
           {t("add.autoGrid")}
         </PopItem>
         <PopDivider />
-        <PopItem icon="⬆" onClick={() => { close(); onBulkUpload(); }} hint={t("add.viaUpload")}>
+        <PopItem
+          icon="⬆"
+          onClick={() => {
+            close();
+            onBulkUpload();
+          }}
+          hint={t("add.viaUpload")}
+        >
           {t("add.bulkUpload")}
         </PopItem>
       </Popover>
@@ -197,18 +279,47 @@ export function ViewBar({
   );
 }
 
-function Toggle({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }): ReactNode {
+function Toggle({
+  label,
+  on,
+  onClick,
+}: {
+  label: string;
+  on: boolean;
+  onClick: () => void;
+}): ReactNode {
   return (
-    <button type="button" onClick={onClick} className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 hover:bg-ap-bg/60">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 hover:bg-ap-bg/60"
+    >
       <span className="text-sm">{label}</span>
-      <span className={"relative h-5 w-9 rounded-full transition-colors " + (on ? "bg-ap-primary" : "bg-ap-line")}>
-        <span className={"absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all " + (on ? "start-[18px]" : "start-0.5")} />
+      <span
+        className={
+          "relative h-5 w-9 rounded-full transition-colors " + (on ? "bg-ap-primary" : "bg-ap-line")
+        }
+      >
+        <span
+          className={
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all " +
+            (on ? "start-[18px]" : "start-0.5")
+          }
+        />
       </span>
     </button>
   );
 }
 
-function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }): ReactNode {
+function Slider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}): ReactNode {
   return (
     <div className="px-2.5 py-1.5">
       <div className="mb-1 flex justify-between text-xs text-ap-muted">

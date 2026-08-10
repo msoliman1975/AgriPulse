@@ -18,7 +18,9 @@ const PRODUCT_ID = "019eab8c-6550-7827-b10d-007109e77470";
 const h = vi.hoisted(() => ({
   saved: { current: { imagery: [] as unknown[], weather: [] as unknown[] } },
   applySubscriptionsMock: vi.fn(),
-  savedGrid: { current: { cell_size_m: null as number | null, anomaly_z_threshold: null as number | null } },
+  savedGrid: {
+    current: { cell_size_m: null as number | null, anomaly_z_threshold: null as number | null },
+  },
   applyGridMock: vi.fn(),
   applyGridCellSizeMock: vi.fn(),
   previewApplyGridMock: vi.fn(),
@@ -64,7 +66,11 @@ vi.mock("@/api/farmConfig", async () => {
       Promise.resolve({ subscriptions: false, irrigation: false, org: false, grid: false }),
     ),
     getIrrigationTemplate: vi.fn(() =>
-      Promise.resolve({ irrigation_system: null, irrigation_source: null, flow_rate_m3_per_hour: null }),
+      Promise.resolve({
+        irrigation_system: null,
+        irrigation_source: null,
+        flow_rate_m3_per_hour: null,
+      }),
     ),
     getOrgTemplate: vi.fn(() => Promise.resolve({ default_tags: [] })),
     getGridTemplate: vi.fn(() => Promise.resolve(h.savedGrid.current)),
@@ -99,9 +105,7 @@ vi.mock("@/api/config", () => ({
 }));
 
 vi.mock("@/api/weather", () => ({
-  listWeatherProviders: vi.fn(() =>
-    Promise.resolve([{ code: "open_meteo", name: "Open-Meteo" }]),
-  ),
+  listWeatherProviders: vi.fn(() => Promise.resolve([{ code: "open_meteo", name: "Open-Meteo" }])),
 }));
 
 async function renderPanel() {
@@ -316,7 +320,6 @@ describe("BlockDefaultsPanel — grid & anomaly", () => {
   });
 });
 
-
 // ---- Bulk rezone (cell-size scope) ----------------------------------------
 //
 // The destructive half. The property under test throughout is that the
@@ -432,7 +435,9 @@ describe("BlockDefaultsPanel — bulk rezone", () => {
   it("does not demand confirmation when nothing live is retired", async () => {
     // A farm being gridded for the first time destroys nothing.
     previewApplyGridMock.mockResolvedValue({
-      rows: [{ ...REZONE_ROW, action: "create" as const, current_cell_size_m: null, scenes_affected: 0 }],
+      rows: [
+        { ...REZONE_ROW, action: "create" as const, current_cell_size_m: null, scenes_affected: 0 },
+      ],
       total_rows: 1,
       changed_rows: 1,
       unchanged_rows: 0,

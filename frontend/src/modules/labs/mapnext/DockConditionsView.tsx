@@ -22,8 +22,7 @@ function statusColor(tree: ExplainTree): string {
 function StepRow({ step, fired }: { step: ExplainStep; fired: boolean }): ReactNode {
   const { i18n } = useTranslation("farmConsole");
   const reading = readCondition(step);
-  const label =
-    localizedField(i18n.language, step.label_en, step.label_ar) ?? step.node_id;
+  const label = localizedField(i18n.language, step.label_en, step.label_ar) ?? step.node_id;
   // A condition evaluating false is NOT a failure — it just means the walk
   // took the other branch. Only mark it red when the tree actually fired, so
   // a block with nothing wrong doesn't read as a wall of red crosses.
@@ -35,7 +34,11 @@ function StepRow({ step, fired }: { step: ExplainStep; fired: boolean }): ReactN
       : HEALTH_DOT.unknown;
   return (
     <div className="flex items-start gap-2 border-b border-ap-line/70 py-1.5 last:border-b-0">
-      <span aria-hidden="true" className="mt-px w-3.5 text-center text-xs font-bold" style={{ color }}>
+      <span
+        aria-hidden="true"
+        className="mt-px w-3.5 text-center text-xs font-bold"
+        style={{ color }}
+      >
         {mark}
       </span>
       <span className="min-w-0 flex-1 text-sm text-ap-ink">{label}</span>

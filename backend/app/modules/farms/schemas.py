@@ -727,6 +727,32 @@ class BlockUpdateRequest(BaseModel):
     irrigation_geometry: dict[str, Any] | None = None
 
 
+class BlockResponsibleRequest(BaseModel):
+    """PUT /blocks/{id}/responsible — hand the block to a member.
+
+    Its own request rather than a field on the block update, because a handover
+    carries a reason and the generic update does not.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # NULL is a legitimate value: unassigning is a change worth recording, and
+    # it is the state that makes dispatch fall back to an arbitrary member.
+    membership_id: UUID | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class BlockResponsibleLogEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    previous_membership_id: UUID | None
+    new_membership_id: UUID | None
+    note: str | None
+    changed_at: datetime
+    changed_by: UUID | None
+
+
 class BlockResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

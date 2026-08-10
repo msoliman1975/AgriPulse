@@ -557,10 +557,24 @@
   },
   "responsible": {
     "title": "Responsible",
+    "manageButton": "Responsible member",
+    "formTitle": "Responsible member",
     "label": "Responsible member",
     "none": "— No one —",
-    "hint": "Dispatch from the Action Center defaults to this person.",
-    "hiddenName": "Assigned (name hidden)",
-    "saveFailed": "Could not save. The previous value is still in effect."
+    "hint": "Dispatch from the Action Center defaults to this person. Every change is recorded below.",
+    "noteLabel": "Reason (optional)",
+    "notePlaceholder": "e.g. covering while Ahmed is on leave",
+    "save": "Save",
+    "saving": "Saving…",
+    "reset": "Reset",
+    "readOnly": "You do not have permission to change this.",
+    "namesForbidden": "You do not have permission to read user names.",
+    "saveFailed": "Could not save. Nothing was changed.",
+    "historyTitle": "Handover history",
+    "historyLoading": "Loading history…",
+    "historyFailed": "Could not load the history.",
+    "historyEmpty": "No changes recorded yet.",
+    "entryFirst": "Assigned to {{to}}",
+    "entryHandover": "{{from}} → {{to}}"
   }
 }
