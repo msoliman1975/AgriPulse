@@ -117,11 +117,27 @@ class SignalAssignment(Base, TimestampedMixin):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
-    # Cross-schema FK into the public catalog (tenant -> public is legal and
-    # already used by tenant_memberships.user_id). May reference either tier.
+    # Deliberately NOT a foreign key into public.signal_definitions, even
+    # though the row does reference it. A tenant -> public FK makes the
+    # referenced table part of every tenant schema's dependency graph, so
+    # `DROP SCHEMA tenant_x CASCADE` must take an ACCESS EXCLUSIVE lock on
+    # public.signal_definitions to drop the constraint. That lock conflicts
+    # with the ROW EXCLUSIVE any other tenant holds while creating a tenant or
+    # authoring a signal, so a single purge serialises tenant lifecycle across
+    # the whole platform — and blocks indefinitely behind one idle transaction.
+    # Found exactly that way: nine tenancy tests went from 9s to a hard hang.
+    #
+    # Nothing is lost. The FK's ON DELETE CASCADE could never fire: definitions
+    # are soft-deleted (`deleted_at`), and the one hard delete — tenant purge —
+    # removes signal_assignments through its own manifest entry, whose `fk`
+    # flag is informational because the engine always deletes explicitly.
+    #
+    # This is also the only shape the rest of the schema uses: no other tenant
+    # table carries an FK into public. (An earlier comment here claimed
+    # tenant_memberships.user_id as precedent; that table lives in *public*,
+    # so its FK is public -> public and proves the opposite.)
     signal_definition_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("public.signal_definitions.id", ondelete="CASCADE"),
         nullable=False,
     )
     farm_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)

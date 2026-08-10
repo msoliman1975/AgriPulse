@@ -15,14 +15,18 @@ tables are guaranteed to exist (``infra/helm/api/templates/migration-job.yaml``)
 **Primary keys are preserved.** ``signal_observations`` references
 ``signal_definition_id`` with no FK at all (a deliberate logical reference —
 see tenant migration 0017), so keeping ids identical means the hypertable and
-every historical observation keep resolving without being touched. The same
-holds for ``signal_assignments``, whose FK is simply repointed.
+every historical observation keep resolving without being touched.
+``signal_assignments`` now joins it: its FK is dropped rather than repointed at
+``public``, because a tenant -> public FK forces ``DROP SCHEMA tenant_x
+CASCADE`` to take an ACCESS EXCLUSIVE lock on the shared catalog and serialises
+tenant lifecycle platform-wide. 0017's logical-reference choice was right; this
+migration follows it instead of inventing the schema's only tenant -> public FK.
 
 Ordering matters and is not arbitrary:
 
 1. copy definitions, then templates, then the junction (FK order);
 2. drop the tenant junction table — it carries FKs into both tenant tables;
-3. repoint ``signal_assignments`` at the public catalog;
+3. drop ``signal_assignments``' FK, leaving a logical reference;
 4. only then drop the two tenant catalog tables.
 
 Idempotency: Postgres gives us transactional DDL, so a failure rolls the whole
@@ -178,19 +182,23 @@ def upgrade() -> None:
     op.execute("DROP TABLE IF EXISTS signal_template_definitions")
 
     # ---- 3. repoint signal_assignments at the public catalog --------------
-    # Cross-schema tenant -> public FK, the same shape as
-    # tenant_memberships.user_id -> public.users.id.
+    # Drop the tenant-local FK and deliberately do NOT replace it with a
+    # cross-schema one. A tenant -> public FK puts public.signal_definitions in
+    # every tenant schema's dependency graph, so `DROP SCHEMA tenant_x CASCADE`
+    # has to take an ACCESS EXCLUSIVE lock on it to drop the constraint. That
+    # conflicts with the ROW EXCLUSIVE held by any concurrent tenant creation or
+    # signal edit, which serialises tenant lifecycle platform-wide and hangs
+    # outright behind one idle-in-transaction session.
+    #
+    # The FK bought nothing anyway: definitions are soft-deleted, so its
+    # ON DELETE CASCADE could never fire, and tenant purge deletes
+    # signal_assignments through its own manifest entry.
+    #
+    # The column keeps its index (created with the table), so lookups by
+    # definition are unaffected. Integrity is the service layer's job — see
+    # SignalAssignment in app/modules/signals/models.py.
     fk = _fk_name("signal_assignments", "signal_definition_id")
     op.drop_constraint(fk, "signal_assignments", type_="foreignkey")
-    op.create_foreign_key(
-        "fk_signal_assignments_signal_definition_id_signal_definitions",
-        "signal_assignments",
-        "signal_definitions",
-        ["signal_definition_id"],
-        ["id"],
-        ondelete="CASCADE",
-        referent_schema="public",
-    )
 
     # ---- 4. drop the tenant catalog tables ---------------------------------
     # IF EXISTS because a tenant provisioned after this migration ships replays
@@ -368,8 +376,10 @@ def downgrade() -> None:
     )
 
     # ---- 3. repoint signal_assignments back at the tenant table ------------
-    fk = _fk_name("signal_assignments", "signal_definition_id")
-    op.drop_constraint(fk, "signal_assignments", type_="foreignkey")
+    # `upgrade` leaves the column with no FK at all, so there is nothing to drop
+    # here — `_fk_name` would raise on an empty result. Re-adding the
+    # tenant-local FK is safe in this direction: it references a table inside
+    # the same schema, which is what made the original shape unproblematic.
     op.create_foreign_key(
         "fk_signal_assignments_signal_definition_id_signal_definitions",
         "signal_assignments",
