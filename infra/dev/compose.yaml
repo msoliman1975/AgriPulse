@@ -71,6 +71,15 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
+      # Pin the frontend URL so the `iss` claim is stable no matter which host
+      # the request arrived on. Without this, start-dev derives the issuer from
+      # the request: the Android emulator must reach Keycloak at 10.0.2.2 (its
+      # "localhost" is the emulator itself), so its tokens would carry
+      # iss=http://10.0.2.2:8080/... while the api validates an exact-string
+      # issuer of http://localhost:8080/... — every request 401s after a
+      # sign-in that appeared to succeed. Inert for the web app, which already
+      # talks to localhost.
+      KC_HOSTNAME: http://localhost:8080
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_LOG_LEVEL: INFO
