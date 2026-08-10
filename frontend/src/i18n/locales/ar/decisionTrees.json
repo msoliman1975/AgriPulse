@@ -390,6 +390,7 @@
       "outcome": {
         "heading": "النتيجة",
         "kind": "النوع",
+        "actionTypeUnset": "— غير محدّد —",
         "actionType": "نوع الإجراء",
         "severity": "الخطورة",
         "confidence": "الثقة",

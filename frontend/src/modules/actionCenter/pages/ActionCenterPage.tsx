@@ -22,6 +22,7 @@ import { useDateLocale } from "@/hooks/useDateLocale";
 import { DispatchDialog } from "@/modules/actionCenter/components/DispatchDialog";
 import { ItemRow } from "@/modules/actionCenter/components/ItemRow";
 import { useActionItems } from "@/queries/actionCenter";
+import { useTenantUsers } from "@/queries/users";
 import { useCapability } from "@/rbac/useCapability";
 
 const TABS: ReadonlyArray<UnifiedStatus | "all"> = [
@@ -61,10 +62,13 @@ export function ActionCenterPage(): ReactNode {
   const [customTo, setCustomTo] = useState("");
   const [severity, setSeverity] = useState<ItemSeverity | "">("");
   const [blockId, setBlockId] = useState("");
+  const [assignee, setAssignee] = useState("");
 
-  // Collapse state is keyed by group key and deliberately survives tab and
-  // filter changes — a supervisor who shut "Monitoring" wants it to stay shut.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  // Groups start COLLAPSED, so the screen opens as a summary of what needs
+  // doing rather than a wall of rows. We track what the user has *opened*
+  // rather than what they closed: a group that appears after a filter change
+  // then starts collapsed like the rest, instead of springing open.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [dispatching, setDispatching] = useState<ActionItem[] | null>(null);
@@ -78,6 +82,7 @@ export function ActionCenterPage(): ReactNode {
       group_by: groupBy,
       ...(severity !== "" ? { severity: [severity] } : {}),
       ...(blockId !== "" ? { block_id: blockId } : {}),
+      ...(assignee !== "" ? { assigned_membership_id: assignee } : {}),
       ...(range === "custom"
         ? {
             ...(customFrom !== "" ? { raised_from: new Date(customFrom).toISOString() } : {}),
@@ -87,9 +92,10 @@ export function ActionCenterPage(): ReactNode {
           }
         : { date_range: range }),
     };
-  }, [farmId, tab, kinds, groupBy, severity, blockId, range, customFrom, customTo]);
+  }, [farmId, tab, kinds, groupBy, severity, blockId, assignee, range, customFrom, customTo]);
 
   const query = useActionItems(params);
+  const tenantUsers = useTenantUsers();
 
   if (farmId === undefined) {
     return <Navigate to="/" replace />;
@@ -100,6 +106,36 @@ export function ActionCenterPage(): ReactNode {
   const counts = data?.status_counts ?? {};
   const allItems = groups.flatMap((g) => g.items);
   const blockCodes = [...new Set(allItems.map((i) => i.block_code))].sort();
+
+  // People who hold work in the current result set. Derived from the items so
+  // the filter can never offer a name that would return nothing.
+  const userByMembership = new Map((tenantUsers.data ?? []).map((u) => [u.membership_id, u]));
+  const assignees = [
+    ...new Set(
+      allItems.map((i) => i.assigned_membership_id).filter((id): id is string => id !== null),
+    ),
+  ]
+    .map((id) => ({ id, name: userByMembership.get(id)?.full_name ?? id.slice(0, 8) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const anyFilterActive =
+    severity !== "" ||
+    blockId !== "" ||
+    assignee !== "" ||
+    range !== "30d" ||
+    kinds.size !== 2 ||
+    customFrom !== "" ||
+    customTo !== "";
+
+  const clearFilters = (): void => {
+    setSeverity("");
+    setBlockId("");
+    setAssignee("");
+    setRange("30d");
+    setCustomFrom("");
+    setCustomTo("");
+    setKinds(new Set<ItemKind>(["recommendation", "alert"]));
+  };
 
   const toggleKind = (kind: ItemKind): void => {
     setKinds((prev) => {
@@ -113,7 +149,7 @@ export function ActionCenterPage(): ReactNode {
   };
 
   const toggleGroup = (key: string): void =>
-    setCollapsed((prev) => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -252,6 +288,29 @@ export function ActionCenterPage(): ReactNode {
             ))}
           </select>
 
+          {/* Assigned-to. Only meaningful once something has been dispatched,
+              so the options are the people who actually hold work here rather
+              than the whole roster. */}
+          <select
+            className="input w-auto"
+            aria-label={t("filters.assignedTo")}
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+          >
+            <option value="">{t("filters.anyone")}</option>
+            {assignees.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+
+          {anyFilterActive ? (
+            <Button size="sm" variant="ghost" onClick={clearFilters}>
+              {t("filters.clearAll")}
+            </Button>
+          ) : null}
+
           <div className="flex-1" />
           <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
             {t("filters.groupBy")}
@@ -276,7 +335,7 @@ export function ActionCenterPage(): ReactNode {
         <EmptyState message={t("page.empty")} action={null} />
       ) : (
         groups.map((group) => {
-          const shut = collapsed.has(group.key);
+          const shut = !expandedGroups.has(group.key);
           const selectable = group.items.filter(
             (i) => i.status !== "done" && i.status !== "dismissed",
           );

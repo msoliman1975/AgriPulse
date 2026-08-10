@@ -390,6 +390,7 @@
       "outcome": {
         "heading": "Outcome",
         "kind": "Kind",
+        "actionTypeUnset": "— not set —",
         "actionType": "Action type",
         "severity": "Severity",
         "confidence": "Confidence",

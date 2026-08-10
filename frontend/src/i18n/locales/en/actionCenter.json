@@ -44,7 +44,7 @@
     "none": "No deadline"
   },
   "groupBy": {
-    "action_type": "Task type",
+    "action_type": "Action type",
     "block": "Block",
     "due": "Action date",
     "none": "None"
@@ -67,7 +67,10 @@
     "allBlocks": "All blocks",
     "severity": "Severity",
     "allSeverities": "All severities",
-    "groupBy": "Group by"
+    "groupBy": "Group by",
+    "assignedTo": "Assigned to",
+    "anyone": "Anyone",
+    "clearAll": "Clear all filters"
   },
   "group": {
     "meta": "{{count}} items · {{blocks}} blocks",

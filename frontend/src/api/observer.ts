@@ -152,8 +152,10 @@ function scopeParams(scope: ObserverScope): Record<string, unknown> {
     farm_id: scope.farmId,
     from: scope.from,
     to: scope.to,
-    // Repeated `blocks=` params; axios serializes an array that way by
-    // default, which is what FastAPI's `list[UUID]` query expects.
+    // Repeated `blocks=` params, which is what FastAPI's `list[UUID]` query
+    // expects. Axios does NOT do this by default -- it emits `blocks[]=` and
+    // FastAPI ignores it -- so apiClient sets `paramsSerializer.indexes: null`.
+    // This filter was silently unfiltered until that landed.
     blocks: scope.blockIds?.length ? scope.blockIds : undefined,
     product: scope.productId || undefined,
   };
