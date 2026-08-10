@@ -78,6 +78,7 @@ const DETAIL: UnitDetail = {
     status: "active",
   },
   signals: [],
+  responsible_membership_id: null,
 };
 
 function renderDock(detail: UnitDetail = DETAIL): void {
@@ -267,8 +268,22 @@ describe("BlockDock", () => {
       granularity: "daily",
       points: [
         // The API serves NUMERIC as a string; the view runs it through Number().
-        { time: "2026-06-01", mean: "0.04", min: null, max: null, valid_pixels: 400, valid_pixel_pct: "98" },
-        { time: "2026-06-30", mean: "0.05", min: null, max: null, valid_pixels: 400, valid_pixel_pct: "98" },
+        {
+          time: "2026-06-01",
+          mean: "0.04",
+          min: null,
+          max: null,
+          valid_pixels: 400,
+          valid_pixel_pct: "98",
+        },
+        {
+          time: "2026-06-30",
+          mean: "0.05",
+          min: null,
+          max: null,
+          valid_pixels: 400,
+          valid_pixel_pct: "98",
+        },
       ],
     });
 

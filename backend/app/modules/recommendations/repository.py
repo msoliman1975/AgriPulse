@@ -1101,18 +1101,19 @@ class RecommendationsRepository:
 
     async def get_block_current_crop(
         self, *, block_id: UUID
-    ) -> tuple[UUID | None, UUID | None, str | None, str | None, str | None]:
-        """Return (block_crop_id, crop_id, crop_category, growth_stage,
-        crop_path) for the active assignment, or all-None if none.
+    ) -> tuple[UUID | None, UUID | None, str | None, str | None]:
+        """Return (block_crop_id, crop_id, growth_stage, crop_path) for the
+        active assignment, or all-None if none.
 
         ``growth_stage`` (KB P3) is the stored phenological stage on the
         block_crops row, advanced daily by the phenology task; conditions
         read it as ``{source: block, field: growth_stage}``.
 
         ``crop_path`` is the denormalized hierarchical taxonomy code
-        (``mango.alphonso.short`` / ``cotton``); it drives decision-tree
-        path-prefix targeting and the ``crop_path`` / ``crop_strain``
-        block predicates."""
+        (``mango.alphonso.short`` / ``cotton``). It drives decision-tree
+        path-prefix *targeting* and is stamped on every recommendation — it is
+        no longer readable as a condition, since the targeting already says
+        which crops the tree runs on."""
         row = (
             await self._tenant.execute(
                 text(
@@ -1129,20 +1130,10 @@ class RecommendationsRepository:
             )
         ).first()
         if row is None:
-            return None, None, None, None, None
-        crop_row = (
-            await self._public.execute(
-                text("SELECT category FROM public.crops WHERE id = :crop_id").bindparams(
-                    bindparam("crop_id", type_=PG_UUID(as_uuid=True))
-                ),
-                {"crop_id": row.crop_id},
-            )
-        ).first()
-        category = crop_row.category if crop_row is not None else None
+            return None, None, None, None
         return (
             row.block_crop_id,
             row.crop_id,
-            category,
             row.growth_stage,
             row.crop_path,
         )

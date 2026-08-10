@@ -39,6 +39,7 @@ from app.modules.farms.models import (
     BlockCrop,
     BlockCropAttributeValue,
     BlockCropAttributeValueLog,
+    BlockResponsibleLog,
     Country,
     Crop,
     CropAttributeDefinition,
@@ -583,6 +584,82 @@ class FarmsRepository:
         stmt = stmt.order_by(Block.id.asc()).limit(limit)
         rows = (await self._tenant.execute(stmt)).all()
         return [_block_row_to_dict(r, with_boundary=with_boundary) for r in rows]
+
+    async def set_block_responsible(
+        self,
+        *,
+        block_id: UUID,
+        new_membership_id: UUID | None,
+        note: str | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        """Set the block's responsible member and record the handover.
+
+        The read of the current value and the write of both the column and the
+        log row share one transaction, so a concurrent change cannot slip
+        between them and leave a log entry claiming a predecessor that was
+        never there. Returns None when the block does not exist.
+
+        A no-op assignment writes nothing: re-saving the same person is not a
+        handover, and logging it would bury the real ones.
+        """
+        current = (
+            await self._tenant.execute(
+                select(Block.agronomist_membership_id).where(
+                    Block.id == block_id, Block.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+        if current is None and not await self._block_exists(block_id):
+            return None
+        if current == new_membership_id:
+            return {"changed": False, "previous_membership_id": current}
+
+        await self._tenant.execute(
+            update(Block)
+            .where(Block.id == block_id, Block.deleted_at.is_(None))
+            .values(agronomist_membership_id=new_membership_id, updated_by=actor_user_id)
+        )
+        self._tenant.add(
+            BlockResponsibleLog(
+                block_id=block_id,
+                previous_membership_id=current,
+                new_membership_id=new_membership_id,
+                note=note,
+                changed_by=actor_user_id,
+            )
+        )
+        await self._tenant.flush()
+        return {"changed": True, "previous_membership_id": current}
+
+    async def _block_exists(self, block_id: UUID) -> bool:
+        return (
+            await self._tenant.execute(
+                select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
+            )
+        ).scalar_one_or_none() is not None
+
+    async def list_block_responsible_log(
+        self, *, block_id: UUID, limit: int = 50
+    ) -> tuple[dict[str, Any], ...]:
+        stmt = (
+            select(BlockResponsibleLog)
+            .where(BlockResponsibleLog.block_id == block_id)
+            .order_by(BlockResponsibleLog.changed_at.desc(), BlockResponsibleLog.id.desc())
+            .limit(limit)
+        )
+        rows = (await self._tenant.execute(stmt)).scalars().all()
+        return tuple(
+            {
+                "id": r.id,
+                "previous_membership_id": r.previous_membership_id,
+                "new_membership_id": r.new_membership_id,
+                "note": r.note,
+                "changed_at": r.changed_at,
+                "changed_by": r.changed_by,
+            }
+            for r in rows
+        )
 
     async def update_block(
         self,

@@ -153,6 +153,7 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         fk=False,
         hypertable=True,
     ),
+    OwnedTable("block_responsible_log", owner_column="block_id", order=10),
     OwnedTable("growth_stage_logs", owner_column="block_id", order=10),
     OwnedTable(
         "imagery_ingestion_jobs",

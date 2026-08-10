@@ -29,6 +29,8 @@ class AlertResponse(BaseModel):
     cell_row: int | None = None
     cell_col: int | None = None
     rule_code: str
+    # NULL for alerts opened before migration 0063 — render as unclassified.
+    action_type: str | None = None
     severity: AlertSeverity
     status: AlertStatus
     diagnosis_en: str | None

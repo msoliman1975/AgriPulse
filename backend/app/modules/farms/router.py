@@ -47,6 +47,8 @@ from app.modules.farms.schemas import (
     BlockInactivationResponse,
     BlockListItemResponse,
     BlockReactivationResponse,
+    BlockResponsibleLogEntry,
+    BlockResponsibleRequest,
     BlockUpdateRequest,
     BulkBlockCreateRequest,
     BulkBlockCreateResponse,
@@ -465,6 +467,70 @@ async def get_block(
     if not has_capability(context, "block.read", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
     return block
+
+
+@router.put(
+    "/blocks/{block_id}/responsible",
+    response_model=list[BlockResponsibleLogEntry],
+    summary="Set the member responsible for a block, recording the handover.",
+)
+async def set_block_responsible(
+    block_id: UUID,
+    payload: BlockResponsibleRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """Its own endpoint rather than a field on PATCH /blocks/{id}.
+
+    A handover carries a reason and produces history; the generic block update
+    takes a bag of metadata fields and audits only their names. Returns the
+    refreshed log so the caller renders the new history without a second round
+    trip -- and so a no-op save still returns the truth rather than an empty
+    success the UI would have to interpret.
+    """
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    schema = _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    if not has_capability(context, "block.update_metadata", farm_id=block["farm_id"]):
+        # 404 rather than 403: the same shape the other block writes use, so a
+        # caller cannot probe which blocks exist on farms they cannot see.
+        raise BlockNotFoundError(block_id)
+
+    result = await service.set_block_responsible(
+        block_id=block_id,
+        membership_id=payload.membership_id,
+        note=payload.note,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+    if result is None:
+        raise BlockNotFoundError(block_id)
+    return list(await service.list_block_responsible_log(block_id=block_id))
+
+
+@router.get(
+    "/blocks/{block_id}/responsible/history",
+    response_model=list[BlockResponsibleLogEntry],
+    summary="Handover history for a block's responsible member.",
+)
+async def list_block_responsible_history(
+    block_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: FarmService = Depends(_service),
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    from app.modules.farms.errors import BlockNotFoundError
+    from app.shared.rbac.check import has_capability
+
+    _ensure_tenant(context)
+    block = await service.get_block(block_id=block_id, preferred_unit=context.preferred_unit)
+    # Reading who has been responsible needs only block.read -- it is the same
+    # class of fact as the block's crop or its area.
+    if not has_capability(context, "block.read", farm_id=block["farm_id"]):
+        raise BlockNotFoundError(block_id)
+    return list(await service.list_block_responsible_log(block_id=block_id, limit=limit))
 
 
 @router.patch(

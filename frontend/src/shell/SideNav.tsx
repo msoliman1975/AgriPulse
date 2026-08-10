@@ -294,6 +294,16 @@ export function SideNav(): ReactNode {
         activePathPrefix="/signals/"
         collapsed={collapsed}
       />
+      {/* The unified queue. The two single-kind screens below stay in the nav
+          until this one is signed off, then they go. */}
+      <SideNavItem
+        to={hasFarm ? `/action-center/${farmSegment}` : "#"}
+        label={t("common:workspaceNav.actionCenter")}
+        icon={<RecommendationsIcon className="h-4 w-4" />}
+        disabled={!hasFarm}
+        activePathPrefix="/action-center/"
+        collapsed={collapsed}
+      />
       <SideNavItem
         to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
         label={t("common:workspaceNav.recommendations")}

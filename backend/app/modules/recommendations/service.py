@@ -56,7 +56,7 @@ from app.modules.weather.snapshot import load_index_snapshot as load_weather_ind
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.shared.conditions import ConditionContext
-from app.shared.crop_taxonomy import path_matches, strain_code
+from app.shared.crop_taxonomy import path_matches
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 
@@ -74,7 +74,6 @@ class _BlockEvaluation:
     farm_id: UUID
     block_crop_id: UUID | None
     crop_path: str | None
-    crop_category: str | None
     growth_stage: str | None
     soil_texture: str | None
     salinity_class: str | None
@@ -99,11 +98,8 @@ class _BlockEvaluation:
         """Block context with this cell's imagery means swapped in."""
         return ConditionContext.from_block_signals(
             block_id=self.ctx.block_id,
-            crop_category=self.crop_category,
             block_attributes={
                 "growth_stage": self.growth_stage,
-                "crop_path": self.crop_path,
-                "crop_strain": strain_code(self.crop_path),
                 "soil_texture": self.soil_texture,
                 "salinity_class": self.salinity_class,
             },
@@ -370,7 +366,6 @@ class RecommendationsServiceImpl:
         (
             block_crop_id,
             crop_id,
-            crop_category,
             growth_stage,
             crop_path,
         ) = await self._repo.get_block_current_crop(block_id=block_id)
@@ -410,11 +405,8 @@ class RecommendationsServiceImpl:
         )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
-            crop_category=crop_category,
             block_attributes={
                 "growth_stage": growth_stage,
-                "crop_path": crop_path,
-                "crop_strain": strain_code(crop_path),
                 "soil_texture": soil_texture,
                 "salinity_class": salinity_class,
             },
@@ -460,7 +452,6 @@ class RecommendationsServiceImpl:
             farm_id=farm_id,
             block_crop_id=block_crop_id,
             crop_path=crop_path,
-            crop_category=crop_category,
             growth_stage=growth_stage,
             soil_texture=soil_texture,
             salinity_class=salinity_class,
@@ -765,7 +756,9 @@ class RecommendationsServiceImpl:
             _trace("fired", outcome=leaf_outcome, alert_id=opened)
             return {
                 "kind": "alert",
-                "action_type": "alert",
+                # Was the literal string "alert" — a placeholder from when the
+                # alert row had nowhere to keep the leaf's verb. It does now.
+                "action_type": result.outcome.action_type,
                 "severity": result.outcome.severity,
             }
 
@@ -913,6 +906,10 @@ class RecommendationsServiceImpl:
             cell_id=cell_id,
             rule_code=rule_code,
             severity=outcome.severity,
+            # The leaf picked a verb even on the alert branch; 0063 gave the
+            # alert row somewhere to keep it so the Action Center can group
+            # alerts by task type alongside recommendations.
+            action_type=outcome.action_type,
             diagnosis_en=outcome.text_en,
             diagnosis_ar=outcome.text_ar,
             prescription_en=None,
@@ -937,6 +934,7 @@ class RecommendationsServiceImpl:
                 "cell_id": str(cell_id) if cell_id else None,
                 "rule_code": rule_code,
                 "severity": outcome.severity,
+                "action_type": outcome.action_type,
                 "tree_code": tree["tree_code"],
                 "tree_version": tree["version"],
                 "leaf_node_id": leaf_node_id,
@@ -2077,7 +2075,6 @@ class DecisionTreesAuthorService:
         (
             dry_run_block_crop_id,
             dry_run_crop_id,
-            crop_category,
             growth_stage,
             crop_path,
         ) = await repo.get_block_current_crop(block_id=block_id)
@@ -2111,11 +2108,8 @@ class DecisionTreesAuthorService:
         )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
-            crop_category=crop_category,
             block_attributes={
                 "growth_stage": growth_stage,
-                "crop_path": crop_path,
-                "crop_strain": strain_code(crop_path),
                 "soil_texture": soil_texture,
                 "salinity_class": salinity_class,
             },
@@ -2222,7 +2216,6 @@ class DecisionTreesAuthorService:
             # context avoids re-loading the inherited snapshots per cell.
             cell_indices = ConditionContext.from_block_signals(
                 block_id=base_ctx.block_id,
-                crop_category=base_ctx.crop_category,
                 latest_index_aggregates=_merge_cell_means(latest_indices, cell_means),
             ).indices
             cell_result = evaluate_tree(compiled, replace(base_ctx, indices=cell_indices))

@@ -15,6 +15,12 @@ export interface Crop {
   relevant_indices: string[];
   classification_depth: ClassificationDepth;
   is_active: boolean;
+  /** Base temperature for growing-degree-day accumulation. A stage that
+   *  advances on GDD is only valid when the crop sets this. */
+  gdd_base_temp_c?: string | null;
+  /** The crop's stage calendar. Null for most crops today — a block whose crop
+   *  has none can never advance a growth stage on its own. */
+  phenology_stages?: { stages: PhenologyStage[] } | null;
 }
 
 export interface CropVariety {
@@ -139,5 +145,40 @@ export async function listVarietyStrains(cropVarietyId: string): Promise<CropVar
   const { data } = await apiClient.get<CropVarietyStrain[]>(
     `/v1/crop-varieties/${cropVarietyId}/strains`,
   );
+  return data;
+}
+
+// --- Resolved taxonomy (phenology stages + size classes) ------------------
+
+/** How a stage decides it is the current one. Discriminated on `mode`;
+ *  mirrors the Advance union in backend/app/modules/farms/phenology.py. */
+export type AdvanceRule =
+  | { mode: "manual" }
+  | { mode: "calendar_doy"; start_doy: string; end_doy: string }
+  | { mode: "days_from_planting"; start_day: number; end_day: number }
+  | { mode: "gdd_from_planting"; start_gdd: number; end_gdd: number };
+
+export interface PhenologyStage {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  order: number;
+  advance: AdvanceRule;
+}
+
+export interface ResolvedTaxonomy {
+  crop_path: string;
+  phenology_stages: { stages: PhenologyStage[] } | null;
+  size_classes: { classes?: { code: string }[] } | null;
+}
+
+/** Deepest-wins resolution for a crop path: a variety's own stage calendar
+ *  overrides the crop's. `phenology_stages` is null when no level of the
+ *  taxonomy defines one — which is most crops today, and is why the stage
+ *  control has an explicit empty state. */
+export async function getResolvedTaxonomy(cropPath: string): Promise<ResolvedTaxonomy> {
+  const { data } = await apiClient.get<ResolvedTaxonomy>("/v1/crops/resolved-taxonomy", {
+    params: { crop_path: cropPath },
+  });
   return data;
 }

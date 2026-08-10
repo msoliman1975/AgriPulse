@@ -920,13 +920,182 @@ global:
   #   Image verified in ghcr before the bump: frontend:0bf2cc1 is a 200 with
   #   digest sha256:e3274cb5..., distinct from frontend:45b5a08
   #   (sha256:716c4e3a...).
+  # 4c03ab2 -- Action Center (#395): recommendations + alerts as one queue at
+  #   /action-center/:farmId, with dispatch to a named team member. The two
+  #   older screens (/recommendations, /alerts) are untouched and still
+  #   routed; nothing was removed, so this is additive to the UI.
+  #
+  #   ALL THREE move together this time: the api gained
+  #   GET /v1/action-items + POST /v1/action-items:dispatch, the workers image
+  #   shares the backend build, and the frontend carries the new route. A
+  #   frontend-only bump would have shipped a page whose endpoints 404.
+  #
+  #   Tenant migration 0063 runs as a PreSync hook before the api rolls. Both
+  #   its columns are additive and nullable -- `alerts.action_type` (the verb
+  #   the firing leaf chose, which the alert row previously discarded) and
+  #   `plan_activities.assigned_membership_id` (who is expected to do the work;
+  #   `completed_by` already recorded who did it). Alerts raised before this
+  #   keep action_type NULL and render as "unclassified"; there is no honest
+  #   backfill, since recovering the value means resolving the rule_code
+  #   against the tree version that fired.
+  #
+  #   Rollback is these three tags back to api/workers 591db3e and frontend
+  #   0bf2cc1. The migration stays applied and that is fine: nothing outside
+  #   this feature reads either column, and both are nullable.
+  #
+  #   Images verified present in ghcr BEFORE this commit, not inferred from
+  #   the run conclusion -- api:4c03ab2 sha256:c975374a, workers:4c03ab2
+  #   sha256:60b96fa7, frontend:4c03ab2 sha256:65abaf08, each distinct from
+  #   the tag it replaces (api 591db3e sha256:5cef8472, frontend 0bf2cc1
+  #   sha256:58845eca).
+  #
+  #   NOT browser-verified. The UI has never been rendered anywhere -- the
+  #   Playwright profile was locked throughout the build -- so the data paths
+  #   are covered by 68 unit + 30 real-Postgres integration tests and the
+  #   rendered page is not covered at all.
+  # a51c72a -- Action Center dispatch fix (#396). The "Assign to" picker showed
+  #   only its placeholder: the default read `assigned_membership_id`, which is
+  #   NULL until AFTER an item is dispatched, so it never resolved for the one
+  #   case that matters. The block's owner is now carried on every item
+  #   (`responsible_membership_id`) instead of only on the group, and the
+  #   member list distinguishes "no permission" / "load failed" / "no members"
+  #   instead of rendering all three as an empty dropdown.
+  #
+  #   API + frontend both move: the item schema gained a field, so a
+  #   frontend-only bump would read a key the api does not send. No migration
+  #   -- 0063 already added everything this needs; the column was simply not
+  #   projected onto the item.
+  #
+  #   Rollback is these three back to 4c03ab2. Nothing to strand.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:a51c72a sha256:ff407013,
+  #   workers:a51c72a sha256:07cee345, frontend:a51c72a sha256:5a6522e0.
+  #
+  #   Still NOT browser-verified -- this fix exists because the previous
+  #   promote was not either.
+  # 143c9cb -- Action Center filters + a closed action-type vocabulary (#398).
+  #
+  #   The severity filter was never sent. Axios serialises an array query param
+  #   as `severity[]=critical`; FastAPI binds `list[X]` from REPEATED keys and
+  #   ignores the bracket form, so it bound None and returned everything. The
+  #   request succeeded, so nothing surfaced. Fixed with one
+  #   `paramsSerializer: { indexes: null }` on the shared axios client.
+  #
+  #   READ THIS BEFORE BLAMING THIS TAG FOR A BEHAVIOUR CHANGE: that fix is
+  #   app-wide, not Action-Center-local. The type filter here, and the observer
+  #   scene/block, irrigation-status and eval-trace-status filters, were ALL
+  #   silently unfiltered before this. They now filter. Screens that appeared
+  #   to "show everything" will start showing less -- that is the correction,
+  #   not a regression.
+  #
+  #   Also: decision-tree `action_type` is a dropdown instead of a free-text
+  #   box (it is CHECK-constrained at persist, so a typo used to save and
+  #   publish cleanly and fail only when the tree fired), groups start
+  #   collapsed, and the assigned-to + clear-all filters exist.
+  #
+  #   FRONTEND-DOMINANT but api moves too: #399 (b7bfb93) landed just before
+  #   this and its CI run was CANCELLED, so b7bfb93 has NO images. 143c9cb
+  #   supersedes it and is the first SHA since a51c72a that has a full set.
+  #
+  #   No migration. Rollback is these three back to a51c72a; the serializer
+  #   fix goes with the frontend tag.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:143c9cb sha256:d7deec01,
+  #   workers:143c9cb sha256:19e70b84, frontend:143c9cb sha256:f18e7f39.
+  # e7a9341 -- Action Center dispatch picker (#403), plus three PRs that merged
+  #   on top of 143c9cb and cannot be left behind: a tag is a point on the
+  #   trunk, not a cherry-pick.
+  #
+  #     #403 dispatch offers the same people who can own a block. The block
+  #          form picks an owner from the TENANT USER list; this dialog was
+  #          offering FARM MEMBERS. So an owner who was not also a farm member
+  #          had no option to render, and a farm with no farm_scopes rows got
+  #          an empty dropdown while block assignment worked fine. Also: the
+  #          select is always rendered now -- a roster failure used to remove
+  #          the control outright, which made such a farm undispatchable even
+  #          though the server resolves an assignee per block regardless.
+  #     #402 block growth stage from the crop assignment (farms).
+  #     #401 decision trees: explain every condition code inline.
+  #     #400 decision trees: operand values follow the signal / crop-field
+  #          definition. The ONLY backend change in this whole range --
+  #          `shared/conditions/evaluator.py`. Everything else is frontend.
+  #
+  #   NO MIGRATION anywhere in 143c9cb..e7a9341, checked rather than assumed,
+  #   so the PreSync hook has nothing to run and rollback strands nothing.
+  #
+  #   #402's own CI run was CANCELLED, so 6f7ab85 has no images and could only
+  #   ever reach prod inside a later SHA. This is that SHA. (Third cancelled
+  #   merge build tonight -- the concurrency group keys on ref.)
+  #
+  #   Rollback: all three back to 143c9cb. That also reverts #400-#402.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:e7a9341 sha256:444baf02,
+  #   workers:e7a9341 sha256:68af7569, frontend:e7a9341 sha256:9c4a84c4.
+  # 02cf517 = #404 crop phenology stage-calendar editor.
+  #   The piece that makes `growth_stage` exist. The daily phenology task can
+  #   only advance a block whose crop defines a stage calendar, and only 3 of
+  #   23 crops did -- there was no way to write one outside a migration. For
+  #   the other twenty, every stage-gated decision tree was silently
+  #   unfireable; seven published trees branch on stage.
+  #   FRONTEND ONLY. No backend file changed between e7a9341 and 02cf517, so
+  #   api + workers stay on e7a9341 and only the frontend tag moves. The
+  #   editor writes through the existing PATCH /admin/crops/{id}, whose
+  #   validators (unique codes, mode-vs-cycle, GDD base requirement) have been
+  #   there since KB P3 with no UI in front of them.
+  #   NO MIGRATION. Rollback is the frontend tag back to e7a9341 alone.
+  #   Image verified in ghcr before the bump, not inferred from a run: the
+  #   only "completed" run for this SHA was argocd-sync, which has ZERO
+  #   container jobs, so its success said nothing. frontend:02cf517 is a 200
+  #   with digest sha256:7ac767a9..., distinct from frontend:e7a9341.
+  # d6e7d13 -- #406 (frontend only, superseded by 7b7f7ba below). A block's
+  #   responsible member became visible and settable in the Farm Console dock;
+  #   until then the only route to it was Header > Configs > "Imagery & weather"
+  #   > a block > Edit, because there is no Farms entry in the side nav. Also
+  #   renamed the label "Agronomist" -> "Responsible member"; the COLUMN keeps
+  #   its name, which is load bearing across the API, the dock and the dispatch
+  #   resolver. Kept here as history: e7a9341..d6e7d13 touched zero backend
+  #   files, which is why api + workers correctly stayed put for it.
+  #   Learned the hard way on that bump: the PR run's green containers job
+  #   builds the PR HEAD, not the merge commit -- d6e7d13 was a ghcr 404 at
+  #   first check and only the main run produced it.
+  #
+  # 7b7f7ba -- #407: a block's responsible member moves under Manage, gets its
+  #   own form (select + reason + explicit Save) and an append-only handover
+  #   history. Replaces the save-on-change picker #406 put in the overview,
+  #   which had no room for a reason and no view of who you were replacing.
+  #
+  #   ALL THREE MOVE, unlike the last promote: this adds tenant migration
+  #   **0064 block_responsible_log**, so api + workers cannot stay behind on
+  #   e7a9341 while the schema changes under them. PreSync runs it before the
+  #   api rolls. Rolling the tags back leaves the table -- harmless, nothing
+  #   outside this feature reads it -- and the two new routes
+  #   (PUT/GET /blocks/{id}/responsible[/history]) simply disappear with the
+  #   api image.
+  #
+  #   Why a table and not the audit trail: farms.block_updated records changed
+  #   field NAMES and no values, so it can say the field changed and never from
+  #   whom to whom. audit_data_changes has before/after JSONB and is written by
+  #   nothing. Registered in the purge manifest alongside growth_stage_logs.
+  #
+  #   api/workers also pick up the backend halves of #404-#406, which were
+  #   promoted frontend-only; those ranges contained no backend files, so the
+  #   genuinely new backend content here is 0064 plus the two routes.
+  #
+  #   TAG IS 7 CHARS. git now abbreviates this SHA to 8 (7b7f7ba0) but CI tags
+  #   images with format=short -- ghcr 404s on 7b7f7ba0 and 200s on 7b7f7ba.
+  #   Writing what git printed would have been an ImagePullBackOff on all three.
+  #
+  #   Rollback: api + workers back to e7a9341, frontend back to d6e7d13.
+  #
+  #   Images verified in ghcr BEFORE this commit: api sha256:d42dca15,
+  #   workers sha256:cb280c02, frontend sha256:9bb00d88.
   images:
     api:
-      tag: "591db3e"
+      tag: "7b7f7ba"
     workers:
-      tag: "591db3e"
+      tag: "7b7f7ba"
     frontend:
-      tag: "0bf2cc1"
+      tag: "7b7f7ba"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers

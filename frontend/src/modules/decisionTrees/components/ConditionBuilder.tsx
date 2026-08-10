@@ -17,6 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listCropAttributeCatalog } from "@/api/crops";
 import { listSignalDefinitions } from "@/api/signals";
+import { getWeatherIndexCatalog } from "@/api/weatherIndices";
+
+import { FieldHint } from "./FieldHint";
 import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
@@ -35,18 +38,22 @@ import {
   WEATHER_SCOPES,
   attributePathAppliesToCrops,
   changeTermOp,
+  cropAttributeOperandSpec,
   defaultGroupNode,
   defaultTermNode,
   defaultValueRef,
   leftOperandType,
   leftOperandValues,
+  operandOutOfRange,
   retypeTermForLeft,
   riskAppliesToCrops,
   serializeNode,
   signalKeysForValueKind,
+  signalOperandSpec,
   type ConditionNode,
   type EditableCondition,
   type GroupMode,
+  type OperandSpec,
   type RightOperand,
   type Term,
   type TermOp,
@@ -313,6 +320,49 @@ function NotBox({
   );
 }
 
+/** Look up a hint, returning undefined rather than the key itself when the
+ *  string is missing — FieldHint then renders nothing at all. */
+function useHint(): (group: string, code: string | undefined) => string | undefined {
+  const { t } = useTranslation("decisionTrees");
+  return (group, code) => {
+    if (!code) return undefined;
+    const key = `editor.condition.hint.${group}.${code}`;
+    const value = t(key, { defaultValue: "" });
+    return value || undefined;
+  };
+}
+
+// ---- Definition-driven operand shape --------------------------------
+
+/** Resolve the right-hand operand's shape from the definition behind a
+ *  `signals` / `crop_attribute` left ref. Returns null for every other source,
+ *  where the ref alone is enough. */
+function useOperandSpec(left: ValueRef): OperandSpec | null {
+  const isSignal = left.source === "signals";
+  const isCropAttr = left.source === "crop_attribute";
+  const signalDefs = useQuery({
+    queryKey: ["signal_definitions", "list"] as const,
+    queryFn: () => listSignalDefinitions(),
+    staleTime: 60_000,
+    enabled: isSignal,
+  });
+  const cropAttrDefs = useQuery({
+    queryKey: ["crop_attribute_definitions", "catalog"] as const,
+    queryFn: () => listCropAttributeCatalog(),
+    staleTime: 60_000,
+    enabled: isCropAttr,
+  });
+  if (isSignal) {
+    return signalOperandSpec((signalDefs.data ?? []).find((d) => d.code === left.code));
+  }
+  if (isCropAttr) {
+    // The same code can be defined at several taxonomy depths; they share a
+    // value type, so the first match is representative.
+    return cropAttributeOperandSpec((cropAttrDefs.data ?? []).find((d) => d.code === left.code));
+  }
+  return null;
+}
+
 // ---- Term row ------------------------------------------------------
 
 interface TermRowProps {
@@ -325,6 +375,12 @@ interface TermRowProps {
 
 function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  // `signals` and `crop_attribute` get their operand shape from the definition
+  // rather than from the ref: the tenant's signal and the platform's crop
+  // attribute already declare the type, the legal values, the bounds and the
+  // unit. Both queries are the ones the code dropdowns run, so react-query
+  // serves them from cache.
+  const spec = useOperandSpec(term.left);
   // The node details panel is a fixed, narrow (~360px) column, so the
   // comparison fields stack vertically. A previous `sm:grid-cols-[…]`
   // 4-column layout keyed off the *viewport* width (≥640px), not the
@@ -351,7 +407,7 @@ function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps
           readOnly={readOnly}
           onChange={(next) => onChange(changeTermOp(term, next))}
         />
-        <TermOperands term={term} readOnly={readOnly} onChange={onChange} />
+        <TermOperands term={term} readOnly={readOnly} spec={spec} onChange={onChange} />
         {onRemove && !readOnly ? (
           <button
             type="button"
@@ -373,10 +429,12 @@ function TermRow({ term, readOnly, cropPaths, onChange, onRemove }: TermRowProps
 function TermOperands({
   term,
   readOnly,
+  spec,
   onChange,
 }: {
   term: Term;
   readOnly: boolean;
+  spec: OperandSpec | null;
   onChange: (next: Term) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
@@ -388,6 +446,7 @@ function TermOperands({
           label={t("editor.condition.low")}
           value={term.low}
           left={term.left}
+          spec={spec}
           readOnly={readOnly}
           onChange={(low) => onChange({ ...term, low })}
         />
@@ -395,6 +454,7 @@ function TermOperands({
           label={t("editor.condition.high")}
           value={term.high}
           left={term.left}
+          spec={spec}
           readOnly={readOnly}
           onChange={(high) => onChange({ ...term, high })}
         />
@@ -419,6 +479,7 @@ function TermOperands({
                 label={`#${idx + 1}`}
                 value={v}
                 left={term.left}
+                spec={spec}
                 readOnly={readOnly}
                 onChange={(next) => setValue(idx, next)}
               />
@@ -436,7 +497,9 @@ function TermOperands({
         {!readOnly ? (
           <AddButton
             label={t("editor.condition.addValue")}
-            onClick={() => onChange({ ...term, values: [...term.values, newInValue(term.left)] })}
+            onClick={() =>
+              onChange({ ...term, values: [...term.values, newInValue(term.left, spec)] })
+            }
           />
         ) : null}
       </div>
@@ -448,6 +511,7 @@ function TermOperands({
       label={t("editor.condition.right")}
       value={term.right}
       left={term.left}
+      spec={spec}
       readOnly={readOnly}
       onChange={(right) => onChange({ ...term, right })}
     />
@@ -476,6 +540,7 @@ function ValueRefEditor({
   onChange,
 }: ValueRefEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  const hint = useHint();
   const sources: ValueRefSource[] = disallowParams
     ? [
         "indices",
@@ -519,6 +584,7 @@ function ValueRefEditor({
           </option>
         ))}
       </select>
+      <FieldHint text={hint("source", value.source)} />
       <SourceSpecificFields
         value={value}
         readOnly={readOnly}
@@ -541,6 +607,9 @@ function SourceSpecificFields({
   onChange: (next: ValueRef) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  const hint = useHint();
+  const { i18n } = useTranslation();
+  const arabic = i18n.language?.startsWith("ar") ?? false;
   // Tenant signal definitions for the signals-source code dropdown. Loaded
   // once and shared across every condition row via react-query dedupe.
   const signalDefs = useQuery({
@@ -557,6 +626,29 @@ function SourceSpecificFields({
     queryFn: () => listCropAttributeCatalog(),
     staleTime: 60_000,
   });
+  // Bilingual descriptions for the eight curated weather indices, straight
+  // from the platform catalog rather than restated here.
+  const weatherIndexCatalog = useQuery({
+    queryKey: ["weather_index_catalog"] as const,
+    queryFn: () => getWeatherIndexCatalog(),
+    staleTime: 300_000,
+  });
+  const signalDef =
+    value.source === "signals"
+      ? (signalDefs.data ?? []).find((d) => d.code === value.code)
+      : undefined;
+  const weatherIndexEntry =
+    value.source === "weather_index"
+      ? (weatherIndexCatalog.data ?? []).find((e) => e.code === value.index_code)
+      : undefined;
+  const weatherIndexHint = weatherIndexEntry
+    ? {
+        text: arabic
+          ? (weatherIndexEntry.description_ar ?? weatherIndexEntry.description_en)
+          : weatherIndexEntry.description_en,
+        unit: weatherIndexEntry.unit,
+      }
+    : undefined;
   if (value.source === "indices") {
     return (
       <>
@@ -574,6 +666,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("indexCode", value.index_code)} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -588,24 +681,28 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("indicesKey", value.key)} />
       </>
     );
   }
   if (value.source === "block") {
     return (
-      <select
-        disabled={readOnly}
-        value={value.field}
-        onChange={(e) => onChange({ ...value, field: e.target.value as typeof value.field })}
-        className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
-        aria-label={t("editor.condition.blockField")}
-      >
-        {BLOCK_FIELDS.map((f) => (
-          <option key={f} value={f}>
-            {f}
-          </option>
-        ))}
-      </select>
+      <>
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) => onChange({ ...value, field: e.target.value as typeof value.field })}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.blockField")}
+        >
+          {BLOCK_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <FieldHint text={hint("blockField", value.field)} />
+      </>
     );
   }
   if (value.source === "weather") {
@@ -646,6 +743,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherScope", value.scope)} />
         <select
           disabled={readOnly}
           value={value.field}
@@ -659,6 +757,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherField", value.field)} />
       </>
     );
   }
@@ -683,6 +782,9 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        {/* The catalog carries the agronomists own bilingual description, so
+            use it rather than restating it in the frontend. */}
+        <FieldHint text={weatherIndexHint?.text} unit={weatherIndexHint?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -697,6 +799,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("weatherIndexKey", value.key)} />
       </>
     );
   }
@@ -730,6 +833,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("riskCode", value.risk_code)} />
         <select
           disabled={readOnly}
           value={value.field}
@@ -744,6 +848,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("riskField", value.field)} />
       </>
     );
   }
@@ -769,6 +874,8 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        {/* Written by the tenant when they defined the signal. */}
+        <FieldHint text={signalDef?.description} unit={signalDef?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -787,6 +894,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("signalKey", value.key)} />
       </>
     );
   }
@@ -822,6 +930,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("gridField", value.field)} />
       </>
     );
   }
@@ -842,6 +951,16 @@ function SourceSpecificFields({
     // selectable so switching to the dropdown never silently drops it.
     const codes = [...byCode.keys()];
     const codeOptions = value.code && !codes.includes(value.code) ? [value.code, ...codes] : codes;
+    // The platform authored this description on the attribute definition.
+    const attrDef = byCode.get(value.code);
+    const attrHint = attrDef
+      ? {
+          text: arabic
+            ? (attrDef.description_ar ?? attrDef.description_en)
+            : attrDef.description_en,
+          unit: arabic ? attrDef.unit_ar : attrDef.unit_en,
+        }
+      : undefined;
     return (
       <>
         <select
@@ -861,6 +980,7 @@ function SourceSpecificFields({
             );
           })}
         </select>
+        <FieldHint text={attrHint?.text} unit={attrHint?.unit} />
         <select
           disabled={readOnly}
           value={value.key}
@@ -875,6 +995,7 @@ function SourceSpecificFields({
             </option>
           ))}
         </select>
+        <FieldHint text={hint("cropAttributeKey", value.key)} />
       </>
     );
   }
@@ -951,19 +1072,31 @@ interface RightEditorProps {
    *  boolean or a categorical, and supplies the vocabulary when there is
    *  a closed one. */
   left: ValueRef;
+  /** Definition-driven shape, when the left ref is a signal or crop attribute.
+   *  Takes precedence over anything derived from `left`. */
+  spec: OperandSpec | null;
   readOnly: boolean;
   onChange: (next: RightOperand) => void;
 }
 
-function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProps): ReactNode {
+function RightEditor({
+  label,
+  value,
+  left,
+  spec,
+  readOnly,
+  onChange,
+}: RightEditorProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
   // The user picks between "literal" (number/string/boolean) and "ref"
   // (typically a params ref). Number is the default and most common.
-  const kindLabel = value.kind === "ref" ? "params ref" : value.kind;
+  const kindLabel = value.kind === "ref" ? "params ref" : (spec?.unit ?? value.kind);
   // Closed vocabularies (soil texture, risk level, trend direction, …) become
   // a picker: those are exactly the comparisons an author gets wrong by
   // typing, and a wrong value fails closed with no error anywhere.
-  const vocabulary = leftOperandValues(left);
+  // A definition's own option list wins over the static per-ref vocabulary.
+  const vocabulary = spec ? (spec.values ?? null) : leftOperandValues(left);
+  const outOfRange = operandOutOfRange(spec, value);
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] text-ap-muted">
@@ -990,6 +1123,14 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
             const n = Number(e.target.value);
             if (!Number.isNaN(n)) onChange({ kind: "number", value: n });
           }}
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
+        />
+      ) : value.kind === "string" && spec?.control === "date" ? (
+        <input
+          type="date"
+          disabled={readOnly}
+          value={value.value}
+          onChange={(e) => onChange({ kind: "string", value: e.target.value })}
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs font-mono"
         />
       ) : value.kind === "string" && vocabulary ? (
@@ -1038,6 +1179,13 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
           className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
         />
       )}
+      {/* Advisory, never blocking: a threshold outside the recorded range is
+          often the point of the rule. */}
+      {outOfRange ? (
+        <span className="text-[11px] text-ap-warn">
+          {t("editor.condition.outOfRange", { min: spec?.min ?? "—", max: spec?.max ?? "—" })}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -1045,7 +1193,12 @@ function RightEditor({ label, value, left, readOnly, onChange }: RightEditorProp
 /** A fresh `in` entry starts in the left ref's own shape — a number for a
  *  numeric left, and the first value of a closed vocabulary where there is
  *  one, rather than an empty string that can never match. */
-function newInValue(left: ValueRef): RightOperand {
+function newInValue(left: ValueRef, spec: OperandSpec | null): RightOperand {
+  if (spec) {
+    if (spec.control === "number") return { kind: "number", value: 0 };
+    if (spec.control === "boolean") return { kind: "boolean", value: true };
+    return { kind: "string", value: spec.values?.[0] ?? "" };
+  }
   if (leftOperandType(left) === "number") return { kind: "number", value: 0 };
   if (leftOperandType(left) === "boolean") return { kind: "boolean", value: true };
   const vocabulary = leftOperandValues(left);

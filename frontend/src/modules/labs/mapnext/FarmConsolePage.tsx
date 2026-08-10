@@ -731,238 +731,240 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         {/* Map + dock share one column so the dock spans the map canvas only,
             and follows the rail as it collapses/expands. */}
         <div className="flex min-w-0 flex-1 flex-col">
-        <main className="relative min-w-0 flex-1">
-          <MapCanvas
-            geojson={summary.geojson}
-            farmBoundary={summary.farm.boundary}
-            selectedId={selectedId}
-            onSelect={select}
-            fitBoundsKey={farmId}
-            showAoi={layers.aoi}
-            showBlocks={layers.blocks}
-            showBlockBorders={layers.borders}
-            showBlockLabels={layers.labels}
-            borderOpacity={layers.borderOpacity}
-            blockFillOpacity={layers.fillOpacity}
-            gridCells={gridCellsFc}
-            highlightedCellIds={highlightedCellIds}
-            selectedGridCellId={selectedCellId}
-            onGridCellClick={(cellId, point) => {
-              setSelectedCellId(cellId);
-              setCellClickPoint(point);
-            }}
-            signalOverlay={signalOverlayFc}
-            onSignalClick={(observationId, point) => {
-              const next = new URLSearchParams(search);
-              next.set("signal_obs", observationId);
-              setSearch(next, { replace: true });
-              setObsClickPoint(point);
-              setSelectedCellId(null);
-            }}
-            reshapeBlock={
-              reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
-            }
-            onReshape={(poly) => setReshapeCandidate(poly)}
-            drawEnabled={drawTarget != null && !reshaping}
-            drawTarget={drawTarget ?? "block"}
-            onDrawProgress={setDrawProgress}
-            onPolygonDrawn={(poly, areaM2, target) => {
-              setDrawProgress(null);
-              if (target === "block") setPendingBlock({ polygon: poly, areaM2 });
-            }}
-            onPivotDrawn={(r) =>
-              setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })
-            }
-            autoBlockPreview={autoBlockPreviewFc}
-            bulkPreview={bulkPreviewFc}
-          />
-
-          {/* Draw-in-progress hint (before a shape is completed) */}
-          {drawTarget && !pendingBlock && !pendingPivot ? (
-            <DrawHintBar
-              kind={drawTarget}
-              vertices={drawProgress?.vertices}
-              areaM2={drawProgress?.areaM2}
-              onCancel={resetCreate}
-            />
-          ) : null}
-
-          {/* Create-block capture (after drawing a polygon) */}
-          {pendingBlock ? (
-            <CreateBlockPanel
-              areaM2={pendingBlock.areaM2}
-              submitting={createBlockMut.isPending}
-              error={createBlockMut.isError ? t("create.createFailed") : null}
-              onSubmit={({ code, name }) =>
-                createBlockMut.mutate({ polygon: pendingBlock.polygon, code, name })
-              }
-              onCancel={resetCreate}
-            />
-          ) : null}
-
-          {/* Create-pivot capture (after drawing a center + radius) */}
-          {pendingPivot ? (
-            <CreatePivotPanel
-              centerLat={pendingPivot.lat}
-              centerLon={pendingPivot.lon}
-              radiusM={pendingPivot.radiusM}
-              submitting={createPivotMut.isPending}
-              error={createPivotMut.isError ? t("create.createFailed") : null}
-              onSubmit={({ code, name, sector_count }) =>
-                createPivotMut.mutate({
-                  lat: pendingPivot.lat,
-                  lon: pendingPivot.lon,
-                  radiusM: pendingPivot.radiusM,
-                  code,
-                  name,
-                  sectorCount: sector_count,
-                })
-              }
-              onCancel={resetCreate}
-            />
-          ) : null}
-
-          {/* Auto-block panel (max area → compute → pick → create) */}
-          {autoOpen ? (
-            <AutoBlockPanel
-              maxAreaM2={maxAreaM2}
-              onMaxAreaM2={setMaxAreaM2}
-              unit={areaUnit}
-              effectiveCellSizeM={autoCellSizeM}
-              onCompute={() => void computeAutoGrid()}
-              computing={autoComputing}
-              candidates={candidates}
-              selected={selectedCandidates}
-              onToggle={(code) =>
-                setSelectedCandidates((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(code)) next.delete(code);
-                  else next.add(code);
-                  return next;
-                })
-              }
-              onToggleAll={(all) =>
-                setSelectedCandidates(
-                  all ? new Set((candidates ?? []).map((c) => c.code)) : new Set(),
-                )
-              }
-              creating={autoCreating}
-              progressDone={autoCreatedCount}
-              error={autoError}
-              onCreate={() => void commitAutoBlock()}
-              onClose={closeAuto}
-            />
-          ) : null}
-
-          {/* Bulk AOI upload panel (drop many files → review → reconcile) */}
-          {bulkOpen ? (
-            <BulkAoiUploadPanel
-              farmId={farmId}
-              existing={existingBlocks}
-              canReplace={canBulkReplace}
-              onPreviewChange={setBulkPreviewFc}
-              onCommitted={({ created, replaced, reused, errors }) => {
-                void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
-                flash(t("bulk.committed", { created, replaced, reused, errors }));
+          <main className="relative min-w-0 flex-1">
+            <MapCanvas
+              geojson={summary.geojson}
+              farmBoundary={summary.farm.boundary}
+              selectedId={selectedId}
+              onSelect={select}
+              fitBoundsKey={farmId}
+              showAoi={layers.aoi}
+              showBlocks={layers.blocks}
+              showBlockBorders={layers.borders}
+              showBlockLabels={layers.labels}
+              borderOpacity={layers.borderOpacity}
+              blockFillOpacity={layers.fillOpacity}
+              gridCells={gridCellsFc}
+              highlightedCellIds={highlightedCellIds}
+              selectedGridCellId={selectedCellId}
+              onGridCellClick={(cellId, point) => {
+                setSelectedCellId(cellId);
+                setCellClickPoint(point);
               }}
-              onClose={closeBulk}
-            />
-          ) : null}
-
-          {/* Reshape banner */}
-          {reshaping ? (
-            <div className="absolute left-1/2 top-3.5 z-20 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-ap-panel px-4 py-2 shadow-card">
-              <span className="text-sm font-semibold text-ap-ink">{t("page.reshapeTitle")}</span>
-              <button
-                type="button"
-                disabled={!reshapeCandidate || reshapeMut.isPending}
-                onClick={() =>
-                  reshapeCandidate &&
-                  reshapeMut.mutate({ blockId: reshapeTarget.id, boundary: reshapeCandidate })
-                }
-                className="h-8 rounded-lg bg-ap-primary px-3 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {t("manage.save")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setReshapeTarget(null);
-                  setReshapeCandidate(null);
-                }}
-                className="h-8 rounded-lg border border-ap-line px-3 text-sm font-semibold text-ap-ink"
-              >
-                {t("manage.cancel")}
-              </button>
-            </div>
-          ) : null}
-
-          {/* Grid cell popup */}
-          {selectedCellId ? (
-            <GridCellPopup
-              open
-              cellId={selectedCellId}
-              productId={cellMeta.get(selectedCellId)?.productId ?? null}
-              indexCode={activeIndex}
-              value={cellMeta.get(selectedCellId)?.value ?? null}
-              lat={cellMeta.get(selectedCellId)?.lat ?? null}
-              lon={cellMeta.get(selectedCellId)?.lon ?? null}
-              blockName={cellMeta.get(selectedCellId)?.blockName ?? null}
-              x={cellClickPoint?.x ?? null}
-              y={cellClickPoint?.y ?? null}
-              time={cellMeta.get(selectedCellId)?.time ?? null}
-              baselineMean={selectedCellBaseline?.blockMean ?? null}
-              z={selectedCellBaseline?.z ?? null}
-              cellItems={cellItemsByCell.get(selectedCellId) ?? []}
-              onClose={() => {
-                setSelectedCellId(null);
-                setCellClickPoint(null);
-              }}
-            />
-          ) : null}
-
-          {/* Signal observation popup */}
-          {selectedObsId ? (
-            <SignalObservationPanel
-              observation={selectedObs}
-              definition={selectedSignalDef}
-              isLoading={signalObsQ.isLoading}
-              x={obsClickPoint?.x ?? null}
-              y={obsClickPoint?.y ?? null}
-              onClose={() => {
+              signalOverlay={signalOverlayFc}
+              onSignalClick={(observationId, point) => {
                 const next = new URLSearchParams(search);
-                next.delete("signal_obs");
+                next.set("signal_obs", observationId);
                 setSearch(next, { replace: true });
-                setObsClickPoint(null);
+                setObsClickPoint(point);
+                setSelectedCellId(null);
               }}
+              reshapeBlock={
+                reshapeTarget ? { id: reshapeTarget.id, boundary: reshapeTarget.boundary } : null
+              }
+              onReshape={(poly) => setReshapeCandidate(poly)}
+              drawEnabled={drawTarget != null && !reshaping}
+              drawTarget={drawTarget ?? "block"}
+              onDrawProgress={setDrawProgress}
+              onPolygonDrawn={(poly, areaM2, target) => {
+                setDrawProgress(null);
+                if (target === "block") setPendingBlock({ polygon: poly, areaM2 });
+              }}
+              onPivotDrawn={(r) =>
+                setPendingPivot({ lat: r.center_lat, lon: r.center_lon, radiusM: r.radius_m })
+              }
+              autoBlockPreview={autoBlockPreviewFc}
+              bulkPreview={bulkPreviewFc}
             />
-          ) : null}
 
-          {toast ? (
-            <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-ap-ink/85 px-3.5 py-1.5 text-xs text-white shadow-card">
-              {toast}
-            </div>
-          ) : null}
+            {/* Draw-in-progress hint (before a shape is completed) */}
+            {drawTarget && !pendingBlock && !pendingPivot ? (
+              <DrawHintBar
+                kind={drawTarget}
+                vertices={drawProgress?.vertices}
+                areaM2={drawProgress?.areaM2}
+                onCancel={resetCreate}
+              />
+            ) : null}
 
-          {/* Inactive-farm banner — the way back from a farm inactivation. */}
-          {!summary.farm.is_active ? (
-            <div className="absolute bottom-4 end-4 z-20 flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2 text-xs text-amber-900 shadow-card">
-              <span>{t("dangerZone.inactiveSince", { date: summary.farm.active_to ?? "—" })}</span>
-              {canInactivateFarm ? (
+            {/* Create-block capture (after drawing a polygon) */}
+            {pendingBlock ? (
+              <CreateBlockPanel
+                areaM2={pendingBlock.areaM2}
+                submitting={createBlockMut.isPending}
+                error={createBlockMut.isError ? t("create.createFailed") : null}
+                onSubmit={({ code, name }) =>
+                  createBlockMut.mutate({ polygon: pendingBlock.polygon, code, name })
+                }
+                onCancel={resetCreate}
+              />
+            ) : null}
+
+            {/* Create-pivot capture (after drawing a center + radius) */}
+            {pendingPivot ? (
+              <CreatePivotPanel
+                centerLat={pendingPivot.lat}
+                centerLon={pendingPivot.lon}
+                radiusM={pendingPivot.radiusM}
+                submitting={createPivotMut.isPending}
+                error={createPivotMut.isError ? t("create.createFailed") : null}
+                onSubmit={({ code, name, sector_count }) =>
+                  createPivotMut.mutate({
+                    lat: pendingPivot.lat,
+                    lon: pendingPivot.lon,
+                    radiusM: pendingPivot.radiusM,
+                    code,
+                    name,
+                    sectorCount: sector_count,
+                  })
+                }
+                onCancel={resetCreate}
+              />
+            ) : null}
+
+            {/* Auto-block panel (max area → compute → pick → create) */}
+            {autoOpen ? (
+              <AutoBlockPanel
+                maxAreaM2={maxAreaM2}
+                onMaxAreaM2={setMaxAreaM2}
+                unit={areaUnit}
+                effectiveCellSizeM={autoCellSizeM}
+                onCompute={() => void computeAutoGrid()}
+                computing={autoComputing}
+                candidates={candidates}
+                selected={selectedCandidates}
+                onToggle={(code) =>
+                  setSelectedCandidates((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(code)) next.delete(code);
+                    else next.add(code);
+                    return next;
+                  })
+                }
+                onToggleAll={(all) =>
+                  setSelectedCandidates(
+                    all ? new Set((candidates ?? []).map((c) => c.code)) : new Set(),
+                  )
+                }
+                creating={autoCreating}
+                progressDone={autoCreatedCount}
+                error={autoError}
+                onCreate={() => void commitAutoBlock()}
+                onClose={closeAuto}
+              />
+            ) : null}
+
+            {/* Bulk AOI upload panel (drop many files → review → reconcile) */}
+            {bulkOpen ? (
+              <BulkAoiUploadPanel
+                farmId={farmId}
+                existing={existingBlocks}
+                canReplace={canBulkReplace}
+                onPreviewChange={setBulkPreviewFc}
+                onCommitted={({ created, replaced, reused, errors }) => {
+                  void qc.invalidateQueries({ queryKey: ["labs/mapnext/summary"] });
+                  flash(t("bulk.committed", { created, replaced, reused, errors }));
+                }}
+                onClose={closeBulk}
+              />
+            ) : null}
+
+            {/* Reshape banner */}
+            {reshaping ? (
+              <div className="absolute left-1/2 top-3.5 z-20 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-ap-panel px-4 py-2 shadow-card">
+                <span className="text-sm font-semibold text-ap-ink">{t("page.reshapeTitle")}</span>
                 <button
                   type="button"
-                  onClick={() => reactivateFarmMut.mutate()}
-                  disabled={reactivateFarmMut.isPending}
-                  className="rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                  disabled={!reshapeCandidate || reshapeMut.isPending}
+                  onClick={() =>
+                    reshapeCandidate &&
+                    reshapeMut.mutate({ blockId: reshapeTarget.id, boundary: reshapeCandidate })
+                  }
+                  className="h-8 rounded-lg bg-ap-primary px-3 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  {reactivateFarmMut.isPending
-                    ? t("dangerZone.reactivating")
-                    : t("dangerZone.reactivate")}
+                  {t("manage.save")}
                 </button>
-              ) : null}
-            </div>
-          ) : null}
-        </main>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReshapeTarget(null);
+                    setReshapeCandidate(null);
+                  }}
+                  className="h-8 rounded-lg border border-ap-line px-3 text-sm font-semibold text-ap-ink"
+                >
+                  {t("manage.cancel")}
+                </button>
+              </div>
+            ) : null}
+
+            {/* Grid cell popup */}
+            {selectedCellId ? (
+              <GridCellPopup
+                open
+                cellId={selectedCellId}
+                productId={cellMeta.get(selectedCellId)?.productId ?? null}
+                indexCode={activeIndex}
+                value={cellMeta.get(selectedCellId)?.value ?? null}
+                lat={cellMeta.get(selectedCellId)?.lat ?? null}
+                lon={cellMeta.get(selectedCellId)?.lon ?? null}
+                blockName={cellMeta.get(selectedCellId)?.blockName ?? null}
+                x={cellClickPoint?.x ?? null}
+                y={cellClickPoint?.y ?? null}
+                time={cellMeta.get(selectedCellId)?.time ?? null}
+                baselineMean={selectedCellBaseline?.blockMean ?? null}
+                z={selectedCellBaseline?.z ?? null}
+                cellItems={cellItemsByCell.get(selectedCellId) ?? []}
+                onClose={() => {
+                  setSelectedCellId(null);
+                  setCellClickPoint(null);
+                }}
+              />
+            ) : null}
+
+            {/* Signal observation popup */}
+            {selectedObsId ? (
+              <SignalObservationPanel
+                observation={selectedObs}
+                definition={selectedSignalDef}
+                isLoading={signalObsQ.isLoading}
+                x={obsClickPoint?.x ?? null}
+                y={obsClickPoint?.y ?? null}
+                onClose={() => {
+                  const next = new URLSearchParams(search);
+                  next.delete("signal_obs");
+                  setSearch(next, { replace: true });
+                  setObsClickPoint(null);
+                }}
+              />
+            ) : null}
+
+            {toast ? (
+              <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-ap-ink/85 px-3.5 py-1.5 text-xs text-white shadow-card">
+                {toast}
+              </div>
+            ) : null}
+
+            {/* Inactive-farm banner — the way back from a farm inactivation. */}
+            {!summary.farm.is_active ? (
+              <div className="absolute bottom-4 end-4 z-20 flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2 text-xs text-amber-900 shadow-card">
+                <span>
+                  {t("dangerZone.inactiveSince", { date: summary.farm.active_to ?? "—" })}
+                </span>
+                {canInactivateFarm ? (
+                  <button
+                    type="button"
+                    onClick={() => reactivateFarmMut.mutate()}
+                    disabled={reactivateFarmMut.isPending}
+                    className="rounded-lg bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                  >
+                    {reactivateFarmMut.isPending
+                      ? t("dangerZone.reactivating")
+                      : t("dangerZone.reactivate")}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </main>
 
           {/* Block detail spans the map canvas, not the whole page — see
               docs/proposals/block-dock.html. */}

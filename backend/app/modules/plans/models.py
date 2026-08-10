@@ -88,6 +88,13 @@ class PlanActivity(Base, TimestampedMixin):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'scheduled'"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    # Who is expected to do this (Action Center dispatch). A *membership* id,
+    # matching blocks.agronomist_membership_id and GET /farms/{id}/members —
+    # unlike completed_by above, which is a user id. The names differ on
+    # purpose so the two are never read as the same thing.
+    assigned_membership_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     # Provenance for template-applied rows (PR-E). ``source`` distinguishes
     # manual board edits from template/recommendation-generated rows so
     # re-apply can regenerate only its own scheduled rows.

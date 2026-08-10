@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+
+import { PhenologyStagesEditor } from "@/modules/admin/components/PhenologyStagesEditor";
 import { Link } from "react-router-dom";
 
 import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
@@ -139,6 +141,7 @@ function CropRow({
   const { t } = useTranslation("admin");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [stagesOpen, setStagesOpen] = useState(false);
   const [addingVariety, setAddingVariety] = useState(false);
   const updateCrop = useUpdateCrop();
 
@@ -162,6 +165,17 @@ function CropRow({
             ) : null}
             <span className="ms-2 font-mono text-[11px] text-ap-primary">{crop.code}</span>
             <DepthBadge depth={crop.classification_depth} />
+            {/* Most crops have no calendar, and nothing used to say so — a
+                stage-gated tree simply never fired for them. */}
+            {(crop.phenology_stages?.stages?.length ?? 0) > 0 ? (
+              <span className="ms-2 rounded bg-ap-line/40 px-1.5 py-0.5 text-[11px] text-ap-muted">
+                {crop.phenology_stages?.stages.length} {t("phenology.stages")}
+              </span>
+            ) : (
+              <span className="ms-2 rounded bg-ap-warn/15 px-1.5 py-0.5 text-[11px] text-ap-warn">
+                {t("phenology.noCalendar")}
+              </span>
+            )}
             {!crop.is_active ? <RetiredBadge /> : null}
           </span>
         </button>
@@ -171,6 +185,15 @@ function CropRow({
         >
           {t("cropAttrs.manageLink")}
         </Link>
+        {canManage ? (
+          <button
+            type="button"
+            className="text-xs text-ap-primary hover:underline"
+            onClick={() => setStagesOpen((v) => !v)}
+          >
+            {t("phenology.stages")}
+          </button>
+        ) : null}
         {canManage ? (
           <RowActions
             isActive={crop.is_active}
@@ -182,6 +205,27 @@ function CropRow({
           />
         ) : null}
       </div>
+
+      {stagesOpen && canManage ? (
+        <div className="px-4 pb-3 ps-10">
+          <PhenologyStagesEditor
+            crop={crop}
+            busy={updateCrop.isPending}
+            onCancel={() => setStagesOpen(false)}
+            onSave={(stages) =>
+              updateCrop.mutate(
+                { cropId: crop.id, patch: { phenology_stages: { stages } } },
+                { onSuccess: () => setStagesOpen(false) },
+              )
+            }
+          />
+          {updateCrop.isError ? (
+            <p role="alert" className="mt-1 text-[11px] text-ap-crit">
+              {apiMsg(updateCrop.error)}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {editing && canManage ? (
         <div className="px-4 pb-3 ps-10">

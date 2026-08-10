@@ -291,6 +291,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.tenancy.repository",
@@ -318,6 +319,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.iam.repository",
@@ -344,6 +346,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.audit.models",
@@ -378,6 +381,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.farms.repository",
@@ -408,6 +412,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.imagery.repository",
@@ -440,6 +445,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.indices.repository",
@@ -466,6 +472,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.weather.repository",
@@ -497,12 +504,41 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.signals.repository",
   "app.modules.signals.models",
   "app.modules.signals.router",
   "app.modules.signals.schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "action_center internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.plans",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.analytics",
+  "app.modules.forecasting",
+  "app.modules.observer",
+]
+forbidden_modules = [
+  "app.modules.action_center.repository",
+  "app.modules.action_center.service",
+  "app.modules.action_center.router",
+  "app.modules.action_center.schemas",
 ]
 allow_indirect_imports = true
 
@@ -524,6 +560,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.alerts.repository",
@@ -558,6 +595,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.plans.repository",
@@ -585,6 +623,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.irrigation.repository",
@@ -611,6 +650,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.recommendations.repository",
@@ -637,6 +677,7 @@ source_modules = [
   "app.modules.analytics",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.notifications.repository",
@@ -663,6 +704,7 @@ source_modules = [
   "app.modules.notifications",
   "app.modules.forecasting",
   "app.modules.observer",
+  "app.modules.action_center",
 ]
 forbidden_modules = [
   "app.modules.analytics.repository",

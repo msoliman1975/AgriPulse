@@ -9,15 +9,18 @@ import {
   WEATHER_RISK_CROP_PREFIX,
   attributePathAppliesToCrops,
   changeTermOp,
+  cropAttributeOperandSpec,
   defaultValueRef,
   leftOperandType,
   leftOperandValues,
+  operandOutOfRange,
   parseConditionTree,
   retypeTermForLeft,
   riskAppliesToCrops,
   serializeCondition,
   serializeNode,
   signalKeysForValueKind,
+  signalOperandSpec,
   type ConditionNode,
   type EditableCondition,
   type Term,
@@ -198,7 +201,7 @@ describe("constants stay in lock-step with the backend", () => {
   });
 
   it("accepts the crop-taxonomy block fields", () => {
-    for (const field of ["crop_path", "crop_strain", "soil_texture", "salinity_class"]) {
+    for (const field of ["growth_stage", "soil_texture", "salinity_class"]) {
       expect(BLOCK_FIELDS).toContain(field);
       expect(
         parseConditionTree({ op: "eq", left: { source: "block", field }, right: "x" }).kind,
@@ -609,7 +612,7 @@ describe("operand typing", () => {
     // Growth stages come from the crop taxonomy and a crop path is free text,
     // so neither can be offered as a closed list.
     expect(leftOperandValues({ source: "block", field: "growth_stage" })).toBeNull();
-    expect(leftOperandValues({ source: "block", field: "crop_path" })).toBeNull();
+    expect(leftOperandValues({ source: "block", field: "growth_stage" })).toBeNull();
   });
 
   it("seeds the first vocabulary value when the left becomes categorical", () => {
@@ -631,9 +634,9 @@ describe("operand typing", () => {
       left: { source: "block", field: "soil_texture" },
       right: { kind: "string", value: "clay" },
     };
-    const next = retypeTermForLeft(term, { source: "block", field: "crop_path" });
+    const next = retypeTermForLeft(term, { source: "block", field: "growth_stage" });
     if (next.op === "between" || next.op === "in") throw new Error("expected a binary term");
-    // crop_path has no closed vocabulary, so the string stands.
+    // growth_stage has no closed vocabulary here, so the string stands.
     expect(next.right).toEqual({ kind: "string", value: "clay" });
   });
 
@@ -742,5 +745,79 @@ describe("source vocabularies vs the tree's targeting", () => {
     expect(signalKeysForValueKind("event")).toEqual(["value_event"]);
     // No definition picked yet — don't empty the dropdown.
     expect(signalKeysForValueKind(undefined)).toEqual(SIGNAL_KEYS);
+  });
+});
+
+describe("operand shape from a definition", () => {
+  it("turns a categorical signal into a closed list", () => {
+    // A categorical signal records one of its declared options and nothing
+    // else, so anything outside the list is a guaranteed non-match.
+    expect(
+      signalOperandSpec({ value_kind: "categorical", categorical_values: ["low", "high"] }),
+    ).toEqual({ control: "select", values: ["low", "high"] });
+  });
+
+  it("carries a numeric signal's bounds and unit", () => {
+    expect(
+      signalOperandSpec({
+        value_kind: "numeric",
+        value_min: "0",
+        value_max: "14",
+        unit: "pH",
+      }),
+    ).toEqual({ control: "number", min: 0, max: 14, unit: "pH" });
+  });
+
+  it("falls back to free text for kinds with no closed vocabulary", () => {
+    expect(signalOperandSpec({ value_kind: "event" })?.control).toBe("text");
+    expect(signalOperandSpec({ value_kind: "geopoint" })?.control).toBe("text");
+    // Categorical with no options declared can't offer a list.
+    expect(signalOperandSpec({ value_kind: "categorical", categorical_values: [] })?.control).toBe(
+      "text",
+    );
+  });
+
+  it("maps a signal's boolean kind to a boolean control", () => {
+    expect(signalOperandSpec({ value_kind: "boolean" })).toEqual({ control: "boolean" });
+  });
+
+  it("returns nothing when the definition hasn't loaded", () => {
+    expect(signalOperandSpec(undefined)).toBeNull();
+    expect(cropAttributeOperandSpec(undefined)).toBeNull();
+  });
+
+  it("maps every crop-attribute value type to a control", () => {
+    const opts = [{ code: "seedling" }, { code: "grafted" }];
+    expect(cropAttributeOperandSpec({ value_type: "single_select", options: opts })).toEqual({
+      control: "select",
+      values: ["seedling", "grafted"],
+    });
+    expect(cropAttributeOperandSpec({ value_type: "multi_select", options: opts })?.control).toBe(
+      "select",
+    );
+    expect(cropAttributeOperandSpec({ value_type: "date" })).toEqual({ control: "date" });
+    expect(cropAttributeOperandSpec({ value_type: "boolean" })).toEqual({ control: "boolean" });
+    expect(cropAttributeOperandSpec({ value_type: "text" })?.control).toBe("text");
+    expect(
+      cropAttributeOperandSpec({ value_type: "integer", value_min: "1", unit_en: "months" }),
+    ).toEqual({ control: "number", min: 1, max: undefined, unit: "months" });
+  });
+
+  it("warns outside the recorded range but only for numbers", () => {
+    const spec = { control: "number", min: 0, max: 14 } as const;
+    expect(operandOutOfRange(spec, { kind: "number", value: 20 })).toBe(true);
+    expect(operandOutOfRange(spec, { kind: "number", value: -1 })).toBe(true);
+    expect(operandOutOfRange(spec, { kind: "number", value: 7 })).toBe(false);
+    // A params ref resolves at evaluation time — there is nothing to check.
+    expect(operandOutOfRange(spec, { kind: "ref", ref: { source: "params", name: "x" } })).toBe(
+      false,
+    );
+    expect(operandOutOfRange(null, { kind: "number", value: 999 })).toBe(false);
+  });
+
+  it("treats an open-ended bound as no bound", () => {
+    expect(operandOutOfRange({ control: "number", min: 0 }, { kind: "number", value: 1e6 })).toBe(
+      false,
+    );
   });
 });

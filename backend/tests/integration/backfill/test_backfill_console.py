@@ -59,12 +59,45 @@ def _tenant_client(tenant_id: UUID) -> AsyncClient:
 
 
 async def _first_tenant_and_farm(client: AsyncClient) -> tuple[str, str] | None:
+    """Find a tenant + farm this console can actually run against.
+
+    "Unoccupied" is necessary but not sufficient: a run also requires the farm
+    to have active imagery or weather subscriptions, and `FarmOption` says
+    nothing about those. Picking on `active_run_id` alone means any farm that
+    some *other* test module seeded — for its own purposes, with no
+    subscriptions — can be chosen here, and the run then 422s with a message
+    about subscriptions that reads like a backfill bug.
+
+    So the precondition is verified the only way the API exposes it: ask for
+    an estimate and keep looking unless it reports a subscription to fetch from.
+    """
+    probe_from = (date.today() - timedelta(days=30)).isoformat()
+    probe_to = date.today().isoformat()
     tenants = (await client.get("/api/v1/admin/backfill/tenants")).json()
     for t in tenants:
         farms = (await client.get(f"/api/v1/admin/backfill/tenants/{t['id']}/farms")).json()
-        free = [f for f in farms if not f.get("active_run_id")]
-        if free:
-            return t["id"], free[0]["id"]
+        for farm in farms:
+            if farm.get("active_run_id"):
+                continue
+            est = await client.post(
+                f"/api/v1/admin/backfill/tenants/{t['id']}:estimate",
+                json={
+                    "farm_id": farm["id"],
+                    "window_from": probe_from,
+                    "window_to": probe_to,
+                    "imagery": True,
+                    "weather": True,
+                },
+            )
+            if est.status_code != 200:
+                continue
+            body = est.json()
+            # `subscriptions` / `weather_subscriptions` ARE the run's
+            # precondition — the estimate exposes them precisely so the console
+            # can warn before submitting. A 200 alone proves nothing: estimate
+            # happily costs a farm that has nothing to fetch.
+            if body["subscriptions"] > 0 or body["weather_subscriptions"] > 0:
+                return t["id"], farm["id"]
     return None
 
 

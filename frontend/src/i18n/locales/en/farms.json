@@ -66,8 +66,8 @@
     "soilTexture": "Soil texture",
     "salinityClass": "Salinity",
     "soilPh": "Soil pH",
-    "agronomist": "Agronomist",
-    "agronomistNone": "— Unassigned —",
+    "agronomist": "Responsible member",
+    "agronomistNone": "— No one —",
     "notes": "Notes",
     "submitBlockCreate": "Create block",
     "submitBlockUpdate": "Save block",
@@ -339,5 +339,23 @@
     },
     "cropFields": "Crop fields",
     "fieldRequired": "Required for this option"
+  },
+  "growthStage": {
+    "heading": "Growth stage",
+    "changedOn": "changed {{date}}",
+    "unset": "Not set — no stage recorded for this block yet.",
+    "noCalendar": "This crop has no stage calendar, so the stage cannot advance on its own and cannot be set here. A platform admin defines the calendar on the crop.",
+    "setTo": "Set stage to",
+    "record": "Record stage",
+    "saving": "Saving…",
+    "lock": "Keep this stage",
+    "lockHint": "Stops the nightly update from moving it. Use when you have set the stage from what you saw in the field.",
+    "failed": "Could not save the stage.",
+    "timeline": "Stage history",
+    "source": {
+      "manual": "set by hand",
+      "derived": "automatic",
+      "imported": "imported"
+    }
   }
 }

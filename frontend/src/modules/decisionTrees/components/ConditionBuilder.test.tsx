@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +11,46 @@ import { ConditionBuilder } from "./ConditionBuilder";
 // The signals-source dropdown loads the tenant signal catalog; the
 // builder itself is what's under test, so stub the network away.
 vi.mock("@/api/signals", () => ({
-  listSignalDefinitions: () => Promise.resolve([]),
+  listSignalDefinitions: () =>
+    Promise.resolve([
+      {
+        code: "leaf_colour",
+        value_kind: "categorical",
+        categorical_values: ["pale", "normal"],
+        description: "Visual leaf colour scored by the scout.",
+      },
+      { code: "soil_ph", value_kind: "numeric", value_min: "0", value_max: "14", unit: "pH" },
+    ]),
+}));
+vi.mock("@/api/weatherIndices", () => ({
+  getWeatherIndexCatalog: () =>
+    Promise.resolve([
+      {
+        code: "rain_et_balance",
+        unit: "mm",
+        description_en: "Daily water balance: rainfall minus ET0.",
+        description_ar: "الميزان المائي اليومي",
+      },
+    ]),
+}));
+vi.mock("@/api/crops", () => ({
+  listCropAttributeCatalog: () =>
+    Promise.resolve([
+      {
+        code: "transplant_date",
+        path: "mango",
+        name_en: "Transplant date",
+        value_type: "date",
+        description_en: "When the block was transplanted.",
+      },
+      {
+        code: "rootstock_type",
+        path: "mango",
+        name_en: "Rootstock",
+        value_type: "single_select",
+        options: [{ code: "seedling" }, { code: "grafted" }],
+      },
+    ]),
 }));
 
 function renderBuilder(rawTree: unknown) {
@@ -153,8 +192,8 @@ describe("<ConditionBuilder>", () => {
 
     // Was `number: 0`, which against a stored string could never match.
     const emitted = onChange.mock.calls[0][0] as { right: unknown; left: unknown };
-    expect(emitted.left).toEqual({ source: "block", field: "crop_category" });
-    expect(emitted.right).toBe("cereal");
+    expect(emitted.left).toEqual({ source: "block", field: "growth_stage" });
+    expect(emitted.right).toBe("");
   });
 
   it("renders a closed vocabulary as a picker, not a text box", () => {
@@ -179,6 +218,128 @@ describe("<ConditionBuilder>", () => {
     renderBuilder({ op: "eq", left: { source: "block", field: "growth_stage" }, right: "kimri" });
     // Growth stages come from the crop taxonomy — no closed list to offer.
     expect(screen.getByDisplayValue("kimri").tagName).toBe("INPUT");
+  });
+
+  it("offers a categorical signal's own options as a closed list", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "signals", code: "leaf_colour", key: "value_categorical" },
+      right: "pale",
+    });
+
+    // The definition declares the vocabulary; anything else can never match.
+    await waitFor(() => expect(screen.getByDisplayValue("pale").tagName).toBe("SELECT"));
+    const operand = screen.getByDisplayValue("pale");
+    expect(
+      within(operand as HTMLSelectElement)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["pale", "normal"]);
+  });
+
+  it("warns, but still saves, a threshold outside the recorded range", async () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "signals", code: "soil_ph", key: "value_numeric" },
+      right: 20,
+    });
+
+    // 20 is past the definition's max of 14 — advisory only, because "alert if
+    // pH goes above 9" on a signal that has never recorded above 8.5 is a
+    // legitimate rule.
+    expect(await screen.findByText(/Outside the recorded range/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("20")).toBeInTheDocument();
+  });
+
+  it("does not warn inside the range", async () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "signals", code: "soil_ph", key: "value_numeric" },
+      right: 7,
+    });
+    // Let the definition load, then confirm nothing was flagged.
+    await waitFor(() => expect(screen.getByDisplayValue("7")).toBeInTheDocument());
+    expect(screen.queryByText(/Outside the recorded range/)).not.toBeInTheDocument();
+  });
+
+  it("renders a date crop attribute as a date input", async () => {
+    renderBuilder({
+      op: "lt",
+      left: { source: "crop_attribute", code: "transplant_date", key: "value" },
+      right: "2024-03-01",
+    });
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("2024-03-01")).toHaveAttribute("type", "date"),
+    );
+  });
+
+  it("renders a single-select crop attribute as its option list", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "crop_attribute", code: "rootstock_type", key: "value" },
+      right: "grafted",
+    });
+    await waitFor(() => expect(screen.getByDisplayValue("grafted").tagName).toBe("SELECT"));
+    const operand = screen.getByDisplayValue("grafted");
+    expect(
+      within(operand as HTMLSelectElement)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["seedling", "grafted"]);
+  });
+
+  it("explains the selected code with a hint from the i18n catalogue", () => {
+    renderBuilder(NDVI_LT_0);
+    // A code is only self-explanatory to whoever named it.
+    expect(screen.getByText(/Canopy greenness and vigour/)).toBeInTheDocument();
+    expect(screen.getByText(/Standard deviations from this block/)).toBeInTheDocument();
+  });
+
+  it("explains a weather field, which differs per scope", () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "derived_today", field: "gdd_cumulative_base10_season" },
+      right: 500,
+    });
+    expect(screen.getByText(/Season-to-date accumulated degree days/)).toBeInTheDocument();
+  });
+
+  it("uses the tenant's own description for a custom signal", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "signals", code: "leaf_colour", key: "value_categorical" },
+      right: "pale",
+    });
+    // Written by the tenant when they defined the signal — not restated here.
+    expect(await screen.findByText(/Visual leaf colour scored by the scout/)).toBeInTheDocument();
+  });
+
+  it("uses the platform catalog's description for a weather index", async () => {
+    renderBuilder({
+      op: "lt",
+      left: { source: "weather_index", index_code: "rain_et_balance", key: "value" },
+      right: -5,
+    });
+    expect(await screen.findByText(/Daily water balance/)).toBeInTheDocument();
+  });
+
+  it("uses the definition's description for a crop field", async () => {
+    renderBuilder({
+      op: "lt",
+      left: { source: "crop_attribute", code: "transplant_date", key: "value" },
+      right: "2024-03-01",
+    });
+    expect(await screen.findByText(/When the block was transplanted/)).toBeInTheDocument();
+  });
+
+  it("renders no hint line at all when a code has no description", () => {
+    // An empty muted line under a dropdown is worse than none.
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather", scope: "latest_observation", field: "some_unknown_column" },
+      right: 1,
+    });
+    expect(screen.queryByText(/editor\.condition\.hint/)).not.toBeInTheDocument();
   });
 
   it("wraps a lone term into a group when a second condition is added", async () => {

@@ -22,7 +22,7 @@ from app.shared.conditions.models import (
 def _ctx(
     ndvi_dev: Decimal | None = None,
     ndvi_mean: Decimal | None = None,
-    crop_category: str | None = None,
+    soil_texture: str | None = None,
 ) -> ConditionContext:
     indices: dict[str, IndicesEntry] = {}
     if ndvi_dev is not None or ndvi_mean is not None:
@@ -33,7 +33,7 @@ def _ctx(
         )
     return ConditionContext(
         block_id="00000000-0000-0000-0000-000000000001",
-        crop_category=crop_category,
+        block_attributes={"soil_texture": soil_texture},
         indices=indices,
     )
 
@@ -59,10 +59,13 @@ def test_parse_indices_value_ref_unknown_key_raises() -> None:
         parse_value_ref({"source": "indices", "index_code": "ndvi", "key": "median"})
 
 
-def test_parse_block_value_ref_crop_category() -> None:
-    ref = parse_value_ref({"source": "block", "field": "crop_category"})
-    assert isinstance(ref, BlockValueRef)
-    assert ref.field == "crop_category"
+def test_parse_block_value_ref_rejects_the_crop_identity_fields() -> None:
+    # crop_category / crop_path / crop_strain all restate the tree's targeting,
+    # which already declares the crop paths it runs on. Rejecting them at parse
+    # time is what stops one being reintroduced by hand-written YAML.
+    for field in ("crop_category", "crop_path", "crop_strain"):
+        with pytest.raises(ConditionParseError):
+            parse_value_ref({"source": "block", "field": field})
 
 
 # ---- growth_stage block field (KB P3) -------------------------------------
@@ -164,53 +167,6 @@ def test_salinity_class_in_operator_and_fails_closed() -> None:
     assert evaluate(tree, _soilsize_ctx(salinity_class=None))[0] is False
 
 
-# ---- crop_path / crop_strain block fields (crop taxonomy) -----------------
-
-
-def _crop_ctx(*, crop_path: str | None, crop_strain: str | None) -> ConditionContext:
-    return ConditionContext(
-        block_id="00000000-0000-0000-0000-000000000001",
-        block_attributes={"crop_path": crop_path, "crop_strain": crop_strain},
-    )
-
-
-def test_parse_block_value_ref_crop_path_and_strain() -> None:
-    assert parse_value_ref({"source": "block", "field": "crop_path"}).field == "crop_path"
-    assert parse_value_ref({"source": "block", "field": "crop_strain"}).field == "crop_strain"
-
-
-def test_crop_strain_eq_branches_on_strain() -> None:
-    tree = {
-        "op": "eq",
-        "left": {"source": "block", "field": "crop_strain"},
-        "right": "short",
-    }
-    ctx = _crop_ctx(crop_path="mango.alphonso.short", crop_strain="short")
-    assert evaluate(tree, ctx)[0] is True
-    other = _crop_ctx(crop_path="mango.alphonso.long", crop_strain="long")
-    assert evaluate(tree, other)[0] is False
-
-
-def test_crop_strain_unset_fails_closed() -> None:
-    tree = {
-        "op": "eq",
-        "left": {"source": "block", "field": "crop_strain"},
-        "right": "short",
-    }
-    # Variety-level crop has no strain segment -> None -> fail-closed.
-    assert evaluate(tree, _crop_ctx(crop_path="mango.alphonso", crop_strain=None))[0] is False
-
-
-def test_crop_path_eq_exact_match() -> None:
-    tree = {
-        "op": "eq",
-        "left": {"source": "block", "field": "crop_path"},
-        "right": "mango.alphonso.short",
-    }
-    ctx = _crop_ctx(crop_path="mango.alphonso.short", crop_strain="short")
-    assert evaluate(tree, ctx)[0] is True
-
-
 def test_parse_value_ref_unknown_source_raises() -> None:
     with pytest.raises(ConditionParseError):
         parse_value_ref({"source": "weather", "field": "temp_c"})
@@ -270,11 +226,11 @@ def test_between_inclusive() -> None:
 def test_in_op_against_block_field() -> None:
     tree = {
         "op": "in",
-        "left": {"source": "block", "field": "crop_category"},
-        "values": ["fruit_tree", "vegetable"],
+        "left": {"source": "block", "field": "soil_texture"},
+        "values": ["sandy", "sandy_loam"],
     }
-    assert evaluate(tree, _ctx(crop_category="fruit_tree"))[0] is True
-    assert evaluate(tree, _ctx(crop_category="cereal"))[0] is False
+    assert evaluate(tree, _ctx(soil_texture="sandy"))[0] is True
+    assert evaluate(tree, _ctx(soil_texture="clay"))[0] is False
 
 
 def test_missing_signal_short_circuits_to_false() -> None:
@@ -297,19 +253,19 @@ def test_all_of_requires_every_child_to_match() -> None:
             {"op": "lt", "left": {"source": "indices", "index_code": "ndvi"}, "right": -1.0},
             {
                 "op": "eq",
-                "left": {"source": "block", "field": "crop_category"},
-                "right": "fruit_tree",
+                "left": {"source": "block", "field": "soil_texture"},
+                "right": "sandy",
             },
         ]
     }
-    matched, snap = evaluate(tree, _ctx(ndvi_dev=Decimal("-2.0"), crop_category="fruit_tree"))
+    matched, snap = evaluate(tree, _ctx(ndvi_dev=Decimal("-2.0"), soil_texture="sandy"))
     assert matched is True
     # both refs recorded
     assert "indices.ndvi.baseline_deviation" in snap["values"]
-    assert "block.crop_category" in snap["values"]
+    assert "block.soil_texture" in snap["values"]
 
     # one branch fails → whole tree fails
-    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-2.0"), crop_category="cereal"))
+    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-2.0"), soil_texture="clay"))
     assert matched is False
 
 
@@ -319,16 +275,16 @@ def test_any_of_requires_at_least_one_child() -> None:
             {"op": "lt", "left": {"source": "indices", "index_code": "ndvi"}, "right": -1.5},
             {
                 "op": "eq",
-                "left": {"source": "block", "field": "crop_category"},
-                "right": "fruit_tree",
+                "left": {"source": "block", "field": "soil_texture"},
+                "right": "sandy",
             },
         ]
     }
     # second branch matches alone
-    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-1.0"), crop_category="fruit_tree"))
+    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-1.0"), soil_texture="sandy"))
     assert matched is True
     # neither matches
-    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-1.0"), crop_category="cereal"))
+    matched, _ = evaluate(tree, _ctx(ndvi_dev=Decimal("-1.0"), soil_texture="clay"))
     assert matched is False
 
 
@@ -358,14 +314,14 @@ def test_nested_boolean_tree() -> None:
             {
                 "not": {
                     "op": "eq",
-                    "left": {"source": "block", "field": "crop_category"},
-                    "right": "cereal",
+                    "left": {"source": "block", "field": "soil_texture"},
+                    "right": "clay",
                 }
             },
         ]
     }
-    assert evaluate(tree, _ctx(ndvi_dev=Decimal("-1.2"), crop_category="fruit_tree"))[0] is True
-    assert evaluate(tree, _ctx(ndvi_dev=Decimal("-1.2"), crop_category="cereal"))[0] is False
+    assert evaluate(tree, _ctx(ndvi_dev=Decimal("-1.2"), soil_texture="sandy"))[0] is True
+    assert evaluate(tree, _ctx(ndvi_dev=Decimal("-1.2"), soil_texture="clay"))[0] is False
 
 
 def test_empty_all_of_is_vacuously_true() -> None:
@@ -417,10 +373,10 @@ def test_decimal_vs_float_compares_correctly() -> None:
 def test_string_vs_string_eq() -> None:
     tree = {
         "op": "eq",
-        "left": {"source": "block", "field": "crop_category"},
-        "right": "fruit_tree",
+        "left": {"source": "block", "field": "soil_texture"},
+        "right": "sandy",
     }
-    matched, _ = evaluate(tree, _ctx(crop_category="fruit_tree"))
+    matched, _ = evaluate(tree, _ctx(soil_texture="sandy"))
     assert matched is True
 
 
@@ -430,7 +386,7 @@ def test_string_vs_string_eq() -> None:
 def test_from_block_signals_adapts_alerts_signals_shape() -> None:
     ctx = ConditionContext.from_block_signals(
         block_id="x",
-        crop_category="fruit_tree",
+        block_attributes={"soil_texture": "sandy"},
         latest_index_aggregates={
             "ndvi": {
                 "time": datetime.now(UTC),
@@ -439,7 +395,7 @@ def test_from_block_signals_adapts_alerts_signals_shape() -> None:
             }
         },
     )
-    assert ctx.crop_category == "fruit_tree"
+    assert ctx.block_attributes["soil_texture"] == "sandy"
     assert "ndvi" in ctx.indices
     assert ctx.indices["ndvi"].baseline_deviation == Decimal("-2.0")
 
@@ -582,3 +538,55 @@ def test_weather_risk_missing_pathogen_fails_closed() -> None:
     }
     # Context only carries a powdery_mildew entry → fruit_fly is None → no match.
     assert evaluate(tree, _wr_ctx(score=90))[0] is False
+
+
+# ---- date-typed crop attributes -------------------------------------------
+
+
+def _date_attr_ctx(value: object) -> ConditionContext:
+    return ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        crop_attributes={"transplant_date": value},
+    )
+
+
+def _date_tree(op: str, right: str) -> dict:
+    return {
+        "op": op,
+        "left": {"source": "crop_attribute", "code": "transplant_date"},
+        "right": right,
+    }
+
+
+def test_date_attribute_compares_against_an_iso_string() -> None:
+    # The regression: crop_attribute resolves dates as real `date` objects while
+    # a YAML threshold is text. `date < str` raises TypeError, which _compare
+    # swallows into False — so every comparison against the four seeded date
+    # attributes silently never matched.
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("lt", "2025-01-01"), ctx)[0] is True
+    assert evaluate(_date_tree("gt", "2025-01-01"), ctx)[0] is False
+    assert evaluate(_date_tree("eq", "2024-03-01"), ctx)[0] is True
+    assert evaluate(_date_tree("ge", "2024-03-01"), ctx)[0] is True
+
+
+def test_date_attribute_accepts_a_timestamp_threshold() -> None:
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("eq", "2024-03-01T00:00:00"), ctx)[0] is True
+
+
+def test_datetime_value_is_compared_by_its_date() -> None:
+    ctx = _date_attr_ctx(datetime(2024, 3, 1, 14, 30, tzinfo=UTC))
+    assert evaluate(_date_tree("eq", "2024-03-01"), ctx)[0] is True
+
+
+def test_unparseable_threshold_still_fails_closed() -> None:
+    ctx = _date_attr_ctx(date(2024, 3, 1))
+    assert evaluate(_date_tree("lt", "not-a-date"), ctx)[0] is False
+
+
+def test_a_numeric_string_pair_is_still_compared_numerically() -> None:
+    # The date arm must not intercept the numeric path: "9" > "10" as text.
+    ctx = ConditionContext(block_id="b1", crop_attributes={"tree_age": Decimal("9")})
+    tree = {"op": "lt", "left": {"source": "crop_attribute", "code": "tree_age"}, "right": "10"}
+    assert evaluate(tree, ctx)[0] is True

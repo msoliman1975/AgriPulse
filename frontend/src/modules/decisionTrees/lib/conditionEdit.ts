@@ -33,20 +33,18 @@ export const INDICES_KEYS = [
 // backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
 export const INDEX_CODES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"] as const;
 export const BLOCK_FIELDS = [
-  "crop_category",
   // KB P3: the block's current phenological stage, resolved from the crop
   // taxonomy and auto-advanced daily.
   "growth_stage",
-  // Crop taxonomy: hierarchical path (`mango.alphonso.short`) + strain leaf.
-  "crop_path",
-  "crop_strain",
   "soil_texture",
   "salinity_class",
-  // NOTE: no `canopy_size_class`. The column exists on block_crops but no
-  // surface in the product ever rendered an input for it, so a predicate
-  // against it could never be true. Dropped from the backend BLOCK_FIELDS in
-  // the same change — keep the two lists identical.
+  // NOTE: no `crop_category`, `crop_path` or `crop_strain`. All three restate
+  // the tree's own targeting — it already declares which crop paths it runs
+  // on — so branching on them asks a question the targeting has answered. No
+  // tree ever used one. Also no `canopy_size_class`: nothing writes it.
+  // Keep identical to BLOCK_FIELDS in backend/app/shared/conditions/models.py.
 ] as const;
+
 export const SIGNAL_KEYS = [
   "value_numeric",
   "value_categorical",
@@ -575,7 +573,7 @@ function serializeRightOperand(rhs: RightOperand): unknown {
 // ---- Operand typing ------------------------------------------------
 //
 // The evaluator compares whatever the left ref resolves to against the
-// right operand, with no type checking: `crop_category = 0` parses, saves,
+// right operand, with no type checking: `soil_texture = 0` parses, saves,
 // publishes and then never matches, because a string is never equal to a
 // number. The builder used to make that the *default* — every left ref got
 // a `number: 0` on the right — so picking a categorical field and typing
@@ -608,7 +606,6 @@ const SALINITY_VALUES = [
   "moderately_saline",
   "strongly_saline",
 ] as const;
-const CROP_CATEGORY_VALUES = ["cereal", "fiber", "fodder", "fruit_tree", "vegetable"] as const;
 const RISK_LEVEL_VALUES = ["low", "moderate", "high"] as const;
 const GRID_SEVERITY_VALUES = ["warning", "critical"] as const;
 
@@ -653,9 +650,123 @@ export function leftOperandValues(ref: ValueRef): readonly string[] | null {
   if (ref.source === "block") {
     if (ref.field === "soil_texture") return SOIL_TEXTURE_VALUES;
     if (ref.field === "salinity_class") return SALINITY_VALUES;
-    if (ref.field === "crop_category") return CROP_CATEGORY_VALUES;
   }
   return null;
+}
+
+/** What the right-hand operand should look like for a given left ref.
+ *
+ *  For most sources this follows from the ref alone, but `signals` and
+ *  `crop_attribute` are defined by *data*: the tenant's signal definition or
+ *  the platform's crop-attribute definition fixes the type, the legal values,
+ *  the bounds and the unit. Those definitions are already fetched to populate
+ *  the code dropdowns, so the operand editor can use them too rather than
+ *  making the author retype what the platform already knows.
+ */
+export interface OperandSpec {
+  control: "number" | "text" | "select" | "boolean" | "date";
+  /** Closed vocabulary. A value outside it can never match, so it is enforced. */
+  values?: readonly string[];
+  /** Advisory bounds. NOT enforced — see the note on `operandOutOfRange`. */
+  min?: number;
+  max?: number;
+  unit?: string | null;
+}
+
+/** The subset of a signal definition the operand editor needs. */
+export interface SignalOperandSource {
+  value_kind: string;
+  categorical_values?: string[] | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  unit?: string | null;
+}
+
+/** The subset of a crop-attribute definition the operand editor needs. */
+export interface CropAttributeOperandSource {
+  value_type: string;
+  options?: { code: string }[] | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  unit_en?: string | null;
+}
+
+function numeric(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function signalOperandSpec(def: SignalOperandSource | undefined): OperandSpec | null {
+  if (!def) return null;
+  switch (def.value_kind) {
+    case "numeric":
+      return {
+        control: "number",
+        min: numeric(def.value_min),
+        max: numeric(def.value_max),
+        unit: def.unit ?? null,
+      };
+    case "boolean":
+      return { control: "boolean" };
+    case "categorical":
+      // A categorical signal records one of its declared options and nothing
+      // else, so anything outside the list is a guaranteed non-match.
+      return def.categorical_values?.length
+        ? { control: "select", values: def.categorical_values }
+        : { control: "text" };
+    default:
+      // `event` is free-form text; `geopoint` has no comparable value key.
+      return { control: "text" };
+  }
+}
+
+export function cropAttributeOperandSpec(
+  def: CropAttributeOperandSource | undefined,
+): OperandSpec | null {
+  if (!def) return null;
+  switch (def.value_type) {
+    case "integer":
+    case "decimal":
+      return {
+        control: "number",
+        min: numeric(def.value_min),
+        max: numeric(def.value_max),
+        unit: def.unit_en ?? null,
+      };
+    case "boolean":
+      return { control: "boolean" };
+    case "date":
+      return { control: "date" };
+    case "single_select":
+    case "multi_select":
+      return def.options?.length
+        ? { control: "select", values: def.options.map((o) => o.code) }
+        : { control: "text" };
+    default:
+      return { control: "text" };
+  }
+}
+
+/** True when a numeric operand sits outside the definition's recorded bounds.
+ *
+ *  Deliberately advisory, not blocking. `value_min` / `value_max` describe the
+ *  range the platform expects to *record*, and a rule that fires outside it is
+ *  often exactly the rule worth writing — "alert if pH goes above 9" on a
+ *  signal whose recorded maximum is 8.5. Warning keeps the typo visible without
+ *  refusing the alert.
+ */
+export function operandOutOfRange(spec: OperandSpec | null, operand: RightOperand): boolean {
+  if (!spec || spec.control !== "number" || operand.kind !== "number") return false;
+  if (spec.min !== undefined && operand.value < spec.min) return true;
+  return spec.max !== undefined && operand.value > spec.max;
+}
+
+/** The operand kind a spec's control implies, for re-typing on a left change. */
+export function specOperandKind(spec: OperandSpec): RightOperand["kind"] {
+  if (spec.control === "number") return "number";
+  if (spec.control === "boolean") return "boolean";
+  return "string";
 }
 
 /** Coerce one operand to `type`, keeping the value where it survives the
@@ -673,7 +784,11 @@ function retypeOperand(operand: RightOperand, type: OperandType): RightOperand {
     return { kind: "boolean", value: operand.kind === "string" && operand.value === "true" };
   }
   if (operand.kind === "string") return operand;
-  return { kind: "string", value: operand.kind === "number" ? String(operand.value) : "" };
+  // A number crossing into a categorical slot is dropped rather than
+  // stringified. `growth_stage = "0"` is a filled-in box that can never match;
+  // an empty one reads as unfinished, which is what it is. Where the field has
+  // a closed vocabulary, retypeTermForLeft seeds a real value over this.
+  return { kind: "string", value: "" };
 }
 
 /** Swap a term's left ref, re-typing the right side to match it. When the
@@ -740,7 +855,7 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
     case "indices":
       return { source: "indices", index_code: "ndvi", key: "baseline_deviation" };
     case "block":
-      return { source: "block", field: "crop_category" };
+      return { source: "block", field: "growth_stage" };
     case "weather":
       return { source: "weather", scope: "forecast_24h", field: "precipitation_mm_total" };
     case "weather_index":

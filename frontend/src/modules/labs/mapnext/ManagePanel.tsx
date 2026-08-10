@@ -16,19 +16,43 @@ import {
 } from "@/api/blocks";
 import { CropAssignmentPanel } from "@/modules/farms/components/CropAssignmentPanel";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
+import { ResponsibleForm } from "./ResponsibleForm";
 
-export type ManageMode = "edit" | "crop" | "grid";
+export type ManageMode = "edit" | "crop" | "grid" | "responsible";
 
-const IRR_SYSTEMS: IrrigationSystem[] = ["drip", "micro_sprinkler", "pivot", "furrow", "flood", "surface", "none"];
+const IRR_SYSTEMS: IrrigationSystem[] = [
+  "drip",
+  "micro_sprinkler",
+  "pivot",
+  "furrow",
+  "flood",
+  "surface",
+  "none",
+];
 const IRR_SOURCES: IrrigationSource[] = ["well", "canal", "nile", "mixed"];
-const SOIL_TEXTURES: SoilTexture[] = ["sandy", "sandy_loam", "loam", "clay_loam", "clay", "silty_loam", "silty_clay"];
-const SALINITY: SalinityClass[] = ["non_saline", "slightly_saline", "moderately_saline", "strongly_saline"];
+const SOIL_TEXTURES: SoilTexture[] = [
+  "sandy",
+  "sandy_loam",
+  "loam",
+  "clay_loam",
+  "clay",
+  "silty_loam",
+  "silty_clay",
+];
+const SALINITY: SalinityClass[] = [
+  "non_saline",
+  "slightly_saline",
+  "moderately_saline",
+  "strongly_saline",
+];
 
 interface Props {
   mode: ManageMode;
   blockId: string;
   farmId: string;
   gridProductId: string | null;
+  /** Current responsible member, so the form opens on the truth immediately. */
+  responsibleMembershipId: string | null;
   onDone: () => void; // return to monitor view + invalidate caches
 }
 
@@ -37,12 +61,21 @@ export function ManagePanel({
   blockId,
   farmId,
   gridProductId,
+  responsibleMembershipId,
   onDone,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   return (
     <div className="px-4 pb-8 pt-3">
       {mode === "edit" ? <EditForm blockId={blockId} onDone={onDone} /> : null}
+      {mode === "responsible" ? (
+        <ResponsibleForm
+          blockId={blockId}
+          farmId={farmId}
+          current={responsibleMembershipId}
+          onSaved={onDone}
+        />
+      ) : null}
       {mode === "crop" ? (
         <div className="rounded-xl border border-ap-line p-3">
           {/* Current assignment + its crop fields + history + the assign form,
@@ -79,7 +112,11 @@ const inputCls =
 function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }): ReactNode {
   const { t } = useTranslation("farmConsole");
   const qc = useQueryClient();
-  const blockQ = useQuery({ queryKey: ["labs/mapnext/block", blockId], queryFn: () => getBlock(blockId), staleTime: 10_000 });
+  const blockQ = useQuery({
+    queryKey: ["labs/mapnext/block", blockId],
+    queryFn: () => getBlock(blockId),
+    staleTime: 10_000,
+  });
 
   const [form, setForm] = useState<BlockUpdatePayload | null>(null);
   const b = blockQ.data;
@@ -110,8 +147,10 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
     },
   });
 
-  if (blockQ.isLoading) return <div className="text-sm text-ap-muted">{t("inspector.loading")}</div>;
-  if (blockQ.isError || !b) return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
+  if (blockQ.isLoading)
+    return <div className="text-sm text-ap-muted">{t("inspector.loading")}</div>;
+  if (blockQ.isError || !b)
+    return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
 
   return (
     <form
@@ -121,31 +160,73 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
       }}
     >
       <Field label={t("manage.name")}>
-        <input className={inputCls} value={state.name ?? ""} onChange={(e) => set({ name: e.target.value || null })} />
+        <input
+          className={inputCls}
+          value={state.name ?? ""}
+          onChange={(e) => set({ name: e.target.value || null })}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t("manage.irrSystem")}>
-          <select className={inputCls} value={state.irrigation_system ?? ""} onChange={(e) => set({ irrigation_system: (e.target.value || null) as IrrigationSystem | null })}>
+          <select
+            className={inputCls}
+            value={state.irrigation_system ?? ""}
+            onChange={(e) =>
+              set({ irrigation_system: (e.target.value || null) as IrrigationSystem | null })
+            }
+          >
             <option value="">—</option>
-            {IRR_SYSTEMS.map((v) => <option key={v} value={v}>{v.replace(/_/g, " ")}</option>)}
+            {IRR_SYSTEMS.map((v) => (
+              <option key={v} value={v}>
+                {v.replace(/_/g, " ")}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label={t("manage.irrSource")}>
-          <select className={inputCls} value={state.irrigation_source ?? ""} onChange={(e) => set({ irrigation_source: (e.target.value || null) as IrrigationSource | null })}>
+          <select
+            className={inputCls}
+            value={state.irrigation_source ?? ""}
+            onChange={(e) =>
+              set({ irrigation_source: (e.target.value || null) as IrrigationSource | null })
+            }
+          >
             <option value="">—</option>
-            {IRR_SOURCES.map((v) => <option key={v} value={v}>{v}</option>)}
+            {IRR_SOURCES.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label={t("manage.soilTexture")}>
-          <select className={inputCls} value={state.soil_texture ?? ""} onChange={(e) => set({ soil_texture: (e.target.value || null) as SoilTexture | null })}>
+          <select
+            className={inputCls}
+            value={state.soil_texture ?? ""}
+            onChange={(e) => set({ soil_texture: (e.target.value || null) as SoilTexture | null })}
+          >
             <option value="">—</option>
-            {SOIL_TEXTURES.map((v) => <option key={v} value={v}>{v.replace(/_/g, " ")}</option>)}
+            {SOIL_TEXTURES.map((v) => (
+              <option key={v} value={v}>
+                {v.replace(/_/g, " ")}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label={t("manage.salinity")}>
-          <select className={inputCls} value={state.salinity_class ?? ""} onChange={(e) => set({ salinity_class: (e.target.value || null) as SalinityClass | null })}>
+          <select
+            className={inputCls}
+            value={state.salinity_class ?? ""}
+            onChange={(e) =>
+              set({ salinity_class: (e.target.value || null) as SalinityClass | null })
+            }
+          >
             <option value="">—</option>
-            {SALINITY.map((v) => <option key={v} value={v}>{v.replace(/_/g, " ")}</option>)}
+            {SALINITY.map((v) => (
+              <option key={v} value={v}>
+                {v.replace(/_/g, " ")}
+              </option>
+            ))}
           </select>
         </Field>
       </div>
@@ -164,18 +245,40 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
         <input
           className={inputCls}
           value={(state.tags ?? []).join(", ")}
-          onChange={(e) => set({ tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+          onChange={(e) =>
+            set({
+              tags: e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
         />
       </Field>
       <Field label={t("manage.notes")}>
-        <textarea className={inputCls} rows={3} value={state.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} />
+        <textarea
+          className={inputCls}
+          rows={3}
+          value={state.notes ?? ""}
+          onChange={(e) => set({ notes: e.target.value || null })}
+        />
       </Field>
-      {mut.isError ? <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
+      {mut.isError ? (
+        <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div>
+      ) : null}
       <div className="flex gap-2">
-        <button type="submit" disabled={mut.isPending} className="h-9 flex-1 rounded-lg bg-ap-primary text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={mut.isPending}
+          className="h-9 flex-1 rounded-lg bg-ap-primary text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60"
+        >
           {mut.isPending ? t("manage.saving") : t("manage.save")}
         </button>
-        <button type="button" onClick={onDone} className="h-9 rounded-lg border border-ap-line px-4 text-sm font-semibold text-ap-ink hover:bg-ap-bg/60">
+        <button
+          type="button"
+          onClick={onDone}
+          className="h-9 rounded-lg border border-ap-line px-4 text-sm font-semibold text-ap-ink hover:bg-ap-bg/60"
+        >
           {t("manage.cancel")}
         </button>
       </div>

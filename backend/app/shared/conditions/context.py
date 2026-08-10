@@ -7,7 +7,7 @@ here and teaching the relevant value-ref resolver to read it; the
 evaluator core stays untouched.
 
 Currently wired sources: ``indices`` (NDVI / EVI / etc. aggregates),
-``block`` (crop_category and other block attributes), and ``weather``
+``block`` (growth stage, soil texture, salinity class), and ``weather``
 (latest observation, near-term forecast windows, derived daily). The
 ``signals`` source is still unbuilt — rules that reference it return
 ``(False, {})`` per the permissive-on-missing-data contract.
@@ -225,7 +225,6 @@ class ConditionContext:
     """
 
     block_id: str
-    crop_category: str | None = None
     block_attributes: dict[str, Any] = field(default_factory=dict)
     indices: dict[str, IndicesEntry] = field(default_factory=dict)
     weather: WeatherSnapshot | None = None
@@ -264,7 +263,6 @@ class ConditionContext:
         cls,
         *,
         block_id: str,
-        crop_category: str | None,
         latest_index_aggregates: dict[str, dict[str, Any]],
         block_attributes: dict[str, Any] | None = None,
         weather: WeatherSnapshot | None = None,
@@ -298,7 +296,6 @@ class ConditionContext:
             )
         return cls(
             block_id=block_id,
-            crop_category=crop_category,
             block_attributes=dict(block_attributes or {}),
             indices=indices,
             weather=weather,

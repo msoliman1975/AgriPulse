@@ -443,6 +443,41 @@ class FarmWeatherTemplate(Base):
     updated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
+class BlockResponsibleLog(Base):
+    """Append-only history of `blocks.agronomist_membership_id`.
+
+    The column itself names one person and remembers nothing, which stopped
+    being adequate once dispatch began defaulting to it: "why did this task go
+    to them" is only answerable if the previous answers were kept.
+
+    No `TimestampedMixin` — a history row is a fact about a moment, so it has
+    `changed_at`/`changed_by` and is never updated or soft-deleted. Correcting
+    a mistake means recording the correction as its own row.
+    """
+
+    __tablename__ = "block_responsible_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    block_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("blocks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # NULL on the first assignment; NULL on the new side means unassigned,
+    # which is a change worth recording rather than an absence of one.
+    previous_membership_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    new_membership_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    changed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
 class BlockCrop(Base, TimestampedMixin):
     __tablename__ = "block_crops"
 

@@ -334,6 +334,7 @@
       "right": "Threshold",
       "operator": "Operator",
       "indexCode": "Index code",
+      "outOfRange": "Outside the recorded range ({{min}}–{{max}}). This will still save.",
       "weatherField": "Weather field",
       "weatherIndexCode": "Weather index",
       "weatherRiskCode": "Pathogen / pest",
@@ -357,6 +358,109 @@
         "grid": "Grid anomaly",
         "crop_attribute": "Crop field",
         "params": "Tree parameter"
+      },
+      "hint": {
+        "source": {
+          "indices": "Satellite index for this block, from the latest usable scene.",
+          "block": "What this block is — its growth stage and its soil.",
+          "weather": "Raw weather for the farm: latest reading, a forecast window, or a derived daily row.",
+          "weather_index": "A curated weather index, with a built-in comparison against the farm's own climatology.",
+          "weather_risk": "Modelled disease or pest pressure for this block.",
+          "signals": "Your own recorded observations, from your signal catalog.",
+          "grid": "Where inside the block the anomaly is, and how bad the worst patch is.",
+          "crop_attribute": "Per-crop data recorded on the block's crop assignment.",
+          "params": "A named threshold this tree declares, so it can be re-tuned without editing the logic."
+        },
+        "indexCode": {
+          "ndvi": "Canopy greenness and vigour. Saturates on dense canopy and is noisy over bare soil.",
+          "ndwi": "Surface water — ponding and flooding. Not canopy moisture; that is NDMI.",
+          "evi": "Greenness that resists saturation and soil/haze effects. Better on mature orchards.",
+          "savi": "Greenness corrected for bright bare soil. For young or wide-spaced plantings.",
+          "ndre": "Red-edge chlorophyll and nitrogen status. Still discriminates in dense canopy.",
+          "gndvi": "Green-band greenness; more sensitive to chlorophyll than NDVI.",
+          "ndmi": "Leaf and canopy water content. Falls as the canopy dries — the water-stress index."
+        },
+        "indicesKey": {
+          "mean": "The block's average on the latest scene. Absolute, so thresholds are crop-specific.",
+          "baseline_deviation": "Standard deviations from this block's own value for this day of year. Self-calibrating.",
+          "slope": "Rate of change over recent history, index units per day. Negative means declining.",
+          "delta": "Total change across the recent window — the size of the move, not its rate.",
+          "trend_direction": "The trend as a word: rising, falling or stable."
+        },
+        "blockField": {
+          "growth_stage": "The block's current phenological stage, advanced daily from the crop's stage calendar.",
+          "soil_texture": "The block's soil texture, from the block record.",
+          "salinity_class": "The block's salinity banding, from the block record."
+        },
+        "weatherScope": {
+          "latest_observation": "The most recent hourly reading — conditions right now.",
+          "forecast_24h": "The next 24 hours of forecast, aggregated into one row.",
+          "forecast_72h": "The next 72 hours of forecast, aggregated into one row.",
+          "derived_today": "Today's computed daily row: degree days, rolling rain, temperature extremes.",
+          "derived_yesterday": "Yesterday's daily row — the last complete day the crop actually experienced."
+        },
+        "weatherIndexKey": {
+          "value": "The index's actual value for the day, in its own unit.",
+          "baseline_deviation": "Standard deviations from this farm's climatology for this day of year."
+        },
+        "riskCode": {
+          "powdery_mildew": "Mango. Builds on warm, humid but dry days — rain suppresses it. Worst at flowering.",
+          "anthracnose": "Mango. Needs warmth and prolonged leaf wetness. Builds through fruit development.",
+          "fruit_fly": "Mango. Humidity-weighted degree days above 13 °C, concentrated in the fruiting window."
+        },
+        "riskField": {
+          "score": "Accumulated pressure, 0–100.",
+          "level": "The score banded: low (under 40), moderate (40–69), high (70 and above)."
+        },
+        "signalKey": {
+          "value_numeric": "The measured number, for a numeric signal.",
+          "value_categorical": "The recorded option, for a categorical signal.",
+          "value_event": "The recorded event name.",
+          "value_boolean": "The recorded yes/no.",
+          "value_slope": "Rate of change over the last 30 days. Numeric signals only.",
+          "value_delta": "Total change over the last 30 days. Numeric signals only.",
+          "value_trend_direction": "Rising, falling or stable over the last 30 days. Numeric signals only."
+        },
+        "gridField": {
+          "worst_z": "How far below the block mean the worst cell sits, in standard deviations.",
+          "flagged_count": "How many cells crossed the threshold — the extent, not the depth.",
+          "worst_row": "Grid row of the worst cell.",
+          "worst_col": "Grid column of the worst cell.",
+          "severity": "The verdict for the block: warning or critical."
+        },
+        "cropAttributeKey": {
+          "value": "The recorded value. Its type follows the crop field's own definition."
+        },
+        "weatherField": {
+          "air_temp_c": "Air temperature at the reading, °C.",
+          "humidity_pct": "Relative humidity, %. Sustained highs drive fungal infection.",
+          "precipitation_mm": "Rainfall in that hour, mm.",
+          "wind_speed_m_s": "Wind speed, m/s.",
+          "wind_direction_deg": "Wind direction, degrees clockwise from north.",
+          "pressure_hpa": "Barometric pressure, hPa.",
+          "solar_radiation_w_m2": "Incoming solar radiation, W/m².",
+          "cloud_cover_pct": "Cloud cover, %.",
+          "et0_mm": "Reference evapotranspiration for that hour, mm.",
+          "precipitation_mm_total": "Total forecast rainfall across the window, mm.",
+          "precipitation_probability_pct_max": "Highest hourly chance of rain in the window, %.",
+          "air_temp_c_max": "Peak forecast temperature, °C.",
+          "air_temp_c_min": "Lowest forecast temperature, °C — frost and chill checks.",
+          "air_temp_c_mean": "Average forecast temperature across the window, °C.",
+          "humidity_pct_mean": "Average forecast relative humidity, %.",
+          "et0_mm_total": "Total forecast water demand across the window, mm.",
+          "wind_speed_m_s_max": "Peak forecast wind, m/s — the spray-safety gate.",
+          "hours_observed": "How many hours of forecast the window actually contains.",
+          "gdd_base10": "Growing degree days for the day, base 10 °C.",
+          "gdd_base15": "Growing degree days for the day, base 15 °C.",
+          "gdd_cumulative_base10_season": "Season-to-date accumulated degree days, base 10 °C.",
+          "et0_mm_daily": "The day's total reference evapotranspiration, mm.",
+          "precip_mm_daily": "The day's total rainfall, mm.",
+          "precip_mm_7d": "Rolling 7-day rainfall, mm.",
+          "precip_mm_30d": "Rolling 30-day rainfall, mm.",
+          "temp_min_c": "The day's minimum temperature, °C.",
+          "temp_max_c": "The day's maximum temperature, °C.",
+          "temp_mean_c": "The day's mean temperature, °C."
+        }
       }
     },
     "delete": {
@@ -390,6 +494,7 @@
       "outcome": {
         "heading": "Outcome",
         "kind": "Kind",
+        "actionTypeUnset": "— not set —",
         "actionType": "Action type",
         "severity": "Severity",
         "confidence": "Confidence",

@@ -27,6 +27,7 @@ import type { LeafOutcomePatch, NodePatch } from "../lib/treeEdit";
 import { parseConditionTree } from "../lib/conditionEdit";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { Card } from "@/components/Card";
+import { ACTION_TYPES } from "@/lib/actionTypes";
 
 interface NodeDetailsPanelProps {
   node: PositionedNode;
@@ -348,9 +349,20 @@ function LeafOutcomeSection({
         ]}
         onChange={(v) => updateOutcome({ kind: v as "recommendation" | "alert" })}
       />
-      <TextField
+      {/* Was a free-text box sitting between two dropdowns. `action_type` is a
+          closed set enforced by a CHECK constraint at persist time, so a typo
+          here saved and published cleanly and then 500'd when a tree actually
+          fired. The vocabulary is shared with the Action Center. */}
+      <SelectField
         label={t("editor.panel.outcome.actionType")}
         value={effective.action_type ?? ""}
+        options={[
+          { value: "", label: t("editor.panel.outcome.actionTypeUnset") },
+          ...ACTION_TYPES.map((a) => ({
+            value: a,
+            label: t(`actionType.${a}`, { ns: "actionCenter", defaultValue: a }),
+          })),
+        ]}
         onChange={(v) => updateOutcome({ action_type: v })}
       />
       {kind === "alert" ? (

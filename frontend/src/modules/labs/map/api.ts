@@ -418,6 +418,7 @@ export async function loadUnitDetail(args: {
           status: args.activePlan.status,
         }
       : null,
+    responsible_membership_id: blockDetail.agronomist_membership_id ?? null,
     crop_assignment: cropAssignmentSummary,
     signals,
   };
