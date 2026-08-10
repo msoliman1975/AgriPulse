@@ -134,6 +134,7 @@ class PlansRepository:
         notes: str | None,
         actor_user_id: UUID | None,
         recommendation_id: UUID | None = None,
+        assigned_membership_id: UUID | None = None,
     ) -> dict[str, Any]:
         activity = PlanActivity(
             id=activity_id,
@@ -141,6 +142,7 @@ class PlansRepository:
             farm_id=farm_id,
             block_id=block_id,
             recommendation_id=recommendation_id,
+            assigned_membership_id=assigned_membership_id,
             activity_type=activity_type,
             scheduled_date=scheduled_date,
             duration_days=duration_days,

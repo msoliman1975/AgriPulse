@@ -1,0 +1,127 @@
+{
+  "page": {
+    "title": "Action Center",
+    "subtitle": "Recommendations and alerts from the decision engine, in one queue.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load the action queue.",
+    "empty": "Nothing matches these filters."
+  },
+  "tabsLabel": "Status",
+  "tabs": {
+    "needs_action": "Needs action",
+    "dispatched": "Dispatched",
+    "done": "Done",
+    "dismissed": "Dismissed",
+    "all": "All"
+  },
+  "kind": {
+    "recommendation": "Recommendation",
+    "alert": "Alert"
+  },
+  "severity": {
+    "info": "Info",
+    "warning": "Warning",
+    "critical": "Critical"
+  },
+  "action": {
+    "scout": "Scout",
+    "spray": "Spray",
+    "irrigate": "Irrigate",
+    "fertilize": "Fertilize",
+    "prune": "Prune",
+    "harvest_window": "Harvest window",
+    "inspect": "Inspect",
+    "other": "Other",
+    "no_action": "No action",
+    "unclassified": "Unclassified"
+  },
+  "due": {
+    "overdue": "Overdue",
+    "today": "Due today",
+    "week": "Due this week",
+    "later": "Due later",
+    "monitoring": "Ongoing",
+    "none": "No deadline"
+  },
+  "groupBy": {
+    "action_type": "Task type",
+    "block": "Block",
+    "due": "Action date",
+    "none": "None"
+  },
+  "ranges": {
+    "1d": "Last 24 hours",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    "all": "All time",
+    "custom": "Custom range…"
+  },
+  "filters": {
+    "type": "Type",
+    "selectAll": "Select all",
+    "raised": "Raised",
+    "from": "From",
+    "to": "to",
+    "block": "Block",
+    "allBlocks": "All blocks",
+    "severity": "Severity",
+    "allSeverities": "All severities",
+    "groupBy": "Group by"
+  },
+  "group": {
+    "meta": "{{count}} items · {{blocks}} blocks",
+    "meta_one": "{{count}} item · {{blocks}} block",
+    "atCellLevel": "{{count}} at cell level",
+    "critical": "{{count}} critical",
+    "responsible": "Has a responsible member",
+    "noResponsible": "No one responsible",
+    "collapse": "Collapse {{group}}",
+    "expand": "Expand {{group}}",
+    "selectAllIn": "Select all in {{group}}"
+  },
+  "row": {
+    "select": "Select item",
+    "copy": "Copy",
+    "navigate": "Navigate",
+    "cell": "cell {{cellNo}}",
+    "wholeBlock": "Whole block · {{block}}",
+    "raised": "raised {{when}}",
+    "scheduled": "scheduled {{date}}"
+  },
+  "why": {
+    "title": "Why this fired",
+    "none": "No reasoning was recorded for this item.",
+    "confidence": "{{percent}}% confidence",
+    "alertCertainty": "Alerts express certainty, not probability."
+  },
+  "actions": {
+    "why": "Why",
+    "hideWhy": "Hide why",
+    "dispatch": "Dispatch",
+    "dispatchTo": "Dispatch to…",
+    "dispatchAll": "Dispatch all {{count}}",
+    "openBoard": "Open board"
+  },
+  "bulk": {
+    "selected": "{{count}} selected",
+    "clear": "Clear"
+  },
+  "dispatch": {
+    "title": "Dispatch to a team member",
+    "summary": "{{count}} items · {{blocks}} blocks",
+    "summary_one": "{{count}} item · {{blocks}} block",
+    "assignTo": "Assign to",
+    "useBlockResponsible": "Each block's responsible member",
+    "defaultExplained": "Each item goes to the member responsible for its block. If a block has no one, the server picks a member and the result will say so.",
+    "explicitExplained": "Every item in this batch goes to this person, overriding block responsibility.",
+    "scheduledDate": "Scheduled date",
+    "notes": "Instructions for the field team",
+    "notesPlaceholder": "Optional — appears on the assignee's task card",
+    "send": "Send to field",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "failed": "Dispatch failed. Nothing was assigned."
+  }
+}

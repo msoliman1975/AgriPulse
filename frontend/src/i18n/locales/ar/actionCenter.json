@@ -1,0 +1,127 @@
+{
+  "page": {
+    "title": "مركز الإجراءات",
+    "subtitle": "التوصيات والتنبيهات من محرك القرار، في قائمة واحدة.",
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "تعذّر تحميل قائمة الإجراءات.",
+    "empty": "لا يوجد ما يطابق هذه المرشّحات."
+  },
+  "tabsLabel": "الحالة",
+  "tabs": {
+    "needs_action": "يحتاج إجراء",
+    "dispatched": "تم الإسناد",
+    "done": "مكتمل",
+    "dismissed": "مُستبعد",
+    "all": "الكل"
+  },
+  "kind": {
+    "recommendation": "توصية",
+    "alert": "تنبيه"
+  },
+  "severity": {
+    "info": "معلومة",
+    "warning": "تحذير",
+    "critical": "حرج"
+  },
+  "action": {
+    "scout": "استكشاف",
+    "spray": "رش",
+    "irrigate": "ري",
+    "fertilize": "تسميد",
+    "prune": "تقليم",
+    "harvest_window": "نافذة الحصاد",
+    "inspect": "فحص",
+    "other": "أخرى",
+    "no_action": "لا إجراء",
+    "unclassified": "غير مصنّف"
+  },
+  "due": {
+    "overdue": "متأخر",
+    "today": "مستحق اليوم",
+    "week": "مستحق هذا الأسبوع",
+    "later": "مستحق لاحقًا",
+    "monitoring": "مستمر",
+    "none": "بدون موعد"
+  },
+  "groupBy": {
+    "action_type": "نوع المهمة",
+    "block": "القطعة",
+    "due": "تاريخ الإجراء",
+    "none": "بدون"
+  },
+  "ranges": {
+    "1d": "آخر ٢٤ ساعة",
+    "7d": "آخر ٧ أيام",
+    "30d": "آخر ٣٠ يومًا",
+    "90d": "آخر ٩٠ يومًا",
+    "all": "كل الفترات",
+    "custom": "نطاق مخصّص…"
+  },
+  "filters": {
+    "type": "النوع",
+    "selectAll": "تحديد الكل",
+    "raised": "تاريخ الإصدار",
+    "from": "من",
+    "to": "إلى",
+    "block": "القطعة",
+    "allBlocks": "كل القطع",
+    "severity": "الخطورة",
+    "allSeverities": "كل الدرجات",
+    "groupBy": "التجميع حسب"
+  },
+  "group": {
+    "meta": "{{count}} عنصر · {{blocks}} قطعة",
+    "meta_one": "{{count}} عنصر · {{blocks}} قطعة",
+    "atCellLevel": "{{count}} على مستوى الخلية",
+    "critical": "{{count}} حرج",
+    "responsible": "لديها مسؤول",
+    "noResponsible": "لا يوجد مسؤول",
+    "collapse": "طيّ {{group}}",
+    "expand": "توسيع {{group}}",
+    "selectAllIn": "تحديد كل ما في {{group}}"
+  },
+  "row": {
+    "select": "تحديد العنصر",
+    "copy": "نسخ",
+    "navigate": "الانتقال",
+    "cell": "خلية {{cellNo}}",
+    "wholeBlock": "القطعة كاملة · {{block}}",
+    "raised": "صدر {{when}}",
+    "scheduled": "مجدول {{date}}"
+  },
+  "why": {
+    "title": "سبب التفعيل",
+    "none": "لم يُسجَّل سبب لهذا العنصر.",
+    "confidence": "ثقة {{percent}}%",
+    "alertCertainty": "التنبيهات تعبّر عن يقين، لا عن احتمال."
+  },
+  "actions": {
+    "why": "السبب",
+    "hideWhy": "إخفاء السبب",
+    "dispatch": "إسناد",
+    "dispatchTo": "إسناد إلى…",
+    "dispatchAll": "إسناد الكل ({{count}})",
+    "openBoard": "فتح اللوحة"
+  },
+  "bulk": {
+    "selected": "{{count}} محدّد",
+    "clear": "إلغاء التحديد"
+  },
+  "dispatch": {
+    "title": "الإسناد إلى أحد أعضاء الفريق",
+    "summary": "{{count}} عنصر · {{blocks}} قطعة",
+    "summary_one": "{{count}} عنصر · {{blocks}} قطعة",
+    "assignTo": "إسناد إلى",
+    "useBlockResponsible": "مسؤول كل قطعة",
+    "defaultExplained": "يذهب كل عنصر إلى مسؤول قطعته. إذا لم يكن للقطعة مسؤول، يختار النظام عضوًا وسيوضّح ذلك في النتيجة.",
+    "explicitExplained": "تذهب كل عناصر هذه الدفعة إلى هذا الشخص، بغضّ النظر عن مسؤول القطعة.",
+    "scheduledDate": "التاريخ المجدول",
+    "notes": "تعليمات للفريق الميداني",
+    "notesPlaceholder": "اختياري — تظهر على بطاقة مهمة المكلّف",
+    "send": "إرسال للميدان",
+    "sending": "جارٍ الإرسال…",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "failed": "فشل الإسناد. لم يتم إسناد أي عنصر."
+  }
+}

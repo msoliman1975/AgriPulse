@@ -56,6 +56,7 @@ class AlertsRepository:
         cell_id: UUID | None = None,
         rule_code: str,
         severity: str,
+        action_type: str | None = None,
         diagnosis_en: str | None,
         diagnosis_ar: str | None,
         prescription_en: str | None,
@@ -82,13 +83,14 @@ class AlertsRepository:
                 text(
                     """
                     INSERT INTO alerts (
-                        id, block_id, cell_id, rule_code, severity, status,
+                        id, block_id, cell_id, rule_code, severity, action_type, status,
                         diagnosis_en, diagnosis_ar,
                         prescription_en, prescription_ar,
                         prescription_activity_id,
                         signal_snapshot, created_by, updated_by
                     ) VALUES (
-                        :id, :block_id, :cell_id, :rule_code, :severity, 'open',
+                        :id, :block_id, :cell_id, :rule_code, :severity,
+                        :action_type, 'open',
                         :diag_en, :diag_ar,
                         :pre_en, :pre_ar,
                         :prescription_activity_id,
@@ -108,6 +110,7 @@ class AlertsRepository:
                     "cell_id": cell_id,
                     "rule_code": rule_code,
                     "severity": severity,
+                    "action_type": action_type,
                     "diag_en": diagnosis_en,
                     "diag_ar": diagnosis_ar,
                     "pre_en": prescription_en,
@@ -233,6 +236,7 @@ def _alert_to_dict(row: Alert) -> dict[str, Any]:
         "block_id": row.block_id,
         "cell_id": row.cell_id,
         "rule_code": row.rule_code,
+        "action_type": row.action_type,
         "severity": row.severity,
         "status": row.status,
         "diagnosis_en": row.diagnosis_en,

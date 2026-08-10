@@ -44,6 +44,12 @@ class Alert(Base, TimestampedMixin):
     # (block_id, rule_code) dedup separates cells without an index change.
     cell_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     rule_code: Mapped[str] = mapped_column(Text, nullable=False)
+    # The verb the firing leaf chose (spray / scout / irrigate / ...). The
+    # engine has always decided one; before 0063 the alert row dropped it, so
+    # rows predating that migration are NULL and stay NULL — there is no
+    # trustworthy backfill (the tree version that fired may since have been
+    # edited). Consumers render NULL as "unclassified", never as a guess.
+    action_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     severity: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'open'"))
     diagnosis_en: Mapped[str | None] = mapped_column(Text, nullable=True)
