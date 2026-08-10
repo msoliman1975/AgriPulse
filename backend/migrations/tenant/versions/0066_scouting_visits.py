@@ -38,8 +38,8 @@ from alembic import op
 from geoalchemy2.types import Geometry
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0064"
-down_revision: str | Sequence[str] | None = "0063"
+revision: str = "0066"
+down_revision: str | Sequence[str] | None = "0065"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
