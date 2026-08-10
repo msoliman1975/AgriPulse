@@ -61,6 +61,9 @@ export interface ActionItem {
   due_bucket: DueBucket;
   due_date: string | null;
 
+  /** The member responsible for this item's block. Present regardless of
+   *  dispatch state — it is what the dispatch dialog defaults to. */
+  responsible_membership_id: string | null;
   assigned_membership_id: string | null;
   activity_id: string | null;
   scheduled_date: string | null;

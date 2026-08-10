@@ -368,3 +368,20 @@ async def test_get_item_is_farm_scoped(admin_session: Any) -> None:
     found = await repo.get_item(farm_id=seeded["farm_id"], item_id=seeded["rec_block"])
     assert found is not None
     assert await repo.get_item(farm_id=uuid4(), item_id=seeded["rec_block"]) is None
+
+
+@pytest.mark.asyncio
+async def test_every_item_carries_its_blocks_responsible_member(admin_session: Any) -> None:
+    """The dispatch dialog defaults from this, for a SINGLE item.
+
+    It was originally exposed only on the group — so the default worked when
+    the queue happened to be grouped by block and silently failed everywhere
+    else, which is exactly how it shipped.
+    """
+    repo, seeded = await _seed(admin_session)
+    rows = await repo.list_items(farm_id=seeded["farm_id"])
+    owned = next(r for r in rows if r["id"] == seeded["rec_block"])
+    assert owned["responsible_membership_id"] == seeded["member_id"]
+    # B-02 names nobody; NULL must survive rather than becoming a guess.
+    unowned = next(r for r in rows if r["id"] == seeded["alert_tree"])
+    assert unowned["responsible_membership_id"] is None

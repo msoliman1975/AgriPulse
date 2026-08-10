@@ -13,7 +13,6 @@ import type {
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
-import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
@@ -150,9 +149,6 @@ export function ActionCenterPage(): ReactNode {
               value={tab}
               onChange={(v) => setTab(v)}
             />
-            <LinkButton variant="secondary" to={`/board/${farmId}`}>
-              {t("actions.openBoard")}
-            </LinkButton>
           </>
         }
       />

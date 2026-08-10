@@ -101,7 +101,7 @@
     "dispatch": "Dispatch",
     "dispatchTo": "Dispatch to…",
     "dispatchAll": "Dispatch all {{count}}",
-    "openBoard": "Open board"
+    "openOnBoard": "Open on board"
   },
   "bulk": {
     "selected": "{{count}} selected",
@@ -113,8 +113,15 @@
     "summary_one": "{{count}} item · {{blocks}} block",
     "assignTo": "Assign to",
     "useBlockResponsible": "Each block's responsible member",
-    "defaultExplained": "Each item goes to the member responsible for its block. If a block has no one, the server picks a member and the result will say so.",
-    "explicitExplained": "Every item in this batch goes to this person, overriding block responsibility.",
+    "explicitExplained": "Every item in this batch goes to {{name}}, overriding block responsibility.",
+    "blockDefaultExplained": "Defaulted to {{name}}, the member responsible for block {{block}}.",
+    "perBlockExplained": "These items span blocks with different owners, so each goes to its own block's responsible member.",
+    "noResponsibleExplained": "No one is responsible for these blocks. The server will pick a member and the result will say so — set an owner in block settings to control this.",
+    "membersLoading": "Loading team members…",
+    "membersForbidden": "You cannot view this farm's team, so you cannot choose an assignee. Dispatch will still fall back to each block's responsible member.",
+    "membersError": "Could not load the team list. Dispatch will fall back to each block's responsible member.",
+    "membersEmpty": "No one is assigned to this farm yet. Add members in farm settings.",
+    "namesForbidden": "Showing membership ids — you do not have permission to read user names.",
     "scheduledDate": "Scheduled date",
     "notes": "Instructions for the field team",
     "notesPlaceholder": "Optional — appears on the assignee's task card",

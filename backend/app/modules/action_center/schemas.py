@@ -96,6 +96,12 @@ class ActionItem(BaseModel):
     due_bucket: DueBucket
     due_date: date | None = None
 
+    # The member responsible for this item's BLOCK (blocks.agronomist_membership_id).
+    # Present whether or not the item has been dispatched — it is what dispatch
+    # defaults to, so the dialog has to know it for a single item and not only
+    # when the queue happens to be grouped by block.
+    responsible_membership_id: UUID | None = None
+
     # Set once dispatched, read off the linked board activity.
     assigned_membership_id: UUID | None = None
     activity_id: UUID | None = None

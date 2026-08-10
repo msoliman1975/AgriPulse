@@ -199,6 +199,7 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         valid_until=row.get("valid_until"),
         due_bucket=bucket,
         due_date=due_date,
+        responsible_membership_id=row.get("responsible_membership_id"),
         assigned_membership_id=row.get("assigned_membership_id"),
         activity_id=row.get("activity_id"),
         scheduled_date=row.get("scheduled_date"),
