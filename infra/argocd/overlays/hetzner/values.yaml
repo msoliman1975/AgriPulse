@@ -1031,13 +1031,29 @@ global:
   #
   #   Images verified in ghcr BEFORE this commit: api:e7a9341 sha256:444baf02,
   #   workers:e7a9341 sha256:68af7569, frontend:e7a9341 sha256:9c4a84c4.
+  # 02cf517 = #404 crop phenology stage-calendar editor.
+  #   The piece that makes `growth_stage` exist. The daily phenology task can
+  #   only advance a block whose crop defines a stage calendar, and only 3 of
+  #   23 crops did -- there was no way to write one outside a migration. For
+  #   the other twenty, every stage-gated decision tree was silently
+  #   unfireable; seven published trees branch on stage.
+  #   FRONTEND ONLY. No backend file changed between e7a9341 and 02cf517, so
+  #   api + workers stay on e7a9341 and only the frontend tag moves. The
+  #   editor writes through the existing PATCH /admin/crops/{id}, whose
+  #   validators (unique codes, mode-vs-cycle, GDD base requirement) have been
+  #   there since KB P3 with no UI in front of them.
+  #   NO MIGRATION. Rollback is the frontend tag back to e7a9341 alone.
+  #   Image verified in ghcr before the bump, not inferred from a run: the
+  #   only "completed" run for this SHA was argocd-sync, which has ZERO
+  #   container jobs, so its success said nothing. frontend:02cf517 is a 200
+  #   with digest sha256:7ac767a9..., distinct from frontend:e7a9341.
   images:
     api:
       tag: "e7a9341"
     workers:
       tag: "e7a9341"
     frontend:
-      tag: "e7a9341"
+      tag: "02cf517"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
