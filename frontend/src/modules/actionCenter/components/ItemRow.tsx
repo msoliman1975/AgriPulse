@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ActionItem } from "@/api/actionCenter";
 import { Button } from "@/components/Button";
+import { LinkButton } from "@/components/LinkButton";
 import { Pill } from "@/components/Pill";
 import {
   cellOrdinal,
@@ -173,6 +174,17 @@ export function ItemRow({
 
       <div className="flex flex-none flex-col items-end gap-1.5 px-3 py-3">
         <div className="flex gap-1">
+          {/* Only once there is an activity to open. A board link on an
+              undispatched item points at nothing in particular. */}
+          {item.activity_id === null ? null : (
+            <LinkButton
+              size="sm"
+              variant="ghost"
+              to={`/board/${item.farm_id}?activity=${item.activity_id}&lane=${item.block_id}`}
+            >
+              {t("actions.openOnBoard")}
+            </LinkButton>
+          )}
           <Button size="sm" variant="ghost" onClick={onToggleExpand}>
             {expanded ? t("actions.hideWhy") : t("actions.why")}
           </Button>

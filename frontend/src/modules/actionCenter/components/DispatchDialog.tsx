@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 import type { ActionItem } from "@/api/actionCenter";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { defaultAssignee } from "@/modules/actionCenter/lib/assignee";
 import { useDispatchActionItems } from "@/queries/actionCenter";
 import { useFarmMembers } from "@/queries/farmMembers";
 import { useTenantUsers } from "@/queries/users";
+import { useCapability } from "@/rbac/useCapability";
 
 interface Props {
   farmId: string;
@@ -22,21 +24,30 @@ function today(): string {
 /**
  * Dispatch — assign items to a team member as board activities.
  *
- * The assignee defaults to the block's responsible member. When the block
- * names nobody the server still picks one, and this dialog *says so*: a silent
- * arbitrary assignment is worse than no default, because the supervisor has no
- * way to know the name in front of them was a coin toss.
+ * The assignee defaults to the block's responsible member
+ * (`blocks.agronomist_membership_id`, carried on every item as
+ * `responsible_membership_id`). When the blocks in the batch disagree, or name
+ * nobody, the dialog stays on "each block's responsible member" and lets the
+ * server resolve per item — which is strictly better than picking one name for
+ * a mixed batch.
+ *
+ * The picker needs two capabilities the queue itself does not: `farm.member.read`
+ * to list who is on the farm, and `user.read` to turn membership ids into names.
+ * Missing either one used to render an empty dropdown with no explanation; the
+ * states are now distinct, because "you cannot see the roster" and "this farm
+ * has no members" need different fixes from the person reading it.
  */
 export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props): ReactNode {
   const { t } = useTranslation("actionCenter");
-  const members = useFarmMembers(farmId);
+  const canReadMembers = useCapability("farm.member.read", { farmId });
+  const canReadUsers = useCapability("user.read");
+  const members = useFarmMembers(canReadMembers ? farmId : null);
   const users = useTenantUsers();
   const dispatch = useDispatchActionItems();
 
   const blockCodes = [...new Set(items.map((i) => i.block_code))];
   const cellCount = items.filter((i) => i.cell !== null).length;
 
-  // Assignable people = this farm's members, named via the tenant user list.
   const options = useMemo(() => {
     const byMembership = new Map((users.data ?? []).map((u) => [u.membership_id, u]));
     return (members.data ?? [])
@@ -44,22 +55,35 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
       .map((m) => ({
         membershipId: m.membership_id,
         role: m.role,
+        // Fall back to a short id rather than blank: an unnamed row is still
+        // selectable, and a blank option looks like a broken list.
         name: byMembership.get(m.membership_id)?.full_name ?? m.membership_id.slice(0, 8),
       }));
   }, [members.data, users.data]);
 
-  // Default from the first item's block. Only meaningful when the batch is one
-  // block; with several we still have to start somewhere, and the supervisor
-  // can override for the whole batch.
-  const blockDefault = items[0]?.block_id;
-  const defaultMembership = useMemo(() => {
-    const sameBlock = items.filter((i) => i.block_id === blockDefault);
-    return sameBlock.find((i) => i.assigned_membership_id !== null)?.assigned_membership_id ?? "";
-  }, [items, blockDefault]);
+  // The batch's default: the block owner, but only when every item agrees on
+  // one. Mixed blocks fall back to per-item resolution on the server.
+  const responsible = useMemo(() => defaultAssignee(items), [items]);
 
-  const [assignee, setAssignee] = useState<string>(defaultMembership);
+  const [assignee, setAssignee] = useState<string>(responsible);
   const [date, setDate] = useState<string>(today());
   const [notes, setNotes] = useState<string>("");
+
+  const assigneeName = (id: string): string =>
+    options.find((o) => o.membershipId === id)?.name ?? id.slice(0, 8);
+
+  const singleBlock = blockCodes.length === 1;
+  const noOneResponsible = items.every((i) => i.responsible_membership_id === null);
+
+  const pickerState = !canReadMembers
+    ? "forbidden"
+    : members.isPending || users.isPending
+      ? "loading"
+      : members.isError
+        ? "error"
+        : options.length === 0
+          ? "empty"
+          : "ready";
 
   const submit = (): void => {
     dispatch.mutate(
@@ -67,9 +91,9 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
         farmId,
         payload: {
           item_ids: items.map((i) => i.id),
-          // Empty means "let the server default to each block's responsible
-          // member" — which is per-item and therefore better than anything
-          // this dialog could pick for a multi-block batch.
+          // Empty means "let the server default each item to its own block's
+          // responsible member" — per-item, so better than anything this
+          // dialog could pick for a multi-block batch.
           assigned_membership_id: assignee === "" ? null : assignee,
           scheduled_date: date,
           notes: notes === "" ? null : notes,
@@ -100,22 +124,48 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
             <label className="label" htmlFor="dispatch-assignee">
               {t("dispatch.assignTo")}
             </label>
-            <select
-              id="dispatch-assignee"
-              className="input"
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
-            >
-              <option value="">{t("dispatch.useBlockResponsible")}</option>
-              {options.map((o) => (
-                <option key={o.membershipId} value={o.membershipId}>
-                  {o.name} — {o.role}
-                </option>
-              ))}
-            </select>
+
+            {pickerState === "ready" ? (
+              <select
+                id="dispatch-assignee"
+                className="input"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+              >
+                <option value="">{t("dispatch.useBlockResponsible")}</option>
+                {options.map((o) => (
+                  <option key={o.membershipId} value={o.membershipId}>
+                    {o.name} — {o.role}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-lg border border-ap-line bg-ap-bg/60 p-2 text-xs text-ap-muted">
+                {pickerState === "loading"
+                  ? t("dispatch.membersLoading")
+                  : pickerState === "forbidden"
+                    ? t("dispatch.membersForbidden")
+                    : pickerState === "error"
+                      ? t("dispatch.membersError")
+                      : t("dispatch.membersEmpty")}
+              </p>
+            )}
+
             <p className="mt-1 text-meta text-ap-muted">
-              {assignee === "" ? t("dispatch.defaultExplained") : t("dispatch.explicitExplained")}
+              {assignee !== ""
+                ? t("dispatch.explicitExplained", { name: assigneeName(assignee) })
+                : noOneResponsible
+                  ? t("dispatch.noResponsibleExplained")
+                  : singleBlock && responsible !== ""
+                    ? t("dispatch.blockDefaultExplained", {
+                        name: assigneeName(responsible),
+                        block: blockCodes[0],
+                      })
+                    : t("dispatch.perBlockExplained")}
             </p>
+            {!canReadUsers && pickerState === "ready" ? (
+              <p className="mt-1 text-meta text-ap-warn">{t("dispatch.namesForbidden")}</p>
+            ) : null}
           </div>
 
           <div className="mb-3">
