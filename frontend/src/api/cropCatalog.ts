@@ -6,6 +6,7 @@ import { apiClient } from "./client";
 import type {
   ClassificationDepth,
   Crop,
+  PhenologyStage,
   CropAttributeDefinition,
   CropAttributeGate,
   CropAttributeOption,
@@ -24,6 +25,22 @@ export interface CropCreatePayload {
   default_growing_season_days?: number | null;
 }
 
+// --- Phenology stage calendar ---------------------------------------------
+//
+// Mirrors backend/app/modules/farms/phenology.py. The advance rule is a
+// discriminated union on `mode`, and which modes are legal depends on the
+// crop: a perennial has no planting date to count from, an annual has no
+// fixed calendar window. `gdd_from_planting` additionally needs the crop to
+// set a GDD base temperature.
+
+export const PERENNIAL_ADVANCE_MODES = ["calendar_doy", "manual"] as const;
+export const ANNUAL_ADVANCE_MODES = ["days_from_planting", "gdd_from_planting", "manual"] as const;
+
+export type { AdvanceRule } from "./crops";
+
+/** What the update endpoint accepts — identical to the read shape. */
+export type PhenologyStagePayload = PhenologyStage;
+
 export interface CropUpdatePayload {
   name_en?: string;
   name_ar?: string;
@@ -33,6 +50,9 @@ export interface CropUpdatePayload {
   classification_depth?: ClassificationDepth;
   default_growing_season_days?: number | null;
   is_active?: boolean;
+  /** The whole calendar is replaced at once — the array is too interdependent
+   *  (unique codes, unique orders) to patch a stage at a time. */
+  phenology_stages?: { stages: PhenologyStagePayload[] } | null;
 }
 
 export interface VarietyCreatePayload {

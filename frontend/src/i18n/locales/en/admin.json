@@ -858,5 +858,37 @@
       "membership": "Cell and block counts do not sum, by design: a cell claims a pixel when the pixel's centre falls inside it, while the block claims a pixel when its footprint touches the boundary. Edge pixels therefore count for the block but for no cell.",
       "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
     }
+  },
+  "phenology": {
+    "heading": "Stage calendar — {{crop}}",
+    "perennialHint": "A perennial has no planting date to count from, so stages advance on calendar windows (MM-DD, and a window may wrap past new year).",
+    "annualHint": "An annual counts from its planting date, in days or in accumulated growing degree days.",
+    "empty": "No stages yet. Until this crop has a calendar, its blocks can never advance a growth stage — and any decision tree that gates on one will never fire for them.",
+    "addStage": "+ Add stage",
+    "code": "Code",
+    "nameEn": "Name (EN)",
+    "nameAr": "Name (AR)",
+    "advance": "Advances by",
+    "mode": {
+      "manual": "By hand only",
+      "calendar_doy": "Calendar window",
+      "days_from_planting": "Days from planting",
+      "gdd_from_planting": "Degree days from planting"
+    },
+    "from": "From (MM-DD)",
+    "to": "To (MM-DD)",
+    "fromDay": "From day",
+    "toDay": "To day",
+    "fromGdd": "From GDD",
+    "toGdd": "To GDD",
+    "needsGddBase": "This crop has no GDD base temperature, so a degree-day stage can never resolve. Set one on the crop first.",
+    "moveUp": "Move earlier",
+    "moveDown": "Move later",
+    "remove": "Remove stage",
+    "save": "Save calendar",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "stages": "Stages",
+    "noCalendar": "No calendar"
   }
 }
