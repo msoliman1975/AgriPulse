@@ -113,6 +113,7 @@ class PlansService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
         recommendation_id: UUID | None = None,
+        assigned_membership_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
     async def get_board(
@@ -358,6 +359,7 @@ class PlansServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         recommendation_id: UUID | None = None,
+        assigned_membership_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Board-flow activity creation — no enclosing vegetation_plan.
 
@@ -379,6 +381,7 @@ class PlansServiceImpl:
             notes=notes,
             actor_user_id=actor_user_id,
             recommendation_id=recommendation_id,
+            assigned_membership_id=assigned_membership_id,
         )
         await self._audit.record(
             tenant_schema=tenant_schema,

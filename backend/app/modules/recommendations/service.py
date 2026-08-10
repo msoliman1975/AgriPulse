@@ -765,7 +765,9 @@ class RecommendationsServiceImpl:
             _trace("fired", outcome=leaf_outcome, alert_id=opened)
             return {
                 "kind": "alert",
-                "action_type": "alert",
+                # Was the literal string "alert" — a placeholder from when the
+                # alert row had nowhere to keep the leaf's verb. It does now.
+                "action_type": result.outcome.action_type,
                 "severity": result.outcome.severity,
             }
 
@@ -913,6 +915,10 @@ class RecommendationsServiceImpl:
             cell_id=cell_id,
             rule_code=rule_code,
             severity=outcome.severity,
+            # The leaf picked a verb even on the alert branch; 0063 gave the
+            # alert row somewhere to keep it so the Action Center can group
+            # alerts by task type alongside recommendations.
+            action_type=outcome.action_type,
             diagnosis_en=outcome.text_en,
             diagnosis_ar=outcome.text_ar,
             prescription_en=None,
@@ -937,6 +943,7 @@ class RecommendationsServiceImpl:
                 "cell_id": str(cell_id) if cell_id else None,
                 "rule_code": rule_code,
                 "severity": outcome.severity,
+                "action_type": outcome.action_type,
                 "tree_code": tree["tree_code"],
                 "tree_version": tree["version"],
                 "leaf_node_id": leaf_node_id,

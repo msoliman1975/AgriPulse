@@ -135,6 +135,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     factory's import graph thin in environments that do not need the
     full app (e.g., a Celery worker importing only `app.core.settings`).
     """
+    from app.modules.action_center.router import router as action_center_router
     from app.modules.alerts.router import router as alerts_router
     from app.modules.backfill.router import router as backfill_router
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
@@ -198,6 +199,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(indices_router)
     app.include_router(grid_router)
     app.include_router(weather_router)
+    app.include_router(action_center_router)
     app.include_router(alerts_router)
     app.include_router(plans_router)
     app.include_router(plan_templates_router)

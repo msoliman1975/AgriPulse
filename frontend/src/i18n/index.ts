@@ -10,6 +10,7 @@ import enIndices from "./locales/en/indices.json";
 import enWeather from "./locales/en/weather.json";
 import enWeatherIndices from "./locales/en/weatherIndices.json";
 import enWeatherRisk from "./locales/en/weatherRisk.json";
+import enActionCenter from "./locales/en/actionCenter.json";
 import enRecommendations from "./locales/en/recommendations.json";
 import enSignals from "./locales/en/signals.json";
 import enInsights from "./locales/en/insights.json";
@@ -36,6 +37,7 @@ import arIndices from "./locales/ar/indices.json";
 import arWeather from "./locales/ar/weather.json";
 import arWeatherIndices from "./locales/ar/weatherIndices.json";
 import arWeatherRisk from "./locales/ar/weatherRisk.json";
+import arActionCenter from "./locales/ar/actionCenter.json";
 import arRecommendations from "./locales/ar/recommendations.json";
 import arSignals from "./locales/ar/signals.json";
 import arInsights from "./locales/ar/insights.json";
@@ -73,6 +75,7 @@ const resources = {
     weather: enWeather,
     weatherIndices: enWeatherIndices,
     weatherRisk: enWeatherRisk,
+    actionCenter: enActionCenter,
     recommendations: enRecommendations,
     signals: enSignals,
     insights: enInsights,
@@ -101,6 +104,7 @@ const resources = {
     weather: arWeather,
     weatherIndices: arWeatherIndices,
     weatherRisk: arWeatherRisk,
+    actionCenter: arActionCenter,
     recommendations: arRecommendations,
     signals: arSignals,
     insights: arInsights,
@@ -139,6 +143,7 @@ void i18n
       "weather",
       "weatherIndices",
       "weatherRisk",
+      "actionCenter",
       "recommendations",
       "signals",
       "insights",
