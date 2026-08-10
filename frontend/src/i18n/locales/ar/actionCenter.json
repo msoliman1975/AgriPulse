@@ -44,7 +44,7 @@
     "none": "بدون موعد"
   },
   "groupBy": {
-    "action_type": "نوع المهمة",
+    "action_type": "نوع الإجراء",
     "block": "القطعة",
     "due": "تاريخ الإجراء",
     "none": "بدون"
@@ -67,7 +67,10 @@
     "allBlocks": "كل القطع",
     "severity": "الخطورة",
     "allSeverities": "كل الدرجات",
-    "groupBy": "التجميع حسب"
+    "groupBy": "التجميع حسب",
+    "assignedTo": "المكلّف",
+    "anyone": "الجميع",
+    "clearAll": "مسح كل المرشّحات"
   },
   "group": {
     "meta": "{{count}} عنصر · {{blocks}} قطعة",

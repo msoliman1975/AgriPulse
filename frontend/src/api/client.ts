@@ -7,6 +7,17 @@ const baseURL: string = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,
+  // Array query params must repeat the key -- `status=a&status=b` -- because
+  // that is what FastAPI's `list[X]` Query binding reads. Axios's DEFAULT is
+  // `status[]=a&status[]=b`, which FastAPI does not recognise: it binds None
+  // and the filter is silently ignored. No error, no warning, just unfiltered
+  // results, which is exactly how the Action Center's severity filter shipped
+  // doing nothing. Several other filters (observer scenes/blocks, irrigation
+  // status, eval-trace status) were quietly broken the same way -- one of them
+  // even carried a comment asserting the default was already correct.
+  paramsSerializer: {
+    indexes: null,
+  },
   // Trust the access token; cookies aren't part of the auth path.
   withCredentials: false,
   headers: {
