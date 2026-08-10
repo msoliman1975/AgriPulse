@@ -79,6 +79,11 @@ charts/*.tgz
 # only public hostnames/client_ids, no secrets.
 !frontend/.env.development
 !frontend/.env.production
+# Same reasoning for the Scout app's production build: public hostnames and a
+# farm id, no secrets. Committed so an APK built on any machine points at the
+# same backend — the alternative is a hand-typed .env that silently ships a
+# handset pointed at somebody's laptop.
+!mobile/.env.production
 *.pem
 *.key
 *.crt
