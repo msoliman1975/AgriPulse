@@ -16,6 +16,9 @@ export interface BlockCropAssignment {
   actual_harvest_date: string | null;
   growth_stage: string | null;
   growth_stage_updated_at: string | null;
+  /** When true the daily phenology sweep leaves this assignment alone, so a
+   *  stage someone set by hand survives. */
+  growth_stage_locked: boolean;
   /** Valid time, half-open `[from, to)`. `effective_to === null` = ongoing. */
   effective_from: string;
   effective_to: string | null;
@@ -127,6 +130,67 @@ export async function getBlockCropAttributeHistory(
   const { data } = await apiClient.get<BlockCropAttributeHistoryEntry[]>(
     `/v1/crop-assignments/${blockCropId}/attributes/history`,
     { params: code ? { code } : undefined },
+  );
+  return data;
+}
+
+// --- Growth stage ---------------------------------------------------------
+//
+// The stage lives on the crop assignment but has its own endpoints, because a
+// transition is an event: it appends to the block's phenology timeline rather
+// than overwriting a field. The daily `phenology.advance_growth_stages` task
+// writes through the same log with `source: "auto"`.
+
+export type GrowthStageSource = "auto" | "manual" | "model";
+
+export interface GrowthStageLogEntry {
+  id: string;
+  block_id: string;
+  block_crop_id: string | null;
+  stage: string;
+  source: GrowthStageSource;
+  confirmed_by: string | null;
+  transition_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface RecordGrowthStagePayload {
+  stage: string;
+  source?: GrowthStageSource;
+  transition_date?: string | null;
+  block_crop_id?: string | null;
+  notes?: string | null;
+}
+
+export async function listGrowthStages(blockId: string): Promise<GrowthStageLogEntry[]> {
+  const { data } = await apiClient.get<GrowthStageLogEntry[]>(
+    `/v1/blocks/${blockId}/growth-stages`,
+  );
+  return data;
+}
+
+export async function recordGrowthStage(
+  blockId: string,
+  payload: RecordGrowthStagePayload,
+): Promise<GrowthStageLogEntry> {
+  const { data } = await apiClient.post<GrowthStageLogEntry>(
+    `/v1/blocks/${blockId}/growth-stages`,
+    { source: "manual", ...payload },
+  );
+  return data;
+}
+
+/** Patch the agronomy fields on an assignment. Growth stage itself is
+ *  deliberately not settable here — it goes through `recordGrowthStage`. */
+export async function updateBlockCrop(
+  blockId: string,
+  blockCropId: string,
+  fields: { growth_stage_locked?: boolean; notes?: string | null },
+): Promise<BlockCropAssignment> {
+  const { data } = await apiClient.patch<BlockCropAssignment>(
+    `/v1/blocks/${blockId}/crop-assignments/${blockCropId}`,
+    fields,
   );
   return data;
 }
