@@ -35,7 +35,7 @@ import {
   type BlockDetail,
 } from "@/api/blocks";
 import { getFarmGridCells, getGridCells } from "@/api/grid";
-import { mapWithConcurrency, clearDetailCache } from "@/modules/labs/map/api";
+import { mapWithConcurrency } from "@/modules/labs/map/api";
 import { griddedBlocks } from "./gridOverlay";
 import { listSubscriptions } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
@@ -981,13 +981,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               gridProductId={gridProductId}
               onReshape={() => void openReshape()}
               onInactivate={() => setInactivateOpen(true)}
-              onResponsibleChanged={() => {
-                // The detail is cached for 30s and `loadUnitDetail` keeps its
-                // own cache, so a plain invalidate would re-serve the stale
-                // owner. Drop both.
-                clearDetailCache();
-                void detailQ.refetch();
-              }}
               resetKey={resetKey}
             />
           ) : null}

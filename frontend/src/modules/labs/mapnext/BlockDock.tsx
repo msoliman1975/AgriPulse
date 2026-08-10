@@ -28,7 +28,6 @@ import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
-import { ResponsibleMember } from "./ResponsibleMember";
 import { clearDetailCache } from "../map/api";
 import type { UnitDetail, UnitIntegration } from "../map/types";
 import {
@@ -102,9 +101,6 @@ interface Props {
   gridProductId: string | null;
   onReshape: () => void;
   onInactivate: () => void;
-  /** Refetch the detail after the responsible member changes, so the dock and
-   *  the Action Center's dispatch default do not disagree. */
-  onResponsibleChanged: () => void;
   resetKey?: number;
 }
 
@@ -180,7 +176,6 @@ export function BlockDock({
   gridProductId,
   onReshape,
   onInactivate,
-  onResponsibleChanged,
   resetKey,
 }: Props): ReactNode {
   // `insights` carries the shared activity-type catalogue and `weather` the
@@ -427,14 +422,6 @@ export function BlockDock({
           <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
             {tab === "overview" ? (
               <div className={COLS_3}>
-                <Col title={t("responsible.title")}>
-                  <ResponsibleMember
-                    farmId={farmId}
-                    blockId={detail.id}
-                    value={detail.responsible_membership_id}
-                    onChanged={onResponsibleChanged}
-                  />
-                </Col>
                 <Col title={t("inspector.alertsTitle")}>
                   {detail.alerts.length ? (
                     <div className="flex flex-col gap-1.5">
@@ -716,6 +703,7 @@ export function BlockDock({
                     blockId={detail.id}
                     farmId={farmId}
                     gridProductId={gridProductId}
+                    responsibleMembershipId={detail.responsible_membership_id}
                     onDone={afterManage}
                   />
                 </div>
@@ -723,6 +711,13 @@ export function BlockDock({
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={ghostBtn} onClick={() => setManageMode("edit")}>
                     ✎ {t("inspector.editDetails")}
+                  </button>
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={() => setManageMode("responsible")}
+                  >
+                    👤 {t("responsible.manageButton")}
                   </button>
                   <button type="button" className={ghostBtn} onClick={() => setManageMode("crop")}>
                     🌱 {t("inspector.assignCrop")}

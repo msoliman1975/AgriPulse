@@ -26,7 +26,8 @@ vi.mock("@/api/farms", async () => {
 });
 
 vi.mock("@/api/countries", () => ({
-  listCountries: () => Promise.resolve([{ id: "1", code: "EG", name_en: "Egypt", name_ar: "مصر", is_active: true }]),
+  listCountries: () =>
+    Promise.resolve([{ id: "1", code: "EG", name_en: "Egypt", name_ar: "مصر", is_active: true }]),
 }));
 
 // A valid ring inside the supported bbox, and one outside it.
@@ -36,11 +37,27 @@ vi.mock("@/api/countries", () => ({
 // surface; worth fixing in lib/geometry.ts separately.
 const VALID_RING: Polygon = {
   type: "Polygon",
-  coordinates: [[[31.0, 30.0], [31.02, 30.0], [31.02, 30.02], [31.0, 30.02], [31.0, 30.0]]],
+  coordinates: [
+    [
+      [31.0, 30.0],
+      [31.02, 30.0],
+      [31.02, 30.02],
+      [31.0, 30.02],
+      [31.0, 30.0],
+    ],
+  ],
 };
 const OUT_OF_BBOX_RING: Polygon = {
   type: "Polygon",
-  coordinates: [[[10.0, 5.0], [10.02, 5.0], [10.02, 5.02], [10.0, 5.02], [10.0, 5.0]]],
+  coordinates: [
+    [
+      [10.0, 5.0],
+      [10.02, 5.0],
+      [10.02, 5.02],
+      [10.0, 5.02],
+      [10.0, 5.0],
+    ],
+  ],
 };
 
 // MapCanvas needs maplibre (unavailable in jsdom). Stub it and expose the
@@ -52,7 +69,10 @@ vi.mock("../map/MapCanvas", () => ({
   }: {
     onPolygonDrawn?: (p: Polygon, areaM2: number, target: string) => void;
   }) => (
-    <button type="button" onClick={() => onPolygonDrawn?.(drawn.polygon as Polygon, 40_000, "farm_aoi")}>
+    <button
+      type="button"
+      onClick={() => onPolygonDrawn?.(drawn.polygon as Polygon, 40_000, "farm_aoi")}
+    >
       stub-finish-draw
     </button>
   ),
@@ -94,7 +114,13 @@ describe("CreateFarmFlow", () => {
 
   it("captures a drawn boundary, then creates the farm and lands on its console", async () => {
     await setupTestI18n("en");
-    createFarmMock.mockResolvedValue({ id: "farm-9", code: "SUEZ-02", name: "Suez East", area_m2: 1, area_value: 1 });
+    createFarmMock.mockResolvedValue({
+      id: "farm-9",
+      code: "SUEZ-02",
+      name: "Suez East",
+      area_m2: 1,
+      area_value: 1,
+    });
     renderFlow();
     const user = userEvent.setup();
 

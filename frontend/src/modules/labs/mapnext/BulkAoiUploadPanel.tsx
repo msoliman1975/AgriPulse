@@ -26,7 +26,12 @@ interface Props {
   existing: ExistingBlock[];
   canReplace: boolean;
   onPreviewChange: (fc: FeatureCollection<Polygon, BulkPreviewProps> | null) => void;
-  onCommitted: (summary: { created: number; replaced: number; reused: number; errors: number }) => void;
+  onCommitted: (summary: {
+    created: number;
+    replaced: number;
+    reused: number;
+    errors: number;
+  }) => void;
   onClose: () => void;
 }
 
@@ -139,11 +144,20 @@ export function BulkAoiUploadPanel({
     try {
       const res = await bulkCreateBlocks(
         farmId,
-        toSend.map((r) => ({ code: r.code, name: r.name.trim() || null, boundary: r.geometry as Polygon })),
+        toSend.map((r) => ({
+          code: r.code,
+          name: r.name.trim() || null,
+          boundary: r.geometry as Polygon,
+        })),
         allowReplace,
       );
       setResults(res.results);
-      onCommitted({ created: res.created, replaced: res.replaced, reused: res.reused, errors: res.errors });
+      onCommitted({
+        created: res.created,
+        replaced: res.replaced,
+        reused: res.reused,
+        errors: res.errors,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -272,7 +286,10 @@ function RowItem({
   const isError = row.status === "error";
   return (
     <li className="flex items-start gap-2 px-3 py-2">
-      <span className={"mt-2 h-2.5 w-2.5 flex-none rounded-full " + STATUS_DOT[row.status]} title={t(`bulk.status.${row.status}`)} />
+      <span
+        className={"mt-2 h-2.5 w-2.5 flex-none rounded-full " + STATUS_DOT[row.status]}
+        title={t(`bulk.status.${row.status}`)}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <input
@@ -354,8 +371,17 @@ function Footer({
           </div>
         )
       ) : null}
-      {error ? <div className="mb-2 rounded-lg bg-ap-crit/10 px-2 py-1 text-[11px] text-ap-crit">{error}</div> : null}
-      <button type="button" onClick={onSubmit} disabled={submitting || sendCount === 0} className={primaryBtn + " w-full"}>
+      {error ? (
+        <div className="mb-2 rounded-lg bg-ap-crit/10 px-2 py-1 text-[11px] text-ap-crit">
+          {error}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={submitting || sendCount === 0}
+        className={primaryBtn + " w-full"}
+      >
         {submitting ? t("bulk.creating") : t("bulk.create", { n: sendCount })}
       </button>
     </div>
@@ -372,7 +398,9 @@ function ResultsView({
   t: TFn;
 }): ReactNode {
   const label = (r: BulkBlockResultRow): string =>
-    r.status === "error" && r.error_code ? t(`bulk.err.${r.error_code}`) : t(`bulk.result.${r.status}`);
+    r.status === "error" && r.error_code
+      ? t(`bulk.err.${r.error_code}`)
+      : t(`bulk.result.${r.status}`);
   const dot = (r: BulkBlockResultRow): string => {
     if (r.status === "created") return STATUS_DOT.new;
     if (r.status === "reused") return STATUS_DOT.reuse;

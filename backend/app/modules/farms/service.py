@@ -316,6 +316,20 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
+    async def set_block_responsible(
+        self,
+        *,
+        block_id: UUID,
+        membership_id: UUID | None,
+        note: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any] | None: ...
+
+    async def list_block_responsible_log(
+        self, *, block_id: UUID, limit: int = 50
+    ) -> tuple[dict[str, Any], ...]: ...
+
     async def preview_block_inactivation(
         self,
         *,
@@ -1435,6 +1449,62 @@ class FarmServiceImpl:
         if block is None:
             raise BlockNotFoundError(block_id)
         return _stamp_area_unit(block, preferred_unit)
+
+    async def set_block_responsible(
+        self,
+        *,
+        block_id: UUID,
+        membership_id: UUID | None,
+        note: str | None,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any] | None:
+        """Hand a block over to a member, recording the handover.
+
+        Deliberately NOT folded into `update_block`: that path takes a bag of
+        metadata fields and audits only their NAMES, which cannot answer "who
+        was responsible in March". This one reads the outgoing member, writes
+        the column and the log row in one transaction, and carries an optional
+        note explaining why.
+        """
+        result = await self._repo.set_block_responsible(
+            block_id=block_id,
+            new_membership_id=membership_id,
+            note=note,
+            actor_user_id=actor_user_id,
+        )
+        if result is None:
+            return None
+        # Re-saving the same person is not a handover: nothing was written, so
+        # there is nothing to announce.
+        if not result["changed"]:
+            return result
+
+        block = await self._repo.get_block_by_id(block_id, with_boundary=False)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.block_responsible_changed",
+            actor_user_id=actor_user_id,
+            subject_kind="block",
+            subject_id=block_id,
+            farm_id=block["farm_id"] if block else None,
+            details={
+                # Values, not just field names -- the whole reason this exists.
+                "previous_membership_id": (
+                    str(result["previous_membership_id"])
+                    if result["previous_membership_id"]
+                    else None
+                ),
+                "new_membership_id": str(membership_id) if membership_id else None,
+                "has_note": note is not None,
+            },
+        )
+        return result
+
+    async def list_block_responsible_log(
+        self, *, block_id: UUID, limit: int = 50
+    ) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_block_responsible_log(block_id=block_id, limit=limit)
 
     async def update_block(
         self,

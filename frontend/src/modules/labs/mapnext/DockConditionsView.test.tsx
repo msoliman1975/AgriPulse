@@ -88,9 +88,7 @@ describe("DockConditionsView", () => {
 
     renderView(<DockConditionsView blockId="b1" farmId="f1" />);
 
-    await waitFor(() =>
-      expect(screen.getByText("Soil moisture within target range")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("Soil moisture within target range")).toBeTruthy());
     // "22 · 35–50" — the number and the band it had to sit inside.
     expect(screen.getByText(/22/)).toBeTruthy();
     expect(screen.getByText(/35–50/)).toBeTruthy();
@@ -102,9 +100,7 @@ describe("DockConditionsView", () => {
       block_id: "b1",
       evaluated_at: "2026-06-30T00:00:00Z",
       crop_path: "citrus.valencia",
-      trees: [
-        tree({ tree_id: "t2", name_en: "Pest risk", status: "clear", steps: [] }),
-      ],
+      trees: [tree({ tree_id: "t2", name_en: "Pest risk", status: "clear", steps: [] })],
     } satisfies ExplainBlockResponse);
 
     renderView(<DockConditionsView blockId="b1" farmId="f1" />);

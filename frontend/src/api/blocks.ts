@@ -246,10 +246,10 @@ export async function bulkCreateBlocks(
   items: BulkBlockItem[],
   allowReplace: boolean,
 ): Promise<BulkBlockCreateResult> {
-  const { data } = await apiClient.post<BulkBlockCreateResult>(
-    `/v1/farms/${farmId}/blocks:bulk`,
-    { items, allow_replace: allowReplace },
-  );
+  const { data } = await apiClient.post<BulkBlockCreateResult>(`/v1/farms/${farmId}/blocks:bulk`, {
+    items,
+    allow_replace: allowReplace,
+  });
   return data;
 }
 
@@ -291,16 +291,52 @@ export interface AutoGridParams {
   maxAreaM2?: number;
 }
 
-export async function autoGrid(
-  farmId: string,
-  params: AutoGridParams,
-): Promise<AutoGridResponse> {
+export async function autoGrid(farmId: string, params: AutoGridParams): Promise<AutoGridResponse> {
   const body: Record<string, number> = {};
   if (params.maxAreaM2 != null) body.max_area_m2 = params.maxAreaM2;
   if (params.cellSizeM != null) body.cell_size_m = params.cellSizeM;
   const { data } = await apiClient.post<AutoGridResponse>(
     `/v1/farms/${farmId}/blocks/auto-grid`,
     body,
+  );
+  return data;
+}
+
+/** One handover of a block's responsible member. Append-only; newest first. */
+export interface BlockResponsibleLogEntry {
+  id: string;
+  previous_membership_id: string | null;
+  new_membership_id: string | null;
+  note: string | null;
+  changed_at: string;
+  changed_by: string | null;
+}
+
+/**
+ * Hand a block over to a member.
+ *
+ * Its own endpoint rather than a field on `updateBlock`: a handover carries a
+ * reason and produces history, while the generic block update takes a bag of
+ * metadata fields and audits only their names. Returns the refreshed history,
+ * so the panel re-renders without a second round trip — and so a no-op save
+ * still returns the truth rather than an empty success.
+ */
+export async function setBlockResponsible(
+  blockId: string,
+  payload: { membership_id: string | null; note: string | null },
+): Promise<BlockResponsibleLogEntry[]> {
+  const { data } = await apiClient.put<BlockResponsibleLogEntry[]>(
+    `/v1/blocks/${blockId}/responsible`,
+    payload,
+  );
+  return data;
+}
+
+export async function listBlockResponsibleHistory(
+  blockId: string,
+): Promise<BlockResponsibleLogEntry[]> {
+  const { data } = await apiClient.get<BlockResponsibleLogEntry[]>(
+    `/v1/blocks/${blockId}/responsible/history`,
   );
   return data;
 }

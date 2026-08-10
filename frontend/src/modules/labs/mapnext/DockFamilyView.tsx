@@ -65,7 +65,9 @@ function Chart({ points }: { points: Point[] }): ReactNode {
   const X = (i: number): number => padL + (i / (points.length - 1)) * (W - padL - padR);
   const Y = (v: number): number => padT + (1 - (v - yMin) / (yMax - yMin)) * (H - padT - padB);
 
-  const line = points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`).join(" ");
+  const line = points
+    .map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`)
+    .join(" ");
   const gridlines = [0, 1, 2, 3, 4].map((g) => {
     const v = yMin + (g / 4) * (yMax - yMin);
     return { y: Y(v), label: v.toFixed(2) };
@@ -81,14 +83,33 @@ function Chart({ points }: { points: Point[] }): ReactNode {
     >
       {gridlines.map((g) => (
         <g key={g.label}>
-          <line x1={padL} x2={W - padR} y1={g.y} y2={g.y} stroke="currentColor" className="text-ap-line" strokeWidth={1} />
+          <line
+            x1={padL}
+            x2={W - padR}
+            y1={g.y}
+            y2={g.y}
+            stroke="currentColor"
+            className="text-ap-line"
+            strokeWidth={1}
+          />
           <text x={padL - 6} y={g.y + 3} textAnchor="end" className="fill-ap-muted text-[9px]">
             {g.label}
           </text>
         </g>
       ))}
-      <path d={line} fill="none" stroke={HEALTH_DOT.healthy} strokeWidth={2} vectorEffect="non-scaling-stroke" />
-      <circle cx={X(points.length - 1)} cy={Y(points[points.length - 1].value)} r={3.5} fill={HEALTH_DOT.healthy} />
+      <path
+        d={line}
+        fill="none"
+        stroke={HEALTH_DOT.healthy}
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={X(points.length - 1)}
+        cy={Y(points[points.length - 1].value)}
+        r={3.5}
+        fill={HEALTH_DOT.healthy}
+      />
       {ticks.map((i, k) => (
         <text
           key={i}
@@ -133,7 +154,9 @@ function IndexCard({
       onClick={onSelect}
       className={clsx(
         "relative flex min-w-[104px] flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-start",
-        active ? "border-ap-primary bg-ap-primary-soft" : "border-ap-line hover:bg-ap-primary-soft/50",
+        active
+          ? "border-ap-primary bg-ap-primary-soft"
+          : "border-ap-line hover:bg-ap-primary-soft/50",
         gridOnly && "cursor-not-allowed opacity-45 hover:bg-transparent",
       )}
     >
@@ -142,7 +165,10 @@ function IndexCard({
       <span className="text-lg font-bold leading-tight tabular-nums text-ap-ink">
         {gridOnly ? "—" : fmt(series?.current ?? null)}
       </span>
-      <span className="text-xs font-bold" style={{ color: gridOnly ? HEALTH_DOT.unknown : d.color }}>
+      <span
+        className="text-xs font-bold"
+        style={{ color: gridOnly ? HEALTH_DOT.unknown : d.color }}
+      >
         {gridOnly ? t("dock.gridOnly") : `${d.arrow} ${d.text}`}
       </span>
     </button>
@@ -195,13 +221,20 @@ export function DockFamilyView({
     const before = points.filter((p) => Date.parse(p.time) <= cutoff);
     return before.length ? before[before.length - 1].value : points[0].value;
   }, [points]);
-  const delta = current != null && earlier != null && earlier !== 0 ? ((current - earlier) / Math.abs(earlier)) * 100 : null;
+  const delta =
+    current != null && earlier != null && earlier !== 0
+      ? ((current - earlier) / Math.abs(earlier)) * 100
+      : null;
   const chartedBand = bandFor(charted, current);
 
   return (
     <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
       <div className="flex min-h-0 flex-col gap-2">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t(`dock.family.${family}`)}>
+        <div
+          className="flex flex-wrap gap-1.5"
+          role="group"
+          aria-label={t(`dock.family.${family}`)}
+        >
           {members.map((code) => (
             <IndexCard
               key={code}

@@ -96,7 +96,6 @@ function renderDock(detail: UnitDetail = DETAIL): void {
       gridProductId={null}
       onReshape={() => {}}
       onInactivate={() => {}}
-      onResponsibleChanged={() => {}}
     />
   );
   render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
