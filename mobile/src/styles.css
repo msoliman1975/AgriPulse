@@ -56,3 +56,21 @@ body { background: var(--field); color: var(--ink); }
   background: var(--sage); color: #fff; font-size: 13px; font-weight: 650; }
 .error { color: var(--crit); font-size: 13px; margin-top: 12px; }
 .empty { color: var(--muted); font-size: 14px; margin-top: 28px; text-align: center; }
+
+/* Reachability, on the sign-in screen. Deliberately quiet when everything is
+   fine — a green line nobody reads is fine; a red one has to be noticed. */
+.health { font-size: 12px; margin: -4px 0 14px; }
+.health.checking { color: var(--muted); }
+.health.ok { color: var(--sage); }
+.health.bad { color: var(--crit); }
+.health .linkish { background: none; border: 0; padding: 0; font: inherit;
+  color: inherit; text-decoration: underline; }
+
+/* Language picker. Below the button, because it is the least likely thing a
+   returning scout needs and the most likely to be tapped by accident up top. */
+.langpick { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.langpick .lang { background: none; border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 16px; color: var(--muted); font-size: 13px; }
+/* The current language reads as chosen, not merely highlighted: this control is
+   used by people who may not read the label next to it. */
+.langpick .lang.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }

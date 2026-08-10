@@ -30,6 +30,7 @@ from app.modules.iam.users_service import (
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
+from app.shared.i18n import SupportedLanguage
 from app.shared.rbac.check import (
     PermissionDeniedError,
     has_capability,
@@ -322,6 +323,11 @@ class FieldEnrolmentRequest(BaseModel):
     # Link an existing `resources` worker rather than creating a second row for
     # somebody the farm already knows about.
     worker_id: UUID | None = None
+    # The language this person's app opens in. Defaults to Arabic because that
+    # is what the field speaks, but a farm with mixed crews needs to set it per
+    # person rather than per deployment. Changeable afterwards through
+    # PATCH /users/{id} with `preferences.language`.
+    language: SupportedLanguage = "ar"
 
 
 class FieldEnrolmentResponse(BaseModel):
@@ -370,6 +376,7 @@ async def enrol_field_worker(
         full_name=payload.full_name,
         role=payload.role,
         worker_id=payload.worker_id,
+        language=payload.language,
         actor_user_id=context.user_id,
     )
     return {

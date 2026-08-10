@@ -39,6 +39,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return resp.status === 204 ? (undefined as T) : ((await resp.json()) as T);
 }
 
+/**
+ * An authenticated GET for callers outside this module. Exported rather than
+ * letting them build their own fetch, so token refresh, the 401 handling and
+ * Problem Details parsing stay in one place.
+ */
+export function authedGet<T>(path: string): Promise<T> {
+  return request<T>(path);
+}
+
 export type VisitOrigin =
   | "recommendation"
   | "alert"
@@ -59,15 +68,6 @@ export interface Visit {
   due_by: string | null;
   status: string;
   assigned_to: string | null;
-}
-
-/**
- * An authenticated GET for callers outside this module. Exported rather than
- * letting them build their own fetch, so token refresh, 401 handling and
- * Problem Details parsing stay in one place.
- */
-export function authedGet<T>(path: string): Promise<T> {
-  return request<T>(path);
 }
 
 export function listVisits(farmId: string, params: { mine?: boolean; claimable?: boolean } = {}) {

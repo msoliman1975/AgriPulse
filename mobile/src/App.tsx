@@ -1,18 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { fetchMyFarms, type FarmScope } from "@/api/me";
+import { fetchMe, type FarmScope } from "@/api/me";
 import { currentSession } from "@/auth/session";
-import { t, type Lang } from "@/i18n/strings";
+import { dirOf, t, type Lang } from "@/i18n";
+import { adoptServerLang, initialLang } from "@/i18n/preference";
 import { ensureDeviceRegistered } from "@/push/register";
 import { SignInScreen } from "@/screens/SignInScreen";
 import { VisitsScreen } from "@/screens/VisitsScreen";
 
 /**
- * Build-time farm, kept only as a development override. It used to be the
- * only source, which meant one APK per farm — and it failed in the worst
- * possible direction: a scout on any other farm signed in successfully and
- * then saw "couldn't load visits", because the app was asking about a farm
- * their token does not cover.
+ * Build-time farm, kept only as a development override. It used to be the only
+ * source, which meant one APK per farm — and it failed in the worst direction:
+ * a scout on any other farm signed in successfully and then saw "couldn't load
+ * visits", because the app was asking about a farm their token does not cover.
+ * Unset in `.env.production` on purpose.
  */
 const FALLBACK_FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
 
@@ -21,40 +22,38 @@ const PICKED_FARM_KEY = "agripulse.scout.farm";
 
 export function App(): ReactNode {
   const [signedIn, setSignedIn] = useState(() => currentSession() !== null);
-  // Arabic is the default, not a fallback.
-  const lang: Lang = (import.meta.env.VITE_LANG as Lang) ?? "ar";
+  const [lang, setLang] = useState<Lang>(initialLang);
 
   const [farms, setFarms] = useState<FarmScope[] | null>(null);
   const [farmId, setFarmId] = useState<string>(
     () => localStorage.getItem(PICKED_FARM_KEY) ?? "",
   );
 
-  // Re-register on every launch of a signed-in app, not just at sign-in:
-  // FCM rotates tokens on reinstall and restore, and a stale token is a
-  // phone that has silently stopped buzzing.
-  // Registration is farm-gated, so it waits for the farm to resolve rather
-  // than firing at sign-in and 403-ing against a farm the scout does not hold.
-  useEffect(() => {
-    if (signedIn && farmId) void ensureDeviceRegistered(farmId);
-  }, [signedIn, farmId]);
-
-  // Resolve the farm from the token rather than the build. Runs on every
-  // launch, not just first sign-in, because a scout can be granted or lose a
-  // farm between sessions and the app must follow.
+  // One call answers both questions the app has after sign-in: where this
+  // person may work, and which language to open in. Runs on every launch, not
+  // just first sign-in, because a scout can gain or lose a farm between
+  // sessions and the app has to follow.
+  //
+  // Failure is silent by design: the app is already usable in whatever
+  // language it opened in, and blocking the visit list on a preference lookup
+  // would be a worse trade for someone standing in a field.
   useEffect(() => {
     if (!signedIn) {
       setFarms(null);
       return;
     }
     let live = true;
-    void fetchMyFarms().then((scopes) => {
+    void fetchMe().then((me) => {
       if (!live) return;
-      setFarms(scopes);
+      setFarms(me.farms);
+      // A choice made on this device wins — `adoptServerLang` enforces that,
+      // not this call site.
+      if (me.language) setLang(adoptServerLang(me.language));
       setFarmId((current) => {
         // Keep an explicit choice only while it is still granted; a farm the
         // scout no longer holds would 403 forever and read as a broken app.
-        if (current && scopes.some((s) => s.farm_id === current)) return current;
-        if (scopes.length === 1) return scopes[0].farm_id;
+        if (current && me.farms.some((s) => s.farm_id === current)) return current;
+        if (me.farms.length === 1) return me.farms[0].farm_id;
         return "";
       });
     });
@@ -63,10 +62,27 @@ export function App(): ReactNode {
     };
   }, [signedIn]);
 
+  // Registration is farm-gated, so it waits for the farm to resolve rather
+  // than firing at sign-in and 403-ing against a farm the scout does not hold.
+  // FCM also rotates tokens on reinstall and restore, so this runs on every
+  // launch — a register-once app quietly stops buzzing months later.
+  useEffect(() => {
+    if (signedIn && farmId) void ensureDeviceRegistered(farmId);
+  }, [signedIn, farmId]);
+
+  // The document, not just the container: the keyboard, scrollbars and text
+  // selection follow the root direction, and Capacitor renders into a plain
+  // index.html whose static dir="rtl" would otherwise outlive a switch to
+  // English.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dirOf(lang);
+  }, [lang]);
+
   if (!signedIn) {
     return (
-      <div className="app" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
-        <SignInScreen lang={lang} onSignedIn={() => setSignedIn(true)} />
+      <div className="app" dir={dirOf(lang)} lang={lang}>
+        <SignInScreen lang={lang} onLangChange={setLang} onSignedIn={() => setSignedIn(true)} />
       </div>
     );
   }
@@ -75,7 +91,7 @@ export function App(): ReactNode {
   const resolved = farmId || (farms === null ? FALLBACK_FARM_ID : "");
 
   return (
-    <div className="app" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
+    <div className="app" dir={dirOf(lang)} lang={lang}>
       {resolved ? (
         <VisitsScreen lang={lang} farmId={resolved} />
       ) : farms && farms.length === 0 ? (

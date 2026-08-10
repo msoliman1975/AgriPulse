@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { claimVisit, listVisits, type Visit } from "@/api/client";
 import { signOut } from "@/auth/session";
-import { dueIn, t, type Lang } from "@/i18n/strings";
+import { dueIn, t, type Lang } from "@/i18n";
+import { resetLangOnSignOut } from "@/i18n/preference";
 import { releaseDevice } from "@/push/register";
 
 /** Overdue first, then by deadline: a warning due in two hours outranks a
@@ -82,6 +83,9 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
           disabled={signingOut}
           onClick={() => {
             setSigningOut(true);
+            // A handset passed to the next scout should open in *their*
+            // language, unless somebody deliberately set this device's.
+            resetLangOnSignOut();
             // Revoke first and await it: the request authenticates with the
             // access token, so clearing the session or reloading before it
             // lands would cancel it and leave this handset receiving a

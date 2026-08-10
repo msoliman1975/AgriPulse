@@ -122,6 +122,7 @@ class FieldEnrolmentService:
         full_name: str,
         role: str = "Scout",
         worker_id: UUID | None = None,
+        language: str = "ar",
         actor_user_id: UUID | None,
     ) -> EnrolmentResult:
         """Give one field worker app access. Returns the PIN to read aloud."""
@@ -252,12 +253,13 @@ class FieldEnrolmentService:
             text(
                 """
                 INSERT INTO public.user_preferences (user_id, language, notification_channels)
-                VALUES (:uid, 'ar', ARRAY['in_app','push'])
+                VALUES (:uid, :lang, ARRAY['in_app','push'])
                 ON CONFLICT (user_id) DO UPDATE
-                   SET notification_channels = EXCLUDED.notification_channels
+                   SET notification_channels = EXCLUDED.notification_channels,
+                       language = EXCLUDED.language
                 """
             ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
-            {"uid": user_id},
+            {"uid": user_id, "lang": language},
         )
 
         linked_worker = await self._link_worker(

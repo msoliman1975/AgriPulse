@@ -730,3 +730,46 @@ async def test_audit_reports_availability_without_a_matching_scope(
     assert "Mismatched Mona" in {w["name"] for w in flagged.json()["scope_mismatch"]}
     # On the farm where both agree, nothing is reported.
     assert "Mismatched Mona" not in {w["name"] for w in clean.json()["scope_mismatch"]}
+
+
+@pytest.mark.asyncio
+async def test_enrolment_sets_the_persons_language(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """A crew is not all one language, so this is per person, not per deployment.
+
+    Arabic is the default because it is what the field speaks; the app reads
+    this back from GET /me and opens in it.
+    """
+    env = scouting_env
+    default = await _enrol(env)
+    assert default.status_code == 201, default.text
+    lang = (
+        await admin_session.execute(
+            text("SELECT language FROM public.user_preferences WHERE user_id = :u"),
+            {"u": default.json()["user_id"]},
+        )
+    ).scalar_one()
+    assert lang == "ar"
+
+    chosen = await _enrol(env, phone="01009998877", full_name="Hala Mansour", language="en")
+    assert chosen.status_code == 201, chosen.text
+    lang2 = (
+        await admin_session.execute(
+            text("SELECT language FROM public.user_preferences WHERE user_id = :u"),
+            {"u": chosen.json()["user_id"]},
+        )
+    ).scalar_one()
+    assert lang2 == "en"
+
+
+@pytest.mark.asyncio
+async def test_an_untranslated_language_is_refused(scouting_env: ScoutingFixture) -> None:
+    """422 rather than storing it.
+
+    Accepting a code the app has no catalogue for produces a person whose
+    language setting silently does nothing — the app falls back to English and
+    the supervisor has no way to tell that from a bug.
+    """
+    resp = await _enrol(scouting_env, phone="01007776655", full_name="Karim Fahmy", language="fr")
+    assert resp.status_code == 422, resp.text
