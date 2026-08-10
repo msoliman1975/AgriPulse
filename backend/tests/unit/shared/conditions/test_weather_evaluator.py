@@ -113,7 +113,7 @@ def test_combined_indices_plus_weather_tree() -> None:
 
     ctx = ConditionContext(
         block_id="b1",
-        crop_category="vegetables",
+        block_attributes={"soil_texture": "loam"},
         indices={
             "ndvi": IndicesEntry(
                 time=datetime.now(UTC),

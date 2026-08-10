@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgriPulse — Decision Node Condition Sources</title>
+<style>
+  :root {
+    --green: #2f8f4e;
+    --green-dark: #1f5d34;
+    --ink: #1c2b24;
+    --muted: #5b6b62;
+    --line: #d8e2dc;
+    --soft: #eef5f0;
+    --accent: #0b6e99;
+    --warn: #9a6a00;
+    --warn-soft: #fdf6e3;
+    --code-bg: #f2f6f3;
+    --page: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --green: #5cc47c;
+      --green-dark: #8fdca8;
+      --ink: #e6efe9;
+      --muted: #9db1a5;
+      --line: #2c3a32;
+      --soft: #17211c;
+      --accent: #6cc4e8;
+      --warn: #e0b25a;
+      --warn-soft: #241d0d;
+      --code-bg: #141c17;
+      --page: #0f1512;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--page);
+    margin: 0;
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 22px 80px; }
+
+  header.top { border-left: 7px solid var(--green); padding: 6px 0 6px 18px; margin-bottom: 26px; }
+  .kicker { color: var(--green); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+  h1 { font-size: 30px; margin: 6px 0 8px; line-height: 1.15; }
+  .sub { color: var(--muted); max-width: 70ch; margin: 0; }
+  .meta { margin-top: 14px; font-size: 12px; color: var(--muted); }
+
+  h2 { font-size: 20px; margin: 40px 0 6px; scroll-margin-top: 16px; }
+  h2 .code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; color: var(--muted); font-weight: 500; }
+  h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em; color: var(--green-dark); margin: 22px 0 6px; }
+  p { margin: 8px 0; }
+
+  code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .9em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  h2 .code code { background: none; padding: 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 4px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th { background: var(--soft); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--green-dark); }
+  td:first-child { white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 2px 18px 16px; margin: 12px 0 30px; }
+  .lead { color: var(--muted); }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; padding: 0; list-style: none; }
+  .facts li { background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12px; }
+  .facts b { color: var(--green-dark); font-weight: 600; }
+
+  .note { background: var(--soft); border: 1px solid var(--line); border-left: 4px solid var(--green); border-radius: 6px; padding: 10px 13px; margin: 12px 0; font-size: 14px; }
+  .note.warn { background: var(--warn-soft); border-left-color: var(--warn); }
+  .note b { color: var(--green-dark); }
+  .note.warn b { color: var(--warn); }
+
+  .toc { border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; background: var(--soft); }
+  .toc ol { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+  .toc li { margin: 3px 0; break-inside: avoid; }
+  a { color: var(--accent); }
+  .toc a { text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .type { font-size: 11px; border-radius: 4px; padding: 1px 6px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .type.num { color: var(--accent); }
+  .type.cat { color: var(--green-dark); }
+  .type.bool { color: var(--warn); }
+
+  footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 12px; color: var(--muted); }
+
+  @media print {
+    body { font-size: 10.5px; }
+    .wrap { max-width: none; padding: 0; }
+    .card, .note, .tbl-scroll { break-inside: avoid; }
+    h2 { break-after: avoid; }
+    .toc { break-after: page; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="kicker">AgriPulse reference</div>
+  <h1>Decision node — condition sources</h1>
+  <p class="sub">Every source a decision node can branch on, and the two levels of
+  fields beneath it. What each one means, where its data comes from, and what it
+  resolves to when the data isn't there.</p>
+  <div class="meta">Generated 2026-08-10 · reflects production at frontend <code>0bf2cc1</code> / api <code>591db3e</code></div>
+</header>
+
+<h2 id="anatomy">How a condition is built</h2>
+<p>Every comparison in a decision node has the same three parts:</p>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Part</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><b>Left</b></td><td>A <b>value reference</b> — a pointer at observed data. This is what the source picker and its sub-fields build. It is always data about the block being evaluated, never a literal.</td></tr>
+    <tr><td><b>Operator</b></td><td><code>&lt;</code> <code>≤</code> <code>&gt;</code> <code>≥</code> <code>=</code> <code>≠</code>, plus <code>between</code> (a low/high pair) and <code>in</code> (a value list).</td></tr>
+    <tr><td><b>Right</b></td><td>A literal (number, text, true/false) or a <b>tree parameter</b> reference, so the same tree can be re-tuned per tenant without editing its logic.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note warn">
+  <b>The rule that governs everything below: missing data fails closed.</b>
+  If a reference can't resolve — no imagery yet, no weather provider, a signal
+  never recorded, a crop attribute the crop doesn't define — it evaluates to
+  <i>nothing</i>, and the comparison is simply false. The node takes its
+  <b>on&nbsp;miss</b> branch. Nothing is logged as an error, and nothing warns you.
+  A predicate that can never be true is therefore indistinguishable, at runtime,
+  from one that is merely false today. That is why each source below states
+  <i>when it is empty</i>.
+</div>
+
+<div class="note">
+  <b>Numeric vs categorical matters.</b> Fields marked
+  <span class="type num">number</span> are compared with the ordering operators;
+  fields marked <span class="type cat">text</span> only make sense with
+  <code>=</code>, <code>≠</code> or <code>in</code>. Comparing a text field against a
+  number is always false — the builder now picks the right operand shape for you,
+  but hand-written YAML can still get this wrong.
+</div>
+
+<div class="toc">
+  <b>The nine sources</b>
+  <ol>
+    <li><a href="#indices">Imagery index</a> — satellite greenness, water, chlorophyll</li>
+    <li><a href="#block">Block attribute</a> — stage and soil</li>
+    <li><a href="#weather">Weather</a> — observations, forecast windows, derived daily</li>
+    <li><a href="#weather-index">Weather index (anomaly)</a> — curated indices vs climatology</li>
+    <li><a href="#weather-risk">Disease / pest risk</a> — modelled pathogen pressure</li>
+    <li><a href="#signals">Custom signal</a> — your own recorded observations</li>
+    <li><a href="#grid">Grid anomaly</a> — where inside the block the problem is</li>
+    <li><a href="#crop-attribute">Crop field</a> — per-crop data on the assignment</li>
+    <li><a href="#params">Tree parameter</a> — right-hand side only</li>
+  </ol>
+</div>
+
+<!-- ===================== 1. INDICES ===================== -->
+<h2 id="indices">1. Imagery index <span class="code"><code>indices</code></span></h2>
+<div class="card">
+<p class="lead">Satellite-derived vegetation and water indices for the block, from
+the most recent usable scene. This is the workhorse source: it is what "the crop
+looks stressed" means numerically.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block</li>
+  <li><b>Updated</b> each new scene (Sentinel-2, cloud-masked)</li>
+  <li><b>Needs</b> an active imagery subscription on the block</li>
+  <li><b>Empty when</b> no scene has been processed yet</li>
+</ul>
+
+<h3>Level 2 — Index code</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Code</th><th>Formula</th><th>What it tells you</th></tr></thead>
+  <tbody>
+    <tr><td><code>ndvi</code></td><td class="mono">(NIR−RED)/(NIR+RED)</td><td>Canopy greenness and vigour — the general-purpose health index. Saturates over dense canopy and is noisy where bare soil shows between trees.</td></tr>
+    <tr><td><code>ndwi</code></td><td class="mono">(GREEN−NIR)/(GREEN+NIR)</td><td><b>Surface water</b> (McFeeters) — standing water, flooding, irrigation ponding. <b>Not canopy moisture</b>; that is <code>ndmi</code>. Higher means more open water, so its scale runs opposite to the vegetation indices.</td></tr>
+    <tr><td><code>evi</code></td><td class="mono">MODIS 3-band form</td><td>Enhanced vegetation index. Corrects for soil background and atmospheric haze, and keeps responding where NDVI has saturated — better for mature, dense orchards.</td></tr>
+    <tr><td><code>savi</code></td><td class="mono">soil-adjusted, L=0.5</td><td>Vegetation index that suppresses bright bare-soil background. The right choice for young, sparse or wide-spaced plantings and sandy reclamation land, where NDVI reads the soil as much as the crop.</td></tr>
+    <tr><td><code>ndre</code></td><td class="mono">(NIR−RedEdge)/(NIR+RedEdge)</td><td>Red-edge chlorophyll index — tracks nitrogen and chlorophyll status, and keeps discriminating in dense canopy where NDVI flattens.</td></tr>
+    <tr><td><code>gndvi</code></td><td class="mono">(NIR−GREEN)/(NIR+GREEN)</td><td>Green-band NDVI. More sensitive to chlorophyll concentration than NDVI, useful as a nitrogen proxy.</td></tr>
+    <tr><td><code>ndmi</code></td><td class="mono">(NIR−SWIR1)/(NIR+SWIR1)</td><td><b>Leaf and canopy water content</b> (equivalent to NDII). Falls as the canopy dries, so it is the water-stress index — the one people often reach for <code>ndwi</code> expecting.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Key</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Key</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>mean</code></td><td><span class="type num">number</span></td><td>The block's average index value on the latest scene. An absolute number, so thresholds have to be chosen per crop, per variety and per season.</td></tr>
+    <tr><td><code>baseline_deviation</code></td><td><span class="type num">number</span></td><td><b>The default, and usually the right one.</b> How far today sits from <i>this block's own</i> value for this day of the year, in standard deviations. Self-calibrating: <code>≤ −1.5</code> means "unusually low for this block at this time of year" whatever the crop. Needs enough history to have a baseline.</td></tr>
+    <tr><td><code>slope</code></td><td><span class="type num">number</span></td><td>Rate of change over the recent history window, in index units per day. Negative means declining.</td></tr>
+    <tr><td><code>delta</code></td><td><span class="type num">number</span></td><td>Total change across that window — the size of the move rather than its rate.</td></tr>
+    <tr><td><code>trend_direction</code></td><td><span class="type cat">text</span></td><td>The trend as a word: <code>rising</code>, <code>falling</code> or <code>stable</code>. Lets a rule say "NDMI is falling" without picking a numeric cutoff.</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="lead"><small>Trend keys need enough recent scenes to compute; on a short
+history they resolve to nothing and the comparison fails closed.</small></p>
+</div>
+
+<!-- ===================== 2. BLOCK ===================== -->
+<h2 id="block">2. Block attribute <span class="code"><code>block</code></span></h2>
+<div class="card">
+<p class="lead">What state this block is <i>in</i> — its growth stage and its
+soil. Used to gate a tree so its advice only fires in the right context. This is
+the one source with no third level: pick the field and compare.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block</li>
+  <li><b>All values are text</b> — use <code>=</code>, <code>≠</code>, <code>in</code></li>
+  <li><b>Empty when</b> the block has no current crop assignment</li>
+</ul>
+
+<h3>Level 2 — Field <span class="lead" style="text-transform:none;letter-spacing:0">(no third level)</span></h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Meaning</th><th>Values</th></tr></thead>
+  <tbody>
+    <tr><td><code>growth_stage</code></td><td>The block's <b>current phenological stage</b>, advanced automatically each day from the crop's stage calendar. The single most useful gate there is — it stops flowering advice reaching a block that is dormant.</td><td>Per crop. Mango: <code>pre_flowering</code>, <code>flowering</code>, <code>fruit_set</code>, <code>fruit_development</code>, <code>post_harvest_flush</code>, <code>veg_flush</code>. Date palm: <code>dormancy</code>, <code>pollination</code>, <code>fruit_set</code>, <code>kimri</code>, <code>khalal</code>, <code>rutab</code>, <code>tamar</code>. Potato: <code>emergence</code>, <code>vegetative</code>, <code>tuber_initiation</code>, <code>tuber_bulking</code>, <code>maturation</code>.</td></tr>
+    <tr><td><code>soil_texture</code></td><td>The block's soil texture, recorded on the block record. Drives which index is trustworthy (bright sandy soil breaks NDVI) and how fast water moves.</td><td><code>sandy</code>, <code>sandy_loam</code>, <code>loam</code>, <code>clay_loam</code>, <code>clay</code>, <code>silty_loam</code>, <code>silty_clay</code></td></tr>
+    <tr><td><code>salinity_class</code></td><td>The block's salinity banding, recorded on the block record. Gates salinity-aware advice such as leaching-fraction guidance.</td><td><code>non_saline</code>, <code>slightly_saline</code>, <code>moderately_saline</code>, <code>strongly_saline</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <b>Crop identity is not in this list, deliberately.</b> <code>crop_category</code>,
+  <code>crop_path</code> and <code>crop_strain</code> were removed: a tree already
+  declares which crop paths it runs on in <b>Targeting</b>, so branching on them
+  inside the tree asks a question the targeting has already answered. If two
+  varieties need different agronomy, give them two trees with different targeting
+  rather than one tree that branches on its own crop.
+</div>
+</div>
+</div>
+
+<!-- ===================== 3. WEATHER ===================== -->
+<h2 id="weather">3. Weather <span class="code"><code>weather</code></span></h2>
+<div class="card">
+<p class="lead">Raw weather for the farm — what just happened, what is coming, and
+the derived daily roll-ups. The scope you choose decides <i>which</i> set of
+field names is available, and the three sets do not overlap.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per farm — every block on a farm sees the same numbers</li>
+  <li><b>Source</b> the farm's weather provider</li>
+  <li><b>Empty when</b> the farm has no provider or no rows in that window</li>
+</ul>
+
+<div class="note warn">
+  <b>The same quantity has three different names depending on scope.</b>
+  Maximum temperature is <code>air_temp_c</code> on the hourly observation (it is
+  just "the temperature then"), <code>air_temp_c_max</code> across a forecast
+  window, and <code>temp_max_c</code> on the derived daily row. Picking a name
+  from the wrong scope resolves to nothing and the rule silently never fires.
+</div>
+
+<h3>Level 2 — Scope</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Scope</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>latest_observation</code></td><td>The most recent hourly observation. A snapshot of conditions right now.</td></tr>
+    <tr><td><code>forecast_24h</code></td><td>The next 24 hours of forecast, pre-aggregated into one row (sums, maxima, means).</td></tr>
+    <tr><td><code>forecast_72h</code></td><td>The same aggregation over the next 72 hours — for decisions with a longer lead time.</td></tr>
+    <tr><td><code>derived_today</code></td><td>Today's computed daily row: growing degree days, rolling rainfall totals, daily temperature extremes.</td></tr>
+    <tr><td><code>derived_yesterday</code></td><td>The same row for yesterday — the only complete day, and so the honest one for "what did the crop actually experience".</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Field, for <code>latest_observation</code></h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Unit</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>air_temp_c</code></td><td>°C</td><td>Air temperature at the observation time.</td></tr>
+    <tr><td><code>humidity_pct</code></td><td>%</td><td>Relative humidity. Sustained high values are the main driver of fungal infection.</td></tr>
+    <tr><td><code>precipitation_mm</code></td><td>mm</td><td>Rainfall recorded in that hour.</td></tr>
+    <tr><td><code>wind_speed_m_s</code></td><td>m/s</td><td>Wind speed — drives spray drift decisions and evaporative demand.</td></tr>
+    <tr><td><code>wind_direction_deg</code></td><td>°</td><td>Wind direction, degrees clockwise from north.</td></tr>
+    <tr><td><code>pressure_hpa</code></td><td>hPa</td><td>Barometric pressure.</td></tr>
+    <tr><td><code>solar_radiation_w_m2</code></td><td>W/m²</td><td>Incoming shortwave solar radiation.</td></tr>
+    <tr><td><code>cloud_cover_pct</code></td><td>%</td><td>Cloud cover fraction.</td></tr>
+    <tr><td><code>et0_mm</code></td><td>mm</td><td>Reference evapotranspiration for that hour — the atmospheric demand for water.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Field, for <code>forecast_24h</code> and <code>forecast_72h</code></h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Unit</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>precipitation_mm_total</code></td><td>mm</td><td>Total forecast rainfall across the window. The usual "is rain coming, should I skip irrigation" test.</td></tr>
+    <tr><td><code>precipitation_probability_pct_max</code></td><td>%</td><td>Highest hourly probability of rain in the window — confidence, where the total is quantity.</td></tr>
+    <tr><td><code>air_temp_c_max</code></td><td>°C</td><td>Peak forecast temperature. Heat-stress and spray-window rules key off this.</td></tr>
+    <tr><td><code>air_temp_c_min</code></td><td>°C</td><td>Lowest forecast temperature — frost and chill checks.</td></tr>
+    <tr><td><code>air_temp_c_mean</code></td><td>°C</td><td>Average forecast temperature across the window.</td></tr>
+    <tr><td><code>humidity_pct_mean</code></td><td>%</td><td>Average forecast relative humidity — the leading indicator for disease pressure.</td></tr>
+    <tr><td><code>et0_mm_total</code></td><td>mm</td><td>Total forecast reference evapotranspiration: how much water the atmosphere will ask for.</td></tr>
+    <tr><td><code>wind_speed_m_s_max</code></td><td>m/s</td><td>Peak forecast wind — the spray-safety gate.</td></tr>
+    <tr><td><code>hours_observed</code></td><td>count</td><td>How many hours of forecast actually went into the aggregate. Lets a rule refuse to act on a partial window (<code>hours_observed ≥ 24</code>) instead of trusting a total built from four hours.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Field, for <code>derived_today</code> and <code>derived_yesterday</code></h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Unit</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>gdd_base10</code></td><td>°C·day</td><td>Growing degree days for the day, base 10 °C — accumulated heat available for development.</td></tr>
+    <tr><td><code>gdd_base15</code></td><td>°C·day</td><td>The same on a base of 15 °C, for crops with a higher development threshold.</td></tr>
+    <tr><td><code>gdd_cumulative_base10_season</code></td><td>°C·day</td><td>Season-to-date accumulated GDD. The thermal-time clock behind stage prediction — "has this block banked enough heat yet".</td></tr>
+    <tr><td><code>et0_mm_daily</code></td><td>mm</td><td>The day's total reference evapotranspiration.</td></tr>
+    <tr><td><code>precip_mm_daily</code></td><td>mm</td><td>The day's total rainfall.</td></tr>
+    <tr><td><code>precip_mm_7d</code></td><td>mm</td><td>Rolling 7-day rainfall — recent wetness, which is what disease models care about.</td></tr>
+    <tr><td><code>precip_mm_30d</code></td><td>mm</td><td>Rolling 30-day rainfall — the medium-term moisture picture.</td></tr>
+    <tr><td><code>temp_min_c</code></td><td>°C</td><td>The day's minimum temperature.</td></tr>
+    <tr><td><code>temp_max_c</code></td><td>°C</td><td>The day's maximum temperature.</td></tr>
+    <tr><td><code>temp_mean_c</code></td><td>°C</td><td>The day's mean temperature.</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- ===================== 4. WEATHER INDEX ===================== -->
+<h2 id="weather-index">4. Weather index (anomaly) <span class="code"><code>weather_index</code></span></h2>
+<div class="card">
+<p class="lead">The curated weather-index family. Where the <b>Weather</b> source
+gives you raw numbers, these are the eight agronomist-defined indices, each with
+a built-in comparison against the farm's own day-of-year climatology. Ask "is
+this <i>unusual</i> here" rather than "is this above 35 °C".</p>
+<ul class="facts">
+  <li><b>Granularity</b> per farm, daily</li>
+  <li><b>Empty when</b> the farm has no projected index row for that day</li>
+</ul>
+
+<h3>Level 2 — Index code</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>temperature</code></td><td>Max/Min Temperature</td><td>°C</td><td>Daily max / min / mean air temperature at the farm centroid. Heat drives evapotranspiration; cold suppresses photosynthesis.</td></tr>
+    <tr><td><code>radiation</code></td><td>Solar Radiation</td><td>W/m²</td><td>Shortwave solar radiation, daily mean and total. High radiation lifts greenness indices and insect activity; low radiation favours fungal growth.</td></tr>
+    <tr><td><code>wind</code></td><td>Wind Speed &amp; Direction</td><td>m/s, °</td><td>Mean and maximum wind speed with vector-mean direction. Wind spreads fungal spores and disperses pests, and raises water demand.</td></tr>
+    <tr><td><code>humidity</code></td><td>Relative Humidity</td><td>%</td><td>Daily mean relative humidity. Sustained highs drive powdery mildew and anthracnose — prolonged leaf wetness is the main trigger.</td></tr>
+    <tr><td><code>rainfall</code></td><td>Rainfall Amount &amp; Density</td><td>mm</td><td>Daily precipitation plus rolling 7- and 30-day totals. Heavy rain raises anthracnose and root rot.</td></tr>
+    <tr><td><code>evapotranspiration</code></td><td>Plant Water Loss (ET₀)</td><td>mm</td><td>FAO-56 Penman-Monteith reference evapotranspiration, daily total. The demand side of the water balance.</td></tr>
+    <tr><td><code>evaporation_coeff</code></td><td>Soil Dry-down / Water Deficit</td><td>mm</td><td>Rolling 30-day sum of (ET₀ − rainfall): the cumulative soil water deficit. A <b>stock</b> — how dry the soil has become — as opposed to today's flux. Proxy for wilt and soil-larvae conditions.</td></tr>
+    <tr><td><code>rain_et_balance</code></td><td>Rainfall ↔ ET Balance</td><td>mm</td><td>Today's water balance: rainfall − ET₀. Positive is surplus, negative is deficit. The daily <b>flux</b> whose running total is <code>evaporation_coeff</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Key</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Key</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>value</code></td><td><span class="type num">number</span></td><td>The index's actual value for the day, in the unit above.</td></tr>
+    <tr><td><code>baseline_deviation</code></td><td><span class="type num">number</span></td><td><b>The default.</b> The value as a z-score against this farm's climatology for that day of the year. <code>≥ 2</code> means "well above what this farm normally sees today". Needs several years of history for that day, and stays empty for indices whose spread is near zero in an arid climate (rainfall, often).</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- ===================== 5. WEATHER RISK ===================== -->
+<h2 id="weather-risk">5. Disease / pest risk <span class="code"><code>weather_risk</code></span></h2>
+<div class="card">
+<p class="lead">Modelled pathogen and pest pressure — the weather already
+interpreted through a disease model, so a rule can say "anthracnose pressure is
+high" instead of reconstructing temperature-and-wetness logic itself. Unlike the
+weather sources this is <b>per block</b>, because the model folds in the block's
+crop and growth stage.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block, daily</li>
+  <li><b>Window</b> a trailing 14 days of weather</li>
+  <li><b>Empty when</b> the daily risk sweep hasn't scored the block</li>
+</ul>
+
+<div class="note warn">
+  <b>All three models are mango-only.</b> A model only ever scores blocks whose
+  crop sits under its registered crop. Branching on one of these from a tree
+  targeting citrus or potato gives a branch that can never be taken. The picker
+  now shows the crop in brackets and hides models your tree's crops can't be
+  scored for.
+</div>
+
+<h3>Level 2 — Pathogen / pest</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Code</th><th>Crop</th><th>What the model looks for</th></tr></thead>
+  <tbody>
+    <tr><td><code>powdery_mildew</code></td><td>mango</td><td><i>Oidium mangiferae.</i> Pressure builds on warm (about 20–27 °C), humid (RH above 60%) but <b>dry</b> days — free water on the leaf washes conidia off, so rain actually suppresses it. Worst through panicle emergence and flowering.</td></tr>
+    <tr><td><code>anthracnose</code></td><td>mango</td><td><i>Colletotrichum gloeosporioides.</i> The mirror image: needs warmth (about 24–30 °C) <b>and</b> prolonged leaf wetness, from rain or near-saturated air. Accumulates through flowering and fruit development, often as latent infections that appear after harvest.</td></tr>
+    <tr><td><code>fruit_fly</code></td><td>mango</td><td>Humidity-weighted degree-day accumulation above a 13 °C development base, concentrated in the fruit-set and fruit-development window. Dry air damps the accumulation; the model is about generation speed, not a single day's weather.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Field</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>score</code></td><td><span class="type num">number</span></td><td><b>The default.</b> Accumulated pressure on a 0–100 scale. Use it when you want your own threshold.</td></tr>
+    <tr><td><code>level</code></td><td><span class="type cat">text</span></td><td>The same score banded into words: <code>low</code> (under 40), <code>moderate</code> (40–69), <code>high</code> (70 and above). Compare with <code>=</code> or <code>in</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- ===================== 6. SIGNALS ===================== -->
+<h2 id="signals">6. Custom signal <span class="code"><code>signals</code></span></h2>
+<div class="card">
+<p class="lead">Your own recorded observations — anything your team measures that
+the platform doesn't: soil salinity readings, trap counts, lab results, a
+scouting verdict. The catalog is defined by your tenant, so this is the source
+whose vocabulary is yours rather than ours.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block, from the latest observation that applies</li>
+  <li><b>Applies to a block</b> if assigned tenant-wide, to its farm, or to it directly</li>
+  <li><b>Empty when</b> nothing has been recorded for that signal</li>
+</ul>
+
+<h3>Level 2 — Signal code</h3>
+<p>Whatever your tenant has defined, listed by code. Each definition fixes a
+<b>value kind</b> when it is created, and that decides which key at level 3 will
+actually hold anything.</p>
+
+<div class="note">
+  <b>A definition also carries an aggregation mode.</b> Where several
+  observations fall in the window, the signal collapses to one value by
+  <code>latest</code>, <code>mean</code>, <code>median</code>, <code>max</code>,
+  <code>min</code>, <code>sum</code> or <code>count</code>. So "soil salinity" may
+  mean the newest reading or the 30-day average depending on how it was set up —
+  worth checking before you write a threshold against it.
+</div>
+
+<h3>Level 3 — Key</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Key</th><th>Type</th><th>Populated when the signal's kind is…</th></tr></thead>
+  <tbody>
+    <tr><td><code>value_numeric</code></td><td><span class="type num">number</span></td><td><b>numeric</b> — a measurement. The common case.</td></tr>
+    <tr><td><code>value_categorical</code></td><td><span class="type cat">text</span></td><td><b>categorical</b> — one of a fixed set of options defined on the signal.</td></tr>
+    <tr><td><code>value_event</code></td><td><span class="type cat">text</span></td><td><b>event</b> — something happened, recorded by name.</td></tr>
+    <tr><td><code>value_boolean</code></td><td><span class="type bool">true / false</span></td><td><b>boolean</b> — a yes/no observation.</td></tr>
+    <tr><td><code>value_slope</code></td><td><span class="type num">number</span></td><td>numeric only — rate of change over the trailing 30 days.</td></tr>
+    <tr><td><code>value_delta</code></td><td><span class="type num">number</span></td><td>numeric only — total change over that window.</td></tr>
+    <tr><td><code>value_trend_direction</code></td><td><span class="type cat">text</span></td><td>numeric only — <code>rising</code>, <code>falling</code> or <code>stable</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="lead"><small>Exactly one <code>value_*</code> key carries data per
+definition. Reading the wrong one for the kind always resolves to nothing — the
+picker now offers only the keys that can apply.</small></p>
+</div>
+
+<!-- ===================== 7. GRID ===================== -->
+<h2 id="grid">7. Grid anomaly <span class="code"><code>grid</code></span></h2>
+<div class="card">
+<p class="lead">Where <i>inside</i> the block the problem is. The sub-block grid
+splits a block into cells and compares each cell against the block's own mean for
+that scene, so this source answers "is the weakness localised, and how bad is the
+worst patch" — the difference between a failing irrigation valve and a block-wide
+decline.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block, per index</li>
+  <li><b>Needs</b> a grid configured on the block</li>
+  <li><b>Empty when</b> the latest scene crossed no threshold — <b>present only when there is a current anomaly</b></li>
+</ul>
+
+<h3>Level 2 — Index code</h3>
+<p>The same seven imagery indices as source&nbsp;1 — <code>ndvi</code>,
+<code>ndwi</code>, <code>evi</code>, <code>savi</code>, <code>ndre</code>,
+<code>gndvi</code>, <code>ndmi</code> — but read per cell rather than per block.</p>
+
+<h3>Level 3 — Field</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>worst_z</code></td><td><span class="type num">number</span></td><td>How many standard deviations the worst flagged cell sits below the block's mean for that scene. The depth of the worst patch.</td></tr>
+    <tr><td><code>flagged_count</code></td><td><span class="type num">number</span></td><td>How many cells crossed the detection threshold. The <i>extent</i> of the problem — one cell is a spot, twenty is a zone.</td></tr>
+    <tr><td><code>worst_row</code></td><td><span class="type num">number</span></td><td>Grid row of the worst cell. Position, for advice that needs to point somewhere.</td></tr>
+    <tr><td><code>worst_col</code></td><td><span class="type num">number</span></td><td>Grid column of the worst cell.</td></tr>
+    <tr><td><code>severity</code></td><td><span class="type cat">text</span></td><td>The verdict for the block as a whole: <code>warning</code> or <code>critical</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- ===================== 8. CROP ATTRIBUTE ===================== -->
+<h2 id="crop-attribute">8. Crop field <span class="code"><code>crop_attribute</code></span></h2>
+<div class="card">
+<p class="lead">The per-crop data recorded on the block's crop assignment —
+establishment method, transplant date, rootstock, tree age and whatever else the
+catalog defines for that crop. These are the fields that only make sense for one
+crop, which is exactly why they aren't columns on the block.</p>
+<ul class="facts">
+  <li><b>Granularity</b> per block, from the current crop assignment</li>
+  <li><b>Vocabulary</b> data, not a fixed list — it grows with the crop catalog</li>
+  <li><b>Empty when</b> the block has no assignment, or no value was recorded</li>
+</ul>
+
+<h3>Level 2 — Crop field code</h3>
+<p>Defined per crop in the platform catalog and <b>inherited down the taxonomy</b>,
+so an attribute defined on <code>mango</code> is available to
+<code>mango.keitt</code>. The picker only offers codes that can resolve for the
+crops your tree targets, and saving a tree that references one its crops don't
+define is now rejected outright. Mango, for example, carries eleven — among them:</p>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>tree_age</code></td><td>Age of the trees, the usual gate between young-orchard and mature-orchard advice.</td></tr>
+    <tr><td><code>transplant_date</code></td><td>When the block was transplanted.</td></tr>
+    <tr><td><code>age_at_transplant_months</code></td><td>How old the material was at transplanting.</td></tr>
+    <tr><td><code>rootstock_type</code></td><td>Rootstock used — drives vigour and salinity tolerance.</td></tr>
+    <tr><td><code>graft_union_height_cm</code></td><td>Height of the graft union.</td></tr>
+    <tr><td><code>transplant_height_cm</code> / <code>transplant_trunk_diameter_cm</code></td><td>Size of the material at planting.</td></tr>
+    <tr><td><code>nursery_source</code></td><td>Supplier the material came from — for tracing a problem back to a batch.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Level 3 — Key</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Key</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>value</code></td><td>follows the definition</td><td>The recorded value. Its type comes from the attribute's own definition: a number for numeric fields, a date for dates, text for text and single-select, and a list for multi-select — which is only meaningfully compared with <code>in</code>, <code>=</code> or <code>≠</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<!-- ===================== 9. PARAMS ===================== -->
+<h2 id="params">9. Tree parameter <span class="code"><code>params</code></span></h2>
+<div class="card">
+<p class="lead">The one source that appears on the <b>right</b> of a comparison
+rather than the left. Instead of hard-coding <code>≤ −1.5</code>, a tree declares
+a named parameter and compares against that — so the same tree can be re-tuned
+per tenant without touching its logic, and the threshold gets a name that explains
+what it is.</p>
+<ul class="facts">
+  <li><b>Right-hand side only</b> — the left is always observed data</li>
+  <li><b>Declared</b> in the tree's own parameters block, with a default</li>
+  <li><b>Checked at save time</b> — a reference to an undeclared parameter is rejected</li>
+</ul>
+<h3>Level 2 — Parameter name</h3>
+<p>Whatever the tree declares. A parameter carries a type
+(<code>number</code>, <code>integer</code>, <code>boolean</code>, <code>string</code>,
+<code>enum</code>), a default, and optional min/max bounds. Tenants can override the
+default without forking the tree.</p>
+</div>
+
+<footer>
+  <p><b>Two things worth remembering.</b> First, an unresolvable reference is not
+  an error — it is a silent false, and the node takes its <i>on miss</i> branch.
+  Second, the anomaly keys (<code>baseline_deviation</code> on the imagery and
+  weather indices) are almost always a better threshold than raw values: they
+  calibrate themselves to each block or farm, so one rule works across varieties,
+  soils and seasons.</p>
+  <p>Generated from the running system — index formulas from the imagery
+  pipeline, weather field names from the snapshot loader, index and risk
+  descriptions from the platform catalogs, stage vocabularies from the crop
+  taxonomy in production.</p>
+</footer>
+
+</div>
+</body>
+</html>

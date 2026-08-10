@@ -164,8 +164,6 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
             return None
         return getattr(idx_entry, ref.key, None)
     if isinstance(ref, BlockValueRef):
-        if ref.field == "crop_category":
-            return ctx.crop_category
         return ctx.block_attributes.get(ref.field)
     if isinstance(ref, WeatherValueRef):
         if ctx.weather is None:

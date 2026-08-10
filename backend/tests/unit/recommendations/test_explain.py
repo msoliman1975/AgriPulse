@@ -92,7 +92,6 @@ def _setup(
     latest = {"ndvi": {"time": _T, "mean": ndvi_mean, "baseline_deviation": -1.0}}
     ctx = ConditionContext.from_block_signals(
         block_id=str(_BLOCK_ID),
-        crop_category="fruit",
         block_attributes={},
         latest_index_aggregates=latest,
     )
@@ -100,7 +99,6 @@ def _setup(
         farm_id=_FARM_ID,
         block_crop_id=None,
         crop_path="citrus.valencia",
-        crop_category="fruit",
         growth_stage="fruit_set",
         soil_texture=None,
         salinity_class=None,
