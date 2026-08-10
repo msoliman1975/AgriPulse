@@ -1053,7 +1053,13 @@ global:
     workers:
       tag: "e7a9341"
     frontend:
-      tag: "02cf517"
+      # c7dd112 = #405. The stage timeline rendered the literal string
+      # `growthStage.source.derived` for every automatic transition: the TS
+      # union was written from memory as auto|manual|model, the backend's is
+      # manual|derived|imported. Frontend only, no migration; rollback is this
+      # tag back to 02cf517. Image verified in ghcr (sha256:66d3e596..., a
+      # different digest from 02cf517) before the bump.
+      tag: "c7dd112"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
