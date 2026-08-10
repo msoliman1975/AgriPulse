@@ -8,6 +8,9 @@ license = { text = "Proprietary" }
 authors = [{ name = "AgriPulse" }]
 
 dependencies = [
+    # FCM v1 auth: mints and refreshes the OAuth2 bearer from the service
+    # account. The API has no static key — tokens live one hour.
+    "google-auth>=2.35",
   # Web framework
   "fastapi>=0.115,<0.137",
   "uvicorn[standard]>=0.32,<0.33",

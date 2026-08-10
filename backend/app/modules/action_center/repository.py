@@ -239,6 +239,23 @@ class ActionCenterRepository:
         )
         return dict(row) if row is not None else None
 
+    async def membership_subject(self, *, membership_id: UUID) -> UUID | None:
+        """The Keycloak subject behind a membership.
+
+        The board addresses people by membership id; a scouting visit's
+        `assigned_to` is the subject carried in the JWT. They are different
+        UUIDs for the same person, `assigned_to` has no FK, and sending the
+        wrong one produces a visit that reads as assigned in the database and
+        appears on nobody's phone. Hence an explicit translation rather than
+        passing the membership through and hoping.
+        """
+        stmt = text(
+            "SELECT u.keycloak_subject::uuid FROM public.users u "
+            "JOIN public.tenant_memberships m ON m.user_id = u.id "
+            "WHERE m.id = :m"
+        ).bindparams(bindparam("m", type_=PG_UUID(as_uuid=True)))
+        return (await self._tenant.execute(stmt, {"m": membership_id})).scalar_one_or_none()
+
     async def block_responsible(self, *, block_id: UUID) -> UUID | None:
         stmt = text("SELECT agronomist_membership_id FROM blocks WHERE id = :b").bindparams(
             bindparam("b", type_=PG_UUID(as_uuid=True))

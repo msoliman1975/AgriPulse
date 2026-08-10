@@ -859,6 +859,25 @@
       "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
     }
   },
+  "signals": {
+    "title": "Signal catalog",
+    "subtitle": "Platform-curated signal definitions and forms. Every tenant reads these; a tenant that defines the same code overrides it for itself only.",
+    "readonlyHint": "Read-only",
+    "definitions": "Definitions",
+    "templates": "Forms",
+    "colCode": "Code",
+    "colName": "Name",
+    "colKind": "Type",
+    "colValues": "Values",
+    "colPhoto": "Photo",
+    "colAggregation": "Aggregation",
+    "colState": "State",
+    "active": "Active",
+    "retired": "Retired",
+    "emptyDefinitions": "No platform definitions yet.",
+    "emptyTemplates": "No platform forms yet.",
+    "loadFailed": "Could not load the signal catalog."
+  },
   "phenology": {
     "heading": "Stage calendar — {{crop}}",
     "perennialHint": "A perennial has no planting date to count from, so stages advance on calendar windows (MM-DD, and a window may wrap past new year).",

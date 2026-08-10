@@ -152,6 +152,7 @@ async def dispatch_action_items(
         assigned_membership_id=payload.assigned_membership_id,
         scheduled_date=payload.scheduled_date,
         notes=payload.notes,
+        target=payload.target,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )

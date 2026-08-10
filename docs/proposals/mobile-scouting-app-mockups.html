@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriPulse Scout — Mobile Mockups (Part D)</title>
+<style>
+  :root{
+    /* AgriPulse brand family — carried from the web design system */
+    --sage:#4a7c59; --sage-dk:#3a6347; --mint:#e8f3ec; --mint2:#d6ebdd;
+    --pulse:#22c55e; --ink:#16261c; --muted:#5d6f63; --line:#dfe7e0;
+    --bg:#f1f5f2; --panel:#ffffff;
+    /* severity — matches alerts */
+    --crit:#dc2626; --watch:#e8a317; --ok:#22a35a;
+    /* field surfaces: map + capture run dark for sun glare */
+    --field:#0e1a15; --field2:#17271f; --field3:#22362c;
+    /* the human hand: ad-hoc supervisor instructions only */
+    --sand:#c2a878; --sand-dim:#f0e7d6;
+
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+    --ar:"Segoe UI","Noto Naskh Arabic",Tahoma,sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;
+       -webkit-font-smoothing:antialiased}
+  a{color:var(--sage-dk)}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 28px}
+
+  /* ══ measured vs authored: the type rule ══ */
+  .m{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+  /* ══ masthead ══ */
+  .mast{padding:76px 0 46px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+           color:var(--sage);font-weight:600}
+  .mast h1{font-size:clamp(38px,6vw,66px);line-height:1.02;letter-spacing:-.035em;font-weight:750;
+           margin:16px 0 0;max-width:15ch}
+  .mast h1 em{font-style:normal;color:var(--sage)}
+  .lede{margin-top:22px;max-width:62ch;font-size:17.5px;color:#31463a}
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+  .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;border:1px solid var(--line);
+       background:var(--panel);border-radius:99px;padding:6px 13px;color:var(--muted)}
+  .tag b{color:var(--ink);font-weight:600}
+
+  /* ══ origin legend ══ */
+  .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:1px;
+          background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:40px 0 0}
+  .lg{background:var(--panel);padding:15px 16px}
+  .lg .sw{width:26px;height:5px;border-radius:3px;display:block;margin-bottom:10px}
+  .lg code{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink)}
+  .lg p{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.45}
+
+  /* ══ state rail ══ */
+  .rail{margin:56px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:22px 24px}
+  .rail h3{font-size:12px;font-family:var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:15px}
+  .st{font-family:var(--mono);font-size:12.5px;padding:7px 13px;border-radius:8px;background:var(--mint);
+      color:var(--sage-dk);border:1px solid var(--mint2);font-weight:600}
+  .st.term{background:#eef2ef;color:var(--muted);border-color:var(--line)}
+  .st.fin{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .arw{color:#b6c7bc;font-size:13px}
+
+  /* ══ stage bands ══ */
+  .stage{padding:78px 0;border-bottom:1px solid var(--line)}
+  .stage-in{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:64px;align-items:start}
+  .stage:nth-of-type(even) .stage-in{grid-template-columns:360px minmax(0,1fr)}
+  .stage:nth-of-type(even) .notes{order:-1}
+  .stage-num{font-family:var(--mono);font-size:12px;color:var(--sage);letter-spacing:.13em;font-weight:600}
+  .stage h2{font-size:31px;letter-spacing:-.028em;line-height:1.12;margin:9px 0 0;font-weight:700}
+  .stage .sub{color:var(--muted);margin-top:11px;font-size:15.5px;max-width:46ch}
+  .notes{position:sticky;top:26px}
+  .note{border-left:2px solid var(--mint2);padding:0 0 0 17px;margin-top:26px}
+  .note h4{font-size:13px;font-family:var(--mono);letter-spacing:.05em;color:var(--sage-dk);font-weight:600}
+  .note p{font-size:14px;color:#3d5245;margin-top:6px}
+  .note.warn{border-left-color:var(--watch)}
+  .note.warn h4{color:#a06f05}
+  .note code{font-family:var(--mono);font-size:12.5px;background:var(--mint);padding:1px 5px;border-radius:4px;color:var(--sage-dk)}
+  .screens{display:flex;gap:26px;flex-wrap:wrap}
+  .screens>div{flex:0 0 328px;max-width:328px}
+
+  /* ══ phone ══ */
+  .phone{width:328px;flex:0 0 328px;border-radius:36px;background:#0a1310;padding:9px;
+         box-shadow:0 22px 50px rgba(14,38,26,.20),0 2px 6px rgba(14,38,26,.10)}
+  .screen{border-radius:28px;overflow:hidden;background:var(--panel);height:668px;display:flex;flex-direction:column;position:relative}
+  .screen.dark{background:var(--field);color:#e9f2ec}
+  .cap{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:13px;letter-spacing:.03em}
+  .cap b{color:var(--ink);font-weight:600}
+
+  .sbar{display:flex;justify-content:space-between;align-items:center;padding:11px 18px 4px;
+        font-family:var(--mono);font-size:11px;color:var(--muted);flex:0 0 auto}
+  .dark .sbar{color:#7e9689}
+
+  /* app bar */
+  .abar{display:flex;align-items:center;gap:11px;padding:9px 17px 13px;flex:0 0 auto}
+  .abar .ttl{font-size:18px;font-weight:700;letter-spacing:-.02em}
+  .abar .sp{flex:1}
+  .abar .ic{width:32px;height:32px;border-radius:9px;background:var(--mint);display:grid;place-items:center;
+            font-size:14px;color:var(--sage-dk)}
+  .dark .abar .ic{background:var(--field3);color:#a9c4b5}
+  .back{font-size:19px;color:var(--muted);width:30px}
+  .dark .back{color:#9db3a6}
+
+  .body{flex:1;overflow:hidden;padding:0 17px;scrollbar-width:none;-ms-overflow-style:none}
+  .body::-webkit-scrollbar{width:0;height:0}
+  .body.flush{padding:0}
+
+  /* ══ SLA ring — the signature ══ */
+  .ring{width:44px;height:44px;flex:0 0 44px;border-radius:50%;display:grid;place-items:center;position:relative}
+  .ring::before{content:"";position:absolute;inset:0;border-radius:50%;
+                background:conic-gradient(var(--rc) var(--pct),#e4ebe6 0)}
+  .ring::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--panel)}
+  .dark .ring::after{background:var(--field)}
+  .dark .ring::before{background:conic-gradient(var(--rc) var(--pct),#2c4136 0)}
+  .ring span{position:relative;z-index:1;font-family:var(--mono);font-size:11.5px;font-weight:700;line-height:1;
+             letter-spacing:-.04em}
+  .ring.big{width:62px;height:62px;flex:0 0 62px}
+  .ring.big span{font-size:15px}
+  .ring.big::after{inset:5px}
+  .ring.crit span{color:var(--crit)} .ring.crit{--rc:var(--crit)}
+  .ring.watch span{color:#a06f05} .ring.watch{--rc:var(--watch)}
+  .ring.ok span{color:var(--sage-dk)} .ring.ok{--rc:var(--sage)}
+  .ring.sand span{color:#7d6534} .ring.sand{--rc:var(--sand)}
+  @media (prefers-reduced-motion:no-preference){
+    .ring.crit{animation:tick 2.6s ease-in-out infinite}
+    @keyframes tick{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+  }
+
+  /* ══ visit card ══ */
+  .vc{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+  .dark .vc{border-color:#233a2f}
+  .vc .txt{flex:1;min-width:0}
+  .vc .blk{font-size:15px;font-weight:650;letter-spacing:-.015em}
+  .vc .why{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.42;
+           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .vc .foot{display:flex;align-items:center;gap:7px;margin-top:8px}
+  .obadge{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+          padding:3px 7px;border-radius:5px;font-weight:600}
+  .o-rec{background:var(--mint);color:var(--sage-dk)}
+  .o-alert{background:#fde8e8;color:#a91c1c}
+  .o-adhoc{background:var(--sand-dim);color:#7d6534}
+  .o-routine{background:#eef2ef;color:var(--muted)}
+  .o-self{background:#dcf7e6;color:#15803d}
+  .dist{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+  .shead{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+         color:var(--muted);font-weight:600;padding:18px 0 3px;display:flex;gap:8px;align-items:center}
+  .shead .n{background:var(--mint);color:var(--sage-dk);border-radius:20px;padding:1px 7px;font-size:10px}
+  .shead.red .n{background:#fde8e8;color:#a91c1c}
+
+  /* ══ tab bar ══ */
+  .tabs{display:flex;border-top:1px solid var(--line);flex:0 0 auto;background:var(--panel);padding-bottom:7px}
+  .dark .tabs{background:var(--field2);border-color:#233a2f}
+  .tab{flex:1;text-align:center;padding:10px 0 6px;font-size:10.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.02em}
+  .tab .g{display:block;font-size:17px;margin-bottom:3px;filter:grayscale(1) opacity(.55)}
+  .tab.on{color:var(--sage-dk);font-weight:600}
+  .tab.on .g{filter:none}
+
+  /* ══ lock screen ══ */
+  .lock{background:linear-gradient(168deg,#132a20 0%,#0c1a14 58%,#0a1611 100%);height:100%;
+        display:flex;flex-direction:column;padding:0 13px;color:#e9f2ec}
+  .lock .clk{text-align:center;padding:52px 0 28px}
+  .lock .clk .t{font-family:var(--mono);font-size:56px;font-weight:250;letter-spacing:-.04em;line-height:1}
+  .lock .clk .d{font-size:13px;color:#8fa89a;margin-top:7px}
+  .push{background:rgba(255,255,255,.94);color:var(--ink);border-radius:17px;padding:13px 14px;margin-bottom:9px;
+        backdrop-filter:blur(8px);box-shadow:0 4px 18px rgba(0,0,0,.22)}
+  .push .ph{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;color:var(--muted);
+            letter-spacing:.04em;text-transform:uppercase}
+  .push .ph .lo{width:15px;height:15px;border-radius:4px;background:linear-gradient(135deg,var(--sage),var(--pulse))}
+  .push .ph .tm{margin-left:auto;text-transform:none;letter-spacing:0}
+  .push .pt{font-size:14.5px;font-weight:680;margin-top:8px;letter-spacing:-.015em}
+  .push .pb{font-size:13.5px;color:#3d5245;margin-top:3px;line-height:1.42}
+  .push .pa{display:flex;gap:7px;margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
+  .push .pa span{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--sage-dk)}
+  .push .pa span.dim{color:var(--muted);font-weight:500}
+  .push.ar{direction:rtl;font-family:var(--ar)}
+  .push.ar .ph .tm{margin-left:0;margin-right:auto}
+
+  /* ══ reason block ══ */
+  .rsn{background:var(--mint);border-radius:var(--r);padding:15px;margin-top:14px}
+  .rsn .rl{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--sage-dk);font-weight:600}
+  .rsn p{font-size:14px;color:#26382d;margin-top:8px;line-height:1.5}
+  .rsn.hand{background:var(--sand-dim);border-left:3px solid var(--sand)}
+  .rsn.hand .rl{color:#7d6534}
+  .rsn.hand p{font-size:15px;color:#4a3d22}
+  .who{display:flex;align-items:center;gap:8px;margin-top:11px;font-size:12.5px;color:#7d6534}
+  .who .av{width:22px;height:22px;border-radius:50%;background:var(--sand);color:#fff;display:grid;place-items:center;
+           font-size:10px;font-weight:700;font-family:var(--mono)}
+
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);
+      border-radius:11px;overflow:hidden;margin-top:13px}
+  .kv div{background:var(--panel);padding:10px 12px}
+  .kv .k{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .kv .v{font-family:var(--mono);font-size:16px;font-weight:650;margin-top:3px;letter-spacing:-.02em}
+  .kv .v.crit{color:var(--crit)}
+
+  .chartbox{margin-top:14px;border:1px solid var(--line);border-radius:11px;padding:13px 12px 9px}
+  .chartbox .ct{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+                display:flex;justify-content:space-between}
+  .chartbox .cl{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;gap:12px;margin-top:6px}
+  .chartbox .cl i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:-1px}
+
+  /* ══ buttons ══ */
+  .actions{padding:12px 17px 15px;border-top:1px solid var(--line);display:flex;gap:9px;flex:0 0 auto;background:var(--panel)}
+  .dark .actions{background:var(--field2);border-color:#233a2f}
+  .btn{flex:1;text-align:center;padding:14px 0;border-radius:12px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+  .btn.pri{background:var(--sage);color:#fff}
+  .btn.gho{background:var(--mint);color:var(--sage-dk);flex:0 0 96px}
+  .dark .btn.gho{background:var(--field3);color:#a9c4b5}
+  .btn.dis{background:#e8eeea;color:#9db0a4}
+  .btn.warn{background:var(--watch);color:#3a2a02}
+
+  /* ══ map screen ══ */
+  .map{flex:1;position:relative;background:
+       radial-gradient(115% 85% at 28% 22%,#26402f 0%,#16261e 55%,#0e1a15 100%)}
+  .poly{position:absolute;left:11%;top:19%;width:66%;height:47%;
+        border:2px solid rgba(255,255,255,.62);border-radius:5px;
+        background:rgba(220,38,38,.16);transform:rotate(-6deg)}
+  .cell{position:absolute;right:19%;top:11%;width:36%;height:29%;border:2px dashed var(--crit);
+        background:rgba(220,38,38,.30);border-radius:3px;transform:rotate(-6deg)}
+  .cell .cl{position:absolute;top:-21px;left:0;font-family:var(--mono);font-size:10px;color:#ffbdbd;letter-spacing:.05em}
+  .me{position:absolute;left:43%;top:72%;width:17px;height:17px;border-radius:50%;background:#3b82f6;
+      border:2.5px solid #fff;box-shadow:0 0 0 9px rgba(59,130,246,.22)}
+  .bearing{position:absolute;left:44.5%;top:60%;width:2px;height:78px;
+           background:linear-gradient(#3b82f6,rgba(59,130,246,0));transform-origin:bottom center;transform:rotate(19deg)}
+  .mchip{position:absolute;top:13px;left:13px;right:13px;background:rgba(10,20,16,.86);backdrop-filter:blur(9px);
+         border:1px solid #2d453a;border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:11px}
+  .mchip .txt{flex:1;min-width:0}
+  .mchip .b1{font-size:14px;font-weight:650;color:#eaf3ee}
+  .mchip .b2{font-family:var(--mono);font-size:11px;color:#8fa89a;margin-top:2px}
+  .nav{position:absolute;left:13px;right:13px;bottom:13px;display:flex;gap:9px}
+  .navb{flex:1;background:rgba(233,242,236,.95);color:var(--ink);border-radius:12px;padding:12px;
+        text-align:center;font-size:14.5px;font-weight:650}
+  .navb.sec{flex:0 0 108px;background:rgba(34,54,44,.92);color:#cfe0d6;border:1px solid #35503f}
+
+  /* ══ GPS strip ══ */
+  .gps{display:flex;align-items:center;gap:9px;padding:10px 13px;font-family:var(--mono);font-size:11.5px;flex:0 0 auto}
+  .gps.in{background:#dcf7e6;color:#166534}
+  .gps.out{background:#fdf0d8;color:#8a5d05}
+  .gps .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 8px}
+  .gps .sp{flex:1}
+  .gps .fix{text-decoration:underline;font-weight:650}
+
+  /* ══ capture form ══ */
+  .fld{padding:15px 0;border-bottom:1px solid #233a2f}
+  .fld .fl{font-size:13.5px;font-weight:600;color:#e3eee7;display:flex;align-items:center;gap:6px}
+  .fld .req{color:var(--crit);font-size:15px;line-height:1}
+  .fld .fc{font-family:var(--mono);font-size:10px;color:#6f8a7c;letter-spacing:.05em;margin-top:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .chip{padding:9px 13px;border-radius:10px;background:var(--field3);color:#b7cec1;font-size:13.5px;
+        border:1px solid #2e4739;font-weight:550}
+  .chip.sel{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .chip.sel.bad{background:var(--crit);border-color:var(--crit)}
+  .chip.sel.mid{background:var(--watch);border-color:var(--watch);color:#3a2a02}
+  .shots{display:flex;gap:8px;margin-top:10px}
+  .shot{width:62px;height:62px;border-radius:10px;flex:0 0 62px;position:relative;overflow:hidden}
+  .shot.a{background:linear-gradient(150deg,#5d7a3c,#9aa845 60%,#c4b45e)}
+  .shot.b{background:linear-gradient(150deg,#7b6a3a,#a58c4a 55%,#6d7f3e)}
+  .shot .x{position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.6);
+           color:#fff;font-size:10px;display:grid;place-items:center}
+  .shot.add{background:var(--field3);border:1.5px dashed #3d5a49;display:grid;place-items:center;color:#7fa08e;font-size:21px}
+  .noteinp{margin-top:10px;background:var(--field2);border:1px solid #2e4739;border-radius:10px;padding:11px;
+           font-size:13.5px;color:#9db3a6;display:flex;gap:8px;align-items:flex-start}
+  .noteinp .mic{margin-left:auto;color:var(--pulse);font-size:15px}
+
+  .prog{height:3px;background:#233a2f;flex:0 0 auto}
+  .prog i{display:block;height:100%;background:var(--pulse);width:62%}
+
+  /* ══ outcome ══ */
+  .oc{padding:15px 0}
+  .ocr{display:flex;gap:12px;padding:14px;border:1.5px solid var(--line);border-radius:12px;margin-bottom:9px;align-items:flex-start}
+  .ocr.sel{border-color:var(--sage);background:var(--mint)}
+  .ocr .rad{width:19px;height:19px;border-radius:50%;border:2px solid #c3d2c8;flex:0 0 19px;margin-top:2px}
+  .ocr.sel .rad{border-color:var(--sage);background:var(--sage);box-shadow:inset 0 0 0 3.5px #fff}
+  .ocr .t{font-size:14.5px;font-weight:650}
+  .ocr .d{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.42}
+
+  .done{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 30px;text-align:center}
+  .done .tick{width:74px;height:74px;border-radius:50%;background:var(--mint);display:grid;place-items:center;
+              font-size:33px;color:var(--sage)}
+  .done h4{font-size:21px;font-weight:700;margin-top:19px;letter-spacing:-.02em}
+  .done p{font-size:14px;color:var(--muted);margin-top:9px}
+  .recap{margin-top:22px;width:100%;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .recap div{display:flex;justify-content:space-between;padding:9px 12px;font-size:12.5px;border-bottom:1px solid var(--line)}
+  .recap div:last-child{border:0}
+  .recap .k{color:var(--muted)} .recap .v{font-family:var(--mono);font-weight:600}
+
+  /* ══ arabic ══ */
+  .ar{direction:rtl;font-family:var(--ar)}
+  .ar .m,.ar .mono{direction:ltr;unicode-bidi:embed}
+  .ar .tab,.ar .shead,.ar .obadge{font-family:var(--ar);letter-spacing:0}
+  .ar .tab{font-size:11.5px}
+
+  /* ══ web frame ══ */
+  .web{border-radius:11px;overflow:hidden;border:1px solid var(--line);background:var(--panel);
+       box-shadow:0 16px 40px rgba(14,38,26,.13);width:100%}
+  .wbar{height:34px;background:#e7ede9;display:flex;align-items:center;padding:0 12px;gap:6px;border-bottom:1px solid var(--line)}
+  .wbar i{width:9px;height:9px;border-radius:50%;background:#c6d2ca;display:block}
+  .wbar .u{margin-left:12px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .wbody{display:grid;grid-template-columns:1fr 292px;min-height:392px}
+  .wmap{position:relative;background:radial-gradient(120% 90% at 40% 30%,#2b4535 0%,#18291f 60%,#101c16 100%)}
+  .wside{border-left:1px solid var(--line);padding:15px}
+  .wside h5{font-size:13px;font-weight:700;letter-spacing:-.01em}
+  .wside .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .frm{margin-top:13px}
+  .frm label{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+             display:block;margin-top:11px}
+  .frm .inp{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;margin-top:5px;background:#fafcfb}
+  .frm .inp.ta{min-height:62px;color:#4a3d22;background:var(--sand-dim);border-color:#e0d2b6}
+  .frm .inp.sel{display:flex;justify-content:space-between;color:var(--ink)}
+  .frm .inp .car{color:#9db0a4}
+  .wbtn{margin-top:14px;background:var(--sage);color:#fff;border-radius:10px;padding:11px;text-align:center;
+        font-size:13.5px;font-weight:650}
+  .pin{position:absolute;left:47%;top:41%;width:15px;height:15px;border-radius:50% 50% 50% 2px;background:var(--sand);
+       border:2px solid #fff;transform:rotate(-45deg);box-shadow:0 3px 9px rgba(0,0,0,.4)}
+  .pinlbl{position:absolute;left:calc(47% + 22px);top:38%;font-family:var(--mono);font-size:10.5px;color:var(--sand-dim);
+          background:rgba(10,20,16,.75);padding:3px 7px;border-radius:5px;border:1px solid #3d5a49}
+  .wpoly{position:absolute;left:26%;top:24%;width:44%;height:44%;border:2px solid rgba(255,255,255,.55);
+         border-radius:5px;background:rgba(74,124,89,.20);transform:rotate(-5deg)}
+
+  /* triage table */
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+          text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-weight:600}
+  .tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl .bn{font-weight:650}
+  .tbl .sm{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .due{font-family:var(--mono);font-size:12.5px;font-weight:650}
+  .due.red{color:var(--crit)} .due.amb{color:#a06f05} .due.gry{color:var(--muted)}
+  .asg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+  .asg .av{width:22px;height:22px;border-radius:50%;background:var(--sage);color:#fff;font-family:var(--mono);
+           font-size:9.5px;font-weight:700;display:grid;place-items:center}
+  .asg.none{color:var(--muted);font-style:italic}
+  .mini{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:7px;background:var(--sage);color:#fff;font-weight:600}
+  .mini.g{background:var(--mint);color:var(--sage-dk)}
+
+  /* ══ closing ══ */
+  .close{padding:74px 0 96px}
+  .close h2{font-size:29px;letter-spacing:-.025em;font-weight:700}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:26px;margin-top:30px}
+  .col h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--sage);font-weight:600}
+  .col ul{margin-top:11px;padding-left:17px}
+  .col li{font-size:14px;color:#3d5245;margin-bottom:8px}
+  .col li b{color:var(--ink);font-weight:650}
+
+  @media (max-width:1080px){
+    .stage-in,.stage:nth-of-type(even) .stage-in{grid-template-columns:1fr;gap:34px}
+    .stage:nth-of-type(even) .notes{order:0}
+    .notes{position:static}
+    .wbody{grid-template-columns:1fr}
+    .wside{border-left:0;border-top:1px solid var(--line)}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="eyebrow">Part D · Mockups · Android first</div>
+    <h1>Every scouting visit is <em>a clock</em> already running.</h1>
+    <p class="lede">
+      The decision tree that sends a scout out also says how long they have —
+      <span class="m">within_hours: 24</span> for a severe NDVI drop,
+      <span class="m">72</span> for a moderate one. That countdown is the one thing
+      on every screen, because it is the only thing that decides what to do next.
+    </p>
+    <div class="meta">
+      <span class="tag"><b>Capacitor</b> + React</span>
+      <span class="tag"><b>Arabic</b> first, RTL throughout</span>
+      <span class="tag">Online-only <b>v1</b></span>
+      <span class="tag">Role <b>Scout</b>, farm-scoped</span>
+      <span class="tag">Forms rendered from <b>signal templates</b></span>
+    </div>
+
+    <div class="legend">
+      <div class="lg"><span class="sw" style="background:var(--sage)"></span><code>recommendation</code>
+        <p>A decision tree fired. Machine-written reason, machine-set deadline.</p></div>
+      <div class="lg"><span class="sw" style="background:var(--crit)"></span><code>alert</code>
+        <p>A threshold broke. Severity carries straight through to the ring.</p></div>
+      <div class="lg"><span class="sw" style="background:var(--sand)"></span><code>ad_hoc</code>
+        <p>A supervisor saw something and wrote instructions in their own words.</p></div>
+      <div class="lg"><span class="sw" style="background:var(--mint2)"></span><code>routine</code>
+        <p>A scheduled round. No urgency, walked as a sequence.</p></div>
+      <div class="lg"><span class="sw" style="background:var(--pulse)"></span><code>self_initiated</code>
+        <p>The scout was already there and found something worth logging.</p></div>
+    </div>
+
+    <div class="rail">
+      <h3>Visit lifecycle — the screens below follow it in order</h3>
+      <div class="flow">
+        <span class="st">queued</span><span class="arw">→</span>
+        <span class="st">assigned</span><span class="arw">→</span>
+        <span class="st">accepted</span><span class="arw">→</span>
+        <span class="st">in_progress</span><span class="arw">→</span>
+        <span class="st fin">completed</span>
+        <span class="arw" style="margin-left:14px">·</span>
+        <span class="st term">declined</span>
+        <span class="st term">expired</span>
+        <span class="st term">cancelled</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ STAGE 1 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div>
+    <div class="stage-num">01 · queued → assigned</div>
+    <h2>The push has to survive a locked, pocketed phone</h2>
+    <p class="sub">Two notifications, same visit, two locales. The scout acts without unlocking
+      into anything — claim, or open. Everything needed to decide is in four lines.</p>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen"><div class="lock">
+          <div class="clk"><div class="t">07:12</div><div class="d">Saturday, 8 August</div></div>
+          <div class="push">
+            <div class="ph"><span class="lo"></span> AgriPulse Scout <span class="tm m">now</span></div>
+            <div class="pt">Scout M-12 Mango North — within 24h</div>
+            <div class="pb">NDVI is 1.8σ below its seasonal baseline. Find the cause: water, pest, disease or nutrition.</div>
+            <div class="pa"><span>I'll take it</span><span class="dim">Open</span></div>
+          </div>
+          <div class="push" style="opacity:.62;transform:scale(.97)">
+            <div class="ph"><span class="lo"></span> AgriPulse Scout <span class="tm m">6h ago</span></div>
+            <div class="pt">Routine round — Bashayer East, 4 blocks</div>
+          </div>
+          <div style="flex:1"></div>
+        </div></div></div>
+        <div class="cap"><b>Push · English</b> — critical, 24h</div>
+      </div>
+
+      <div>
+        <div class="phone"><div class="screen"><div class="lock">
+          <div class="clk"><div class="t">07:12</div><div class="d">السبت ٨ أغسطس</div></div>
+          <div class="push ar">
+            <div class="ph"><span class="lo"></span> أجريبالس سكاوت <span class="tm m">الآن</span></div>
+            <div class="pt">فحص حقلي: م-١٢ مانجو شمال — خلال ٢٤ ساعة</div>
+            <div class="pb">مؤشر NDVI أقل من المعدل الموسمي بـ ١.٨ انحراف. حدّد السبب: ري، آفات، أمراض، أو تغذية.</div>
+            <div class="pa"><span>أتولى المهمة</span><span class="dim">فتح</span></div>
+          </div>
+          <div class="push ar" style="opacity:.62;transform:scale(.97)">
+            <div class="ph"><span class="lo"></span> أجريبالس سكاوت <span class="tm m">قبل ٦ س</span></div>
+            <div class="pt">جولة روتينية — بشاير شرق، ٤ حقول</div>
+          </div>
+          <div style="flex:1"></div>
+        </div></div></div>
+        <div class="cap"><b>Push · Arabic</b> — same visit, mirrored</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h4>Data message, not notification-only</h4>
+      <p>The app draws the notification itself so <code>claim</code> works from the lock screen and
+      a cold-start deep link lands on the right visit.</p></div>
+    <div class="note"><h4>Locale comes from the user, not the device</h4>
+      <p>Templates are keyed <code>(code, locale, channel, version)</code>, so the body is rendered
+      server-side from <code>user_preferences</code>.</p></div>
+    <div class="note warn"><h4>Push is never the source of truth</h4>
+      <p>Delivery fails silently on some Android builds. The visit list reconciles on every app open —
+      a dropped push must never mean lost work.</p></div>
+    <div class="note"><h4>The 24h is not copy</h4>
+      <p>It is <code>parameters.within_hours</code> off the tree leaf, carried into <code>due_by</code>.</p></div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 2 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div class="notes">
+    <div class="note"><h4>Sorted by deadline, not by severity</h4>
+      <p>A warning due in two hours outranks a critical due tomorrow. The ring makes that
+      legible without reading a word.</p></div>
+    <div class="note"><h4>Claimable is a separate section</h4>
+      <p>Under <code>mode='auto'</code> a visit arrives already assigned. Under <code>triage</code> the
+      supervisor assigns it. Unclaimed work sits in its own bucket so nobody assumes someone else took it.</p></div>
+    <div class="note warn"><h4>Overdue never disappears</h4>
+      <p><code>expired</code> is a flag, not a closure. It stays at the top and escalates to the supervisor —
+      otherwise a neglected farm looks exactly like a healthy one.</p></div>
+    <div class="note"><h4>Distance is measured, so it is mono</h4>
+      <p>Every number the field produced — metres, σ, hours, coordinates — is set in mono.
+      Every sentence a person wrote is set in sans.</p></div>
+  </div>
+
+  <div>
+    <div class="stage-num">02 · the list</div>
+    <h2>Four visits, one glance, no reading</h2>
+    <p class="sub">The home screen answers one question: what do I walk to next?
+      Ring depletion, origin badge, distance. Nothing else earns its place.</p>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span class="m">07:14</span><span class="m">⌁ 4G ▮ 78%</span></div>
+          <div class="abar"><div class="ttl">My visits</div><div class="sp"></div>
+            <div class="ic">⌕</div><div class="ic">☰</div></div>
+          <div class="body">
+            <div class="shead red">Overdue <span class="n m">1</span></div>
+            <div class="vc">
+              <div class="ring crit" style="--pct:100%"><span>−6h</span></div>
+              <div class="txt">
+                <div class="blk">D-04 Date Palm East</div>
+                <div class="why">Soil salinity above threshold for this block's rootstock.</div>
+                <div class="foot"><span class="obadge o-alert">alert</span><span class="dist">1.9 km</span></div>
+              </div>
+            </div>
+
+            <div class="shead">Assigned to me <span class="n m">2</span></div>
+            <div class="vc">
+              <div class="ring crit" style="--pct:22%"><span>18h</span></div>
+              <div class="txt">
+                <div class="blk">M-12 Mango North</div>
+                <div class="why">NDVI 1.8σ below seasonal baseline. Identify cause: water, pest, disease, nutrition.</div>
+                <div class="foot"><span class="obadge o-rec">recommendation</span><span class="dist">340 m</span></div>
+              </div>
+            </div>
+            <div class="vc">
+              <div class="ring sand" style="--pct:40%"><span>2d</span></div>
+              <div class="txt">
+                <div class="blk">P-21 Potato South</div>
+                <div class="why">"The north edge looks patchy on last week's pass — walk it and tell me what you see."</div>
+                <div class="foot"><span class="obadge o-adhoc">ad hoc</span><span class="dist">820 m</span></div>
+              </div>
+            </div>
+
+            <div class="shead">Open to claim <span class="n m">1</span></div>
+            <div class="vc">
+              <div class="ring watch" style="--pct:31%"><span>49h</span></div>
+              <div class="txt">
+                <div class="blk">M-08 Mango West</div>
+                <div class="why">NDVI below baseline. Add to the next routine round.</div>
+                <div class="foot"><span class="obadge o-rec">recommendation</span><span class="dist">1.2 km</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="tabs">
+            <div class="tab on"><span class="g">◎</span>Visits</div>
+            <div class="tab"><span class="g">⬗</span>Map</div>
+            <div class="tab"><span class="g">✎</span>Log</div>
+            <div class="tab"><span class="g">◷</span>History</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>My visits</b> — overdue first, then by deadline</div>
+      </div>
+
+      <div>
+        <div class="phone"><div class="screen ar">
+          <div class="sbar"><span class="m">٧:١٤</span><span class="m">78% ▮ 4G ⌁</span></div>
+          <div class="abar"><div class="ttl">زياراتي</div><div class="sp"></div>
+            <div class="ic">⌕</div><div class="ic">☰</div></div>
+          <div class="body">
+            <div class="shead red">متأخرة <span class="n m">١</span></div>
+            <div class="vc">
+              <div class="ring crit" style="--pct:100%"><span class="m">−6h</span></div>
+              <div class="txt">
+                <div class="blk">د-٠٤ نخيل شرق</div>
+                <div class="why">ملوحة التربة أعلى من الحد المسموح لهذا الأصل.</div>
+                <div class="foot"><span class="obadge o-alert">تنبيه</span><span class="dist m">1.9 km</span></div>
+              </div>
+            </div>
+            <div class="shead">مُسندة إليّ <span class="n m">٢</span></div>
+            <div class="vc">
+              <div class="ring crit" style="--pct:22%"><span class="m">18h</span></div>
+              <div class="txt">
+                <div class="blk">م-١٢ مانجو شمال</div>
+                <div class="why">مؤشر NDVI أقل من المعدل بـ ١.٨ انحراف. حدّد السبب: ري، آفات، أمراض، تغذية.</div>
+                <div class="foot"><span class="obadge o-rec">توصية</span><span class="dist m">340 m</span></div>
+              </div>
+            </div>
+            <div class="vc">
+              <div class="ring sand" style="--pct:40%"><span class="m">2d</span></div>
+              <div class="txt">
+                <div class="blk">ب-٢١ بطاطس جنوب</div>
+                <div class="why">«الحافة الشمالية تبدو غير منتظمة في صور الأسبوع الماضي — امشِ عليها وأخبرني بما ترى.»</div>
+                <div class="foot"><span class="obadge o-adhoc">طلب مشرف</span><span class="dist m">820 m</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="tabs">
+            <div class="tab on"><span class="g">◎</span>الزيارات</div>
+            <div class="tab"><span class="g">⬗</span>الخريطة</div>
+            <div class="tab"><span class="g">✎</span>تسجيل</div>
+            <div class="tab"><span class="g">◷</span>السجل</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Arabic</b> — mirrored; measured values stay LTR</div>
+      </div>
+    </div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 3 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div>
+    <div class="stage-num">03 · accepted — the reason</div>
+    <h2>Why am I being sent here?</h2>
+    <p class="sub">A machine-generated visit shows its working: the anomaly as a shape, the numbers
+      that tripped it. A supervisor's visit shows their handwriting instead — different origin,
+      different surface, deliberately.</p>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span class="m">07:15</span><span class="m">⌁ 4G ▮ 78%</span></div>
+          <div class="abar"><div class="back">‹</div><div class="ttl">M-12 Mango North</div></div>
+          <div class="body" style="overflow-y:auto">
+            <div style="display:flex;align-items:center;gap:14px;padding:4px 0 2px">
+              <div class="ring big crit" style="--pct:22%"><span>18h</span></div>
+              <div>
+                <div style="font-size:13px;color:var(--muted)">Due by</div>
+                <div class="m" style="font-size:16px;font-weight:650">Sat 8 Aug · 23:40</div>
+                <div style="margin-top:5px"><span class="obadge o-rec">recommendation</span></div>
+              </div>
+            </div>
+
+            <div class="rsn">
+              <div class="rl">Scout for stress · critical</div>
+              <p>Severe NDVI drop on this block. Schedule a field scouting visit within
+                 24 hours to identify the cause (water, pest, disease, nutrition).</p>
+            </div>
+
+            <div class="chartbox">
+              <div class="ct"><span>NDVI vs seasonal baseline</span><span>90d</span></div>
+              <svg viewBox="0 0 268 92" width="100%" height="92" style="margin-top:7px" aria-label="NDVI falling below its seasonal baseline band">
+                <path d="M0,34 L268,26 L268,54 L0,62 Z" fill="#d6ebdd"/>
+                <path d="M0,48 L268,40" stroke="#8fb79c" stroke-width="1" stroke-dasharray="3 3" fill="none"/>
+                <path d="M0,46 C34,44 52,40 78,43 C104,46 122,41 148,44 C168,46 182,50 196,58 C212,68 232,78 268,82"
+                      fill="none" stroke="#2f6b45" stroke-width="2.2" stroke-linecap="round"/>
+                <circle cx="268" cy="82" r="4" fill="#dc2626" stroke="#fff" stroke-width="1.6"/>
+                <line x1="196" y1="0" x2="196" y2="92" stroke="#dc2626" stroke-width="1" stroke-dasharray="2 3" opacity=".45"/>
+              </svg>
+              <div class="cl">
+                <span><i style="background:#d6ebdd"></i>baseline ±1σ</span>
+                <span><i style="background:#2f6b45"></i>observed</span>
+                <span><i style="background:#dc2626"></i>breach</span>
+              </div>
+            </div>
+
+            <div class="kv">
+              <div><div class="k">NDVI deviation</div><div class="v crit">−1.82 σ</div></div>
+              <div><div class="k">NDVI today</div><div class="v">0.41</div></div>
+              <div><div class="k">Block baseline</div><div class="v">0.63</div></div>
+              <div><div class="k">Last pass</div><div class="v">6 Aug</div></div>
+            </div>
+            <div style="height:14px"></div>
+          </div>
+          <div class="actions">
+            <div class="btn gho">Decline</div>
+            <div class="btn pri">Start visit</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Machine reason</b> — the anomaly as a shape</div>
+      </div>
+
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span class="m">07:15</span><span class="m">⌁ 4G ▮ 78%</span></div>
+          <div class="abar"><div class="back">‹</div><div class="ttl">P-21 Potato South</div></div>
+          <div class="body" style="overflow-y:auto">
+            <div style="display:flex;align-items:center;gap:14px;padding:4px 0 2px">
+              <div class="ring big sand" style="--pct:40%"><span>2d</span></div>
+              <div>
+                <div style="font-size:13px;color:var(--muted)">Due by</div>
+                <div class="m" style="font-size:16px;font-weight:650">Mon 10 Aug · 12:00</div>
+                <div style="margin-top:5px"><span class="obadge o-adhoc">ad hoc</span></div>
+              </div>
+            </div>
+
+            <div class="rsn hand">
+              <div class="rl">From your supervisor</div>
+              <p>The north edge looks patchy on last week's pass — no alert on it yet.
+                 Walk that strip and tell me whether it's the dripline or something on the leaves.</p>
+              <div class="who"><span class="av">HA</span> Hana Abdelrahman · 06:58</div>
+            </div>
+
+            <div style="margin-top:14px;border:1px solid var(--line);border-radius:11px;overflow:hidden">
+              <div style="height:132px;background:radial-gradient(120% 90% at 55% 40%,#2b4535,#16261e);position:relative">
+                <div style="position:absolute;left:16%;top:20%;width:64%;height:56%;border:2px solid rgba(255,255,255,.5);
+                            border-radius:4px;background:rgba(74,124,89,.18);transform:rotate(-5deg)"></div>
+                <div style="position:absolute;left:47%;top:31%;width:13px;height:13px;border-radius:50% 50% 50% 2px;
+                            background:var(--sand);border:2px solid #fff;transform:rotate(-45deg)"></div>
+              </div>
+              <div style="padding:9px 12px;font-family:var(--mono);font-size:11px;color:var(--muted)">
+                Pinned by supervisor · 29.9781, 32.5194
+              </div>
+            </div>
+            <div style="height:14px"></div>
+          </div>
+          <div class="actions">
+            <div class="btn gho">Decline</div>
+            <div class="btn pri">Start visit</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Human reason</b> — instruction, author, dropped pin</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h4>Sand means a person wrote this</h4>
+      <p>The only warm surface in the app. It appears when, and only when, a human typed the
+      instruction — so the scout knows there is someone to answer to, not a threshold.</p></div>
+    <div class="note"><h4>The chart is the argument</h4>
+      <p>The tree branched on <code>baseline_deviation &lt; −1.5</code>. Drawing the band and the line
+      leaving it explains the decision faster than the sentence does.</p></div>
+    <div class="note"><h4>Decline needs a reason</h4>
+      <p>It returns the visit to the queue and notifies the supervisor. Refusing work is legitimate;
+      refusing it silently is not.</p></div>
+    <div class="note"><h4>Self-contained payload</h4>
+      <p>Reason text, thresholds, block geometry and the full form definition all arrive with the visit —
+      one fetch, and the screen is renderable from cache when the queue lands in v2.</p></div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 4 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div class="notes">
+    <div class="note"><h4>Dark because of the sun</h4>
+      <p>Map and capture run dark. Outdoors at midday a white screen is a mirror.</p></div>
+    <div class="note"><h4>Cell-level, not just block-level</h4>
+      <p>Recommendations already carry <code>cell_id</code>. Sending someone to a 40-hectare block when
+      the anomaly is in one grid cell wastes the visit.</p></div>
+    <div class="note"><h4>Bearing beats turn-by-turn</h4>
+      <p>There are no roads inside a block. Distance plus a heading is what actually helps;
+      hand off to Google Maps only for the drive.</p></div>
+  </div>
+
+  <div>
+    <div class="stage-num">04 · in_progress — getting there</div>
+    <h2>The anomaly is in one cell, not the whole block</h2>
+    <p class="sub">Walk to the red square, not the outline around it.</p>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen dark">
+          <div class="sbar"><span class="m">07:22</span><span class="m">⌁ 4G ▮ 76%</span></div>
+          <div class="map">
+            <div class="mchip">
+              <div class="ring crit" style="--pct:24%"><span>18h</span></div>
+              <div class="txt"><div class="b1">M-12 · cell R3C7</div>
+                <div class="b2">340 m · bearing 019° · ±6 m</div></div>
+            </div>
+            <div class="poly"><div class="cell"><span class="cl">R3C7 · −1.82σ</span></div></div>
+            <div class="bearing"></div>
+            <div class="me"></div>
+            <div class="nav">
+              <div class="navb sec">Drive</div>
+              <div class="navb">I'm here — start logging</div>
+            </div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Navigate</b> — block outline, target cell, heading</div>
+      </div>
+    </div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 5 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div>
+    <div class="stage-num">05 · capture</div>
+    <h2>Tapping, not typing</h2>
+    <p class="sub">The form is rendered entirely from the signal template — labels, options and
+      required flags all arrive with the visit. Adding a new observation type changes the app
+      without shipping a release.</p>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen dark">
+          <div class="sbar"><span class="m">07:31</span><span class="m">⌁ 4G ▮ 74%</span></div>
+          <div class="abar"><div class="back">‹</div><div class="ttl" style="font-size:16px">Log observation</div>
+            <div class="sp"></div><div class="ring crit" style="--pct:26%"><span>17h</span></div></div>
+          <div class="prog"><i></i></div>
+          <div class="gps in"><span class="dot"></span> Inside M-12 · R3C7 <span class="sp"></span> ±6 m</div>
+          <div class="body" style="overflow-y:auto">
+            <div class="fld">
+              <div class="fl">Canopy vigour <span class="req">*</span></div>
+              <div class="fc">canopy_vigour · categorical</div>
+              <div class="chips">
+                <span class="chip">Good</span><span class="chip">Fair</span>
+                <span class="chip sel bad">Poor</span><span class="chip">Severe</span>
+              </div>
+            </div>
+            <div class="fld">
+              <div class="fl">What is causing it? <span class="req">*</span></div>
+              <div class="fc">stress_cause_observed · categorical</div>
+              <div class="chips">
+                <span class="chip sel">Water</span><span class="chip">Pest</span><span class="chip">Disease</span>
+                <span class="chip">Nutrition</span><span class="chip">Salinity</span><span class="chip">Mechanical</span>
+                <span class="chip">Nothing found</span><span class="chip">Not sure</span>
+              </div>
+            </div>
+            <div class="fld">
+              <div class="fl">Soil feel</div>
+              <div class="fc">soil_moisture_feel · categorical</div>
+              <div class="chips">
+                <span class="chip sel mid">Dry</span><span class="chip">Moist</span>
+                <span class="chip">Wet</span><span class="chip">Saturated</span>
+              </div>
+            </div>
+            <div class="fld" style="border-bottom:0">
+              <div class="fl">Photos <span class="req">*</span></div>
+              <div class="fc">scout_photo · 2 attached</div>
+              <div class="shots">
+                <div class="shot a"><span class="x">×</span></div>
+                <div class="shot b"><span class="x">×</span></div>
+                <div class="shot add">+</div>
+              </div>
+              <div class="noteinp">Dripline on the east row looks blocked<span class="mic">🎙</span></div>
+            </div>
+            <div style="height:12px"></div>
+          </div>
+          <div class="actions"><div class="btn pri">Review and submit</div></div>
+        </div></div>
+        <div class="cap"><b>Capture</b> — GPS inside the block, form valid</div>
+      </div>
+
+      <div>
+        <div class="phone"><div class="screen dark">
+          <div class="sbar"><span class="m">07:31</span><span class="m">⌁ 3G ▮ 74%</span></div>
+          <div class="abar"><div class="back">‹</div><div class="ttl" style="font-size:16px">Log observation</div>
+            <div class="sp"></div><div class="ring crit" style="--pct:26%"><span>17h</span></div></div>
+          <div class="prog"><i></i></div>
+          <div class="gps out"><span class="dot"></span> You're 14 m outside M-12
+            <span class="sp"></span> <span class="fix">Fix</span></div>
+          <div class="body" style="overflow-y:auto">
+            <div style="background:var(--field2);border:1px solid #4a3d1a;border-left:3px solid var(--watch);
+                        border-radius:11px;padding:14px;margin-top:14px">
+              <div style="font-size:14.5px;font-weight:650;color:#f0d9a4">Your position is outside this block</div>
+              <p style="font-size:13.5px;color:#b9c9bf;margin-top:7px;line-height:1.5">
+                GPS puts you 14 m past the eastern boundary, with ±11 m accuracy.
+                Pick how to record this observation.</p>
+              <div style="margin-top:13px;display:flex;flex-direction:column;gap:8px">
+                <div style="background:var(--sage);color:#fff;border-radius:10px;padding:11px 13px;font-size:13.5px;font-weight:650">
+                  Snap to the nearest point inside M-12</div>
+                <div style="background:var(--field3);color:#c9dcd0;border-radius:10px;padding:11px 13px;font-size:13.5px;
+                            border:1px solid #3d5a49">
+                  Keep my exact position, outside the block</div>
+                <div style="background:transparent;color:#8fa89a;border-radius:10px;padding:9px 13px;font-size:13px;text-align:center">
+                  Keep waiting for a better fix</div>
+              </div>
+            </div>
+            <div style="margin-top:15px;font-family:var(--mono);font-size:11px;color:#6f8a7c;line-height:1.6">
+              29.97742, 32.52186 · ±11 m<br>nearest boundary point 14 m W<br>
+              → location_mode = free_point
+            </div>
+          </div>
+          <div class="actions"><div class="btn dis">Review and submit</div></div>
+        </div></div>
+        <div class="cap"><b>The edge case that loses work</b> — resolved before submit</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note warn"><h4>This screen exists because the database will refuse</h4>
+      <p><code>location_mode='point_in_entity'</code> is enforced by an <code>ST_Within</code> trigger.
+      Without this, a scout walks the block, shoots photos, taps submit — and the write is rejected
+      by a boundary they were standing on.</p></div>
+    <div class="note"><h4>Keep the real reading, don't discard it</h4>
+      <p><code>free_point</code> keeps the coordinate <em>and</em> the block attribution and skips only the
+      containment check. <code>entity</code> is the lossy option — its CHECK forces the point to NULL —
+      so it is the last resort, not the fallback.</p></div>
+    <div class="note"><h4>Snapping can invent precision</h4>
+      <p>Offer the snap only when the offset is within tolerance <em>and</em> larger than the reported
+      accuracy. Snapping a ±30 m fix that sits 8 m out is fabricating a position.</p></div>
+    <div class="note"><h4>Categorical, not numeric</h4>
+      <p>Chips survive gloves, glare and hurry — and a decision tree can branch on them.
+      A free-text field can do neither.</p></div>
+    <div class="note"><h4>Photos are gated per definition</h4>
+      <p>The camera only appears where <code>attachment_allowed</code> is set. Miss it while authoring
+      the template and the feature silently never shows up.</p></div>
+    <div class="note"><h4>Voice input is not a nicety</h4>
+      <p>Arabic dictation is the difference between a note and no note for much of this workforce.</p></div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 6 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div class="notes">
+    <div class="note"><h4>"I couldn't tell" is a real answer</h4>
+      <p>Forcing every visit into resolved / unresolved produces false data. <code>inconclusive</code>
+      routes the block back to an agronomist instead of pretending it was handled.</p></div>
+    <div class="note"><h4>One call, one transaction</h4>
+      <p>All observations post as a single batch with a client-generated idempotency key,
+      sharing a <code>template_observation_id</code>. Double-tap is safe.</p></div>
+    <div class="note warn"><h4>What "closes the loop" honestly means</h4>
+      <p>Today no decision tree reads a scouting signal — the four codes trees consume are all lab
+      values. Until the trees in §8 of the spec are authored, this confirmation is read by people,
+      not by the engine.</p></div>
+  </div>
+
+  <div>
+    <div class="stage-num">06 · completed</div>
+    <h2>The outcome is three answers, not two</h2>
+
+    <div class="screens">
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span class="m">07:38</span><span class="m">⌁ 4G ▮ 73%</span></div>
+          <div class="abar"><div class="back">‹</div><div class="ttl" style="font-size:16px">Review and submit</div></div>
+          <div class="body" style="overflow-y:auto">
+            <div style="font-size:13px;color:var(--muted);padding-top:13px">How did the visit end?</div>
+            <div class="oc">
+              <div class="ocr sel"><span class="rad"></span><div>
+                <div class="t">Found the cause</div>
+                <div class="d">Water stress — blocked dripline on the east row.</div></div></div>
+              <div class="ocr"><span class="rad"></span><div>
+                <div class="t">Couldn't tell</div>
+                <div class="d">Logged what I saw; someone with more experience should look.</div></div></div>
+              <div class="ocr"><span class="rad"></span><div>
+                <div class="t">Couldn't complete it</div>
+                <div class="d">Block flooded, machinery working, access blocked.</div></div></div>
+            </div>
+            <div class="recap">
+              <div><span class="k">Block</span><span class="v">M-12 · R3C7</span></div>
+              <div><span class="k">Observations</span><span class="v">4</span></div>
+              <div><span class="k">Photos</span><span class="v">2</span></div>
+              <div><span class="k">Observed at</span><span class="v">07:31</span></div>
+              <div><span class="k">Position</span><span class="v">±6 m, inside</span></div>
+            </div>
+          </div>
+          <div class="actions"><div class="btn pri">Submit visit</div></div>
+        </div></div>
+        <div class="cap"><b>Outcome</b> — resolved · inconclusive · blocked</div>
+      </div>
+
+      <div>
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span class="m">07:39</span><span class="m">⌁ 4G ▮ 73%</span></div>
+          <div class="abar"><div class="sp"></div></div>
+          <div class="done">
+            <div class="tick">✓</div>
+            <h4>Visit logged</h4>
+            <p>Hana has been notified. M-12 will be re-checked on the next satellite pass.</p>
+            <div class="recap">
+              <div><span class="k">Completed</span><span class="v">07:39 · 8 min</span></div>
+              <div><span class="k">Outcome</span><span class="v">Found the cause</span></div>
+              <div><span class="k">Deadline</span><span class="v" style="color:var(--ok)">17h to spare</span></div>
+            </div>
+          </div>
+          <div class="actions">
+            <div class="btn gho">Done</div>
+            <div class="btn pri">Next visit — D-04</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Confirmation</b> — then straight into the next one</div>
+      </div>
+    </div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 7 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div>
+    <div class="stage-num">07 · supervisor · web</div>
+    <h2>"Something looks off here — go and look"</h2>
+    <p class="sub">The origin with no alert and no recommendation behind it. A supervisor drops a pin
+      on the Farm Console map, writes a sentence, and picks who walks it. This is the path that turns
+      a hunch into a record.</p>
+
+    <div class="web" style="margin-top:26px">
+      <div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/labs/map — Bashayer</span></div>
+      <div class="wbody">
+        <div class="wmap">
+          <div class="wpoly"></div>
+          <div class="pin"></div>
+          <div class="pinlbl">29.9781, 32.5194</div>
+          <div style="position:absolute;left:13px;bottom:13px;font-family:var(--mono);font-size:10.5px;color:#8fa89a">
+            NDVI · 6 Aug · P-21 Potato South
+          </div>
+        </div>
+        <div class="wside">
+          <h5>Send someone to look</h5>
+          <div class="hint">No alert has fired here. This visit will carry your instructions.</div>
+          <div class="frm">
+            <label>Where</label>
+            <div class="inp sel">P-21 Potato South · pinned point <span class="car">▾</span></div>
+            <label>What should they check</label>
+            <div class="inp ta">The north edge looks patchy on last week's pass — no alert on it yet.
+              Walk that strip and tell me whether it's the dripline or something on the leaves.</div>
+            <label>Form to use</label>
+            <div class="inp sel">scout_general_v1 <span class="car">▾</span></div>
+            <label>Assign to</label>
+            <div class="inp sel">Youssef Barakat · Scout <span class="car">▾</span></div>
+            <label>Due within</label>
+            <div class="inp sel">48 hours <span class="car">▾</span></div>
+            <div class="wbtn">Send visit</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap" style="text-align:left"><b>Ad-hoc dispatch</b> — Farm Console map, <code style="font-family:var(--mono)">scouting.dispatch</code></div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h4>The only origin carrying human words</h4>
+      <p>Every other visit renders text from a template. This one carries
+      <code>instruction</code> and a <code>pin_point</code> — which is why it gets its own surface treatment on the phone.</p></div>
+    <div class="note"><h4>Reuses the console the map already is</h4>
+      <p>Dispatch is an action on the existing <code>/labs/map</code> Farm Console, not a new page.
+      The supervisor is already looking at the imagery when the hunch forms.</p></div>
+    <div class="note"><h4>Assign is optional</h4>
+      <p>Leave it empty and the visit lands in the triage queue as claimable.</p></div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ STAGE 8 ══════════ -->
+<section class="stage"><div class="wrap"><div class="stage-in">
+  <div class="notes">
+    <div class="note"><h4>Two dispatch modes, one board</h4>
+      <p>Farms set <code>mode</code> per routing rule. <code>auto</code> assigns and pushes immediately;
+      <code>triage</code> parks it here. The board shows both, so nothing is invisible.</p></div>
+    <div class="note warn"><h4>Auto with no assignee degrades to triage</h4>
+      <p>If the default scout is inactive and there is no fallback, the visit lands in this queue
+      rather than vanishing. Silent loss is the worst outcome available.</p></div>
+    <div class="note"><h4>One live visit per recommendation</h4>
+      <p>The daily evaluator re-walks every tree. A partial unique index on
+      <code>recommendation_id</code> is what stops a persistent NDVI dip from queueing a new
+      visit every morning.</p></div>
+  </div>
+
+  <div>
+    <div class="stage-num">08 · supervisor · web</div>
+    <h2>The triage queue</h2>
+    <p class="sub">Where machine-created work waits for a human decision — and where overdue
+      work refuses to be ignored.</p>
+
+    <div class="web" style="margin-top:26px">
+      <div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/scouting — Bashayer</span></div>
+      <div style="padding:15px 17px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px">
+        <span class="mini">Queued · 3</span><span class="mini g">In progress · 2</span>
+        <span class="mini g">Overdue · 1</span><span class="mini g">Done this week · 14</span>
+        <span style="flex:1"></span>
+        <span class="mini g">Routing rules</span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Block</th><th>Origin</th><th>Due</th><th>Assigned</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="bn">D-04 Date Palm East</div><div class="sm">Soil salinity above threshold</div></td>
+            <td><span class="obadge o-alert">alert</span></td>
+            <td><span class="due red">6h overdue</span></td>
+            <td><span class="asg"><span class="av">YB</span>Youssef B.</span></td>
+            <td style="text-align:right"><span class="mini">Escalate</span></td>
+          </tr>
+          <tr>
+            <td><div class="bn">M-08 Mango West</div><div class="sm">NDVI below baseline, moderate</div></td>
+            <td><span class="obadge o-rec">recommendation</span></td>
+            <td><span class="due amb">in 49h</span></td>
+            <td><span class="asg none">unassigned</span></td>
+            <td style="text-align:right"><span class="mini">Assign</span></td>
+          </tr>
+          <tr>
+            <td><div class="bn">P-14 Potato Mid</div><div class="sm">Frost risk overnight</div></td>
+            <td><span class="obadge o-alert">alert</span></td>
+            <td><span class="due amb">in 11h</span></td>
+            <td><span class="asg none">unassigned</span></td>
+            <td style="text-align:right"><span class="mini">Assign</span></td>
+          </tr>
+          <tr>
+            <td><div class="bn">Bashayer East · 4 blocks</div><div class="sm">Weekly round</div></td>
+            <td><span class="obadge o-routine">routine</span></td>
+            <td><span class="due gry">Mon</span></td>
+            <td><span class="asg"><span class="av">MS</span>Mahmoud S.</span></td>
+            <td style="text-align:right"><span class="mini g">View</span></td>
+          </tr>
+          <tr>
+            <td><div class="bn">M-12 Mango North</div><div class="sm">Water stress — blocked dripline</div></td>
+            <td><span class="obadge o-rec">recommendation</span></td>
+            <td><span class="due gry">done 07:39</span></td>
+            <td><span class="asg"><span class="av">YB</span>Youssef B.</span></td>
+            <td style="text-align:right"><span class="mini g">Review</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cap" style="text-align:left"><b>Triage queue</b> — <code style="font-family:var(--mono)">scouting.visit.assign</code></div>
+  </div>
+</div></div></section>
+
+<!-- ══════════ CLOSING ══════════ -->
+<section class="close"><div class="wrap">
+  <h2>What these screens commit us to</h2>
+  <div class="cols">
+    <div class="col">
+      <h4>Already exists</h4>
+      <ul>
+        <li><b>The trigger.</b> <span class="m">scout_for_stress_v1</span> emits severity, priority and <span class="m">within_hours</span>, bilingual.</li>
+        <li><b>The observation model.</b> Typed values, photos, GPS, notes — no schema change.</li>
+        <li><b>The form model.</b> Signal templates with ordering and required flags.</li>
+        <li><b>The role.</b> <span class="m">Scout</span>, farm-scoped, working since PR #269.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>Has to be built</h4>
+      <ul>
+        <li><b>scouting_visits</b> — dispatch, deadline, state machine.</li>
+        <li><b>A push channel</b> plus a device-token registry.</li>
+        <li><b>Routing rules</b> — triage and auto, resolved block → farm → tenant.</li>
+        <li><b>The scouting forms themselves.</b> No signal catalogue exists today.</li>
+        <li><b>The Android client.</b> The long pole.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>Decide before building</h4>
+      <ul>
+        <li><b>Does v1 include the loop-closing trees?</b> Without them, findings are read by people, not by the engine.</li>
+        <li><b>Is online-only survivable at the pilot farm?</b> Check coverage on the actual blocks first.</li>
+        <li><b>Who provisions scouts?</b> Every scout needs a Keycloak account.</li>
+        <li><b>SMS fallback for critical?</b> Push alone is not guaranteed on all Android builds.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+</body>
+</html>

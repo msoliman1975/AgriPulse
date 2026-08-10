@@ -371,3 +371,98 @@ async def test_a_far_future_raised_from_filters_everything_out(admin_session: An
     )
     assert listing.total == 0
     assert listing.status_counts["all"] == 0
+
+
+@pytest.mark.asyncio
+async def test_dispatching_to_scout_opens_a_visit_not_a_board_activity(
+    admin_session: Any,
+) -> None:
+    """The link that makes the phone the destination.
+
+    Action Center originally dispatched only to the board, while the mobile app
+    reads `scouting_visits` — so a triaged item could never reach a handset.
+    """
+    seeded = await _seed(admin_session)
+    result = await _service(admin_session).dispatch(
+        farm_id=seeded["farm_id"],
+        item_ids=[seeded["rec_owned"]],
+        assigned_membership_id=None,
+        scheduled_date=date(2026, 8, 10),
+        notes="Walk the north edge.",
+        actor_user_id=None,
+        tenant_schema=seeded["schema"],
+        target="scout",
+    )
+    assert result.dispatched == 1, result.results
+    entry = result.results[0]
+    assert entry.visit_id is not None
+    assert entry.activity_id is None  # a visit, not board work
+
+    row = (
+        (
+            await admin_session.execute(
+                text(
+                    "SELECT origin, status, recommendation_id, assigned_to, due_by, "
+                    "reason_snapshot->>'note' AS note "
+                    "FROM scouting_visits WHERE id = :v"
+                ),
+                {"v": entry.visit_id},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["origin"] == "recommendation"
+    assert row["recommendation_id"] == seeded["rec_owned"]
+    # The supervisor's words survive: `instruction` is CHECK-limited to ad_hoc,
+    # so a non-ad_hoc visit carries them in reason_snapshot instead.
+    # This fixture's "owner" is a bare uuid4 with no membership behind it, so
+    # no Keycloak subject resolves. The visit must still land — queued, so any
+    # scout on the farm can claim it — and the result must NOT claim it was
+    # assigned to someone it was not.
+    assert row["status"] == "queued"
+    assert row["assigned_to"] is None
+    assert entry.assigned_membership_id is None
+    assert entry.assignee_defaulted is False
+    # End of the working day, not midday: "today" must not arrive overdue.
+    assert row["due_by"].hour == 18
+
+
+@pytest.mark.asyncio
+async def test_dispatching_the_same_item_to_a_scout_twice_does_not_duplicate_it(
+    admin_session: Any,
+) -> None:
+    """The routing rules may already have opened a visit for this item.
+
+    Triaging it by hand afterwards must not put the same walk on the list
+    twice; the partial UNIQUE catches it and it reports as already dispatched
+    rather than as an error.
+    """
+    seeded = await _seed(admin_session)
+    svc = _service(admin_session)
+    kwargs: dict[str, Any] = {
+        "farm_id": seeded["farm_id"],
+        "item_ids": [seeded["alert_id"]],
+        "assigned_membership_id": None,
+        "scheduled_date": None,
+        "notes": None,
+        "actor_user_id": None,
+        "tenant_schema": seeded["schema"],
+        "target": "scout",
+    }
+    first = await svc.dispatch(**kwargs)
+    assert first.results[0].visit_id is not None
+
+    second = await svc.dispatch(**kwargs)
+    entry = second.results[0]
+    assert entry.already_dispatched is True
+    assert entry.error is None
+    assert entry.visit_id is None
+
+    count = (
+        await admin_session.execute(
+            text("SELECT count(*) FROM scouting_visits WHERE alert_id = :a"),
+            {"a": seeded["alert_id"]},
+        )
+    ).scalar_one()
+    assert count == 1

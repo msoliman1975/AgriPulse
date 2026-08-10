@@ -51,6 +51,8 @@ export type Capability =
   | "decision_tree.manage"
   | "signal.read"
   | "signal.define"
+  // Platform-scoped: authors the shared catalog every tenant reads.
+  | "signal.platform.manage"
   | "signal.record"
   | "signal.delete_observation"
   | "user.read"

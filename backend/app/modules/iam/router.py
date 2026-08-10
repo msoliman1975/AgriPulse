@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
+from app.modules.iam.field_enrolment import get_field_enrolment_service
 from app.modules.iam.schemas import (
     MeResponse,
     TenantUserResponse,
@@ -285,3 +287,168 @@ async def delete_tenant_user(
         )
     except TenantUserNotFoundError as exc:
         raise _user_not_found(user_id) from exc
+
+
+# ---------- Field enrolment (phone + PIN) -----------------------------------
+
+
+class FieldEnrolmentRequest(BaseModel):
+    """Give one field worker app access.
+
+    No email: this whole path exists because the person does not have one.
+    """
+
+    phone: str = Field(min_length=6, max_length=32)
+    full_name: str = Field(min_length=1, max_length=200)
+    farm_id: UUID
+    role: Literal["Scout", "FieldOperator"] = "Scout"
+    # Link an existing `resources` worker rather than creating a second row for
+    # somebody the farm already knows about.
+    worker_id: UUID | None = None
+
+
+class FieldEnrolmentResponse(BaseModel):
+    """The PIN is here **once**.
+
+    It is not stored in readable form and no endpoint returns it again — a
+    forgotten PIN is re-issued, not looked up. The client is expected to show
+    it, let the supervisor read it aloud, and then drop it.
+    """
+
+    user_id: UUID
+    membership_id: UUID
+    worker_id: UUID | None
+    phone: str
+    pin: str
+
+
+@router.post(
+    "/users/field-enrolment",
+    response_model=FieldEnrolmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Enrol a field worker who signs in with a phone number and a PIN.",
+)
+async def enrol_field_worker(
+    payload: FieldEnrolmentRequest,
+    # `user.invite` rather than a new capability: this is the same act as
+    # inviting a teammate, differing only in how the person is reached.
+    context: RequestContext = Depends(requires_capability("user.invite")),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    slug_row = (
+        await session.execute(
+            text("SELECT slug FROM public.tenants WHERE id = :t"), {"t": tenant_id}
+        )
+    ).first()
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    result = await service.enrol(
+        tenant_id=tenant_id,
+        tenant_slug=str(slug_row.slug) if slug_row else schema,
+        farm_id=payload.farm_id,
+        phone=payload.phone,
+        full_name=payload.full_name,
+        role=payload.role,
+        worker_id=payload.worker_id,
+        actor_user_id=context.user_id,
+    )
+    return {
+        "user_id": result.user_id,
+        "membership_id": result.membership_id,
+        "worker_id": result.worker_id,
+        "phone": result.phone,
+        "pin": result.pin,
+    }
+
+
+class WorkerBrief(BaseModel):
+    id: UUID
+    name: str
+    role: str | None = None
+    has_phone: bool
+
+
+class FieldEnrolmentAuditResponse(BaseModel):
+    """A worklist, not a directory: each bucket implies a different next step."""
+
+    total: int
+    enrolled: list[WorkerBrief]
+    ready_to_enrol: list[WorkerBrief]
+    # `FieldWorker` holds no capabilities, so these people can be scheduled but
+    # can never sign in. Re-role them before enrolling.
+    blocked_by_role: list[WorkerBrief]
+    # The phone is the username, so no phone means no possible account.
+    missing_phone: list[WorkerBrief]
+
+
+class ReRoleRequest(BaseModel):
+    worker_ids: list[UUID] = Field(min_length=1, max_length=500)
+    role: Literal["Scout", "FieldOperator"] = "Scout"
+
+
+class ReRoleResponse(BaseModel):
+    updated: int
+
+
+class PinReissueResponse(BaseModel):
+    """The new PIN, shown once. The previous one stops working immediately."""
+
+    user_id: UUID
+    pin: str
+
+
+@router.get(
+    "/users/field-enrolment/audit",
+    response_model=FieldEnrolmentAuditResponse,
+    summary="Which workers can be given the app, and which cannot yet.",
+)
+async def audit_field_workers(
+    farm_id: UUID | None = None,
+    context: RequestContext = Depends(requires_capability("user.read")),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    return await service.audit_workers(farm_id=farm_id)
+
+
+@router.post(
+    "/users/field-enrolment/re-role",
+    response_model=ReRoleResponse,
+    summary="Promote FieldWorker rows so they can hold an app login.",
+)
+async def re_role_field_workers(
+    payload: ReRoleRequest,
+    context: RequestContext = Depends(requires_capability("user.invite")),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    updated = await service.re_role_field_workers(
+        worker_ids=tuple(payload.worker_ids), role=payload.role
+    )
+    return {"updated": updated}
+
+
+@router.post(
+    "/users/{user_id}/field-pin:reissue",
+    response_model=PinReissueResponse,
+    summary="Issue a new PIN for a field worker who forgot theirs.",
+)
+async def reissue_field_pin(
+    user_id: UUID,
+    # Same capability as enrolling: handing someone a working credential is the
+    # same act whether it is their first or their third.
+    context: RequestContext = Depends(requires_capability("user.invite")),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    pin = await service.reissue_pin(tenant_id=tenant_id, user_id=user_id)
+    return {"user_id": user_id, "pin": pin}

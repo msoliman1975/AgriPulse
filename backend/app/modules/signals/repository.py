@@ -1,7 +1,28 @@
 """Async DB access for the signals module. Internal to the module.
 
-All three tables are tenant-scoped; the caller binds the session to
-the right schema via `SET LOCAL search_path` before calling in.
+`signal_assignments` and `signal_observations` are tenant-scoped; the caller
+binds the session to the right schema via `SET LOCAL search_path` before
+calling in.
+
+The **catalog** (`signal_definitions`, `signal_templates` and their junction)
+moved to `public` with a nullable `tenant_id` (public migration 0052 / tenant
+0063), so schema placement alone no longer isolates tenants. Every catalog
+query must therefore carry an explicit scope predicate:
+
+* reads  -> `_visible_scope()`, platform-curated rows **plus** this tenant's;
+* writes -> an inline `tenant_id IS NOT DISTINCT FROM (…current_schema()…)`
+  predicate, which resolves to "rows owned by whoever this session is".
+
+`IS NOT DISTINCT FROM` rather than `=` is load-bearing, not pedantry. A
+platform-admin session runs with `search_path = public`, so the subquery is
+NULL — and `tenant_id = NULL` is never true, which would have silently blocked
+platform admins from editing the very catalog they own. `IS NOT DISTINCT FROM`
+makes NULL match NULL, so the same predicate gives a tenant its own rows and a
+platform session the platform rows, while neither can reach the other's.
+
+Omitting them is not a style question: an unscoped `select(SignalDefinition)`
+returns every tenant's definitions, and an unscoped UPDATE lets a tenant edit
+the platform catalog for everyone.
 """
 
 from __future__ import annotations
@@ -12,7 +33,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, String, bindparam, select, text
+from sqlalchemy import ColumnElement, String, bindparam, or_, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +50,22 @@ from app.modules.signals.models import (
     SignalTemplateDefinition,
 )
 
+# Resolves the session's tenant from its own search_path, the way
+# `snapshot.py` and tenant migration 0063 do: sessions are bound with
+# `SET LOCAL search_path TO tenant_<id>, public`, so current_schema() is the
+# tenant schema and schema names are the tenant uuid with dashes stripped.
+# Keeping it in SQL means the repository needs no extra constructor argument
+# and cannot be handed a tenant id that disagrees with its session.
+_THIS_TENANT_ID = text(
+    "(SELECT t.id FROM public.tenants t "
+    "WHERE replace(t.id::text, '-', '') = replace(current_schema(), 'tenant_', ''))"
+)
+
+
+def _visible_scope(model: Any) -> ColumnElement[bool]:
+    """Catalog rows this tenant may **read**: platform-curated plus its own."""
+    return or_(model.tenant_id.is_(None), model.tenant_id == _THIS_TENANT_ID)
+
 
 class SignalsRepository:
     """Internal repository — service layer is the only consumer."""
@@ -41,27 +78,47 @@ class SignalsRepository:
     async def list_definitions(
         self, *, include_inactive: bool = False
     ) -> tuple[dict[str, Any], ...]:
-        clauses = [SignalDefinition.deleted_at.is_(None)]
+        clauses = [SignalDefinition.deleted_at.is_(None), _visible_scope(SignalDefinition)]
         if not include_inactive:
             clauses.append(SignalDefinition.is_active.is_(True))
-        stmt = select(SignalDefinition).where(*clauses).order_by(SignalDefinition.code.asc())
+        # Tenant rows shadow a platform row sharing their code, so the tenant
+        # copy sorts first and `DISTINCT ON (code)` keeps it — the same rule
+        # snapshot.py applies before the evaluator sees a definition.
+        stmt = (
+            select(SignalDefinition)
+            .where(*clauses)
+            .distinct(SignalDefinition.code)
+            .order_by(SignalDefinition.code.asc(), SignalDefinition.tenant_id.nullslast())
+        )
         rows = (await self._session.execute(stmt)).scalars().all()
         return tuple(_definition_to_dict(r) for r in rows)
 
     async def get_definition(
         self, *, definition_id: UUID | None = None, code: str | None = None
     ) -> dict[str, Any] | None:
-        clauses: list[ColumnElement[bool]] = [SignalDefinition.deleted_at.is_(None)]
+        clauses: list[ColumnElement[bool]] = [
+            SignalDefinition.deleted_at.is_(None),
+            _visible_scope(SignalDefinition),
+        ]
         if definition_id is not None:
             clauses.append(SignalDefinition.id == definition_id)
         elif code is not None:
             clauses.append(SignalDefinition.code == code)
         else:
             raise ValueError("must provide definition_id or code")
+        # A code lookup can match both tiers; the tenant's row shadows the
+        # platform one. `.first()` over the shadowing order rather than
+        # `.one_or_none()`, which would raise on a legitimate collision.
         row = (
-            (await self._session.execute(select(SignalDefinition).where(*clauses)))
+            (
+                await self._session.execute(
+                    select(SignalDefinition)
+                    .where(*clauses)
+                    .order_by(SignalDefinition.tenant_id.nullslast())
+                )
+            )
             .scalars()
-            .one_or_none()
+            .first()
         )
         return _definition_to_dict(row) if row is not None else None
 
@@ -86,14 +143,18 @@ class SignalsRepository:
             await self._session.execute(
                 text(
                     """
-                    INSERT INTO signal_definitions (
-                        id, code, name, description, value_kind, unit,
+                    INSERT INTO public.signal_definitions (
+                        id, tenant_id, code, name, description, value_kind, unit,
                         categorical_values, value_min, value_max,
                         attachment_allowed, is_active,
                         aggregation, aggregation_window_days,
                         created_by, updated_by
                     ) VALUES (
-                        :id, :code, :name, :description, :value_kind, :unit,
+                        :id,
+                        (SELECT t.id FROM public.tenants t
+                          WHERE replace(t.id::text, '-', '')
+                                = replace(current_schema(), 'tenant_', '')),
+                        :code, :name, :description, :value_kind, :unit,
                         :categorical_values, :value_min, :value_max,
                         :attachment_allowed, TRUE,
                         :aggregation, :aggregation_window_days,
@@ -121,7 +182,11 @@ class SignalsRepository:
                 },
             )
         except IntegrityError as exc:
-            if "uq_signal_definitions_code_active" in str(exc):
+            # Index renamed by public migration 0052: code uniqueness is now
+            # partitioned by scope, so a tenant colliding with its own code
+            # trips `uq_signal_definitions_tenant_code`. The platform-tier
+            # index can only be violated by platform authoring, not from here.
+            if "uq_signal_definitions_tenant_code" in str(exc):
                 raise SignalCodeAlreadyExistsError(code) from exc
             raise
         await self._session.flush()
@@ -167,8 +232,13 @@ class SignalsRepository:
         sets.extend(["updated_at = now()", "updated_by = :actor"])
         await self._session.execute(
             text(
-                f"UPDATE signal_definitions SET {', '.join(sets)} "
-                "WHERE id = :id AND deleted_at IS NULL"
+                f"UPDATE public.signal_definitions SET {', '.join(sets)} "
+                "WHERE id = :id AND deleted_at IS NULL "
+                # Own rows only. Aimed at a platform row this matches nothing,
+                # rather than editing the catalog every tenant reads.
+                "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
+                "WHERE replace(t.id::text, '-', '') "
+                "= replace(current_schema(), 'tenant_', ''))"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -182,9 +252,12 @@ class SignalsRepository:
     ) -> bool:
         result = await self._session.execute(
             text(
-                "UPDATE signal_definitions "
+                "UPDATE public.signal_definitions "
                 "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
-                "WHERE id = :id AND deleted_at IS NULL"
+                "WHERE id = :id AND deleted_at IS NULL "
+                "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
+                "WHERE replace(t.id::text, '-', '') "
+                "= replace(current_schema(), 'tenant_', ''))"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -280,10 +353,15 @@ class SignalsRepository:
     # text matching for two different constraints.
 
     async def list_templates(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
-        clauses = [SignalTemplate.deleted_at.is_(None)]
+        clauses = [SignalTemplate.deleted_at.is_(None), _visible_scope(SignalTemplate)]
         if not include_inactive:
             clauses.append(SignalTemplate.is_active.is_(True))
-        stmt = select(SignalTemplate).where(*clauses).order_by(SignalTemplate.code.asc())
+        stmt = (
+            select(SignalTemplate)
+            .where(*clauses)
+            .distinct(SignalTemplate.code)
+            .order_by(SignalTemplate.code.asc(), SignalTemplate.tenant_id.nullslast())
+        )
         rows = (await self._session.execute(stmt)).scalars().all()
         return tuple(_template_to_dict(r) for r in rows)
 
@@ -291,6 +369,7 @@ class SignalsRepository:
         stmt = select(SignalTemplate).where(
             SignalTemplate.id == template_id,
             SignalTemplate.deleted_at.is_(None),
+            _visible_scope(SignalTemplate),
         )
         row = (await self._session.execute(stmt)).scalars().one_or_none()
         return _template_to_dict(row) if row is not None else None
@@ -343,10 +422,14 @@ class SignalsRepository:
                     text(
                         """
                     SELECT t.id AS id, t.code AS code, t.name AS name
-                    FROM signal_template_definitions td
-                    JOIN signal_templates t ON t.id = td.template_id
+                    FROM public.signal_template_definitions td
+                    JOIN public.signal_templates t ON t.id = td.template_id
                     WHERE td.signal_definition_id = :did
                       AND t.deleted_at IS NULL
+                      AND (t.tenant_id IS NULL OR t.tenant_id = (
+                            SELECT x.id FROM public.tenants x
+                             WHERE replace(x.id::text, '-', '')
+                                   = replace(current_schema(), 'tenant_', '')))
                     ORDER BY t.name
                     """
                     ).bindparams(bindparam("did", type_=PG_UUID(as_uuid=True))),
@@ -366,8 +449,8 @@ class SignalsRepository:
                     text(
                         """
                     SELECT d.code AS code
-                    FROM signal_template_definitions td
-                    JOIN signal_definitions d ON d.id = td.signal_definition_id
+                    FROM public.signal_template_definitions td
+                    JOIN public.signal_definitions d ON d.id = td.signal_definition_id
                     WHERE td.template_id = :tid
                     """
                     ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
@@ -400,11 +483,15 @@ class SignalsRepository:
             await self._session.execute(
                 text(
                     """
-                    INSERT INTO signal_templates (
-                        id, code, name, description,
+                    INSERT INTO public.signal_templates (
+                        id, tenant_id, code, name, description,
                         is_active, created_by, updated_by
                     ) VALUES (
-                        :id, :code, :name, :description,
+                        :id,
+                        (SELECT t.id FROM public.tenants t
+                          WHERE replace(t.id::text, '-', '')
+                                = replace(current_schema(), 'tenant_', '')),
+                        :code, :name, :description,
                         TRUE, :actor, :actor
                     )
                     """
@@ -421,7 +508,10 @@ class SignalsRepository:
                 },
             )
         except IntegrityError as exc:
-            if "uq_signal_templates_code_alive" in str(exc):
+            # Renamed by public migration 0052 — uniqueness is partitioned by
+            # scope, so a tenant colliding with its own code trips the
+            # tenant-tier index.
+            if "uq_signal_templates_tenant_code" in str(exc):
                 raise SignalTemplateCodeAlreadyExistsError(code) from exc
             raise
         await self._insert_template_members(template_id=template_id, members=members)
@@ -454,8 +544,12 @@ class SignalsRepository:
             sets.extend(["updated_at = now()", "updated_by = :actor"])
             await self._session.execute(
                 text(
-                    f"UPDATE signal_templates SET {', '.join(sets)} "
-                    "WHERE id = :id AND deleted_at IS NULL"
+                    f"UPDATE public.signal_templates SET {', '.join(sets)} "
+                    "WHERE id = :id AND deleted_at IS NULL "
+                    # Own rows only — a platform template matches nothing here.
+                    "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
+                    "WHERE replace(t.id::text, '-', '') "
+                    "= replace(current_schema(), 'tenant_', ''))"
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -464,9 +558,17 @@ class SignalsRepository:
             )
         if members is not None:
             await self._session.execute(
-                text("DELETE FROM signal_template_definitions WHERE template_id = :id").bindparams(
-                    bindparam("id", type_=PG_UUID(as_uuid=True))
-                ),
+                text(
+                    "DELETE FROM public.signal_template_definitions td "
+                    "WHERE td.template_id = :id "
+                    # Guard the junction too: without it a tenant could clear
+                    # the members of a platform template for everyone.
+                    "AND EXISTS (SELECT 1 FROM public.signal_templates t "
+                    "WHERE t.id = td.template_id AND t.tenant_id IS NOT DISTINCT FROM "
+                    "(SELECT x.id FROM public.tenants x "
+                    "WHERE replace(x.id::text, '-', '') "
+                    "= replace(current_schema(), 'tenant_', '')))"
+                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
                 {"id": template_id},
             )
             await self._insert_template_members(template_id=template_id, members=members)
@@ -475,9 +577,12 @@ class SignalsRepository:
     async def soft_delete_template(self, *, template_id: UUID, actor_user_id: UUID | None) -> bool:
         result = await self._session.execute(
             text(
-                "UPDATE signal_templates "
+                "UPDATE public.signal_templates "
                 "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
-                "WHERE id = :id AND deleted_at IS NULL"
+                "WHERE id = :id AND deleted_at IS NULL "
+                "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
+                "WHERE replace(t.id::text, '-', '') "
+                "= replace(current_schema(), 'tenant_', ''))"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -493,9 +598,12 @@ class SignalsRepository:
         assertion helpers in tests.)"""
         if not definition_ids:
             return ()
+        # Scoped: an id belonging to another tenant must read as *missing*,
+        # so a template can never be built from a definition we cannot see.
         stmt = select(SignalDefinition.id).where(
             SignalDefinition.id.in_(definition_ids),
             SignalDefinition.deleted_at.is_(None),
+            _visible_scope(SignalDefinition),
         )
         present = set((await self._session.execute(stmt)).scalars().all())
         return tuple(d for d in definition_ids if d not in present)
@@ -525,7 +633,7 @@ class SignalsRepository:
             binds.append(bindparam(f"def_id_{i}", type_=PG_UUID(as_uuid=True)))
         await self._session.execute(
             text(
-                "INSERT INTO signal_template_definitions "
+                "INSERT INTO public.signal_template_definitions "
                 "(signal_definition_id, template_id, position, is_required) "
                 f"VALUES {', '.join(value_rows)}"
             ).bindparams(*binds),
@@ -716,7 +824,9 @@ class SignalsRepository:
                    array_agg(DISTINCT d.code) AS signal_codes,
                    MIN(o.recorded_by::text)::uuid AS recorded_by
             FROM signal_observations o
-            JOIN signal_definitions d ON d.id = o.signal_definition_id
+            -- Observations are tenant-scoped, so joining the shared catalog by
+            -- id cannot pull in another tenant's rows.
+            JOIN public.signal_definitions d ON d.id = o.signal_definition_id
             WHERE o.farm_id = :farm_id
               AND o.import_batch_id IS NOT NULL
             GROUP BY o.import_batch_id
@@ -791,7 +901,8 @@ class SignalsRepository:
             "            ELSE ST_AsGeoJSON(o.location_point)::jsonb END AS location_point_geojson, "
             "       o.template_observation_id "
             "FROM signal_observations o "
-            "JOIN signal_definitions d ON d.id = o.signal_definition_id "
+            # Tenant-scoped observations gate this join; see list_import_batches.
+            "JOIN public.signal_definitions d ON d.id = o.signal_definition_id "
             f"{where_sql} "
             "ORDER BY o.time DESC LIMIT :limit"
         )
@@ -817,11 +928,18 @@ class SignalsRepository:
                     text(
                         """
                     WITH applicable AS (
-                        SELECT DISTINCT d.id, d.code
-                        FROM signal_definitions d
+                        -- Same two-tier + shadowing resolution as snapshot.py:
+                        -- platform rows plus this tenant's, one row per code,
+                        -- the tenant's winning a collision.
+                        SELECT DISTINCT ON (d.code) d.id, d.code
+                        FROM public.signal_definitions d
                         JOIN signal_assignments a ON a.signal_definition_id = d.id
                         WHERE d.deleted_at IS NULL
                           AND d.is_active = TRUE
+                          AND (d.tenant_id IS NULL OR d.tenant_id = (
+                                SELECT x.id FROM public.tenants x
+                                 WHERE replace(x.id::text, '-', '')
+                                       = replace(current_schema(), 'tenant_', '')))
                           AND a.deleted_at IS NULL
                           AND a.is_active = TRUE
                           AND (
@@ -829,6 +947,7 @@ class SignalsRepository:
                              OR (a.block_id = :block_id)
                              OR (a.farm_id = :farm_id AND a.block_id IS NULL)
                           )
+                        ORDER BY d.code, d.tenant_id NULLS LAST
                     ),
                     latest AS (
                         SELECT DISTINCT ON (o.signal_definition_id)

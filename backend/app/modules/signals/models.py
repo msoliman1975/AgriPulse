@@ -1,4 +1,25 @@
-"""Signals ORM models. All tables live in the per-tenant schema.
+"""Signals ORM models. Catalog in `public`, operational data per tenant.
+
+The catalog gained a platform tier (public migration 0052 / tenant 0063):
+`signal_definitions`, `signal_templates` and `signal_template_definitions`
+moved to `public` with a nullable `tenant_id` acting as the scope
+discriminator, mirroring `public.decision_trees`::
+
+    tenant_id IS NULL      -> platform-curated  (authored at /platform/signals)
+    tenant_id IS NOT NULL  -> tenant-authored
+
+Reads must therefore be two-tier — `WHERE tenant_id IS NULL OR tenant_id = :tid`
+— and where two rows share a `code`, **the tenant's row shadows the platform
+one** (see `snapshot.py`). Writes must stamp `tenant_id` and must refuse to
+touch platform rows from a tenant context.
+
+`signal_assignments` and `signal_observations` stay per-tenant: they are
+operational data, not catalog. `signal_assignments.signal_definition_id` is now
+a cross-schema FK into `public.signal_definitions`, the same shape as
+`tenant_memberships.user_id -> public.users.id`. `signal_observations`
+references definitions with **no FK at all** — a deliberate logical reference,
+which is why the migration preserved primary keys and the hypertable never had
+to be rewritten.
 
 `signal_observations` is a TimescaleDB hypertable (no `PRIMARY KEY`
 that excludes the time column); we expose `time` + `id` as the replay
@@ -42,13 +63,25 @@ from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
 
 class SignalDefinition(Base, TimestampedMixin):
-    """`tenant_<id>.signal_definitions` — what kinds of signals exist."""
+    """`public.signal_definitions` — what kinds of signals exist.
+
+    Two-tier: ``tenant_id IS NULL`` is a platform-curated definition visible to
+    every tenant; a non-NULL ``tenant_id`` is that tenant's own. Code uniqueness
+    is partitioned by scope via two partial indexes, both of which keep the
+    original ``deleted_at IS NULL`` predicate so a soft-deleted definition frees
+    its code for reuse.
+    """
 
     __tablename__ = "signal_definitions"
+    __table_args__ = {"schema": "public"}
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
+    # NULL = platform-curated. No FK to public.tenants: purge removes tenant
+    # rows through the ownership manifest (shared/purge/registry.py), and a
+    # CASCADE here would let a tenant delete take the platform catalog with it.
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -84,9 +117,27 @@ class SignalAssignment(Base, TimestampedMixin):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
+    # Deliberately NOT a foreign key into public.signal_definitions, even
+    # though the row does reference it. A tenant -> public FK makes the
+    # referenced table part of every tenant schema's dependency graph, so
+    # `DROP SCHEMA tenant_x CASCADE` must take an ACCESS EXCLUSIVE lock on
+    # public.signal_definitions to drop the constraint. That lock conflicts
+    # with the ROW EXCLUSIVE any other tenant holds while creating a tenant or
+    # authoring a signal, so a single purge serialises tenant lifecycle across
+    # the whole platform — and blocks indefinitely behind one idle transaction.
+    # Found exactly that way: nine tenancy tests went from 9s to a hard hang.
+    #
+    # Nothing is lost. The FK's ON DELETE CASCADE could never fire: definitions
+    # are soft-deleted (`deleted_at`), and the one hard delete — tenant purge —
+    # removes signal_assignments through its own manifest entry, whose `fk`
+    # flag is informational because the engine always deletes explicitly.
+    #
+    # This is also the only shape the rest of the schema uses: no other tenant
+    # table carries an FK into public. (An earlier comment here claimed
+    # tenant_memberships.user_id as precedent; that table lives in *public*,
+    # so its FK is public -> public and proves the opposite.)
     signal_definition_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("signal_definitions.id", ondelete="CASCADE"),
         nullable=False,
     )
     farm_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
@@ -169,18 +220,22 @@ class SignalObservation(Base):
 
 
 class SignalTemplate(Base, TimestampedMixin):
-    """`tenant_<id>.signal_templates` — CS-1 D1.
+    """`public.signal_templates` — CS-1 D1.
 
     Groups N `SignalDefinition`s for the entry/log UX. The engine
     still sees flat per-definition observations; templates are a
-    UX-only construct. Codes are unique among live rows.
+    UX-only construct. Codes are unique among live rows, partitioned
+    by scope like `SignalDefinition`.
     """
 
     __tablename__ = "signal_templates"
+    __table_args__ = {"schema": "public"}
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
+    # NULL = platform-curated; see SignalDefinition.tenant_id.
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -188,7 +243,7 @@ class SignalTemplate(Base, TimestampedMixin):
 
 
 class SignalTemplateDefinition(Base):
-    """`tenant_<id>.signal_template_definitions` — junction table.
+    """`public.signal_template_definitions` — junction table.
 
     Ordered (`position`) and optionally `is_required`. The
     per-template UX uses `position` for field order and `is_required`
@@ -198,18 +253,21 @@ class SignalTemplateDefinition(Base):
     """
 
     __tablename__ = "signal_template_definitions"
+    __table_args__ = {"schema": "public"}
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
+    # Owned transitively through its template — the junction carries no
+    # tenant_id of its own, so it never appears in the purge ownership sweep.
     template_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("signal_templates.id", ondelete="CASCADE"),
+        ForeignKey("public.signal_templates.id", ondelete="CASCADE"),
         nullable=False,
     )
     signal_definition_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("signal_definitions.id", ondelete="CASCADE"),
+        ForeignKey("public.signal_definitions.id", ondelete="CASCADE"),
         nullable=False,
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)

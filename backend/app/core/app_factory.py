@@ -183,6 +183,10 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.recommendations.router import router as recommendations_router
     from app.modules.reports.router import router as reports_router
     from app.modules.resources.router import router as resources_router
+    from app.modules.scouting.router import router as scouting_router
+    from app.modules.scouting.subscribers import (
+        register_subscribers as register_scouting_subscribers,
+    )
     from app.modules.signals.router import router as signals_router
     from app.modules.tenancy.router import router as tenancy_router
     from app.modules.weather.router import router as weather_router
@@ -210,6 +214,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(insights_router)
     app.include_router(reports_router)
     app.include_router(signals_router)
+    app.include_router(scouting_router)
     app.include_router(integrations_health_router)
     app.include_router(integrations_router)
     app.include_router(platform_defaults_router)
@@ -223,7 +228,10 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     # Cross-module event subscribers â€” registered once per process.
     # Imagery's subscriber listens for BlockBoundaryChangedV1 from
     # farms and resets cached scenes accordingly. Notifications listens
-    # for AlertOpenedV1 and fans out per-channel dispatches.
+    # for AlertOpenedV1 and fans out per-channel dispatches. Scouting
+    # listens for both alert and recommendation events and auto-creates
+    # field visits from them.
     bus = get_default_bus()
     register_imagery_subscribers(bus)
     register_notifications_subscribers(bus)
+    register_scouting_subscribers(bus)

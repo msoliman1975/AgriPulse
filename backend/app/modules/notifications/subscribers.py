@@ -20,6 +20,7 @@ items (one per scoped user) plus M ``notification_dispatches`` rows
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -32,10 +33,12 @@ from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.alerts.events import AlertOpenedV1
 from app.modules.notifications.events import InboxItemCreatedV1
+from app.modules.notifications.push import PushSendError, send_push
 from app.modules.notifications.smtp import SmtpSendError, send_email
 from app.modules.notifications.templates import render
 from app.modules.notifications.webhook import WebhookSendError, send_webhook
 from app.modules.recommendations.events import RecommendationOpenedV1
+from app.modules.scouting.events import ScoutingVisitAssignedV1
 from app.shared.db.session import sanitize_tenant_schema
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.realtime import publish_to_user
@@ -44,8 +47,11 @@ _log = get_logger(__name__)
 _DEFAULT_LOCALE = "en"
 # Channels iterated *per user*. The webhook channel is tenant-scoped
 # (one URL per tenant) so it runs once per alert, outside this loop.
-_PER_USER_CHANNELS = ("in_app", "email")
-_KNOWN_CHANNELS = ("in_app", "email", "webhook")
+# `push` joins the per-user fan-out: it targets a person's devices, unlike
+# webhook which is tenant-scoped. Opt-in still runs through the existing
+# user_preferences.notification_channels array.
+_PER_USER_CHANNELS = ("in_app", "email", "push")
+_KNOWN_CHANNELS = ("in_app", "email", "webhook", "push")
 
 _sync_engine = None
 _sync_factory: sessionmaker[Session] | None = None
@@ -275,6 +281,7 @@ def _insert_dispatch(
     *,
     alert_id: UUID | None = None,
     recommendation_id: UUID | None = None,
+    visit_id: UUID | None = None,
     template_code: str,
     locale: str,
     channel: str,
@@ -292,20 +299,22 @@ def _insert_dispatch(
     # the handler runs twice for the same source row (e.g. duplicate
     # subscriber registration in tests, or re-evaluation of a still-
     # active rule/tree before the prior row is resolved).
-    if (alert_id is None) == (recommendation_id is None):
-        raise ValueError("exactly one of alert_id / recommendation_id must be set")
+    # Mirrors the table's CHECK: a dispatch names exactly one source.
+    sources = sum(x is not None for x in (alert_id, recommendation_id, visit_id))
+    if sources != 1:
+        raise ValueError("exactly one of alert_id / recommendation_id / visit_id must be set")
     sp = session.begin_nested()
     try:
         session.execute(
             text(
                 """
                 INSERT INTO notification_dispatches (
-                    alert_id, recommendation_id, template_code, locale, channel,
+                    alert_id, recommendation_id, visit_id, template_code, locale, channel,
                     recipient_user_id, recipient_address,
                     status, rendered_subject, rendered_body, error,
                     sent_at
                 ) VALUES (
-                    :alert_id, :rec_id, :code, :loc, :chan,
+                    :alert_id, :rec_id, :visit_id, :code, :loc, :chan,
                     :uid, :addr,
                     :status, :rs, :rb, :err,
                     CASE WHEN :status = 'sent' THEN now() ELSE NULL END
@@ -315,6 +324,7 @@ def _insert_dispatch(
             {
                 "alert_id": alert_id,
                 "rec_id": recommendation_id,
+                "visit_id": visit_id,
                 "code": template_code,
                 "loc": locale,
                 "chan": channel,
@@ -666,6 +676,18 @@ def _dispatch_channel_for_user(
             created_at=event.created_at,
         )
 
+    if channel == "push":
+        _send_push_channel(
+            session,
+            event=event,
+            user=user,
+            locale=locale,
+            subject=subject,
+            body=body,
+            severity=str(alert["severity"]),
+        )
+        return None
+
     # email
     _send_email_channel(
         session,
@@ -677,6 +699,95 @@ def _dispatch_channel_for_user(
         body_html=template.get("body_html"),
     )
     return None
+
+
+def _live_device_tokens(session: Session, *, user_id: UUID) -> list[str]:
+    """Every device this user still has registered."""
+    rows = session.execute(
+        text(
+            "SELECT token FROM device_tokens "
+            "WHERE user_id = :uid AND revoked_at IS NULL AND deleted_at IS NULL"
+        ),
+        {"uid": user_id},
+    ).all()
+    return [r[0] for r in rows]
+
+
+def _send_push_channel(
+    session: Session,
+    *,
+    event: AlertOpenedV1,
+    user: dict[str, Any],
+    locale: str,
+    subject: str,
+    body: str,
+    severity: str,
+) -> None:
+    """Push the alert to every device this user has registered.
+
+    One dispatch row per device, because "did it reach them" is a per-device
+    question: a scout whose phone is off but whose tablet is on has been
+    reached, and a row per device is the only way to say so honestly.
+
+    A token FCM reports as unregistered is revoked rather than retried — an
+    uninstalled app is permanent, and left alone it would fail on every
+    subsequent alert forever.
+    """
+    tokens = _live_device_tokens(session, user_id=user["user_id"])
+    if not tokens:
+        _insert_dispatch(
+            session,
+            alert_id=event.alert_id,
+            template_code="alert_opened",
+            locale=locale,
+            channel="push",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error="no registered devices",
+        )
+        return
+
+    data = {
+        "type": "alert",
+        "alert_id": str(event.alert_id),
+        "block_id": str(event.block_id),
+        "severity": severity,
+        "deep_link": f"agripulse://alerts/{event.alert_id}",
+    }
+    for token in tokens:
+        status_value, error = "sent", None
+        try:
+            result = send_push(token=token, title=subject, body=body, data=data)
+            if result.skipped:
+                status_value, error = "skipped", "push channel disabled"
+        except PushSendError as exc:
+            status_value, error = "failed", str(exc)
+            if exc.unregistered:
+                session.execute(
+                    text(
+                        "UPDATE device_tokens SET revoked_at = now() "
+                        "WHERE token = :t AND revoked_at IS NULL"
+                    ),
+                    {"t": token},
+                )
+        _insert_dispatch(
+            session,
+            alert_id=event.alert_id,
+            template_code="alert_opened",
+            locale=locale,
+            channel="push",
+            recipient_user_id=user["user_id"],
+            # The device, not an address — enough to identify which handset
+            # without storing a full token in a table operators read.
+            recipient_address=f"device:{token[-8:]}",
+            status=status_value,
+            rendered_subject=subject,
+            rendered_body=body,
+            error=error,
+        )
 
 
 def _send_email_channel(
@@ -1386,3 +1497,177 @@ def register_subscribers(bus: EventBus) -> None:
     )
     if not has_rec_handler:
         bus.register(RecommendationOpenedV1, _on_recommendation_opened, mode="sync")
+    if not any(
+        sub.handler is _on_scouting_visit_assigned
+        for sub in bus.handlers_for(ScoutingVisitAssignedV1)
+    ):
+        bus.register(ScoutingVisitAssignedV1, _on_scouting_visit_assigned, mode="sync")
+
+
+# ---------- Scouting: announce an assigned visit ----------------------------
+
+
+def _on_scouting_visit_assigned(event: ScoutingVisitAssignedV1) -> None:
+    """Tell one scout that a visit is theirs.
+
+    Unlike the alert and recommendation fan-outs this targets exactly one
+    person — the assignee — rather than everyone scoped to the farm. A visit is
+    an instruction to a named individual, and broadcasting it would train the
+    rest of the farm to ignore push.
+
+    Push only. The alert/recommendation that spawned the visit already produced
+    an inbox item; a second in-app row for the same underlying event would
+    double-count the bell badge for everyone reading it.
+    """
+    schema = event.tenant_schema
+    if schema is None:
+        _log.warning("visit_assigned_missing_tenant_schema", visit_id=str(event.visit_id))
+        return
+    try:
+        sanitize_tenant_schema(schema)
+    except ValueError:
+        _log.warning("visit_assigned_invalid_tenant_schema", schema=schema)
+        return
+
+    factory = _session_factory()
+    with factory() as session:
+        session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+        recipient = (
+            session.execute(
+                text(
+                    """
+                SELECT u.id AS user_id,
+                       COALESCE(up.language, 'en') AS locale,
+                       COALESCE(up.notification_channels, ARRAY['in_app','email']::text[])
+                           AS notification_channels
+                  FROM public.users u
+                  LEFT JOIN public.user_preferences up ON up.user_id = u.id
+                 WHERE u.id = :uid
+                """
+                ),
+                {"uid": event.assignee_user_id},
+            )
+            .mappings()
+            .first()
+        )
+        if recipient is None:
+            _log.warning("visit_assigned_unknown_assignee", visit_id=str(event.visit_id))
+            return
+        if "push" not in list(recipient["notification_channels"]):
+            # Opted out. Recorded rather than dropped, so "why didn't my phone
+            # ring" has an answer that is not "we don't know".
+            _insert_dispatch(
+                session,
+                alert_id=None,
+                template_code="scouting_visit_assigned",
+                locale=str(recipient["locale"]),
+                channel="push",
+                recipient_user_id=event.assignee_user_id,
+                recipient_address=None,
+                status="skipped",
+                rendered_subject=None,
+                rendered_body=None,
+                error="user has not enabled push",
+                visit_id=event.visit_id,
+            )
+            session.commit()
+            return
+
+        locale = str(recipient["locale"])
+        template = _load_template(
+            session, template_code="scouting_visit_assigned", locale=locale, channel="push"
+        )
+        if template is None:
+            _log.warning("visit_assigned_template_missing", locale=locale)
+            return
+
+        # The instruction is the whole point of an ad-hoc visit, so it wins the
+        # body over any generated summary.
+        ctx = {
+            "title": event.title,
+            "block_code": "",
+            "due_in": _humanise_due(event.due_by),
+            "instruction": event.instruction or "",
+        }
+        subject = render(template["subject"], ctx)
+        body = render(template["body"], ctx)
+
+        tokens = _live_device_tokens(session, user_id=event.assignee_user_id)
+        if not tokens:
+            _insert_dispatch(
+                session,
+                alert_id=None,
+                template_code="scouting_visit_assigned",
+                locale=locale,
+                channel="push",
+                recipient_user_id=event.assignee_user_id,
+                recipient_address=None,
+                status="skipped",
+                rendered_subject=subject,
+                rendered_body=body,
+                error="no registered devices",
+                visit_id=event.visit_id,
+            )
+            session.commit()
+            return
+
+        data = {
+            "type": "scouting_visit",
+            "visit_id": str(event.visit_id),
+            "farm_id": str(event.farm_id),
+            "block_id": str(event.block_id),
+            "severity": event.severity,
+            "due_by": event.due_by.isoformat() if event.due_by else "",
+            "deep_link": f"agripulse://scout/visits/{event.visit_id}",
+        }
+        for token in tokens:
+            status_value, error = "sent", None
+            try:
+                result = send_push(token=token, title=subject, body=body, data=data)
+                if result.skipped:
+                    status_value, error = "skipped", "push channel disabled"
+            except PushSendError as exc:
+                status_value, error = "failed", str(exc)
+                if exc.unregistered:
+                    session.execute(
+                        text(
+                            "UPDATE device_tokens SET revoked_at = now() "
+                            "WHERE token = :t AND revoked_at IS NULL"
+                        ),
+                        {"t": token},
+                    )
+            _insert_dispatch(
+                session,
+                alert_id=None,
+                template_code="scouting_visit_assigned",
+                locale=locale,
+                channel="push",
+                recipient_user_id=event.assignee_user_id,
+                recipient_address=f"device:{token[-8:]}",
+                status=status_value,
+                rendered_subject=subject,
+                rendered_body=body,
+                error=error,
+                visit_id=event.visit_id,
+            )
+        session.commit()
+
+
+def _humanise_due(due_by: datetime | None) -> str:
+    """ "18h" / "2d" — the countdown the ring shows, as words.
+
+    Deliberately coarse: a scout glancing at a lock screen needs the order of
+    magnitude, not a timestamp they have to subtract from.
+    """
+    if due_by is None:
+        return ""
+    delta = due_by - datetime.now(UTC)
+    # Round rather than floor: a visit created with within_hours=24 is a
+    # microsecond short of 24h by the time this renders, and announcing "23h"
+    # reads as if the scout has already lost an hour they have not.
+    hours = round(delta.total_seconds() / 3600)
+    if delta.total_seconds() < 0:
+        return "overdue"
+    if hours < 48:
+        return f"{max(hours, 1)}h"
+    return f"{round(hours / 24)}d"

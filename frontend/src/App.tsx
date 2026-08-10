@@ -56,6 +56,7 @@ import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAttributesPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
+import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
 import { ObserverSceneDetailPage } from "@/modules/admin/pages/ObserverSceneDetailPage";
@@ -295,10 +296,8 @@ export function App(): ReactNode {
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
-                <Route
-                  path="crops/:cropId/attributes"
-                  element={<PlatformCropAttributesPage />}
-                />
+                <Route path="signals" element={<PlatformSignalsPage />} />
+                <Route path="crops/:cropId/attributes" element={<PlatformCropAttributesPage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="observer" element={<PlatformObserverPage />} />
