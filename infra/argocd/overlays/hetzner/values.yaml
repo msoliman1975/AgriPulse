@@ -920,13 +920,46 @@ global:
   #   Image verified in ghcr before the bump: frontend:0bf2cc1 is a 200 with
   #   digest sha256:e3274cb5..., distinct from frontend:45b5a08
   #   (sha256:716c4e3a...).
+  # 4c03ab2 -- Action Center (#395): recommendations + alerts as one queue at
+  #   /action-center/:farmId, with dispatch to a named team member. The two
+  #   older screens (/recommendations, /alerts) are untouched and still
+  #   routed; nothing was removed, so this is additive to the UI.
+  #
+  #   ALL THREE move together this time: the api gained
+  #   GET /v1/action-items + POST /v1/action-items:dispatch, the workers image
+  #   shares the backend build, and the frontend carries the new route. A
+  #   frontend-only bump would have shipped a page whose endpoints 404.
+  #
+  #   Tenant migration 0063 runs as a PreSync hook before the api rolls. Both
+  #   its columns are additive and nullable -- `alerts.action_type` (the verb
+  #   the firing leaf chose, which the alert row previously discarded) and
+  #   `plan_activities.assigned_membership_id` (who is expected to do the work;
+  #   `completed_by` already recorded who did it). Alerts raised before this
+  #   keep action_type NULL and render as "unclassified"; there is no honest
+  #   backfill, since recovering the value means resolving the rule_code
+  #   against the tree version that fired.
+  #
+  #   Rollback is these three tags back to api/workers 591db3e and frontend
+  #   0bf2cc1. The migration stays applied and that is fine: nothing outside
+  #   this feature reads either column, and both are nullable.
+  #
+  #   Images verified present in ghcr BEFORE this commit, not inferred from
+  #   the run conclusion -- api:4c03ab2 sha256:c975374a, workers:4c03ab2
+  #   sha256:60b96fa7, frontend:4c03ab2 sha256:65abaf08, each distinct from
+  #   the tag it replaces (api 591db3e sha256:5cef8472, frontend 0bf2cc1
+  #   sha256:58845eca).
+  #
+  #   NOT browser-verified. The UI has never been rendered anywhere -- the
+  #   Playwright profile was locked throughout the build -- so the data paths
+  #   are covered by 68 unit + 30 real-Postgres integration tests and the
+  #   rendered page is not covered at all.
   images:
     api:
-      tag: "591db3e"
+      tag: "4c03ab2"
     workers:
-      tag: "591db3e"
+      tag: "4c03ab2"
     frontend:
-      tag: "0bf2cc1"
+      tag: "4c03ab2"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
