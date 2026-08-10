@@ -654,6 +654,121 @@ export function leftOperandValues(ref: ValueRef): readonly string[] | null {
   return null;
 }
 
+/** What the right-hand operand should look like for a given left ref.
+ *
+ *  For most sources this follows from the ref alone, but `signals` and
+ *  `crop_attribute` are defined by *data*: the tenant's signal definition or
+ *  the platform's crop-attribute definition fixes the type, the legal values,
+ *  the bounds and the unit. Those definitions are already fetched to populate
+ *  the code dropdowns, so the operand editor can use them too rather than
+ *  making the author retype what the platform already knows.
+ */
+export interface OperandSpec {
+  control: "number" | "text" | "select" | "boolean" | "date";
+  /** Closed vocabulary. A value outside it can never match, so it is enforced. */
+  values?: readonly string[];
+  /** Advisory bounds. NOT enforced — see the note on `operandOutOfRange`. */
+  min?: number;
+  max?: number;
+  unit?: string | null;
+}
+
+/** The subset of a signal definition the operand editor needs. */
+export interface SignalOperandSource {
+  value_kind: string;
+  categorical_values?: string[] | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  unit?: string | null;
+}
+
+/** The subset of a crop-attribute definition the operand editor needs. */
+export interface CropAttributeOperandSource {
+  value_type: string;
+  options?: { code: string }[] | null;
+  value_min?: string | null;
+  value_max?: string | null;
+  unit_en?: string | null;
+}
+
+function numeric(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function signalOperandSpec(def: SignalOperandSource | undefined): OperandSpec | null {
+  if (!def) return null;
+  switch (def.value_kind) {
+    case "numeric":
+      return {
+        control: "number",
+        min: numeric(def.value_min),
+        max: numeric(def.value_max),
+        unit: def.unit ?? null,
+      };
+    case "boolean":
+      return { control: "boolean" };
+    case "categorical":
+      // A categorical signal records one of its declared options and nothing
+      // else, so anything outside the list is a guaranteed non-match.
+      return def.categorical_values?.length
+        ? { control: "select", values: def.categorical_values }
+        : { control: "text" };
+    default:
+      // `event` is free-form text; `geopoint` has no comparable value key.
+      return { control: "text" };
+  }
+}
+
+export function cropAttributeOperandSpec(
+  def: CropAttributeOperandSource | undefined,
+): OperandSpec | null {
+  if (!def) return null;
+  switch (def.value_type) {
+    case "integer":
+    case "decimal":
+      return {
+        control: "number",
+        min: numeric(def.value_min),
+        max: numeric(def.value_max),
+        unit: def.unit_en ?? null,
+      };
+    case "boolean":
+      return { control: "boolean" };
+    case "date":
+      return { control: "date" };
+    case "single_select":
+    case "multi_select":
+      return def.options?.length
+        ? { control: "select", values: def.options.map((o) => o.code) }
+        : { control: "text" };
+    default:
+      return { control: "text" };
+  }
+}
+
+/** True when a numeric operand sits outside the definition's recorded bounds.
+ *
+ *  Deliberately advisory, not blocking. `value_min` / `value_max` describe the
+ *  range the platform expects to *record*, and a rule that fires outside it is
+ *  often exactly the rule worth writing — "alert if pH goes above 9" on a
+ *  signal whose recorded maximum is 8.5. Warning keeps the typo visible without
+ *  refusing the alert.
+ */
+export function operandOutOfRange(spec: OperandSpec | null, operand: RightOperand): boolean {
+  if (!spec || spec.control !== "number" || operand.kind !== "number") return false;
+  if (spec.min !== undefined && operand.value < spec.min) return true;
+  return spec.max !== undefined && operand.value > spec.max;
+}
+
+/** The operand kind a spec's control implies, for re-typing on a left change. */
+export function specOperandKind(spec: OperandSpec): RightOperand["kind"] {
+  if (spec.control === "number") return "number";
+  if (spec.control === "boolean") return "boolean";
+  return "string";
+}
+
 /** Coerce one operand to `type`, keeping the value where it survives the
  *  crossing. A params ref is left alone — it resolves at evaluation time
  *  and re-typing it would throw away the author's parameter name. */

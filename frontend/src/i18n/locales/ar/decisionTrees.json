@@ -334,6 +334,7 @@
       "right": "العتبة",
       "operator": "المُعامل",
       "indexCode": "رمز المؤشر",
+      "outOfRange": "خارج النطاق المسجّل ({{min}}–{{max}}). سيُحفظ على أي حال.",
       "weatherField": "حقل الطقس",
       "weatherIndexCode": "مؤشر الطقس",
       "weatherRiskCode": "المُمْرِض / الآفة",
