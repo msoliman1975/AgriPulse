@@ -21,6 +21,11 @@ import { PushNotifications } from "@capacitor/push-notifications";
 
 import { registerDevice } from "@/api/client";
 
+// Same source App.tsx reads. Registration is farm-gated because a Scout holds
+// no tenant role, so an unset farm means a guaranteed 403 — worth saying out
+// loud, since the failure is otherwise swallowed as a warning.
+const FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
+
 let inFlight: Promise<void> | null = null;
 
 /** Native only. The browser build has no FCM token to offer. */
@@ -29,6 +34,11 @@ export function pushSupported(): boolean {
 }
 
 async function run(): Promise<void> {
+  if (!FARM_ID) {
+    console.warn("push: VITE_FARM_ID is unset; device registration would 403");
+    return;
+  }
+
   // Ask, then check — on Android 13+ POST_NOTIFICATIONS is a runtime grant,
   // and a scout who declines must not be nagged into a loop on every launch.
   let status = await PushNotifications.checkPermissions();
@@ -44,7 +54,7 @@ async function run(): Promise<void> {
     // `registration` fires asynchronously after register(); the token is not a
     // return value, which is why this is wrapped rather than awaited directly.
     void PushNotifications.addListener("registration", (token) => {
-      registerDevice(token.value)
+      registerDevice(token.value, FARM_ID)
         .catch((err: unknown) => console.warn("push: backend registration failed", err))
         .finally(() => resolve());
     });

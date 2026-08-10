@@ -80,8 +80,12 @@ export function startVisit(visitId: string, farmId: string) {
   return request<Visit>(`/scouting/visits/${visitId}:start?farm_id=${farmId}`, { method: "POST" });
 }
 
-export function registerDevice(token: string) {
-  return request<{ id: string }>("/devices:register", {
+// `farm_id` rides along for the same reason every scouting call carries it: a
+// Scout holds no tenant role, so the capability only resolves against a farm
+// they are scoped to. Without it the backend 403s and — because a failed
+// registration is deliberately non-fatal — the scout simply never gets pushed.
+export function registerDevice(token: string, farmId: string) {
+  return request<{ id: string }>(`/devices:register?farm_id=${farmId}`, {
     method: "POST",
     body: JSON.stringify({ token, platform: "android" }),
   });

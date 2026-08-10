@@ -167,7 +167,16 @@ async def transition_inbox_item(
 )
 async def register_device_endpoint(
     payload: DeviceRegisterRequest,
-    context: RequestContext = Depends(requires_capability("notification.write_inbox")),
+    farm_id: UUID | None = Query(default=None),
+    # Gate on the farm in scope so a farm-scoped-only user can register their
+    # own handset. A Scout holds no tenant role, so without this the capability
+    # resolves against nothing and every registration 403s — silently, because
+    # the app treats a failed registration as non-fatal. That is the whole push
+    # feature dead for exactly the persona it exists for. Tenant/platform
+    # callers still pass via their tenant role and need not send farm_id.
+    context: RequestContext = Depends(
+        requires_capability("notification.write_inbox", farm_id_param="farm_id")
+    ),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     user_id = _ensure_user(context)
@@ -187,7 +196,11 @@ async def register_device_endpoint(
     summary="Devices currently registered to the caller.",
 )
 async def list_devices_endpoint(
-    context: RequestContext = Depends(requires_capability("notification.read_inbox")),
+    farm_id: UUID | None = Query(default=None),
+    # Same farm-scope gate as :register — see the note there.
+    context: RequestContext = Depends(
+        requires_capability("notification.read_inbox", farm_id_param="farm_id")
+    ),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     user_id = _ensure_user(context)
@@ -202,7 +215,12 @@ async def list_devices_endpoint(
 )
 async def revoke_device_endpoint(
     token: str,
-    context: RequestContext = Depends(requires_capability("notification.write_inbox")),
+    farm_id: UUID | None = Query(default=None),
+    # Same farm-scope gate as :register — see the note there. Sign-out must work
+    # for the persona that signs out most.
+    context: RequestContext = Depends(
+        requires_capability("notification.write_inbox", farm_id_param="farm_id")
+    ),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> None:
     user_id = _ensure_user(context)
