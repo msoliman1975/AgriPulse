@@ -20,6 +20,7 @@ from uuid import UUID, uuid4
 
 from app.shared.keycloak.client import InviteResult, KeycloakUserState, group_name_for
 from app.shared.keycloak.errors import KeycloakRequestError
+from app.shared.keycloak.field_identity import synthetic_email
 
 
 @dataclass
@@ -35,6 +36,12 @@ class FakeUser:
     tenant_role: str | None = None
     farm_scopes: tuple[dict[str, str], ...] = ()
     temporary_password: str | None = None
+    # Field identity (phone + PIN). The real Keycloak stores only the PIN's
+    # hash and no endpoint reads it back, so holding the plaintext here is a
+    # test-only affordance: it is the sole way a test can assert that a reissue
+    # actually changed the credential.
+    phone: str | None = None
+    field_pin: str | None = None
 
 
 @dataclass
@@ -170,6 +177,43 @@ class FakeKeycloakClient:
         if user is None:
             raise KeycloakRequestError(404, "user not found", operation="set_farm_scopes")
         user.farm_scopes = tuple({"farm_id": str(s["farm_id"]), "role": s["role"]} for s in scopes)
+
+    async def enrol_field_user(
+        self,
+        *,
+        phone_e164: str,
+        full_name: str | None,
+        group_id: str,
+        pin: str,
+        tenant_id: UUID | str | None = None,
+    ) -> str:
+        self._maybe_fail("enrol_field_user")
+        # The phone is the username, and Keycloak enforces that globally — a
+        # second enrolment of the same number must collide rather than quietly
+        # create a twin. 409 is what the real client surfaces.
+        for existing in self.users.values():
+            if existing.phone == phone_e164:
+                raise KeycloakRequestError(409, "user exists", operation="enrol_field_user")
+        uid = uuid4().hex
+        self.users[uid] = FakeUser(
+            id=uid,
+            email=synthetic_email(phone_e164),
+            full_name=full_name,
+            tenant_id=str(tenant_id) if tenant_id is not None else None,
+            phone=phone_e164,
+            field_pin=pin,
+        )
+        grp = self.groups.get(group_id)
+        if grp is not None:
+            grp.member_ids.append(uid)
+        return uid
+
+    async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None:
+        self._maybe_fail("set_field_pin")
+        user = self.users.get(keycloak_user_id)
+        if user is None:
+            raise KeycloakRequestError(404, "user not found", operation="set_field_pin")
+        user.field_pin = pin
 
     async def add_existing_user_to_group(
         self,

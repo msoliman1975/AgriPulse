@@ -5,8 +5,16 @@ five layers land together, because the failure mode being designed against is
 the half-provisioned worker: someone who can sign in but is scoped to nothing,
 or scoped to a farm but invisible on the work board.
 
-Keycloak is the no-op client here (no realm in the test environment), so what
-is proven is the local half plus the shape of the call — not the realm write.
+Keycloak is `FakeKeycloakClient`, injected via the `fake_keycloak` fixture
+below, so what is proven is the local half plus the shape of the realm call —
+not the realm write itself.
+
+It must be injected explicitly. An earlier version of this file assumed the
+container would fall back to the *no-op* client and asserted nothing about it;
+that held only on a machine with a Keycloak running. In CI
+`keycloak_provisioning_enabled` is false and `get_keycloak_client()` returns a
+client that *raises* `KeycloakNotConfiguredError` rather than shrugging, so all
+four tests here failed while passing locally.
 """
 
 from __future__ import annotations
@@ -20,12 +28,29 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import install_exception_handlers
+from app.modules.iam import field_enrolment
 from app.modules.iam.router import router as iam_router
+from app.shared.keycloak import FakeKeycloakClient
 from app.shared.keycloak.field_identity import SYNTHETIC_EMAIL_DOMAIN
 from tests.integration.farms.conftest import StubAuth
 from tests.integration.scouting.conftest import ScoutingFixture
 
 pytestmark = [pytest.mark.integration]
+
+
+@pytest.fixture(autouse=True)
+def fake_keycloak(monkeypatch: pytest.MonkeyPatch) -> FakeKeycloakClient:
+    """Give every test in this module an in-memory realm.
+
+    Patched at `field_enrolment.get_keycloak_client` because the router builds
+    its service inline rather than through a FastAPI dependency, so there is no
+    `dependency_overrides` seam. `FieldEnrolmentService` resolves the client as
+    `keycloak or get_keycloak_client()`, which makes this the one injection
+    point that covers both the enrolment and the PIN-reissue paths.
+    """
+    fake = FakeKeycloakClient()
+    monkeypatch.setattr(field_enrolment, "get_keycloak_client", lambda: fake)
+    return fake
 
 
 def _client(context):  # type: ignore[no-untyped-def]

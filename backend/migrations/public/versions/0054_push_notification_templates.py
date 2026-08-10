@@ -99,9 +99,19 @@ def upgrade() -> None:
         "notification_templates",
         schema="public",
     )
-    # Short name: the convention expands it to `ck_notification_templates_channel`.
+    # Recreate under the name 0014 used, NOT a tidier short one. The convention
+    # prefixes whatever it is given, so 0014's "ck_notification_templates_channel"
+    # landed on disk doubled, and 0014's own downgrade drops that doubled name
+    # (it passes type_="check", which re-applies the convention). Renaming the
+    # constraint here to a clean `ck_notification_templates_channel` therefore
+    # left 0014.downgrade dropping a name that no longer existed — which is what
+    # broke `test_seed_migration_idempotent`. Passing the same string keeps the
+    # on-disk name byte-identical, at 59 chars, inside the 63-char limit.
     op.create_check_constraint(
-        "channel", "notification_templates", f"channel IN ({_CHANNELS})", schema="public"
+        "ck_notification_templates_channel",
+        "notification_templates",
+        f"channel IN ({_CHANNELS})",
+        schema="public",
     )
     for template_code, locale, subject, body in _TEMPLATES:
         bind.execute(
@@ -134,8 +144,9 @@ def downgrade() -> None:
         "notification_templates",
         schema="public",
     )
+    # Same name as 0014 and as `upgrade` above — see the comment there.
     op.create_check_constraint(
-        "channel",
+        "ck_notification_templates_channel",
         "notification_templates",
         "channel IN ('in_app', 'email', 'webhook')",
         schema="public",
