@@ -1047,38 +1047,55 @@ global:
   #   only "completed" run for this SHA was argocd-sync, which has ZERO
   #   container jobs, so its success said nothing. frontend:02cf517 is a 200
   #   with digest sha256:7ac767a9..., distinct from frontend:e7a9341.
+  # d6e7d13 -- #406 (frontend only, superseded by 7b7f7ba below). A block's
+  #   responsible member became visible and settable in the Farm Console dock;
+  #   until then the only route to it was Header > Configs > "Imagery & weather"
+  #   > a block > Edit, because there is no Farms entry in the side nav. Also
+  #   renamed the label "Agronomist" -> "Responsible member"; the COLUMN keeps
+  #   its name, which is load bearing across the API, the dock and the dispatch
+  #   resolver. Kept here as history: e7a9341..d6e7d13 touched zero backend
+  #   files, which is why api + workers correctly stayed put for it.
+  #   Learned the hard way on that bump: the PR run's green containers job
+  #   builds the PR HEAD, not the merge commit -- d6e7d13 was a ghcr 404 at
+  #   first check and only the main run produced it.
+  #
+  # 7b7f7ba -- #407: a block's responsible member moves under Manage, gets its
+  #   own form (select + reason + explicit Save) and an append-only handover
+  #   history. Replaces the save-on-change picker #406 put in the overview,
+  #   which had no room for a reason and no view of who you were replacing.
+  #
+  #   ALL THREE MOVE, unlike the last promote: this adds tenant migration
+  #   **0064 block_responsible_log**, so api + workers cannot stay behind on
+  #   e7a9341 while the schema changes under them. PreSync runs it before the
+  #   api rolls. Rolling the tags back leaves the table -- harmless, nothing
+  #   outside this feature reads it -- and the two new routes
+  #   (PUT/GET /blocks/{id}/responsible[/history]) simply disappear with the
+  #   api image.
+  #
+  #   Why a table and not the audit trail: farms.block_updated records changed
+  #   field NAMES and no values, so it can say the field changed and never from
+  #   whom to whom. audit_data_changes has before/after JSONB and is written by
+  #   nothing. Registered in the purge manifest alongside growth_stage_logs.
+  #
+  #   api/workers also pick up the backend halves of #404-#406, which were
+  #   promoted frontend-only; those ranges contained no backend files, so the
+  #   genuinely new backend content here is 0064 plus the two routes.
+  #
+  #   TAG IS 7 CHARS. git now abbreviates this SHA to 8 (7b7f7ba0) but CI tags
+  #   images with format=short -- ghcr 404s on 7b7f7ba0 and 200s on 7b7f7ba.
+  #   Writing what git printed would have been an ImagePullBackOff on all three.
+  #
+  #   Rollback: api + workers back to e7a9341, frontend back to d6e7d13.
+  #
+  #   Images verified in ghcr BEFORE this commit: api sha256:d42dca15,
+  #   workers sha256:cb280c02, frontend sha256:9bb00d88.
   images:
     api:
-      tag: "e7a9341"
+      tag: "7b7f7ba"
     workers:
-      tag: "e7a9341"
+      tag: "7b7f7ba"
     frontend:
-      # d6e7d13 = #406. A block's responsible member is now shown and settable
-      #   in the Farm Console block dock. It is `blocks.agronomist_membership_id`
-      #   -- the field the Action Center defaults dispatch to -- and until now
-      #   the only route to it was Header > Configs > "Imagery & weather" > a
-      #   block > Edit. There is no Farms entry in the side nav, and exactly two
-      #   non-test links in the app point into /farms/..., so nobody would find
-      #   it. Also renamed the label "Agronomist" -> "Responsible member"; the
-      #   COLUMN keeps its name, which is load bearing across the API, the dock
-      #   and the dispatch resolver.
-      #
-      #   FRONTEND ONLY, and so were #405 and #404 before it: e7a9341..d6e7d13
-      #   touches zero backend files and adds no migration -- checked, not
-      #   assumed -- so api + workers correctly stay on e7a9341.
-      #
-      #   No new request either: `loadUnitDetail` already called `getBlock`,
-      #   which has carried agronomist_membership_id all along; the detail
-      #   assembly simply dropped it.
-      #
-      #   Rollback is this tag back to c7dd112 (which also reverts #405/#404
-      #   only if rolled further; c7dd112 keeps them).
-      #
-      #   Image verified in ghcr BEFORE this bump: frontend:d6e7d13
-      #   sha256:df67b666, distinct from c7dd112 sha256:66d3e596. The PR run's
-      #   green containers job builds the PR HEAD, not the merge commit -- at
-      #   first check d6e7d13 was a 404 here and only the main run produced it.
-      tag: "d6e7d13"
+      tag: "7b7f7ba"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
