@@ -227,7 +227,7 @@ def build_groups(
         return [_group("all", "All items", items)]
 
     if group_by == "due":
-        keyed = {k: [] for k in _DUE_ORDER}
+        keyed: dict[str, list[ActionItem]] = {k: [] for k in _DUE_ORDER}
         for i in items:
             keyed[i.due_bucket].append(i)
         return [_group(k, _DUE_LABELS[k], v) for k, v in keyed.items() if v]
@@ -331,7 +331,7 @@ class ActionCenterServiceImpl:
         return ActionItemListResponse(
             total=len(items),
             status_counts=counts,
-            grouped_by=group_by,  # type: ignore[arg-type]
+            grouped_by=group_by,
             groups=build_groups(items, group_by=group_by, responsible=responsible),
         )
 
