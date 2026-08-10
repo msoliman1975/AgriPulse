@@ -1053,13 +1053,32 @@ global:
     workers:
       tag: "e7a9341"
     frontend:
-      # c7dd112 = #405. The stage timeline rendered the literal string
-      # `growthStage.source.derived` for every automatic transition: the TS
-      # union was written from memory as auto|manual|model, the backend's is
-      # manual|derived|imported. Frontend only, no migration; rollback is this
-      # tag back to 02cf517. Image verified in ghcr (sha256:66d3e596..., a
-      # different digest from 02cf517) before the bump.
-      tag: "c7dd112"
+      # d6e7d13 = #406. A block's responsible member is now shown and settable
+      #   in the Farm Console block dock. It is `blocks.agronomist_membership_id`
+      #   -- the field the Action Center defaults dispatch to -- and until now
+      #   the only route to it was Header > Configs > "Imagery & weather" > a
+      #   block > Edit. There is no Farms entry in the side nav, and exactly two
+      #   non-test links in the app point into /farms/..., so nobody would find
+      #   it. Also renamed the label "Agronomist" -> "Responsible member"; the
+      #   COLUMN keeps its name, which is load bearing across the API, the dock
+      #   and the dispatch resolver.
+      #
+      #   FRONTEND ONLY, and so were #405 and #404 before it: e7a9341..d6e7d13
+      #   touches zero backend files and adds no migration -- checked, not
+      #   assumed -- so api + workers correctly stay on e7a9341.
+      #
+      #   No new request either: `loadUnitDetail` already called `getBlock`,
+      #   which has carried agronomist_membership_id all along; the detail
+      #   assembly simply dropped it.
+      #
+      #   Rollback is this tag back to c7dd112 (which also reverts #405/#404
+      #   only if rolled further; c7dd112 keeps them).
+      #
+      #   Image verified in ghcr BEFORE this bump: frontend:d6e7d13
+      #   sha256:df67b666, distinct from c7dd112 sha256:66d3e596. The PR run's
+      #   green containers job builds the PR HEAD, not the merge commit -- at
+      #   first check d6e7d13 was a 404 here and only the main run produced it.
+      tag: "d6e7d13"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
