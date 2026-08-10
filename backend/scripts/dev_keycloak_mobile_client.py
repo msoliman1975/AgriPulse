@@ -56,7 +56,15 @@ CLIENT_DEFINITION: dict[str, Any] = {
     "serviceAccountsEnabled": False,
     "implicitFlowEnabled": False,
     "redirectUris": ["agripulse://auth/callback", "agripulse://auth/logout"],
-    "webOrigins": [],
+    # The app is a WebView, so its token request is a browser `fetch` and is
+    # subject to CORS — the custom-scheme redirect URIs above do not exempt it.
+    # Capacitor serves the bundle from `http://localhost` on Android (the config
+    # pins androidScheme to http; the default https would make the dev api mixed
+    # content), and `https://localhost` is what a release build against an https
+    # api will use. Empty webOrigins meant Keycloak returned no
+    # Access-Control-Allow-Origin and sign-in failed on the handset while every
+    # server-side direct grant kept working — the two paths differ only here.
+    "webOrigins": ["http://localhost", "https://localhost"],
     "attributes": {
         "pkce.code.challenge.method": "S256",
         # Refresh tokens are the session; without this an offline token is
