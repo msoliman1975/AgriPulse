@@ -236,3 +236,43 @@ async def test_instruction_is_rejected_on_non_ad_hoc_origins(
         )
     assert resp.status_code == 201
     assert resp.json()["instruction"] is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_visit_leaves_the_scouts_queue(scouting_env: ScoutingFixture) -> None:
+    """A withdrawn visit must stop being work.
+
+    `?mine=true` applied no status filter, so a cancelled visit stayed on the
+    scout's list indefinitely — they would walk out to do work a supervisor had
+    already called off. `claimable` never showed this because it pins
+    status='queued' independently.
+    """
+    env = scouting_env
+    visit = await _dispatch(env)
+    async with _client(env.agronomist_context) as sup:
+        assign = await sup.post(
+            f"/api/v1/scouting/visits/{visit['id']}:assign?farm_id={env.farm_id}",
+            json={"assignee_user_id": str(env.scout_user_id)},
+        )
+        assert assign.status_code == 200, assign.text
+
+    async with _client(env.scout_context) as scout:
+        before = await scout.get(f"/api/v1/scouting/visits?farm_id={env.farm_id}&mine=true")
+        assert [v["id"] for v in before.json()] == [visit["id"]]
+
+    async with _client(env.agronomist_context) as sup:
+        cancelled = await sup.post(
+            f"/api/v1/scouting/visits/{visit['id']}:cancel?farm_id={env.farm_id}"
+        )
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()["status"] == "cancelled"
+
+    async with _client(env.scout_context) as scout:
+        after = await scout.get(f"/api/v1/scouting/visits?farm_id={env.farm_id}&mine=true")
+        assert after.json() == []
+
+        # Asking for it explicitly still works — this is a default, not a ban.
+        history = await scout.get(
+            f"/api/v1/scouting/visits?farm_id={env.farm_id}&mine=true&status=cancelled"
+        )
+        assert [v["id"] for v in history.json()] == [visit["id"]]

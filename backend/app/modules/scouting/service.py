@@ -86,6 +86,15 @@ class ScoutingService:
         statuses: tuple[str, ...] = (),
         claimable: bool = False,
     ) -> tuple[dict[str, Any], ...]:
+        # "Assigned to me" is a work queue, not a history: without a status
+        # filter a cancelled or completed visit stays on the scout's list
+        # forever, and they walk out to do work that was called off. `claimable`
+        # already pins status='queued', which is why only this path was exposed.
+        # `expired` is deliberately included — it is a flag, not a closure, and
+        # such a visit is still actionable (cancel accepts it too).
+        # An explicit `statuses` still wins, so a supervisor can ask for history.
+        if assigned_to is not None and not statuses and not claimable:
+            statuses = (*OPEN_STATUSES, "expired")
         return await self._repo.list_visits(
             farm_id=farm_id,
             block_id=block_id,
