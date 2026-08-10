@@ -137,6 +137,10 @@ capabilities:
     description: Author platform-curated plan templates (create, edit, publish, archive).
     scope: platform
     status: active
+  signal.platform.manage:
+    description: Author platform-curated signal definitions and templates (the shared catalog every tenant reads).
+    scope: platform
+    status: active
   tenant.manage_integrations:
     description: Edit weather, imagery, email, and webhook configs at any inheritance tier.
     scope: tenant
@@ -386,7 +390,31 @@ capabilities:
   scouting.record:
     description: Log a scouting observation (notes, photos).
     scope: farm
-    status: stub
+    status: active
+  scouting.visit.read:
+    description: See scouting visits on an assigned farm.
+    scope: farm
+    status: active
+  scouting.visit.claim:
+    description: Claim, accept, decline or start a scouting visit offered to you.
+    scope: farm
+    status: active
+  scouting.visit.complete:
+    description: Submit observations and close a scouting visit.
+    scope: farm
+    status: active
+  scouting.visit.assign:
+    description: Assign, reassign or cancel a scouting visit for someone else.
+    scope: farm
+    status: active
+  scouting.dispatch:
+    description: Raise an ad-hoc scouting visit from the map, with your own instructions.
+    scope: farm
+    status: active
+  scouting.rule.manage:
+    description: Edit scouting routing rules and routine schedules.
+    scope: farm
+    status: active
 
   # --- Analytics & reports ---------------------------------------------
   analytics.read:

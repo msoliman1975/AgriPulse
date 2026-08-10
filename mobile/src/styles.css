@@ -1,0 +1,58 @@
+/* Field conditions drive this: high contrast for sunlight, large tap targets
+   for gloved hands, and a dark surface because a white screen outdoors at
+   midday is a mirror. Colours track the AgriPulse palette. */
+:root {
+  --field: #0e1a15;
+  --field2: #17271f;
+  --line: #2c4136;
+  --ink: #e9f2ec;
+  --muted: #8fa89a;
+  --sage: #4a7c59;
+  --crit: #dc2626;
+  --watch: #e8a317;
+  --sand: #c2a878;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--field); color: var(--ink); }
+.app { min-height: 100vh; }
+.screen { padding: 20px 18px 32px; }
+
+.signin { display: flex; flex-direction: column; min-height: 100vh; }
+.signin .logo { width: 52px; height: 52px; border-radius: 15px; margin-top: 56px;
+  background: linear-gradient(135deg, var(--sage), #22c55e); }
+.signin h1 { font-size: 25px; margin-top: 22px; }
+.signin .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.signin label { font-size: 12px; color: var(--muted); margin-top: 18px; }
+.signin input { margin-top: 6px; padding: 14px; font-size: 17px; border-radius: 12px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--ink); }
+.signin button { margin-top: auto; padding: 16px; font-size: 16px; font-weight: 650;
+  border: 0; border-radius: 12px; background: var(--sage); color: #fff; }
+.signin button:disabled { opacity: .5; }
+
+.visits header { display: flex; align-items: center; justify-content: space-between; }
+.visits h1 { font-size: 20px; }
+.visits .link { background: none; border: 0; color: var(--muted); font-size: 13px; }
+.section { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); margin: 22px 0 6px; }
+.section.overdue { color: var(--crit); }
+.visits ul { list-style: none; }
+.visit { display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 0; border-bottom: 1px solid var(--line); }
+.visit .ring { flex: 0 0 46px; height: 46px; border-radius: 50%; display: grid;
+  place-items: center; font-size: 12px; font-weight: 700;
+  border: 2px solid var(--muted); color: var(--muted); }
+.visit.sev-critical .ring { border-color: var(--crit); color: var(--crit); }
+.visit.sev-warning .ring { border-color: var(--watch); color: var(--watch); }
+.visit .body { flex: 1; min-width: 0; }
+.visit .title { font-size: 15px; font-weight: 650; }
+/* A person wrote this — the only warm surface in the app. */
+.visit .instruction { font-size: 13px; color: var(--sand); margin-top: 4px; }
+.visit .meta { margin-top: 8px; }
+.visit .origin { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 7px; border-radius: 5px; background: var(--field2); color: var(--muted); }
+.visit .origin-ad_hoc { background: #3a3222; color: var(--sand); }
+.visit button { padding: 10px 14px; border: 0; border-radius: 10px;
+  background: var(--sage); color: #fff; font-size: 13px; font-weight: 650; }
+.error { color: var(--crit); font-size: 13px; margin-top: 12px; }
+.empty { color: var(--muted); font-size: 14px; margin-top: 28px; text-align: center; }

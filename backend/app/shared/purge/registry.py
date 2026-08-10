@@ -197,6 +197,11 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable("imagery_aoi_subscriptions", owner_column="block_id", order=20),
     OwnedTable("weather_subscriptions", owner_column="block_id", order=20),
     OwnedTable("signal_assignments", owner_column="block_id", order=20),
+    # Scouting dispatch (tenant migration 0064). Both cascade off blocks, but
+    # they are listed so the purge preview counts them — an admin confirming a
+    # block deletion should see the outstanding visits it takes with it.
+    OwnedTable("scouting_visits", owner_column="block_id", order=20),
+    OwnedTable("scouting_routing_rules", owner_column="block_id", order=20),
     OwnedTable(
         "recommendations",
         owner_column="block_id",
@@ -301,6 +306,8 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         order=10,
     ),
     OwnedTable("signal_assignments", owner_column="farm_id", order=20),
+    OwnedTable("scouting_visits", owner_column="farm_id", order=20),
+    OwnedTable("scouting_routing_rules", owner_column="farm_id", order=20),
     OwnedTable("recommendations", owner_column="farm_id", order=20, fk=False),
     OwnedTable("plan_activities", owner_column="farm_id", order=30),
     OwnedTable("vegetation_plans", owner_column="farm_id", order=40),
@@ -330,6 +337,35 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored trees; decision_tree_versions cascades off this",
     ),
     OwnedTable("backfill_runs", owner_column="tenant_id", schema="public", order=10, fk=False),
+    # The signals catalog gained a platform tier (public migration 0052 /
+    # tenant 0063): definitions and templates moved out of the tenant schema
+    # into `public`, discriminated by a nullable tenant_id. They are listed
+    # here for the same reason decision_trees is — DROP SCHEMA no longer
+    # reaches them.
+    #
+    # Deleting `WHERE tenant_id = :tid` is exactly the behaviour we want:
+    # platform-curated rows (tenant_id IS NULL) belong to no tenant and must
+    # survive every purge, and the manifest expresses that by construction
+    # rather than by a special case.
+    #
+    # signal_template_definitions needs no entry: it carries no ownership
+    # column and cascades off signal_templates.
+    OwnedTable(
+        "signal_definitions",
+        owner_column="tenant_id",
+        schema="public",
+        order=20,
+        fk=False,
+        note="tenant-authored definitions; platform rows (tenant_id IS NULL) are never purged",
+    ),
+    OwnedTable(
+        "signal_templates",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        fk=False,
+        note="tenant-authored templates; signal_template_definitions cascades off this",
+    ),
     OwnedTable("tenant_settings_overrides", owner_column="tenant_id", schema="public", order=10),
     OwnedTable(
         "tenant_memberships",

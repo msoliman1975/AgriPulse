@@ -35,6 +35,7 @@ from app.shared.keycloak.errors import (
     KeycloakNotConfiguredError,
     KeycloakRequestError,
 )
+from app.shared.keycloak.field_identity import synthetic_email
 
 _TOKEN_REFRESH_SLACK_SECONDS: float = 30.0
 _GROUP_NAME_PREFIX: str = "tenant-"
@@ -97,6 +98,18 @@ class KeycloakAdminClient(Protocol):
         roles: tuple[str, ...] = ("TenantOwner",),
         tenant_id: UUID | str | None = None,
     ) -> InviteResult: ...
+
+    async def enrol_field_user(
+        self,
+        *,
+        phone_e164: str,
+        full_name: str | None,
+        group_id: str,
+        pin: str,
+        tenant_id: UUID | str | None = None,
+    ) -> str: ...
+
+    async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None: ...
 
     async def add_existing_user_to_group(
         self,
@@ -203,6 +216,23 @@ class NoopKeycloakClient:
     async def set_farm_scopes(self, *, keycloak_user_id: str, scopes: list[dict[str, str]]) -> None:
         del scopes
         self._log.warning("keycloak_noop_set_farm_scopes", keycloak_user_id=keycloak_user_id)
+
+    async def enrol_field_user(
+        self,
+        *,
+        phone_e164: str,
+        full_name: str | None,
+        group_id: str,
+        pin: str,
+        tenant_id: UUID | str | None = None,
+    ) -> str:
+        del full_name, group_id, pin, tenant_id
+        self._log.warning("keycloak_noop_enrol_field_user", phone=phone_e164)
+        return f"noop-{phone_e164}"
+
+    async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None:
+        del pin
+        self._log.warning("keycloak_noop_set_field_pin", keycloak_user_id=keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,
@@ -453,6 +483,99 @@ class HttpxKeycloakAdminClient:
             email_sent=result.email_sent,
         )
         return result
+
+    async def enrol_field_user(
+        self,
+        *,
+        phone_e164: str,
+        full_name: str | None,
+        group_id: str,
+        pin: str,
+        tenant_id: UUID | str | None = None,
+    ) -> str:
+        """Provision a field worker who signs in with a phone and a PIN.
+
+        Differs from ``invite_user`` in three ways, each because the person on
+        the other end has no email address and may not read well:
+
+        * the **username is the phone number**, not an address;
+        * the email is synthetic and ``emailVerified`` stays false, so nothing
+          ever tries to deliver to it;
+        * the credential is set with ``temporary=False``. The normal invite path
+          issues a temporary password, which forces Keycloak's UPDATE_PASSWORD
+          browser form on first sign-in — a form this persona cannot complete on
+          a phone in a field. Changing the PIN is offered inside the app instead.
+
+        Returns the Keycloak user id. The PIN is the caller's to show once and
+        then forget; it is never stored anywhere readable.
+        """
+        first, last = _split_full_name(full_name)
+        body: dict[str, Any] = {
+            "username": phone_e164,
+            "email": synthetic_email(phone_e164),
+            "firstName": first,
+            "lastName": last,
+            "enabled": True,
+            "emailVerified": False,
+        }
+        if tenant_id is not None:
+            # Same reason as invite_user: inline the claim, because a later PUT
+            # treats missing fields as empty and wipes what we just set.
+            body["attributes"] = {"tenant_id": [str(tenant_id)]}
+
+        resp = await self._request(
+            "POST", "/users", operation="create_field_user", json=body, expected=(201, 409)
+        )
+        if resp.status_code == 409:
+            # Already provisioned — re-enrolling is a PIN reset, not a second
+            # person. Looked up by username rather than email, because the
+            # phone is the identity and the synthetic domain could change.
+            existing = await self._find_user_id_by_username(phone_e164)
+            if existing is None:
+                raise KeycloakRequestError(409, resp.text, operation="create_field_user")
+            user_id = existing
+        else:
+            location = resp.headers.get("location") or resp.headers.get("Location")
+            if location and "/" in location:
+                user_id = location.rsplit("/", 1)[-1]
+            else:
+                found = await self._find_user_id_by_username(phone_e164)
+                if found is None:
+                    raise KeycloakRequestError(
+                        201, "no Location header", operation="create_field_user"
+                    )
+                user_id = found
+
+        await self._request(
+            "PUT",
+            f"/users/{user_id}/groups/{group_id}",
+            operation="add_field_user_to_group",
+            expected=(204,),
+        )
+        await self.set_field_pin(keycloak_user_id=user_id, pin=pin)
+        self._log.info("keycloak_enrol_field_user", user_id=user_id, phone=phone_e164)
+        return user_id
+
+    async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None:
+        """Set a non-temporary PIN — see ``enrol_field_user`` for why."""
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}/reset-password",
+            operation="set_field_pin",
+            json={"type": "password", "value": pin, "temporary": False},
+            expected=(204,),
+        )
+
+    async def _find_user_id_by_username(self, username: str) -> str | None:
+        resp = await self._request(
+            "GET",
+            "/users",
+            operation="find_user_by_username",
+            params={"username": username, "exact": "true"},
+            expected=(200,),
+        )
+        rows = resp.json()
+        return str(rows[0]["id"]) if rows else None
 
     async def add_existing_user_to_group(
         self,

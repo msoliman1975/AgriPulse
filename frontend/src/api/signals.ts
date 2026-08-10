@@ -456,3 +456,82 @@ export async function createSignalTemplateObservation(
   );
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Platform authoring (cap `signal.platform.manage`).
+//
+// The catalog is shared: `tenant_id IS NULL` rows are platform-curated and every
+// tenant reads them, while a tenant's own rows shadow a platform row of the same
+// `code`. These endpoints operate on the platform tier only — scoping comes from
+// the server binding an admin session, not from anything sent here.
+//
+// Deletion is intentionally absent: archiving a shared definition affects every
+// tenant recording against it, so a platform definition is retired by PATCHing
+// `is_active: false` until a cross-tenant usage check exists.
+
+export async function listPlatformSignalDefinitions(
+  includeInactive = true,
+): Promise<SignalDefinition[]> {
+  const { data } = await apiClient.get<SignalDefinition[]>("/v1/platform/signals/definitions", {
+    params: { include_inactive: includeInactive },
+  });
+  return data;
+}
+
+export async function createPlatformSignalDefinition(
+  payload: SignalDefinitionCreatePayload,
+): Promise<SignalDefinition> {
+  const { data } = await apiClient.post<SignalDefinition>(
+    "/v1/platform/signals/definitions",
+    payload,
+  );
+  return data;
+}
+
+export async function updatePlatformSignalDefinition(
+  id: string,
+  payload: SignalDefinitionUpdatePayload,
+): Promise<SignalDefinition> {
+  const { data } = await apiClient.patch<SignalDefinition>(
+    `/v1/platform/signals/definitions/${id}`,
+    payload,
+  );
+  return data;
+}
+
+export async function listPlatformSignalTemplates(
+  includeInactive = true,
+): Promise<SignalTemplate[]> {
+  const { data } = await apiClient.get<SignalTemplate[]>("/v1/platform/signals/templates", {
+    params: { include_inactive: includeInactive },
+  });
+  return data;
+}
+
+export async function getPlatformSignalTemplate(id: string): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.get<SignalTemplateWithMembers>(
+    `/v1/platform/signals/templates/${id}`,
+  );
+  return data;
+}
+
+export async function createPlatformSignalTemplate(
+  payload: SignalTemplateCreatePayload,
+): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.post<SignalTemplateWithMembers>(
+    "/v1/platform/signals/templates",
+    payload,
+  );
+  return data;
+}
+
+export async function updatePlatformSignalTemplate(
+  id: string,
+  payload: SignalTemplateUpdatePayload,
+): Promise<SignalTemplateWithMembers> {
+  const { data } = await apiClient.patch<SignalTemplateWithMembers>(
+    `/v1/platform/signals/templates/${id}`,
+    payload,
+  );
+  return data;
+}

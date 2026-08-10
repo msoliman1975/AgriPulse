@@ -200,6 +200,13 @@ export function SideNav(): ReactNode {
           collapsed={collapsed}
         />
         <SideNavItem
+          to="/platform/signals"
+          label={t("nav.platformSignals")}
+          icon={<GearIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/signals"
+          collapsed={collapsed}
+        />
+        <SideNavItem
           to="/platform/plan-templates"
           label={t("nav.planTemplates")}
           icon={<PlanIcon className="h-4 w-4" />}

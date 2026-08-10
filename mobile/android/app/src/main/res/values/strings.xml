@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AgriPulse Scout</string>
+    <string name="title_activity_main">AgriPulse Scout</string>
+    <string name="package_name">cloud.agripulse.scout</string>
+    <string name="custom_url_scheme">cloud.agripulse.scout</string>
+</resources>

@@ -263,6 +263,10 @@ roles:
       - irrigation.record
       - fertilization.record
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.assign
+      - scouting.dispatch
+      - scouting.rule.manage
       - analytics.read
       - analytics.export
       - notification.read_inbox
@@ -301,6 +305,11 @@ roles:
       - irrigation.record
       - fertilization.record
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.claim
+      - scouting.visit.complete
+      - scouting.visit.assign
+      - scouting.dispatch
       - analytics.read
       - analytics.export
       - notification.read_inbox
@@ -332,6 +341,9 @@ roles:
       - irrigation.record
       - fertilization.record
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.claim
+      - scouting.visit.complete
       - analytics.read
       - notification.read_inbox
       - notification.write_inbox
@@ -356,6 +368,9 @@ roles:
       - irrigation.schedule.read
       - recommendation.read
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.claim
+      - scouting.visit.complete
       - notification.read_inbox
       - notification.write_inbox
 
@@ -363,6 +378,7 @@ roles:
     description: Read-only view of an assigned farm.
     capabilities:
       - farm.read
+      - scouting.visit.read
       - farm.attachment.read
       - block.read
       - block.attachment.read

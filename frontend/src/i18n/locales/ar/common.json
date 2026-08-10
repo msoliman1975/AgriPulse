@@ -6,7 +6,8 @@
   "nav": {
     "home": "الرئيسية",
     "skipToContent": "تخطّي إلى المحتوى الرئيسي",
-    "noTenants": "لا توجد مؤسسات بعد."
+    "noTenants": "لا توجد مؤسسات بعد.",
+    "platformSignals": "كتالوج المؤشرات"
   },
   "workspaceNav": {
     "workspace": "مساحة العمل",

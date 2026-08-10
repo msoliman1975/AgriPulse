@@ -858,5 +858,24 @@
       "membership": "Cell and block counts do not sum, by design: a cell claims a pixel when the pixel's centre falls inside it, while the block claims a pixel when its footprint touches the boundary. Edge pixels therefore count for the block but for no cell.",
       "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
     }
+  },
+  "signals": {
+    "title": "Signal catalog",
+    "subtitle": "Platform-curated signal definitions and forms. Every tenant reads these; a tenant that defines the same code overrides it for itself only.",
+    "readonlyHint": "Read-only",
+    "definitions": "Definitions",
+    "templates": "Forms",
+    "colCode": "Code",
+    "colName": "Name",
+    "colKind": "Type",
+    "colValues": "Values",
+    "colPhoto": "Photo",
+    "colAggregation": "Aggregation",
+    "colState": "State",
+    "active": "Active",
+    "retired": "Retired",
+    "emptyDefinitions": "No platform definitions yet.",
+    "emptyTemplates": "No platform forms yet.",
+    "loadFailed": "Could not load the signal catalog."
   }
 }

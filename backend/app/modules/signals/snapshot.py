@@ -98,14 +98,39 @@ async def load_snapshot(
             await session.execute(
                 text(
                     f"""
-                WITH applicable AS (
-                    SELECT DISTINCT
+                -- The catalog is platform-tiered (public migration 0052 /
+                -- tenant 0063): definitions live in `public` with a nullable
+                -- tenant_id. Resolve this tenant the way the migrations do —
+                -- the session sets `search_path = tenant_<id>, public`, so
+                -- current_schema() is the tenant schema.
+                WITH this_tenant AS (
+                    SELECT t.id
+                      FROM public.tenants t
+                     WHERE replace(t.id::text, '-', '')
+                           = replace(current_schema(), 'tenant_', '')
+                ),
+                applicable AS (
+                    -- DISTINCT ON (code) implements the shadowing rule: when a
+                    -- tenant has authored a definition sharing a platform
+                    -- definition's code, the tenant's wins. NULLS LAST puts the
+                    -- tenant row (non-NULL tenant_id) first, so it is the one
+                    -- kept. Exactly one definition per code reaches the
+                    -- evaluator — never both.
+                    SELECT DISTINCT ON (d.code)
                            d.id, d.code, d.value_kind,
                            d.aggregation, d.aggregation_window_days
-                    FROM signal_definitions d
+                    FROM public.signal_definitions d
                     JOIN signal_assignments a ON a.signal_definition_id = d.id
                     WHERE d.deleted_at IS NULL
                       AND d.is_active = TRUE
+                      -- Scope to platform + own-tenant rows. Without this a
+                      -- tenant would read every other tenant's definitions;
+                      -- the join to the tenant-scoped signal_assignments masks
+                      -- it in practice, but that is accidental, not a check.
+                      AND (
+                            d.tenant_id IS NULL
+                         OR d.tenant_id = (SELECT id FROM this_tenant)
+                      )
                       AND a.deleted_at IS NULL
                       AND a.is_active = TRUE
                       AND (
@@ -113,6 +138,7 @@ async def load_snapshot(
                          OR (a.block_id = :block_id)
                          OR (a.farm_id = :farm_id AND a.block_id IS NULL)
                       )
+                    ORDER BY d.code, d.tenant_id NULLS LAST
                 ),
                 -- CS-6: latest-mode rows + every non-numeric value_kind.
                 -- DISTINCT ON gives us the most recent observation per

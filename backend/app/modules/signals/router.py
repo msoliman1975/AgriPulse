@@ -53,7 +53,7 @@ from app.modules.signals.schemas import (
 from app.modules.signals.service import SignalsServiceImpl, get_signals_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
-from app.shared.db.session import get_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["signals"])
@@ -724,3 +724,168 @@ async def delete_observation(
         tenant_schema=schema,
     )
     return {"deleted": 1}
+
+
+# ---------- Platform authoring (cap signal.platform.manage) -----------------
+#
+# The catalog is shared: definitions and templates live in `public` with a
+# nullable tenant_id, where NULL means platform-curated (public migration 0052 /
+# tenant 0063). These endpoints author that tier.
+#
+# They depend on `get_admin_db_session`, which binds `search_path = public`
+# only. That is what makes them platform-scoped — with no tenant schema on the
+# path, the repository's `current_schema()` lookup resolves to NULL, so reads
+# return platform rows and writes both stamp and match `tenant_id IS NULL`. The
+# scoping is therefore a property of the session, not a flag a caller can get
+# wrong.
+#
+# Deletion is intentionally absent. Archiving a shared definition affects every
+# tenant recording against it, so it needs a cross-tenant usage check first
+# (CS-13's reference scan is tenant-scoped); until that exists, a platform
+# definition is retired by setting is_active = false via PATCH.
+
+
+def _platform_service(
+    admin_session: AsyncSession = Depends(get_admin_db_session),
+) -> SignalsServiceImpl:
+    return get_signals_service(tenant_session=admin_session)
+
+
+@router.get(
+    "/platform/signals/definitions",
+    response_model=list[SignalDefinitionResponse],
+    summary="List platform-curated signal definitions.",
+)
+async def platform_list_definitions(
+    include_inactive: bool = Query(default=True),
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> list[dict[str, Any]]:
+    del context
+    return list(await service.list_definitions(include_inactive=include_inactive))
+
+
+@router.post(
+    "/platform/signals/definitions",
+    response_model=SignalDefinitionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a platform-curated signal definition.",
+)
+async def platform_create_definition(
+    payload: SignalDefinitionCreateRequest,
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> dict[str, Any]:
+    return await service.create_definition(
+        code=payload.code,
+        name=payload.name,
+        description=payload.description,
+        value_kind=payload.value_kind,
+        unit=payload.unit,
+        categorical_values=payload.categorical_values,
+        value_min=payload.value_min,
+        value_max=payload.value_max,
+        attachment_allowed=payload.attachment_allowed,
+        aggregation=payload.aggregation,
+        aggregation_window_days=payload.aggregation_window_days,
+        actor_user_id=context.user_id,
+        # No tenant schema: audit_events is per-tenant, so a platform write has
+        # nowhere tenant-shaped to record. See SignalsServiceImpl._audit_catalog.
+        tenant_schema=None,
+    )
+
+
+@router.patch(
+    "/platform/signals/definitions/{definition_id}",
+    response_model=SignalDefinitionResponse,
+    summary="Update a platform-curated signal definition.",
+)
+async def platform_update_definition(
+    definition_id: UUID,
+    payload: SignalDefinitionUpdateRequest,
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> dict[str, Any]:
+    return await service.update_definition(
+        definition_id=definition_id,
+        updates=payload.model_dump(exclude_unset=True),
+        actor_user_id=context.user_id,
+        tenant_schema=None,
+    )
+
+
+@router.get(
+    "/platform/signals/templates",
+    response_model=list[SignalTemplateResponse],
+    summary="List platform-curated signal templates.",
+)
+async def platform_list_templates(
+    include_inactive: bool = Query(default=True),
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> list[dict[str, Any]]:
+    del context
+    return list(await service.list_templates(include_inactive=include_inactive))
+
+
+@router.get(
+    "/platform/signals/templates/{template_id}",
+    response_model=SignalTemplateWithMembersResponse,
+    summary="A platform template and its ordered members.",
+)
+async def platform_get_template(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> dict[str, Any]:
+    del context
+    tpl, members = await service.get_template(template_id=template_id)
+    return {"template": tpl, "members": list(members)}
+
+
+@router.post(
+    "/platform/signals/templates",
+    response_model=SignalTemplateWithMembersResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a platform-curated signal template.",
+)
+async def platform_create_template(
+    payload: SignalTemplateCreateRequest,
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> dict[str, Any]:
+    tpl, members = await service.create_template(
+        code=payload.code,
+        name=payload.name,
+        description=payload.description,
+        members=tuple(payload.members),
+        actor_user_id=context.user_id,
+        tenant_schema=None,
+    )
+    return {"template": tpl, "members": list(members)}
+
+
+@router.patch(
+    "/platform/signals/templates/{template_id}",
+    response_model=SignalTemplateWithMembersResponse,
+    summary="Update a platform-curated signal template (optionally replacing members).",
+)
+async def platform_update_template(
+    template_id: UUID,
+    payload: SignalTemplateUpdateRequest,
+    context: RequestContext = Depends(requires_capability("signal.platform.manage")),
+    service: SignalsServiceImpl = Depends(_platform_service),
+) -> dict[str, Any]:
+    updates = payload.model_dump(exclude_unset=True)
+    # `members` is replaced wholesale when present and left untouched when
+    # omitted, so absence and an explicit empty list mean different things.
+    members_supplied = "members" in updates
+    updates.pop("members", None)
+    tpl, member_rows = await service.update_template(
+        template_id=template_id,
+        updates=updates,
+        members=tuple(payload.members or ()) if members_supplied else None,
+        actor_user_id=context.user_id,
+        tenant_schema=None,
+    )
+    return {"template": tpl, "members": list(member_rows)}

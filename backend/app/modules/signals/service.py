@@ -100,7 +100,7 @@ class SignalsService(Protocol):
         aggregation: str,
         aggregation_window_days: int | None,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> dict[str, Any]: ...
 
     async def update_definition(
@@ -109,7 +109,7 @@ class SignalsService(Protocol):
         definition_id: UUID,
         updates: dict[str, Any],
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> dict[str, Any]: ...
 
     # ---- Templates (CS-2/3) ----
@@ -130,7 +130,7 @@ class SignalsService(Protocol):
         description: str | None,
         members: tuple[SignalTemplateDefinitionMember, ...],
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
 
     async def update_template(
@@ -140,7 +140,7 @@ class SignalsService(Protocol):
         updates: dict[str, Any],
         members: tuple[SignalTemplateDefinitionMember, ...] | None,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
 
     async def delete_template(
@@ -148,7 +148,7 @@ class SignalsService(Protocol):
         *,
         template_id: UUID,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
         tenant_id: UUID,
         force: bool = False,
     ) -> None: ...
@@ -158,7 +158,7 @@ class SignalsService(Protocol):
         *,
         definition_id: UUID,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
         tenant_id: UUID,
         force: bool = False,
     ) -> None: ...
@@ -256,6 +256,29 @@ class SignalsServiceImpl:
         self._storage = storage or get_storage_client()
         self._log = get_logger(__name__)
 
+    async def _audit_catalog(self, *, tenant_schema: str | None, **fields: Any) -> None:
+        """Audit a catalog write, skipping it for platform authoring.
+
+        The signal catalog is shared: a platform admin editing it has no tenant
+        schema, and `audit_events` is a per-tenant hypertable, so there is
+        nowhere tenant-shaped to write. This mirrors plan_templates, where the
+        platform authoring endpoints record nothing and only the tenant-side
+        `apply` audits.
+
+        Deliberately narrow — it wraps only the six catalog writes. Every other
+        audit call in this module is tenant-only by construction (observations,
+        assignments) and still calls `self._audit.record` directly, so this
+        cannot quietly swallow a tenant event.
+        """
+        if tenant_schema is None:
+            self._log.info(
+                "signals_catalog_platform_write",
+                event_type=fields.get("event_type"),
+                subject_id=str(fields.get("subject_id")),
+            )
+            return
+        await self._audit.record(tenant_schema=tenant_schema, **fields)
+
     # ---- Definitions --------------------------------------------------
 
     async def list_definitions(
@@ -284,7 +307,7 @@ class SignalsServiceImpl:
         aggregation: str,
         aggregation_window_days: int | None,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> dict[str, Any]:
         if value_kind == "categorical" and not categorical_values:
             raise InvalidSignalValueError(
@@ -323,7 +346,7 @@ class SignalsServiceImpl:
             aggregation_window_days=aggregation_window_days,
             actor_user_id=actor_user_id,
         )
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type="signals.definition_created",
             actor_user_id=actor_user_id,
@@ -340,7 +363,7 @@ class SignalsServiceImpl:
         definition_id: UUID,
         updates: dict[str, Any],
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> dict[str, Any]:
         existing = await self._repo.get_definition(definition_id=definition_id)
         if existing is None:
@@ -366,7 +389,7 @@ class SignalsServiceImpl:
         )
         if out is None:
             raise SignalDefinitionNotFoundError(definition_id)
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type="signals.definition_updated",
             actor_user_id=actor_user_id,
@@ -382,7 +405,7 @@ class SignalsServiceImpl:
         *,
         definition_id: UUID,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
         tenant_id: UUID,
         force: bool = False,
     ) -> None:
@@ -402,7 +425,7 @@ class SignalsServiceImpl:
         )
         if not deleted:
             return
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type=(
                 "signals.definition_force_deleted" if force else "signals.definition_deleted"
@@ -800,7 +823,7 @@ class SignalsServiceImpl:
         description: str | None,
         members: tuple[SignalTemplateDefinitionMember, ...],
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
         self._validate_template_members(members)
         await self._assert_all_definitions_exist(members)
@@ -815,7 +838,7 @@ class SignalsServiceImpl:
             members=repo_members,
             actor_user_id=actor_user_id,
         )
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type="signals.template_created",
             actor_user_id=actor_user_id,
@@ -834,7 +857,7 @@ class SignalsServiceImpl:
         updates: dict[str, Any],
         members: tuple[SignalTemplateDefinitionMember, ...] | None,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
         existing = await self._repo.get_template(template_id=template_id)
         if existing is None:
@@ -863,7 +886,7 @@ class SignalsServiceImpl:
         )
         if out is None:
             raise SignalTemplateNotFoundError(template_id)
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type="signals.template_updated",
             actor_user_id=actor_user_id,
@@ -884,7 +907,7 @@ class SignalsServiceImpl:
         *,
         template_id: UUID,
         actor_user_id: UUID | None,
-        tenant_schema: str,
+        tenant_schema: str | None,
         tenant_id: UUID,
         force: bool = False,
     ) -> None:
@@ -900,7 +923,7 @@ class SignalsServiceImpl:
         )
         if not deleted:
             return
-        await self._audit.record(
+        await self._audit_catalog(
             tenant_schema=tenant_schema,
             event_type=("signals.template_force_deleted" if force else "signals.template_deleted"),
             actor_user_id=actor_user_id,

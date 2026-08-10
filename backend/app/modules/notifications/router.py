@@ -24,8 +24,11 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
+from app.modules.notifications.devices import list_devices, register_device, revoke_device
 from app.modules.notifications.errors import InboxItemNotFoundError
 from app.modules.notifications.schemas import (
+    DeviceRegisterRequest,
+    DeviceResponse,
     InboxItemResponse,
     InboxTransitionRequest,
     InboxUnreadCountResponse,
@@ -144,3 +147,72 @@ async def transition_inbox_item(
     # we still return the current row.
     _ = updated
     return item
+
+
+# ---------- Devices (push channel) ------------------------------------------
+#
+# Gated on `notification.write_inbox` rather than a new capability: every role
+# that can receive notifications already holds it, including Scout, and
+# registering the handset you are already signed in on is the same class of
+# act as marking your own inbox item read. A separate capability would have to
+# be granted to all seven roles on day one to be useful, which is a capability
+# that distinguishes nothing.
+
+
+@router.post(
+    "/devices:register",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register (or refresh) this device's push token.",
+)
+async def register_device_endpoint(
+    payload: DeviceRegisterRequest,
+    context: RequestContext = Depends(requires_capability("notification.write_inbox")),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    user_id = _ensure_user(context)
+    return await register_device(
+        tenant_session,
+        user_id=user_id,
+        token=payload.token,
+        platform=payload.platform,
+        app_version=payload.app_version,
+        locale=payload.locale,
+    )
+
+
+@router.get(
+    "/devices",
+    response_model=list[DeviceResponse],
+    summary="Devices currently registered to the caller.",
+)
+async def list_devices_endpoint(
+    context: RequestContext = Depends(requires_capability("notification.read_inbox")),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    user_id = _ensure_user(context)
+    return list(await list_devices(tenant_session, user_id=user_id))
+
+
+@router.delete(
+    "/devices/{token}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="Stop pushing to one of the caller's devices (sign-out).",
+)
+async def revoke_device_endpoint(
+    token: str,
+    context: RequestContext = Depends(requires_capability("notification.write_inbox")),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> None:
+    user_id = _ensure_user(context)
+    revoked = await revoke_device(tenant_session, user_id=user_id, token=token)
+    if not revoked:
+        # 404 rather than 204: sign-out that silently did nothing is how a
+        # handset keeps receiving a farm's alerts after its owner left.
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Device not found",
+            detail="No live device with that token is registered to you.",
+            type_="https://agripulse.cloud/problems/device-not-found",
+        )

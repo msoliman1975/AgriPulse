@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriPulse Scout — Complete Design Dossier</title>
+<style>
+  :root{
+    --sage:#4a7c59; --sage-dk:#3a6347; --mint:#e8f3ec; --mint2:#d6ebdd;
+    --pulse:#22c55e; --ink:#16261c; --muted:#5d6f63; --line:#dfe7e0;
+    --bg:#f1f5f2; --panel:#ffffff;
+    --crit:#dc2626; --watch:#e8a317; --ok:#22a35a;
+    --field:#0e1a15; --field2:#17271f; --field3:#22362c;
+    --sand:#c2a878; --sand-dim:#f0e7d6;
+    --plat:#6b5ca5; --plat-dim:#ece9f6;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+    --ar:"Segoe UI","Noto Naskh Arabic",Tahoma,sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 28px}
+  .m{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  code{font-family:var(--mono);font-size:.88em;background:var(--mint);padding:1px 5px;border-radius:4px;color:var(--sage-dk)}
+  h2 code,h3 code{font-size:.72em}
+
+  /* masthead */
+  .mast{padding:70px 0 40px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--sage);font-weight:600}
+  .mast h1{font-size:clamp(36px,5.6vw,62px);line-height:1.03;letter-spacing:-.035em;font-weight:750;margin:16px 0 0;max-width:17ch}
+  .mast h1 em{font-style:normal;color:var(--sage)}
+  .lede{margin-top:20px;max-width:64ch;font-size:17px;color:#31463a}
+  .meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:26px}
+  .tag{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:6px 13px;color:var(--muted)}
+  .tag b{color:var(--ink);font-weight:600}
+
+  /* toc */
+  .toc{margin-top:38px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:20px 24px}
+  .toc h3{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .toc ol{margin-top:12px;columns:3;column-gap:34px;list-style:none;counter-reset:t}
+  .toc li{counter-increment:t;font-size:14px;padding:3px 0;break-inside:avoid}
+  .toc li::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:11px;color:var(--sage);margin-right:8px}
+  .toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent}
+  .toc a:hover{border-bottom-color:var(--sage)}
+  @media (max-width:900px){.toc ol{columns:1}}
+
+  /* sections */
+  section.s{padding:64px 0;border-bottom:1px solid var(--line)}
+  .snum{font-family:var(--mono);font-size:12px;color:var(--sage);letter-spacing:.13em;font-weight:600}
+  .s h2{font-size:31px;letter-spacing:-.028em;line-height:1.14;margin:9px 0 0;font-weight:700;max-width:22ch}
+  .s .sub{color:var(--muted);margin-top:11px;font-size:16px;max-width:70ch}
+  .s h3{font-size:19px;margin:34px 0 0;letter-spacing:-.02em;font-weight:700}
+  .s h4{font-size:15px;margin:24px 0 0;font-weight:700}
+  .s p{margin-top:11px;max-width:78ch}
+  .s ul,.s ol{margin-top:11px;padding-left:20px;max-width:78ch}
+  .s li{margin-bottom:6px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px;background:var(--panel);
+        border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+     text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);font-weight:600;background:#fafcfb}
+  td{padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .tw{overflow-x:auto}
+
+  /* callouts */
+  .call{border-left:3px solid var(--sage);background:var(--panel);border-radius:0 11px 11px 0;padding:15px 18px;margin-top:20px;max-width:82ch}
+  .call h4{margin:0;font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--sage-dk);font-weight:600}
+  .call p{margin-top:6px;font-size:14.5px;color:#3d5245}
+  .call.warn{border-left-color:var(--watch)} .call.warn h4{color:#a06f05}
+  .call.bad{border-left-color:var(--crit)} .call.bad h4{color:#a91c1c}
+  .call.plat{border-left-color:var(--plat)} .call.plat h4{color:#4e4180}
+
+  pre{background:var(--field);color:#d8e6dd;border-radius:11px;padding:15px 17px;overflow-x:auto;
+      font-family:var(--mono);font-size:12.5px;line-height:1.62;margin-top:16px;max-width:100%}
+  pre .c{color:#7fa08e} pre .k{color:#8fd6a8} pre .s2{color:#e3c88a}
+
+  .badge{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;
+         border-radius:5px;font-weight:600;white-space:nowrap;display:inline-block}
+  .b-new{background:#dcf7e6;color:#15803d} .b-ext{background:var(--mint);color:var(--sage-dk)}
+  .b-live{background:#eef2ef;color:var(--muted)} .b-dec{background:#fdf0d8;color:#8a5d05}
+  .b-plat{background:var(--plat-dim);color:#4e4180}
+  .o-rec{background:var(--mint);color:var(--sage-dk)} .o-alert{background:#fde8e8;color:#a91c1c}
+  .o-adhoc{background:var(--sand-dim);color:#7d6534} .o-routine{background:#eef2ef;color:var(--muted)}
+  .o-self{background:#dcf7e6;color:#15803d}
+  .yes{color:var(--ok);font-weight:700} .no{color:#c3d2c8}
+
+  /* phones */
+  .screens{display:flex;gap:26px;flex-wrap:wrap;margin-top:22px}
+  .screens>div{flex:0 0 328px;max-width:328px}
+  .phone{width:328px;border-radius:36px;background:#0a1310;padding:9px;box-shadow:0 20px 46px rgba(14,38,26,.19)}
+  .screen{border-radius:28px;overflow:hidden;background:var(--panel);height:660px;display:flex;flex-direction:column;position:relative}
+  .screen.dark{background:var(--field);color:#e9f2ec}
+  .cap{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px}
+  .cap b{color:var(--ink);font-weight:600}
+  .sbar{display:flex;justify-content:space-between;padding:11px 18px 4px;font-family:var(--mono);font-size:11px;color:var(--muted);flex:0 0 auto}
+  .dark .sbar{color:#7e9689}
+  .abar{display:flex;align-items:center;gap:11px;padding:9px 17px 13px;flex:0 0 auto}
+  .abar .ttl{font-size:18px;font-weight:700;letter-spacing:-.02em}
+  .abar .sp{flex:1}
+  .abar .ic{width:32px;height:32px;border-radius:9px;background:var(--mint);display:grid;place-items:center;font-size:14px;color:var(--sage-dk)}
+  .dark .abar .ic{background:var(--field3);color:#a9c4b5}
+  .back{font-size:19px;color:var(--muted);width:30px} .dark .back{color:#9db3a6}
+  .pbody{flex:1;overflow:hidden;padding:0 17px;scrollbar-width:none}
+  .pbody::-webkit-scrollbar{width:0}
+  .ring{width:44px;height:44px;flex:0 0 44px;border-radius:50%;display:grid;place-items:center;position:relative}
+  .ring::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(var(--rc) var(--pct),#e4ebe6 0)}
+  .ring::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--panel)}
+  .dark .ring::after{background:var(--field)}
+  .dark .ring::before{background:conic-gradient(var(--rc) var(--pct),#2c4136 0)}
+  .ring span{position:relative;z-index:1;font-family:var(--mono);font-size:11.5px;font-weight:700;line-height:1}
+  .ring.big{width:62px;height:62px;flex:0 0 62px} .ring.big span{font-size:15px} .ring.big::after{inset:5px}
+  .ring.crit{--rc:var(--crit)} .ring.crit span{color:var(--crit)}
+  .ring.watch{--rc:var(--watch)} .ring.watch span{color:#a06f05}
+  .ring.sand{--rc:var(--sand)} .ring.sand span{color:#7d6534}
+  .vc{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+  .dark .vc{border-color:#233a2f}
+  .vc .txt{flex:1;min-width:0}
+  .vc .blk{font-size:15px;font-weight:650}
+  .vc .why{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.42;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .vc .foot{display:flex;align-items:center;gap:7px;margin-top:8px}
+  .dist{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .shead{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:18px 0 3px;display:flex;gap:8px;align-items:center}
+  .shead .n{background:var(--mint);color:var(--sage-dk);border-radius:20px;padding:1px 7px;font-size:10px}
+  .shead.red .n{background:#fde8e8;color:#a91c1c}
+  .tabs{display:flex;border-top:1px solid var(--line);flex:0 0 auto;background:var(--panel);padding-bottom:7px}
+  .dark .tabs{background:var(--field2);border-color:#233a2f}
+  .tab{flex:1;text-align:center;padding:10px 0 6px;font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+  .tab .g{display:block;font-size:17px;margin-bottom:3px;filter:grayscale(1) opacity(.55)}
+  .tab.on{color:var(--sage-dk);font-weight:600} .tab.on .g{filter:none}
+  .actions{padding:12px 17px 15px;border-top:1px solid var(--line);display:flex;gap:9px;flex:0 0 auto;background:var(--panel)}
+  .dark .actions{background:var(--field2);border-color:#233a2f}
+  .btn{flex:1;text-align:center;padding:14px 0;border-radius:12px;font-size:15px;font-weight:650}
+  .btn.pri{background:var(--sage);color:#fff}
+  .btn.gho{background:var(--mint);color:var(--sage-dk);flex:0 0 96px}
+  .dark .btn.gho{background:var(--field3);color:#a9c4b5}
+  .btn.dis{background:#e8eeea;color:#9db0a4}
+  .rsn{background:var(--mint);border-radius:var(--r);padding:15px;margin-top:14px}
+  .rsn .rl{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--sage-dk);font-weight:600}
+  .rsn p{font-size:14px;color:#26382d;margin-top:8px;line-height:1.5}
+  .rsn.hand{background:var(--sand-dim);border-left:3px solid var(--sand)}
+  .rsn.hand .rl{color:#7d6534} .rsn.hand p{color:#4a3d22;font-size:15px}
+  .who{display:flex;align-items:center;gap:8px;margin-top:11px;font-size:12.5px;color:#7d6534}
+  .who .av{width:22px;height:22px;border-radius:50%;background:var(--sand);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700;font-family:var(--mono)}
+  .gps{display:flex;align-items:center;gap:9px;padding:10px 13px;font-family:var(--mono);font-size:11.5px;flex:0 0 auto}
+  .gps.in{background:#dcf7e6;color:#166534} .gps.out{background:#fdf0d8;color:#8a5d05}
+  .gps .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 8px}
+  .gps .sp{flex:1}
+  .fld{padding:15px 0;border-bottom:1px solid #233a2f}
+  .fld .fl{font-size:13.5px;font-weight:600;color:#e3eee7}
+  .fld .req{color:var(--crit)}
+  .fld .fc{font-family:var(--mono);font-size:10px;color:#6f8a7c;margin-top:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .chip{padding:9px 13px;border-radius:10px;background:var(--field3);color:#b7cec1;font-size:13.5px;border:1px solid #2e4739}
+  .chip.sel{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .chip.sel.bad{background:var(--crit);border-color:var(--crit)}
+  .chip.sel.mid{background:var(--watch);border-color:var(--watch);color:#3a2a02}
+  .shots{display:flex;gap:8px;margin-top:10px}
+  .shot{width:62px;height:62px;border-radius:10px;flex:0 0 62px}
+  .shot.a{background:linear-gradient(150deg,#5d7a3c,#9aa845 60%,#c4b45e)}
+  .shot.b{background:linear-gradient(150deg,#7b6a3a,#a58c4a 55%,#6d7f3e)}
+  .shot.add{background:var(--field3);border:1.5px dashed #3d5a49;display:grid;place-items:center;color:#7fa08e;font-size:21px}
+  .map{flex:1;position:relative;background:radial-gradient(115% 85% at 28% 22%,#26402f 0%,#16261e 55%,#0e1a15 100%)}
+  .poly{position:absolute;left:11%;top:19%;width:66%;height:47%;border:2px solid rgba(255,255,255,.62);border-radius:5px;background:rgba(220,38,38,.16);transform:rotate(-6deg)}
+  .cell{position:absolute;right:19%;top:11%;width:36%;height:29%;border:2px dashed var(--crit);background:rgba(220,38,38,.3);border-radius:3px}
+  .me{position:absolute;left:43%;top:72%;width:17px;height:17px;border-radius:50%;background:#3b82f6;border:2.5px solid #fff;box-shadow:0 0 0 9px rgba(59,130,246,.22)}
+  .mchip{position:absolute;top:13px;left:13px;right:13px;background:rgba(10,20,16,.86);border:1px solid #2d453a;border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:11px}
+  .mchip .b1{font-size:14px;font-weight:650;color:#eaf3ee}
+  .mchip .b2{font-family:var(--mono);font-size:11px;color:#8fa89a;margin-top:2px}
+  .nav{position:absolute;left:13px;right:13px;bottom:13px;display:flex;gap:9px}
+  .navb{flex:1;background:rgba(233,242,236,.95);color:var(--ink);border-radius:12px;padding:12px;text-align:center;font-size:14.5px;font-weight:650}
+  .navb.sec{flex:0 0 108px;background:rgba(34,54,44,.92);color:#cfe0d6;border:1px solid #35503f}
+  /* login */
+  .login{flex:1;display:flex;flex-direction:column;padding:0 26px;background:linear-gradient(170deg,#163023,#0d1c15)}
+  .login .lg{margin-top:66px;width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,var(--sage),var(--pulse))}
+  .login h4{color:#eaf3ee;font-size:25px;font-weight:700;margin-top:22px;letter-spacing:-.02em}
+  .login .sub2{color:#8fa89a;font-size:14px;margin-top:7px}
+  .inpd{margin-top:14px;background:rgba(255,255,255,.06);border:1px solid #35503f;border-radius:12px;padding:13px 14px;color:#eaf3ee;font-family:var(--mono);font-size:15px}
+  .inpd.lbl{font-family:var(--sans);font-size:11px;color:#7fa08e;background:none;border:0;padding:0 0 5px;margin-top:16px}
+  .pins{display:flex;gap:9px;margin-top:6px}
+  .pins i{flex:1;height:52px;border-radius:11px;background:rgba(255,255,255,.06);border:1px solid #35503f;display:grid;place-items:center;font-family:var(--mono);font-size:21px;color:#eaf3ee;font-style:normal}
+  .pins i.e{color:#3d5a49}
+  /* web frames */
+  .web{border-radius:11px;overflow:hidden;border:1px solid var(--line);background:var(--panel);box-shadow:0 14px 36px rgba(14,38,26,.12);margin-top:20px}
+  .wbar{height:34px;background:#e7ede9;display:flex;align-items:center;padding:0 12px;gap:6px;border-bottom:1px solid var(--line)}
+  .wbar i{width:9px;height:9px;border-radius:50%;background:#c6d2ca;display:block}
+  .wbar .u{margin-left:12px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .wpad{padding:16px 18px}
+  .wsplit{display:grid;grid-template-columns:1fr 300px}
+  .wmap{position:relative;background:radial-gradient(120% 90% at 40% 30%,#2b4535,#18291f 60%,#101c16);min-height:360px}
+  .wside{border-left:1px solid var(--line);padding:15px}
+  .wside h5{font-size:13px;font-weight:700}
+  .wside .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .frm label{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:block;margin-top:11px}
+  .inp{border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;margin-top:5px;background:#fafcfb}
+  .inp.ta{min-height:58px;color:#4a3d22;background:var(--sand-dim);border-color:#e0d2b6}
+  .inp.sel{display:flex;justify-content:space-between}
+  .wbtn{margin-top:14px;background:var(--sage);color:#fff;border-radius:10px;padding:11px;text-align:center;font-size:13.5px;font-weight:650}
+  .pin{position:absolute;left:47%;top:41%;width:15px;height:15px;border-radius:50% 50% 50% 2px;background:var(--sand);border:2px solid #fff;transform:rotate(-45deg)}
+  .wpoly{position:absolute;left:26%;top:24%;width:44%;height:44%;border:2px solid rgba(255,255,255,.55);border-radius:5px;background:rgba(74,124,89,.2);transform:rotate(-5deg)}
+  .tbl2{margin:0;border:0;border-radius:0}
+  .due{font-family:var(--mono);font-size:12.5px;font-weight:650}
+  .due.red{color:var(--crit)} .due.amb{color:#a06f05} .due.gry{color:var(--muted)}
+  .asg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+  .asg .av{width:22px;height:22px;border-radius:50%;background:var(--sage);color:#fff;font-family:var(--mono);font-size:9.5px;font-weight:700;display:grid;place-items:center}
+  .asg.none{color:var(--muted);font-style:italic}
+  .mini{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:7px;background:var(--sage);color:#fff;font-weight:600}
+  .mini.g{background:var(--mint);color:var(--sage-dk)}
+  .pinreveal{background:var(--field);border-radius:12px;padding:16px;margin-top:12px;text-align:center}
+  .pinreveal .p1{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7fa08e}
+  .pinreveal .p2{font-family:var(--mono);font-size:27px;color:#eaf3ee;letter-spacing:.13em;margin-top:8px;font-weight:600;white-space:nowrap}
+  .pinreveal .p3{font-size:12px;color:#8fa89a;margin-top:9px}
+  .ar{direction:rtl;font-family:var(--ar)}
+  .ar .m{direction:ltr;unicode-bidi:embed}
+  .ar .tab,.ar .shead{font-family:var(--ar);letter-spacing:0}
+  @media (max-width:1000px){.wsplit{grid-template-columns:1fr}.wside{border-left:0;border-top:1px solid var(--line)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="mast"><div class="wrap">
+  <div class="eyebrow">Complete design dossier · for review before build</div>
+  <h1>AgriPulse Scout — <em>the whole picture</em></h1>
+  <p class="lede">
+    An Android app that turns an index anomaly into a person standing in the right
+    part of the right field, and turns what they see into data the platform can act on.
+    This document consolidates capabilities, specification, identity and access,
+    the signals platform tier, the web-app work, and every screen.
+  </p>
+  <div class="meta">
+    <span class="tag"><b>Android</b> first, Capacitor + React</span>
+    <span class="tag"><b>Arabic</b> first, RTL</span>
+    <span class="tag">Login = <b>phone + PIN</b></span>
+    <span class="tag">Online-only <b>v1</b></span>
+    <span class="tag">4 new tables · 1 new tier</span>
+  </div>
+
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#gap">The gap</a></li>
+      <li><a href="#substrate">What exists, what's new</a></li>
+      <li><a href="#decisions">Decisions locked</a></li>
+      <li><a href="#visits">The visit model</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#tier">Signals platform tier</a></li>
+      <li><a href="#identity">Identity &amp; authentication</a></li>
+      <li><a href="#authz">Authorization matrix</a></li>
+      <li><a href="#api">API surface</a></li>
+      <li><a href="#mobile">Mobile screens</a></li>
+      <li><a href="#web">Web app &amp; screens</a></li>
+      <li><a href="#seq">Delivery sequence</a></li>
+      <li><a href="#risks">Risks</a></li>
+    </ol>
+  </nav>
+</div></header>
+
+<!-- 01 GAP -->
+<section class="s" id="gap"><div class="wrap">
+  <div class="snum">01</div>
+  <h2>The platform was pre-wired for this, then left unbuilt</h2>
+  <p class="sub">Both ends of the scouting loop already exist in code. Only the middle is missing —
+    and one capability was declared, granted to six roles, and never implemented.</p>
+
+<pre><span class="c">index anomaly ──► scout_for_stress_v1 ──► recommendation</span>
+<span class="c">  (NDVI z-score)     (decision tree)        action_type: scout</span>
+<span class="c">                                            within_hours: 24 | 72</span>
+                                                    │
+                                        ╔═══════════▼═══════════╗
+                                        ║      <span class="s2">THE GAP</span>          ║
+                                        ║  push · dispatch ·    ║
+                                        ║  mobile capture       ║
+                                        ╚═══════════┬═══════════╝
+                                                    │
+<span class="c">  decision trees ◄── signals snapshot ◄── signal_observations</span>
+<span class="c">  §06 authors these   service.py:296        photos · GPS · typed values</span></pre>
+
+  <div class="call bad"><h4>An honest correction, carried forward</h4>
+    <p>An early draft of this work claimed the loop was already closed. The <b>mechanism</b> is live —
+    <code>recommendations/service.py:296</code> loads a per-block signals snapshot into
+    <code>ConditionContext</code>. The <b>content</b> is not: across all 18 seed trees only four signal
+    codes appear (<code>soil_salinity</code>, <code>petiole_no3n</code>, <code>petiole_p</code>,
+    <code>petiole_k</code>), every one a lab value. <b>No tree reads a scouting observation.</b>
+    Closing the loop is scope (§06, §12), not a freebie.</p></div>
+
+  <div class="call"><h4>The tell: a stub capability</h4>
+    <p><code>scouting.record</code> is declared in <code>shared/rbac/capabilities.yaml:378</code> —
+    "Log a scouting observation (notes, photos)" — with <code>scope: farm</code>,
+    <b><code>status: stub</code></b>, granted to <b>six roles</b>, and implemented by
+    <b>zero endpoints</b>. It is a reserved contract waiting for this module.</p></div>
+</div></section>
+
+<!-- 02 SUBSTRATE -->
+<section class="s" id="substrate"><div class="wrap">
+  <div class="snum">02</div>
+  <h2>What exists, and what we actually have to build</h2>
+  <p class="sub">Most of this is an integration job. Naming the reuse honestly is what keeps the estimate real.</p>
+
+  <h3>Already live — reuse as-is</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Piece</th><th>Where</th><th>Why it matters here</th></tr></thead>
+    <tbody>
+      <tr><td><code>Scout</code> farm role</td><td><code>shared/auth/context.py:41</code></td><td>The persona already exists in RBAC</td></tr>
+      <tr><td>Scout-triggering tree</td><td><code>seeds/scout_for_stress_v1.yaml</code></td><td>Emits <code>action_type: scout</code>, severity, <code>within_hours</code>, EN+AR. <b>This is the push payload</b></td></tr>
+      <tr><td><code>RecommendationOpenedV1</code></td><td><code>recommendations/events.py</code></td><td>Carries <code>action_type</code>, <code>cell_id</code>; notifications already subscribes. <b>The dispatcher hook already fires</b></td></tr>
+      <tr><td><code>SignalObservation</code></td><td><code>signals/models.py</code></td><td>Typed values, <code>attachment_s3_key</code>, <code>notes</code>, <code>location_point</code>, per-row time. <b>No schema change</b></td></tr>
+      <tr><td><code>SignalTemplate</code> + junction</td><td><code>signals/models.py</code></td><td><code>position</code> + <code>is_required</code> = an ordered form, already modelled</td></tr>
+      <tr><td>Presigned photo upload</td><td><code>signals/service.py::init_attachment_upload</code></td><td>presign → PUT → INSERT. <b>Already built</b></td></tr>
+      <tr><td>GPS containment</td><td>migration <code>0029</code></td><td><code>ST_Within</code> trigger, <b>per row</b></td></tr>
+      <tr><td>Notification fan-out</td><td><code>notifications/subscribers.py</code></td><td><code>in_app</code>/<code>email</code>/<code>webhook</code> with per-user opt-in</td></tr>
+      <tr><td>Farm-scoped JWT</td><td>PR #269 / #270</td><td>Farm-scoped-only users work since 2026-06-16</td></tr>
+      <tr><td>Member ↔ Worker link</td><td><code>resources.membership_id</code> (U-3)</td><td>The join this app finally uses</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Genuinely new</h3>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Thing</th><th>Shape</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-new">new</span></td><td><code>scouting_visits</code></td><td>Dispatch, deadline, state machine</td></tr>
+      <tr><td><span class="badge b-new">new</span></td><td><code>scouting_routing_rules</code></td><td>triage vs auto, resolved block → farm → tenant</td></tr>
+      <tr><td><span class="badge b-new">new</span></td><td><code>device_tokens</code> + <code>push</code> channel</td><td>A fourth channel, not new machinery</td></tr>
+      <tr><td><span class="badge b-plat">tier</span></td><td><b>Signals platform tier</b></td><td>§06 — the S0 blocker</td></tr>
+      <tr><td><span class="badge b-new">new</span></td><td>Phone-based enrolment</td><td>§07 — field workers have no email</td></tr>
+      <tr><td><span class="badge b-new">new</span></td><td>The Android client</td><td>The long pole</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 03 DECISIONS -->
+<section class="s" id="decisions"><div class="wrap">
+  <div class="snum">03</div>
+  <h2>Decisions locked</h2>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Decision</th><th>Consequence</th></tr></thead>
+    <tbody>
+      <tr><td><b>D1</b></td><td>Scouts are <b>real Keycloak logins</b>, farm-scoped</td><td>Reuses IAM, real audit trail; per-scout provisioning cost</td></tr>
+      <tr><td><b>D2</b></td><td><b>Online-only v1</b></td><td>No local DB. Payloads still shaped so a queue is additive, not a rewrite</td></tr>
+      <tr><td><b>D3</b></td><td><b>Capacitor + React</b> in the monorepo</td><td>Reuses tokens, EN/AR catalogues, axios, <code>oidc-client-ts</code>, maplibre, turf</td></tr>
+      <tr><td><b>D4</b></td><td>Thin <code>scouting_visits</code>; observations stay in signals</td><td>Feedback path into the engine stays intact</td></tr>
+      <tr><td><b>D5</b></td><td><b>Both</b> supervisor-triage and rule-based auto-assign</td><td>Per-farm routing rule, not a product-wide switch</td></tr>
+      <tr><td><b>D6</b></td><td><b>Five origins</b>, not just recommendations</td><td><code>ad_hoc</code> is first-class and carries human words</td></tr>
+      <tr><td><b>D7</b></td><td><b>Phone is the Keycloak username</b>; email synthesized</td><td>Zero migration to identity core (§07)</td></tr>
+      <tr><td><b>D8</b> <span class="badge b-new">approved</span></td><td>Signal definitions gain a <b>platform tier</b></td><td>Mirrors <code>decision_trees</code>; authored in a UI, not YAML (§06). Implementation plan: <code>signals-platform-tier-implementation.md</code></td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<!-- 04 VISITS -->
+<section class="s" id="visits"><div class="wrap">
+  <div class="snum">04</div>
+  <h2>A visit is the unit of work</h2>
+  <p class="sub">Where it comes from changes almost nothing structurally, and almost everything about the
+    copy, the deadline and the surface it renders on.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Origin</th><th>Trigger</th><th>Deadline from</th><th>Carries</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge o-rec">recommendation</span></td><td><code>RecommendationOpenedV1</code> where <code>action_type='scout'</code></td><td>tree's <code>within_hours</code> (24 / 72)</td><td>Machine text + the anomaly</td></tr>
+      <tr><td><span class="badge o-alert">alert</span></td><td><code>AlertOpenedV1</code> above a severity floor</td><td>routing rule default</td><td>Threshold breached</td></tr>
+      <tr><td><span class="badge o-routine">routine</span></td><td>Scheduled round</td><td>cadence</td><td>A sequence of blocks</td></tr>
+      <tr><td><span class="badge o-adhoc">ad hoc</span></td><td><b>Supervisor saw something on the map</b></td><td>supervisor sets</td><td><b>Human instruction + dropped pin</b></td></tr>
+      <tr><td><span class="badge o-self">self initiated</span></td><td>Scout is already there</td><td>n/a</td><td>Starts <code>in_progress</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Lifecycle</h3>
+<pre>                    ┌──────────┐
+   triage mode ────►│  queued  │  unassigned, awaiting a supervisor
+                    └────┬─────┘
+                         │ assign
+   auto mode ───────────►├──────────────┐
+                         ▼              │ decline (reason)
+                   ┌──────────┐         │  └──► back to queued
+                   │ assigned │         │       + notify supervisor
+                   └────┬─────┘         │
+                        │ accept        │
+                        ▼               │
+                   ┌──────────┐◄────────┘
+                   │ accepted │
+                   └────┬─────┘
+                        │ start
+                        ▼
+                  ┌─────────────┐
+                  │ in_progress │
+                  └──────┬──────┘
+                         │ submit
+                         ▼
+                  ┌─────────────┐
+                  │  completed  │  outcome: resolved | inconclusive | blocked
+                  └─────────────┘
+
+  Side-paths:  cancelled (supervisor withdrew) · expired (past due_by, swept)</pre>
+
+  <div class="call warn"><h4><code>expired</code> is a flag, not a closure</h4>
+    <p>The sweep marks it, escalates to the supervisor, and the visit stays actionable.
+    Auto-closing overdue work would make a neglected farm look identical to a healthy one.</p></div>
+
+  <div class="call"><h4>"I couldn't tell" is a real answer</h4>
+    <p>Forcing every visit into resolved/unresolved manufactures false data.
+    <code>inconclusive</code> routes the block back to an agronomist instead of pretending it was handled.</p></div>
+</div></section>
+
+<!-- 05 DATA -->
+<section class="s" id="data"><div class="wrap">
+  <div class="snum">05</div>
+  <h2>Data model</h2>
+  <p class="sub">Three new tenant-scoped tables. Observations are untouched.</p>
+
+  <h3><code>scouting_visits</code></h3>
+  <div class="tw"><table>
+    <thead><tr><th>Column</th><th>Type</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code>, <code>farm_id</code>, <code>block_id</code>, <code>cell_id</code></td><td>uuid</td><td><code>cell_id</code> nullable — recs already carry it</td></tr>
+      <tr><td><code>origin</code></td><td>text</td><td>the five values in §04</td></tr>
+      <tr><td><code>recommendation_id</code> / <code>alert_id</code> / <code>schedule_id</code></td><td>uuid null</td><td>set per origin</td></tr>
+      <tr><td><code>instruction</code></td><td>text null</td><td><b>the supervisor's own words</b> — <code>ad_hoc</code> only</td></tr>
+      <tr><td><code>reason_snapshot</code></td><td>jsonb null</td><td>tree text, severity, index values at trigger time</td></tr>
+      <tr><td><code>pin_point</code></td><td>geometry(Point,4326)</td><td>supervisor-dropped pin</td></tr>
+      <tr><td><code>severity</code>, <code>priority</code>, <code>due_by</code></td><td>text / timestamptz</td><td><code>due_by</code> = trigger + <code>within_hours</code></td></tr>
+      <tr><td><code>status</code>, <code>outcome</code></td><td>text</td><td>§04 machine; outcome ∈ resolved/inconclusive/blocked</td></tr>
+      <tr><td><code>assigned_to</code>, <code>assigned_by</code></td><td>uuid null</td><td><code>assigned_by</code> NULL ⇒ assigned by rule, not a human</td></tr>
+      <tr><td><code>template_id</code>, <code>observation_group_id</code></td><td>uuid null</td><td>form used; lead <code>signal_observations.id</code></td></tr>
+      <tr><td><code>idempotency_key</code></td><td>text UNIQUE</td><td>client-generated, guards double-submit</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call bad"><h4>The index that stops a daily flood</h4>
+    <p>Partial UNIQUE on <code>(recommendation_id) WHERE recommendation_id IS NOT NULL AND status NOT IN
+    ('cancelled','expired')</code>. The evaluator re-walks every tree daily — without this, a persistent
+    NDVI dip queues a brand-new visit every single morning.</p></div>
+
+  <h3><code>scouting_routing_rules</code></h3>
+  <p>Resolved most-specific-first: <b>block → farm → tenant</b>. Carries <code>mode</code>
+    (<code>triage</code> | <code>auto</code>), <code>default_assignee</code>, <code>fallback_assignee</code>,
+    <code>min_severity</code>, <code>template_id</code>, <code>default_due_hours</code>.</p>
+  <div class="call warn"><h4><code>auto</code> with no resolvable assignee degrades to <code>triage</code></h4>
+    <p>It never drops the visit. Silent loss is the worst outcome available here.</p></div>
+
+  <h3><code>device_tokens</code></h3>
+  <p><code>user_id</code>, <code>token</code> (UNIQUE), <code>platform</code>, <code>app_version</code>,
+    <code>locale</code>, <code>last_seen_at</code>, <code>revoked_at</code>. Multi-device per user is expected;
+    a reaper revokes tokens unseen 90 days or rejected by FCM.</p>
+
+  <h3>Observations — per row, not per visit</h3>
+  <p>The submit call is one batch, but location and time are recorded <b>per observation row</b>.
+    <code>signal_observations</code> already carries <code>location_point</code>, <code>location_mode</code>,
+    <code>time</code> and <code>attachment_s3_key</code> on every row, and the <code>ST_Within</code>
+    trigger is <code>FOR EACH ROW</code>.</p>
+
+<pre>{ <span class="k">"idempotency_key"</span>: "0198f3…",
+  <span class="k">"outcome"</span>: "inconclusive",
+  <span class="k">"visit_location"</span>: { …fix at submit — the default rows inherit… },
+  <span class="k">"observations"</span>: [
+    { <span class="k">"definition_code"</span>: "canopy_vigour", <span class="k">"value_categorical"</span>: "poor" },
+    <span class="c">// each photo is its own row: its own shutter time and its own fix</span>
+    { <span class="k">"definition_code"</span>: "scout_photo", <span class="k">"attachment_s3_key"</span>: "…/a1.jpg",
+      <span class="k">"observed_at"</span>: "2026-08-08T07:31:12Z",
+      <span class="k">"location"</span>: { <span class="k">"mode"</span>: "point_in_entity", <span class="k">"lat"</span>: 29.97661, <span class="k">"lon"</span>: 32.52288,
+                     <span class="k">"accuracy_m"</span>: 6.0, <span class="k">"source"</span>: "gps_at_capture" } },
+    { <span class="k">"definition_code"</span>: "scout_photo", <span class="k">"attachment_s3_key"</span>: "…/a2.jpg",
+      <span class="k">"location"</span>: { <span class="k">"mode"</span>: <span class="s2">"free_point"</span>, <span class="c">/* 14 m outside — keep the real reading */</span> … } }
+  ] }</pre>
+
+  <p>A scout photographs a lesion at the north edge, walks back, and fills the form four minutes later
+    thirty metres away. Stamping every row with the submit-time fix puts the evidence in the wrong place —
+    and the photo's coordinate is the only thing that makes it re-findable next visit.</p>
+
+  <h4>The GPS fallback ladder</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Situation</th><th><code>location_mode</code></th><th>Coordinate</th></tr></thead>
+    <tbody>
+      <tr><td>Fix inside the block</td><td><code>point_in_entity</code></td><td class="yes">kept</td></tr>
+      <tr><td>≤ 25 m out, offset &gt; accuracy, scout accepts</td><td><code>point_in_entity</code></td><td>snapped inside</td></tr>
+      <tr><td>Outside, or accuracy worse than the offset</td><td><b><code>free_point</code></b></td><td class="yes">kept as-is</td></tr>
+      <tr><td>No fix at all</td><td><code>entity</code></td><td class="no">none</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call warn"><h4>Prefer <code>free_point</code>; <code>entity</code> is the lossy one</h4>
+    <p>The CHECK forces <code>location_point</code> to NULL under <code>entity</code>, discarding the reading.
+    <code>free_point</code> keeps the coordinate <i>and</i> block attribution and only skips the containment
+    check. And never block submission on GPS — losing an observation is far worse than losing its point.</p></div>
+</div></section>
+
+<!-- 06 SIGNALS TIER -->
+<section class="s" id="tier"><div class="wrap">
+  <div class="snum">06</div>
+  <h2>The signals platform tier <span class="badge b-plat">new tier</span></h2>
+  <p class="sub">The S0 blocker: no forms, no app. And there is nowhere today to publish a curated
+    scouting form set once, for everybody.</p>
+
+  <h3>The problem, precisely</h3>
+  <p><code>SignalDefinition</code>, <code>SignalTemplate</code> and <code>SignalTemplateDefinition</code> live in
+    <code>tenant_&lt;id&gt;.*</code> and are authored per tenant at <code>/config/signals/:farmId</code>.
+    There is <b>no <code>public.signal_definitions</code></b> and no platform catalogue. Unlike
+    <code>decision_trees</code> and <code>crops</code>, <b>signals have no platform tier at all</b> — so an
+    improvement to a scouting form can never reach anyone but the tenant who made it.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Catalogue</th><th>Platform tier?</th><th>Authored by</th></tr></thead>
+    <tbody>
+      <tr><td><code>decision_trees</code></td><td class="yes">yes — nullable <code>tenant_id</code></td><td>YAML seeds → <code>sync_from_disk</code> at API startup</td></tr>
+      <tr><td><code>crops</code>, <code>plan_templates</code></td><td class="yes">yes</td><td>Platform UI (<code>/platform/crops</code>, <code>/platform/plan-templates</code>)</td></tr>
+      <tr><td><code>signal_definitions</code></td><td class="no"><b>none</b></td><td>Tenant only</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Design — mirror <code>decision_trees</code>, author like <code>plan_templates</code></h3>
+  <p>Move the three definition/template tables to <code>public</code> with a <b>nullable
+    <code>tenant_id</code></b>: <code>NULL</code> = platform-curated, non-NULL = tenant-authored. Observations
+    and assignments — which are per-farm operational data — stay in the tenant schema.</p>
+
+<pre><span class="c">BEFORE                              AFTER</span>
+tenant_x.signal_definitions         public.signal_definitions   <span class="c">tenant_id NULL = platform</span>
+tenant_x.signal_templates           public.signal_templates     <span class="c">tenant_id NULL = platform</span>
+tenant_x.signal_template_defs       public.signal_template_definitions
+tenant_x.signal_assignments   ───►  tenant_x.signal_assignments <span class="c">(unchanged, per-farm)</span>
+tenant_x.signal_observations  ───►  tenant_x.signal_observations <span class="c">(unchanged, hypertable)</span>
+
+<span class="c">read:  WHERE tenant_id IS NULL OR tenant_id = :tid   ← the pattern, written twice already</span></pre>
+
+  <h4>What makes this feasible</h4>
+  <ul>
+    <li><code>signal_observations.signal_definition_id</code> has <b>no FK</b> — it is already a logical
+      reference, so the hypertable is untouched.</li>
+    <li>Tenant → public FKs are legal and already used (<code>TenantMembership.user_id →
+      public.users.id</code>), so <code>signal_assignments.signal_definition_id</code> can point at
+      <code>public.signal_definitions.id</code>.</li>
+    <li>Code uniqueness partitioned per scope is exactly what <code>decision_trees</code> migration
+      <code>0024</code> already does with partial unique indexes.</li>
+  </ul>
+
+  <h4>What has to change</h4>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Change</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr><td>T1</td><td>New <code>public.signal_definitions</code> / <code>_templates</code> / <code>_template_definitions</code> with nullable <code>tenant_id</code> + partial unique on <code>code</code> per scope</td><td>low</td></tr>
+      <tr><td>T2</td><td><b>Per-tenant data migration</b>: copy each tenant's rows up, stamping <code>tenant_id</code>, preserving ids so assignments/observations keep resolving</td><td><b>high</b> — runs per schema; must be idempotent and reversible</td></tr>
+      <tr><td>T3</td><td>Repoint the two real FKs (<code>signal_assignments</code>, <code>signal_template_definitions</code>) at the public tables</td><td>medium</td></tr>
+      <tr><td>T4</td><td><code>snapshot.py</code> raw SQL joins <code>public.signal_definitions</code> with the two-tier predicate</td><td>medium — it is the engine's read path</td></tr>
+      <tr><td>T5</td><td>Repository/service/router resolve both tiers; tenants may <b>not</b> edit platform rows</td><td>low</td></tr>
+      <tr><td>T6</td><td><code>/platform/signals</code> catalogue UI + seed the scouting forms (§ below)</td><td>low</td></tr>
+      <tr><td>T7</td><td><b>Update the purge manifest</b></td><td><b>high if missed</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call bad"><h4>T7 will fail CI if forgotten, and T2 is the one to rehearse</h4>
+    <p>Tenant purge enforces "no orphans" — tables leaving the tenant schema change what purge must
+    delete, and a stale manifest fails the guard. And T2 preserves primary keys across a schema move
+    while a live hypertable references them logically: rehearse it against the 36-block Bashayer clone
+    before it goes anywhere near prod.</p></div>
+
+  <div class="call plat"><h4>Author in a UI, not YAML — deliberately unlike trees</h4>
+    <p>Trees are YAML because they carry <code>evidence</code> blocks with DOIs, citations and
+    <code>transferability</code> ratings — scientific claims that deserve diffs and code review.
+    Signal definitions carry no such provenance; they are vocabulary. So platform signals are authored at
+    <code>/platform/signals</code> like crops and plan templates, seeded once by a data migration. This
+    <b>avoids the UI-versus-seeder conflict entirely</b> — there is no <code>sync_from_disk</code> to
+    overwrite an edit on the next deploy.</p></div>
+
+  <h3>The scouting form catalogue (platform-curated)</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Code</th><th>Kind</th><th>Values</th><th>Photo</th><th>Aggregation</th></tr></thead>
+    <tbody>
+      <tr><td><code>canopy_vigour</code></td><td>categorical</td><td>good / fair / poor / severe</td><td class="yes">✓</td><td>latest</td></tr>
+      <tr><td><code>stress_cause_observed</code></td><td>categorical</td><td>water / pest / disease / nutrition / salinity / mechanical / none / unknown</td><td class="yes">✓</td><td>latest</td></tr>
+      <tr><td><code>pest_incidence_pct</code></td><td>numeric 0–100</td><td>%</td><td class="yes">✓</td><td>mean, 7d</td></tr>
+      <tr><td><code>disease_symptom</code></td><td>categorical</td><td>leaf_spot / powdery / anthracnose / wilt / chlorosis / necrosis / none</td><td class="yes">✓</td><td>latest</td></tr>
+      <tr><td><code>disease_severity</code></td><td>categorical</td><td>none / trace / moderate / severe</td><td class="yes">✓</td><td>max, 7d</td></tr>
+      <tr><td><code>soil_moisture_feel</code></td><td>categorical</td><td>dry / moist / wet / saturated</td><td class="no">—</td><td>latest</td></tr>
+      <tr><td><code>irrigation_fault</code></td><td>categorical</td><td>none / emitter_blocked / line_leak / no_pressure / uneven</td><td class="yes">✓</td><td>latest</td></tr>
+      <tr><td><code>weed_pressure</code></td><td>categorical</td><td>none / light / moderate / heavy</td><td class="yes">✓</td><td>latest</td></tr>
+      <tr><td><code>scout_photo</code></td><td>event</td><td>—</td><td class="yes">✓</td><td>count, 7d</td></tr>
+    </tbody>
+  </table></div>
+  <p>Categorical almost everywhere, deliberately: it survives gloves, glare and hurry, and it is what a
+    decision tree can branch on. A free-text field can do neither.</p>
+
+  <h4>Templates</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Template</th><th>Fields (* required)</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>scout_general_v1</code></td><td>canopy_vigour*, stress_cause_observed*, soil_moisture_feel, scout_photo*</td><td>default for recommendation / alert</td></tr>
+      <tr><td><code>scout_pest_disease_v1</code></td><td>disease_symptom*, disease_severity*, pest_incidence_pct, scout_photo*</td><td>pest/disease dispatch</td></tr>
+      <tr><td><code>scout_irrigation_v1</code></td><td>soil_moisture_feel*, irrigation_fault*, scout_photo*</td><td>irrigation origin</td></tr>
+      <tr><td><code>scout_routine_v1</code></td><td>canopy_vigour*, weed_pressure, scout_photo</td><td>routine rounds</td></tr>
+      <tr><td><code>scout_quick_v1</code></td><td>scout_photo* + note</td><td>self-initiated walk-up</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call warn"><h4>Set <code>attachment_allowed</code> or the camera silently never appears</h4>
+    <p>Photos are gated per definition. Miss it while authoring and there is no error — just a missing feature.</p></div>
+
+  <h3>Closing the loop — three trees to author</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Tree</th><th>Reads</th><th>Emits</th></tr></thead>
+    <tbody>
+      <tr><td><code>scout_confirmed_water_stress_v1</code></td><td><code>stress_cause_observed=water</code> + <code>soil_moisture_feel=dry</code> + NDVI deviation</td><td>irrigation action, high confidence</td></tr>
+      <tr><td><code>scout_confirmed_pest_pressure_v1</code></td><td><code>pest_incidence_pct</code> + <code>disease_severity</code></td><td>crop-specific treatment</td></tr>
+      <tr><td><code>scout_found_nothing_v1</code></td><td><code>stress_cause_observed=none</code> + <code>canopy_vigour=good</code></td><td>suppress/downgrade the originating alert</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call"><h4><code>scout_found_nothing_v1</code> matters most and is easiest to forget</h4>
+    <p>It is how the platform learns an index threshold is miscalibrated for a block. Without it, every
+    false alarm re-fires forever and scouts learn to ignore the app.</p></div>
+</div></section>
+
+<!-- 07 IDENTITY -->
+<section class="s" id="identity"><div class="wrap">
+  <div class="snum">07</div>
+  <h2>Identity, authentication and access</h2>
+  <p class="sub">The hardest constraint in the whole project: these workers do not have email addresses,
+    and the identity core requires one.</p>
+
+  <h3>Three layers that already exist</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Layer</th><th>Table</th><th>Carries</th><th>Login?</th></tr></thead>
+    <tbody>
+      <tr><td><b>User</b></td><td><code>public.users</code></td><td><code>keycloak_subject</code>, <code>email</code>, <code>phone</code></td><td class="yes">the login</td></tr>
+      <tr><td><b>Member</b></td><td><code>public.tenant_memberships</code> + <code>farm_scopes</code></td><td>tenant, farms, role</td><td>authorises</td></tr>
+      <tr><td><b>Worker</b></td><td><code>tenant_x.resources</code> <code>kind='worker'</code></td><td><code>role</code>, <code>phone</code>, assignable</td><td class="no">no</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Every mobile user is all three</b>, joined by <code>resources.membership_id</code> (U-3, live since
+    June, unused until now). A worker row <i>without</i> <code>membership_id</code> is unlinked labour:
+    schedulable, but cannot log in or be pushed to. That is correct — not every field hand needs an account.</p>
+
+  <div class="call bad"><h4>The blocker</h4>
+    <p><code>public.users.email</code> is <code>CITEXT NOT NULL</code> with <code>uq_users_email</code>
+    (<code>0003_iam_tables.py:74</code>), and <code>KeycloakAdminClient</code> sets
+    <code>"username": email, "email": email</code>. <b>A worker with no email cannot be provisioned today.</b></p></div>
+
+  <h3>D7 — phone as the username, email synthesized</h3>
+<pre><span class="k">public.users</span>
+  phone         = +201001234567                            <span class="c">← real, the identity</span>
+  email         = +201001234567@scouts.agripulse.cloud     <span class="c">← synthetic: satisfies NOT NULL + UNIQUE</span>
+<span class="k">Keycloak</span>
+  username      = +201001234567
+  emailVerified = false
+  credential    = 6-digit PIN, <span class="s2">temporary = false</span></pre>
+
+  <ol>
+    <li><b>Normalise to E.164 on write.</b> Supervisors type <code>01001234567</code>; store
+      <code>+201001234567</code>, or the same person gets two accounts.</li>
+    <li><b>Never synthesize onto <code>.local</code></b> — Keycloak 26 strips those. Use a domain we own,
+      with <b>no MX record</b>, so nothing can ever be delivered.</li>
+    <li><b><code>notification_channels</code> must default to <code>['in_app','push']</code></b> — the system
+      default <code>['in_app','email']</code> would fire mail at a fake address forever.</li>
+    <li><b>The username stays the phone permanently.</b> If a scout later gains a real email, update
+      <code>users.email</code> and leave the username alone.</li>
+    <li>Flag synthetic addresses so the Team screen and reporting can hide them.</li>
+  </ol>
+
+  <div class="call warn"><h4>The existing SMTP fallback is the wrong shape</h4>
+    <p><code>_issue_credential</code> already tolerates dead SMTP via <code>_set_temporary_password</code> —
+    but that sets <code>temporary: true</code>, forcing a Keycloak <b>browser</b> UPDATE_PASSWORD form, which
+    is precisely what this persona cannot complete. Enrolment needs a <code>temporary:false</code> sibling.</p></div>
+
+  <h3>Enrolment</h3>
+<pre><span class="k">Supervisor (web)</span>              <span class="k">Backend</span>                    <span class="k">Keycloak</span>
+────────────────────────────────────────────────────────────────
+Add worker
+ name + phone + role=Scout ──► normalise to E.164
+ ☑ give app access             synthesize email
+                               create users row      ──► create user (username=phone)
+                               membership + scope        set 6-digit PIN, temporary=false
+                               resources row         ──► set farm_scopes attribute
+                                 membership_id=…
+                               channels=[in_app,push]
+ ◄── PIN shown ONCE on screen ─
+Reads the PIN to the scout</pre>
+
+  <h3>Keycloak client and session</h3>
+  <ul>
+    <li>New <b>public</b> client <code>agripulse-mobile</code>: Authorization Code + <b>PKCE</b> in an Android
+      Custom Tab — never an embedded WebView.</li>
+    <li>Redirect <code>agripulse://auth/callback</code>; the same scheme carries push deep links.</li>
+    <li><b><code>offline_access</code> scope</b> for the ~90-day field session. Do <b>not</b> stretch realm SSO
+      lifetimes — that would weaken the web app for everyone.</li>
+    <li>Refresh token in <code>@capacitor/preferences</code>, backed by Android Keystore.</li>
+    <li><code>farm_scopes</code> mapper unchanged — the middleware already parses JSON-string items.</li>
+  </ul>
+
+  <h3>Offboarding — five layers, and one is always forgotten</h3>
+  <ol>
+    <li>Revoke <code>farm_scopes</code> → <code>set_farm_scopes()</code> syncs Keycloak.</li>
+    <li>Membership → inactive.</li>
+    <li><code>resources.archived_at</code> — history preserved.</li>
+    <li>Revoke <code>device_tokens</code>, or a deregistered phone keeps buzzing.</li>
+    <li><b>Revoke the Keycloak offline token.</b></li>
+  </ol>
+  <div class="call bad"><h4>Step 5</h4>
+    <p>An <code>offline_access</code> token outlives an access-token TTL by design; scope revocation alone
+    does not kill it. Until step 5 runs, "we removed their access" is false — for up to 90 days.</p></div>
+</div></section>
+
+<!-- 08 AUTHZ -->
+<section class="s" id="authz"><div class="wrap">
+  <div class="snum">08</div>
+  <h2>Authorization</h2>
+  <p class="sub">No mobile-specific authorization path exists, and none should. The phone is gated by the
+    same middleware as the web app.</p>
+
+  <h3>New capabilities (all <code>scope: farm</code>)</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Capability</th><th>Scout</th><th>FieldOperator</th><th>Agronomist</th><th>FarmManager</th><th>Viewer</th></tr></thead>
+    <tbody>
+      <tr><td><code>scouting.visit.read</code></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td><code>scouting.visit.claim</code></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td><code>scouting.visit.complete</code></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td><code>scouting.visit.assign</code></td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+      <tr><td><code>scouting.dispatch</code></td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+      <tr><td><code>scouting.rule.manage</code></td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+      <tr><td><code>scouting.record</code> <span class="badge b-dec">stub → active</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Existing grants that shape the design</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Capability</th><th>Scout</th><th>FieldOperator</th><th>Consequence</th></tr></thead>
+    <tbody>
+      <tr><td><code>alert.acknowledge</code></td><td class="no">—</td><td class="yes">✓</td><td>A Scout cannot close an alert</td></tr>
+      <tr><td><code>plan_activity.complete</code></td><td class="no">—</td><td class="yes">✓</td><td><b>Why D4 exists</b> — a visit cannot be a plan activity, or Scouts couldn't close their own work</td></tr>
+      <tr><td><code>analytics.read</code></td><td class="no">—</td><td class="yes">✓</td><td>Blocks "my history" stats without a grant change</td></tr>
+      <tr><td><code>signal.record</code></td><td class="yes">✓</td><td class="yes">✓</td><td>Observation writes already permitted</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call bad"><h4><code>FieldWorker</code> cannot use the app at all</h4>
+    <p>U-2 added it to the <code>resources.role</code> vocabulary as worker-only with <b>zero capabilities</b>.
+    Anyone recorded as <code>FieldWorker</code> must be re-roled to <code>Scout</code> before they can be given
+    an account. <b>Audit the worker table before the pilot</b> — it is free, and it tells you how many
+    accounts you actually need.</p></div>
+
+  <div class="call warn"><h4>Recycled phone numbers</h4>
+    <p>Egyptian numbers get reassigned. With <code>username = phone</code>, never bolt SMS-based password
+    reset onto this model without re-verification, and make offboarding archive the <i>user</i>, not just the
+    membership.</p></div>
+</div></section>
+
+<!-- 09 API -->
+<section class="s" id="api"><div class="wrap">
+  <div class="snum">09</div>
+  <h2>API surface</h2>
+  <p class="sub">All under the existing <code>/api/v1</code> prefix, farm-scoped via <code>farm_id_param</code> —
+    the pattern PR #270 established for farm-scoped-only users.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Method</th><th>Path</th><th>Capability</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/scouting/visits</code></td><td><code>visit.read</code></td><td><code>?assigned_to=me&amp;status=open</code>, <code>claimable=true</code></td></tr>
+      <tr><td>GET</td><td><code>/scouting/visits/{id}</code></td><td><code>visit.read</code></td><td><b>Self-contained</b>: reason, geometry, full template definition</td></tr>
+      <tr><td>POST</td><td><code>/scouting/visits/{id}:claim</code></td><td><code>visit.claim</code></td><td>409 if already claimed</td></tr>
+      <tr><td>POST</td><td><code>…:accept</code> / <code>:decline</code> / <code>:start</code></td><td><code>visit.claim</code></td><td>decline carries a reason</td></tr>
+      <tr><td>POST</td><td><code>…:submit</code></td><td><code>visit.complete</code></td><td><b>single batch</b>, idempotent</td></tr>
+      <tr><td>POST</td><td><code>/scouting/visits</code></td><td><code>visit.complete</code></td><td><code>self_initiated</code> only</td></tr>
+      <tr><td>POST</td><td><code>…:assign</code> / <code>:cancel</code></td><td><code>visit.assign</code></td><td>web</td></tr>
+      <tr><td>POST</td><td><code>/scouting/visits:dispatch</code></td><td><code>dispatch</code></td><td>ad-hoc, from the map</td></tr>
+      <tr><td>GET/PUT</td><td><code>/scouting/routing-rules</code>, <code>/schedules</code></td><td><code>rule.manage</code></td><td>web</td></tr>
+      <tr><td>POST/DEL</td><td><code>/devices:register</code>, <code>/devices/{token}</code></td><td>authenticated</td><td>FCM token upsert / logout</td></tr>
+      <tr><td>POST</td><td><code>/scouting/attachments:presign</code></td><td><code>scouting.record</code></td><td><span class="badge b-live">reuse</span> <code>init_attachment_upload</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Push pipeline</h3>
+  <ul>
+    <li><code>push</code> joins <code>_PER_USER_CHANNELS</code> and <code>_KNOWN_CHANNELS</code> in
+      <code>notifications/subscribers.py</code>; per-user opt-in already exists.</li>
+    <li>New sender <code>notifications/push.py</code> beside <code>smtp.py</code> / <code>webhook.py</code>.</li>
+    <li>Templates keyed <code>(template_code, locale, channel='push', version)</code> — one per origin, EN + AR.</li>
+    <li><b>Data message</b>, not notification-only, so the app controls presentation and cold-start deep links.</li>
+    <li>Add <code>visit_id</code> to <code>notification_dispatches</code> for the existing idempotency index.</li>
+  </ul>
+  <div class="call warn"><h4>Push is never the source of truth</h4>
+    <p>FCM delivery is best-effort and fails silently on some OEM builds. The visit list reconciles on
+    every app open. A dropped push must never mean lost work.</p></div>
+</div></section>
+
+<!-- 10 MOBILE -->
+<section class="s" id="mobile"><div class="wrap">
+  <div class="snum">10</div>
+  <h2>Mobile screens</h2>
+  <p class="sub">Sun glare, gloves, dust and a phone held at arm's length. Mono for anything the field
+    <i>measures</i>; sans for anything a human <i>wrote</i>. Colour encodes origin.</p>
+
+  <h3>Sign in — phone and PIN</h3>
+  <div class="screens">
+    <div><div class="phone"><div class="screen dark">
+      <div class="sbar"><span class="m">06:58</span><span class="m">⌁ 4G ▮ 92%</span></div>
+      <div class="login">
+        <div class="lg"></div>
+        <h4>AgriPulse Scout</h4>
+        <div class="sub2">Sign in with your phone number</div>
+        <div class="inpd lbl">Phone number</div>
+        <div class="inpd">+20 100 123 4567</div>
+        <div class="inpd lbl">6-digit PIN</div>
+        <div class="pins"><i>4</i><i>7</i><i>2</i><i>9</i><i class="e">·</i><i class="e">·</i></div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="actions"><div class="btn pri">Sign in</div></div>
+    </div></div><div class="cap"><b>Login</b> — no email anywhere</div></div>
+
+    <div><div class="phone"><div class="screen dark ar">
+      <div class="sbar"><span class="m">٦:٥٨</span><span class="m">92% ▮ 4G</span></div>
+      <div class="login">
+        <div class="lg"></div>
+        <h4>أجريبالس سكاوت</h4>
+        <div class="sub2">سجّل الدخول برقم هاتفك</div>
+        <div class="inpd lbl">رقم الهاتف</div>
+        <div class="inpd m">+20 100 123 4567</div>
+        <div class="inpd lbl">الرقم السري (٦ أرقام)</div>
+        <div class="pins"><i>٤</i><i>٧</i><i>٢</i><i>٩</i><i class="e">·</i><i class="e">·</i></div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="actions"><div class="btn pri">دخول</div></div>
+    </div></div><div class="cap"><b>Arabic</b> — mirrored, numerals localised</div></div>
+  </div>
+
+  <h3>The queue, and why you're being sent</h3>
+  <div class="screens">
+    <div><div class="phone"><div class="screen">
+      <div class="sbar"><span class="m">07:14</span><span class="m">⌁ 4G ▮ 78%</span></div>
+      <div class="abar"><div class="ttl">My visits</div><div class="sp"></div><div class="ic">☰</div></div>
+      <div class="pbody">
+        <div class="shead red">Overdue <span class="n m">1</span></div>
+        <div class="vc"><div class="ring crit" style="--pct:100%"><span>−6h</span></div>
+          <div class="txt"><div class="blk">D-04 Date Palm East</div>
+          <div class="why">Soil salinity above threshold for this rootstock.</div>
+          <div class="foot"><span class="badge o-alert">alert</span><span class="dist">1.9 km</span></div></div></div>
+        <div class="shead">Assigned to me <span class="n m">2</span></div>
+        <div class="vc"><div class="ring crit" style="--pct:22%"><span>18h</span></div>
+          <div class="txt"><div class="blk">M-12 Mango North</div>
+          <div class="why">NDVI 1.8σ below seasonal baseline. Identify cause: water, pest, disease, nutrition.</div>
+          <div class="foot"><span class="badge o-rec">recommendation</span><span class="dist">340 m</span></div></div></div>
+        <div class="vc"><div class="ring sand" style="--pct:40%"><span>2d</span></div>
+          <div class="txt"><div class="blk">P-21 Potato South</div>
+          <div class="why">"The north edge looks patchy — walk it and tell me what you see."</div>
+          <div class="foot"><span class="badge o-adhoc">ad hoc</span><span class="dist">820 m</span></div></div></div>
+        <div class="shead">Open to claim <span class="n m">1</span></div>
+        <div class="vc"><div class="ring watch" style="--pct:31%"><span>49h</span></div>
+          <div class="txt"><div class="blk">M-08 Mango West</div>
+          <div class="why">NDVI below baseline. Add to the next routine round.</div>
+          <div class="foot"><span class="badge o-rec">recommendation</span><span class="dist">1.2 km</span></div></div></div>
+      </div>
+      <div class="tabs"><div class="tab on"><span class="g">◎</span>Visits</div><div class="tab"><span class="g">⬗</span>Map</div>
+        <div class="tab"><span class="g">✎</span>Log</div><div class="tab"><span class="g">◷</span>History</div></div>
+    </div></div><div class="cap"><b>My visits</b> — overdue first, then by deadline</div></div>
+
+    <div><div class="phone"><div class="screen">
+      <div class="sbar"><span class="m">07:15</span><span class="m">⌁ 4G ▮ 78%</span></div>
+      <div class="abar"><div class="back">‹</div><div class="ttl">M-12 Mango North</div></div>
+      <div class="pbody">
+        <div style="display:flex;align-items:center;gap:14px;padding:4px 0 2px">
+          <div class="ring big crit" style="--pct:22%"><span>18h</span></div>
+          <div><div style="font-size:13px;color:var(--muted)">Due by</div>
+          <div class="m" style="font-size:16px;font-weight:650">Sat 8 Aug · 23:40</div>
+          <div style="margin-top:5px"><span class="badge o-rec">recommendation</span></div></div>
+        </div>
+        <div class="rsn"><div class="rl">Scout for stress · critical</div>
+          <p>Severe NDVI drop on this block. Schedule a field scouting visit within 24 hours to identify
+          the cause (water, pest, disease, nutrition).</p></div>
+        <div style="margin-top:14px;border:1px solid var(--line);border-radius:11px;padding:13px 12px 9px">
+          <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between"><span>NDVI vs baseline</span><span>90d</span></div>
+          <svg viewBox="0 0 268 92" width="100%" height="92" style="margin-top:7px" aria-label="NDVI leaving its seasonal baseline band">
+            <path d="M0,34 L268,26 L268,54 L0,62 Z" fill="#d6ebdd"/>
+            <path d="M0,46 C34,44 52,40 78,43 C104,46 122,41 148,44 C168,46 182,50 196,58 C212,68 232,78 268,82"
+                  fill="none" stroke="#2f6b45" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="268" cy="82" r="4" fill="#dc2626" stroke="#fff" stroke-width="1.6"/>
+          </svg>
+        </div>
+      </div>
+      <div class="actions"><div class="btn gho">Decline</div><div class="btn pri">Start visit</div></div>
+    </div></div><div class="cap"><b>Machine reason</b> — the anomaly as a shape</div></div>
+
+    <div><div class="phone"><div class="screen">
+      <div class="sbar"><span class="m">07:15</span><span class="m">⌁ 4G ▮ 78%</span></div>
+      <div class="abar"><div class="back">‹</div><div class="ttl">P-21 Potato South</div></div>
+      <div class="pbody">
+        <div style="display:flex;align-items:center;gap:14px;padding:4px 0 2px">
+          <div class="ring big sand" style="--pct:40%"><span>2d</span></div>
+          <div><div style="font-size:13px;color:var(--muted)">Due by</div>
+          <div class="m" style="font-size:16px;font-weight:650">Mon 10 Aug · 12:00</div>
+          <div style="margin-top:5px"><span class="badge o-adhoc">ad hoc</span></div></div>
+        </div>
+        <div class="rsn hand"><div class="rl">From your supervisor</div>
+          <p>The north edge looks patchy on last week's pass — no alert on it yet. Walk that strip and tell
+          me whether it's the dripline or something on the leaves.</p>
+          <div class="who"><span class="av">HA</span> Hana Abdelrahman · 06:58</div></div>
+        <div style="margin-top:14px;border-radius:11px;overflow:hidden;height:120px;position:relative;
+                    background:radial-gradient(120% 90% at 55% 40%,#2b4535,#16261e)">
+          <div style="position:absolute;left:16%;top:20%;width:64%;height:56%;border:2px solid rgba(255,255,255,.5);
+                      border-radius:4px;background:rgba(74,124,89,.18);transform:rotate(-5deg)"></div>
+          <div style="position:absolute;left:47%;top:31%;width:13px;height:13px;border-radius:50% 50% 50% 2px;
+                      background:var(--sand);border:2px solid #fff;transform:rotate(-45deg)"></div>
+        </div>
+      </div>
+      <div class="actions"><div class="btn gho">Decline</div><div class="btn pri">Start visit</div></div>
+    </div></div><div class="cap"><b>Human reason</b> — sand = a person wrote this</div></div>
+  </div>
+
+  <h3>Getting there, and capturing what's there</h3>
+  <div class="screens">
+    <div><div class="phone"><div class="screen dark">
+      <div class="sbar"><span class="m">07:22</span><span class="m">⌁ 4G ▮ 76%</span></div>
+      <div class="map">
+        <div class="mchip"><div class="ring crit" style="--pct:24%"><span>18h</span></div>
+          <div><div class="b1">M-12 · cell R3C7</div><div class="b2">340 m · bearing 019° · ±6 m</div></div></div>
+        <div class="poly"><div class="cell"></div></div>
+        <div class="me"></div>
+        <div class="nav"><div class="navb sec">Drive</div><div class="navb">I'm here — start logging</div></div>
+      </div>
+    </div></div><div class="cap"><b>Navigate</b> — two legs: Maps to drive, bearing to walk</div></div>
+
+    <div><div class="phone"><div class="screen dark">
+      <div class="sbar"><span class="m">07:31</span><span class="m">⌁ 4G ▮ 74%</span></div>
+      <div class="abar"><div class="back">‹</div><div class="ttl" style="font-size:16px">Log observation</div>
+        <div class="sp"></div><div class="ring crit" style="--pct:26%"><span>17h</span></div></div>
+      <div class="gps in"><span class="dot"></span> Inside M-12 · R3C7 <span class="sp"></span> ±6 m</div>
+      <div class="pbody">
+        <div class="fld"><div class="fl">Canopy vigour <span class="req">*</span></div>
+          <div class="fc">canopy_vigour · platform definition</div>
+          <div class="chips"><span class="chip">Good</span><span class="chip">Fair</span>
+            <span class="chip sel bad">Poor</span><span class="chip">Severe</span></div></div>
+        <div class="fld"><div class="fl">What is causing it? <span class="req">*</span></div>
+          <div class="fc">stress_cause_observed</div>
+          <div class="chips"><span class="chip sel">Water</span><span class="chip">Pest</span>
+            <span class="chip">Disease</span><span class="chip">Nutrition</span>
+            <span class="chip">Salinity</span><span class="chip">Nothing found</span></div></div>
+        <div class="fld" style="border-bottom:0"><div class="fl">Photos <span class="req">*</span></div>
+          <div class="fc">scout_photo · each carries its own fix</div>
+          <div class="shots"><div class="shot a"></div><div class="shot b"></div><div class="shot add">+</div></div></div>
+      </div>
+      <div class="actions"><div class="btn pri">Review and submit</div></div>
+    </div></div><div class="cap"><b>Capture</b> — form rendered from the template</div></div>
+
+    <div><div class="phone"><div class="screen dark">
+      <div class="sbar"><span class="m">07:31</span><span class="m">⌁ 3G ▮ 74%</span></div>
+      <div class="abar"><div class="back">‹</div><div class="ttl" style="font-size:16px">Log observation</div>
+        <div class="sp"></div><div class="ring crit" style="--pct:26%"><span>17h</span></div></div>
+      <div class="gps out"><span class="dot"></span> You're 14 m outside M-12 <span class="sp"></span> Fix</div>
+      <div class="pbody">
+        <div style="background:var(--field2);border:1px solid #4a3d1a;border-left:3px solid var(--watch);
+                    border-radius:11px;padding:14px;margin-top:14px">
+          <div style="font-size:14.5px;font-weight:650;color:#f0d9a4">Your position is outside this block</div>
+          <p style="font-size:13.5px;color:#b9c9bf;margin-top:7px;line-height:1.5">
+            GPS puts you 14 m past the eastern boundary, with ±11 m accuracy. Pick how to record it.</p>
+          <div style="margin-top:13px;display:flex;flex-direction:column;gap:8px">
+            <div style="background:var(--sage);color:#fff;border-radius:10px;padding:11px 13px;font-size:13.5px;font-weight:650">
+              Snap to the nearest point inside M-12</div>
+            <div style="background:var(--field3);color:#c9dcd0;border-radius:10px;padding:11px 13px;font-size:13.5px;
+                        border:1px solid #3d5a49">Keep my exact position, outside the block</div>
+            <div style="color:#8fa89a;padding:9px;font-size:13px;text-align:center">Keep waiting for a better fix</div>
+          </div>
+        </div>
+        <div style="margin-top:15px;font-family:var(--mono);font-size:11px;color:#6f8a7c;line-height:1.6">
+          29.97742, 32.52186 · ±11 m<br>→ location_mode = free_point
+        </div>
+      </div>
+      <div class="actions"><div class="btn dis">Review and submit</div></div>
+    </div></div><div class="cap"><b>The edge case that loses work</b> — resolved before submit</div></div>
+  </div>
+</div></section>
+
+<!-- 11 WEB -->
+<section class="s" id="web"><div class="wrap">
+  <div class="snum">11</div>
+  <h2>The web app — 22 additions</h2>
+  <p class="sub">The phone is half the product. Every visit is dispatched, assigned and reviewed here,
+    and scouts are enrolled here. Checked against the live route table in <code>App.tsx</code>.</p>
+
+  <h3>Enrol a scout <span class="badge b-ext">extends /settings/workers</span></h3>
+  <div class="web"><div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/settings/workers</span></div>
+    <div class="wsplit">
+      <div class="wpad">
+        <table class="tbl2"><thead><tr><th>Worker</th><th>Role</th><th>Phone</th><th>App access</th></tr></thead>
+        <tbody>
+          <tr><td><b>Youssef Barakat</b></td><td>Scout</td><td class="m">+201001234567</td>
+            <td><span class="badge b-live">active · 1 device</span></td></tr>
+          <tr><td><b>Mahmoud Sayed</b></td><td>Scout</td><td class="m">+201119876543</td>
+            <td><span class="badge b-live">active · 2 devices</span></td></tr>
+          <tr><td><b>Ahmed Fathy</b></td><td><span style="color:var(--crit)">FieldWorker</span></td><td class="m">+201223344556</td>
+            <td><span class="badge b-dec">cannot log in</span></td></tr>
+          <tr><td><b>Sara Mostafa</b></td><td>Scout</td><td class="m">+201005556677</td>
+            <td><span class="mini">Give app access</span></td></tr>
+        </tbody></table>
+        <div style="margin-top:14px;font-size:13px;color:var(--muted);border-left:3px solid var(--watch);padding-left:12px">
+          <b>1 worker cannot be given access.</b> <code>FieldWorker</code> has no capabilities —
+          re-role to <code>Scout</code> first. <span class="mini g" style="margin-left:6px">Re-role 1</span>
+        </div>
+      </div>
+      <div class="wside">
+        <h5>Give app access</h5>
+        <div class="hint">Sara signs in with her phone number. No email needed.</div>
+        <div class="frm">
+          <label>Phone number</label><div class="inp m">+20 100 555 6677</div>
+          <label>Role</label><div class="inp sel">Scout <span style="color:#9db0a4">▾</span></div>
+          <label>Farms</label><div class="inp sel">Bashayer <span style="color:#9db0a4">▾</span></div>
+        </div>
+        <div class="pinreveal">
+          <div class="p1">PIN — shown once</div>
+          <div class="p2">472915</div>
+          <div class="p3">Read this to Sara now. It will not be shown again.</div>
+        </div>
+        <div class="wbtn">Done</div>
+      </div>
+    </div>
+  </div>
+  <div class="cap" style="text-align:left"><b>W9 / W14</b> — enrolment, PIN reveal, and the <code>FieldWorker</code> audit in one place</div>
+
+  <h3>Ad-hoc dispatch <span class="badge b-ext">action on /labs/map</span></h3>
+  <div class="web"><div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/labs/map — Bashayer</span></div>
+    <div class="wsplit">
+      <div class="wmap"><div class="wpoly"></div><div class="pin"></div>
+        <div style="position:absolute;left:13px;bottom:13px;font-family:var(--mono);font-size:10.5px;color:#8fa89a">
+          NDVI · 6 Aug · P-21 Potato South</div></div>
+      <div class="wside">
+        <h5>Send someone to look</h5>
+        <div class="hint">No alert has fired here. This visit carries your instructions.</div>
+        <div class="frm">
+          <label>Where</label><div class="inp sel">P-21 · pinned point <span style="color:#9db0a4">▾</span></div>
+          <label>What should they check</label>
+          <div class="inp ta">The north edge looks patchy on last week's pass — walk that strip and tell me
+            whether it's the dripline or something on the leaves.</div>
+          <label>Form to use</label><div class="inp sel">scout_general_v1 <span style="color:#9db0a4">▾</span></div>
+          <label>Assign to</label><div class="inp sel">Youssef Barakat <span style="color:#9db0a4">▾</span></div>
+          <label>Due within</label><div class="inp sel">48 hours <span style="color:#9db0a4">▾</span></div>
+        </div>
+        <div class="wbtn">Send visit</div>
+      </div>
+    </div>
+  </div>
+  <div class="cap" style="text-align:left"><b>W4</b> — the highest-value feature, and the only origin carrying human words</div>
+
+  <h3>Triage queue <span class="badge b-new">new /scouting/:farmId</span></h3>
+  <div class="web"><div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/scouting — Bashayer</span></div>
+    <div style="padding:14px 17px;border-bottom:1px solid var(--line);display:flex;gap:9px;align-items:center">
+      <span class="mini">Queued · 3</span><span class="mini g">In progress · 2</span>
+      <span class="mini g">Overdue · 1</span><span class="mini g">Done this week · 14</span>
+      <span style="flex:1"></span><span class="mini g">Routing rules</span>
+    </div>
+    <table class="tbl2"><thead><tr><th>Block</th><th>Origin</th><th>Due</th><th>Assigned</th><th></th></tr></thead>
+    <tbody>
+      <tr><td><b>D-04 Date Palm East</b><div style="font-size:11.5px;color:var(--muted)">Soil salinity above threshold</div></td>
+        <td><span class="badge o-alert">alert</span></td><td><span class="due red">6h overdue</span></td>
+        <td><span class="asg"><span class="av">YB</span>Youssef B.</span></td><td style="text-align:right"><span class="mini">Escalate</span></td></tr>
+      <tr><td><b>M-08 Mango West</b><div style="font-size:11.5px;color:var(--muted)">NDVI below baseline</div></td>
+        <td><span class="badge o-rec">recommendation</span></td><td><span class="due amb">in 49h</span></td>
+        <td><span class="asg none">unassigned</span></td><td style="text-align:right"><span class="mini">Assign</span></td></tr>
+      <tr><td><b>Bashayer East · 4 blocks</b><div style="font-size:11.5px;color:var(--muted)">Weekly round</div></td>
+        <td><span class="badge o-routine">routine</span></td><td><span class="due gry">Mon</span></td>
+        <td><span class="asg"><span class="av">MS</span>Mahmoud S.</span></td><td style="text-align:right"><span class="mini g">View</span></td></tr>
+      <tr><td><b>M-12 Mango North</b><div style="font-size:11.5px;color:var(--muted)">Water stress — blocked dripline</div></td>
+        <td><span class="badge o-rec">recommendation</span></td><td><span class="due gry">done 07:39</span></td>
+        <td><span class="asg"><span class="av">YB</span>Youssef B.</span></td><td style="text-align:right"><span class="mini g">Review</span></td></tr>
+    </tbody></table>
+  </div>
+  <div class="cap" style="text-align:left"><b>W1–W3</b> — the only path when a farm is in <code>triage</code> mode</div>
+
+  <h3>Platform signals catalogue <span class="badge b-plat">new /platform/signals</span></h3>
+  <div class="web"><div class="wbar"><i></i><i></i><i></i><span class="u">app.agripulse.cloud/platform/signals</span></div>
+    <div style="padding:14px 17px;border-bottom:1px solid var(--line);display:flex;gap:9px;align-items:center">
+      <span class="mini">Definitions · 9</span><span class="mini g">Templates · 5</span>
+      <span style="flex:1"></span><span class="mini">New definition</span>
+    </div>
+    <table class="tbl2"><thead><tr><th>Code</th><th>Kind</th><th>Photo</th><th>Aggregation</th><th>Tenants using</th></tr></thead>
+    <tbody>
+      <tr><td><code>canopy_vigour</code></td><td>categorical · 4</td><td class="yes">✓</td><td class="m">latest</td><td class="m">6 / 6</td></tr>
+      <tr><td><code>stress_cause_observed</code></td><td>categorical · 8</td><td class="yes">✓</td><td class="m">latest</td><td class="m">6 / 6</td></tr>
+      <tr><td><code>pest_incidence_pct</code></td><td>numeric 0–100</td><td class="yes">✓</td><td class="m">mean 7d</td><td class="m">4 / 6</td></tr>
+      <tr><td><code>soil_moisture_feel</code></td><td>categorical · 4</td><td class="no">—</td><td class="m">latest</td><td class="m">6 / 6</td></tr>
+      <tr><td><code>scout_photo</code></td><td>event</td><td class="yes">✓</td><td class="m">count 7d</td><td class="m">6 / 6</td></tr>
+    </tbody></table>
+  </div>
+  <div class="cap" style="text-align:left"><b>T6</b> — curated once, read by every tenant. No YAML, so no seeder conflict</div>
+
+  <h3>The full list</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Area</th><th>Items</th></tr></thead>
+    <tbody>
+      <tr><td><b>Scouting</b> <span class="badge b-new">new</span></td><td>W1 triage queue · W2 board · W3 assign/bulk · <b>W4 ad-hoc dispatch from the map</b> · W5 visit + observation review (each photo at its own coordinate) · W6 routing rules · W7 routine schedules · W8 coverage reporting</td></tr>
+      <tr><td><b>Identity</b> <span class="badge b-ext">extends</span></td><td>W9 enrol with PIN reveal · W10 re-issue PIN · W11 offboard across five layers · W12 registered devices + revoke · W13 hide synthetic emails · <b>W14 FieldWorker audit + bulk re-role</b> · W15 E.164 phone validation</td></tr>
+      <tr><td><b>Notifications</b> <span class="badge b-ext">extends</span></td><td>W16 <code>push</code> as a fourth channel · W17 scout defaults <code>[in_app,push]</code> · W18 per-origin mute</td></tr>
+      <tr><td><b>Platform</b> <span class="badge b-plat">tier</span></td><td>T6 <code>/platform/signals</code> · C1 <code>/platform/decision-trees</code> read-only catalogue</td></tr>
+      <tr><td><b>Smaller</b></td><td>W19 <code>farms.access_point</code> (the gate) · W20 "send a scout" from an alert · W21 observations on the block timeline · W22 Arabic strings throughout</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call plat"><h4>On <code>/platform/decision-trees</code></h4>
+    <p>There is no platform decision-tree page and there never was one. Global trees
+    (<code>tenant_id IS NULL</code>) are authored <b>only</b> as YAML and upserted by
+    <code>sync_from_disk()</code> at API startup — deploying the API is what publishes a tree. Tenants can
+    already <i>see</i> them. What is missing is a place to manage the global catalogue.
+    <b>Recommendation: a read-only catalogue (C1).</b> Do not make the DB the source of truth while the
+    seeder still runs — the UI writes a row, the next deploy overwrites it.</p></div>
+</div></section>
+
+<!-- 12 SEQUENCE -->
+<section class="s" id="seq"><div class="wrap">
+  <div class="snum">12</div>
+  <h2>Delivery sequence</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Phase</th><th>Contents</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td><b>S-1</b></td><td><code>FieldWorker</code> audit; phone-as-username enrolment; PIN issuance (<code>temporary:false</code>); <code>agripulse-mobile</code> client</td><td>A scout with no email can log in</td></tr>
+      <tr><td><b>S0</b></td><td>Signals platform tier (T1–T7); author the definitions + templates; capabilities and role grants</td><td>Forms exist, curated once</td></tr>
+      <tr><td><b>S1</b></td><td><code>scouting_visits</code>, routing rules, service, API</td><td>Testable with curl</td></tr>
+      <tr><td><b>S2</b></td><td><code>push</code> channel, <code>device_tokens</code>, FCM sender, templates</td><td>A phone rings</td></tr>
+      <tr><td><b>S3</b></td><td>Android app: auth, list, detail, capture, submit</td><td>End-to-end on a real handset</td></tr>
+      <tr><td><b>S4</b></td><td>Web: triage queue, ad-hoc map dispatch, board, review</td><td>Supervisor loop closed</td></tr>
+      <tr><td><b>S5</b></td><td>The three loop-closing trees, overdue sweep, routine schedules</td><td>Automation loop closed</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>S-1 comes first and is partly free.</b> The <code>FieldWorker</code> audit is a query, and it tells
+    you how many accounts you actually need before building any enrolment UI. S0 and S2 are independent of
+    S1 and can run in parallel. S3 is the long pole.</p>
+</div></section>
+
+<!-- 13 RISKS -->
+<section class="s" id="risks" style="border-bottom:0"><div class="wrap">
+  <div class="snum">13</div>
+  <h2>Risks</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td><b>Field workers have no email — cannot be provisioned at all today</b></td><td><b>High</b></td><td>D7 phone-as-username. Blocks everything, hence S-1</td></tr>
+      <tr><td>The tenant→public signals migration (T2) touches every tenant schema</td><td><b>High</b></td><td>Idempotent, reversible, rehearsed on the 36-block Bashayer clone. And do not forget the purge manifest (T7)</td></tr>
+      <tr><td>Offline token survives offboarding</td><td><b>High</b></td><td>Revoke in Keycloak, not just farm scopes</td></tr>
+      <tr><td>GPS <code>ST_Within</code> rejections lose a completed visit</td><td><b>High</b></td><td>Client pre-validates per row; prefer <code>free_point</code>; never block submit</td></tr>
+      <tr><td>Daily evaluator floods scouts with repeat visits</td><td><b>High</b></td><td>Partial UNIQUE on <code>recommendation_id</code></td></tr>
+      <tr><td>Online-only v1 fails its first field trial</td><td><b>High</b></td><td>Payloads already offline-shaped, so the fix is additive. Pilot on a block with known coverage</td></tr>
+      <tr><td>Scouting data recorded but inert</td><td>Medium</td><td>Be explicit that S5, not v1, closes the loop</td></tr>
+      <tr><td>Push undelivered on some Android OEM builds</td><td>Medium</td><td>List is source of truth; consider SMS fallback for <code>critical</code></td></tr>
+      <tr><td>Recycled phone numbers inherit an identity</td><td>Medium</td><td>No SMS reset without re-verification; archive the user on offboard</td></tr>
+      <tr><td>6-digit PIN is weak</td><td>Medium</td><td>Keycloak brute-force detection on. Blast radius is one farm, read + observations</td></tr>
+      <tr><td>Supervisor becomes the password-reset helpdesk</td><td>Medium</td><td>Accepted cost of no SMS; measure at pilot</td></tr>
+      <tr><td>Capacitor performance on low-end handsets</td><td>Low</td><td>maplibre on one screen only; test on a ~$100 device early</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call" style="margin-top:34px"><h4>What to decide before building</h4>
+    <p><b>1.</b> Approve the signals platform tier (§06) — it is the S0 blocker and carries the only
+    high-risk migration. <b>2.</b> Confirm v1 ships without the loop-closing trees, so "scouting improves
+    recommendations" is a S5 promise, not a v1 one. <b>3.</b> Confirm online-only survives the pilot farm's
+    actual coverage. <b>4.</b> Confirm who provisions scouts and reads out PINs.</p></div>
+</div></section>
+
+</body>
+</html>

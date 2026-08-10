@@ -345,6 +345,20 @@ class Settings(BaseSettings):
     smtp_from: str = "AgriPulse <noreply@agripulse.local>"
     smtp_timeout_seconds: float = 10.0
 
+    # --- FCM (notifications push channel, scout app S2) ------------------
+    # Off by default so a dev environment without Firebase credentials records
+    # `skipped` dispatch rows rather than failing every send. Cluster envs
+    # override via ExternalSecret.
+    fcm_enabled: bool = False
+    fcm_project_id: str = ""
+    # Path to the Firebase service-account JSON. Preferred: the app mints and
+    # refreshes its own bearer, because FCM v1 tokens expire after an hour.
+    fcm_service_account_file: str = ""
+    # Escape hatch for a one-off manual test: a hand-minted bearer. Wins over
+    # the service account when set, and stops working an hour later.
+    fcm_access_token: str = ""
+    fcm_timeout_seconds: float = 10.0
+
     # --- Webhook channel (PR-S4-E) ---------------------------------------
     # Per-tenant ``webhook_endpoint_url`` is the receiver URL; the HMAC
     # secret in production resolves through KMS (the per-tenant
