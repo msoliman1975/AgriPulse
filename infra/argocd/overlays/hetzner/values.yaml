@@ -953,13 +953,33 @@ global:
   #   Playwright profile was locked throughout the build -- so the data paths
   #   are covered by 68 unit + 30 real-Postgres integration tests and the
   #   rendered page is not covered at all.
+  # a51c72a -- Action Center dispatch fix (#396). The "Assign to" picker showed
+  #   only its placeholder: the default read `assigned_membership_id`, which is
+  #   NULL until AFTER an item is dispatched, so it never resolved for the one
+  #   case that matters. The block's owner is now carried on every item
+  #   (`responsible_membership_id`) instead of only on the group, and the
+  #   member list distinguishes "no permission" / "load failed" / "no members"
+  #   instead of rendering all three as an empty dropdown.
+  #
+  #   API + frontend both move: the item schema gained a field, so a
+  #   frontend-only bump would read a key the api does not send. No migration
+  #   -- 0063 already added everything this needs; the column was simply not
+  #   projected onto the item.
+  #
+  #   Rollback is these three back to 4c03ab2. Nothing to strand.
+  #
+  #   Images verified in ghcr BEFORE this commit: api:a51c72a sha256:ff407013,
+  #   workers:a51c72a sha256:07cee345, frontend:a51c72a sha256:5a6522e0.
+  #
+  #   Still NOT browser-verified -- this fix exists because the previous
+  #   promote was not either.
   images:
     api:
-      tag: "4c03ab2"
+      tag: "a51c72a"
     workers:
-      tag: "4c03ab2"
+      tag: "a51c72a"
     frontend:
-      tag: "4c03ab2"
+      tag: "a51c72a"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
