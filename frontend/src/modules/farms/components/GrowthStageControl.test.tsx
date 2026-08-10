@@ -142,6 +142,28 @@ describe("<GrowthStageControl>", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/not in the crop calendar/);
   });
 
+  it("never renders a raw i18n key for an unrecognised source", async () => {
+    // The vocabulary is manual | derived | imported; guessing it wrong is how
+    // "growthStage.source.derived" ended up on screen in production.
+    listGrowthStages.mockResolvedValue([
+      {
+        id: "log-9",
+        block_id: "block-1",
+        block_crop_id: "bc-1",
+        stage: "pre_flowering",
+        source: "something_new",
+        confirmed_by: null,
+        transition_date: "2026-03-01T00:00:00Z",
+        notes: null,
+        created_at: "2026-03-01T00:00:00Z",
+      },
+    ]);
+    renderControl();
+
+    expect(await screen.findByText(/something_new/)).toBeInTheDocument();
+    expect(screen.queryByText(/growthStage\.source/)).not.toBeInTheDocument();
+  });
+
   it("lists past transitions with where each came from", async () => {
     listGrowthStages.mockResolvedValue([
       {
@@ -149,7 +171,7 @@ describe("<GrowthStageControl>", () => {
         block_id: "block-1",
         block_crop_id: "bc-1",
         stage: "pre_flowering",
-        source: "auto",
+        source: "derived",
         confirmed_by: null,
         transition_date: "2026-03-01T00:00:00Z",
         notes: null,

@@ -174,7 +174,11 @@ export function GrowthStageControl({
               <li key={entry.id} className="text-[11px] text-ap-muted">
                 <span className="font-mono">{entry.transition_date.slice(0, 10)}</span>{" "}
                 {label(entry.stage)}{" "}
-                <span className="opacity-70">· {t(`growthStage.source.${entry.source}`)}</span>
+                <span className="opacity-70">
+                  {/* defaultValue keeps an unrecognised source showing as
+                      itself rather than as `growthStage.source.<x>`. */}
+                  · {t(`growthStage.source.${entry.source}`, { defaultValue: entry.source })}
+                </span>
               </li>
             ))}
           </ul>

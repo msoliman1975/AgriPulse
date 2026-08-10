@@ -141,7 +141,10 @@ export async function getBlockCropAttributeHistory(
 // than overwriting a field. The daily `phenology.advance_growth_stages` task
 // writes through the same log with `source: "auto"`.
 
-export type GrowthStageSource = "auto" | "manual" | "model";
+// Mirrors GrowthStageSource in backend/app/modules/farms/schemas.py. The
+// daily phenology sweep writes "derived", NOT "auto" — getting this wrong meant
+// the timeline rendered a raw i18n key for every automatic transition.
+export type GrowthStageSource = "manual" | "derived" | "imported";
 
 export interface GrowthStageLogEntry {
   id: string;

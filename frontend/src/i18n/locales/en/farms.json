@@ -353,9 +353,9 @@
     "failed": "Could not save the stage.",
     "timeline": "Stage history",
     "source": {
-      "auto": "automatic",
       "manual": "set by hand",
-      "model": "model"
+      "derived": "automatic",
+      "imported": "imported"
     }
   }
 }
