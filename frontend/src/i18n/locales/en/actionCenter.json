@@ -120,6 +120,7 @@
     "blockDefaultExplained": "Defaulted to {{name}}, the member responsible for block {{block}}.",
     "perBlockExplained": "These items span blocks with different owners, so each goes to its own block's responsible member.",
     "noResponsibleExplained": "No one is responsible for these blocks. The server will pick a member and the result will say so — set an owner in block settings to control this.",
+    "setResponsible": "Assign one for {{block}} →",
     "membersLoading": "Loading team members…",
     "membersForbidden": "You cannot view this farm's team, so you cannot choose an assignee. Dispatch will still fall back to each block's responsible member.",
     "membersError": "Could not load the team list. Dispatch will fall back to each block's responsible member.",

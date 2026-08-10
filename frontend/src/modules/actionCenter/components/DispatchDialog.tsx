@@ -1,10 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import type { ActionItem } from "@/api/actionCenter";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { defaultAssignee } from "@/modules/actionCenter/lib/assignee";
+import { buildAssigneeOptions } from "@/modules/actionCenter/lib/assigneeOptions";
 import { useDispatchActionItems } from "@/queries/actionCenter";
 import { useFarmMembers } from "@/queries/farmMembers";
 import { useTenantUsers } from "@/queries/users";
@@ -31,16 +33,24 @@ function today(): string {
  * server resolve per item — which is strictly better than picking one name for
  * a mixed batch.
  *
- * The picker needs two capabilities the queue itself does not: `farm.member.read`
- * to list who is on the farm, and `user.read` to turn membership ids into names.
- * Missing either one used to render an empty dropdown with no explanation; the
- * states are now distinct, because "you cannot see the roster" and "this farm
- * has no members" need different fixes from the person reading it.
+ * **People come from the tenant user list, not from farm membership.** That is
+ * deliberate and it is a fix: the block-edit form sets a block's responsible
+ * member from `listTenantUsers()`, so sourcing this picker from `farm_scopes`
+ * meant the two lists could disagree. A block owner who was not also a farm
+ * member could not be rendered *or* re-selected here — the select held a value
+ * with no matching option — and a farm with no `farm_scopes` rows produced an
+ * empty dropdown even though block assignment worked fine. Farm membership is
+ * still read, but only to annotate a person with their role on this farm.
+ *
+ * The select is ALWAYS rendered. Whatever the roster does — forbidden, failed,
+ * empty — the user must still be able to choose someone, so a failure degrades
+ * to a smaller list plus an explanation rather than to no control at all.
  */
 export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props): ReactNode {
   const { t } = useTranslation("actionCenter");
   const canReadMembers = useCapability("farm.member.read", { farmId });
   const canReadUsers = useCapability("user.read");
+  // Roles are a nice-to-have annotation; names are the thing that matters.
   const members = useFarmMembers(canReadMembers ? farmId : null);
   const users = useTenantUsers();
   const dispatch = useDispatchActionItems();
@@ -48,18 +58,10 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
   const blockCodes = [...new Set(items.map((i) => i.block_code))];
   const cellCount = items.filter((i) => i.cell !== null).length;
 
-  const options = useMemo(() => {
-    const byMembership = new Map((users.data ?? []).map((u) => [u.membership_id, u]));
-    return (members.data ?? [])
-      .filter((m) => m.revoked_at === null)
-      .map((m) => ({
-        membershipId: m.membership_id,
-        role: m.role,
-        // Fall back to a short id rather than blank: an unnamed row is still
-        // selectable, and a blank option looks like a broken list.
-        name: byMembership.get(m.membership_id)?.full_name ?? m.membership_id.slice(0, 8),
-      }));
-  }, [members.data, users.data]);
+  const options = useMemo(
+    () => buildAssigneeOptions(users.data ?? [], members.data ?? [], defaultAssignee(items)),
+    [members.data, users.data, items],
+  );
 
   // The batch's default: the block owner, but only when every item agrees on
   // one. Mixed blocks fall back to per-item resolution on the server.
@@ -75,15 +77,17 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
   const singleBlock = blockCodes.length === 1;
   const noOneResponsible = items.every((i) => i.responsible_membership_id === null);
 
-  const pickerState = !canReadMembers
-    ? "forbidden"
-    : members.isPending || users.isPending
-      ? "loading"
-      : members.isError
-        ? "error"
+  // A note ABOUT the list, not a replacement FOR it — the select renders
+  // either way. `null` means there is nothing worth saying.
+  const rosterNote = users.isPending
+    ? "membersLoading"
+    : !canReadUsers
+      ? "namesForbidden"
+      : users.isError
+        ? "membersError"
         : options.length === 0
-          ? "empty"
-          : "ready";
+          ? "membersEmpty"
+          : null;
 
   const submit = (): void => {
     dispatch.mutate(
@@ -125,30 +129,21 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
               {t("dispatch.assignTo")}
             </label>
 
-            {pickerState === "ready" ? (
-              <select
-                id="dispatch-assignee"
-                className="input"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-              >
-                <option value="">{t("dispatch.useBlockResponsible")}</option>
-                {options.map((o) => (
-                  <option key={o.membershipId} value={o.membershipId}>
-                    {o.name} — {o.role}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p className="rounded-lg border border-ap-line bg-ap-bg/60 p-2 text-xs text-ap-muted">
-                {pickerState === "loading"
-                  ? t("dispatch.membersLoading")
-                  : pickerState === "forbidden"
-                    ? t("dispatch.membersForbidden")
-                    : pickerState === "error"
-                      ? t("dispatch.membersError")
-                      : t("dispatch.membersEmpty")}
-              </p>
+            <select
+              id="dispatch-assignee"
+              className="input"
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+            >
+              <option value="">{t("dispatch.useBlockResponsible")}</option>
+              {options.map((o) => (
+                <option key={o.membershipId} value={o.membershipId}>
+                  {o.role === null ? o.name : `${o.name} — ${o.role}`}
+                </option>
+              ))}
+            </select>
+            {rosterNote === null ? null : (
+              <p className="mt-1 text-meta text-ap-warn">{t(`dispatch.${rosterNote}`)}</p>
             )}
 
             <p className="mt-1 text-meta text-ap-muted">
@@ -162,10 +157,22 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
                         block: blockCodes[0],
                       })
                     : t("dispatch.perBlockExplained")}
+              {/* "Set an owner in block settings" is useless advice without a
+                  route: the field lives on the block edit form and nothing
+                  links to it. Only offered for a single block, since a batch
+                  spanning blocks has no one page to send them to. */}
+              {noOneResponsible && singleBlock ? (
+                <>
+                  {" "}
+                  <Link
+                    className="text-ap-accent hover:underline"
+                    to={`/farms/${farmId}/blocks/${items[0].block_id}/edit`}
+                  >
+                    {t("dispatch.setResponsible", { block: blockCodes[0] })}
+                  </Link>
+                </>
+              ) : null}
             </p>
-            {!canReadUsers && pickerState === "ready" ? (
-              <p className="mt-1 text-meta text-ap-warn">{t("dispatch.namesForbidden")}</p>
-            ) : null}
           </div>
 
           <div className="mb-3">
