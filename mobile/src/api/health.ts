@@ -23,33 +23,35 @@ export interface Reachability {
 }
 
 /**
- * `/health` is one of the few unauthenticated paths (`_PUBLIC_PATHS` in the
- * auth middleware). `/healthz` is NOT — it sits behind the 401-on-every-path
- * middleware, so probing it reports a healthy server as unreachable.
+ * Probed under the API base, not at `/health`.
  *
- * Derived from the API base rather than configured separately: two settings
- * that must agree is one more thing to get wrong per environment.
+ * `/health` is unauthenticated and works locally, but production's ingress
+ * routes only `/api/*` to the API — `https://api.agripulse.cloud/health` is a
+ * 404 from the ingress, so a build pointed at prod would report a perfectly
+ * healthy API as unreachable.
+ *
+ * `/me` exists in every environment and needs no token to prove the point: an
+ * unauthenticated call returns 401 from the auth middleware, and a 401 is the
+ * API answering. What we are ruling out is 404 (nothing routed there — wrong
+ * host, wrong base path, API not deployed) and 5xx.
  */
-function healthUrl(): string {
-  const base = API_BASE.replace(/\/+$/, "");
-  // "http://host:8000/api/v1" -> "http://host:8000/health"; a relative
-  // "/api/v1" (the dev proxy) -> "/health".
-  return `${base.replace(/\/api\/v\d+$/, "")}/health`;
+function apiProbeUrl(): string {
+  return `${API_BASE.replace(/\/+$/, "")}/me`;
 }
 
-async function reachable(url: string): Promise<boolean> {
+/** Statuses that prove the API itself replied. */
+const API_ALIVE = new Set([200, 401, 403]);
+
+async function reachable(url: string, accept: (status: number) => boolean): Promise<boolean> {
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    // 2xx, not merely "something answered". Both probes hit endpoints that are
-    // public and expected to return 200, so anything else means the host is
-    // there but the service behind it is not the one we want — an ingress
-    // serving a SPA or a 404 where the API should be. Treating that as
-    // reachable is how a green dot ends up next to an app that cannot work:
-    // https://api.agripulse.cloud/health currently answers 404, and the old
-    // "any reply counts" rule would have called that connected.
+    // Not "anything answered" — an ingress serving a SPA or a 404 where the API
+    // should be would pass that, and a green dot next to an app that cannot
+    // work is worse than no dot. Each probe says which statuses prove *its*
+    // service replied.
     const resp = await fetch(url, { method: "GET", signal: abort.signal, cache: "no-store" });
-    if (!resp.ok) {
+    if (!accept(resp.status)) {
       console.warn(`health: ${url} answered ${resp.status}`);
       return false;
     }
@@ -68,10 +70,11 @@ async function reachable(url: string): Promise<boolean> {
 
 export async function checkReachability(): Promise<Reachability> {
   const [api, auth] = await Promise.all([
-    reachable(healthUrl()),
+    reachable(apiProbeUrl(), (s) => API_ALIVE.has(s)),
     // The discovery document is public and CORS-open, and it is the exact
-    // origin the token request will use.
-    reachable(`${ISSUER.replace(/\/+$/, "")}/.well-known/openid-configuration`),
+    // origin the token request will use. A 200 is the only acceptable answer:
+    // anything else means this is not a realm.
+    reachable(`${ISSUER.replace(/\/+$/, "")}/.well-known/openid-configuration`, (s) => s === 200),
   ]);
   return { api, auth };
 }
