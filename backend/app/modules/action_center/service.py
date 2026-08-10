@@ -7,7 +7,7 @@ one-line "why".
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from datetime import date as date_type
 from typing import Any, Protocol
 from uuid import UUID
@@ -346,17 +346,30 @@ class ActionCenterServiceImpl:
         notes: str | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        target: str = "board",
     ) -> DispatchResponse:
-        """Send items to a person as board activities.
+        """Send items to a person, as board activities or as scouting visits.
 
         Per-item SAVEPOINT: one bad item in a batch of 40 must not abort the
         transaction and take the other 39 with it — the pattern this codebase
         learned the hard way on cross-tenant loops.
+
+        `target="scout"` opens a visit in the scouting module instead of a plan
+        activity, which is what puts the item on a field worker's phone with a
+        claim/start/submit lifecycle behind it. A plan activity has none of
+        that, so the two destinations are genuinely different work, not two
+        spellings of one.
         """
         from app.modules.plans.service import get_plans_service
 
         plans = get_plans_service(tenant_session=self._session)
         when = scheduled_date or date_type.today()
+        # A scouting deadline is a moment, not a working day, so a date has to
+        # become a time. End of the working day rather than midday: dispatching
+        # something "for today" at 12:14 with a midday deadline puts it on the
+        # scout's phone already overdue, which is how a queue teaches people to
+        # ignore its red badges.
+        due_by = datetime.combine(when, time(18, 0), tzinfo=UTC) if target == "scout" else None
         results: list[DispatchResultItem] = []
         fallback_cache: UUID | None = None
 
@@ -384,6 +397,21 @@ class ActionCenterServiceImpl:
                     fallback_cache = await self._repo.any_farm_member(farm_id=farm_id)
                 assignee = fallback_cache
                 defaulted = True
+
+            if target == "scout":
+                results.append(
+                    await self._dispatch_to_scout(
+                        farm_id=farm_id,
+                        item_id=item_id,
+                        row=row,
+                        assignee_membership_id=assignee,
+                        assignee_defaulted=defaulted,
+                        note=notes,
+                        due_by=due_by,
+                        actor_user_id=actor_user_id,
+                    )
+                )
+                continue
 
             savepoint = await self._session.begin_nested()
             try:
@@ -434,6 +462,80 @@ class ActionCenterServiceImpl:
 
         ok = sum(1 for r in results if r.error is None)
         return DispatchResponse(dispatched=ok, failed=len(results) - ok, results=results)
+
+    async def _dispatch_to_scout(
+        self,
+        *,
+        farm_id: UUID,
+        item_id: UUID,
+        row: dict[str, Any],
+        assignee_membership_id: UUID | None,
+        assignee_defaulted: bool,
+        note: str | None,
+        due_by: datetime | None,
+        actor_user_id: UUID | None,
+    ) -> DispatchResultItem:
+        """One item onto a scout's phone. Never raises — returns the outcome."""
+        from app.modules.scouting.service import get_scouting_service
+
+        scouting = get_scouting_service(tenant_session=self._session)
+        try:
+            # Membership -> Keycloak subject. Leaving this untranslated is the
+            # failure that looks like success: the row says assigned, the phone
+            # shows nothing.
+            subject = (
+                await self._repo.membership_subject(membership_id=assignee_membership_id)
+                if assignee_membership_id is not None
+                else None
+            )
+            visit = await scouting.dispatch_from_action_item(
+                farm_id=farm_id,
+                block_id=row["block_id"],
+                kind=row["kind"],
+                item_id=item_id,
+                title=row.get("title_en") or row.get("title_ar") or "Field check",
+                severity=row.get("severity") or "info",
+                note=note,
+                assigned_to=subject,
+                due_by=due_by,
+                actor_user_id=actor_user_id,
+            )
+        except Exception as exc:
+            return DispatchResultItem(
+                item_id=item_id,
+                kind=row["kind"],
+                activity_id=None,
+                assigned_membership_id=None,
+                error=type(exc).__name__,
+            )
+
+        if visit is None:
+            # A live visit already covers this item — normally one the routing
+            # rules opened. Reported as a distinct outcome so the UI can say
+            # "already with a scout" rather than claiming a fresh dispatch.
+            return DispatchResultItem(
+                item_id=item_id,
+                kind=row["kind"],
+                activity_id=None,
+                visit_id=None,
+                already_dispatched=True,
+                assigned_membership_id=assignee_membership_id,
+                assignee_defaulted=assignee_defaulted,
+            )
+
+        # If the membership had no Keycloak subject behind it the visit was
+        # created unassigned, and saying otherwise would be a lie the UI then
+        # repeats to the supervisor. Queued is the right outcome — any scout on
+        # the farm can still claim it — but it must be reported as unassigned.
+        landed_on = assignee_membership_id if visit.get("assigned_to") is not None else None
+        return DispatchResultItem(
+            item_id=item_id,
+            kind=row["kind"],
+            activity_id=None,
+            visit_id=visit["id"],
+            assigned_membership_id=landed_on,
+            assignee_defaulted=assignee_defaulted and landed_on is not None,
+        )
 
 
 def get_action_center_service(*, tenant_session: AsyncSession) -> ActionCenterServiceImpl:

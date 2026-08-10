@@ -140,7 +140,7 @@ class ActionItemListResponse(BaseModel):
 
 
 class DispatchRequest(BaseModel):
-    """Send one or more items to a team member as board activities."""
+    """Send one or more items to a team member, as board work or a field visit."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -150,12 +150,22 @@ class DispatchRequest(BaseModel):
     assigned_membership_id: UUID | None = None
     scheduled_date: date | None = None
     notes: str | None = Field(default=None, max_length=4000)
+    # `board` writes a plan activity, as before. `scout` opens a scouting visit
+    # the mobile app can claim, start and submit against, and pushes it to the
+    # assignee's handset. Default stays `board` so existing callers are
+    # untouched — a silent change of destination is how work disappears.
+    target: Literal["board", "scout"] = "board"
 
 
 class DispatchResultItem(BaseModel):
     item_id: UUID
     kind: ItemKind
     activity_id: UUID | None
+    # Set instead of activity_id when target is `scout`. None with no error and
+    # `already_dispatched` true means a live visit already covered the item —
+    # usually one the auto-dispatch rules opened first.
+    visit_id: UUID | None = None
+    already_dispatched: bool = False
     assigned_membership_id: UUID | None
     # True when the assignee came from the block rather than the request, so
     # the UI can say where a default came from instead of assigning silently.

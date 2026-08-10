@@ -11,6 +11,7 @@ PostGIS geometry and has to be rendered as GeoJSON on the way out, the same way
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -126,8 +127,15 @@ class ScoutingRepository:
         """Insert a visit. `lat`/`lon`, when present, become `pin_point`."""
         lat = values.pop("lat", None)
         lon = values.pop("lon", None)
+        if isinstance(values.get("reason_snapshot"), dict):
+            # asyncpg will not adapt a bare dict to jsonb, and a postfix
+            # `:x::jsonb` inside text() is parsed as another bind marker — so
+            # serialise here and cast below. Kept in the repository because it
+            # is a fact about the driver, not something each caller should have
+            # to remember.
+            values["reason_snapshot"] = json.dumps(values["reason_snapshot"])
         cols = list(values.keys())
-        placeholders = [f":{c}" for c in cols]
+        placeholders = [f"CAST(:{c} AS jsonb)" if c == "reason_snapshot" else f":{c}" for c in cols]
         if lat is not None and lon is not None:
             cols.append("pin_point")
             placeholders.append("ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)")

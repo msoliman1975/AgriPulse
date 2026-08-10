@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
@@ -36,10 +37,15 @@ from app.shared.eventbus import get_default_bus
 # may still act on.
 OPEN_STATUSES: tuple[str, ...] = ("queued", "assigned", "accepted", "in_progress")
 
+# A triaged item carries a severity but no priority of its own. Mapping keeps
+# the scout's list ordered by the same urgency the supervisor saw.
+_SEVERITY_PRIORITY: dict[str, str] = {"critical": "high", "warning": "medium", "info": "low"}
+
 
 class ScoutingService:
     def __init__(self, *, tenant_session: AsyncSession, tenant_schema: str | None = None) -> None:
         self._repo = ScoutingRepository(tenant_session)
+        self._session = tenant_session
         self._tenant_schema = tenant_schema
         self._log = get_logger(__name__)
 
@@ -153,6 +159,69 @@ class ScoutingService:
         if payload.lat is not None and payload.lon is not None:
             values.update(lat=payload.lat, lon=payload.lon)
         visit = await self._repo.insert_visit(values=values)
+        self._announce_assignment(visit)
+        return visit
+
+    async def dispatch_from_action_item(
+        self,
+        *,
+        farm_id: UUID,
+        block_id: UUID,
+        kind: str,
+        item_id: UUID,
+        title: str,
+        severity: str,
+        note: str | None,
+        assigned_to: UUID | None,
+        due_by: datetime | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        """A supervisor triaged a rec/alert in the Action Center and sent it to a scout.
+
+        Origin is the item's own kind rather than `ad_hoc`, so the partial
+        UNIQUE on recommendation_id/alert_id dedups against a visit the
+        auto-dispatch subscriber may already have opened: triaging something
+        the routing rules already sent must not put the same walk on a scout's
+        list twice. Returns None when a live visit already covers the item, so
+        the caller can report "already dispatched" rather than an error.
+
+        The supervisor's note rides in `reason_snapshot`, not `instruction` —
+        that column is CHECK-constrained to ad_hoc, and relaxing it would let a
+        machine-generated visit carry words no human typed.
+        """
+        values: dict[str, Any] = {
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "origin": kind,
+            ("recommendation_id" if kind == "recommendation" else "alert_id"): item_id,
+            "title": title[:200],
+            "severity": severity,
+            "priority": _SEVERITY_PRIORITY.get(severity, "medium"),
+            "due_by": due_by,
+            "status": "queued",
+            "reason_snapshot": {
+                "source": "action_center",
+                **({"note": note} if note else {}),
+            },
+            "created_by": actor_user_id,
+        }
+        if assigned_to is not None:
+            values.update(
+                status="assigned",
+                assigned_to=assigned_to,
+                assigned_by=actor_user_id,
+                assigned_at=datetime.now(UTC),
+            )
+        # Nested so a duplicate does not poison the caller's transaction — the
+        # Action Center dispatches in batches and one already-covered item must
+        # not take the other thirty-nine with it.
+        savepoint = await self._session.begin_nested()
+        try:
+            visit = await self._repo.insert_visit(values=values)
+            await savepoint.commit()
+        except IntegrityError:
+            await savepoint.rollback()
+            return None
         self._announce_assignment(visit)
         return visit
 
