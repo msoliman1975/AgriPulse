@@ -20,6 +20,7 @@ four tests here failed while passing locally.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -32,8 +33,14 @@ from app.modules.iam import field_enrolment
 from app.modules.iam.router import router as iam_router
 from app.shared.keycloak import FakeKeycloakClient
 from app.shared.keycloak.field_identity import SYNTHETIC_EMAIL_DOMAIN
-from tests.integration.farms.conftest import StubAuth
-from tests.integration.scouting.conftest import ScoutingFixture
+from tests.integration.farms.conftest import (
+    FarmRole,
+    FarmScope,
+    StubAuth,
+    make_context,
+)
+from tests.integration.farms.test_farms_crud import _square
+from tests.integration.scouting.conftest import ScoutingFixture, build_app
 
 pytestmark = [pytest.mark.integration]
 
@@ -276,7 +283,11 @@ async def test_re_role_only_touches_field_workers(
     async with _client(env.admin_context) as client:
         resp = await client.post(
             "/api/v1/users/field-enrolment/re-role",
-            json={"worker_ids": [str(blocked), str(agronomist)], "role": "Scout"},
+            json={
+                "farm_id": env.farm_id,
+                "worker_ids": [str(blocked), str(agronomist)],
+                "role": "Scout",
+            },
         )
     assert resp.status_code == 200, resp.text
     # Only the FieldWorker moved; the Agronomist was passed in and ignored.
@@ -319,3 +330,191 @@ async def test_pin_reissue_works_for_field_users_and_refuses_real_accounts(
         refused = await client.post(f"/api/v1/users/{env.agronomist_user_id}/field-pin:reissue")
     assert refused.status_code == 422, refused.text
     assert "password-reset flow" in refused.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# W1-A — the farm manager, who is the person standing with the crew
+# ---------------------------------------------------------------------------
+
+
+def _unique_phone() -> str:
+    """`public.users` is global, not per-tenant, and the synthetic email is
+    derived from the number. A fixed literal therefore collides with the row a
+    previous run left behind, and enrolment silently adopts that row — keeping
+    its stale Keycloak subject, which then 404s on PIN reissue."""
+    return "010" + f"{uuid4().int % 10**8:08d}"
+
+
+def _farm_manager(env: ScoutingFixture, farm_id: str | None = None):  # type: ignore[no-untyped-def]
+    """A FarmManager on one farm and nothing else — no tenant role at all.
+
+    This is the shape the whole capability exists for, and the shape that
+    used to 403 on every one of these routes because they demanded the
+    tenant-scoped `user.invite`.
+    """
+    return make_context(
+        user_id=uuid4(),
+        tenant_id=env.tenant_id,
+        tenant_role=None,
+        farm_scopes=(FarmScope(farm_id=UUID(farm_id or env.farm_id), role=FarmRole.FARM_MANAGER),),
+    )
+
+
+@pytest.mark.asyncio
+async def test_farm_manager_can_enrol_on_their_own_farm(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    body = {
+        "phone": _unique_phone(),
+        "full_name": "Mansour Fahmy",
+        "farm_id": env.farm_id,
+        "role": "Scout",
+    }
+    async with _client(_farm_manager(env)) as client:
+        resp = await client.post("/api/v1/users/field-enrolment", json=body)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["pin"].isdigit()
+
+
+@pytest.mark.asyncio
+async def test_farm_manager_cannot_enrol_onto_someone_elses_farm(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """The farm is in the body, so the check has to read the body. If it read
+    only the token the manager would pass for every farm in the tenant."""
+    env = scouting_env
+    other_farm = str(uuid4())
+    body = {
+        "phone": _unique_phone(),
+        "full_name": "Not Mine",
+        "farm_id": other_farm,
+        "role": "Scout",
+    }
+    async with _client(_farm_manager(env)) as client:
+        resp = await client.post("/api/v1/users/field-enrolment", json=body)
+    assert resp.status_code == 403, resp.text
+    # `extras` are flattened onto the problem document, not nested under a key.
+    body = resp.json()
+    assert body["capability"] == "user.field_enrol"
+    assert body["farm_id"] == other_farm
+
+
+@pytest.mark.asyncio
+async def test_farm_manager_audit_needs_a_farm_and_tenant_wide_is_refused(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """Omitting farm_id asks for every worker in the tenant. A farm-scoped
+    grant must not answer a tenant-wide question."""
+    env = scouting_env
+    async with _client(_farm_manager(env)) as client:
+        scoped = await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+        unscoped = await client.get("/api/v1/users/field-enrolment/audit")
+    assert scoped.status_code == 200, scoped.text
+    assert unscoped.status_code == 403, unscoped.text
+    # The tenant admin still gets the whole-tenant view.
+    async with _client(env.admin_context) as client:
+        admin_wide = await client.get("/api/v1/users/field-enrolment/audit")
+    assert admin_wide.status_code == 200, admin_wide.text
+
+
+@pytest.mark.asyncio
+async def test_re_role_ignores_workers_on_another_farm(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """The capability was checked against one farm, so ids from another farm
+    must not be rewritten just because they were posted in the same list."""
+    env = scouting_env
+    # A real second farm, built the way the fixture builds the first: `farms`
+    # needs boundary/centroid/area geometry that a hand-written INSERT cannot
+    # supply, and the FK from `resources.farm_id` means it has to exist.
+    async with AsyncClient(
+        transport=ASGITransport(app=build_app(env.admin_context)), base_url="http://test"
+    ) as client:
+        created = await client.post(
+            "/api/v1/farms",
+            json={
+                "code": "SC-FARM-2",
+                "name": "Other farm",
+                "boundary": _square(31.90, 30.90),
+                "farm_type": "commercial",
+                "tags": [],
+            },
+        )
+    assert created.status_code == 201, created.text
+    other_farm = created.json()["id"]
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    mine = (
+        await admin_session.execute(
+            text(
+                "INSERT INTO resources (farm_id, kind, name, role, phone) "
+                "VALUES (CAST(:f AS uuid), 'worker', 'Mine', 'FieldWorker', '+201005555555') "
+                "RETURNING id"
+            ),
+            {"f": env.farm_id},
+        )
+    ).scalar()
+    theirs = (
+        await admin_session.execute(
+            text(
+                "INSERT INTO resources (farm_id, kind, name, role, phone) "
+                "VALUES (CAST(:f AS uuid), 'worker', 'Theirs', 'FieldWorker', '+201006666666') "
+                "RETURNING id"
+            ),
+            {"f": str(other_farm)},
+        )
+    ).scalar()
+    await admin_session.commit()
+
+    async with _client(_farm_manager(env)) as client:
+        resp = await client.post(
+            "/api/v1/users/field-enrolment/re-role",
+            json={
+                "farm_id": env.farm_id,
+                "worker_ids": [str(mine), str(theirs)],
+                "role": "Scout",
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["updated"] == 1
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    roles = dict(
+        (
+            await admin_session.execute(
+                text("SELECT id, role FROM resources WHERE id = ANY(:ids)"),
+                {"ids": [mine, theirs]},
+            )
+        ).all()
+    )
+    assert roles[mine] == "Scout"
+    assert roles[theirs] == "FieldWorker"
+
+
+@pytest.mark.asyncio
+async def test_pin_reissue_by_farm_manager_is_confined_to_their_farm(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """Naming a farm is a claim, not a permission — the target has to actually
+    be scoped there, or a manager could reset any scout in the tenant."""
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    user_id = enrolled.json()["user_id"]
+
+    async with _client(_farm_manager(env)) as client:
+        ok = await client.post(f"/api/v1/users/{user_id}/field-pin:reissue?farm_id={env.farm_id}")
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["pin"].isdigit()
+
+    # Same manager, same farm claim, but a person who is not on that farm.
+    async with _client(_farm_manager(env)) as client:
+        wrong = await client.post(
+            f"/api/v1/users/{env.agronomist_user_id}/field-pin:reissue?farm_id={env.farm_id}"
+        )
+    assert wrong.status_code == 422, wrong.text
+    assert "does not have access to this farm" in wrong.json()["detail"]
+
+    # And with no farm named at all it is a tenant-wide act they cannot do.
+    async with _client(_farm_manager(env)) as client:
+        unscoped = await client.post(f"/api/v1/users/{user_id}/field-pin:reissue")
+    assert unscoped.status_code == 403, unscoped.text

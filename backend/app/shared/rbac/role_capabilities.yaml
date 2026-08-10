@@ -58,6 +58,7 @@ roles:
       - subscription.manage
       - user.read
       - user.invite
+      - user.field_enrol
       - user.update
       - user.suspend
       - user.delete
@@ -135,6 +136,7 @@ roles:
       - subscription.read
       - user.read
       - user.invite
+      - user.field_enrol
       - user.update
       - user.suspend
       - user.delete
@@ -256,6 +258,7 @@ roles:
       - plan_activity.complete
       - resource.read
       - resource.manage
+      - user.field_enrol
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read

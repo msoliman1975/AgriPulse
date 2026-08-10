@@ -334,13 +334,18 @@ class FieldEnrolmentService:
         }
 
     async def re_role_field_workers(
-        self, *, worker_ids: tuple[UUID, ...], role: str = "Scout"
+        self, *, farm_id: UUID, worker_ids: tuple[UUID, ...], role: str = "Scout"
     ) -> int:
         """Promote worker-only rows into a role that can hold capabilities.
 
         Scoped to ``FieldWorker`` on purpose: this is a bulk action reached
         from an audit list, and a bulk action that can rewrite *any* role is a
         way to quietly grant Agronomist to a dozen people at once.
+
+        Scoped to one ``farm_id`` for the same reason. The caller's capability
+        was checked against that farm, so ids belonging to another farm must
+        not be rewritten just because they were posted in the same list —
+        otherwise the farm check is decoration.
         """
         if role not in ENROLLABLE_ROLES:
             raise InvalidEnrolmentError(
@@ -351,20 +356,27 @@ class FieldEnrolmentService:
         result = await self._tenant.execute(
             text(
                 "UPDATE resources SET role = :role, updated_at = now() "
-                "WHERE id = ANY(:ids) AND kind = 'worker' AND role = 'FieldWorker' "
-                "AND archived_at IS NULL"
-            ),
-            {"role": role, "ids": list(worker_ids)},
+                "WHERE id = ANY(:ids) AND farm_id = :fid AND kind = 'worker' "
+                "AND role = 'FieldWorker' AND archived_at IS NULL"
+            ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+            {"role": role, "ids": list(worker_ids), "fid": farm_id},
         )
         return int(getattr(result, "rowcount", 0) or 0)
 
-    async def reissue_pin(self, *, tenant_id: UUID, user_id: UUID) -> str:
+    async def reissue_pin(
+        self, *, tenant_id: UUID, user_id: UUID, farm_id: UUID | None = None
+    ) -> str:
         """Mint a fresh PIN for a field worker who forgot theirs.
 
         A PIN cannot be looked up — Keycloak stores only its hash — so recovery
         is replacement. Restricted to synthetic-email users: this must never
         become a way to reset a colleague's real password from the workers
         screen.
+
+        ``farm_id`` is the farm the caller's capability was checked against.
+        When it is set the target must hold an active scope on that farm, or a
+        farm manager could reset the PIN of any scout in the tenant simply by
+        naming their own farm.
         """
         row = (
             await self._public.execute(
@@ -384,6 +396,27 @@ class FieldEnrolmentService:
         ).first()
         if row is None:
             raise InvalidEnrolmentError("no active member of this tenant with that id")
+        if farm_id is not None:
+            scoped = (
+                await self._public.execute(
+                    text(
+                        """
+                        SELECT 1
+                          FROM public.farm_scopes fs
+                          JOIN public.tenant_memberships m ON m.id = fs.membership_id
+                         WHERE m.user_id = :uid AND m.tenant_id = :tid
+                           AND fs.farm_id = :fid AND fs.revoked_at IS NULL
+                        """
+                    ).bindparams(
+                        bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"uid": user_id, "tid": tenant_id, "fid": farm_id},
+                )
+            ).first()
+            if scoped is None:
+                raise InvalidEnrolmentError("that person does not have access to this farm")
         if not is_synthetic_email(row.email):
             raise InvalidEnrolmentError(
                 "that account signs in with an email address; use the password-reset flow"
