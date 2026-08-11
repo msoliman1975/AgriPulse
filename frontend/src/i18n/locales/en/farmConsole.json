@@ -27,6 +27,21 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "signals": {
+    "pickSignal": "Signal",
+    "historyHeading": "Observation history for this block",
+    "loadError": "Couldn't load the signal catalogue.",
+    "noDefinitions": "No signals are defined for this farm yet.",
+    "noRecordPermission": "You don't have permission to record signals on this farm.",
+    "photo": "Photo",
+    "record": "Record",
+    "recording": "Recording…",
+    "uploading": "Uploading…",
+    "saved": "Recorded.",
+    "errorGeneric": "Couldn't record this observation — please retry.",
+    "errorLatLon": "Enter a valid latitude and longitude.",
+    "errorLocationPoint": "Pick a point on the map, or switch back to whole-block."
+  },
   "viewbar": {
     "index": "Index",
     "layers": "Layers",
@@ -129,6 +144,7 @@
     "manageHeading": "Manage this unit",
     "editDetails": "Edit details & agronomics",
     "assignCrop": "Assign crop / variety / strain",
+    "recordSignal": "Record signal / observation",
     "reshape": "Reshape boundary",
     "gridConfig": "Sub-block grid config",
     "inactivate": "Inactivate…",

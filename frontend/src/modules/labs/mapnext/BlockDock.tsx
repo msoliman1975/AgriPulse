@@ -722,6 +722,13 @@ export function BlockDock({
                   <button type="button" className={ghostBtn} onClick={() => setManageMode("crop")}>
                     🌱 {t("inspector.assignCrop")}
                   </button>
+                  <button
+                    type="button"
+                    className={ghostBtn}
+                    onClick={() => setManageMode("signals")}
+                  >
+                    📋 {t("inspector.recordSignal")}
+                  </button>
                   <button type="button" className={ghostBtn} onClick={onReshape}>
                     ⬡ {t("inspector.reshape")}
                   </button>
