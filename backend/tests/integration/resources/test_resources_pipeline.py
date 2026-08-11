@@ -500,3 +500,142 @@ async def test_resource_cannot_be_assigned_to_a_farm_it_does_not_serve(
         ).json()["id"]
         ok = await client.post(f"/api/v1/activities/{activity_a}/resources/{worker['id']}")
         assert ok.status_code in (200, 201), ok.text
+
+
+@pytest.mark.asyncio
+async def test_a_farm_manager_cannot_rename_a_worker_shared_with_another_farm(
+    admin_session: AsyncSession,
+) -> None:
+    """W2-B — the authorization split, and the failure mode it exists for.
+
+    Name, phone, role and archived state are one row shared by every farm the
+    resource serves. A farm-A manager editing them is rewriting farm B's data,
+    so the strict side of the split requires the capability on *every* farm in
+    the availability set. Reading only needs one.
+    """
+    from uuid import UUID as _UUID
+
+    from app.shared.auth.context import FarmRole, FarmScope
+
+    _t, admin_ctx, farm_a, _b = await _bootstrap(admin_session, "bd-authz")
+    admin_app = _build_app(admin_ctx)
+    async with AsyncClient(
+        transport=ASGITransport(app=admin_app), base_url="http://test"
+    ) as client:
+        farm_b = (
+            await client.post(
+                "/api/v1/farms",
+                json={
+                    "code": "BD-AUTHZ-B",
+                    "name": "Authz farm B",
+                    "boundary": _square(31.95, 30.95),
+                    "farm_type": "commercial",
+                    "tags": [],
+                },
+            )
+        ).json()["id"]
+        shared = (
+            await client.post(
+                f"/api/v1/farms/{farm_a}/resources",
+                json={"kind": "worker", "name": "Shared Salma", "role": "FieldOperator"},
+            )
+        ).json()
+        # Lend them to farm B as well.
+        both = await client.put(
+            f"/api/v1/resources/{shared['id']}/farms",
+            json={"farm_ids": [farm_a, farm_b]},
+        )
+        assert both.status_code == 200, both.text
+        assert set(both.json()) == {farm_a, farm_b}
+
+    # A manager of farm A only — no tenant role at all.
+    a_only = make_context(
+        user_id=uuid4(),
+        tenant_id=admin_ctx.tenant_id,
+        tenant_role=None,
+        farm_scopes=(FarmScope(farm_id=_UUID(farm_a), role=FarmRole.FARM_MANAGER),),
+    )
+    async with AsyncClient(
+        transport=ASGITransport(app=_build_app(a_only)), base_url="http://test"
+    ) as client:
+        # Reading is fine: they manage one of the farms this person serves.
+        readable = await client.get(f"/api/v1/resources/{shared['id']}")
+        assert readable.status_code == 200, readable.text
+
+        # Renaming is not — farm B would silently get a different worker.
+        renamed = await client.patch(
+            f"/api/v1/resources/{shared['id']}", json={"name": "Renamed By A"}
+        )
+        assert renamed.status_code == 404, renamed.text
+
+        # Nor can they quietly drop farm B from the availability set.
+        dropped = await client.put(
+            f"/api/v1/resources/{shared['id']}/farms", json={"farm_ids": [farm_a]}
+        )
+        assert dropped.status_code == 404, dropped.text
+
+    # The name really did not change.
+    async with AsyncClient(
+        transport=ASGITransport(app=admin_app), base_url="http://test"
+    ) as client:
+        assert (await client.get(f"/api/v1/resources/{shared['id']}")).json()[
+            "name"
+        ] == "Shared Salma"
+
+        # And a worker on farm A alone is still editable by farm A's manager.
+        solo = (
+            await client.post(
+                f"/api/v1/farms/{farm_a}/resources",
+                json={"kind": "worker", "name": "Solo Samir", "role": "FieldOperator"},
+            )
+        ).json()
+    async with AsyncClient(
+        transport=ASGITransport(app=_build_app(a_only)), base_url="http://test"
+    ) as client:
+        ok = await client.patch(f"/api/v1/resources/{solo['id']}", json={"name": "Renamed Fine"})
+        assert ok.status_code == 200, ok.text
+
+
+@pytest.mark.asyncio
+async def test_tenant_roster_lists_every_farm_and_its_availability(
+    admin_session: AsyncSession,
+) -> None:
+    """The read the People page is built on: one row per person, carrying
+    where they can work — not one row per person per farm."""
+    _t, context, farm_a, _b = await _bootstrap(admin_session, "bd-roster")
+    app = _build_app(context)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        farm_b = (
+            await client.post(
+                "/api/v1/farms",
+                json={
+                    "code": "BD-ROSTER-B",
+                    "name": "Roster farm B",
+                    "boundary": _square(32.05, 31.05),
+                    "farm_type": "commercial",
+                    "tags": [],
+                },
+            )
+        ).json()["id"]
+        worker = (
+            await client.post(
+                f"/api/v1/farms/{farm_a}/resources",
+                json={"kind": "worker", "name": "Roaming Rami", "role": "FieldOperator"},
+            )
+        ).json()
+        await client.put(
+            f"/api/v1/resources/{worker['id']}/farms",
+            json={"farm_ids": [farm_a, farm_b]},
+        )
+
+        roster = await client.get("/api/v1/resources")
+        assert roster.status_code == 200, roster.text
+        rows = {r["id"]: r for r in roster.json()}
+        # One row, not two — which is the entire point of the promotion.
+        assert list(rows).count(worker["id"]) == 1
+        assert set(rows[worker["id"]]["farm_ids"]) == {farm_a, farm_b}
+
+        # And they show up on both farms' per-farm lists.
+        for farm in (farm_a, farm_b):
+            listed = (await client.get(f"/api/v1/farms/{farm}/resources")).json()
+            assert worker["id"] in {r["id"] for r in listed}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
@@ -105,6 +106,26 @@ class ResourcesServiceImpl:
         if row is None:
             raise ResourceNotFoundError(resource_id)
         return row
+
+    async def farm_ids_for(self, *, resource_id: UUID) -> tuple[UUID, ...]:
+        return await self._repo.farm_ids_for(resource_id=resource_id)
+
+    async def farm_ids_for_many(
+        self, *, resource_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[UUID, ...]]:
+        return await self._repo.farm_ids_for_many(resource_ids=resource_ids)
+
+    async def set_farms(self, *, resource_id: UUID, farm_ids: Sequence[UUID]) -> tuple[UUID, ...]:
+        """Replace where a resource may be used.
+
+        Emptying the set is allowed and means "available nowhere" — the same
+        state a farm purge leaves behind. It is deliberately not the same as
+        archiving: a machine between farms is still a machine.
+        """
+        if await self._repo.get(resource_id=resource_id) is None:
+            raise ResourceNotFoundError(resource_id)
+        await self._repo.set_farms(resource_id=resource_id, farm_ids=farm_ids)
+        return await self._repo.farm_ids_for(resource_id=resource_id)
 
     async def list(
         self,
