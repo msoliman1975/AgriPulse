@@ -1,0 +1,2006 @@
+<meta charset="utf-8" />
+<title>Crop catalog authoring — 3 UX proposals</title>
+<style>
+  /* Panels are toggled with the `hidden` attribute, and several of them are
+     flex containers — without this the layout rule wins and nothing hides. */
+  [hidden] { display: none !important; }
+
+  /* ---- Document chrome tokens: light is the base, complete palette ---- */
+  :root {
+    --ground: #f2f4ef;
+    --panel: #fbfcfa;
+    --ink: #171c17;
+    --muted: #5c6459;
+    --rule: #dde3d8;
+    --rule-soft: #e8ede4;
+    --accent: #356b30;
+    --accent-ink: #ffffff;
+    --accent-soft: #e2ecdf;
+    --cool: #1f6f9a;
+    --hot: #b24430;
+    --shadow: 0 1px 2px rgb(23 28 23 / .05), 0 8px 24px -12px rgb(23 28 23 / .18);
+
+    --display: "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --body: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131711;
+      --panel: #1b201a;
+      --ink: #eaeee6;
+      --muted: #9aa394;
+      --rule: #2b322a;
+      --rule-soft: #232a22;
+      --accent: #8ec286;
+      --accent-ink: #12170f;
+      --accent-soft: #232e21;
+      --cool: #6fb4d8;
+      --hot: #e08b76;
+      --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -12px rgb(0 0 0 / .7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131711;
+    --panel: #1b201a;
+    --ink: #eaeee6;
+    --muted: #9aa394;
+    --rule: #2b322a;
+    --rule-soft: #232a22;
+    --accent: #8ec286;
+    --accent-ink: #12170f;
+    --accent-soft: #232e21;
+    --cool: #6fb4d8;
+    --hot: #e08b76;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -12px rgb(0 0 0 / .7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 96px; }
+  .prose { max-width: 72ch; }
+
+  h1, h2, h3, h4 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 4.6vw, 3.1rem); line-height: 1.04; letter-spacing: -.03em; font-weight: 800; }
+  h2 { font-size: clamp(1.4rem, 2.4vw, 1.9rem); line-height: 1.15; letter-spacing: -.02em; font-weight: 750; }
+  h3 { font-size: 1.05rem; letter-spacing: -.008em; font-weight: 700; }
+  h4 { font-size: .9rem; font-weight: 700; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  code, .mono { font-family: var(--mono); }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---- masthead ---- */
+  header.top { padding: 72px 0 40px; display: flex; flex-direction: column; gap: 20px; }
+  header.top .lede { font-size: 1.12rem; color: var(--muted); max-width: 68ch; }
+  .rule { height: 1px; background: var(--rule); border: 0; margin: 0; }
+
+  section.block { padding: 56px 0 0; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ---- generic doc bits ---- */
+  .note {
+    border-inline-start: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: .93rem;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  ul.tight { margin: 0; padding-inline-start: 1.15em; display: flex; flex-direction: column; gap: 7px; }
+  ul.tight li::marker { color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; min-width: 720px; }
+  th, td { text-align: start; padding: 9px 14px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; background: var(--rule-soft); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.mono, th.mono { font-family: var(--mono); font-size: .8rem; }
+  .yes { color: var(--accent); font-weight: 700; }
+  .same { color: var(--muted); }
+
+  /* ---- concept header ---- */
+  .concept-head { display: flex; flex-direction: column; gap: 10px; }
+  .concept-head .tag {
+    display: inline-flex; align-items: baseline; gap: 10px;
+  }
+  .letter {
+    font-family: var(--display); font-weight: 800; font-size: 1rem;
+    background: var(--accent); color: var(--accent-ink);
+    width: 26px; height: 26px; border-radius: 6px;
+    display: inline-grid; place-items: center; letter-spacing: 0;
+  }
+  .thesis { font-size: 1.05rem; color: var(--muted); max-width: 70ch; }
+
+  .tradeoffs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .tradeoff {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font-size: .88rem;
+  }
+  .tradeoff .h { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .tradeoff.win .h { color: var(--accent); }
+  .tradeoff.cost .h { color: var(--hot); }
+
+  /* =====================================================================
+     MOCKUP PANES
+     Fixed AgriPulse product palette — these are screenshots of the product,
+     which has a single light theme, so they do not follow the doc theme.
+     Every colour inside .mock is explicit so the pane holds on any ground.
+     ===================================================================== */
+  .mock {
+    --p-bg: #f7f6f1; --p-panel: #ffffff; --p-line: #e8e5db;
+    --p-ink: #1f2420; --p-muted: #6c7268;
+    --p-primary: #356b30; --p-primary-soft: #dceadb;
+    --p-warn: #c98a18; --p-warn-soft: #f7e7c2;
+    --p-crit: #b24430; --p-crit-soft: #f3d2c9;
+    --p-accent: #1f6f9a;
+    background: var(--p-bg);
+    color: var(--p-ink);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .mock .chrome {
+    background: var(--p-panel);
+    border-bottom: 1px solid var(--p-line);
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .mock .chrome .title { font-weight: 700; font-size: 14px; color: var(--p-ink); }
+  .mock .chrome .sub { color: var(--p-muted); font-size: 12px; }
+  .mock .chrome .spacer { margin-inline-start: auto; }
+  .mock .body { display: grid; min-height: 470px; }
+  .mock .col { border-inline-end: 1px solid var(--p-line); background: var(--p-panel); overflow: auto; }
+  .mock .col:last-child { border-inline-end: 0; }
+  .mock .colhead {
+    padding: 8px 14px; border-bottom: 1px solid var(--p-line);
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--p-muted); background: var(--p-bg);
+    position: sticky; top: 0; z-index: 1;
+  }
+  .mock .pad { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* product controls */
+  .mock label.f { display: flex; flex-direction: column; gap: 4px; }
+  .mock label.f > span.lbl { font-size: 11px; font-weight: 600; color: var(--p-muted); }
+  .mock label.f > span.lbl .req { color: var(--p-crit); }
+  .mock input[type="text"], .mock input[type="number"], .mock select, .mock textarea {
+    font: inherit; font-size: 12px; color: var(--p-ink);
+    background: var(--p-panel); border: 1px solid var(--p-line);
+    border-radius: 6px; padding: 5px 8px; width: 100%;
+  }
+  .mock input:disabled, .mock select:disabled { background: var(--p-bg); color: var(--p-muted); }
+  .mock input:focus-visible, .mock select:focus-visible, .mock button:focus-visible,
+  .mock [tabindex]:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--p-primary, var(--accent)); outline-offset: 2px;
+  }
+  .mock .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mock .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .mock .btn {
+    font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+    background: var(--p-primary); color: #fff; border: 1px solid var(--p-primary);
+    border-radius: 6px; padding: 5px 11px;
+  }
+  .mock .btn.ghost { background: var(--p-panel); color: var(--p-ink); border-color: var(--p-line); }
+  .mock .btn.link { background: none; border: 0; color: var(--p-primary); padding: 2px; text-decoration: underline; }
+  .mock .btn.tiny { font-size: 11px; padding: 3px 8px; }
+  .mock .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600; border-radius: 999px; padding: 1px 7px;
+    background: var(--p-bg); color: var(--p-muted); border: 1px solid var(--p-line);
+    white-space: nowrap;
+  }
+  .mock .pill.pri { background: var(--p-primary-soft); color: var(--p-primary); border-color: transparent; }
+  .mock .pill.warn { background: var(--p-warn-soft); color: #7a520c; border-color: transparent; }
+  .mock .pill.crit { background: var(--p-crit-soft); color: var(--p-crit); border-color: transparent; }
+  .mock .pill.info { background: #dceaf3; color: var(--p-accent); border-color: transparent; }
+  .mock .path { font-family: var(--mono); font-size: 11px; color: var(--p-primary); }
+  .mock .hint { font-size: 11px; color: var(--p-muted); }
+  .mock .err { font-size: 11px; color: var(--p-crit); }
+
+  /* tree */
+  .mock .tree { display: flex; flex-direction: column; padding: 6px 0; }
+  .mock .node {
+    display: flex; align-items: center; gap: 7px; width: 100%;
+    background: none; border: 0; font: inherit; font-size: 12px; color: var(--p-ink);
+    padding: 5px 12px; cursor: pointer; text-align: start; border-inline-start: 2px solid transparent;
+  }
+  .mock .node:hover { background: var(--p-bg); }
+  .mock .node[aria-current="true"] { background: var(--p-primary-soft); border-inline-start-color: var(--p-primary); font-weight: 600; }
+  .mock .node .tw { color: var(--p-muted); width: 10px; flex: none; }
+  .mock .node.lv2 { padding-inline-start: 30px; }
+  .mock .node.lv3 { padding-inline-start: 48px; }
+  .mock .node.retired { opacity: .55; }
+
+  /* chip group (type picker / tabs / steps) */
+  .mock .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mock .chip {
+    font: inherit; font-size: 11.5px; cursor: pointer;
+    background: var(--p-panel); color: var(--p-ink);
+    border: 1px solid var(--p-line); border-radius: 999px; padding: 4px 11px;
+  }
+  .mock .chip[aria-pressed="true"] { background: var(--p-primary); color: #fff; border-color: var(--p-primary); font-weight: 600; }
+  .mock .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--p-line); padding: 0 14px; background: var(--p-panel); }
+  .mock .tab {
+    font: inherit; font-size: 12px; cursor: pointer; background: none; border: 0;
+    padding: 8px 10px; color: var(--p-muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .mock .tab[aria-selected="true"] { color: var(--p-primary); border-bottom-color: var(--p-primary); font-weight: 700; }
+
+  /* disclosure section */
+  .mock .sect { border: 1px solid var(--p-line); border-radius: 8px; background: var(--p-panel); }
+  .mock .sect > .sh {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: none; border: 0; font: inherit; cursor: pointer; text-align: start;
+    padding: 9px 12px; color: var(--p-ink);
+  }
+  .mock .sect > .sh .cap { font-weight: 700; font-size: 12px; }
+  .mock .sect > .sh .summary { color: var(--p-muted); font-size: 11.5px; margin-inline-start: auto; text-align: end; }
+  .mock .sect > .sb { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--p-line); padding-top: 12px; }
+  .mock .sect[data-open="false"] > .sb { display: none; }
+  .mock .sect > .sh .tw { color: var(--p-muted); }
+
+  /* list rows */
+  .mock .row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 14px; border-bottom: 1px solid var(--p-line); font-size: 12px;
+  }
+  .mock .row:last-child { border-bottom: 0; }
+  .mock .row .nm { font-weight: 600; }
+  .mock .row .acts { margin-inline-start: auto; display: flex; gap: 8px; }
+  .mock .grouphdr {
+    padding: 5px 14px; background: var(--p-bg); border-bottom: 1px solid var(--p-line);
+    font-family: var(--mono); font-size: 11px; color: var(--p-muted);
+  }
+
+  /* preview */
+  .mock .preview { background: var(--p-bg); }
+  .mock .preview .card {
+    background: var(--p-panel); border: 1px solid var(--p-line); border-radius: 8px;
+    padding: 12px; display: flex; flex-direction: column; gap: 11px;
+  }
+  .mock .preview .gh {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--p-muted); border-bottom: 1px solid var(--p-line); padding-bottom: 4px;
+  }
+
+  /* option repeater */
+  .mock .opt { display: grid; grid-template-columns: 90px 1fr 1fr 26px; gap: 6px; align-items: center; }
+  .mock .opt .x { background: none; border: 0; color: var(--p-muted); cursor: pointer; font-size: 14px; line-height: 1; }
+
+  /* gate sentence */
+  .mock .sentence {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+    font-size: 12px; background: var(--p-bg); border: 1px solid var(--p-line);
+    border-radius: 8px; padding: 9px 11px;
+  }
+  .mock .sentence select { width: auto; min-width: 90px; }
+  .mock .sentence .vals { display: flex; flex-wrap: wrap; gap: 4px; }
+  .mock .sentence .val {
+    font: inherit; font-size: 11px; cursor: pointer; border-radius: 999px; padding: 2px 9px;
+    border: 1px dashed var(--p-line); background: var(--p-panel); color: var(--p-muted);
+  }
+  .mock .sentence .val[aria-pressed="true"] { background: var(--p-primary-soft); color: var(--p-primary); border: 1px solid var(--p-primary-soft); font-weight: 600; }
+
+  /* stepper */
+  .mock .steps { display: flex; align-items: center; gap: 0; padding: 12px 14px; background: var(--p-panel); border-bottom: 1px solid var(--p-line); flex-wrap: wrap; }
+  .mock .step { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--p-muted); }
+  .mock .step .n {
+    width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center;
+    border: 1px solid var(--p-line); font-size: 11px; font-weight: 700; background: var(--p-panel);
+  }
+  .mock .step[data-state="current"] { color: var(--p-ink); font-weight: 700; }
+  .mock .step[data-state="current"] .n { background: var(--p-primary); border-color: var(--p-primary); color: #fff; }
+  .mock .step[data-state="done"] .n { background: var(--p-primary-soft); border-color: var(--p-primary-soft); color: var(--p-primary); }
+  .mock .stepline { flex: 1; height: 1px; background: var(--p-line); margin: 0 10px; min-width: 14px; }
+  .mock .footer {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-top: 1px solid var(--p-line); background: var(--p-panel);
+  }
+  .mock .footer .spacer { margin-inline-start: auto; }
+
+  /* canvas (concept C) */
+  .mock .canvas { background: var(--p-bg); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .mock .fieldcard {
+    background: var(--p-panel); border: 1px solid var(--p-line); border-radius: 8px;
+    padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 5px;
+    border-inline-start: 3px solid transparent;
+  }
+  .mock .fieldcard[aria-current="true"] { border-inline-start-color: var(--p-primary); box-shadow: 0 0 0 1px var(--p-primary-soft); }
+  .mock .fieldcard .top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .mock .fieldcard .grab { color: var(--p-muted); cursor: grab; font-size: 12px; letter-spacing: -2px; }
+  /* The card is the click target; a disabled control inside it would otherwise
+     swallow the event instead of letting it reach the card. */
+  .mock .fieldcard input, .mock .fieldcard select { pointer-events: none; }
+  .mock .fieldcard.inherited { background: repeating-linear-gradient(135deg, var(--p-panel), var(--p-panel) 7px, var(--p-bg) 7px, var(--p-bg) 14px); }
+  .mock .groupbox {
+    border: 1px dashed var(--p-line); border-radius: 10px; padding: 9px;
+    display: flex; flex-direction: column; gap: 8px; background: rgb(255 255 255 / .5);
+  }
+  .mock .groupbox > .gt { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--p-muted); }
+  .mock .addfield {
+    border: 1px dashed var(--p-primary); color: var(--p-primary); background: none;
+    border-radius: 8px; padding: 7px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  .mock .layerbar { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--p-panel); border-bottom: 1px solid var(--p-line); flex-wrap: wrap; }
+
+  /* ---- stage ladder (phenology) ---- */
+  .mock .flex-col { display: flex; flex-direction: column; gap: 8px; }
+  .mock .timeline {
+    position: relative; height: 62px; border: 1px solid var(--p-line);
+    border-radius: 8px; background: var(--p-panel); overflow: hidden;
+  }
+  .mock .timeline .seg {
+    position: absolute; top: 8px; height: 26px; border-radius: 5px;
+    background: var(--p-primary-soft); border: 1px solid #b9d4b6;
+    font-size: 10px; color: #23491f; display: flex; align-items: center;
+    padding: 0 6px; overflow: hidden; white-space: nowrap; cursor: pointer;
+  }
+  .mock .timeline .seg[aria-current="true"] { background: var(--p-primary); border-color: var(--p-primary); color: #fff; font-weight: 600; }
+  .mock .timeline .seg.wrap { border-style: dashed; }
+  .mock .timeline .gap {
+    position: absolute; top: 8px; height: 26px;
+    background: repeating-linear-gradient(45deg, var(--p-crit-soft), var(--p-crit-soft) 4px, transparent 4px, transparent 8px);
+    border-radius: 4px;
+  }
+  .mock .timeline .tick {
+    position: absolute; bottom: 4px; font-size: 9px; color: var(--p-muted);
+    transform: translateX(-50%); white-space: nowrap;
+  }
+  .mock .timeline .tick::before {
+    content: ""; position: absolute; bottom: 13px; left: 50%; width: 1px; height: 6px; background: var(--p-line);
+  }
+  .mock .stagerow {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: start;
+    font: inherit; font-size: 12px; color: var(--p-ink); cursor: pointer;
+    background: var(--p-panel); border: 1px solid var(--p-line);
+    border-inline-start: 3px solid transparent; border-radius: 8px; padding: 7px 10px;
+  }
+  .mock .stagerow[aria-current="true"] { border-inline-start-color: var(--p-primary); box-shadow: 0 0 0 1px var(--p-primary-soft); }
+  .mock .stagerow .ord {
+    width: 20px; height: 20px; flex: none; border-radius: 5px; display: grid; place-items: center;
+    background: var(--p-bg); color: var(--p-muted); font-size: 11px; font-weight: 700;
+  }
+  .mock .stagerow .win { margin-inline-start: auto; font-family: var(--mono); font-size: 11px; color: var(--p-muted); }
+  .mock .warn {
+    display: flex; align-items: center; gap: 7px; font-size: 11.5px;
+    background: var(--p-warn-soft); color: #7a520c; border-radius: 7px; padding: 6px 10px;
+  }
+  .mock .warn.info { background: #dceaf3; color: #14536f; }
+  .mock .chip[disabled] { opacity: .45; cursor: not-allowed; }
+
+  /* responsive: mock columns stack */
+  .mock .body { grid-template-columns: 1fr; }
+  @media (min-width: 900px) {
+    .mock .body.two { grid-template-columns: 260px 1fr; }
+    .mock .body.two-wide { grid-template-columns: 1fr 340px; }
+    .mock .body.three { grid-template-columns: 210px 1fr 300px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <span class="eyebrow">AgriPulse · platform admin · design proposal</span>
+    <h1>Crop catalog authoring,<br />without the wall of fields.</h1>
+    <p class="lede">
+      Three UX directions for the two screens that author the crop catalog — the
+      <code>Crop → Variety → Strain</code> taxonomy and the typed attributes that ride on it.
+      Every direction keeps <strong>exactly</strong> the functionality shipped today. Nothing is added, nothing is dropped.
+      The panes below are live: click the trees, switch the types, open the sections.
+    </p>
+  </header>
+
+  <hr class="rule" />
+
+  <!-- ============================== DIAGNOSIS ============================== -->
+  <section class="block">
+    <span class="eyebrow">What's actually wrong</span>
+    <h2>The density is real, and it is concentrated in one editor</h2>
+    <div class="prose" style="display:flex;flex-direction:column;gap:16px">
+      <p>
+        <code>/platform/crops</code> holds a six-field crop form, but it opens <em>inline</em>, and so do the
+        variety and strain forms — three different forms can be pushed into the same tree at once, each
+        shoving the rows below it down the page.
+      </p>
+      <p>
+        <code>/platform/crops/:id/attributes</code> is where it gets heavy. One flat two-column grid carries up to
+        <strong>twenty controls</strong>, and roughly half of them appear or vanish depending on the chosen type:
+      </p>
+      <ul class="tight">
+        <li><strong>Always</strong> — code, type, name EN, name AR, group code, sort order, always-required, reportable, two gate boxes.</li>
+        <li><strong>Create only</strong> — variety, strain.</li>
+        <li><strong>Numeric only</strong> — unit EN, unit AR, minimum, maximum, and decimal places for <code>decimal</code>.</li>
+        <li><strong>Text only</strong> — max length.</li>
+        <li><strong>Select only</strong> — the options repeater.</li>
+        <li><strong>Only once a group code is typed</strong> — group name EN, group name AR.</li>
+      </ul>
+      <p>
+        Four specific problems fall out of that, and all three directions below attack the same four:
+      </p>
+      <ul class="tight">
+        <li><strong>Fields reflow under you.</strong> Picking a type mid-form re-lays out the grid; controls move while you're reading them.</li>
+        <li><strong>Attachment is asked twice, abstractly.</strong> Two dropdowns (variety, strain) express a position you were already standing on in the tree.</li>
+        <li><strong>Presentation is typed, not seen.</strong> <code>group_code</code>, <code>group_name_en</code>, <code>group_name_ar</code> and <code>sort_order</code> are four text inputs describing a layout that is rendered live two feet to the right.</li>
+        <li><strong>Gates are the hardest concept and get the least room</strong> — two identical boxes at the bottom, distinguished only by their headings.</li>
+      </ul>
+      <div class="note">
+        <strong>Scope note — a large part of the crop catalog has no UI at all.</strong>
+        <span>Growth stages, size classes, thresholds and the GDD base temperatures are all first-class catalog data
+        that the admin API accepts on every taxonomy level, and none of them can be reached from any screen. That is a
+        bigger gap than the form's density, and it gets <a href="#stages">its own section below</a>. The three
+        directions above reproduce today's screen exactly, as briefed — so they reproduce the gap too.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CONCEPT A ============================== -->
+  <section class="block">
+    <div class="concept-head">
+      <span class="tag"><span class="letter">A</span><span class="eyebrow">Catalog inspector</span></span>
+      <h2>One tree, one inspector, forms that never move the page</h2>
+      <p class="thesis">
+        The tree stops being a place where forms erupt and becomes a permanent left rail. Whatever you select is
+        described in a stable right-hand inspector. The attribute editor keeps its single-form shape but is
+        <em>type-first</em> and sectioned, so you only ever see the controls your chosen type actually uses.
+      </p>
+    </div>
+
+    <div class="mock" id="mockA">
+      <div class="chrome">
+        <span class="title">Crop catalog</span>
+        <span class="sub">Author the Crop → Variety → Strain taxonomy</span>
+        <span class="spacer"></span>
+        <button class="chip" type="button" aria-pressed="false" data-a-retired>Show retired</button>
+        <button class="btn" type="button">Add crop</button>
+      </div>
+      <div class="body two">
+        <div class="col">
+          <div class="colhead">Catalog</div>
+          <div class="pad" style="padding-bottom:0">
+            <input type="text" placeholder="Search crops, varieties, strains…" aria-label="Search catalog" />
+          </div>
+          <div class="tree" id="aTree">
+            <button class="node" type="button" data-node="mango" aria-current="true">
+              <span class="tw">▾</span><span>Mango</span><span class="pill">Variety + Strain</span>
+            </button>
+            <button class="node lv2" type="button" data-node="alphonso">
+              <span class="tw">▾</span><span>Alphonso</span>
+            </button>
+            <button class="node lv3" type="button" data-node="alphonso-a1">
+              <span class="tw"></span><span>Clone A1</span>
+            </button>
+            <button class="node lv2 retired" type="button" data-node="sindhri">
+              <span class="tw">▸</span><span>Sindhri</span><span class="pill crit">Retired</span>
+            </button>
+            <button class="node" type="button" data-node="wheat">
+              <span class="tw">▸</span><span>Wheat</span><span class="pill">Crop only</span>
+            </button>
+            <button class="node" type="button" data-node="tomato">
+              <span class="tw">▸</span><span>Tomato</span><span class="pill">Variety</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="col" style="background:var(--p-bg)">
+          <div class="colhead" id="aCrumb">mango</div>
+          <div class="tabs" role="tablist">
+            <button class="tab" type="button" role="tab" aria-selected="true" data-a-tab="details">Details</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-a-tab="attrs">Attributes <span class="pill" style="margin-inline-start:5px">6</span></button>
+          </div>
+
+          <!-- Details tab -->
+          <div class="pad" data-a-panel="details">
+            <div class="sect" data-open="true">
+              <div class="sh" style="cursor:default">
+                <span class="cap" id="aDetailTitle">Mango</span>
+                <span class="path" id="aDetailPath">mango</span>
+                <span class="summary">
+                  <button class="btn tiny ghost" type="button">Edit</button>
+                  <button class="btn tiny ghost" type="button">Retire</button>
+                </span>
+              </div>
+              <div class="sb" id="aDetailBody"></div>
+            </div>
+            <p class="hint" id="aDetailHint"></p>
+          </div>
+
+          <!-- Attributes tab -->
+          <div class="pad" data-a-panel="attrs" hidden>
+            <div class="sect" data-open="true">
+              <div class="sh" style="cursor:default">
+                <span class="cap">Attributes resolving at <span class="path">mango.alphonso</span></span>
+                <span class="summary"><button class="btn tiny" type="button" data-a-open-editor>Add attribute</button></span>
+              </div>
+              <div class="sb" style="padding:0;border-top:1px solid var(--p-line)">
+                <div class="grouphdr">mango &nbsp;·&nbsp; inherited</div>
+                <div class="row">
+                  <span class="nm">Rootstock</span><code>rootstock</code>
+                  <span class="pill">Single choice</span><span class="pill info">inherited</span>
+                  <span class="acts"><button class="btn tiny ghost" type="button">Override here</button></span>
+                </div>
+                <div class="row">
+                  <span class="nm">Tree spacing</span><code>tree_spacing</code>
+                  <span class="pill">Decimal</span><span class="pill info">inherited</span>
+                  <span class="acts"><button class="btn tiny ghost" type="button">Override here</button></span>
+                </div>
+                <div class="grouphdr">mango.alphonso &nbsp;·&nbsp; attached here</div>
+                <div class="row">
+                  <span class="nm">Irrigation method</span><code>irrigation_method</code>
+                  <span class="pill">Single choice</span><span class="pill warn">Required</span>
+                  <span class="acts">
+                    <button class="btn tiny ghost" type="button" data-a-open-editor>Edit</button>
+                    <button class="btn tiny ghost" type="button">Retire</button>
+                  </span>
+                </div>
+                <div class="row">
+                  <span class="nm">Emitter flow rate</span><code>emitter_lph</code>
+                  <span class="pill">Decimal</span><span class="pill info">shown when irrigation_method</span>
+                  <span class="acts">
+                    <button class="btn tiny ghost" type="button" data-a-open-editor>Edit</button>
+                    <button class="btn tiny ghost" type="button">Retire</button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor drawer -->
+      <div id="aDrawer" hidden style="border-top:1px solid var(--p-line);background:var(--p-panel)">
+        <div class="chrome" style="border-bottom:1px solid var(--p-line)">
+          <span class="title">New attribute</span>
+          <span class="sub">Attaching to <span class="path">mango.alphonso</span>
+            <button class="btn link" type="button">change</button></span>
+          <span class="spacer"></span>
+          <button class="btn ghost tiny" type="button" data-a-close-editor>Close</button>
+        </div>
+        <div class="body two-wide">
+          <div class="col" style="border-inline-end:1px solid var(--p-line)">
+            <div class="pad">
+              <div>
+                <span class="lbl" style="font-size:11px;font-weight:600;color:var(--p-muted)">What kind of field is this?</span>
+                <div class="chips" style="margin-top:6px" id="aTypes">
+                  <button class="chip" type="button" aria-pressed="false" data-type="integer">Whole number</button>
+                  <button class="chip" type="button" aria-pressed="true" data-type="decimal">Decimal</button>
+                  <button class="chip" type="button" aria-pressed="false" data-type="text">Text</button>
+                  <button class="chip" type="button" aria-pressed="false" data-type="boolean">Yes / no</button>
+                  <button class="chip" type="button" aria-pressed="false" data-type="date">Date</button>
+                  <button class="chip" type="button" aria-pressed="false" data-type="single_select">Single choice</button>
+                  <button class="chip" type="button" aria-pressed="false" data-type="multi_select">Multiple choice</button>
+                </div>
+                <p class="hint" style="margin-top:6px">Type is permanent once saved — stored values are read through it.</p>
+              </div>
+
+              <div class="sect" data-open="true">
+                <button class="sh" type="button" data-toggle><span class="tw">▾</span><span class="cap">Identity</span><span class="summary">emitter_lph · Emitter flow rate</span></button>
+                <div class="sb">
+                  <div class="grid2">
+                    <label class="f"><span class="lbl">Code <span class="req">*</span></span>
+                      <input type="text" value="emitter_lph" /></label>
+                    <label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span>
+                      <input type="text" value="Emitter flow rate" /></label>
+                  </div>
+                  <label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span>
+                    <input type="text" dir="rtl" value="معدل تدفق النقاط" /></label>
+                  <p class="hint">Letters, numbers, _ or -, up to 32 characters. Built-in codes such as <code>growth_stage</code> are rejected inline.</p>
+                </div>
+              </div>
+
+              <div class="sect" data-open="true" id="aValues">
+                <button class="sh" type="button" data-toggle><span class="tw">▾</span><span class="cap">Allowed values</span><span class="summary" id="aValuesSummary">0–12 L/h · 1 decimal</span></button>
+                <div class="sb" id="aValuesBody"></div>
+              </div>
+
+              <div class="sect" data-open="false">
+                <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">When it appears</span><span class="summary">Shown when Irrigation method is Drip</span></button>
+                <div class="sb">
+                  <label class="f" style="flex-direction:row;align-items:center;gap:7px">
+                    <input type="checkbox" style="width:auto" /><span class="lbl" style="font-size:12px">Always required</span>
+                  </label>
+                  <div class="sentence">
+                    <span>Show only when</span>
+                    <select aria-label="Gate field"><option>Irrigation method</option><option>Has windbreak</option><option>Always shown</option></select>
+                    <span>is one of</span>
+                    <span class="vals">
+                      <button class="val" type="button" aria-pressed="true" data-val>Drip</button>
+                      <button class="val" type="button" aria-pressed="true" data-val>Micro-sprinkler</button>
+                      <button class="val" type="button" aria-pressed="false" data-val>Flood</button>
+                    </span>
+                  </div>
+                  <div class="sentence">
+                    <span>Required only when</span>
+                    <select aria-label="Required gate field"><option>Always shown</option><option>Irrigation method</option><option>Has windbreak</option></select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sect" data-open="false">
+                <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">Grouping &amp; reporting</span><span class="summary">Irrigation group · position 2 · in reports</span></button>
+                <div class="sb">
+                  <div class="grid2">
+                    <label class="f"><span class="lbl">Group</span>
+                      <select><option>Irrigation</option><option>Canopy</option><option>— none —</option><option>New group…</option></select></label>
+                    <label class="f"><span class="lbl">Sort order</span><input type="number" value="2" /></label>
+                  </div>
+                  <p class="hint">Picking an existing group reuses its EN/AR names. “New group…” reveals both name fields.</p>
+                  <label class="f" style="flex-direction:row;align-items:center;gap:7px">
+                    <input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Available in reports</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="footer">
+              <button class="btn" type="button">Save</button>
+              <button class="btn ghost" type="button" data-a-close-editor>Cancel</button>
+            </div>
+          </div>
+
+          <div class="col preview">
+            <div class="colhead">Assignment form preview</div>
+            <div class="pad">
+              <p class="hint">This is the form a user sees. Change a gating answer to watch the gated fields appear.</p>
+              <div class="card">
+                <span class="gh">Irrigation</span>
+                <label class="f"><span class="lbl">Irrigation method <span class="req">*</span></span>
+                  <select id="aPreviewGate"><option>Drip</option><option>Micro-sprinkler</option><option>Flood</option></select></label>
+                <label class="f" id="aPreviewGated"><span class="lbl">Emitter flow rate</span>
+                  <input type="number" placeholder="L/h" /></label>
+                <p class="hint" id="aPreviewNote" hidden>Emitter flow rate is hidden — the gate only opens for Drip and Micro-sprinkler.</p>
+                <span class="gh">Canopy</span>
+                <label class="f"><span class="lbl">Tree spacing</span><input type="number" placeholder="m" /></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoffs">
+      <div class="tradeoff win">
+        <span class="h">Wins</span>
+        <span>Nothing reflows the page. Attachment comes from where you're standing, so the variety/strain dropdowns disappear. Type-first means you never see a control your type can't use.</span>
+      </div>
+      <div class="tradeoff cost">
+        <span class="h">Costs</span>
+        <span>Still one long form for the complex types. The drawer sits over the inspector, which is a third depth level on a narrow screen.</span>
+      </div>
+      <div class="tradeoff">
+        <span class="h">Build</span>
+        <span>Smallest of the three. Reuses <code>CropAttributeEditor</code>'s field set wholesale; the work is layout, sectioning and routing selection state.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CONCEPT B ============================== -->
+  <section class="block">
+    <div class="concept-head">
+      <span class="tag"><span class="letter">B</span><span class="eyebrow">Guided authoring</span></span>
+      <h2>Ask four questions instead of showing twenty fields</h2>
+      <p class="thesis">
+        Creating an attribute is rare and consequential — code, type and attachment are all permanent afterwards. So
+        creation runs as a four-question flow with the live preview pinned beside every step and a review before commit.
+        <em>Editing</em>, which is frequent and small, never enters the flow: it opens the same four questions collapsed
+        into one panel, each showing a one-line answer.
+      </p>
+    </div>
+
+    <div class="mock" id="mockB">
+      <div class="chrome">
+        <span class="title">New attribute</span>
+        <span class="sub">Mango</span>
+        <span class="spacer"></span>
+        <button class="chip" type="button" aria-pressed="false" id="bModeToggle">Show me the edit view instead</button>
+      </div>
+
+      <!-- wizard -->
+      <div id="bWizard">
+        <div class="steps">
+          <span class="step" data-step="1" data-state="current"><span class="n">1</span> What kind of field?</span>
+          <span class="stepline"></span>
+          <span class="step" data-step="2" data-state="todo"><span class="n">2</span> Allowed values</span>
+          <span class="stepline"></span>
+          <span class="step" data-step="3" data-state="todo"><span class="n">3</span> When it appears</span>
+          <span class="stepline"></span>
+          <span class="step" data-step="4" data-state="todo"><span class="n">4</span> Where it sits</span>
+          <span class="stepline"></span>
+          <span class="step" data-step="5" data-state="todo"><span class="n">✓</span> Review</span>
+        </div>
+        <div class="body two-wide">
+          <div class="col">
+            <div class="pad" data-b-step="1">
+              <h4 style="font-family:var(--body);font-size:13px">What kind of field is this?</h4>
+              <div class="chips" id="bTypes">
+                <button class="chip" type="button" aria-pressed="false" data-type="integer">Whole number</button>
+                <button class="chip" type="button" aria-pressed="false" data-type="decimal">Decimal</button>
+                <button class="chip" type="button" aria-pressed="false" data-type="text">Text</button>
+                <button class="chip" type="button" aria-pressed="false" data-type="boolean">Yes / no</button>
+                <button class="chip" type="button" aria-pressed="false" data-type="date">Date</button>
+                <button class="chip" type="button" aria-pressed="true" data-type="single_select">Single choice</button>
+                <button class="chip" type="button" aria-pressed="false" data-type="multi_select">Multiple choice</button>
+              </div>
+              <p class="hint">Permanent once saved. Only <strong>Single choice</strong> and <strong>Yes / no</strong> fields can gate other fields later.</p>
+              <div class="grid2">
+                <label class="f"><span class="lbl">Code <span class="req">*</span></span><input type="text" value="irrigation_method" /></label>
+                <label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Irrigation method" /></label>
+              </div>
+              <label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="طريقة الري" /></label>
+            </div>
+
+            <div class="pad" data-b-step="2" hidden>
+              <h4 style="font-family:var(--body);font-size:13px" id="bStep2Title">What values are allowed?</h4>
+              <div id="bStep2Body"></div>
+            </div>
+
+            <div class="pad" data-b-step="3" hidden>
+              <h4 style="font-family:var(--body);font-size:13px">When does this field appear, and when is it required?</h4>
+              <label class="f" style="flex-direction:row;align-items:center;gap:7px">
+                <input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Always required</span>
+              </label>
+              <div class="sentence">
+                <span>Show only when</span>
+                <select aria-label="Gate field"><option>Always shown</option><option>Has windbreak</option></select>
+              </div>
+              <p class="hint">Only one single-choice or yes/no sibling exists so far, so there is little to gate on. The list grows as you add fields.</p>
+              <div class="sentence">
+                <span>Required only when</span>
+                <select aria-label="Required gate field"><option>Always shown</option><option>Has windbreak</option></select>
+              </div>
+            </div>
+
+            <div class="pad" data-b-step="4" hidden>
+              <h4 style="font-family:var(--body);font-size:13px">Where does it sit?</h4>
+              <div class="grid2">
+                <label class="f"><span class="lbl">Attach to</span>
+                  <select id="bAttach"><option>Whole crop — mango</option><option>Variety — Alphonso</option><option>Strain — Clone A1</option></select></label>
+                <label class="f"><span class="lbl">Group</span>
+                  <select><option>Irrigation</option><option>Canopy</option><option>— none —</option><option>New group…</option></select></label>
+              </div>
+              <p class="hint">Attaching deeper overrides an inherited definition with the same code. Strain requires a variety.</p>
+              <div class="grid2">
+                <label class="f"><span class="lbl">Sort order</span><input type="number" value="1" /></label>
+                <label class="f" style="justify-content:flex-end">
+                  <span style="display:flex;align-items:center;gap:7px"><input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Available in reports</span></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="pad" data-b-step="5" hidden>
+              <h4 style="font-family:var(--body);font-size:13px">Review before saving</h4>
+              <div class="sect" data-open="true">
+                <div class="sb" style="border-top:0;padding-top:12px" id="bReview"></div>
+              </div>
+              <p class="hint">Code, type and attachment cannot be changed after this point.</p>
+            </div>
+
+            <div class="footer">
+              <button class="btn ghost" type="button" id="bBack" disabled>Back</button>
+              <span class="spacer"></span>
+              <span class="hint" id="bProgress">Step 1 of 5</span>
+              <button class="btn" type="button" id="bNext">Next</button>
+            </div>
+          </div>
+
+          <div class="col preview">
+            <div class="colhead">Assignment form preview</div>
+            <div class="pad">
+              <p class="hint">Updates as you answer. The field you're authoring is outlined.</p>
+              <div class="card">
+                <span class="gh">Irrigation</span>
+                <label class="f" style="outline:2px solid var(--p-primary);outline-offset:5px;border-radius:4px">
+                  <span class="lbl">Irrigation method <span class="req">*</span></span>
+                  <select id="bPreviewControl"><option>Drip</option><option>Micro-sprinkler</option><option>Flood</option></select>
+                </label>
+                <label class="f"><span class="lbl">Emitter flow rate</span><input type="number" placeholder="L/h" /></label>
+                <span class="gh">Canopy</span>
+                <label class="f"><span class="lbl">Tree spacing</span><input type="number" placeholder="m" /></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- edit view -->
+      <div id="bEdit" hidden>
+        <div class="chrome" style="border-bottom:1px solid var(--p-line)">
+          <span class="title">Irrigation method</span>
+          <span class="path">mango.alphonso</span>
+          <span class="pill">Single choice</span>
+          <span class="pill warn">Required</span>
+        </div>
+        <div class="pad">
+          <p class="hint">Editing skips the flow — the same four questions, collapsed to their answers. Open only what you need to change.</p>
+          <div class="sect" data-open="false">
+            <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">1 · Kind of field</span><span class="summary">Single choice · <code>irrigation_method</code> · locked</span></button>
+            <div class="sb"><p class="hint">Type and code are permanent. Names stay editable.</p>
+              <div class="grid2">
+                <label class="f"><span class="lbl">Name (EN)</span><input type="text" value="Irrigation method" /></label>
+                <label class="f"><span class="lbl">Name (AR)</span><input type="text" dir="rtl" value="طريقة الري" /></label>
+              </div>
+            </div>
+          </div>
+          <div class="sect" data-open="false">
+            <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">2 · Allowed values</span><span class="summary">3 options — Drip, Micro-sprinkler, Flood</span></button>
+            <div class="sb">
+              <div class="opt"><input type="text" value="drip" /><input type="text" value="Drip" /><input type="text" dir="rtl" value="تنقيط" /><button class="x" type="button" aria-label="Remove option">×</button></div>
+              <div class="opt"><input type="text" value="micro" /><input type="text" value="Micro-sprinkler" /><input type="text" dir="rtl" value="رشاش دقيق" /><button class="x" type="button" aria-label="Remove option">×</button></div>
+              <div class="opt"><input type="text" value="flood" /><input type="text" value="Flood" /><input type="text" dir="rtl" value="غمر" /><button class="x" type="button" aria-label="Remove option">×</button></div>
+              <div><button class="btn ghost tiny" type="button">Add option</button></div>
+            </div>
+          </div>
+          <div class="sect" data-open="false">
+            <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">3 · When it appears</span><span class="summary">Always shown · always required</span></button>
+            <div class="sb"><div class="sentence"><span>Show only when</span><select aria-label="Gate"><option>Always shown</option><option>Has windbreak</option></select></div></div>
+          </div>
+          <div class="sect" data-open="false">
+            <button class="sh" type="button" data-toggle><span class="tw">▸</span><span class="cap">4 · Where it sits</span><span class="summary">mango.alphonso · Irrigation · position 1 · in reports</span></button>
+            <div class="sb"><p class="hint">Attachment is permanent; group, position and reporting stay editable.</p></div>
+          </div>
+        </div>
+        <div class="footer">
+          <button class="btn" type="button">Save</button>
+          <button class="btn ghost" type="button">Cancel</button>
+          <span class="spacer"></span>
+          <button class="btn ghost" type="button">Retire</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoffs">
+      <div class="tradeoff win">
+        <span class="h">Wins</span>
+        <span>Gates finally get a whole screen. The review step makes the three permanent decisions explicit before they set. Best for whoever authors a crop for the first time.</span>
+      </div>
+      <div class="tradeoff cost">
+        <span class="h">Costs</span>
+        <span>More clicks per attribute, and two editors to maintain — the flow and the collapsed panel. A wrong answer on step 1 means going back.</span>
+      </div>
+      <div class="tradeoff">
+        <span class="h">Build</span>
+        <span>Medium. Step state plus a review renderer; the underlying draft object and validation are unchanged.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CONCEPT C ============================== -->
+  <section class="block">
+    <div class="concept-head">
+      <span class="tag"><span class="letter">C</span><span class="eyebrow">Form builder</span></span>
+      <h2>Edit the form itself; the preview <em>is</em> the editor</h2>
+      <p class="thesis">
+        Today the assignment form is rendered live beside the editor but is read-only — you type <code>sort_order: 2</code>
+        on the left and watch a field move on the right. Direct manipulation collapses that: fields are dragged to order,
+        dropped into a group container, and clicking one opens its properties. Four of the busiest controls
+        (<code>group_code</code>, both group names, <code>sort_order</code>) stop being form inputs entirely.
+      </p>
+    </div>
+
+    <div class="mock" id="mockC">
+      <div class="chrome">
+        <span class="title">Attributes — Mango</span>
+        <span class="sub">Typed fields on this crop's block assignments</span>
+        <span class="spacer"></span>
+        <button class="chip" type="button" aria-pressed="false">Show retired</button>
+        <button class="btn ghost" type="button">Back to catalog</button>
+      </div>
+      <div class="layerbar">
+        <span class="hint" style="font-weight:600">Editing layer</span>
+        <div class="chips" id="cLayers">
+          <button class="chip" type="button" aria-pressed="false" data-layer="mango">Whole crop · mango</button>
+          <button class="chip" type="button" aria-pressed="true" data-layer="alphonso">Alphonso</button>
+          <button class="chip" type="button" aria-pressed="false" data-layer="a1">Alphonso · Clone A1</button>
+        </div>
+        <span class="hint" id="cLayerNote" style="margin-inline-start:auto">Hatched cards are inherited from <span class="path">mango</span> — override to attach a copy here.</span>
+      </div>
+      <div class="body three">
+        <div class="col">
+          <div class="colhead">Catalog</div>
+          <div class="tree">
+            <button class="node" type="button" aria-current="true"><span class="tw">▾</span><span>Mango</span></button>
+            <button class="node lv2" type="button" aria-current="true"><span class="tw">▾</span><span>Alphonso</span></button>
+            <button class="node lv3" type="button"><span class="tw"></span><span>Clone A1</span></button>
+            <button class="node lv2 retired" type="button"><span class="tw">▸</span><span>Sindhri</span></button>
+            <button class="node" type="button"><span class="tw">▸</span><span>Wheat</span></button>
+            <button class="node" type="button"><span class="tw">▸</span><span>Tomato</span></button>
+          </div>
+        </div>
+
+        <div class="col canvas" id="cCanvas">
+          <div class="groupbox">
+            <span class="gt">▚ Irrigation <button class="btn link tiny" type="button">rename</button></span>
+            <div class="fieldcard" tabindex="0" aria-current="true" data-field="irrigation_method">
+              <span class="top"><span class="grab" aria-hidden="true">⠿⠿</span><strong>Irrigation method</strong>
+                <span class="pill">Single choice</span><span class="pill warn">Required</span></span>
+              <select disabled><option>Drip</option></select>
+            </div>
+            <div class="fieldcard" tabindex="0" data-field="emitter_lph">
+              <span class="top"><span class="grab" aria-hidden="true">⠿⠿</span><strong>Emitter flow rate</strong>
+                <span class="pill">Decimal</span><span class="pill info">shown when Irrigation method is Drip</span></span>
+              <input type="number" placeholder="L/h" disabled />
+            </div>
+          </div>
+
+          <div class="groupbox">
+            <span class="gt">▚ Canopy <button class="btn link tiny" type="button">rename</button></span>
+            <div class="fieldcard inherited" tabindex="0" data-field="tree_spacing">
+              <span class="top"><span class="grab" aria-hidden="true">⠿⠿</span><strong>Tree spacing</strong>
+                <span class="pill">Decimal</span><span class="pill info">inherited from mango</span></span>
+              <input type="number" placeholder="m" disabled />
+            </div>
+            <div class="fieldcard inherited" tabindex="0" data-field="rootstock">
+              <span class="top"><span class="grab" aria-hidden="true">⠿⠿</span><strong>Rootstock</strong>
+                <span class="pill">Single choice</span><span class="pill info">inherited from mango</span></span>
+              <select disabled><option>Polyembryonic</option></select>
+            </div>
+          </div>
+
+          <button class="addfield" type="button">+ Add field here</button>
+          <p class="hint">Drag a card to reorder (<code>sort_order</code>). Drag it into a container to group it. Drag a container to move the whole group.</p>
+        </div>
+
+        <div class="col">
+          <div class="colhead" id="cPropTitle">Properties — Irrigation method</div>
+          <div class="pad" id="cProps"></div>
+          <div class="footer">
+            <button class="btn" type="button">Save</button>
+            <button class="btn ghost" type="button">Cancel</button>
+            <span class="spacer"></span>
+            <button class="btn ghost tiny" type="button">Retire</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoffs">
+      <div class="tradeoff win">
+        <span class="h">Wins</span>
+        <span>Presentation is manipulated, not described. Inheritance becomes visible — hatched cards with an “Override here” action replace the two attachment dropdowns entirely.</span>
+      </div>
+      <div class="tradeoff cost">
+        <span class="h">Costs</span>
+        <span>Largest build, and drag-and-drop needs a real keyboard path to stay accessible. Three columns want a wide screen.</span>
+      </div>
+      <div class="tradeoff">
+        <span class="h">Build</span>
+        <span>Highest. Needs a DnD library, a group-as-container model over flat <code>group_code</code>, and a canvas that renders every value type.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== STAGES ============================== -->
+  <section class="block" id="stages">
+    <span class="eyebrow">The gap you spotted</span>
+    <h2>Growth stages are catalog data, and no screen can author them</h2>
+    <div class="prose" style="display:flex;flex-direction:column;gap:16px">
+      <p>
+        You're right that stages aren't on the screen — and it isn't that the mockups dropped them. Nothing in the
+        frontend can author them. <code>phenology_stages</code> is JSONB on the crop, with
+        <code>phenology_stages_override</code> on the variety and the strain; the admin create and update endpoints
+        accept all three, <code>farms/phenology.py</code> validates them strictly, and the auto-advance task, the
+        recommendation engine and plan-template authoring all read them. But <code>cropCatalog.ts</code> doesn't type
+        the field, so no control exists anywhere. Today a stage ladder is set outside the product.
+      </p>
+      <p>Stages aren't alone. Everything the admin API takes but no screen renders:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Catalog field</th><th>Levels</th><th>What it drives</th><th>Reachable from the UI?</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">phenology_stages<br />phenology_stages_override</td><td>crop · variety · strain</td><td>Block stage auto-advance, stage-scoped recommendations, plan templates</td><td style="color:var(--hot);font-weight:700">No — not even typed</td></tr>
+            <tr><td class="mono">size_classes<br />size_classes_override</td><td>crop · variety · strain</td><td>The block canopy-size dropdown</td><td style="color:var(--hot);font-weight:700">No — not even typed</td></tr>
+            <tr><td class="mono">default_thresholds</td><td>crop · variety · strain</td><td>Rule thresholds inherited by decision trees</td><td style="color:var(--hot);font-weight:700">No — not even typed</td></tr>
+            <tr><td class="mono">gdd_base_temp_c<br />gdd_upper_temp_c</td><td>crop</td><td>GDD accumulation; required before any <code>gdd_from_planting</code> stage</td><td style="color:var(--hot);font-weight:700">No — not even typed</td></tr>
+            <tr><td class="mono">relevant_indices</td><td>crop</td><td>Which remote-sensing indices the crop shows</td><td style="color:var(--hot);font-weight:700">No — read-only in the type</td></tr>
+            <tr><td class="mono">scientific_name</td><td>crop</td><td>Display / reference</td><td style="color:var(--hot);font-weight:700">No — typed, no control</td></tr>
+            <tr><td class="mono">default_growing_season_days</td><td>crop</td><td>Season length default</td><td style="color:var(--hot);font-weight:700">No — typed, no control</td></tr>
+            <tr><td class="mono">description_en / description_ar</td><td>attribute definition</td><td>Help text under a field</td><td style="color:var(--hot);font-weight:700">No — typed, no control</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Stages are the one that actually deserves purpose-built UX rather than another pair of inputs, because the
+        rules are conditional in a way a generic form handles badly:
+      </p>
+      <ul class="tight">
+        <li><strong>The available advance modes depend on the crop's cycle.</strong> A perennial may only use <code>calendar_doy</code> or <code>manual</code>; an annual may use <code>days_from_planting</code>, <code>gdd_from_planting</code> or <code>manual</code>. The server rejects the wrong one.</li>
+        <li><strong><code>gdd_from_planting</code> requires <code>gdd_base_temp_c</code> on the crop</strong> — a field that also has no UI. So one missing number silently makes a whole mode unusable.</li>
+        <li><strong>Each mode carries different operands</strong> — day numbers, GDD sums, or <code>MM-DD</code> windows that may wrap across the year end.</li>
+        <li><strong>Codes and orders must both be unique</strong>, and the ladder is an ordered sequence — exactly the thing a list with drag-to-order expresses and a JSON blob does not.</li>
+        <li><strong>An override at variety or strain replaces the whole ladder, it does not merge.</strong> That is the single most dangerous thing about this data and it must be stated in the UI, not in a docstring.</li>
+      </ul>
+
+      <h3 style="margin-top:8px">Yes — every level can carry its own ladder, and the data model already allows it</h3>
+      <p>
+        To answer the question directly: <code>mango.alphonso</code> and <code>mango.kitti</code> can hold completely
+        different ladders, and <code>mango.alphonso.a1</code> can differ again from Alphonso. That is not a change we
+        need to make — <code>resolve_phenology_stages()</code> in <code>farms/crop_thresholds.py</code> is exactly
+        eight lines of <em>deepest non-NULL wins</em>:
+      </p>
+      <ul class="tight">
+        <li><strong>Strain beats variety beats crop.</strong> A node with no override of its own resolves to its nearest ancestor that has one — a strain falls back to <em>its variety</em>, not straight to the crop.</li>
+        <li><strong>Wholesale replace, never merge.</strong> An override supplies the entire array, so a variety can define five stages where the crop defines six, or rename and re-window all of them.</li>
+        <li><strong>An override can be cleared.</strong> Sending <code>phenology_stages_override: null</code> sets the column back to NULL and the node resolves to its parent again — so "revert to inherited" is a real, supported action, not a delete-and-retype.</li>
+        <li><strong>Every level is still validated against the crop.</strong> A variety override is checked against the <em>crop's</em> <code>is_perennial</code> and <code>gdd_base_temp_c</code>, so a variety cannot smuggle in a mode the crop's cycle forbids.</li>
+      </ul>
+      <p>
+        So the work is UI, not schema. The editor below is driven by the taxonomy: pick any node and you get the
+        ladder that <em>resolves</em> there, plus whether it is owned or inherited and from where. Alphonso, Kitti and
+        Clone A1 each carry their own; Sindhri and Clone A2 inherit. Wheat is annual, so its modes and axis differ.
+      </p>
+    </div>
+
+    <div class="mock" id="mockS">
+      <div class="chrome">
+        <span class="title">Stages</span>
+        <span class="sub">The ladder a block climbs through the season</span>
+        <span class="spacer"></span>
+        <span class="hint">Resolution: strain → variety → crop, deepest non-NULL wins</span>
+      </div>
+
+      <div class="body three">
+        <div class="col">
+          <div class="colhead">Taxonomy</div>
+          <div class="tree" id="sTree"></div>
+          <p class="hint" style="padding:0 12px 12px">
+            A node is either <span class="pill pri">Own ladder</span> or
+            <span class="pill info">Inherited</span>. Nothing else is possible — the column is NULL or it isn't.
+          </p>
+        </div>
+
+        <div class="col" style="background:var(--p-bg)">
+          <div class="colhead">Resolved ladder · <span id="sCtx" class="path">mango</span></div>
+          <div class="pad">
+            <div id="sInherit"></div>
+            <div id="sTimeline" class="timeline"></div>
+            <div id="sWarnings" class="flex-col"></div>
+            <div id="sList" class="flex-col"></div>
+            <div id="sListFoot"></div>
+          </div>
+        </div>
+
+        <div class="col preview">
+          <div class="colhead">Stage rule — <span id="sRuleTitle">Flowering</span></div>
+          <div class="pad" id="sRule"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoffs">
+      <div class="tradeoff win">
+        <span class="h">Why a ladder, not a form</span>
+        <span>Order, gaps and the year-end wrap are all spatial facts. A timeline shows them; six number inputs hide them until a block advances to the wrong stage in the field.</span>
+      </div>
+      <div class="tradeoff win">
+        <span class="h">Why inherited is read-only</span>
+        <span>Editing a ladder you're only inheriting would silently change every other node inheriting it. The node must own a ladder before it can be edited — so the first click is always "Create an override", never a surprise.</span>
+      </div>
+      <div class="tradeoff cost">
+        <span class="h">Careful with</span>
+        <span>The wholesale-replace override. One starting from an empty ladder would strip every stage the parent defines — it must start as a copy, and say so.</span>
+      </div>
+      <div class="tradeoff">
+        <span class="h">Slots into</span>
+        <span>A and C as a third tab beside Details and Attributes on the selected node — the tree is already there. In B it is its own flow. The editor itself is identical in all three.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== SHARED ============================== -->
+  <section class="block">
+    <span class="eyebrow">Common to all three</span>
+    <h2>Five moves I'd make regardless of which one you pick</h2>
+    <div class="prose">
+      <ul class="tight">
+        <li><strong>Attachment comes from selection, not dropdowns.</strong> Where you are in the tree (A, C) or an explicit “attach to” with the tree visible (B) replaces the abstract variety + strain pair.</li>
+        <li><strong>Type is chosen first and visibly locked afterwards.</strong> It governs half the form; asking for it in the middle of a grid is what makes the form reflow.</li>
+        <li><strong>Gates read as sentences.</strong> “Show only when <em>Irrigation method</em> is one of <em>Drip, Micro-sprinkler</em>” instead of a heading, a select and a checkbox list.</li>
+        <li><strong>Group is a picker, not three text fields.</strong> Choosing an existing group reuses its EN/AR names; only “New group…” asks for them.</li>
+        <li><strong>Permanence is shown, not discovered.</strong> Code, type and attachment carry a lock affordance and an explanation, rather than silently going <code>disabled</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================== PARITY ============================== -->
+  <section class="block">
+    <span class="eyebrow">Functional parity</span>
+    <h2>Every capability shipped today, and where it lives in each direction</h2>
+    <p class="prose" style="color:var(--muted)">
+      Nothing in this table is dropped or added by any of the three. “Same” means the current control is kept as-is.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Capability today</th><th>A · Inspector</th><th>B · Guided</th><th>C · Builder</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lazy tree: crops → varieties → strains</td><td class="yes">Left rail, persistent</td><td class="same">Same tree</td><td class="yes">Left rail + layer switch</td></tr>
+          <tr><td>Show retired filter (both screens)</td><td class="same">Toolbar chip</td><td class="same">Toolbar chip</td><td class="same">Toolbar chip</td></tr>
+          <tr><td>Crop create: code, EN/AR name, category (+ “Other…”), depth, perennial</td><td class="yes">Inspector Details, edit in place</td><td class="yes">2-step flow (identity → depth)</td><td class="yes">Inspector Details</td></tr>
+          <tr><td>Crop edit — code immutable</td><td class="yes">Locked with reason</td><td class="yes">Locked with reason</td><td class="yes">Locked with reason</td></tr>
+          <tr><td>Variety / strain create + edit (code, EN/AR)</td><td class="yes">Inspector Details for that node</td><td class="yes">Single-step panel</td><td class="yes">Inspector Details</td></tr>
+          <tr><td>Depth gates children (crop_only / variety / variety_strain)</td><td class="yes">Rail hides child affordance + hint</td><td class="yes">Explained at the depth step</td><td class="yes">Rail hides child affordance</td></tr>
+          <tr><td>Retire / restore at all three levels</td><td class="same">Row + inspector action</td><td class="same">Panel footer</td><td class="same">Row + panel footer</td></tr>
+          <tr><td>Read-only mode without <code>platform.manage_crops</code></td><td class="same">Actions hidden, banner kept</td><td class="same">Same</td><td class="same">Canvas becomes read-only</td></tr>
+          <tr><td>Attribute list grouped by attach path, shallowest → deepest</td><td class="yes">Attributes tab, inherited vs attached</td><td class="same">Same list</td><td class="yes">Canvas layers, hatched = inherited</td></tr>
+          <tr><td>Badges: type, gated-on, required, retired</td><td class="same">Kept</td><td class="same">Kept</td><td class="yes">On the field card</td></tr>
+          <tr><td>Attribute attach to crop / variety / strain</td><td class="yes">Tree selection</td><td class="yes">Step 4 “Attach to”</td><td class="yes">Layer switch + Override here</td></tr>
+          <tr><td>7 value types</td><td class="yes">Type chips</td><td class="yes">Step 1 chips</td><td class="yes">Properties, locked on edit</td></tr>
+          <tr><td>Code + type + attachment immutable on edit</td><td class="yes">Locked with reason</td><td class="yes">Locked, stated at review</td><td class="yes">Locked with reason</td></tr>
+          <tr><td>Unit EN / AR, min, max, decimals (numeric)</td><td class="yes">Allowed values section</td><td class="yes">Step 2</td><td class="yes">Properties → Values</td></tr>
+          <tr><td>Max length (text)</td><td class="yes">Allowed values section</td><td class="yes">Step 2</td><td class="yes">Properties → Values</td></tr>
+          <tr><td>Options repeater, EN + AR per option</td><td class="yes">Allowed values section</td><td class="yes">Step 2</td><td class="yes">Properties → Values</td></tr>
+          <tr><td><code>show_when</code> / <code>required_when</code> gates</td><td class="yes">Sentence builder</td><td class="yes">Step 3, full screen</td><td class="yes">Sentence builder</td></tr>
+          <tr><td>Gate targets limited to single-choice / yes-no siblings</td><td class="same">Same filter + empty state</td><td class="same">Same, explained</td><td class="same">Same filter</td></tr>
+          <tr><td><code>group_code</code> + group EN/AR names</td><td class="yes">Group picker, names only for new</td><td class="yes">Step 4 picker</td><td class="yes">Drag into container; rename in place</td></tr>
+          <tr><td><code>sort_order</code></td><td class="same">Number input</td><td class="same">Number input</td><td class="yes">Drag to reorder</td></tr>
+          <tr><td>Always required, available in reports</td><td class="same">Kept</td><td class="same">Steps 3 &amp; 4</td><td class="same">Properties</td></tr>
+          <tr><td>Inline validation (code regex, reserved codes, EN+AR required, options, min ≤ max)</td><td class="same">Unchanged, shown per section</td><td class="same">Unchanged, blocks the step</td><td class="same">Unchanged, shown on the card</td></tr>
+          <tr><td>Live assignment-form preview with real gate evaluation</td><td class="yes">Drawer right pane</td><td class="yes">Pinned beside every step</td><td class="yes">The canvas <em>is</em> the preview</td></tr>
+          <tr><td>Retire / restore a definition</td><td class="same">Row action</td><td class="same">Panel footer</td><td class="same">Panel footer</td></tr>
+          <tr><td colspan="4" style="background:var(--rule-soft);font-weight:700">Not authorable anywhere today — additive, needs your go-ahead</td></tr>
+          <tr><td>Growth stages + per-variety / per-strain overrides</td><td colspan="3" class="yes">Stage ladder, third tab on the selected node (own flow in B)</td></tr>
+          <tr><td>Size classes + overrides</td><td colspan="3" class="yes">Same ladder pattern, ordered list without advance rules</td></tr>
+          <tr><td>GDD base / upper temperature</td><td colspan="3" class="yes">Crop Details — a prerequisite the stage editor links to</td></tr>
+          <tr><td>Default thresholds, relevant indices, scientific name, season days, attribute descriptions</td><td colspan="3" class="same">Crop Details / editor fields — plain additions</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block">
+    <span class="eyebrow">Recommendation</span>
+    <h2>A now, C later — and take B's gate step into whichever wins</h2>
+    <div class="prose" style="display:flex;flex-direction:column;gap:14px">
+      <p>
+        <strong>A</strong> removes the two things you actually feel — the page reflowing under you and controls that
+        don't apply to your type — for the least work, and it leaves the current editor's field set and validation intact.
+      </p>
+      <p>
+        <strong>C</strong> is the direction that ends the problem rather than reducing it, because it deletes four
+        controls instead of rearranging them and makes inheritance legible. It's the right end state, and a bigger bet.
+      </p>
+      <p>
+        <strong>B</strong> is the weakest as a whole system — a flow is heavy for a screen a platform admin returns to —
+        but its step 3 is the best treatment of gates here. That step belongs in A or C regardless.
+      </p>
+      <p>
+        On <strong>stages</strong>: the redesign is the moment to add them, and I'd put the ladder in ahead of
+        rearranging the attribute editor. A form that is merely dense is a worse experience; catalog data with no
+        screen at all is a capability the product doesn't have. The two are independent — the ladder can ship on
+        today's layout if you'd rather not wait.
+      </p>
+      <p>
+        Tell me which direction to take forward, and whether stages come first. The rest of the unwired fields
+        (GDD temps, thresholds, indices, scientific name, season days, attribute descriptions) are plain additions
+        once we've agreed they belong on the screen.
+      </p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- shared: collapsible sections ---------- */
+  document.querySelectorAll("[data-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var sect = btn.closest(".sect");
+      var open = sect.getAttribute("data-open") === "true";
+      sect.setAttribute("data-open", open ? "false" : "true");
+      var tw = btn.querySelector(".tw");
+      if (tw) tw.textContent = open ? "▸" : "▾";
+    });
+  });
+
+  /* ---------- shared: pressed-chip groups ---------- */
+  function chipGroup(root, onPick) {
+    if (!root) return;
+    root.addEventListener("click", function (e) {
+      var chip = e.target.closest(".chip");
+      if (!chip || !root.contains(chip)) return;
+      root.querySelectorAll(".chip").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      chip.setAttribute("aria-pressed", "true");
+      if (onPick) onPick(chip);
+    });
+  }
+
+  /* ---------- shared: gate value toggles ---------- */
+  document.querySelectorAll("[data-val]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+    });
+  });
+
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  }); };
+
+  /* =====================================================================
+     Type-conditional "allowed values" markup — the same rules the real
+     editor applies (NUMERIC_TYPES / text / SELECT_TYPES).
+     ===================================================================== */
+  var OPTION_ROWS =
+    '<div class="opt"><input type="text" value="drip" aria-label="Option code" />' +
+    '<input type="text" value="Drip" aria-label="Option name EN" />' +
+    '<input type="text" dir="rtl" value="تنقيط" aria-label="Option name AR" />' +
+    '<button class="x" type="button" aria-label="Remove option">×</button></div>' +
+    '<div class="opt"><input type="text" value="micro" aria-label="Option code" />' +
+    '<input type="text" value="Micro-sprinkler" aria-label="Option name EN" />' +
+    '<input type="text" dir="rtl" value="رشاش دقيق" aria-label="Option name AR" />' +
+    '<button class="x" type="button" aria-label="Remove option">×</button></div>' +
+    '<div class="opt"><input type="text" value="flood" aria-label="Option code" />' +
+    '<input type="text" value="Flood" aria-label="Option name EN" />' +
+    '<input type="text" dir="rtl" value="غمر" aria-label="Option name AR" />' +
+    '<button class="x" type="button" aria-label="Remove option">×</button></div>' +
+    '<div><button class="btn ghost tiny" type="button">Add option</button></div>';
+
+  function valuesFor(type) {
+    if (type === "integer" || type === "decimal") {
+      return {
+        summary: type === "decimal" ? "0–12 L/h · 1 decimal" : "0–12 L/h",
+        html:
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Unit (EN)</span><input type="text" value="L/h" /></label>' +
+            '<label class="f"><span class="lbl">Unit (AR)</span><input type="text" dir="rtl" value="لتر/ساعة" /></label>' +
+          "</div>" +
+          '<div class="' + (type === "decimal" ? "grid3" : "grid2") + '">' +
+            '<label class="f"><span class="lbl">Minimum</span><input type="number" value="0" /></label>' +
+            '<label class="f"><span class="lbl">Maximum</span><input type="number" value="12" /></label>' +
+            (type === "decimal"
+              ? '<label class="f"><span class="lbl">Decimal places</span><input type="number" value="1" min="0" max="4" /></label>'
+              : "") +
+          "</div>" +
+          '<p class="hint">Minimum cannot exceed maximum.</p>'
+      };
+    }
+    if (type === "text") {
+      return {
+        summary: "free text · max 240 characters",
+        html:
+          '<label class="f" style="max-width:220px"><span class="lbl">Max length</span>' +
+          '<input type="number" value="240" min="1" max="4000" /></label>'
+      };
+    }
+    if (type === "single_select" || type === "multi_select") {
+      return {
+        summary: "3 options — Drip, Micro-sprinkler, Flood",
+        html:
+          '<p class="hint">Every option needs a code and both an English and an Arabic name.</p>' + OPTION_ROWS
+      };
+    }
+    if (type === "boolean") {
+      return { summary: "Yes / no — nothing to configure", html: '<p class="hint">A yes/no field has no value settings. It can gate other fields.</p>' };
+    }
+    return { summary: "Date — nothing to configure", html: '<p class="hint">A date field has no value settings.</p>' };
+  }
+
+  function previewControlFor(type) {
+    if (type === "single_select") return '<select><option>Drip</option><option>Micro-sprinkler</option><option>Flood</option></select>';
+    if (type === "multi_select") return '<select multiple size="3"><option>Drip</option><option>Micro-sprinkler</option><option>Flood</option></select>';
+    if (type === "boolean") return '<select><option>Yes</option><option>No</option></select>';
+    if (type === "date") return '<input type="text" placeholder="yyyy-mm-dd" />';
+    if (type === "text") return '<input type="text" placeholder="Notes…" />';
+    return '<input type="number" placeholder="L/h" />';
+  }
+
+  /* =====================================================================
+     CONCEPT A
+     ===================================================================== */
+  (function conceptA() {
+    var mock = document.getElementById("mockA");
+    if (!mock) return;
+
+    var NODES = {
+      mango: {
+        title: "Mango", path: "mango", level: "crop",
+        hint: "Depth is “Variety + Strain”, so this crop can hold varieties and each variety can hold strains.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="mango" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Mango" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="مانجو" /></label>' +
+          "</div>" +
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Category</span><select><option>fruit_tree</option><option>cereal</option><option>vegetable</option><option>Other…</option></select></label>' +
+            '<label class="f"><span class="lbl">Classification depth</span><select><option>Variety + Strain</option><option>Variety</option><option>Crop only</option></select></label>' +
+            '<label class="f" style="justify-content:flex-end"><span style="display:flex;align-items:center;gap:7px"><input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Perennial</span></span></label>' +
+          "</div>" +
+          '<p class="hint">Code is permanent — it anchors the canonical path.</p>'
+      },
+      alphonso: {
+        title: "Alphonso", path: "mango.alphonso", level: "variety",
+        hint: "A variety of Mango. Its strains sit one level deeper.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="alphonso" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Alphonso" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR)</span><input type="text" dir="rtl" value="ألفونسو" /></label>' +
+          "</div>" +
+          '<p class="hint">Varieties carry names only — category, depth and perennial live on the crop.</p>'
+      },
+      "alphonso-a1": {
+        title: "Clone A1", path: "mango.alphonso.a1", level: "strain",
+        hint: "A strain of Alphonso — the deepest level this crop's depth allows.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="a1" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Clone A1" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR)</span><input type="text" dir="rtl" value="سلالة A1" /></label>' +
+          "</div>"
+      },
+      sindhri: {
+        title: "Sindhri", path: "mango.sindhri", level: "variety",
+        hint: "Retired. It stays in the catalog and keeps resolving for assignments already made against it.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="sindhri" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Sindhri" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR)</span><input type="text" dir="rtl" value="سندري" /></label>' +
+          "</div>"
+      },
+      wheat: {
+        title: "Wheat", path: "wheat", level: "crop",
+        hint: "Depth is “Crop only”, so this crop has no varieties. Change the depth to add some.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="wheat" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Wheat" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="قمح" /></label>' +
+          "</div>" +
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Category</span><select><option>cereal</option><option>fruit_tree</option><option>Other…</option></select></label>' +
+            '<label class="f"><span class="lbl">Classification depth</span><select><option>Crop only</option><option>Variety</option><option>Variety + Strain</option></select></label>' +
+            '<label class="f" style="justify-content:flex-end"><span style="display:flex;align-items:center;gap:7px"><input type="checkbox" style="width:auto" /><span class="lbl" style="font-size:12px">Perennial</span></span></label>' +
+          "</div>"
+      },
+      tomato: {
+        title: "Tomato", path: "tomato", level: "crop",
+        hint: "Depth is “Variety”, so it holds varieties but no strains.",
+        fields:
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="tomato" disabled /></label>' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Tomato" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="طماطم" /></label>' +
+          "</div>" +
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Category</span><select><option>vegetable</option><option>Other…</option></select></label>' +
+            '<label class="f"><span class="lbl">Classification depth</span><select><option>Variety</option><option>Crop only</option><option>Variety + Strain</option></select></label>' +
+            '<label class="f" style="justify-content:flex-end"><span style="display:flex;align-items:center;gap:7px"><input type="checkbox" style="width:auto" /><span class="lbl" style="font-size:12px">Perennial</span></span></label>' +
+          "</div>"
+      }
+    };
+
+    var tree = document.getElementById("aTree");
+    var crumb = document.getElementById("aCrumb");
+    var dTitle = document.getElementById("aDetailTitle");
+    var dPath = document.getElementById("aDetailPath");
+    var dBody = document.getElementById("aDetailBody");
+    var dHint = document.getElementById("aDetailHint");
+
+    function select(key) {
+      var n = NODES[key];
+      if (!n) return;
+      tree.querySelectorAll(".node").forEach(function (b) {
+        b.setAttribute("aria-current", b.getAttribute("data-node") === key ? "true" : "false");
+      });
+      crumb.textContent = n.path;
+      dTitle.textContent = n.title;
+      dPath.textContent = n.path;
+      dBody.innerHTML = n.fields;
+      dHint.textContent = n.hint || "";
+    }
+    tree.addEventListener("click", function (e) {
+      var b = e.target.closest(".node");
+      if (b) select(b.getAttribute("data-node"));
+    });
+    select("mango");
+
+    mock.querySelectorAll("[data-a-tab]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        var name = tab.getAttribute("data-a-tab");
+        mock.querySelectorAll("[data-a-tab]").forEach(function (t) {
+          t.setAttribute("aria-selected", t === tab ? "true" : "false");
+        });
+        mock.querySelectorAll("[data-a-panel]").forEach(function (p) {
+          p.hidden = p.getAttribute("data-a-panel") !== name;
+        });
+      });
+    });
+
+    var drawer = document.getElementById("aDrawer");
+    mock.querySelectorAll("[data-a-open-editor]").forEach(function (b) {
+      b.addEventListener("click", function () { drawer.hidden = false; drawer.scrollIntoView({ block: "nearest" }); });
+    });
+    mock.querySelectorAll("[data-a-close-editor]").forEach(function (b) {
+      b.addEventListener("click", function () { drawer.hidden = true; });
+    });
+
+    var vBody = document.getElementById("aValuesBody");
+    var vSummary = document.getElementById("aValuesSummary");
+    function applyType(type) {
+      var v = valuesFor(type);
+      vBody.innerHTML = v.html;
+      vSummary.textContent = v.summary;
+    }
+    chipGroup(document.getElementById("aTypes"), function (chip) { applyType(chip.getAttribute("data-type")); });
+    applyType("decimal");
+
+    var gate = document.getElementById("aPreviewGate");
+    var gated = document.getElementById("aPreviewGated");
+    var note = document.getElementById("aPreviewNote");
+    gate.addEventListener("change", function () {
+      var open = gate.value !== "Flood";
+      gated.hidden = !open;
+      note.hidden = open;
+    });
+  })();
+
+  /* =====================================================================
+     CONCEPT B
+     ===================================================================== */
+  (function conceptB() {
+    var mock = document.getElementById("mockB");
+    if (!mock) return;
+
+    var type = "single_select";
+    var step = 1;
+    var LAST = 5;
+
+    var s2Title = document.getElementById("bStep2Title");
+    var s2Body = document.getElementById("bStep2Body");
+    var review = document.getElementById("bReview");
+    var progress = document.getElementById("bProgress");
+    var back = document.getElementById("bBack");
+    var next = document.getElementById("bNext");
+    var previewControl = document.getElementById("bPreviewControl");
+
+    var TYPE_LABEL = {
+      integer: "Whole number", decimal: "Decimal", text: "Text", boolean: "Yes / no",
+      date: "Date", single_select: "Single choice", multi_select: "Multiple choice"
+    };
+
+    function renderStep2() {
+      var v = valuesFor(type);
+      s2Title.textContent = (type === "boolean" || type === "date")
+        ? "Nothing to configure for this type"
+        : "What values are allowed?";
+      s2Body.innerHTML = v.html;
+    }
+
+    function renderPreview() {
+      var wrap = previewControl.parentNode;
+      var html = previewControlFor(type);
+      var tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      var el = tmp.firstChild;
+      el.id = "bPreviewControl";
+      wrap.replaceChild(el, previewControl);
+      previewControl = el;
+    }
+
+    function renderReview() {
+      var v = valuesFor(type);
+      review.innerHTML =
+        '<div class="row" style="padding-inline:0"><span class="nm">Kind of field</span>' +
+          '<span class="pill pri">' + esc(TYPE_LABEL[type]) + '</span>' +
+          '<span class="acts"><span class="pill crit">permanent</span></span></div>' +
+        '<div class="row" style="padding-inline:0"><span class="nm">Code</span><code>irrigation_method</code>' +
+          '<span class="acts"><span class="pill crit">permanent</span></span></div>' +
+        '<div class="row" style="padding-inline:0"><span class="nm">Names</span>' +
+          '<span>Irrigation method · <span dir="rtl">طريقة الري</span></span></div>' +
+        '<div class="row" style="padding-inline:0"><span class="nm">Allowed values</span><span>' + esc(v.summary) + "</span></div>" +
+        '<div class="row" style="padding-inline:0"><span class="nm">Appears</span><span>Always shown · always required</span></div>' +
+        '<div class="row" style="padding-inline:0"><span class="nm">Attached to</span>' +
+          '<span class="path">' + esc(document.getElementById("bAttach").value.split("— ")[1] || "mango") + "</span>" +
+          '<span class="acts"><span class="pill crit">permanent</span></span></div>' +
+        '<div class="row" style="padding-inline:0"><span class="nm">Placement</span><span>Irrigation group · position 1 · available in reports</span></div>';
+    }
+
+    function show(n) {
+      step = n;
+      mock.querySelectorAll("[data-b-step]").forEach(function (p) {
+        p.hidden = Number(p.getAttribute("data-b-step")) !== step;
+      });
+      mock.querySelectorAll(".step").forEach(function (s) {
+        var i = Number(s.getAttribute("data-step"));
+        s.setAttribute("data-state", i === step ? "current" : (i < step ? "done" : "todo"));
+      });
+      back.disabled = step === 1;
+      next.textContent = step === LAST ? "Save attribute" : "Next";
+      progress.textContent = "Step " + step + " of " + LAST;
+      if (step === 2) renderStep2();
+      if (step === LAST) renderReview();
+    }
+
+    chipGroup(document.getElementById("bTypes"), function (chip) {
+      type = chip.getAttribute("data-type");
+      renderPreview();
+    });
+    back.addEventListener("click", function () { if (step > 1) show(step - 1); });
+    next.addEventListener("click", function () { if (step < LAST) show(step + 1); });
+    show(1);
+
+    var toggle = document.getElementById("bModeToggle");
+    var wizard = document.getElementById("bWizard");
+    var edit = document.getElementById("bEdit");
+    toggle.addEventListener("click", function () {
+      var showingEdit = toggle.getAttribute("aria-pressed") === "true";
+      toggle.setAttribute("aria-pressed", showingEdit ? "false" : "true");
+      wizard.hidden = !showingEdit;
+      edit.hidden = showingEdit;
+      toggle.textContent = showingEdit ? "Show me the edit view instead" : "Back to the create flow";
+      mock.querySelector(".chrome .title").textContent = showingEdit ? "New attribute" : "Edit attribute";
+    });
+  })();
+
+  /* =====================================================================
+     CONCEPT C
+     ===================================================================== */
+  (function conceptC() {
+    var mock = document.getElementById("mockC");
+    if (!mock) return;
+
+    var LOCK = '<p class="hint">🔒 Code, type and attachment are permanent — stored values are read through them.</p>';
+
+    var FIELDS = {
+      irrigation_method: {
+        title: "Irrigation method",
+        html:
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="irrigation_method" disabled /></label>' +
+            '<label class="f"><span class="lbl">Type</span><input type="text" value="Single choice" disabled /></label>' +
+          "</div>" + LOCK +
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Irrigation method" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="طريقة الري" /></label>' +
+          "</div>" +
+          '<span class="lbl" style="font-size:11px;font-weight:600;color:var(--p-muted)">Options</span>' +
+          OPTION_ROWS +
+          '<div class="sentence"><span>Show only when</span><select aria-label="Gate"><option>Always shown</option><option>Has windbreak</option></select></div>' +
+          '<label class="f" style="flex-direction:row;align-items:center;gap:7px"><input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Always required</span></label>' +
+          '<label class="f" style="flex-direction:row;align-items:center;gap:7px"><input type="checkbox" checked style="width:auto" /><span class="lbl" style="font-size:12px">Available in reports</span></label>' +
+          '<p class="hint">Group and position are set by dragging on the canvas — they are not fields here.</p>'
+      },
+      emitter_lph: {
+        title: "Emitter flow rate",
+        html:
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="emitter_lph" disabled /></label>' +
+            '<label class="f"><span class="lbl">Type</span><input type="text" value="Decimal" disabled /></label>' +
+          "</div>" + LOCK +
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="Emitter flow rate" /></label>' +
+            '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="معدل تدفق النقاط" /></label>' +
+          "</div>" +
+          '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Unit (EN)</span><input type="text" value="L/h" /></label>' +
+            '<label class="f"><span class="lbl">Unit (AR)</span><input type="text" dir="rtl" value="لتر/ساعة" /></label>' +
+          "</div>" +
+          '<div class="grid3">' +
+            '<label class="f"><span class="lbl">Minimum</span><input type="number" value="0" /></label>' +
+            '<label class="f"><span class="lbl">Maximum</span><input type="number" value="12" /></label>' +
+            '<label class="f"><span class="lbl">Decimals</span><input type="number" value="1" /></label>' +
+          "</div>" +
+          '<div class="sentence"><span>Show only when</span>' +
+            '<select aria-label="Gate"><option>Irrigation method</option><option>Always shown</option></select>' +
+            '<span>is one of</span><span class="vals">' +
+              '<button class="val" type="button" aria-pressed="true" data-val>Drip</button>' +
+              '<button class="val" type="button" aria-pressed="true" data-val>Micro-sprinkler</button>' +
+              '<button class="val" type="button" aria-pressed="false" data-val>Flood</button>' +
+            "</span></div>" +
+          '<label class="f" style="flex-direction:row;align-items:center;gap:7px"><input type="checkbox" style="width:auto" /><span class="lbl" style="font-size:12px">Always required</span></label>'
+      },
+      tree_spacing: {
+        title: "Tree spacing",
+        html:
+          '<p class="hint" style="background:#dceaf3;color:#14536f;padding:9px 11px;border-radius:8px">' +
+            "Inherited from <strong>mango</strong>. Editing it here changes it everywhere it resolves. " +
+            "To change it for Alphonso only, override it — that attaches a copy at <span class='path'>mango.alphonso</span>." +
+          "</p>" +
+          '<div><button class="btn" type="button">Override here</button> ' +
+          '<button class="btn ghost" type="button">Edit at mango</button></div>' +
+          '<div class="grid2" style="margin-top:10px">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="tree_spacing" disabled /></label>' +
+            '<label class="f"><span class="lbl">Type</span><input type="text" value="Decimal" disabled /></label>' +
+          "</div>" +
+          '<label class="f"><span class="lbl">Name (EN)</span><input type="text" value="Tree spacing" disabled /></label>'
+      },
+      rootstock: {
+        title: "Rootstock",
+        html:
+          '<p class="hint" style="background:#dceaf3;color:#14536f;padding:9px 11px;border-radius:8px">' +
+            "Inherited from <strong>mango</strong>. Override to attach a copy at <span class='path'>mango.alphonso</span>." +
+          "</p>" +
+          '<div><button class="btn" type="button">Override here</button> ' +
+          '<button class="btn ghost" type="button">Edit at mango</button></div>' +
+          '<div class="grid2" style="margin-top:10px">' +
+            '<label class="f"><span class="lbl">Code</span><input type="text" value="rootstock" disabled /></label>' +
+            '<label class="f"><span class="lbl">Type</span><input type="text" value="Single choice" disabled /></label>' +
+          "</div>"
+      }
+    };
+
+    var props = document.getElementById("cProps");
+    var propTitle = document.getElementById("cPropTitle");
+    var canvas = document.getElementById("cCanvas");
+
+    function pick(key) {
+      var f = FIELDS[key];
+      if (!f) return;
+      canvas.querySelectorAll(".fieldcard").forEach(function (c) {
+        c.setAttribute("aria-current", c.getAttribute("data-field") === key ? "true" : "false");
+      });
+      propTitle.textContent = "Properties — " + f.title;
+      props.innerHTML = f.html;
+      props.querySelectorAll("[data-val]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+        });
+      });
+    }
+
+    canvas.addEventListener("click", function (e) {
+      var card = e.target.closest(".fieldcard");
+      if (card) pick(card.getAttribute("data-field"));
+    });
+    canvas.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      var card = e.target.closest(".fieldcard");
+      if (card) { e.preventDefault(); pick(card.getAttribute("data-field")); }
+    });
+    pick("irrigation_method");
+
+    var note = document.getElementById("cLayerNote");
+    var NOTES = {
+      mango: "Everything here is attached at mango — nothing is inherited at the top layer.",
+      alphonso: "Hatched cards are inherited from mango — override to attach a copy here.",
+      a1: "Hatched cards are inherited from mango or Alphonso — override to attach a copy here."
+    };
+    chipGroup(document.getElementById("cLayers"), function (chip) {
+      note.innerHTML = NOTES[chip.getAttribute("data-layer")];
+    });
+  })();
+
+  /* =====================================================================
+     STAGE LADDER — mirrors farms/phenology.py and crop_thresholds.py:
+       resolution  strain → variety → crop, deepest non-NULL wins, wholesale
+       perennial   calendar_doy | manual
+       annual      days_from_planting | gdd_from_planting | manual
+       gdd_from_planting requires the crop's gdd_base_temp_c
+     ===================================================================== */
+  (function stages() {
+    var mock = document.getElementById("mockS");
+    if (!mock) return;
+
+    var MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    function doy(mmdd) {
+      var p = mmdd.split("-"), m = Number(p[0]), d = Number(p[1]), n = d;
+      for (var i = 0; i < m - 1; i++) n += MONTH_DAYS[i];
+      return n;
+    }
+    function cal(code, en, ar, start, end) {
+      return { code: code, en: en, ar: ar, start: start, end: end };
+    }
+
+    /* Ladders. `own: null` = the column is NULL, so the node inherits. */
+    var MANGO = [
+      cal("flowering", "Flowering", "التزهير", "02-01", "03-15"),
+      cal("fruit_set", "Fruit set", "عقد الثمار", "03-16", "04-30"),
+      cal("fruit_dev", "Fruit development", "نمو الثمار", "05-01", "06-25"),
+      cal("ripening", "Ripening", "النضج", "07-01", "08-31"),
+      cal("harvest", "Harvest", "الحصاد", "09-01", "09-30"),
+      cal("post_harvest", "Post-harvest", "ما بعد الحصاد", "10-01", "01-31")
+    ];
+    var ALPHONSO = [
+      cal("flowering", "Flowering", "التزهير", "12-15", "01-31"),
+      cal("fruit_set", "Fruit set", "عقد الثمار", "02-01", "03-10"),
+      cal("fruit_dev", "Fruit development", "نمو الثمار", "03-11", "05-05"),
+      cal("ripening", "Ripening", "النضج", "05-06", "06-15"),
+      cal("harvest", "Harvest", "الحصاد", "06-16", "07-15"),
+      cal("post_harvest", "Post-harvest", "ما بعد الحصاد", "07-16", "12-14")
+    ];
+    var KITTI = [
+      cal("flowering", "Flowering", "التزهير", "03-01", "04-15"),
+      cal("fruit_set", "Fruit set", "عقد الثمار", "04-16", "05-31"),
+      cal("fruit_dev", "Fruit development", "نمو الثمار", "06-01", "07-31"),
+      cal("ripen_harvest", "Ripening & harvest", "النضج والحصاد", "08-01", "09-30"),
+      cal("post_harvest", "Post-harvest", "ما بعد الحصاد", "10-01", "02-28")
+    ];
+    var CLONE_A1 = [
+      cal("flowering", "Flowering", "التزهير", "12-15", "01-31"),
+      cal("fruit_set", "Fruit set", "عقد الثمار", "02-01", "03-10"),
+      cal("fruit_dev", "Fruit development", "نمو الثمار", "03-11", "05-05"),
+      cal("ripening", "Ripening", "النضج", "05-06", "06-15"),
+      cal("harvest", "Harvest", "الحصاد", "06-16", "07-15"),
+      cal("second_flush", "Second flush", "الدفعة الثانية", "07-16", "09-15"),
+      cal("post_harvest", "Post-harvest", "ما بعد الحصاد", "09-16", "12-14")
+    ];
+    var WHEAT = [
+      { code: "emergence", en: "Emergence", ar: "الإنبات", start: 0, end: 14 },
+      { code: "tillering", en: "Tillering", ar: "التفريع", start: 15, end: 45 },
+      { code: "stem_elongation", en: "Stem elongation", ar: "استطالة الساق", start: 46, end: 75 },
+      { code: "heading", en: "Heading", ar: "طرد السنابل", start: 76, end: 95 },
+      { code: "grain_fill", en: "Grain filling", ar: "امتلاء الحبوب", start: 96, end: 125 },
+      { code: "maturity", en: "Maturity", ar: "النضج", start: 126, end: 150 }
+    ];
+
+    var NODES = {
+      mango:    { label: "Mango",    path: "mango",                  kind: "crop",    depth: 0, parent: null,      cycle: "perennial", own: MANGO },
+      alphonso: { label: "Alphonso", path: "mango.alphonso",         kind: "variety", depth: 1, parent: "mango",   cycle: "perennial", own: ALPHONSO },
+      a1:       { label: "Clone A1", path: "mango.alphonso.a1",      kind: "strain",  depth: 2, parent: "alphonso", cycle: "perennial", own: CLONE_A1 },
+      a2:       { label: "Clone A2", path: "mango.alphonso.a2",      kind: "strain",  depth: 2, parent: "alphonso", cycle: "perennial", own: null },
+      kitti:    { label: "Kitti",    path: "mango.kitti",            kind: "variety", depth: 1, parent: "mango",   cycle: "perennial", own: KITTI },
+      sindhri:  { label: "Sindhri",  path: "mango.sindhri",          kind: "variety", depth: 1, parent: "mango",   cycle: "perennial", own: null },
+      wheat:    { label: "Wheat",    path: "wheat",                  kind: "crop",    depth: 0, parent: null,      cycle: "annual",    own: WHEAT }
+    };
+    var ORDER = ["mango", "alphonso", "a1", "a2", "kitti", "sindhri", "wheat"];
+
+    /* resolve_phenology_stages(): deepest non-NULL wins. */
+    function resolve(key) {
+      var n = NODES[key];
+      while (n && n.own === null) n = NODES[n.parent];
+      return n ? { stages: n.own, sourceKey: n === NODES[key] ? key : nodeKeyOf(n) } : { stages: null, sourceKey: null };
+    }
+    function nodeKeyOf(node) {
+      for (var k in NODES) if (NODES[k] === node) return k;
+      return null;
+    }
+
+    var current = "mango";
+    var selected = 0;
+
+    var elTree = document.getElementById("sTree");
+    var elCtx = document.getElementById("sCtx");
+    var elInherit = document.getElementById("sInherit");
+    var elTimeline = document.getElementById("sTimeline");
+    var elList = document.getElementById("sList");
+    var elListFoot = document.getElementById("sListFoot");
+    var elWarn = document.getElementById("sWarnings");
+    var elRule = document.getElementById("sRule");
+    var elRuleTitle = document.getElementById("sRuleTitle");
+
+    function isPerennial(key) { return NODES[key].cycle === "perennial"; }
+    function windowText(key, s) {
+      return isPerennial(key) ? s.start + " → " + s.end : "day " + s.start + " – " + s.end;
+    }
+    function spans(key, s) {
+      if (!isPerennial(key)) return [[s.start / 150, s.end / 150]];
+      var a = (doy(s.start) - 1) / 365, b = doy(s.end) / 365;
+      return a <= b ? [[a, b]] : [[a, 1], [0, b]];
+    }
+
+    function renderTree() {
+      elTree.innerHTML = ORDER.map(function (k) {
+        var n = NODES[k];
+        var badge = n.own
+          ? '<span class="pill pri">Own ladder</span>'
+          : '<span class="pill info">Inherited</span>';
+        var count = n.own ? '<span class="hint">' + n.own.length + "</span>" : "";
+        return '<button class="node' + (n.depth === 1 ? " lv2" : n.depth === 2 ? " lv3" : "") + '" type="button" ' +
+          'data-node="' + k + '" aria-current="' + (k === current) + '">' +
+          '<span class="tw">' + (n.depth === 0 ? "▾" : "") + "</span>" +
+          "<span>" + esc(n.label) + "</span>" + badge + count + "</button>";
+      }).join("");
+    }
+
+    function renderInherit() {
+      var n = NODES[current];
+      var r = resolve(current);
+      var owned = n.own !== null;
+      elCtx.textContent = n.path;
+
+      if (owned) {
+        var parentR = n.parent ? resolve(n.parent) : null;
+        var cmp = "";
+        if (parentR && parentR.stages) {
+          // "6 → 6" says nothing; name what actually differs instead.
+          var p = parentR.stages, o = n.own, how;
+          if (p.length !== o.length) how = p.length + " stages → " + o.length;
+          else if (p.map(function (x) { return x.code; }).join() !== o.map(function (x) { return x.code; }).join())
+            how = "same count, different stages";
+          else how = "same " + o.length + " stages, different windows";
+          cmp = " It replaces " + esc(NODES[parentR.sourceKey].path) + "'s ladder entirely (" + how + ").";
+        }
+        elInherit.innerHTML =
+          '<div class="warn info" style="margin-bottom:10px">' +
+            "<span><strong>" + esc(n.label) + "</strong> has its own ladder." + cmp +
+            (n.kind === "crop" ? " Every variety and strain without an override inherits it." : "") +
+            "</span>" +
+            (n.kind !== "crop"
+              ? '<button class="btn ghost tiny" type="button" style="margin-inline-start:auto">Revert to inherited</button>'
+              : "") +
+          "</div>";
+      } else {
+        elInherit.innerHTML =
+          '<div class="warn" style="margin-bottom:10px">' +
+            "<span><strong>" + esc(n.label) + "</strong> has no ladder of its own — it resolves to <strong>" +
+            esc(NODES[r.sourceKey].path) + "</strong>. Read-only here: editing it would change every node that " +
+            "inherits it.</span>" +
+            '<button class="btn tiny" type="button" style="margin-inline-start:auto">Create an override</button>' +
+          "</div>";
+      }
+    }
+
+    function render() {
+      var key = current;
+      var r = resolve(key);
+      var set = r.stages || [];
+      var owned = NODES[key].own !== null;
+      if (selected >= set.length) selected = 0;
+
+      renderTree();
+      renderInherit();
+
+      /* timeline */
+      var html = "";
+      set.forEach(function (s, i) {
+        var parts = spans(key, s);
+        parts.forEach(function (sp, k) {
+          html +=
+            '<button class="seg' + (parts.length > 1 ? " wrap" : "") + '" type="button" ' +
+            'data-i="' + i + '" aria-current="' + (i === selected) + '" ' +
+            'style="inset-inline-start:' + (sp[0] * 100).toFixed(2) + "%;width:" + ((sp[1] - sp[0]) * 100).toFixed(2) + '%" ' +
+            'title="' + esc(s.en + " · " + windowText(key, s)) + '">' + (k === 0 ? esc(s.en) : "") + "</button>";
+        });
+      });
+      var gaps = [];
+      for (var i = 0; i < set.length - 1; i++) {
+        var cur = set[i], nxt = set[i + 1], endF, startF;
+        // Day and calendar ranges are inclusive, so consecutive units touch.
+        if (!isPerennial(key)) { endF = (cur.end + 1) / 150; startF = nxt.start / 150; }
+        else { endF = doy(cur.end) / 365; startF = (doy(nxt.start) - 1) / 365; }
+        if (startF - endF > 0.001) {
+          gaps.push({ a: cur, b: nxt });
+          html += '<span class="gap" style="inset-inline-start:' + (endF * 100).toFixed(2) +
+            "%;width:" + ((startF - endF) * 100).toFixed(2) + '%"></span>';
+        }
+      }
+      var ticks = isPerennial(key)
+        ? [[0, "Jan"], [0.25, "Apr"], [0.5, "Jul"], [0.75, "Oct"], [1, "Dec"]]
+        : [[0, "day 0"], [1 / 3, "50"], [2 / 3, "100"], [1, "150"]];
+      // The first and last labels sit on the edges, so centring them would clip
+      // half of each against the container.
+      ticks.forEach(function (tk, ti) {
+        var shift = ti === 0 ? "translateX(4px)"
+          : ti === ticks.length - 1 ? "translateX(calc(-100% - 4px))"
+          : "translateX(-50%)";
+        html += '<span class="tick" style="inset-inline-start:' + (tk[0] * 100) + "%;transform:" + shift + '">' +
+          tk[1] + "</span>";
+      });
+      elTimeline.innerHTML = html;
+
+      /* warnings */
+      var w = "";
+      gaps.forEach(function (g) {
+        w += '<div class="warn">⚠ Nothing covers the span between <strong>' + esc(g.a.en) +
+          "</strong> and <strong>" + esc(g.b.en) + "</strong>. A block sitting there will not auto-advance.</div>";
+      });
+      var wrapped = set.filter(function (s) { return spans(key, s).length > 1; });
+      if (wrapped.length) {
+        w += '<div class="warn info">↩ <strong>' + esc(wrapped[0].en) +
+          "</strong> wraps across the year end (" + esc(wrapped[0].start + " → " + wrapped[0].end) +
+          "). Allowed for a perennial, and drawn as two bands.</div>";
+      }
+      elWarn.innerHTML = w;
+
+      /* list */
+      elList.innerHTML = set.map(function (s, i) {
+        return '<button class="stagerow" type="button" data-i="' + i + '" aria-current="' + (i === selected) + '">' +
+          (owned ? '<span class="grab" aria-hidden="true">⠿⠿</span>' : '<span class="grab" aria-hidden="true">🔒</span>') +
+          '<span class="ord">' + i + "</span>" +
+          "<span><strong>" + esc(s.en) + '</strong> <span dir="rtl">' + esc(s.ar) + "</span> <code>" +
+          esc(s.code) + "</code></span>" +
+          '<span class="win">' + esc(windowText(key, s)) + "</span></button>";
+      }).join("");
+
+      elListFoot.innerHTML = owned
+        ? '<button class="btn ghost tiny" type="button">+ Add stage</button>' +
+          '<span class="hint" style="margin-inline-start:8px">Drag a row to reorder — position is <code>order</code>, and it must be unique.</span>'
+        : '<span class="hint">🔒 Inherited ladders are read-only. Create an override on <strong>' +
+          esc(NODES[current].label) + "</strong> to change them here.</span>";
+
+      renderRule();
+    }
+
+    function renderRule() {
+      var key = current;
+      var r = resolve(key);
+      var set = r.stages || [];
+      var s = set[selected];
+      var owned = NODES[key].own !== null;
+      if (!s) { elRule.innerHTML = ""; return; }
+      elRuleTitle.textContent = s.en;
+      var dis = owned ? "" : " disabled";
+
+      var modes = isPerennial(key)
+        ? [["calendar_doy", "Calendar window", false, ""], ["manual", "Manual only", false, ""]]
+        : [["days_from_planting", "Days from planting", false, ""],
+           ["gdd_from_planting", "GDD from planting", true, "Needs a GDD base temperature on the crop — not set."],
+           ["manual", "Manual only", false, ""]];
+      var activeMode = isPerennial(key) ? "calendar_doy" : "days_from_planting";
+
+      var operands = isPerennial(key)
+        ? '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Starts (MM-DD)</span><input type="text" value="' + esc(s.start) + '"' + dis + " /></label>" +
+            '<label class="f"><span class="lbl">Ends (MM-DD)</span><input type="text" value="' + esc(s.end) + '"' + dis + " /></label>" +
+          "</div>" +
+          '<p class="hint">A start later than the end wraps across the year end — allowed, and expected for post-harvest.</p>'
+        : '<div class="grid2">' +
+            '<label class="f"><span class="lbl">Start day</span><input type="number" value="' + s.start + '"' + dis + " /></label>" +
+            '<label class="f"><span class="lbl">End day</span><input type="number" value="' + s.end + '"' + dis + " /></label>" +
+          "</div>" +
+          '<p class="hint">End day must be greater than start day. Both count from the block\'s planting date.</p>';
+
+      elRule.innerHTML =
+        (owned ? "" :
+          '<p class="hint" style="background:#f3e6c9;color:#7a520c;padding:8px 10px;border-radius:7px">' +
+          "🔒 Read-only — this ladder belongs to <strong>" + esc(NODES[r.sourceKey].path) +
+          "</strong>. Create an override to edit it for <strong>" + esc(NODES[key].label) + "</strong>.</p>") +
+        '<div class="grid2">' +
+          '<label class="f"><span class="lbl">Code</span><input type="text" value="' + esc(s.code) + '"' + dis + " /></label>" +
+          '<label class="f"><span class="lbl">Position</span><input type="number" value="' + selected + '" disabled /></label>' +
+        "</div>" +
+        '<div class="grid2">' +
+          '<label class="f"><span class="lbl">Name (EN) <span class="req">*</span></span><input type="text" value="' + esc(s.en) + '"' + dis + " /></label>" +
+          '<label class="f"><span class="lbl">Name (AR) <span class="req">*</span></span><input type="text" dir="rtl" value="' + esc(s.ar) + '"' + dis + " /></label>" +
+        "</div>" +
+        '<div><span class="lbl" style="font-size:11px;font-weight:600;color:var(--p-muted)">How a block advances into this stage</span>' +
+          '<div class="chips" style="margin-top:6px">' +
+            modes.map(function (m) {
+              return '<button class="chip" type="button" aria-pressed="' + (m[0] === activeMode) + '"' +
+                (m[2] || !owned ? " disabled" : "") + ' title="' + esc(m[3]) + '">' + esc(m[1]) + "</button>";
+            }).join("") +
+          "</div>" +
+          (isPerennial(key)
+            ? '<p class="hint" style="margin-top:6px">A perennial may only use a calendar window or manual advance — planting was years ago, so day- and GDD-from-planting are meaningless. Checked against the <em>crop\'s</em> <code>is_perennial</code>, even for a strain override.</p>'
+            : '<p class="hint" style="margin-top:6px">🔒 <strong>GDD from planting</strong> is unavailable: the crop has no <code>gdd_base_temp_c</code>, and that field has no UI either. The server would reject the stage.</p>') +
+        "</div>" +
+        operands +
+        (owned
+          ? '<div style="display:flex;gap:8px"><button class="btn" type="button">Save ladder</button>' +
+            '<button class="btn ghost" type="button">Remove stage</button></div>'
+          : '<div><button class="btn" type="button">Create an override for ' + esc(NODES[key].label) + "</button>" +
+            '<p class="hint" style="margin-top:6px">Starts as a copy of the ' + esc(set.length) +
+            " inherited stages, so nothing is lost the moment you take ownership.</p></div>");
+    }
+
+    elTree.addEventListener("click", function (e) {
+      var b = e.target.closest(".node");
+      if (b) { current = b.getAttribute("data-node"); selected = 0; render(); }
+    });
+    elTimeline.addEventListener("click", function (e) {
+      var seg = e.target.closest(".seg");
+      if (seg) { selected = Number(seg.getAttribute("data-i")); render(); }
+    });
+    elList.addEventListener("click", function (e) {
+      var row = e.target.closest(".stagerow");
+      if (row) { selected = Number(row.getAttribute("data-i")); render(); }
+    });
+
+    render();
+  })();
+})();
+</script>

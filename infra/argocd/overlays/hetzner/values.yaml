@@ -1129,13 +1129,31 @@ global:
   #   frontend sha256:00c72d56. frontend 404'd for ~4 minutes after api and
   #   workers were already up -- bumping on the first check would have been an
   #   ImagePullBackOff.
+  # fb6981b = #410 crop catalog console -- a new platform screen at
+  #   /platform/catalog, additive beside /platform/crops, which is untouched
+  #   and still routed. It is the first UI able to author stage ladders and
+  #   canopy size classes at the variety and strain level, and the first to
+  #   write gdd_base_temp_c at all -- fields the admin API has always accepted
+  #   and no control has ever sent.
+  #
+  #   No migration and no backend delta: every field, on every taxonomy level,
+  #   was already in the create/update schemas and already returned by the read
+  #   schemas. FE only -> only frontend bumped; api + workers stay 7889d95,
+  #   tile-server stays 9d140cc.
+  #
+  #   Rollback is a plain tag revert to 7889d95, with no asymmetry: the screen
+  #   writes the same columns the migrations used to seed, so nothing it saves
+  #   is unreadable by the old bundle.
+  #
+  #   Image verified in ghcr BEFORE this commit, by manifest not by run
+  #   conclusion: frontend sha256:a6fd58a0.
   images:
     api:
       tag: "7889d95"
     workers:
       tag: "7889d95"
     frontend:
-      tag: "7889d95"
+      tag: "fb6981b"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
