@@ -387,6 +387,132 @@ async def test_farm_purge_removes_its_blocks(
 
 
 @pytest.mark.asyncio
+async def test_farm_purge_archives_its_own_workers_and_spares_shared_ones(
+    tenant_env: dict[str, Any], admin_session: AsyncSession
+) -> None:
+    """W2-C — a worker is tenant-level now, so purging a farm cannot delete them.
+
+    Two things have to hold at once. Somebody who only ever worked the purged
+    farm must stop appearing anywhere, but be *archived* rather than deleted:
+    hard-deleting cascades `activity_resources` away, and those rows are the
+    record of who did the work — including on farms that were not purged.
+    Somebody who also works another farm must come through completely
+    untouched, having merely lost one availability link.
+    """
+    schema = tenant_env["schema_name"]
+    async with client_for(tenant_env["tenant_context"]) as tc:
+        doomed_farm, _ = await _make_farm_with_block(tc, code="DOOMED")
+        keeper_farm, _ = await _make_farm_with_block(tc, code="KEEPER")
+        await tc.delete(f"/api/v1/farms/{doomed_farm}")
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+    only_here = uuid4()
+    shared = uuid4()
+    for rid, name in ((only_here, "Only Here"), (shared, "Shared Sami")):
+        await admin_session.execute(
+            text(
+                "INSERT INTO resources (id, farm_id, kind, name, role) "
+                "VALUES (:id, :f, 'worker', :n, 'Scout')"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": rid, "f": UUID(doomed_farm), "n": name},
+        )
+        await admin_session.execute(
+            text("INSERT INTO resource_farms (resource_id, farm_id) VALUES (:r, :f)").bindparams(
+                bindparam("r", type_=PG_UUID(as_uuid=True)),
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"r": rid, "f": UUID(doomed_farm)},
+        )
+    # The shared one also works the farm that survives.
+    await admin_session.execute(
+        text("INSERT INTO resource_farms (resource_id, farm_id) VALUES (:r, :f)").bindparams(
+            bindparam("r", type_=PG_UUID(as_uuid=True)),
+            bindparam("f", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"r": shared, "f": UUID(keeper_farm)},
+    )
+    await admin_session.commit()
+
+    async with client_for(tenant_env["platform_context"]) as pc:
+        preview = (
+            await pc.get(
+                "/api/v1/admin/purge/preview",
+                params={
+                    "kind": "farm",
+                    "id": doomed_farm,
+                    "tenant_id": str(tenant_env["tenant_id"]),
+                },
+            )
+        ).json()
+        resp = await pc.post(
+            "/api/v1/admin/purge",
+            json={
+                "kind": "farm",
+                "id": doomed_farm,
+                "tenant_id": str(tenant_env["tenant_id"]),
+                "confirmation": preview["confirmation_phrase"],
+            },
+        )
+    assert resp.status_code == 202, resp.text
+    job = resp.json()
+    assert job["status"] == "succeeded", job
+    assert job["receipt"]["verification"]["orphans_found"] == 0
+
+    # Neither worker row was deleted — that is the whole point.
+    assert (
+        await _count(
+            admin_session,
+            schema,
+            "SELECT count(*) FROM resources WHERE id = ANY(:ids)",
+            {"ids": [only_here, shared]},
+        )
+        == 2
+    )
+    # The one with nowhere left to work is archived.
+    assert (
+        await _count(
+            admin_session,
+            schema,
+            "SELECT count(*) FROM resources WHERE id = :r AND archived_at IS NOT NULL",
+            {"r": only_here},
+        )
+        == 1
+    )
+    # The shared one is untouched and still linked to the surviving farm.
+    assert (
+        await _count(
+            admin_session,
+            schema,
+            "SELECT count(*) FROM resources WHERE id = :r AND archived_at IS NULL",
+            {"r": shared},
+        )
+        == 1
+    )
+    assert (
+        await _count(
+            admin_session,
+            schema,
+            "SELECT count(*) FROM resource_farms WHERE resource_id = :r",
+            {"r": shared},
+        )
+        == 1
+    )
+    # And the purged farm's links are gone for both.
+    assert (
+        await _count(
+            admin_session,
+            schema,
+            "SELECT count(*) FROM resource_farms WHERE farm_id = :f",
+            {"f": UUID(doomed_farm)},
+        )
+        == 0
+    )
+
+
+@pytest.mark.asyncio
 async def test_farm_scopes_are_cleaned_across_the_schema_boundary(
     tenant_env: dict[str, Any], admin_session: AsyncSession
 ) -> None:

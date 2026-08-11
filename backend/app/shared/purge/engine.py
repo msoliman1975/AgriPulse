@@ -183,11 +183,40 @@ class PurgeEngine:
             return PurgeReport()
         report = await self.delete_blocks(await self.farm_block_ids(farm_ids))
         report.merge(await self._delete(FARM_OWNED, farm_ids))
+        report.rows["resources_archived"] = await self._archive_farmless_resources()
         report.rows["farms"] = await self._rowcount(
             text("DELETE FROM farms WHERE id = ANY(:ids)").bindparams(_IDS),
             {"ids": farm_ids},
         )
         return report
+
+    async def _archive_farmless_resources(self) -> int:
+        """Archive workers and equipment the purge left with no farm at all.
+
+        Since W2-A a resource is tenant-level: the farm link lives in
+        ``resource_farms``, which the manifest has just emptied for the purged
+        farms. Anything still linked elsewhere is shared and must survive
+        untouched.
+
+        What is left over is archived rather than deleted, for the same reason
+        every other retirement in this codebase is: ``activity_resources`` rows
+        on *other* farms name this resource, and a hard delete would cascade
+        them away — erasing who did the work, on farms that were not purged.
+        Archived rows keep their name so historical assignments still read.
+        """
+        return await self._rowcount(
+            text(
+                """
+                UPDATE resources r
+                   SET archived_at = now(), updated_at = now()
+                 WHERE r.archived_at IS NULL
+                   AND NOT EXISTS (
+                         SELECT 1 FROM resource_farms rf WHERE rf.resource_id = r.id
+                       )
+                """
+            ),
+            {},
+        )
 
     # -- tenant (public-schema residue only) ---------------------------------
 
