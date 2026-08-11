@@ -1176,6 +1176,13 @@ env:
   # weather chart requests a 7-day horizon, so bump to 168h (7d) — within
   # Open-Meteo's free-tier forecast range — so "next week" isn't clipped.
   WEATHER_FORECAST_HOURS: "168"
+  # Push (AgriPulse Scout). Left unset, `fcm_enabled` defaults to false and
+  # every send records `skipped` rather than `failed` — correct behaviour and
+  # the quietest possible failure, which is how a pilot runs for a week
+  # believing push works. The project id is not a secret; the service-account
+  # key arrives as FCM_SERVICE_ACCOUNT_JSON in agripulse-app-secrets.
+  FCM_ENABLED: "true"
+  FCM_PROJECT_ID: "agripulse-scout"
 # Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
 # single shared overlay applies to every service chart, so api/workers/tile
 # all load both — harmless (same R2 account creds; unused keys are ignored).

@@ -354,6 +354,11 @@ class Settings(BaseSettings):
     # Path to the Firebase service-account JSON. Preferred: the app mints and
     # refreshes its own bearer, because FCM v1 tokens expire after an hour.
     fcm_service_account_file: str = ""
+    # The same credential inline, for deployments that inject secrets as env
+    # vars rather than mounted files. Hetzner seeds plain Secrets consumed via
+    # `envFrom` and the charts mount no secret volumes, so requiring a path
+    # would mean adding a volume to every chart that sends push.
+    fcm_service_account_json: str = ""
     # Escape hatch for a one-off manual test: a hand-minted bearer. Wins over
     # the service account when set, and stops working an hour later.
     fcm_access_token: str = ""

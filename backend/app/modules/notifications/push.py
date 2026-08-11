@@ -21,6 +21,7 @@ report honestly whether the send happened, not to guarantee it.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -77,19 +78,32 @@ def _bearer(settings: Any) -> str:
         return str(static)
 
     key_file = getattr(settings, "fcm_service_account_file", "")
-    if not key_file:
+    key_json = getattr(settings, "fcm_service_account_json", "")
+    if not key_file and not key_json:
         raise PushSendError(
-            "FCM is enabled but neither FCM_SERVICE_ACCOUNT_FILE nor " "FCM_ACCESS_TOKEN is set"
+            "FCM is enabled but none of FCM_SERVICE_ACCOUNT_JSON, "
+            "FCM_SERVICE_ACCOUNT_FILE or FCM_ACCESS_TOKEN is set"
         )
 
     global _credentials
     if _credentials is None:
         from google.oauth2 import service_account  # imported lazily: dev has no key file
 
-        # google-auth ships no type stubs, so mypy sees an untyped call here.
-        _credentials = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
-            key_file, scopes=[_SCOPE]
-        )
+        # google-auth ships no type stubs, so mypy sees untyped calls here.
+        if key_json:
+            # Inline wins: a cluster that sets both is one that mounted a file
+            # for a previous deploy and has since moved to env injection.
+            try:
+                info = json.loads(key_json)
+            except ValueError as exc:
+                raise PushSendError("FCM_SERVICE_ACCOUNT_JSON is not valid JSON") from exc
+            _credentials = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
+                info, scopes=[_SCOPE]
+            )
+        else:
+            _credentials = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
+                key_file, scopes=[_SCOPE]
+            )
     if not _credentials.valid or _credentials.expired:
         from google.auth.transport.requests import Request
 
