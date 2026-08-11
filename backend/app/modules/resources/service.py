@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.resources.errors import (
     InvalidResourceShapeError,
+    ResourceNotAvailableOnFarmError,
     ResourceNotFoundError,
 )
 from app.modules.resources.repository import ResourcesRepository
@@ -35,7 +36,7 @@ class ResourcesService(Protocol):
     async def list(
         self,
         *,
-        farm_id: UUID,
+        farm_id: UUID | None = None,
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]: ...
@@ -54,6 +55,7 @@ class ResourcesService(Protocol):
         activity_id: UUID,
         resource_id: UUID,
         actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
     async def detach(self, *, activity_id: UUID, resource_id: UUID) -> bool: ...
@@ -77,8 +79,12 @@ class ResourcesServiceImpl:
         membership_id: UUID | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
-        return await self._repo.insert(
-            resource_id=uuid7(),
+        resource_id = uuid7()
+        created = await self._repo.insert(
+            resource_id=resource_id,
+            # Dual-written until 0071 drops the column: the running image may
+            # still be one that reads it, and a row it cannot see is worse
+            # than a redundant value.
             farm_id=farm_id,
             kind=kind,
             name=name.strip(),
@@ -88,6 +94,11 @@ class ResourcesServiceImpl:
             membership_id=membership_id,
             actor_user_id=actor_user_id,
         )
+        # The link is what availability actually means now. Without it the row
+        # exists tenant-wide and shows up on no farm at all.
+        await self._repo.add_farm(resource_id=resource_id, farm_id=farm_id)
+        created["farm_ids"] = [farm_id]
+        return created
 
     async def get(self, *, resource_id: UUID) -> dict[str, Any]:
         row = await self._repo.get(resource_id=resource_id)
@@ -98,7 +109,7 @@ class ResourcesServiceImpl:
     async def list(
         self,
         *,
-        farm_id: UUID,
+        farm_id: UUID | None = None,
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]:
@@ -161,6 +172,7 @@ class ResourcesServiceImpl:
         activity_id: UUID,
         resource_id: UUID,
         actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> dict[str, Any]:
         # Validate resource exists and is not archived.
         resource = await self._repo.get(resource_id=resource_id)
@@ -170,6 +182,15 @@ class ResourcesServiceImpl:
             raise InvalidResourceShapeError(
                 detail="Cannot assign an archived resource. Restore it first."
             )
+        # The guard `farm_id` used to make unnecessary. While a resource was
+        # farm-locked, assigning one to an activity on another farm was
+        # structurally impossible; tenant-level, nothing stops it — and the
+        # result is somebody scheduled on a farm they cannot open, which is
+        # exactly the drift the availability set exists to prevent.
+        if farm_id is not None and not await self._repo.is_available_on(
+            resource_id=resource_id, farm_id=farm_id
+        ):
+            raise ResourceNotAvailableOnFarmError(resource_id=resource_id, farm_id=farm_id)
         await self._repo.attach(
             activity_id=activity_id,
             resource_id=resource_id,

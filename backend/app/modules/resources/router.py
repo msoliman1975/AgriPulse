@@ -176,6 +176,8 @@ async def attach_resource(
         activity_id=activity_id,
         resource_id=resource_id,
         actor_user_id=context.user_id,
+        # The activity's farm is the one the resource has to serve.
+        farm_id=activity["farm_id"],
     )
 
 

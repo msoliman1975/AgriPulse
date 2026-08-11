@@ -43,6 +43,30 @@ class Resource(Base, TimestampedMixin):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ResourceFarm(Base):
+    """`tenant_<id>.resource_farms` — which farms a resource is available on.
+
+    The many-to-many that replaced ``resources.farm_id`` (W2-A). Mirrors
+    ``public.farm_scopes``: one row per (thing, place it may be used). A
+    resource with no rows here is available nowhere, which is the state farm
+    purge leaves behind and the reason it archives rather than deletes.
+    """
+
+    __tablename__ = "resource_farms"
+
+    resource_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("resources.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class ActivityResource(Base):
     """`tenant_<id>.activity_resources` — assignment join table.
 

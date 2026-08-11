@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +16,7 @@ from app.modules.resources.errors import (
     DuplicateResourceNameError,
     InvalidResourceShapeError,
 )
-from app.modules.resources.models import ActivityResource, Resource
+from app.modules.resources.models import ActivityResource, Resource, ResourceFarm
 
 
 class ResourcesRepository:
@@ -74,11 +76,23 @@ class ResourcesRepository:
     async def list(
         self,
         *,
-        farm_id: UUID,
+        farm_id: UUID | None = None,
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]:
-        clauses = [Resource.farm_id == farm_id, Resource.deleted_at.is_(None)]
+        """Roster rows. ``farm_id=None`` is the tenant-wide view.
+
+        Availability is read through ``resource_farms``, not
+        ``resources.farm_id`` — the column survives only until 0071 and no
+        longer says where a resource can be used.
+        """
+        clauses = [Resource.deleted_at.is_(None)]
+        if farm_id is not None:
+            clauses.append(
+                Resource.id.in_(
+                    select(ResourceFarm.resource_id).where(ResourceFarm.farm_id == farm_id)
+                )
+            )
         if kind is not None:
             clauses.append(Resource.kind == kind)
         if not include_archived:
@@ -86,6 +100,71 @@ class ResourcesRepository:
         stmt = select(Resource).where(*clauses).order_by(Resource.kind, Resource.name)
         rows = (await self._session.execute(stmt)).scalars().all()
         return tuple(_to_dict(r) for r in rows)
+
+    # ---- Availability (W2-A) -------------------------------------------
+
+    async def farm_ids_for(self, *, resource_id: UUID) -> tuple[UUID, ...]:
+        rows = (
+            await self._session.execute(
+                select(ResourceFarm.farm_id)
+                .where(ResourceFarm.resource_id == resource_id)
+                .order_by(ResourceFarm.created_at, ResourceFarm.farm_id)
+            )
+        ).scalars()
+        return tuple(rows.all())
+
+    async def farm_ids_for_many(
+        self, *, resource_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[UUID, ...]]:
+        """Batched, so listing a roster does not fan out one query per row."""
+        if not resource_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(ResourceFarm.resource_id, ResourceFarm.farm_id)
+                .where(ResourceFarm.resource_id.in_(list(resource_ids)))
+                .order_by(ResourceFarm.created_at, ResourceFarm.farm_id)
+            )
+        ).all()
+        out: dict[UUID, list[UUID]] = {}
+        for resource_id, farm_id in rows:
+            out.setdefault(resource_id, []).append(farm_id)
+        return {k: tuple(v) for k, v in out.items()}
+
+    async def is_available_on(self, *, resource_id: UUID, farm_id: UUID) -> bool:
+        row = (
+            await self._session.execute(
+                select(ResourceFarm.resource_id).where(
+                    ResourceFarm.resource_id == resource_id,
+                    ResourceFarm.farm_id == farm_id,
+                )
+            )
+        ).first()
+        return row is not None
+
+    async def add_farm(self, *, resource_id: UUID, farm_id: UUID) -> None:
+        await self._session.execute(
+            pg_insert(ResourceFarm)
+            .values(resource_id=resource_id, farm_id=farm_id)
+            .on_conflict_do_nothing()
+        )
+
+    async def set_farms(self, *, resource_id: UUID, farm_ids: Sequence[UUID]) -> None:
+        """Replace the availability set.
+
+        Deletes then inserts rather than diffing: the set is small, and the
+        `created_at` of a link that was already there carries no meaning worth
+        preserving — only membership does.
+        """
+        await self._session.execute(
+            delete(ResourceFarm).where(ResourceFarm.resource_id == resource_id)
+        )
+        for farm_id in dict.fromkeys(farm_ids):
+            await self._session.execute(
+                pg_insert(ResourceFarm)
+                .values(resource_id=resource_id, farm_id=farm_id)
+                .on_conflict_do_nothing()
+            )
 
     async def update_fields(
         self,

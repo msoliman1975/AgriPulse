@@ -413,3 +413,90 @@ async def test_attach_archived_resource_rejected(
         await client.patch(f"/api/v1/resources/{worker['id']}", json={"archive": True})
         bad = await client.post(f"/api/v1/activities/{activity['id']}/resources/{worker['id']}")
         assert bad.status_code == 422, bad.text
+
+
+@pytest.mark.asyncio
+async def test_resource_cannot_be_assigned_to_a_farm_it_does_not_serve(
+    admin_session: AsyncSession,
+) -> None:
+    """W2-B — the guard that `resources.farm_id` used to make unnecessary.
+
+    While a resource was farm-locked this was structurally impossible. Now
+    that the roster is tenant-level, the only thing standing between a shared
+    worker and being scheduled somewhere their sign-in does not reach is an
+    explicit check against the availability set.
+    """
+    _t, context, farm_a, block_a = await _bootstrap(admin_session, "bd-avail")
+    app = _build_app(context)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # A second farm, with an activity of its own.
+        farm_b = (
+            await client.post(
+                "/api/v1/farms",
+                json={
+                    "code": "BD-FARM-B",
+                    "name": "Other board farm",
+                    "boundary": _square(31.80, 30.80),
+                    "farm_type": "commercial",
+                    "tags": [],
+                },
+            )
+        ).json()["id"]
+        block_b = (
+            await client.post(
+                f"/api/v1/farms/{farm_b}/blocks",
+                json={"code": "BD-B2", "boundary": _polygon(31.81, 30.81)},
+            )
+        ).json()["id"]
+        plan_b = (
+            await client.post(
+                f"/api/v1/farms/{farm_b}/plans",
+                json={"season_label": "2026-summer", "season_year": 2026},
+            )
+        ).json()
+        activity_b = (
+            await client.post(
+                f"/api/v1/plans/{plan_b['id']}/activities",
+                json={
+                    "block_id": block_b,
+                    "activity_type": "spraying",
+                    "scheduled_date": (date.today() + timedelta(days=3)).isoformat(),
+                },
+            )
+        ).json()["id"]
+
+        # A worker who serves only farm A.
+        worker = (
+            await client.post(
+                f"/api/v1/farms/{farm_a}/resources",
+                json={"kind": "worker", "name": "Farm A Only", "role": "FieldOperator"},
+            )
+        ).json()
+
+        refused = await client.post(f"/api/v1/activities/{activity_b}/resources/{worker['id']}")
+        assert refused.status_code == 409, refused.text
+        assert "not available on the farm" in refused.json()["detail"]
+
+        # They are not silently listed on farm B either.
+        listed_b = (await client.get(f"/api/v1/farms/{farm_b}/resources")).json()
+        assert worker["id"] not in {r["id"] for r in listed_b}
+
+        # And the same assignment on their own farm still works.
+        plan_a = (
+            await client.post(
+                f"/api/v1/farms/{farm_a}/plans",
+                json={"season_label": "2026-summer", "season_year": 2026},
+            )
+        ).json()
+        activity_a = (
+            await client.post(
+                f"/api/v1/plans/{plan_a['id']}/activities",
+                json={
+                    "block_id": block_a,
+                    "activity_type": "spraying",
+                    "scheduled_date": (date.today() + timedelta(days=4)).isoformat(),
+                },
+            )
+        ).json()["id"]
+        ok = await client.post(f"/api/v1/activities/{activity_a}/resources/{worker['id']}")
+        assert ok.status_code in (200, 201), ok.text
