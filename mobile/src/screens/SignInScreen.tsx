@@ -1,8 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 
+import { normalisePhone } from "@/auth/phone";
 import { SignInError, signIn } from "@/auth/session";
 import { t, type Lang } from "@/i18n/strings";
-import { ensureDeviceRegistered } from "@/push/register";
 
 /**
  * Phone and PIN. No email field anywhere — this persona does not have one, and
@@ -19,11 +19,13 @@ export function SignInScreen({ lang, onSignedIn }: { lang: Lang; onSignedIn: () 
     setBusy(true);
     setError(null);
     try {
-      await signIn(phone.trim(), pin.trim());
-      // Deliberately not awaited: a slow or refused permission prompt must
-      // not hold a scout on the sign-in screen. Push is a convenience; the
-      // visit list is the source of truth.
-      void ensureDeviceRegistered();
+      // Normalise here, not in the field: a scout watching their own
+      // number get rewritten as they type would reasonably think the app
+      // was refusing it.
+      await signIn(normalisePhone(phone), pin.trim());
+      // Device registration is NOT done here any more: it is farm-gated, and
+      // at this instant the farm is still unknown — the token has to be
+      // exchanged for /me first. App.tsx registers once the farm resolves.
       onSignedIn();
     } catch (err) {
       setError(err instanceof SignInError ? t(lang, "signIn.invalidCredentials") : String(err));

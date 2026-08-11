@@ -77,3 +77,24 @@ def test_pin_is_numeric_and_not_predictable() -> None:
 def test_pin_length_floor_is_enforced() -> None:
     with pytest.raises(ValueError, match="not a credential"):
         generate_pin(length=3)
+
+
+def test_a_one_digit_typo_in_an_egyptian_mobile_is_rejected() -> None:
+    """The generic 8-15 window swallowed this, and the consequence was not a
+    failure — it was a working account under a number nobody owns. The scout
+    then could not sign in with their real number, and the app reported
+    "wrong phone or PIN". Seen in production."""
+    with pytest.raises(InvalidPhoneNumberError) as exc:
+        normalise_phone("0100001111")
+    assert "12 digits" in str(exc.value)
+
+    # The correct number still normalises from every spelling.
+    for spelling in ("01000011111", "+201000011111", "00201000011111", "0100 001 1111"):
+        assert normalise_phone(spelling) == "+201000011111"
+
+
+def test_other_country_codes_keep_the_generic_window() -> None:
+    """The tightening is Egypt-specific on purpose; it must not start
+    rejecting numbers from anywhere else."""
+    assert normalise_phone("+17017305526") == "+17017305526"
+    assert normalise_phone("+441234567890") == "+441234567890"

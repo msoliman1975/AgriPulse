@@ -61,6 +61,15 @@ export interface Visit {
   assigned_to: string | null;
 }
 
+/**
+ * An authenticated GET for callers outside this module. Exported rather than
+ * letting them build their own fetch, so token refresh, 401 handling and
+ * Problem Details parsing stay in one place.
+ */
+export function authedGet<T>(path: string): Promise<T> {
+  return request<T>(path);
+}
+
 export function listVisits(farmId: string, params: { mine?: boolean; claimable?: boolean } = {}) {
   const q = new URLSearchParams({ farm_id: farmId });
   if (params.mine) q.set("mine", "true");
