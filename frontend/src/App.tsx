@@ -58,6 +58,7 @@ import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPa
 import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAttributesPage";
 import { PlatformCatalogPage } from "@/modules/admin/pages/PlatformCatalogPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
+import { PlatformRolesPage } from "@/modules/admin/pages/PlatformRolesPage";
 import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
@@ -309,6 +310,7 @@ export function App(): ReactNode {
                 <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
                 <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
+                <Route path="roles" element={<PlatformRolesPage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
                 <Route
                   path="integrations/health/tenants/:tenantId"

@@ -16,9 +16,10 @@ import {
 } from "@/api/blocks";
 import { CropAssignmentPanel } from "@/modules/farms/components/CropAssignmentPanel";
 import { BlockGridConfigCard } from "@/modules/grid/BlockGridConfigCard";
+import { BlockSignalsPanel } from "./BlockSignalsPanel";
 import { ResponsibleForm } from "./ResponsibleForm";
 
-export type ManageMode = "edit" | "crop" | "grid" | "responsible";
+export type ManageMode = "edit" | "crop" | "grid" | "responsible" | "signals";
 
 const IRR_SYSTEMS: IrrigationSystem[] = [
   "drip",
@@ -84,6 +85,7 @@ export function ManagePanel({
           <CropAssignmentPanel blockId={blockId} farmId={farmId} onAssigned={onDone} />
         </div>
       ) : null}
+      {mode === "signals" ? <BlockSignalsPanel blockId={blockId} farmId={farmId} /> : null}
       {mode === "grid" ? (
         gridProductId ? (
           <BlockGridConfigCard blockId={blockId} productId={gridProductId} />

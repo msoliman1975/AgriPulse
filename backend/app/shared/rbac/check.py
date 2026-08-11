@@ -25,9 +25,10 @@ First match wins; otherwise PermissionDeniedError (HTTP 403).
 # it would silently demote the parameter to a query param and break
 # every route that depends on this factory.
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID
 
@@ -35,10 +36,47 @@ import yaml
 from fastapi import Depends, Request, status
 
 from app.core.errors import APIError
-from app.shared.auth.context import RequestContext
+from app.shared.auth.context import (
+    FarmRole,
+    PlatformRole,
+    RequestContext,
+    TenantRole,
+)
 from app.shared.auth.middleware import get_current_context
 
 WILDCARD = "*"
+
+# Role -> the JWT layer that can grant it. Derived from the three StrEnums in
+# auth.context rather than restated, so a role added there cannot silently miss
+# a tier here. `Viewer` is a FarmRole, but public migration 0036 also lets it
+# sit in tenant_role_assignments — see role_tier's docstring.
+_ROLE_TIERS: dict[str, str] = {
+    **{r.value: "platform" for r in PlatformRole},
+    **{r.value: "tenant" for r in TenantRole},
+    **{r.value: "farm" for r in FarmRole},
+}
+
+
+class UnknownRoleError(ValueError):
+    """A role name that is in neither the YAML nor the enums."""
+
+
+def role_tier(role: str) -> str:
+    """`platform` | `tenant` | `farm` for a role name.
+
+    Raises `UnknownRoleError` rather than defaulting, so a divergence between
+    role_capabilities.yaml and the enums fails loudly at the one place that
+    enumerates roles instead of quietly mislabelling a row in the admin UI.
+
+    Note this is the tier a role is *defined* at, not every tier it can be
+    assigned at: `Viewer` is a FarmRole here, yet public migration 0036 permits
+    it in `tenant_role_assignments` too.
+    """
+    try:
+        return _ROLE_TIERS[role]
+    except KeyError:
+        raise UnknownRoleError(f"unknown role: {role!r}") from None
+
 
 _RBAC_DIR = Path(__file__).resolve().parent
 _CAPABILITIES_FILE = _RBAC_DIR / "capabilities.yaml"
@@ -73,9 +111,11 @@ class CapabilityRegistry:
         *,
         capabilities: dict[str, dict[str, Any]],
         role_capabilities: dict[str, frozenset[str]],
+        role_descriptions: dict[str, str] | None = None,
     ) -> None:
         self._capabilities = capabilities
         self._role_capabilities = role_capabilities
+        self._role_descriptions = role_descriptions or {}
 
     @classmethod
     def from_files(
@@ -100,9 +140,11 @@ class CapabilityRegistry:
             raise ValueError("role_capabilities.yaml: 'roles' must be a mapping")
 
         compiled: dict[str, frozenset[str]] = {}
+        descriptions: dict[str, str] = {}
         for role_name, body in role_caps_raw.items():
             if not isinstance(body, dict):
                 raise ValueError(f"role_capabilities.yaml: '{role_name}' must be a mapping")
+            descriptions[role_name] = str(body.get("description") or "").strip()
             caps = body.get("capabilities") or []
             if not isinstance(caps, list):
                 raise ValueError(
@@ -118,10 +160,33 @@ class CapabilityRegistry:
                     )
             compiled[role_name] = frozenset(caps)
 
-        return cls(capabilities=capabilities, role_capabilities=compiled)
+        return cls(
+            capabilities=capabilities,
+            role_capabilities=compiled,
+            role_descriptions=descriptions,
+        )
 
     def known(self, capability: str) -> bool:
         return capability in self._capabilities
+
+    def capabilities(self) -> Mapping[str, Mapping[str, Any]]:
+        """The capability catalogue: name -> {description, scope, status}.
+
+        Read-only view for the RBAC admin surface. Enforcement never reads
+        this — `role_grants` is the only authorization path.
+        """
+        return MappingProxyType(self._capabilities)
+
+    def roles(self) -> Mapping[str, frozenset[str]]:
+        """Compiled role -> granted capability names.
+
+        PlatformAdmin's set is the literal `{"*"}`; callers that need the
+        expanded list should substitute `capabilities()` themselves.
+        """
+        return MappingProxyType(self._role_capabilities)
+
+    def role_description(self, role: str) -> str:
+        return self._role_descriptions.get(role, "")
 
     def role_grants(self, role: str, capability: str) -> bool:
         granted = self._role_capabilities.get(role)

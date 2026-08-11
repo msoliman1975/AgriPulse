@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
@@ -29,6 +29,13 @@ interface Props {
   farmId: string;
   definitions: SignalDefinition[];
   canDelete: boolean;
+  /**
+   * Pins the list to one block and hides the block filter. Used by the Farm
+   * Console inspector, where the block is already the subject of the panel —
+   * offering a picker there would let the operator silently wander off the
+   * unit they think they are reading.
+   */
+  lockedBlockId?: string | null;
 }
 
 interface Filters {
@@ -77,17 +84,27 @@ function formatValue(o: SignalObservation): string {
   return "—";
 }
 
-export function ObservationList({ farmId, definitions, canDelete }: Props): ReactNode {
+export function ObservationList({
+  farmId,
+  definitions,
+  canDelete,
+  lockedBlockId = null,
+}: Props): ReactNode {
   const { t } = useTranslation("signals");
   const dateLocale = useDateLocale();
 
   const [filters, setFilters] = useState<Filters>({
     definitionId: "",
-    blockId: "",
+    blockId: lockedBlockId ?? "",
     since: defaultSince(),
     until: null,
     templatedOnly: false,
   });
+  // Switching blocks in the console remounts nothing — the panel just gets a
+  // new id — so re-pin the filter rather than keep showing the old block.
+  useEffect(() => {
+    if (lockedBlockId) setFilters((f) => ({ ...f, blockId: lockedBlockId }));
+  }, [lockedBlockId]);
   const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters((f) => ({ ...f, [k]: v }));
 
@@ -100,7 +117,8 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
   const blocksQ = useQuery({
     queryKey: ["blocks", "list", farmId] as const,
     queryFn: () => listBlocks(farmId),
-    enabled: Boolean(farmId),
+    // Only the block filter consumes this; a pinned list has no picker to fill.
+    enabled: Boolean(farmId) && !lockedBlockId,
     staleTime: 60_000,
   });
   const blocks = blocksQ.data?.items ?? [];
@@ -186,21 +204,23 @@ export function ObservationList({ farmId, definitions, canDelete }: Props): Reac
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-0.5">
-          <span className="text-ap-muted">{t("log.list.filters.block")}</span>
-          <select
-            value={filters.blockId}
-            onChange={(e) => setFilter("blockId", e.target.value)}
-            className={inputCls}
-          >
-            <option value="">{t("log.list.filters.anyBlock")}</option>
-            {blocks.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {lockedBlockId ? null : (
+          <label className="flex flex-col gap-0.5">
+            <span className="text-ap-muted">{t("log.list.filters.block")}</span>
+            <select
+              value={filters.blockId}
+              onChange={(e) => setFilter("blockId", e.target.value)}
+              className={inputCls}
+            >
+              <option value="">{t("log.list.filters.anyBlock")}</option>
+              {blocks.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-0.5">
           <span className="text-ap-muted">{t("log.list.filters.since")}</span>
           <input

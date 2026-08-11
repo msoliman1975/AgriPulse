@@ -1233,13 +1233,80 @@ global:
   #
   #   Images verified by pulling on the node before this commit:
   #   api sha256:5c30b43e, workers sha256:afa2f40d.
+  # 0e67d59 = #414, signal capture on a block from the Farm Console inspector.
+  #   The console could edit a block's agronomics, crop, grid and responsible
+  #   agronomist but not log an observation against it -- the only capture
+  #   surface was /signals -> Log, which re-picks the farm and hunts for the
+  #   block in a dropdown, throwing away the block context the console already
+  #   has and filing the reading against the wrong unit when the pick is wrong.
+  #
+  #   FRONTEND-ONLY -- no backend delta, so api/workers stay on d5feb37 and
+  #   tile-server on 9d140cc. No migration. Unlike crop attributes (which
+  #   needed block_crop_attribute_values plus a companion history table), a
+  #   signal observation is already an immutable timestamped row carrying
+  #   recorded_by, and the list endpoint already filters by block_id -- the
+  #   observations ARE the history, so nothing new was persisted.
+  #
+  #   #414 is the ONLY frontend change between bc63176 and this tag, so the
+  #   promote ships exactly this feature. Plain tag revert to bc63176 is a
+  #   safe rollback: nothing else rides along and no schema moved.
+  #
+  #   NOT browser-verified. tsc/eslint/prettier clean and 120 unit tests pass
+  #   (incl. 3 new), and CI's frontend job is green -- but the panel has never
+  #   been rendered in a real browser, so first real render is in prod.
+  #
+  #   Image verified from the merge build's own log, not the job conclusion:
+  #   pushing manifest for frontend:0e67d59@sha256:cc0a41ae.
+  # f81df64 = #416, /platform/roles -- the first surface that shows what any
+  #   role can actually do. Until now the only answers to "what can a
+  #   FarmManager do?" were reading role_capabilities.yaml or a Python REPL.
+  #
+  #   Two halves, and the second one changes what users see:
+  #
+  #     * The page itself. GET /api/v1/admin/rbac/matrix returns all 10 roles
+  #       and 94 capabilities in one payload, gated on the EXISTING
+  #       platform.read -- no new capability, no migration. Read-only;
+  #       editing grants at runtime is Phase 2 and is deliberately not here.
+  #
+  #     * A resync of frontend/src/rbac/capabilities.ts, which restates the
+  #       whole matrix so useCapability can resolve locally from JWT claims.
+  #       Nothing generated it and nothing checked it, and it had drifted in
+  #       BOTH directions. Controls appear and disappear in prod:
+  #         - BillingAdmin had no entry at all, so roleGrants() returned false
+  #           for everything and the role saw nothing it was entitled to.
+  #         - The Capability union listed 64 of 94 names; every non-wildcard
+  #           role's grant set was short (TenantOwner 56/81, FarmManager
+  #           42/56), hiding controls users were allowed to use.
+  #         - Four grants existed ONLY on the frontend and are now gone:
+  #           Agronomist -> plan.manage + alert_rule.manage, FarmManager ->
+  #           alert_rule.manage, PlatformSupport -> irrigation.schedule.read.
+  #           These rendered buttons that 403 on click. Removing them takes
+  #           buttons away from anyone whose ONLY role is FarmManager or
+  #           Agronomist; anyone also holding a tenant role keeps the
+  #           capability through that tier.
+  #
+  #   api/workers move off d5feb37 for the first time since #413. This commit
+  #   is the ONLY backend change in that range and there are NO migrations in
+  #   it, so the bump ships exactly this feature -- verified with
+  #   `git log d5feb37..f81df64 -- backend/` and a diff of backend/migrations/.
+  #   tile-server unchanged. Plain tag revert to d5feb37 (api/workers) and
+  #   0e67d59 (frontend) is a safe rollback; no schema moved.
+  #
+  #   NOT browser-verified. tsc/eslint/ruff/black clean, 747 frontend tests,
+  #   20 backend RBAC unit tests and 4 integration tests against a real
+  #   Postgres all pass, and CI is fully green -- but the page has never been
+  #   rendered in a real browser, so first real render is in prod.
+  #
+  #   Images verified from the merge build's own log, not the job conclusion:
+  #   api:f81df64@sha256:83269183, workers:f81df64@sha256:d82a1de0,
+  #   frontend:f81df64@sha256:f2feccac.
   images:
     api:
-      tag: "d5feb37"
+      tag: "f81df64"
     workers:
-      tag: "d5feb37"
+      tag: "f81df64"
     frontend:
-      tag: "bc63176"
+      tag: "f81df64"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
