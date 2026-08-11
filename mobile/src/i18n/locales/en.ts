@@ -20,6 +20,7 @@ export const en = {
   "visits.overdue": "Overdue",
   "visits.assigned": "Assigned to me",
   "visits.claimable": "Open to claim",
+  "work.board": "Scheduled work",
   "visits.empty": "Nothing to walk right now.",
   "visits.loadFailed": "Could not load your visits.",
   "visits.claim": "I'll take it",

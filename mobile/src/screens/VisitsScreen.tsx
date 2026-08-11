@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import { claimVisit, listVisits, type Visit } from "@/api/client";
+import { claimVisit, listMyWork, listVisits, type Visit, type WorkItem } from "@/api/client";
 import { signOut } from "@/auth/session";
 import { dueIn, t, type Lang } from "@/i18n";
 import { resetLangOnSignOut } from "@/i18n/preference";
@@ -45,16 +45,25 @@ function VisitRow({ lang, visit, onClaim }: { lang: Lang; visit: Visit; onClaim?
 export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): ReactNode {
   const [mine, setMine] = useState<Visit[]>([]);
   const [claimable, setClaimable] = useState<Visit[]>([]);
+  const [board, setBoard] = useState<WorkItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   async function load(): Promise<void> {
     try {
-      const [assigned, open] = await Promise.all([
+      // `/me/work` merges the three key spaces a person can be assigned in;
+      // the visit calls stay because claiming still needs the visit shape and
+      // `claimable` is work assigned to nobody, which is not "mine" by any
+      // definition.
+      const [assigned, open, work] = await Promise.all([
         listVisits(farmId, { mine: true }),
         listVisits(farmId, { claimable: true }),
+        listMyWork(farmId),
       ]);
       setMine(ordered(assigned));
       setClaimable(ordered(open));
+      // Visits already have their own sections above; showing them twice
+      // would make one job look like two.
+      setBoard(work.filter((w) => w.kind !== "scouting_visit"));
       setError(null);
     } catch {
       setError(t(lang, "visits.loadFailed"));
@@ -120,6 +129,26 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
         ))}
       </ul>
 
+      {board.length > 0 ? (
+        <>
+          <h2 className="section">{t(lang, "work.board")}</h2>
+          <ul>
+            {board.map((w) => (
+              <li key={w.id} className="visit work">
+                <span className="ring">{dueIn(lang, w.due_at)}</span>
+                <div className="body">
+                  <div className="title">{w.title}</div>
+                  {w.detail ? <div className="instruction">{w.detail}</div> : null}
+                  <div className="meta">
+                    <span className="origin origin-plan">{w.status}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
       <h2 className="section">{t(lang, "visits.claimable")}</h2>
       <ul>
         {claimable.map((v) => (
@@ -137,7 +166,7 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
         ))}
       </ul>
 
-      {mine.length === 0 && claimable.length === 0 && !error ? (
+      {mine.length === 0 && claimable.length === 0 && board.length === 0 && !error ? (
         <p className="empty">{t(lang, "visits.empty")}</p>
       ) : null}
     </div>

@@ -70,6 +70,33 @@ export interface Visit {
   assigned_to: string | null;
 }
 
+/** One item of work, whatever surface assigned it. Mirrors WorkItemResponse. */
+export interface WorkItem {
+  kind: "scouting_visit" | "plan_activity";
+  id: string;
+  farm_id: string;
+  block_id: string | null;
+  title: string;
+  detail: string | null;
+  status: string;
+  category: string | null;
+  severity: "info" | "warning" | "critical" | null;
+  priority: "low" | "medium" | "high" | null;
+  due_at: string | null;
+}
+
+/**
+ * Everything assigned to this scout, merged server-side.
+ *
+ * `listVisits` only ever saw `scouting_visits`. Board work — the natural way a
+ * supervisor schedules a crew — is keyed on a membership, not a user, so it
+ * was structurally invisible here: the scout saw an empty list while their
+ * name sat on the activities.
+ */
+export function listMyWork(farmId: string) {
+  return request<WorkItem[]>(`/me/work?farm_id=${encodeURIComponent(farmId)}`);
+}
+
 export function listVisits(farmId: string, params: { mine?: boolean; claimable?: boolean } = {}) {
   const q = new URLSearchParams({ farm_id: farmId });
   if (params.mine) q.set("mine", "true");

@@ -142,3 +142,27 @@ class UserUpdateRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=32)
     avatar_url: str | None = Field(default=None, max_length=500)
     preferences: dict[str, Any] | None = None  # partial preferences patch
+
+
+class WorkItemResponse(BaseModel):
+    """One thing assigned to the signed-in person, whatever surface set it.
+
+    Deliberately flat and shared across kinds. The phone renders one list, and
+    a client that had to branch on `kind` before it could show a title would be
+    doing the merge this endpoint exists to have already done.
+    """
+
+    kind: Literal["scouting_visit", "plan_activity"]
+    id: UUID
+    farm_id: UUID
+    block_id: UUID | None = None
+    title: str
+    detail: str | None = None
+    status: str
+    # `origin` for a visit, `activity_type` for board work.
+    category: str | None = None
+    severity: str | None = None
+    priority: str | None = None
+    # ISO date or timestamp. A visit carries a deadline; board work carries the
+    # day it is scheduled for.
+    due_at: str | None = None

@@ -21,6 +21,7 @@ export const ar: Messages = {
   "visits.overdue": "متأخرة",
   "visits.assigned": "مُسندة إليّ",
   "visits.claimable": "متاحة",
+  "work.board": "أعمال مجدولة",
   "visits.empty": "لا توجد زيارات الآن.",
   "visits.loadFailed": "تعذّر تحميل الزيارات.",
   "visits.claim": "أتولى المهمة",
