@@ -449,8 +449,10 @@ class FieldEnrolmentService:
         result = await self._tenant.execute(
             text(
                 "UPDATE resources SET role = :role, updated_at = now() "
-                "WHERE id = ANY(:ids) AND farm_id = :fid AND kind = 'worker' "
-                "AND role = 'FieldWorker' AND archived_at IS NULL"
+                "WHERE id = ANY(:ids) AND kind = 'worker' "
+                "AND role = 'FieldWorker' AND archived_at IS NULL "
+                "AND EXISTS (SELECT 1 FROM resource_farms rf "
+                "            WHERE rf.resource_id = resources.id AND rf.farm_id = :fid)"
             ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
             {"role": role, "ids": list(worker_ids), "fid": farm_id},
         )
@@ -697,17 +699,15 @@ class FieldEnrolmentService:
         await self._tenant.execute(
             text(
                 """
-                INSERT INTO resources (id, farm_id, kind, name, role, phone, membership_id)
-                VALUES (:id, :fid, 'worker', :name, :role, :phone, :mid)
+                INSERT INTO resources (id, kind, name, role, phone, membership_id)
+                VALUES (:id, 'worker', :name, :role, :phone, :mid)
                 """
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
-                bindparam("fid", type_=PG_UUID(as_uuid=True)),
                 bindparam("mid", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "id": new_id,
-                "fid": farm_id,
                 "name": full_name,
                 "role": role,
                 "phone": phone,

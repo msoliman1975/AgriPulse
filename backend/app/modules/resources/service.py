@@ -83,10 +83,6 @@ class ResourcesServiceImpl:
         resource_id = uuid7()
         created = await self._repo.insert(
             resource_id=resource_id,
-            # Dual-written until 0071 drops the column: the running image may
-            # still be one that reads it, and a row it cannot see is worse
-            # than a redundant value.
-            farm_id=farm_id,
             kind=kind,
             name=name.strip(),
             role=role,

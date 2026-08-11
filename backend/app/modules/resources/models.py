@@ -26,11 +26,8 @@ class Resource(Base, TimestampedMixin):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
-    farm_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("farms.id", ondelete="CASCADE"),
-        nullable=False,
-    )
+    # No `farm_id`: dropped in 0071. Availability lives in `resource_farms`,
+    # because one person can work several farms and a column cannot say that.
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str | None] = mapped_column(Text, nullable=True)

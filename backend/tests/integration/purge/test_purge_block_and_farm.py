@@ -411,13 +411,10 @@ async def test_farm_purge_archives_its_own_workers_and_spares_shared_ones(
     for rid, name in ((only_here, "Only Here"), (shared, "Shared Sami")):
         await admin_session.execute(
             text(
-                "INSERT INTO resources (id, farm_id, kind, name, role) "
-                "VALUES (:id, :f, 'worker', :n, 'Scout')"
-            ).bindparams(
-                bindparam("id", type_=PG_UUID(as_uuid=True)),
-                bindparam("f", type_=PG_UUID(as_uuid=True)),
-            ),
-            {"id": rid, "f": UUID(doomed_farm), "n": name},
+                "INSERT INTO resources (id, kind, name, role) "
+                "VALUES (:id, 'worker', :n, 'Scout')"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {"id": rid, "n": name},
         )
         await admin_session.execute(
             text("INSERT INTO resource_farms (resource_id, farm_id) VALUES (:r, :f)").bindparams(

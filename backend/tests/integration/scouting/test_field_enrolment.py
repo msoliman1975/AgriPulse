@@ -100,8 +100,8 @@ async def _seed_worker(
     worker_id = (
         await session.execute(
             text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', :n, :r, :p) RETURNING id"
+                "INSERT INTO resources (kind, name, role, phone) "
+                "VALUES ('worker', :n, :r, :p) RETURNING id"
             ),
             {"f": farm_id, "n": name, "r": role, "p": phone},
         )
@@ -231,8 +231,8 @@ async def test_enrolment_can_adopt_an_existing_worker_row(
     worker_id = (
         await admin_session.execute(
             text(
-                "INSERT INTO resources (farm_id, kind, name, role) "
-                "VALUES (CAST(:f AS uuid), 'worker', 'Existing Hand', 'Scout') RETURNING id"
+                "INSERT INTO resources (kind, name, role) "
+                "VALUES ('worker', 'Existing Hand', 'Scout') RETURNING id"
             ),
             {"f": env.farm_id},
         )
@@ -301,28 +301,22 @@ async def test_re_role_only_touches_field_workers(
     """A bulk action that could rewrite any role would be a way to grant
     Agronomist to a dozen people at once."""
     env = scouting_env
-    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
-    blocked = (
-        await admin_session.execute(
-            text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', 'Blocked', 'FieldWorker', '+201003333333') "
-                "RETURNING id"
-            ),
-            {"f": env.farm_id},
-        )
-    ).scalar()
-    agronomist = (
-        await admin_session.execute(
-            text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', 'Agro', 'Agronomist', '+201004444444') "
-                "RETURNING id"
-            ),
-            {"f": env.farm_id},
-        )
-    ).scalar()
-    await admin_session.commit()
+    blocked = await _seed_worker(
+        admin_session,
+        schema=env.schema,
+        farm_id=env.farm_id,
+        name="Blocked",
+        role="FieldWorker",
+        phone="+201003333333",
+    )
+    agronomist = await _seed_worker(
+        admin_session,
+        schema=env.schema,
+        farm_id=env.farm_id,
+        name="Agro",
+        role="Agronomist",
+        phone="+201004444444",
+    )
 
     async with _client(env.admin_context) as client:
         resp = await client.post(
@@ -521,28 +515,22 @@ async def test_re_role_ignores_workers_on_another_farm(
     assert created.status_code == 201, created.text
     other_farm = created.json()["id"]
 
-    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
-    mine = (
-        await admin_session.execute(
-            text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', 'Mine', 'FieldWorker', '+201005555555') "
-                "RETURNING id"
-            ),
-            {"f": env.farm_id},
-        )
-    ).scalar()
-    theirs = (
-        await admin_session.execute(
-            text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', 'Theirs', 'FieldWorker', '+201006666666') "
-                "RETURNING id"
-            ),
-            {"f": str(other_farm)},
-        )
-    ).scalar()
-    await admin_session.commit()
+    mine = await _seed_worker(
+        admin_session,
+        schema=env.schema,
+        farm_id=env.farm_id,
+        name="Mine",
+        role="FieldWorker",
+        phone="+201005555555",
+    )
+    theirs = await _seed_worker(
+        admin_session,
+        schema=env.schema,
+        farm_id=str(other_farm),
+        name="Theirs",
+        role="FieldWorker",
+        phone="+201006666666",
+    )
 
     async with _client(_farm_manager(env)) as client:
         resp = await client.post(

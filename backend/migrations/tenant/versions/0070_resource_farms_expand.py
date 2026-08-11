@@ -170,8 +170,12 @@ def downgrade() -> None:
         BEGIN
             SELECT count(*) INTO orphans FROM resources WHERE farm_id IS NULL;
             IF orphans > 0 THEN
-                RAISE EXCEPTION
-                    'cannot downgrade: % resource(s) belong to no farm', orphans;
+                -- USING MESSAGE, not RAISE's format string: its placeholder
+                -- is a percent sign, which psycopg reads as a parameter
+                -- marker and mangles before Postgres ever sees it.
+                RAISE EXCEPTION USING MESSAGE =
+                    'cannot downgrade: ' || orphans
+                    || ' resource(s) belong to no farm';
             END IF;
         END $$
         """

@@ -29,7 +29,6 @@ class ResourcesRepository:
         self,
         *,
         resource_id: UUID,
-        farm_id: UUID,
         kind: str,
         name: str,
         role: str | None,
@@ -40,7 +39,6 @@ class ResourcesRepository:
     ) -> dict[str, Any]:
         resource = Resource(
             id=resource_id,
-            farm_id=farm_id,
             kind=kind,
             name=name,
             role=role,
@@ -56,7 +54,7 @@ class ResourcesRepository:
             await self._session.flush()
         except IntegrityError as exc:
             msg = str(exc.orig) if exc.orig else str(exc)
-            if "uq_resources_farm_kind_active_name" in msg:
+            if "uq_resources_kind_active_name" in msg:
                 raise DuplicateResourceNameError(name=name, kind=kind) from exc
             if "ck_resources" in msg:
                 raise InvalidResourceShapeError(
@@ -65,11 +63,10 @@ class ResourcesRepository:
             raise
         return _to_dict(resource)
 
-    async def get(self, *, resource_id: UUID, farm_id: UUID | None = None) -> dict[str, Any] | None:
-        clauses = [Resource.id == resource_id, Resource.deleted_at.is_(None)]
-        if farm_id is not None:
-            clauses.append(Resource.farm_id == farm_id)
-        stmt = select(Resource).where(*clauses)
+    async def get(self, *, resource_id: UUID) -> dict[str, Any] | None:
+        stmt = select(Resource).where(
+            Resource.id == resource_id, Resource.deleted_at.is_(None)
+        )
         row = (await self._session.execute(stmt)).scalars().one_or_none()
         return _to_dict(row) if row else None
 
@@ -185,7 +182,7 @@ class ResourcesRepository:
             row = (await self._session.execute(stmt)).scalars().one_or_none()
         except IntegrityError as exc:
             msg = str(exc.orig) if exc.orig else str(exc)
-            if "uq_resources_farm_kind_active_name" in msg:
+            if "uq_resources_kind_active_name" in msg:
                 raise DuplicateResourceNameError(
                     name=str(changes.get("name", "")), kind="resource"
                 ) from exc
@@ -249,7 +246,6 @@ def _to_dict(row: Resource | None) -> dict[str, Any]:
         return {}  # caller is responsible for None checks; this branch unused
     return {
         "id": row.id,
-        "farm_id": row.farm_id,
         "kind": row.kind,
         "name": row.name,
         "role": row.role,
