@@ -1147,13 +1147,55 @@ global:
   #
   #   Image verified in ghcr BEFORE this commit, by manifest not by run
   #   conclusion: frontend sha256:a6fd58a0.
+  # bc63176 = #412 field access for scouts + tenant-level workers/equipment.
+  #
+  #   *** THIS BUMP HAS NO ROLLBACK PATH. *** Its PreSync job runs BOTH halves
+  #   of the resources promotion: tenant 0070 (adds resource_farms, backfills
+  #   1:1, relaxes resources.farm_id, and re-points that FK from ON DELETE
+  #   CASCADE to SET NULL) and tenant 0071 (DROPS resources.farm_id, makes the
+  #   name index tenant-wide, makes membership_id UNIQUE).
+  #
+  #   Once 0071 has run, 7889d95 CANNOT serve: it selects resources.farm_id on
+  #   every read of the module, and the column is gone. A tag-only rollback
+  #   yields UndefinedColumn on the board's worker picker, the workers screen
+  #   and enrolment. Recovery is forward-fix, or `alembic downgrade 0069` per
+  #   tenant first -- and that downgrade REFUSES while any resource is linked
+  #   to no farm, by design, because pre-0070 farm_id is NOT NULL.
+  #
+  #   Shipping both halves at once was an explicit call, made knowing the
+  #   above. The expand/contract split exists precisely so they can go
+  #   separately; taking them together trades the rollback path for one deploy.
+  #
+  #   Pre-flight scans re-run against THIS database immediately before 0071 was
+  #   written: zero cross-farm name collisions, zero memberships holding more
+  #   than one worker row, across all three tenants. Both are hard failures in
+  #   the migration if they ever become non-zero, with the offending names in
+  #   the error.
+  #
+  #   FCM stops being inert: FCM_ENABLED/FCM_PROJECT_ID are set in this file's
+  #   env block and FCM_SERVICE_ACCOUNT_JSON was hand-seeded into
+  #   agripulse-app-secrets (ESO is off here, so ArgoCD will not revert it).
+  #   Sends move from recording `skipped` to actually reaching Google.
+  #
+  #   frontend also moves: the bundle gains /settings/field-access and drops
+  #   `farm_id` from its Resource type. api + workers + frontend all go to
+  #   bc63176; tile-server stays 9d140cc.
+  #
+  #   TAG IS 7 CHARS -- git prints bc631764 (8); ghcr has bc63176. Bumping to
+  #   what git printed would have been an ImagePullBackOff on every pod, with
+  #   0071 already applied by the PreSync job.
+  #
+  #   Images verified BEFORE this commit by pulling them on the node itself,
+  #   not by run conclusion and not via the packages REST API (which 404s for
+  #   this repo): api sha256:cb22e4b7, workers sha256:c805a80a, frontend
+  #   sha256:f07acf90. frontend again lagged api/workers by several minutes.
   images:
     api:
-      tag: "7889d95"
+      tag: "bc63176"
     workers:
-      tag: "7889d95"
+      tag: "bc63176"
     frontend:
-      tag: "fb6981b"
+      tag: "bc63176"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
