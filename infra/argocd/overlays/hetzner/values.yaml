@@ -1233,13 +1233,37 @@ global:
   #
   #   Images verified by pulling on the node before this commit:
   #   api sha256:5c30b43e, workers sha256:afa2f40d.
+  # 0e67d59 = #414, signal capture on a block from the Farm Console inspector.
+  #   The console could edit a block's agronomics, crop, grid and responsible
+  #   agronomist but not log an observation against it -- the only capture
+  #   surface was /signals -> Log, which re-picks the farm and hunts for the
+  #   block in a dropdown, throwing away the block context the console already
+  #   has and filing the reading against the wrong unit when the pick is wrong.
+  #
+  #   FRONTEND-ONLY -- no backend delta, so api/workers stay on d5feb37 and
+  #   tile-server on 9d140cc. No migration. Unlike crop attributes (which
+  #   needed block_crop_attribute_values plus a companion history table), a
+  #   signal observation is already an immutable timestamped row carrying
+  #   recorded_by, and the list endpoint already filters by block_id -- the
+  #   observations ARE the history, so nothing new was persisted.
+  #
+  #   #414 is the ONLY frontend change between bc63176 and this tag, so the
+  #   promote ships exactly this feature. Plain tag revert to bc63176 is a
+  #   safe rollback: nothing else rides along and no schema moved.
+  #
+  #   NOT browser-verified. tsc/eslint/prettier clean and 120 unit tests pass
+  #   (incl. 3 new), and CI's frontend job is green -- but the panel has never
+  #   been rendered in a real browser, so first real render is in prod.
+  #
+  #   Image verified from the merge build's own log, not the job conclusion:
+  #   pushing manifest for frontend:0e67d59@sha256:cc0a41ae.
   images:
     api:
       tag: "d5feb37"
     workers:
       tag: "d5feb37"
     frontend:
-      tag: "bc63176"
+      tag: "0e67d59"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
