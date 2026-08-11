@@ -1,15 +1,14 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 import type { RbacCapability, RbacRole } from "@/api/rbacMatrix";
-import { Card } from "@/components/Card";
 import { DataTable, type Column } from "@/components/DataTable";
-import { KPICard } from "@/components/KPICard";
-import { KPIRow } from "@/components/KPIRow";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { Tooltip } from "@/components/Tooltip";
 import { Toolbar, ToolbarChips, type FilterAxis, type FilterValues } from "@/components/Toolbar";
 import { mapAsyncState, queryState } from "@/components/asyncState";
 import { useRbacMatrix } from "@/queries/rbacMatrix";
@@ -19,12 +18,40 @@ type ViewMode = "byRole" | "byCapability";
 /** Order the tier bands the way authority flows, not alphabetically. */
 const TIER_ORDER = ["platform", "tenant", "farm"] as const;
 
+/**
+ * A column header that explains itself on hover/focus.
+ *
+ * "Granted", "Scope" and "Status" are all terms of art here — Scope in
+ * particular is documentation only (the resolver ignores it), which nobody
+ * would guess. The description is also rendered sr-only, because the shared
+ * Tooltip is visual and does not wire aria-describedby.
+ */
+function HeaderWithHint({ label, hint }: { label: string; hint: string }): ReactNode {
+  return (
+    <Tooltip content={hint} className="w-56 whitespace-normal text-start font-normal">
+      {/* A real button: it is focusable by keyboard and reveals the hint, which
+          a bare span with tabIndex is not. */}
+      <button
+        type="button"
+        className="cursor-help font-inherit underline decoration-dotted underline-offset-4"
+      >
+        {label}
+        <span className="sr-only"> — {hint}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
 export function PlatformRolesPage(): ReactNode {
   const { t } = useTranslation("admin");
   const matrix = useRbacMatrix();
 
+  // Selection lives in the URL so a view can be handed to someone else,
+  // matching the pattern PlatformObserverPage established.
+  const [params] = useSearchParams();
+  const selectedRole = params.get("role");
+
   const [view, setView] = useState<ViewMode>("byRole");
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterValues>({});
   // Default to "granted only": it turns the first paint into the 20-80 rows
@@ -35,8 +62,8 @@ export function PlatformRolesPage(): ReactNode {
   const roles = useMemo(() => data?.roles ?? [], [data]);
   const capabilities = useMemo(() => data?.capabilities ?? [], [data]);
 
-  // Falls back to the first role once loaded, so the detail pane is never
-  // an empty frame waiting on a click.
+  // Falls back to the first role once loaded, so the detail table is never an
+  // empty frame waiting on a click.
   const activeRole: RbacRole | undefined =
     roles.find((r) => r.name === selectedRole) ?? roles[0];
 
@@ -45,7 +72,7 @@ export function PlatformRolesPage(): ReactNode {
     [activeRole],
   );
 
-  /** role name -> the roles granting it, for the by-capability view. */
+  /** capability name -> the roles granting it, for the by-capability view. */
   const grantedBy = useMemo(() => {
     const map = new Map<string, RbacRole[]>();
     for (const cap of capabilities) map.set(cap.name, []);
@@ -59,14 +86,14 @@ export function PlatformRolesPage(): ReactNode {
     const resources = Array.from(new Set(capabilities.map((c) => c.resource))).sort();
     return [
       {
-        key: "resource",
-        label: t("roles.filterResource"),
-        options: resources.map((r) => ({ value: r, label: r })),
-      },
-      {
         key: "scope",
         label: t("roles.filterScope"),
         options: TIER_ORDER.map((s) => ({ value: s, label: t(`roles.tier_${s}`) })),
+      },
+      {
+        key: "resource",
+        label: t("roles.filterResource"),
+        options: resources.map((r) => ({ value: r, label: r })),
       },
       {
         key: "status",
@@ -111,6 +138,71 @@ export function PlatformRolesPage(): ReactNode {
       <span className="text-ap-muted">{t("roles.statusActive")}</span>
     );
 
+  const scopeHeader = (
+    <HeaderWithHint label={t("roles.colScope")} hint={t("roles.tipScope")} />
+  );
+  const statusHeader = (
+    <HeaderWithHint label={t("roles.colStatus")} hint={t("roles.tipStatus")} />
+  );
+
+  const roleColumns: Column<RbacRole>[] = [
+    {
+      key: "name",
+      header: t("roles.colRole"),
+      cell: (role) => {
+        const isActive = role.name === activeRole?.name;
+        // DataTable wraps this cell in the row's <Link>, which is the focusable
+        // element — a second focus target here would be redundant and invalid.
+        // `title` carries the description on hover; the sr-only copy puts it in
+        // the link's accessible name for screen readers.
+        return (
+          <span
+            title={role.description}
+            aria-current={isActive ? "true" : undefined}
+            className={isActive ? "font-semibold text-ap-primary" : "text-ap-ink"}
+          >
+            {isActive ? <span aria-hidden="true">▸ </span> : null}
+            {/* Name in its own element so the sr-only description below does
+                not fuse with it when queried or read aloud. */}
+            <span>{role.name}</span>
+            <span className="sr-only"> — {role.description}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "tier",
+      header: <HeaderWithHint label={t("roles.colTier")} hint={t("roles.tipTier")} />,
+      className: "text-xs",
+      cell: (role) => t(`roles.tier_${role.tier}`, { defaultValue: role.tier }),
+    },
+    {
+      key: "count",
+      header: t("roles.colPermissions"),
+      className: "text-end tabular-nums",
+      cell: (role) =>
+        role.wildcard ? <Pill kind="info">{t("roles.wildcard")}</Pill> : role.capability_count,
+    },
+    {
+      key: "active",
+      header: t("roles.statusActive"),
+      className: "text-end tabular-nums text-ap-muted",
+      cell: (role) => role.active_count,
+    },
+    {
+      key: "stub",
+      header: t("roles.statusStub"),
+      className: "text-end tabular-nums text-ap-muted",
+      cell: (role) => role.stub_count,
+    },
+    {
+      key: "holders",
+      header: <HeaderWithHint label={t("roles.colHolders")} hint={t("roles.tipHolders")} />,
+      className: "text-end tabular-nums",
+      cell: (role) => role.holders.total,
+    },
+  ];
+
   const identityCell = (cap: RbacCapability) => (
     <>
       <code className="font-mono text-xs text-ap-ink">{cap.name}</code>
@@ -122,7 +214,7 @@ export function PlatformRolesPage(): ReactNode {
     { key: "name", header: t("roles.colCapability"), cell: identityCell },
     {
       key: "granted",
-      header: t("roles.colGranted"),
+      header: <HeaderWithHint label={t("roles.colGranted")} hint={t("roles.tipGranted")} />,
       className: "text-center",
       cell: (cap) =>
         grantedNames.has(cap.name) ? (
@@ -137,18 +229,18 @@ export function PlatformRolesPage(): ReactNode {
     },
     {
       key: "scope",
-      header: t("roles.colScope"),
+      header: scopeHeader,
       className: "text-xs",
       cell: (cap) => t(`roles.tier_${cap.scope}`, { defaultValue: cap.scope }),
     },
-    { key: "status", header: t("roles.colStatus"), className: "text-xs", cell: statusCell },
+    { key: "status", header: statusHeader, className: "text-xs", cell: statusCell },
   ];
 
   const byCapabilityColumns: Column<RbacCapability>[] = [
     { key: "name", header: t("roles.colCapability"), cell: identityCell },
     {
       key: "grantedTo",
-      header: t("roles.colGrantedTo"),
+      header: <HeaderWithHint label={t("roles.colGrantedTo")} hint={t("roles.tipGrantedTo")} />,
       cell: (cap) => {
         const holders = grantedBy.get(cap.name) ?? [];
         if (holders.length === 0) {
@@ -168,80 +260,40 @@ export function PlatformRolesPage(): ReactNode {
     },
     {
       key: "scope",
-      header: t("roles.colScope"),
+      header: scopeHeader,
       className: "text-xs",
       cell: (cap) => t(`roles.tier_${cap.scope}`, { defaultValue: cap.scope }),
     },
-    { key: "status", header: t("roles.colStatus"), className: "text-xs", cell: statusCell },
+    { key: "status", header: statusHeader, className: "text-xs", cell: statusCell },
   ];
 
   return (
     <Page>
-      <PageHeader title={t("roles.title")} subtitle={t("roles.subtitle")} />
+      <PageHeader
+        title={t("roles.title")}
+        subtitle={
+          data
+            ? t("roles.subtitleCounts", {
+                roles: roles.length,
+                permissions: data.capability_count,
+                enforced: data.active_count,
+                pending: data.stub_count,
+              })
+            : t("roles.subtitle")
+        }
+      />
 
-      <KPIRow columns={3}>
-        <KPICard title={t("roles.kpiRoles")} value={roles.length || "—"} />
-        <KPICard
-          title={t("roles.kpiCapabilities")}
-          value={data?.capability_count ?? "—"}
-          hint={data ? t("roles.kpiCapabilitiesHint", { n: data.active_count }) : undefined}
-        />
-        <KPICard
-          title={t("roles.kpiPending")}
-          value={data?.stub_count ?? "—"}
-          hint={t("roles.kpiPendingHint")}
-        />
-      </KPIRow>
-
-      {TIER_ORDER.map((tier) => {
-        const band = roles.filter((r) => r.tier === tier);
-        if (band.length === 0) return null;
-        return (
-          <section key={tier} className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-ap-ink">{t(`roles.band_${tier}`)}</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {band.map((role) => {
-                const isActive = role.name === activeRole?.name;
-                return (
-                  <Card
-                    key={role.name}
-                    title={role.name}
-                    actions={
-                      role.wildcard ? (
-                        <Pill kind="info">{t("roles.wildcard")}</Pill>
-                      ) : (
-                        <Pill kind="neutral">{role.capability_count}</Pill>
-                      )
-                    }
-                    className={isActive ? "ring-2 ring-ap-primary" : undefined}
-                  >
-                    <button
-                      type="button"
-                      className="w-full cursor-pointer text-start hover:opacity-80"
-                      onClick={() => {
-                        setSelectedRole(role.name);
-                        setView("byRole");
-                      }}
-                      aria-pressed={isActive}
-                    >
-                      <p className="text-xs text-ap-muted">{role.description}</p>
-                      <p className="mt-2 text-xs text-ap-ink">
-                        {t("roles.cardCounts", {
-                          active: role.active_count,
-                          stub: role.stub_count,
-                        })}
-                      </p>
-                      <p className="text-xs text-ap-muted">
-                        {t("roles.cardHolders", { n: role.holders.total })}
-                      </p>
-                    </button>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <DataTable<RbacRole>
+        columns={roleColumns}
+        rowKey={(role) => role.name}
+        identityKey="name"
+        rowHref={(role) => `?role=${encodeURIComponent(role.name)}`}
+        state={mapAsyncState(queryState(matrix), (m) => m.roles)}
+        caption={t("roles.tableCaptionRoles")}
+        errorMessage={t("roles.loadFailed")}
+        empty={t("roles.emptyRoles")}
+        skeletonRows={5}
+      />
 
       <SegmentedControl<ViewMode>
         items={[
@@ -274,6 +326,7 @@ export function PlatformRolesPage(): ReactNode {
           ) : undefined
         }
         axes={axes}
+        axisLayout="inline"
         values={filters}
         onValuesChange={setFilters}
         resultCount={{ shown: visible.length, total: capabilities.length }}
@@ -287,7 +340,10 @@ export function PlatformRolesPage(): ReactNode {
         identityKey="name"
         caption={
           view === "byRole" && activeRole
-            ? t("roles.tableCaptionRole", { role: activeRole.name })
+            ? t("roles.tableCaptionRole", {
+                role: activeRole.name,
+                description: activeRole.description,
+              })
             : t("roles.tableCaptionAll")
         }
         errorMessage={t("roles.loadFailed")}

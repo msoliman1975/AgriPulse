@@ -991,11 +991,6 @@
   "roles": {
     "title": "Roles & permissions",
     "subtitle": "Every role in the platform and the permissions it grants. Read-only — the policy ships with the release.",
-    "kpiRoles": "Roles",
-    "kpiCapabilities": "Permissions",
-    "kpiCapabilitiesHint": "{{n}} enforced today",
-    "kpiPending": "Not yet enforced",
-    "kpiPendingHint": "Reserved for modules that have not shipped",
     "band_platform": "Platform roles",
     "band_tenant": "Tenant roles",
     "band_farm": "Farm roles",
@@ -1026,10 +1021,23 @@
     "grantedYes": "Granted",
     "grantedNo": "Not granted",
     "grantedToNone": "No role",
-    "tableCaptionRole": "Permissions for {{role}}",
+    "tableCaptionRole": "Permissions for {{role}} — {{description}}",
     "tableCaptionAll": "All permissions",
     "loadFailed": "Could not load the roles and permissions.",
     "empty": "No permissions are defined.",
-    "noResults": "No permission matches these filters."
+    "noResults": "No permission matches these filters.",
+    "subtitleCounts": "{{roles}} roles · {{permissions}} permissions · {{enforced}} enforced · {{pending}} not yet enforced",
+    "colRole": "Role",
+    "colTier": "Tier",
+    "colPermissions": "Permissions",
+    "colHolders": "People",
+    "tableCaptionRoles": "Roles — select one to see its permissions",
+    "emptyRoles": "No roles are defined.",
+    "tipGranted": "Whether this role grants the permission. A tick means a user with only this role passes the check.",
+    "tipScope": "Which layer of the token can grant this permission — platform, tenant, or a single farm. Documentation only: the resolver enforces the role mapping, not this field.",
+    "tipStatus": "Enforced means a live endpoint checks this permission today. Pending means it is reserved for a module that has not shipped, so granting it has no effect yet.",
+    "tipTier": "The layer the role is defined at. Platform roles are cross-tenant, tenant roles cover every farm in a tenant, farm roles are granted per farm.",
+    "tipHolders": "Distinct people holding this role right now, across all tenants. Someone scoped to five farms counts once.",
+    "tipGrantedTo": "Every role that grants this permission. A user holding any of them passes the check."
   }
 }
