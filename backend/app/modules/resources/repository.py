@@ -64,9 +64,7 @@ class ResourcesRepository:
         return _to_dict(resource)
 
     async def get(self, *, resource_id: UUID) -> dict[str, Any] | None:
-        stmt = select(Resource).where(
-            Resource.id == resource_id, Resource.deleted_at.is_(None)
-        )
+        stmt = select(Resource).where(Resource.id == resource_id, Resource.deleted_at.is_(None))
         row = (await self._session.execute(stmt)).scalars().one_or_none()
         return _to_dict(row) if row else None
 
