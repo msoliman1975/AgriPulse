@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import ColumnElement, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,11 +77,13 @@ class ResourcesRepository:
     ) -> tuple[dict[str, Any], ...]:
         """Roster rows. ``farm_id=None`` is the tenant-wide view.
 
-        Availability is read through ``resource_farms``, not
-        ``resources.farm_id`` — the column survives only until 0071 and no
-        longer says where a resource can be used.
+        Availability is read through ``resource_farms``: since 0071 there is
+        no ``resources.farm_id`` to read, and one row can serve many farms.
         """
-        clauses = [Resource.deleted_at.is_(None)]
+        # Annotated rather than inferred: the list would otherwise take its
+        # type from the first element (a BinaryExpression) and reject the
+        # `IN (subquery)` below, which is a plain ColumnElement.
+        clauses: list[ColumnElement[bool]] = [Resource.deleted_at.is_(None)]
         if farm_id is not None:
             clauses.append(
                 Resource.id.in_(
