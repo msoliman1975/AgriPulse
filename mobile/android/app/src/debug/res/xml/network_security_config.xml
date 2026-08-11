@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG BUILDS ONLY. Overrides the strict config in src/main by resource
+  merging; release builds never see this file and still refuse cleartext.
+
+  A dev backend moves around — 10.0.2.2 for an emulator, a LAN address for a
+  handset on Wi-Fi, a tunnel host for a colleague's machine — and all of it is
+  plain http. Maintaining that as a whitelist means every new address is a
+  silent "TypeError: Failed to fetch" with nothing in logcat to explain it.
+
+  Release keeps the whitelist in src/main, because a build pointed at
+  https://api.agripulse.cloud attempting plaintext is a bug that should fail
+  loudly rather than quietly succeed.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

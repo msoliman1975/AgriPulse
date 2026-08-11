@@ -1,19 +1,26 @@
 /**
- * Who is signed in, and which farms they may work.
+ * The signed-in person's own record: which farms they may work, and the
+ * language chosen for them.
  *
- * The farm used to be `VITE_FARM_ID`, baked in at build time. That made one
- * APK per farm, and worse, it failed silently in the wrong direction: a scout
- * on a different farm signed in perfectly well and then got "couldn't load
- * visits", because the app was asking for visits on somebody else's farm. If
- * that farm belonged to another tenant the request could not have succeeded
- * under any circumstances.
+ * Both answers come from one call. `GET /api/v1/me` returns the whole profile,
+ * and asking twice on every cold start would be two round trips on a field
+ * connection to learn things the same response already carried.
  *
- * The token already carries the answer. `farm_scopes` is exactly the set of
- * farms this person is allowed to work, so it is both the correct source and
- * the one that cannot disagree with what the API will authorize.
+ * **The farm** used to be `VITE_FARM_ID`, baked in at build time. That made one
+ * APK per farm, and it failed in the worst direction: a scout on any other farm
+ * signed in perfectly well and then got "couldn't load visits". In production
+ * the compiled farm belonged to a different *tenant* than the scout using the
+ * app, so the request could never have succeeded. `farm_scopes` is exactly the
+ * set of farms this person is allowed to work — both the correct source and the
+ * one that cannot disagree with what the API will authorize.
+ *
+ * **The language** is what makes setting it per person at enrolment mean
+ * anything on the handset. A choice made on the device still wins; that rule
+ * lives in `i18n/preference`, not here.
  */
 
 import { authedGet } from "@/api/client";
+import { isLang, type Lang } from "@/i18n";
 
 export interface FarmScope {
   farm_id: string;
@@ -26,19 +33,30 @@ interface MeResponse {
   farm_scopes?: FarmScope[];
 }
 
+export interface Me {
+  farms: FarmScope[];
+  /**
+   * Null covers three cases the caller treats identically: the request failed,
+   * the field is missing, or the stored code is a language this build has no
+   * catalogue for — that last one is why `isLang` is checked rather than
+   * trusted. The API's supported list (`app/shared/i18n.py`) and this app's
+   * locale registry are separate lists, and a value can legitimately exist in
+   * one before the other catches up.
+   */
+  language: Lang | null;
+}
+
 /**
- * The farms this scout may work, in grant order.
- *
- * Returns an empty list rather than throwing: the caller has to render
- * *something*, and "you are not assigned to a farm yet" is a far more useful
- * screen than a generic failure — it is also a real state, produced by
- * enrolling somebody and forgetting the scope.
+ * Never throws. The caller has to render *something*, and an empty farm list
+ * is a real state — enrolled, signed in, and not yet put on a farm — which
+ * deserves its own screen rather than a generic failure.
  */
-export async function fetchMyFarms(): Promise<FarmScope[]> {
+export async function fetchMe(): Promise<Me> {
   try {
     const me = await authedGet<MeResponse>("/me");
-    return me.farm_scopes ?? [];
+    const lang = me.preferences?.language;
+    return { farms: me.farm_scopes ?? [], language: isLang(lang) ? lang : null };
   } catch {
-    return [];
+    return { farms: [], language: null };
   }
 }

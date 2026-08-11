@@ -39,6 +39,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return resp.status === 204 ? (undefined as T) : ((await resp.json()) as T);
 }
 
+/**
+ * An authenticated GET for callers outside this module. Exported rather than
+ * letting them build their own fetch, so token refresh, the 401 handling and
+ * Problem Details parsing stay in one place.
+ */
+export function authedGet<T>(path: string): Promise<T> {
+  return request<T>(path);
+}
+
 export type VisitOrigin =
   | "recommendation"
   | "alert"
@@ -61,13 +70,31 @@ export interface Visit {
   assigned_to: string | null;
 }
 
+/** One item of work, whatever surface assigned it. Mirrors WorkItemResponse. */
+export interface WorkItem {
+  kind: "scouting_visit" | "plan_activity";
+  id: string;
+  farm_id: string;
+  block_id: string | null;
+  title: string;
+  detail: string | null;
+  status: string;
+  category: string | null;
+  severity: "info" | "warning" | "critical" | null;
+  priority: "low" | "medium" | "high" | null;
+  due_at: string | null;
+}
+
 /**
- * An authenticated GET for callers outside this module. Exported rather than
- * letting them build their own fetch, so token refresh, 401 handling and
- * Problem Details parsing stay in one place.
+ * Everything assigned to this scout, merged server-side.
+ *
+ * `listVisits` only ever saw `scouting_visits`. Board work — the natural way a
+ * supervisor schedules a crew — is keyed on a membership, not a user, so it
+ * was structurally invisible here: the scout saw an empty list while their
+ * name sat on the activities.
  */
-export function authedGet<T>(path: string): Promise<T> {
-  return request<T>(path);
+export function listMyWork(farmId: string) {
+  return request<WorkItem[]>(`/me/work?farm_id=${encodeURIComponent(farmId)}`);
 }
 
 export function listVisits(farmId: string, params: { mine?: boolean; claimable?: boolean } = {}) {

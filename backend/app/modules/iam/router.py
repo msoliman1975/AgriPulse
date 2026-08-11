@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
 from app.modules.iam.field_enrolment import get_field_enrolment_service
+from app.modules.iam.my_work import list_my_work
 from app.modules.iam.schemas import (
     MeResponse,
     TenantUserResponse,
@@ -19,6 +20,7 @@ from app.modules.iam.schemas import (
     UserInviteResponse,
     UserResendInviteResponse,
     UserUpdateRequest,
+    WorkItemResponse,
 )
 from app.modules.iam.service import UserNotFoundError, UserService, get_user_service
 from app.modules.iam.users_service import (
@@ -30,6 +32,7 @@ from app.modules.iam.users_service import (
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
+from app.shared.i18n import SupportedLanguage
 from app.shared.rbac.check import (
     PermissionDeniedError,
     has_capability,
@@ -126,6 +129,39 @@ async def get_me(
             detail="No user record exists for this token. Sign out and back in.",
             type_="https://agripulse.cloud/problems/user-not-found",
         ) from exc
+
+
+@router.get(
+    "/me/work",
+    response_model=list[WorkItemResponse],
+    summary="Everything assigned to the caller, across scouting and the board.",
+)
+async def get_my_work(
+    farm_id: UUID | None = None,
+    # No capability gate: every row returned is one where the caller IS the
+    # assignee. Requiring one would defeat the purpose — a Scout holds no
+    # `plan_activity.complete`, so gating on it would hide from them exactly
+    # the work somebody assigned them.
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    schema = _ensure_tenant(context)
+    if context.user_id is None:
+        raise APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="User context required",
+            detail="This endpoint needs a user-scoped token.",
+            type_="https://agripulse.cloud/problems/user-required",
+        )
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    return await list_my_work(
+        public_session=session,
+        tenant_session=tenant_session,
+        user_id=context.user_id,
+        tenant_id=tenant_id,
+        farm_id=farm_id,
+    )
 
 
 # ---------- Tenant user management ----------------------------------------
@@ -322,6 +358,11 @@ class FieldEnrolmentRequest(BaseModel):
     # Link an existing `resources` worker rather than creating a second row for
     # somebody the farm already knows about.
     worker_id: UUID | None = None
+    # The language this person's app opens in. Defaults to Arabic because that
+    # is what the field speaks, but a farm with mixed crews needs to set it per
+    # person rather than per deployment. Changeable afterwards through
+    # PATCH /users/{id} with `preferences.language`.
+    language: SupportedLanguage = "ar"
 
 
 class FieldEnrolmentResponse(BaseModel):
@@ -370,6 +411,7 @@ async def enrol_field_worker(
         full_name=payload.full_name,
         role=payload.role,
         worker_id=payload.worker_id,
+        language=payload.language,
         actor_user_id=context.user_id,
     )
     return {
