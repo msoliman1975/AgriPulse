@@ -55,6 +55,7 @@ import { TenantListPage as AdminTenantListPage } from "@/modules/admin/pages/Ten
 import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages/TenantCreatePage";
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAttributesPage";
+import { PlatformCatalogPage } from "@/modules/admin/pages/PlatformCatalogPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
@@ -296,6 +297,7 @@ export function App(): ReactNode {
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
+                <Route path="catalog" element={<PlatformCatalogPage />} />
                 <Route path="signals" element={<PlatformSignalsPage />} />
                 <Route path="crops/:cropId/attributes" element={<PlatformCropAttributesPage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />

@@ -29,17 +29,33 @@ import type { AdvanceRule, Crop, PhenologyStage } from "@/api/crops";
 import { defaultAdvance, validateStages } from "@/modules/admin/lib/phenologyStages";
 
 interface Props {
+  /** The crop supplies the *rules* — cycle and GDD base — even when the
+   *  ladder being edited belongs to one of its varieties or strains. Every
+   *  level is validated against the crop, never against its parent node. */
   crop: Crop;
+  /** The ladder to edit. Omit for the crop's own; pass an override's stages
+   *  (or a copy of the inherited ones) when editing a variety or strain. */
+  initialStages?: PhenologyStage[];
+  /** Overrides the default "Stage calendar — {crop}" heading, so an override
+   *  editor can name the node it will actually write to. */
+  heading?: string;
   busy: boolean;
   onCancel: () => void;
   onSave: (stages: PhenologyStage[]) => void;
 }
 
-export function PhenologyStagesEditor({ crop, busy, onCancel, onSave }: Props): ReactNode {
+export function PhenologyStagesEditor({
+  crop,
+  initialStages,
+  heading,
+  busy,
+  onCancel,
+  onSave,
+}: Props): ReactNode {
   const { t } = useTranslation("admin");
   const [stages, setStages] = useState<PhenologyStage[]>(
     () =>
-      crop.phenology_stages?.stages
+      (initialStages ?? crop.phenology_stages?.stages)
         ?.slice()
         .sort((a, b) => a.order - b.order)
         .map((s) => ({ ...s })) ?? [],
@@ -77,7 +93,7 @@ export function PhenologyStagesEditor({ crop, busy, onCancel, onSave }: Props): 
     <section className="rounded-md border border-ap-line bg-ap-panel p-3">
       <header className="mb-2">
         <h3 className="text-sm font-semibold text-ap-ink">
-          {t("phenology.heading", { crop: crop.name_en })}
+          {heading ?? t("phenology.heading", { crop: crop.name_en })}
         </h3>
         <p className="text-[11px] text-ap-muted">
           {crop.is_perennial ? t("phenology.perennialHint") : t("phenology.annualHint")}
