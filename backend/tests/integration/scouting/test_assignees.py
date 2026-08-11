@@ -102,6 +102,21 @@ async def test_a_farm_scoped_supervisor_can_load_the_picker(
 
 
 @pytest.mark.asyncio
+async def test_a_tenant_admin_sees_every_farm(scouting_env: ScoutingFixture) -> None:
+    """Decided 2026-08-10: tenant admins hold the scouting capabilities.
+
+    An admin who can invite the people but cannot see the work they are sent
+    on is a hole rather than a safeguard. Farm-scoped capabilities resolve
+    against the tenant-role branch first, so one tenant role reaches every
+    farm without needing a scope on each.
+    """
+    env = scouting_env
+    async with _client(env.admin_context) as client:
+        resp = await client.get(f"/api/v1/scouting/assignees?farm_id={env.farm_id}")
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
 async def test_a_scout_cannot_enumerate_the_farm(scouting_env: ScoutingFixture) -> None:
     """Reading the roster is dispatching, not doing the visit."""
     env = scouting_env
