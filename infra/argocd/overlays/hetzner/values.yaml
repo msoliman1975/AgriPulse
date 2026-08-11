@@ -1206,11 +1206,38 @@ global:
   #
   #   Images verified by pulling on the node before this commit:
   #   api sha256:6d0ce8ce, workers sha256:ec1410a1.
+  # d5feb37 = #413, three bugs that made a correctly-enrolled scout unable to
+  #   work. All three reported themselves as a bad credential when the
+  #   credential was fine, which is why they took a live handset to find.
+  #
+  #   Backend half only. Two of the three fixes are in `mobile/`, which ships
+  #   as an APK rather than a deployed service, so they land in the repo and
+  #   take effect when the APK is rebuilt -- NOT with this bump. What deploys
+  #   here is:
+  #     * `_split_full_name` no longer leaves lastName empty. This realm has
+  #       VERIFY_PROFILE enabled with both name fields required, so a
+  #       single-word name ("Majed") made Keycloak reject the direct grant
+  #       with "Account is not fully set up" -- on the phone, worded as a bad
+  #       credential, with nothing in any log.
+  #     * `normalise_phone` requires exactly 12 digits for +20. The generic
+  #       8-15 window accepted a number one digit short, which does not fail:
+  #       it mints a working account under a number nobody owns, after which
+  #       the scout cannot sign in with their real number.
+  #
+  #   Both apply to every future enrolment immediately. Existing bad rows are
+  #   NOT repaired by this: the KC username is set only at creation and there
+  #   is no rename path, so a typo'd scout must be deleted and re-enrolled.
+  #
+  #   No migration. Frontend and tile-server unchanged. Plain tag revert to
+  #   b65f42c is a safe rollback.
+  #
+  #   Images verified by pulling on the node before this commit:
+  #   api sha256:5c30b43e, workers sha256:afa2f40d.
   images:
     api:
-      tag: "b65f42c"
+      tag: "d5feb37"
     workers:
-      tag: "b65f42c"
+      tag: "d5feb37"
     frontend:
       tag: "bc63176"
     tileServer:
