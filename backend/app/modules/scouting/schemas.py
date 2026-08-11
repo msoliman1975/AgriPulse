@@ -154,3 +154,21 @@ class RoutingRuleWriteRequest(BaseModel):
         if self.block_id is not None and self.farm_id is None:
             raise ValueError("a block-scoped rule must also name its farm")
         return self
+
+
+class AssigneeResponse(BaseModel):
+    """One person who can be sent on a visit.
+
+    `email` is null for field workers: their address is synthetic and
+    undeliverable, and a picker that falls back to it renders
+    `+2010…@scouts…` where a name should be. `identity_kind` says which
+    handle is the real one.
+    """
+
+    user_id: UUID
+    membership_id: UUID
+    full_name: str
+    phone: str | None = None
+    email: str | None = None
+    identity_kind: Literal["email", "phone"]
+    role: str

@@ -26,11 +26,8 @@ class Resource(Base, TimestampedMixin):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
-    farm_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("farms.id", ondelete="CASCADE"),
-        nullable=False,
-    )
+    # No `farm_id`: dropped in 0071. Availability lives in `resource_farms`,
+    # because one person can work several farms and a column cannot say that.
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -41,6 +38,30 @@ class Resource(Base, TimestampedMixin):
     # logical reference, like farm_scopes.farm_id. See migration 0044.
     membership_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ResourceFarm(Base):
+    """`tenant_<id>.resource_farms` — which farms a resource is available on.
+
+    The many-to-many that replaced ``resources.farm_id`` (W2-A). Mirrors
+    ``public.farm_scopes``: one row per (thing, place it may be used). A
+    resource with no rows here is available nowhere, which is the state farm
+    purge leaves behind and the reason it archives rather than deletes.
+    """
+
+    __tablename__ = "resource_farms"
+
+    resource_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("resources.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class ActivityResource(Base):

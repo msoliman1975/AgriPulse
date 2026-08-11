@@ -19,7 +19,7 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
-import { registerDevice } from "@/api/client";
+import { registerDevice, revokeDevice } from "@/api/client";
 
 // Same source App.tsx reads. Registration is farm-gated because a Scout holds
 // no tenant role, so an unset farm means a guaranteed 403 — worth saying out
@@ -27,6 +27,9 @@ import { registerDevice } from "@/api/client";
 const FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
 
 let inFlight: Promise<void> | null = null;
+// The FCM token arrives in a listener rather than as a return value, so
+// sign-out has nothing to revoke unless we hold on to it here.
+let lastToken: string | null = null;
 
 /** Native only. The browser build has no FCM token to offer. */
 export function pushSupported(): boolean {
@@ -54,6 +57,7 @@ async function run(): Promise<void> {
     // `registration` fires asynchronously after register(); the token is not a
     // return value, which is why this is wrapped rather than awaited directly.
     void PushNotifications.addListener("registration", (token) => {
+      lastToken = token.value;
       registerDevice(token.value, FARM_ID)
         .catch((err: unknown) => console.warn("push: backend registration failed", err))
         .finally(() => resolve());
@@ -81,7 +85,25 @@ export function ensureDeviceRegistered(): Promise<void> {
   return inFlight;
 }
 
-/** Called on sign-out so the next scout on this handset re-registers cleanly. */
-export function resetDeviceRegistration(): void {
+/**
+ * Called on sign-out. Tells the server to stop pushing to this handset, then
+ * clears the in-session guard so the next scout registers under their own
+ * account.
+ *
+ * Awaited by the caller before the session is cleared and the app reloads:
+ * the request needs the access token, and a reload mid-flight cancels it.
+ * Failure is non-fatal — the next registration reassigns the token anyway —
+ * but leaving it out entirely means a drawered phone keeps buzzing for
+ * somebody who has left.
+ */
+export async function releaseDevice(): Promise<void> {
+  const token = lastToken;
   inFlight = null;
+  lastToken = null;
+  if (!token) return;
+  try {
+    await revokeDevice(token);
+  } catch (err) {
+    console.warn("push: could not revoke this device", err);
+  }
 }

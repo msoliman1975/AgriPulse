@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import install_exception_handlers
 from app.modules.farms.router import router as farms_router
+from app.modules.iam.router import router as iam_router
 from app.modules.scouting.router import router as scouting_router
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import FarmRole, FarmScope, TenantRole
@@ -30,6 +31,9 @@ def build_app(context) -> FastAPI:  # type: ignore[no-untyped-def]
     install_exception_handlers(app)
     app.include_router(farms_router)
     app.include_router(scouting_router)
+    # Enrolment is how a scout comes to exist, so the assignee picker
+    # tests need both halves mounted on one app.
+    app.include_router(iam_router)
     app.add_middleware(StubAuth, context=context)
     return app
 

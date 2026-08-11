@@ -57,6 +57,7 @@ export type Capability =
   | "signal.delete_observation"
   | "user.read"
   | "user.invite"
+  | "user.field_enrol"
   | "user.update"
   | "user.suspend"
   | "user.delete"
@@ -280,6 +281,7 @@ function tenantWideCaps(): ReadonlySet<Capability> {
     "signal.delete_observation",
     "user.read",
     "user.invite",
+    "user.field_enrol",
     "user.update",
     "user.suspend",
     "user.delete",

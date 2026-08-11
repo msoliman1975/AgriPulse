@@ -97,7 +97,13 @@ class ResourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    farm_id: UUID
+    # Vestigial since W2-A and dropped in 0071 — whichever farm happened to
+    # create the row. Read `farm_ids` for where the resource may actually be
+    # used; this stays only so the current image keeps deserialising.
+    farm_id: UUID | None = None
+    # Where it may be used. Populated on the tenant-wide roster; empty on the
+    # per-farm list, where the farm is already the question being asked.
+    farm_ids: list[UUID] = Field(default_factory=list)
     kind: ResourceKind
     name: str
     role: WorkerRole | None
@@ -107,3 +113,16 @@ class ResourceResponse(BaseModel):
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class ResourceFarmsRequest(BaseModel):
+    """PUT /v1/resources/{id}/farms — replace the availability set.
+
+    An empty list is meaningful and allowed: "available nowhere", the state a
+    farm purge leaves behind. It is not the same as archiving — a machine
+    between farms is still a machine.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    farm_ids: list[UUID] = Field(default_factory=list, max_length=500)

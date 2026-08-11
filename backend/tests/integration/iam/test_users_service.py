@@ -581,6 +581,72 @@ async def test_delete_user_in_multi_tenant_keeps_global_and_kc(
     # KC user still present (other tenant still relies on them).
     assert kc_subject in fake.users
 
+    # W1-D: and their sessions were ended. Authorization is read from the
+    # token — `_build_context` takes tenant_id and farm_scopes off the claims
+    # and never queries Postgres — so revoking the rows above changes nothing
+    # until Keycloak is told. Without the logout the departed member keeps
+    # refreshing, and a field session carries `offline_access` for months.
+    assert kc_subject in fake.logged_out
+
+
+@pytest.mark.asyncio
+async def test_delete_reprojects_surviving_farm_scopes_into_keycloak(
+    admin_session: AsyncSession,
+) -> None:
+    """Removing someone from tenant A must strip A's farms from their claims
+    while leaving tenant B's intact — the claim is a property of the person,
+    so it cannot be rebuilt from one tenant's rows alone."""
+    fake = FakeKeycloakClient()
+    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="proj-a")
+    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="proj-b")
+    svc = _users_service(admin_session, fake)
+
+    a_result = await svc.invite_user(
+        email="proj@proj.test",
+        full_name="Projected",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema_a,
+        actor_user_id=None,
+    )
+    b_result = await svc.invite_user(
+        email="proj@proj.test",
+        full_name="Projected",
+        phone=None,
+        tenant_role="TenantAdmin",
+        tenant_schema=schema_b,
+        actor_user_id=None,
+    )
+    kc_subject = a_result["keycloak_subject"]
+
+    farm_a, farm_b = uuid4(), uuid4()
+    for membership_id, farm_id in (
+        (a_result["membership_id"], farm_a),
+        (b_result["membership_id"], farm_b),
+    ):
+        await admin_session.execute(
+            text(
+                "INSERT INTO public.farm_scopes (membership_id, farm_id, role) "
+                "VALUES (:m, :f, 'FarmManager')"
+            ).bindparams(
+                bindparam("m", type_=PG_UUID(as_uuid=True)),
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"m": membership_id, "f": farm_id},
+        )
+    await admin_session.commit()
+
+    await svc.delete_user(
+        user_id=a_result["user_id"],
+        tenant_id=tenant_a,
+        actor_user_id=None,
+        tenant_schema=schema_a,
+    )
+
+    projected = {s["farm_id"] for s in fake.users[kc_subject].farm_scopes}
+    assert str(farm_a) not in projected, "the farm they were removed from must leave the token"
+    assert str(farm_b) in projected, "the other tenant's farm must survive"
+
 
 # =====================================================================
 # Cross-tenant safety

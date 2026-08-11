@@ -16,7 +16,7 @@ RBAC:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -27,6 +27,7 @@ from app.modules.plans.service import PlansServiceImpl, get_plans_service
 from app.modules.resources.errors import ResourceNotFoundError
 from app.modules.resources.schemas import (
     ResourceCreateRequest,
+    ResourceFarmsRequest,
     ResourceResponse,
     ResourceUpdateRequest,
 )
@@ -114,6 +115,92 @@ async def list_resources(
     return list(rows)
 
 
+async def _authorize(
+    context: RequestContext,
+    service: ResourcesServiceImpl,
+    resource: dict[str, Any],
+    *,
+    capability: str,
+    on: Literal["any", "all"],
+) -> None:
+    """Authorize against the availability set, not the vestigial ``farm_id``.
+
+    A tenant-level resource has no single owning farm, so "can this person
+    touch it" splits in two:
+
+    * ``any`` — reading, and being offered in a picker. Holding the capability
+      on one farm the resource serves is enough.
+    * ``all`` — editing the shared record. Name, phone, role and archived
+      state are the same bytes for every farm, so a manager of one farm
+      changing them rewrites the others' data. Requires the capability on
+      *every* farm in the set.
+
+    A tenant- or platform-level grant satisfies both without enumerating
+    anything: it resolves before the farm branch. That is checked first, and
+    is why an empty availability set does not lock a tenant admin out of a
+    resource nobody can otherwise reach.
+
+    Denials are 404, not 403, matching the rest of this module: whether a
+    resource exists on a farm you cannot see is itself not your business.
+    """
+    if has_capability(context, capability):
+        return
+    farm_ids = await service.farm_ids_for(resource_id=resource["id"])
+    if not farm_ids:
+        # Stranded by a farm purge. Only a tenant-level grant reaches it,
+        # and that was checked above.
+        raise ResourceNotFoundError(resource["id"])
+    checks = (has_capability(context, capability, farm_id=f) for f in farm_ids)
+    if not (any(checks) if on == "any" else all(checks)):
+        raise ResourceNotFoundError(resource["id"])
+
+
+@router.get(
+    "/resources",
+    response_model=list[ResourceResponse],
+    summary="The tenant-wide roster of workers and equipment.",
+)
+async def list_tenant_resources(
+    kind: str | None = Query(default=None, pattern="^(worker|equipment)$"),
+    include_archived: bool = Query(default=False),
+    # Tenant-scoped on purpose: this is the whole roster across every farm,
+    # which is a different question from "who is on my farm" and is not
+    # answerable from a single farm's grant.
+    context: RequestContext = Depends(requires_capability("resource.read")),
+    service: ResourcesServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    rows = await service.list(farm_id=None, kind=kind, include_archived=include_archived)
+    by_resource = await service.farm_ids_for_many(resource_ids=[r["id"] for r in rows])
+    # Availability travels with each row so the People page can render the
+    # farm-by-role matrix without a request per person.
+    return [{**r, "farm_ids": list(by_resource.get(r["id"], ()))} for r in rows]
+
+
+@router.put(
+    "/resources/{resource_id}/farms",
+    response_model=list[UUID],
+    summary="Replace the farms a resource is available on.",
+)
+async def set_resource_farms(
+    resource_id: UUID,
+    payload: ResourceFarmsRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: ResourcesServiceImpl = Depends(_service),
+) -> list[UUID]:
+    _ensure_tenant(context)
+    existing = await service.get(resource_id=resource_id)
+    # Both sides of the change have to be authorized. Requiring it on the
+    # farms being *added* stops someone lending a worker onto a farm they
+    # have no business staffing; requiring it on the current set stops them
+    # quietly removing a farm they do not manage from a shared record.
+    await _authorize(context, service, existing, capability="resource.manage", on="all")
+    for farm_id in payload.farm_ids:
+        if not has_capability(context, "resource.manage", farm_id=farm_id):
+            raise ResourceNotFoundError(resource_id)
+    return list(await service.set_farms(resource_id=resource_id, farm_ids=payload.farm_ids))
+
+
 @router.get(
     "/resources/{resource_id}",
     response_model=ResourceResponse,
@@ -126,8 +213,7 @@ async def get_resource(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     resource = await service.get(resource_id=resource_id)
-    if not has_capability(context, "resource.read", farm_id=resource["farm_id"]):
-        raise ResourceNotFoundError(resource_id)
+    await _authorize(context, service, resource, capability="resource.read", on="any")
     return resource
 
 
@@ -144,8 +230,10 @@ async def update_resource(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     existing = await service.get(resource_id=resource_id)
-    if not has_capability(context, "resource.manage", farm_id=existing["farm_id"]):
-        raise ResourceNotFoundError(resource_id)
+    # Editing the record itself — name, phone, role, archive — is the strict
+    # case: these fields are shared by every farm the resource serves, so a
+    # farm-A manager renaming a worker would be rewriting farm B's data.
+    await _authorize(context, service, existing, capability="resource.manage", on="all")
     return await service.update(
         resource_id=resource_id,
         changes=payload.model_dump(exclude_unset=True),
@@ -176,6 +264,8 @@ async def attach_resource(
         activity_id=activity_id,
         resource_id=resource_id,
         actor_user_id=context.user_id,
+        # The activity's farm is the one the resource has to serve.
+        farm_id=activity["farm_id"],
     )
 
 

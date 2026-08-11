@@ -16,6 +16,7 @@ import { Toolbar } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
 import { useCapability } from "@/rbac/useCapability";
 import { useCreateResource, useResources, useUpdateResource } from "@/queries/resources";
+import { displayUser } from "@/lib/userDisplay";
 
 const ROLES: WorkerRole[] = ["FarmManager", "Agronomist", "FieldOperator", "Scout", "FieldWorker"];
 
@@ -45,7 +46,7 @@ function MemberSelect({
       <option value="">{t("link.none")}</option>
       {members.map((m) => (
         <option key={m.membership_id} value={m.membership_id}>
-          {m.full_name || m.email}
+          {displayUser(m, m.membership_id)}
         </option>
       ))}
     </select>

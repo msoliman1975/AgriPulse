@@ -11,7 +11,19 @@ export type EquipmentType = "tractor" | "sprayer" | "irrigation_pump" | "harvest
 
 export interface Resource {
   id: string;
-  farm_id: string;
+  /**
+   * Gone from the API since tenant migration 0071 — a worker or machine
+   * belongs to the tenant, not one farm. Kept optional only so a response
+   * cached from an older build still parses.
+   * @deprecated read `farm_ids`
+   */
+  farm_id?: string | null;
+  /**
+   * The farms this resource may be used on. Populated by the tenant-wide
+   * roster (`GET /v1/resources`); empty on the per-farm list, where the farm
+   * is already the question being asked.
+   */
+  farm_ids?: string[];
   kind: ResourceKind;
   name: string;
   role: WorkerRole | null;

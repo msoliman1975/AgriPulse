@@ -37,3 +37,24 @@ class InvalidResourceShapeError(APIError):
             detail=detail,
             type_="https://agripulse.cloud/problems/resource-invalid",
         )
+
+
+class ResourceNotAvailableOnFarmError(APIError):
+    """Assigning a worker or machine to work on a farm it does not serve.
+
+    Only reachable since W2-A. While a resource carried `farm_id` this could
+    not be expressed; tenant-level it can, and the consequence is somebody
+    scheduled on a farm their sign-in does not reach.
+    """
+
+    def __init__(self, *, resource_id: UUID, farm_id: UUID) -> None:
+        super().__init__(
+            status_code=409,
+            title="Not available on this farm",
+            detail=(
+                "That worker or machine is not available on the farm this "
+                "activity belongs to. Add the farm to their availability first."
+            ),
+            type_="https://agripulse.cloud/problems/resource-not-available-on-farm",
+            extras={"resource_id": str(resource_id), "farm_id": str(farm_id)},
+        )

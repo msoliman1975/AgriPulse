@@ -71,6 +71,14 @@ capabilities:
     description: Invite a new user to the tenant.
     scope: tenant
     status: active
+  # Farm-scoped sibling of user.invite. Enrolling a scout reaches exactly one
+  # farm, and the person who should do it is the manager standing with the
+  # crew — not head office. Kept separate from user.invite rather than
+  # widening it, because inviting an Agronomist reaches the whole tenant.
+  user.field_enrol:
+    description: Enrol a field worker on a farm with a phone and a PIN, and re-issue their PIN.
+    scope: farm
+    status: active
   user.update:
     description: Edit a user's profile (name, phone) within the tenant.
     scope: tenant

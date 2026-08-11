@@ -58,6 +58,10 @@ class FakeKeycloakClient:
     def __init__(self) -> None:
         self.groups: dict[str, FakeGroup] = {}  # group_id -> FakeGroup
         self.users: dict[str, FakeUser] = {}  # user_id -> FakeUser
+        # Subjects `logout_user` was called for. Offboarding has to kill live
+        # sessions, not only stop the next refresh, and the only way to assert
+        # that happened is to record the call.
+        self.logged_out: list[str] = []
         self._closed = False
         # A method name; the next call to that method raises once.
         self.fail_on: str | None = None
@@ -281,6 +285,12 @@ class FakeKeycloakClient:
         for grp in self.groups.values():
             if keycloak_user_id in grp.member_ids:
                 grp.member_ids.remove(keycloak_user_id)
+
+    async def logout_user(self, *, keycloak_user_id: str) -> None:
+        self._maybe_fail("logout_user")
+        # Recorded rather than enacted: there are no sessions in here, and what
+        # the offboarding tests need to assert is that the call was made at all.
+        self.logged_out.append(keycloak_user_id)
 
     async def invite_platform_admin(
         self,

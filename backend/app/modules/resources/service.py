@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.resources.errors import (
     InvalidResourceShapeError,
+    ResourceNotAvailableOnFarmError,
     ResourceNotFoundError,
 )
 from app.modules.resources.repository import ResourcesRepository
@@ -35,7 +37,7 @@ class ResourcesService(Protocol):
     async def list(
         self,
         *,
-        farm_id: UUID,
+        farm_id: UUID | None = None,
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]: ...
@@ -54,6 +56,7 @@ class ResourcesService(Protocol):
         activity_id: UUID,
         resource_id: UUID,
         actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> dict[str, Any]: ...
 
     async def detach(self, *, activity_id: UUID, resource_id: UUID) -> bool: ...
@@ -77,9 +80,9 @@ class ResourcesServiceImpl:
         membership_id: UUID | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
-        return await self._repo.insert(
-            resource_id=uuid7(),
-            farm_id=farm_id,
+        resource_id = uuid7()
+        created = await self._repo.insert(
+            resource_id=resource_id,
             kind=kind,
             name=name.strip(),
             role=role,
@@ -88,6 +91,11 @@ class ResourcesServiceImpl:
             membership_id=membership_id,
             actor_user_id=actor_user_id,
         )
+        # The link is what availability actually means now. Without it the row
+        # exists tenant-wide and shows up on no farm at all.
+        await self._repo.add_farm(resource_id=resource_id, farm_id=farm_id)
+        created["farm_ids"] = [farm_id]
+        return created
 
     async def get(self, *, resource_id: UUID) -> dict[str, Any]:
         row = await self._repo.get(resource_id=resource_id)
@@ -95,10 +103,30 @@ class ResourcesServiceImpl:
             raise ResourceNotFoundError(resource_id)
         return row
 
+    async def farm_ids_for(self, *, resource_id: UUID) -> tuple[UUID, ...]:
+        return await self._repo.farm_ids_for(resource_id=resource_id)
+
+    async def farm_ids_for_many(
+        self, *, resource_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[UUID, ...]]:
+        return await self._repo.farm_ids_for_many(resource_ids=resource_ids)
+
+    async def set_farms(self, *, resource_id: UUID, farm_ids: Sequence[UUID]) -> tuple[UUID, ...]:
+        """Replace where a resource may be used.
+
+        Emptying the set is allowed and means "available nowhere" — the same
+        state a farm purge leaves behind. It is deliberately not the same as
+        archiving: a machine between farms is still a machine.
+        """
+        if await self._repo.get(resource_id=resource_id) is None:
+            raise ResourceNotFoundError(resource_id)
+        await self._repo.set_farms(resource_id=resource_id, farm_ids=farm_ids)
+        return await self._repo.farm_ids_for(resource_id=resource_id)
+
     async def list(
         self,
         *,
-        farm_id: UUID,
+        farm_id: UUID | None = None,
         kind: str | None = None,
         include_archived: bool = False,
     ) -> tuple[dict[str, Any], ...]:
@@ -161,6 +189,7 @@ class ResourcesServiceImpl:
         activity_id: UUID,
         resource_id: UUID,
         actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> dict[str, Any]:
         # Validate resource exists and is not archived.
         resource = await self._repo.get(resource_id=resource_id)
@@ -170,6 +199,15 @@ class ResourcesServiceImpl:
             raise InvalidResourceShapeError(
                 detail="Cannot assign an archived resource. Restore it first."
             )
+        # The guard `farm_id` used to make unnecessary. While a resource was
+        # farm-locked, assigning one to an activity on another farm was
+        # structurally impossible; tenant-level, nothing stops it — and the
+        # result is somebody scheduled on a farm they cannot open, which is
+        # exactly the drift the availability set exists to prevent.
+        if farm_id is not None and not await self._repo.is_available_on(
+            resource_id=resource_id, farm_id=farm_id
+        ):
+            raise ResourceNotAvailableOnFarmError(resource_id=resource_id, farm_id=farm_id)
         await self._repo.attach(
             activity_id=activity_id,
             resource_id=resource_id,

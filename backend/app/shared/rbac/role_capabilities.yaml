@@ -58,6 +58,7 @@ roles:
       - subscription.manage
       - user.read
       - user.invite
+      - user.field_enrol
       - user.update
       - user.suspend
       - user.delete
@@ -116,6 +117,12 @@ roles:
       - irrigation.record
       - fertilization.record
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.claim
+      - scouting.visit.complete
+      - scouting.visit.assign
+      - scouting.dispatch
+      - scouting.rule.manage
       - analytics.read
       - analytics.export
       - notification.read_inbox
@@ -135,6 +142,7 @@ roles:
       - subscription.read
       - user.read
       - user.invite
+      - user.field_enrol
       - user.update
       - user.suspend
       - user.delete
@@ -193,6 +201,12 @@ roles:
       - irrigation.record
       - fertilization.record
       - scouting.record
+      - scouting.visit.read
+      - scouting.visit.claim
+      - scouting.visit.complete
+      - scouting.visit.assign
+      - scouting.dispatch
+      - scouting.rule.manage
       - analytics.read
       - analytics.export
       - notification.read_inbox
@@ -256,6 +270,7 @@ roles:
       - plan_activity.complete
       - resource.read
       - resource.manage
+      - user.field_enrol
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read

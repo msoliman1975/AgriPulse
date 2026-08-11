@@ -312,7 +312,12 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable("recommendations", owner_column="farm_id", order=20, fk=False),
     OwnedTable("plan_activities", owner_column="farm_id", order=30),
     OwnedTable("vegetation_plans", owner_column="farm_id", order=40),
-    OwnedTable("resources", owner_column="farm_id", order=40),
+    # W2-C: the availability link, not the worker. Deleting the link is what
+    # "this farm is gone" means for a tenant-level roster; the worker row
+    # itself survives if any other farm still uses them, and is archived by
+    # `PurgeEngine.delete_farms` when the last farm goes. `resources` is
+    # therefore no longer a farm-owned table — see EXEMPT_PAIRS.
+    OwnedTable("resource_farms", owner_column="farm_id", order=10),
     # -- public-schema rows keyed by farm_id --------------------------------
     # These are the cross-schema leaks: no FK can reach across schemas, so
     # nothing cleans them up today. farm_scopes has a dedicated hourly detector
@@ -405,6 +410,13 @@ EXEMPT_PAIRS: dict[tuple[str, str], str] = {
     # walking the manifest, so registering them would double-delete.
     ("blocks", "farm_id"): "the block row itself; deleted by the engine",
     ("tenants", "tenant_id"): "the tenant row itself; deleted by the engine",
+    # W2-A left `resources.farm_id` in place, nullable, so the schema serves
+    # both the old and the new image; 0071 drops it. Either way the column no
+    # longer says who owns the row — `resource_farms` does. Purging a farm
+    # deletes the links and archives any worker left with no farms, which
+    # `delete_farms` does explicitly: deleting them would take
+    # `activity_resources` history on *other* farms with them.
+    ("resources", "farm_id"): "tenant-level since W2-A; archived, not deleted, by delete_farms",
     # Views and continuous aggregates are not independently deletable; they
     # follow their source tables (CAGGs via BLOCK_CAGGS refresh).
     ("block_index_daily", "block_id"): "continuous aggregate over block_index_aggregates",

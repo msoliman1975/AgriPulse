@@ -15,7 +15,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.scouting.assignees import list_farm_assignees
 from app.modules.scouting.schemas import (
+    AssigneeResponse,
     RoutingRuleResponse,
     RoutingRuleWriteRequest,
     ScoutingVisitResponse,
@@ -28,7 +30,7 @@ from app.modules.scouting.schemas import (
 from app.modules.scouting.service import ScoutingService, get_scouting_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
-from app.shared.db.session import get_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["scouting"])
@@ -65,6 +67,29 @@ async def list_visits(
             claimable=claimable,
             statuses=tuple(status_filter or ()),
         )
+    )
+
+
+@router.get(
+    "/scouting/assignees",
+    response_model=list[AssigneeResponse],
+    summary="People on this farm who can be sent on a visit.",
+)
+async def list_assignees(
+    farm_id: UUID = Query(description="Farm to list possible assignees for."),
+    # `scouting.dispatch` and not `user.read`: this answers "who can I send",
+    # which is part of dispatching, and gating it on tenant-wide directory
+    # access is what put the picker out of reach of a farm-scoped supervisor.
+    context: RequestContext = Depends(
+        requires_capability("scouting.dispatch", farm_id_param="farm_id")
+    ),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    return await list_farm_assignees(
+        public_session=public_session,
+        tenant_session=tenant_session,
+        farm_id=farm_id,
     )
 
 

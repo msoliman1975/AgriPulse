@@ -30,9 +30,26 @@ from app.modules.iam.users_service import (
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
-from app.shared.rbac.check import requires_capability
+from app.shared.rbac.check import (
+    PermissionDeniedError,
+    has_capability,
+    requires_capability,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["iam"])
+
+
+def _require_field_enrol(context: RequestContext, farm_id: UUID | None) -> None:
+    """``user.field_enrol`` on ``farm_id``, or tenant-wide when none is named.
+
+    Not ``requires_capability`` because the farm arrives in the request *body*
+    on the enrolment route, and that dependency only reads path and query
+    params. Passing ``farm_id=None`` deliberately narrows to the tenant- and
+    platform-role branches of the resolver, so an unscoped call still needs an
+    unscoped grant: a farm manager must say which farm they are acting on.
+    """
+    if not has_capability(context, "user.field_enrol", farm_id=farm_id):
+        raise PermissionDeniedError("user.field_enrol", farm_id=farm_id)
 
 
 def _service(
@@ -330,12 +347,13 @@ class FieldEnrolmentResponse(BaseModel):
 )
 async def enrol_field_worker(
     payload: FieldEnrolmentRequest,
-    # `user.invite` rather than a new capability: this is the same act as
-    # inviting a teammate, differing only in how the person is reached.
-    context: RequestContext = Depends(requires_capability("user.invite")),
+    context: RequestContext = Depends(get_current_context),
     session: AsyncSession = Depends(get_admin_db_session),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    # Checked against the farm in the body, so the manager of that farm can do
+    # this without holding tenant-wide `user.invite`.
+    _require_field_enrol(context, payload.farm_id)
     schema = _ensure_tenant(context)
     tenant_id = await _resolve_tenant_id(schema=schema, session=session)
     slug_row = (
@@ -367,7 +385,14 @@ class WorkerBrief(BaseModel):
     id: UUID
     name: str
     role: str | None = None
+    # The number the farm already recorded. Returned so enrolment does not ask
+    # an operator to retype the username — a typo there mints a second account
+    # rather than failing, because the phone *is* the username.
+    phone: str | None = None
     has_phone: bool
+    # Set only for people already enrolled; PIN reissue is keyed on the user,
+    # and a worker row does not carry one.
+    user_id: UUID | None = None
 
 
 class FieldEnrolmentAuditResponse(BaseModel):
@@ -381,15 +406,39 @@ class FieldEnrolmentAuditResponse(BaseModel):
     blocked_by_role: list[WorkerBrief]
     # The phone is the username, so no phone means no possible account.
     missing_phone: list[WorkerBrief]
+    # W2-D: available to be scheduled somewhere they cannot sign in to.
+    # Silent like the two above — the first sign is a scout standing in a
+    # block looking at an empty list.
+    scope_mismatch: list[WorkerBrief] = Field(default_factory=list)
 
 
 class ReRoleRequest(BaseModel):
+    # Required, and the update is scoped to it. Without a farm this is a bulk
+    # write over every worker in the tenant, which a farm manager must not
+    # have — and the ids come from an audit that is already per-farm.
+    farm_id: UUID
     worker_ids: list[UUID] = Field(min_length=1, max_length=500)
     role: Literal["Scout", "FieldOperator"] = "Scout"
 
 
 class ReRoleResponse(BaseModel):
     updated: int
+
+
+class FarmAccessRequest(BaseModel):
+    """POST /v1/users/{user_id}/farm-access — one more farm for someone who
+    already has the app. Not a re-enrolment: same identity, same PIN."""
+
+    farm_id: UUID
+    role: Literal["Scout", "FieldOperator"] = "Scout"
+
+
+class FarmAccessResponse(BaseModel):
+    user_id: UUID
+    membership_id: UUID
+    farm_id: UUID
+    role: str
+    worker_id: UUID | None
 
 
 class PinReissueResponse(BaseModel):
@@ -406,10 +455,13 @@ class PinReissueResponse(BaseModel):
 )
 async def audit_field_workers(
     farm_id: UUID | None = None,
-    context: RequestContext = Depends(requires_capability("user.read")),
+    context: RequestContext = Depends(get_current_context),
     session: AsyncSession = Depends(get_admin_db_session),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    # A farm manager runs their own pre-flight by naming their farm; omitting
+    # it asks for every worker in the tenant and needs the tenant-wide grant.
+    _require_field_enrol(context, farm_id)
     _ensure_tenant(context)
     service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
     return await service.audit_workers(farm_id=farm_id)
@@ -422,16 +474,44 @@ async def audit_field_workers(
 )
 async def re_role_field_workers(
     payload: ReRoleRequest,
-    context: RequestContext = Depends(requires_capability("user.invite")),
+    context: RequestContext = Depends(get_current_context),
     session: AsyncSession = Depends(get_admin_db_session),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    _require_field_enrol(context, payload.farm_id)
     _ensure_tenant(context)
     service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
     updated = await service.re_role_field_workers(
-        worker_ids=tuple(payload.worker_ids), role=payload.role
+        farm_id=payload.farm_id, worker_ids=tuple(payload.worker_ids), role=payload.role
     )
     return {"updated": updated}
+
+
+@router.post(
+    "/users/{user_id}/farm-access",
+    response_model=FarmAccessResponse,
+    summary="Give someone who already has the app access to another farm.",
+)
+async def grant_field_farm_access(
+    user_id: UUID,
+    payload: FarmAccessRequest,
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    # Checked against the farm being granted: this is the same act as
+    # enrolling, reaching exactly one farm.
+    _require_field_enrol(context, payload.farm_id)
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    return await service.grant_farm_access(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        farm_id=payload.farm_id,
+        role=payload.role,
+        actor_user_id=context.user_id,
+    )
 
 
 @router.post(
@@ -442,13 +522,18 @@ async def re_role_field_workers(
 async def reissue_field_pin(
     user_id: UUID,
     # Same capability as enrolling: handing someone a working credential is the
-    # same act whether it is their first or their third.
-    context: RequestContext = Depends(requires_capability("user.invite")),
+    # same act whether it is their first or their third. Naming a farm lets
+    # that farm's manager do it; the service then verifies the target is
+    # actually scoped there, so the farm is a claim to be checked and not a
+    # way to reach a scout on somebody else's farm.
+    farm_id: UUID | None = None,
+    context: RequestContext = Depends(get_current_context),
     session: AsyncSession = Depends(get_admin_db_session),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    _require_field_enrol(context, farm_id)
     schema = _ensure_tenant(context)
     tenant_id = await _resolve_tenant_id(schema=schema, session=session)
     service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
-    pin = await service.reissue_pin(tenant_id=tenant_id, user_id=user_id)
+    pin = await service.reissue_pin(tenant_id=tenant_id, user_id=user_id, farm_id=farm_id)
     return {"user_id": user_id, "pin": pin}
