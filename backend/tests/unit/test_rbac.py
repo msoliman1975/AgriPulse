@@ -16,8 +16,10 @@ from app.shared.auth.context import (
 from app.shared.rbac.check import (
     CapabilityRegistry,
     PermissionDeniedError,
+    UnknownRoleError,
     get_default_registry,
     has_capability,
+    role_tier,
 )
 
 
@@ -110,3 +112,55 @@ def test_permission_denied_carries_capability() -> None:
     assert err.title == "Forbidden"
     assert err.extras["capability"] == "alert.acknowledge"
     assert "farm_id" in err.extras
+
+
+# --- Read-only accessors backing the RBAC admin matrix -------------------
+
+
+def test_capabilities_accessor_exposes_metadata(registry: CapabilityRegistry) -> None:
+    caps = registry.capabilities()
+    assert len(caps) > 50
+    entry = caps["farm.read"]
+    assert entry["scope"] == "farm"
+    assert entry["status"] in {"active", "stub"}
+    assert entry["description"]
+
+
+def test_accessors_return_immutable_views(registry: CapabilityRegistry) -> None:
+    # The registry is a process-wide singleton on the authorization path;
+    # handing out a mutable dict would let one caller edit everyone's policy.
+    with pytest.raises(TypeError):
+        registry.capabilities()["x.read"] = {}  # type: ignore[index]
+    with pytest.raises(TypeError):
+        registry.roles()["Bogus"] = frozenset()  # type: ignore[index]
+
+
+def test_roles_accessor_keeps_wildcard_unexpanded(registry: CapabilityRegistry) -> None:
+    # Expansion is a presentation concern; the registry stays literal so
+    # role_grants can keep short-circuiting on WILDCARD.
+    assert registry.roles()["PlatformAdmin"] == frozenset({"*"})
+
+
+def test_role_description_reads_from_yaml(registry: CapabilityRegistry) -> None:
+    assert "cross-tenant" in registry.role_description("PlatformAdmin")
+    assert registry.role_description("NoSuchRole") == ""
+
+
+def test_every_yaml_role_has_a_tier() -> None:
+    # Binds role_capabilities.yaml to the three StrEnums in auth.context.
+    # If someone adds a role to one and not the other, this is where it fails.
+    for role in get_default_registry().roles():
+        assert role_tier(role) in {"platform", "tenant", "farm"}
+
+
+def test_role_tier_matches_the_defining_enum() -> None:
+    assert role_tier(PlatformRole.PLATFORM_SUPPORT.value) == "platform"
+    assert role_tier(TenantRole.BILLING_ADMIN.value) == "tenant"
+    # Viewer is defined as a farm role even though public migration 0036 also
+    # permits it in tenant_role_assignments.
+    assert role_tier(FarmRole.VIEWER.value) == "farm"
+
+
+def test_role_tier_raises_on_unknown_role() -> None:
+    with pytest.raises(UnknownRoleError):
+        role_tier("Sysadmin")
