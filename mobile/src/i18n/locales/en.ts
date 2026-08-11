@@ -37,7 +37,6 @@ export const en = {
   "work.outcome.blocked": "Could not do it",
   "work.recordedCount": "Readings saved:",
   "work.alreadyClosed": "This job is closed.",
-  "work.boardReadOnly": "Scheduled from the office. Mark it done there for now.",
   "work.boardNoComplete": "Readings are saved against the block. The office closes the job.",
   "work.actionFailed": "That did not go through. Try again.",
   "work.recordFailed": "Could not save that reading.",

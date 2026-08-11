@@ -38,7 +38,6 @@ export const ar: Messages = {
   "work.outcome.blocked": "تعذّر التنفيذ",
   "work.recordedCount": "القراءات المحفوظة:",
   "work.alreadyClosed": "هذه المهمة مغلقة.",
-  "work.boardReadOnly": "مجدولة من المكتب. أغلقها من هناك حاليًا.",
   "work.boardNoComplete": "تُحفظ القراءات على القطعة. المكتب يغلق المهمة.",
   "work.actionFailed": "لم تتم العملية. حاول مرة أخرى.",
   "work.recordFailed": "تعذّر حفظ القراءة.",
