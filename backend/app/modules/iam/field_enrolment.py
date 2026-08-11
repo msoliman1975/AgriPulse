@@ -306,10 +306,18 @@ class FieldEnrolmentService:
         * a worker with no ``phone`` cannot be enrolled at all under D7, because
           the phone *is* the username.
         """
+        # Availability comes from `resource_farms`, not the vestigial
+        # `resources.farm_id` (W2-A). Filtering on the column would have made
+        # this audit blind to exactly the drift it now reports: a worker lent
+        # to a second farm has a link there and a `farm_id` pointing somewhere
+        # else entirely.
         where = "kind = 'worker' AND archived_at IS NULL"
         params: dict[str, Any] = {}
         if farm_id is not None:
-            where += " AND farm_id = :fid"
+            where += (
+                " AND EXISTS (SELECT 1 FROM resource_farms rf "
+                "             WHERE rf.resource_id = resources.id AND rf.farm_id = :fid)"
+            )
             params["fid"] = farm_id
         rows = (
             (
@@ -359,7 +367,64 @@ class FieldEnrolmentService:
             # Re-role these to Scout first — see re_role_field_workers.
             "blocked_by_role": [_worker_brief(w) for w in blocked],
             "missing_phone": [_worker_brief(w) for w in no_phone],
+            "scope_mismatch": [
+                _worker_brief(w) for w in await self._scope_mismatches(workers, farm_id=farm_id)
+            ],
         }
+
+    async def _scope_mismatches(
+        self, workers: list[dict[str, Any]], *, farm_id: UUID | None
+    ) -> list[dict[str, Any]]:
+        """Enrolled people whose two projections disagree (W2-D).
+
+        ``resource_farms`` says where somebody may be **scheduled**;
+        ``farm_scopes`` says where they may **look**. Before the roster went
+        tenant-level these could not disagree — enrolment wrote both from one
+        ``farm_id``. Now they are independent sets, and a worker available on
+        a farm they hold no scope for can be assigned work their sign-in does
+        not reach.
+
+        Reported as a bucket rather than an error for the same reason
+        ``blocked_by_role`` and ``missing_phone`` are: nothing fails, nothing
+        logs, and the first sign is a scout standing in a block looking at an
+        empty list.
+        """
+        linked = [w for w in workers if w["membership_id"] is not None]
+        if not linked:
+            return []
+        rows = (
+            await self._public.execute(
+                text(
+                    "SELECT membership_id, farm_id FROM public.farm_scopes "
+                    "WHERE membership_id = ANY(:mids) AND revoked_at IS NULL"
+                ),
+                {"mids": [w["membership_id"] for w in linked]},
+            )
+        ).all()
+        scoped: dict[Any, set[Any]] = {}
+        for membership_id, scoped_farm in rows:
+            scoped.setdefault(membership_id, set()).add(scoped_farm)
+
+        out = []
+        for worker in linked:
+            available = await self._tenant.execute(
+                text("SELECT farm_id FROM resource_farms WHERE resource_id = :r").bindparams(
+                    bindparam("r", type_=PG_UUID(as_uuid=True))
+                ),
+                {"r": worker["id"]},
+            )
+            farms_available = {r.farm_id for r in available.all()}
+            farms_scoped = scoped.get(worker["membership_id"], set())
+            # Scoped-but-unavailable is benign — they can look and simply have
+            # nothing assigned. Available-but-unscoped is the harmful
+            # direction, and when the audit is filtered to one farm only that
+            # farm's disagreement is this farm manager's problem.
+            gap = farms_available - farms_scoped
+            if farm_id is not None:
+                gap &= {farm_id}
+            if gap:
+                out.append(worker)
+        return out
 
     async def re_role_field_workers(
         self, *, farm_id: UUID, worker_ids: tuple[UUID, ...], role: str = "Scout"
@@ -463,6 +528,126 @@ class FieldEnrolmentService:
         _log.info("field_pin_reissued", user_id=str(user_id))
         return pin
 
+    async def grant_farm_access(
+        self,
+        *,
+        tenant_id: UUID,
+        user_id: UUID,
+        farm_id: UUID,
+        role: str = "Scout",
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Give someone who already has the app access to another farm.
+
+        Adding a farm is not re-enrolment. Before W2-A the roster was
+        farm-locked, so the only way to put an existing scout on a second farm
+        was to enrol them again — which 409s, because one phone is one
+        username and one account. This is the operation that was missing.
+
+        It writes **both projections in one action**, which is the invariant
+        the whole promotion turns on: ``farm_scopes`` says where they may
+        look, ``resource_farms`` says where they may be scheduled, and the two
+        drifting apart is how someone ends up assigned work they cannot open.
+
+        No new PIN and no new identity — the same person, one more place.
+        """
+        if role not in ENROLLABLE_ROLES:
+            raise InvalidEnrolmentError(
+                f"role must be one of {', '.join(ENROLLABLE_ROLES)}, got {role!r}"
+            )
+        member = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT m.id AS membership_id, u.keycloak_subject
+                      FROM public.tenant_memberships m
+                      JOIN public.users u ON u.id = m.user_id
+                     WHERE m.user_id = :uid AND m.tenant_id = :tid
+                       AND m.status = 'active' AND m.deleted_at IS NULL
+                    """
+                ).bindparams(
+                    bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"uid": user_id, "tid": tenant_id},
+            )
+        ).first()
+        if member is None:
+            raise InvalidEnrolmentError("no active member of this tenant with that id")
+
+        # Scope first. Idempotent via the partial-unique on active scopes —
+        # re-granting a farm somebody already has must not raise.
+        await self._public.execute(
+            text(
+                """
+                INSERT INTO public.farm_scopes (membership_id, farm_id, role, granted_by)
+                SELECT :mid, :fid, :role, :actor
+                 WHERE NOT EXISTS (
+                       SELECT 1 FROM public.farm_scopes
+                        WHERE membership_id = :mid AND farm_id = :fid AND revoked_at IS NULL
+                 )
+                """
+            ).bindparams(
+                bindparam("mid", type_=PG_UUID(as_uuid=True)),
+                bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"mid": member.membership_id, "fid": farm_id, "role": role, "actor": actor_user_id},
+        )
+
+        # Then availability, on the worker row this membership already owns.
+        worker = (
+            await self._tenant.execute(
+                text(
+                    "SELECT id FROM resources WHERE membership_id = :mid "
+                    "AND kind = 'worker' AND archived_at IS NULL LIMIT 1"
+                ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+                {"mid": member.membership_id},
+            )
+        ).first()
+        if worker is not None:
+            await self._link_worker_to_farm(worker_id=worker.id, farm_id=farm_id)
+
+        # The JWT carries farm_scopes, so without this they hold the grant in
+        # Postgres and 403 on the new farm until something else re-syncs.
+        await self._sync_scopes(
+            keycloak_subject=member.keycloak_subject, membership_id=member.membership_id
+        )
+        _log.info(
+            "field_farm_access_granted",
+            user_id=str(user_id),
+            farm_id=str(farm_id),
+            role=role,
+        )
+        return {
+            "user_id": user_id,
+            "membership_id": member.membership_id,
+            "farm_id": farm_id,
+            "role": role,
+            "worker_id": worker.id if worker is not None else None,
+        }
+
+    async def _sync_scopes(self, *, keycloak_subject: str | None, membership_id: UUID) -> None:
+        """Re-project this membership's active scopes into Keycloak."""
+        if not keycloak_subject or keycloak_subject.startswith("pending::"):
+            return
+        rows = (
+            await self._public.execute(
+                text(
+                    "SELECT farm_id, role FROM public.farm_scopes "
+                    "WHERE membership_id = :mid AND revoked_at IS NULL"
+                ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+                {"mid": membership_id},
+            )
+        ).all()
+        try:
+            await self._kc.set_farm_scopes(
+                keycloak_user_id=keycloak_subject,
+                scopes=[{"farm_id": str(r.farm_id), "role": str(r.role)} for r in rows],
+            )
+        except KeycloakRequestError:
+            _log.exception("field_scope_sync_failed", membership_id=str(membership_id))
+
     async def _link_worker(
         self,
         *,
@@ -478,17 +663,29 @@ class FieldEnrolmentService:
         Without this the person can sign in but does not exist on the work
         board, so nobody can assign them anything — the half-provisioned state
         this whole method exists to prevent.
+
+        Since W2-A the roster is tenant-level, so this also writes the
+        ``resource_farms`` link. A worker row with no link is available on no
+        farm at all: they would sign in, hold a farm scope, and still be
+        invisible to every board.
         """
         if worker_id is not None:
+            # The farm check this had been missing. The error text always said
+            # "on this farm" while the query never looked, so enrolling onto
+            # farm A could adopt farm B's worker row — producing exactly the
+            # scope/availability mismatch the audit now reports.
             result = await self._tenant.execute(
                 text(
                     "UPDATE resources SET membership_id = :mid, updated_at = now() "
-                    "WHERE id = :wid AND kind = 'worker' AND archived_at IS NULL"
+                    "WHERE id = :wid AND kind = 'worker' AND archived_at IS NULL "
+                    "  AND EXISTS (SELECT 1 FROM resource_farms rf "
+                    "               WHERE rf.resource_id = resources.id AND rf.farm_id = :fid)"
                 ).bindparams(
                     bindparam("mid", type_=PG_UUID(as_uuid=True)),
                     bindparam("wid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("fid", type_=PG_UUID(as_uuid=True)),
                 ),
-                {"mid": membership_id, "wid": worker_id},
+                {"mid": membership_id, "wid": worker_id, "fid": farm_id},
             )
             if not (getattr(result, "rowcount", 0) or 0):
                 raise InvalidEnrolmentError(
@@ -517,7 +714,26 @@ class FieldEnrolmentService:
                 "mid": membership_id,
             },
         )
+        await self._link_worker_to_farm(worker_id=new_id, farm_id=farm_id)
         return new_id
+
+    async def _link_worker_to_farm(self, *, worker_id: UUID, farm_id: UUID) -> None:
+        """Make the worker available on this farm (W2-A).
+
+        Idempotent: enrolling somebody onto a farm they already serve is a
+        no-op rather than a constraint violation, which is what makes
+        ``grant_farm_access`` safe to retry.
+        """
+        await self._tenant.execute(
+            text(
+                "INSERT INTO resource_farms (resource_id, farm_id) VALUES (:r, :f) "
+                "ON CONFLICT DO NOTHING"
+            ).bindparams(
+                bindparam("r", type_=PG_UUID(as_uuid=True)),
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"r": worker_id, "f": farm_id},
+        )
 
 
 def get_field_enrolment_service(

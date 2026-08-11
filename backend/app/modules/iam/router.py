@@ -406,6 +406,10 @@ class FieldEnrolmentAuditResponse(BaseModel):
     blocked_by_role: list[WorkerBrief]
     # The phone is the username, so no phone means no possible account.
     missing_phone: list[WorkerBrief]
+    # W2-D: available to be scheduled somewhere they cannot sign in to.
+    # Silent like the two above — the first sign is a scout standing in a
+    # block looking at an empty list.
+    scope_mismatch: list[WorkerBrief] = Field(default_factory=list)
 
 
 class ReRoleRequest(BaseModel):
@@ -419,6 +423,22 @@ class ReRoleRequest(BaseModel):
 
 class ReRoleResponse(BaseModel):
     updated: int
+
+
+class FarmAccessRequest(BaseModel):
+    """POST /v1/users/{user_id}/farm-access — one more farm for someone who
+    already has the app. Not a re-enrolment: same identity, same PIN."""
+
+    farm_id: UUID
+    role: Literal["Scout", "FieldOperator"] = "Scout"
+
+
+class FarmAccessResponse(BaseModel):
+    user_id: UUID
+    membership_id: UUID
+    farm_id: UUID
+    role: str
+    worker_id: UUID | None
 
 
 class PinReissueResponse(BaseModel):
@@ -465,6 +485,33 @@ async def re_role_field_workers(
         farm_id=payload.farm_id, worker_ids=tuple(payload.worker_ids), role=payload.role
     )
     return {"updated": updated}
+
+
+@router.post(
+    "/users/{user_id}/farm-access",
+    response_model=FarmAccessResponse,
+    summary="Give someone who already has the app access to another farm.",
+)
+async def grant_field_farm_access(
+    user_id: UUID,
+    payload: FarmAccessRequest,
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    # Checked against the farm being granted: this is the same act as
+    # enrolling, reaching exactly one farm.
+    _require_field_enrol(context, payload.farm_id)
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    return await service.grant_farm_access(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        farm_id=payload.farm_id,
+        role=payload.role,
+        actor_user_id=context.user_id,
+    )
 
 
 @router.post(

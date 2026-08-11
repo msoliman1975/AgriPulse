@@ -25,7 +25,8 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import install_exception_handlers
@@ -78,6 +79,41 @@ async def _enrol(env: ScoutingFixture, **overrides: Any):  # type: ignore[no-unt
     }
     async with _client(env.admin_context) as client:
         return await client.post("/api/v1/users/field-enrolment", json=body)
+
+
+async def _seed_worker(
+    session: AsyncSession,
+    *,
+    schema: str,
+    farm_id: str,
+    name: str,
+    role: str,
+    phone: str | None = None,
+) -> UUID:
+    """A worker row plus its availability link, the way the API writes them.
+
+    Since W2-A the link is what puts somebody on a farm; a hand-inserted row
+    with only `farm_id` belongs nowhere, and the audit — which reads through
+    `resource_farms` — correctly cannot see it.
+    """
+    await session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+    worker_id = (
+        await session.execute(
+            text(
+                "INSERT INTO resources (farm_id, kind, name, role, phone) "
+                "VALUES (CAST(:f AS uuid), 'worker', :n, :r, :p) RETURNING id"
+            ),
+            {"f": farm_id, "n": name, "r": role, "p": phone},
+        )
+    ).scalar()
+    await session.execute(
+        text(
+            "INSERT INTO resource_farms (resource_id, farm_id) VALUES (:w, CAST(:f AS uuid))"
+        ).bindparams(bindparam("w", type_=PG_UUID(as_uuid=True))),
+        {"w": worker_id, "f": farm_id},
+    )
+    await session.commit()
+    return worker_id
 
 
 @pytest.mark.asyncio
@@ -201,6 +237,15 @@ async def test_enrolment_can_adopt_an_existing_worker_row(
             {"f": env.farm_id},
         )
     ).scalar()
+    # The availability link the API writes for you. Hand-inserting a worker
+    # without it produces a row that belongs to no farm, which is precisely
+    # what adoption now refuses.
+    await admin_session.execute(
+        text(
+            "INSERT INTO resource_farms (resource_id, farm_id) " "VALUES (:r, CAST(:f AS uuid))"
+        ).bindparams(bindparam("r", type_=PG_UUID(as_uuid=True))),
+        {"r": worker_id, "f": env.farm_id},
+    )
     await admin_session.commit()
 
     resp = await _enrol(env, phone="01007776655", worker_id=str(worker_id))
@@ -221,20 +266,19 @@ async def test_audit_separates_who_can_be_enrolled_from_who_cannot(
     """The audit is the pre-flight for a pilot: two of its buckets are silent
     failures rather than errors."""
     env = scouting_env
-    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
     for name, role, phone in [
         ("Ready Rania", "Scout", "+201001111111"),
         ("Blocked Bilal", "FieldWorker", "+201002222222"),
         ("Phoneless Farid", "Scout", None),
     ]:
-        await admin_session.execute(
-            text(
-                "INSERT INTO resources (farm_id, kind, name, role, phone) "
-                "VALUES (CAST(:f AS uuid), 'worker', :n, :r, :p)"
-            ),
-            {"f": env.farm_id, "n": name, "r": role, "p": phone},
+        await _seed_worker(
+            admin_session,
+            schema=env.schema,
+            farm_id=env.farm_id,
+            name=name,
+            role=role,
+            phone=phone,
         )
-    await admin_session.commit()
 
     async with _client(env.admin_context) as client:
         resp = await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
@@ -340,15 +384,14 @@ async def test_audit_carries_what_the_next_action_needs(
     its action takes — the recorded phone (the username, which must not be
     retyped) and, once enrolled, the user id that PIN reissue is keyed on."""
     env = scouting_env
-    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
-    await admin_session.execute(
-        text(
-            "INSERT INTO resources (farm_id, kind, name, role, phone) "
-            "VALUES (CAST(:f AS uuid), 'worker', 'Ready Rania', 'Scout', '+201007654321')"
-        ),
-        {"f": env.farm_id},
+    await _seed_worker(
+        admin_session,
+        schema=env.schema,
+        farm_id=env.farm_id,
+        name="Ready Rania",
+        role="Scout",
+        phone="+201007654321",
     )
-    await admin_session.commit()
 
     enrolled = await _enrol(env, phone=_unique_phone(), full_name="Enrolled Emad")
     assert enrolled.status_code == 201, enrolled.text
@@ -554,3 +597,148 @@ async def test_pin_reissue_by_farm_manager_is_confined_to_their_farm(
     async with _client(_farm_manager(env)) as client:
         unscoped = await client.post(f"/api/v1/users/{user_id}/field-pin:reissue")
     assert unscoped.status_code == 403, unscoped.text
+
+
+# ---------------------------------------------------------------------------
+# W2-D — the invariant: scheduled-where and may-look-where stay together
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_farm_access_adds_both_projections_without_a_new_account(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """Adding a farm is not re-enrolment.
+
+    Before the roster went tenant-level the only way to put an existing scout
+    on a second farm was to enrol them again — which 409s, because one phone
+    is one username and one account. This writes the scope and the
+    availability link together, so the two never disagree.
+    """
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Roaming Rania")
+    assert enrolled.status_code == 201, enrolled.text
+    user_id = enrolled.json()["user_id"]
+    worker_id = enrolled.json()["worker_id"]
+    original_pin = enrolled.json()["pin"]
+
+    async with AsyncClient(
+        transport=ASGITransport(app=build_app(env.admin_context)), base_url="http://test"
+    ) as client:
+        second_farm = (
+            await client.post(
+                "/api/v1/farms",
+                json={
+                    "code": "SC-FARM-3",
+                    "name": "Second farm",
+                    "boundary": _square(32.10, 31.10),
+                    "farm_type": "commercial",
+                    "tags": [],
+                },
+            )
+        ).json()["id"]
+
+    async with _client(env.admin_context) as client:
+        granted = await client.post(
+            f"/api/v1/users/{user_id}/farm-access",
+            json={"farm_id": second_farm, "role": "Scout"},
+        )
+    assert granted.status_code == 200, granted.text
+    assert granted.json()["worker_id"] == worker_id
+
+    # One identity, two scopes.
+    scopes = (
+        (
+            await admin_session.execute(
+                text(
+                    "SELECT farm_id FROM public.farm_scopes "
+                    "WHERE membership_id = CAST(:m AS uuid) AND revoked_at IS NULL"
+                ),
+                {"m": enrolled.json()["membership_id"]},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert {str(f) for f in scopes} == {env.farm_id, second_farm}
+
+    # One worker row, two availabilities — not a second person.
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    links = (
+        (
+            await admin_session.execute(
+                text("SELECT farm_id FROM resource_farms WHERE resource_id = CAST(:r AS uuid)"),
+                {"r": worker_id},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert {str(f) for f in links} == {env.farm_id, second_farm}
+    workers = (
+        await admin_session.execute(
+            text("SELECT count(*) FROM resources WHERE membership_id = CAST(:m AS uuid)"),
+            {"m": enrolled.json()["membership_id"]},
+        )
+    ).scalar()
+    assert workers == 1, "adding a farm must not mint a second worker row"
+
+    # And no new credential was issued: the PIN they were told still works.
+    assert original_pin.isdigit()
+
+    # Re-granting the same farm is a no-op rather than a duplicate.
+    async with _client(env.admin_context) as client:
+        again = await client.post(
+            f"/api/v1/users/{user_id}/farm-access",
+            json={"farm_id": second_farm, "role": "Scout"},
+        )
+    assert again.status_code == 200, again.text
+
+
+@pytest.mark.asyncio
+async def test_audit_reports_availability_without_a_matching_scope(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """The fifth bucket. Availability and scope are independent sets now, and
+    a worker schedulable on a farm they cannot open fails silently — nothing
+    errors, nothing logs, and the first sign is an empty list in the field."""
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Mismatched Mona")
+    assert enrolled.status_code == 201, enrolled.text
+    worker_id = enrolled.json()["worker_id"]
+
+    async with AsyncClient(
+        transport=ASGITransport(app=build_app(env.admin_context)), base_url="http://test"
+    ) as client:
+        other_farm = (
+            await client.post(
+                "/api/v1/farms",
+                json={
+                    "code": "SC-FARM-4",
+                    "name": "Unscoped farm",
+                    "boundary": _square(32.20, 31.20),
+                    "farm_type": "commercial",
+                    "tags": [],
+                },
+            )
+        ).json()["id"]
+
+    # Availability without the scope — exactly what `PUT /resources/{id}/farms`
+    # would leave behind if it were used on its own.
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    await admin_session.execute(
+        text(
+            "INSERT INTO resource_farms (resource_id, farm_id) "
+            "VALUES (CAST(:r AS uuid), CAST(:f AS uuid))"
+        ),
+        {"r": worker_id, "f": other_farm},
+    )
+    await admin_session.commit()
+
+    async with _client(env.admin_context) as client:
+        flagged = await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={other_farm}")
+        clean = await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+    assert flagged.status_code == 200, flagged.text
+    assert "Mismatched Mona" in {w["name"] for w in flagged.json()["scope_mismatch"]}
+    # On the farm where both agree, nothing is reported.
+    assert "Mismatched Mona" not in {w["name"] for w in clean.json()["scope_mismatch"]}
