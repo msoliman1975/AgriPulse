@@ -1300,11 +1300,40 @@ global:
   #   Images verified from the merge build's own log, not the job conclusion:
   #   api:f81df64@sha256:83269183, workers:f81df64@sha256:d82a1de0,
   #   frontend:f81df64@sha256:f2feccac.
+  # 43c76e8 = #415. GET /me/work, plus the language picker and the
+  #   reachability probe salvaged from a promote branch.
+  #
+  #   /me/work closes a gap found by using the product: a supervisor put a
+  #   scout on four board activities and the scout's app showed an empty
+  #   list. "Assign this to X" writes a different column on every surface and
+  #   the three do not share a key space --
+  #     scouting_visits.assigned_to            -> users.id
+  #     plan_activities.assigned_membership_id -> tenant_memberships.id
+  #     activity_resources.resource_id         -> resources.id -> membership
+  #   -- and the phone could only query the first. Board work was
+  #   structurally invisible to it: nothing failed and nothing logged.
+  #
+  #   Resolving that on the server is the only place it can be done: the
+  #   chain crosses the schema boundary. It also only became possible after
+  #   0071 made resources.membership_id unique.
+  #
+  #   The endpoint carries NO capability gate, deliberately: every row is one
+  #   where the caller is the assignee, and gating it would hide board work
+  #   from a Scout, who holds no plan_activity.complete.
+  #
+  #   api + workers only. The frontend bundle is unchanged by this branch, so
+  #   it stays on f81df64 rather than cycling a pod for identical bytes. The
+  #   two mobile-facing changes ship in the APK, not here.
+  #
+  #   No migration. Plain tag revert to f81df64 is a clean rollback.
+  #
+  #   Images verified by pulling them on the node before this commit:
+  #   api sha256:c2be1506, workers sha256:d2ec410e.
   images:
     api:
-      tag: "f81df64"
+      tag: "43c76e8"
     workers:
-      tag: "f81df64"
+      tag: "43c76e8"
     frontend:
       tag: "f81df64"
     tileServer:
