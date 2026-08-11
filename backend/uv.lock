@@ -22,6 +22,7 @@ dependencies = [
     { name = "celery" },
     { name = "fastapi" },
     { name = "geoalchemy2" },
+    { name = "google-auth" },
     { name = "httpx" },
     { name = "numpy" },
     { name = "opentelemetry-api" },
@@ -69,18 +70,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.14,<1.15" },
+    { name = "alembic", specifier = ">=1.14,<1.19" },
     { name = "anyio", marker = "extra == 'dev'", specifier = ">=4.6,<5" },
     { name = "asyncpg", specifier = ">=0.30,<0.31" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=24.10,<25" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.10,<27" },
     { name = "boto3", specifier = ">=1.35,<2" },
-    { name = "celery", specifier = ">=5.4,<5.5" },
-    { name = "fastapi", specifier = ">=0.115,<0.116" },
+    { name = "celery", specifier = ">=5.4,<5.7" },
+    { name = "fastapi", specifier = ">=0.115,<0.137" },
     { name = "freezegun", marker = "extra == 'dev'", specifier = ">=1.5,<2" },
     { name = "geoalchemy2", specifier = ">=0.16,<0.17" },
+    { name = "google-auth", specifier = ">=2.35" },
     { name = "httpx", specifier = ">=0.27,<0.28" },
     { name = "import-linter", marker = "extra == 'dev'", specifier = ">=2.1,<3" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13,<2" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13,<3" },
     { name = "numpy", specifier = ">=1.26,<3" },
     { name = "opentelemetry-api", specifier = ">=1.28,<2" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.28,<2" },
@@ -90,25 +92,25 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.49b0,<1" },
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.49b0,<1" },
     { name = "opentelemetry-sdk", specifier = ">=1.28,<2" },
-    { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0,<8" },
+    { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0,<9" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<3.3" },
     { name = "psycopg-pool", specifier = ">=3.2,<4" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.9,<3" },
     { name = "pydantic-settings", specifier = ">=2.6,<3" },
     { name = "pypgstac", specifier = ">=0.8.5,<0.9" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<9" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.25,<2" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0,<7" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0,<8" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3,<3.4" },
     { name = "python-multipart", specifier = ">=0.0.20,<0.1" },
     { name = "pyyaml", specifier = ">=6.0,<6.1" },
     { name = "rasterio", specifier = ">=1.3,<2" },
-    { name = "redis", specifier = ">=5.2,<5.3" },
+    { name = "redis", specifier = ">=5.2,<8.1" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21,<0.22" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.7,<0.8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.7,<0.16" },
     { name = "shapely", specifier = ">=2,<3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36,<2.1" },
-    { name = "structlog", specifier = ">=24.4,<25" },
+    { name = "structlog", specifier = ">=24.4,<27" },
     { name = "testcontainers", extras = ["postgres", "redis"], marker = "extra == 'dev'", specifier = ">=4.8,<5" },
     { name = "timezonefinder", specifier = ">=6.5,<7" },
     { name = "types-python-jose", marker = "extra == 'dev'", specifier = ">=3,<4" },
@@ -583,6 +585,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b5/d6/b01fa413cb8d7b3407f7f832f9310c623597ba38d21e52082296a36c04fa/geoalchemy2-0.16.0.tar.gz", hash = "sha256:df64bb72af70daafaac3f359492c96501c37ab85ed20f9510c99cc6d02881100", size = 227842, upload-time = "2024-11-13T08:24:37.98Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/43/b1a687122767d544d493776934687ab168b2224bd4a6c1e8b22640ce6227/GeoAlchemy2-0.16.0-py3-none-any.whl", hash = "sha256:b0f27d5500ee757af4654c6262e0f834b7a843504d193653ec747ef1128d2ab5", size = 74663, upload-time = "2024-11-13T08:24:36.234Z" },
+]
+
+[[package]]
+name = "google-auth"
+version = "2.56.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "pyasn1-modules" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/db/4c/fa42116a48bab3f7a143cf5042ecff7df9c8b73f8a376203cd534d1dc966/google_auth-2.56.3.tar.gz", hash = "sha256:40e229fc901f0a305b553050e5fce562d509bee0435be053abfa91582b51b90c", size = 367110, upload-time = "2026-08-06T06:24:01.36Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/b3/6117b2f24065cd7e2c4f140e9a193e215f089ca8ba314cf91eb9d0b7fe0a/google_auth-2.56.3-py3-none-any.whl", hash = "sha256:8ec438808f813ad034535000261eed1067475d229d05bbf4216e78c3f2362e53", size = 259116, upload-time = "2026-08-06T06:22:51.788Z" },
 ]
 
 [[package]]
@@ -1302,6 +1317,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5c/5f/6583902b6f79b399c9c40674ac384fd9cd77805f9e6205075f828ef11fb2/pyasn1-0.6.3.tar.gz", hash = "sha256:697a8ecd6d98891189184ca1fa05d1bb00e2f84b5977c481452050549c8a72cf", size = 148685, upload-time = "2026-03-17T01:06:53.382Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5d/a0/7d793dce3fa811fe047d6ae2431c672364b462850c6235ae306c0efd025f/pyasn1-0.6.3-py3-none-any.whl", hash = "sha256:a80184d120f0864a52a073acc6fc642847d0be408e7c7252f31390c0f4eadcde", size = 83997, upload-time = "2026-03-17T01:06:52.036Z" },
+]
+
+[[package]]
+name = "pyasn1-modules"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/e6/78ebbb10a8c8e4b61a59249394a4a594c1a7af95593dc933a349c8d00964/pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6", size = 307892, upload-time = "2025-03-28T02:41:22.17Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a", size = 181259, upload-time = "2025-03-28T02:41:19.028Z" },
 ]
 
 [[package]]
