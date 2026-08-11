@@ -20,8 +20,11 @@ export default defineConfig({
       // Forward API calls to the natively-running FastAPI backend so we
       // do not need browser-side CORS during dev. Keycloak token + axios
       // baseURL stay relative.
+      // Overridable because several worktrees run side by side: without it
+      // the dev server silently proxies to whichever backend happens to hold
+      // :8000, which is how a new route reads as a 404 in a tree that has it.
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: process.env.VITE_API_TARGET ?? "http://127.0.0.1:8000",
         changeOrigin: false,
       },
     },
