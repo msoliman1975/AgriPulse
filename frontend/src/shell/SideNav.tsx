@@ -14,6 +14,7 @@ import {
   PlanIcon,
   RecommendationsIcon,
   ReportsIcon,
+  RulesIcon,
   SignalsIcon,
   TenantIcon,
   UsersIcon,
@@ -239,6 +240,13 @@ export function SideNav(): ReactNode {
           label={t("nav.platformAdmins")}
           icon={<UsersIcon className="h-4 w-4" />}
           activePathPrefix="/platform/admins"
+          collapsed={collapsed}
+        />
+        <SideNavItem
+          to="/platform/roles"
+          label={t("nav.roles")}
+          icon={<RulesIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/roles"
           collapsed={collapsed}
         />
         <SideNavItem
