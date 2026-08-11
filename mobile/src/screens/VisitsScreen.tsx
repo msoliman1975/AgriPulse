@@ -31,6 +31,8 @@ function asWorkItem(v: Visit, farmId: string): WorkItem {
     severity: v.severity,
     priority: v.priority,
     due_at: v.due_by,
+    // The visit list does not return a template; /me/work does.
+    template_id: null,
   };
 }
 

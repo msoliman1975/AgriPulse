@@ -83,6 +83,8 @@ export interface WorkItem {
   severity: "info" | "warning" | "critical" | null;
   priority: "low" | "medium" | "high" | null;
   due_at: string | null;
+  /** The form the supervisor asked for. Null means the whole catalogue. */
+  template_id: string | null;
 }
 
 /**
@@ -158,6 +160,24 @@ export interface SignalDefinition {
   unit?: string | null;
   allowed_values?: string[] | null;
   attachment_allowed?: boolean | null;
+}
+
+export interface TemplateMember {
+  signal_definition_id: string;
+  position: number;
+  is_required: boolean;
+}
+
+/**
+ * A named form: which signals to record on this visit, in order, and which
+ * are required. This is how a supervisor says "record these three things"
+ * rather than "go and look" — the whole catalogue is a dozen definitions and
+ * asking a scout to find the right ones is how the wrong ones get recorded.
+ */
+export function getSignalTemplate(templateId: string) {
+  return request<{ template: { id: string; name: string }; members: TemplateMember[] }>(
+    `/signals/templates/${templateId}`,
+  );
 }
 
 export function listSignalDefinitions(farmId: string) {

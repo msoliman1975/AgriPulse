@@ -166,3 +166,7 @@ class WorkItemResponse(BaseModel):
     # ISO date or timestamp. A visit carries a deadline; board work carries the
     # day it is scheduled for.
     due_at: str | None = None
+    # The signal template a visit was dispatched with, when the supervisor
+    # named one. It is what turns "go and look" into "record these three
+    # things". Null on board work, which carries no template.
+    template_id: UUID | None = None

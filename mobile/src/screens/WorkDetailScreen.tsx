@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import {
   acceptVisit,
+  getSignalTemplate,
   listSignalDefinitions,
   recordObservation,
   startVisit,
@@ -82,17 +83,19 @@ export function WorkDetailScreen({
           farmId={farmId}
           visitId={item.id}
           blockId={item.block_id}
+          templateId={item.template_id}
           status={status}
           busy={busy}
           onAct={act}
           onDone={onClose}
         />
       ) : (
-        // Board work is read-only here on purpose. Completing a plan activity
-        // needs `plan_activity.complete`, which a Scout does not hold — a
-        // button that always 403s would be worse than none. Showing it at all
-        // is still the point: before this the phone could not see it.
-        <p className="hint">{t(lang, "work.boardReadOnly")}</p>
+        <BoardActions
+          lang={lang}
+          farmId={farmId}
+          blockId={item.block_id}
+          templateId={item.template_id}
+        />
       )}
     </div>
   );
@@ -103,6 +106,7 @@ function VisitActions({
   farmId,
   visitId,
   blockId,
+  templateId,
   status,
   busy,
   onAct,
@@ -112,6 +116,7 @@ function VisitActions({
   farmId: string;
   visitId: string;
   blockId: string | null;
+  templateId: string | null;
   status: string;
   busy: boolean;
   onAct: (fn: () => Promise<{ status: string }>) => Promise<void>;
@@ -175,6 +180,7 @@ function VisitActions({
           lang={lang}
           farmId={farmId}
           blockId={blockId}
+          templateId={templateId}
           onClose={() => setCapturing(false)}
           onRecorded={(id) => setRecorded((prev) => [...prev, id])}
         />
@@ -212,21 +218,74 @@ function SubmitBar({
 }
 
 /**
+ * Board work: no lifecycle, but the scout can still record what they see.
+ *
+ * Completing a plan activity needs `plan_activity.complete`, which a Scout
+ * does not hold — so there is no Done button here. Recording needs only
+ * `signal.record`, which they do hold, and for an activity of type
+ * "observation" that IS the job. Telling a scout their assignment is
+ * read-only, when the readings they take are the whole point, was wrong.
+ */
+function BoardActions({
+  lang,
+  farmId,
+  blockId,
+  templateId,
+}: {
+  lang: Lang;
+  farmId: string;
+  blockId: string | null;
+  templateId: string | null;
+}): ReactNode {
+  const [capturing, setCapturing] = useState(false);
+  const [count, setCount] = useState(0);
+  return (
+    <div className="actions">
+      <button type="button" onClick={() => setCapturing(true)}>
+        {t(lang, "work.record")}
+      </button>
+      {count > 0 ? (
+        <p className="hint">
+          {t(lang, "work.recordedCount")} {count}
+        </p>
+      ) : null}
+      {/* Said plainly and without apology: the readings are saved against the
+          block either way, and closing the activity happens in the office. */}
+      <p className="hint">{t(lang, "work.boardNoComplete")}</p>
+      {capturing ? (
+        <CaptureForm
+          lang={lang}
+          farmId={farmId}
+          blockId={blockId}
+          templateId={templateId}
+          onClose={() => setCapturing(false)}
+          onRecorded={() => setCount((n) => n + 1)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Record one reading against the block.
  *
- * The definition list is the platform's scouting catalogue, so the scout picks
- * what they saw rather than typing a free-text note nobody can aggregate.
+ * When the visit carries a signal template, the form shows *that* form —
+ * the supervisor already said which signals this visit is about, and putting
+ * the full catalogue in front of the scout is how the wrong ones get
+ * recorded. Without a template it falls back to everything available.
  */
 function CaptureForm({
   lang,
   farmId,
   blockId,
+  templateId,
   onClose,
   onRecorded,
 }: {
   lang: Lang;
   farmId: string;
   blockId: string | null;
+  templateId: string | null;
   onClose: () => void;
   onRecorded: (observationId: string) => void;
 }): ReactNode {
@@ -239,7 +298,25 @@ function CaptureForm({
 
   useEffect(() => {
     let live = true;
-    void listSignalDefinitions(farmId)
+    async function load(): Promise<SignalDefinition[]> {
+      const all = await listSignalDefinitions(farmId);
+      if (!templateId) return all;
+      // Narrow to the template, keeping its order — position is the sequence
+      // the form was designed to be filled in.
+      try {
+        const { members } = await getSignalTemplate(templateId);
+        const order = new Map(members.map((m) => [m.signal_definition_id, m.position]));
+        const picked = all
+          .filter((d) => order.has(d.id))
+          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+        // A template naming nothing this farm can record is a misconfiguration,
+        // not a reason to give the scout an empty form.
+        return picked.length > 0 ? picked : all;
+      } catch {
+        return all;
+      }
+    }
+    void load()
       .then((d) => {
         if (!live) return;
         setDefs(d);
@@ -249,7 +326,7 @@ function CaptureForm({
     return () => {
       live = false;
     };
-  }, [farmId, lang]);
+  }, [farmId, lang, templateId]);
 
   const chosen = defs.find((d) => d.id === defId);
   const numeric = chosen?.value_type === "numeric";
