@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { claimVisit, listVisits, type Visit } from "@/api/client";
 import { signOut } from "@/auth/session";
 import { dueIn, t, type Lang } from "@/i18n/strings";
-import { resetDeviceRegistration } from "@/push/register";
+import { releaseDevice } from "@/push/register";
 
 /** Overdue first, then by deadline: a warning due in two hours outranks a
  *  critical due tomorrow, and sorting by severity alone would invert that. */
@@ -67,6 +67,8 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmId]);
 
+  const [signingOut, setSigningOut] = useState(false);
+
   const overdue = mine.filter(isOverdue);
   const current = mine.filter((v) => !isOverdue(v));
 
@@ -74,15 +76,23 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
     <div className="screen visits">
       <header>
         <h1>{t(lang, "visits.title")}</h1>
-        <button type="button" className="link" onClick={() => {
-            // The device row stays registered server-side until offboarding
-            // revokes it; this only clears the in-session guard so the next
-            // scout on this handset registers under their own account.
-            resetDeviceRegistration();
-            signOut();
-            location.reload();
-          }}>
-          {t(lang, "visits.signOut")}
+        <button
+          type="button"
+          className="link"
+          disabled={signingOut}
+          onClick={() => {
+            setSigningOut(true);
+            // Revoke first and await it: the request authenticates with the
+            // access token, so clearing the session or reloading before it
+            // lands would cancel it and leave this handset receiving a
+            // departed scout's visits.
+            void releaseDevice().finally(() => {
+              signOut();
+              location.reload();
+            });
+          }}
+        >
+          {t(lang, signingOut ? "visits.signingOut" : "visits.signOut")}
         </button>
       </header>
 

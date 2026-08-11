@@ -16,6 +16,7 @@ import { MapDraw } from "./MapDraw";
 import { AoiUploader } from "./AoiUploader";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { displayUser } from "@/lib/userDisplay";
 
 const IRRIGATION_SYSTEMS: IrrigationSystem[] = [
   "drip",
@@ -279,7 +280,7 @@ export function BlockForm({
               <option value="">{t("form.agronomistNone")}</option>
               {members.map((m) => (
                 <option key={m.membership_id} value={m.membership_id}>
-                  {m.full_name || m.email}
+                  {displayUser(m, m.membership_id)}
                 </option>
               ))}
             </select>

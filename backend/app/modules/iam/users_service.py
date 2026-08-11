@@ -42,6 +42,7 @@ from app.shared.keycloak import (
     get_keycloak_client,
 )
 from app.shared.keycloak.client import group_name_for
+from app.shared.keycloak.field_identity import is_synthetic_email
 
 
 class TenantUserNotFoundError(LookupError):
@@ -138,10 +139,18 @@ class TenantUsersService:
                 .scalars()
                 .one_or_none()
             )
+            # A field worker's address is synthesised from their phone to
+            # satisfy NOT NULL/UNIQUE; nothing can be delivered to it. Pickers
+            # fall back to `full_name || email`, which renders
+            # `+2010…@scouts…` where a name belongs and reads as a data-entry
+            # error somebody will try to "fix". Say which handle is real
+            # instead of making every caller sniff the domain.
+            synthetic = is_synthetic_email(row["email"])
             out.append(
                 {
                     "id": user_id,
                     "email": row["email"],
+                    "identity_kind": "phone" if synthetic else "email",
                     "full_name": row["full_name"],
                     "phone": row["phone"],
                     "avatar_url": row["avatar_url"],
@@ -526,6 +535,10 @@ class TenantUsersService:
         if kc_subject and not kc_subject.startswith("pending::"):
             try:
                 await self._kc.disable_user(keycloak_user_id=kc_subject)
+                # Disabling stops the next refresh; it leaves any live access
+                # token good until it expires and, on a field handset, leaves
+                # an offline refresh token that has simply not been used yet.
+                await self._kc.logout_user(keycloak_user_id=kc_subject)
             except KeycloakError as exc:
                 self._log.warning("iam_suspend_keycloak_failed", error=str(exc))
         await self._audit.record(
@@ -563,6 +576,43 @@ class TenantUsersService:
             farm_id=None,
             details={},
         )
+
+    async def _sync_scopes_and_end_sessions(self, *, user_id: UUID) -> None:
+        """Push the user's surviving farm scopes to Keycloak, then log them out.
+
+        Surviving means *across every tenant they still belong to*, not just
+        this one — the claim is a property of the person, so rebuilding it from
+        a single tenant's rows would silently strip their access elsewhere.
+        """
+        kc_subject = await self._user_keycloak_subject(user_id=user_id)
+        if not kc_subject or kc_subject.startswith("pending::"):
+            return
+        rows = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT fs.farm_id, fs.role
+                      FROM public.farm_scopes fs
+                      JOIN public.tenant_memberships m ON m.id = fs.membership_id
+                     WHERE m.user_id = :uid
+                       AND fs.revoked_at IS NULL
+                       AND m.deleted_at IS NULL
+                       AND m.status = 'active'
+                    """
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id},
+            )
+        ).all()
+        scopes = [{"farm_id": str(r.farm_id), "role": str(r.role)} for r in rows]
+        try:
+            await self._kc.set_farm_scopes(keycloak_user_id=kc_subject, scopes=scopes)
+            await self._kc.logout_user(keycloak_user_id=kc_subject)
+        except KeycloakError as exc:
+            self._log.warning(
+                "iam_offboard_keycloak_sync_failed",
+                user_id=str(user_id),
+                error=str(exc),
+            )
 
     async def delete_user(
         self,
@@ -607,6 +657,23 @@ class TenantUsersService:
                 ),
                 {"uid": user_id, "tid": tenant_id},
             )
+
+        # Re-project what is left into Keycloak, and end the sessions.
+        #
+        # Authorization is read from the token — `_build_context` takes
+        # `tenant_id` and `farm_scopes` off the validated claims and never
+        # queries Postgres — and those claims are filled from Keycloak user
+        # attributes. Revoking the rows above therefore changes nothing on its
+        # own: a person removed from this tenant who still belongs to another
+        # keeps the revoked farm in their attributes, and keeps working access
+        # to it. A field session is issued with `offline_access` and refreshes
+        # for months, so "it expires eventually" is not a bound worth having.
+        #
+        # Best-effort, and deliberately after the local writes: an identity
+        # provider hiccup must not roll back an offboarding that the operator
+        # has been told succeeded. It is logged loudly instead.
+        await self._sync_scopes_and_end_sessions(user_id=user_id)
+
         # If the user has no other active memberships, soft-delete the
         # global user row + their Keycloak account so a long-since-departed
         # employee isn't left enabled — UNLESS they still hold an active

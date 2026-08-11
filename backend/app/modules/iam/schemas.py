@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -80,6 +80,11 @@ class TenantUserResponse(BaseModel):
 
     id: UUID
     email: str
+    # Which of email/phone is this person's real handle. A field worker signs
+    # in with a phone and carries a synthetic, undeliverable address, so a UI
+    # that falls back to `full_name || email` shows `+2010…@scouts…` where a
+    # name belongs — and implies somewhere you could write to.
+    identity_kind: Literal["email", "phone"] = "email"
     full_name: str
     phone: str | None
     avatar_url: str | None

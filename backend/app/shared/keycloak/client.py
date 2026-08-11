@@ -144,6 +144,8 @@ class KeycloakAdminClient(Protocol):
 
     async def delete_user(self, *, keycloak_user_id: str) -> None: ...
 
+    async def logout_user(self, *, keycloak_user_id: str) -> None: ...
+
     async def invite_platform_admin(
         self,
         *,
@@ -272,6 +274,9 @@ class NoopKeycloakClient:
 
     async def delete_user(self, *, keycloak_user_id: str) -> None:
         self._log.warning("keycloak_noop_delete_user", keycloak_user_id=keycloak_user_id)
+
+    async def logout_user(self, *, keycloak_user_id: str) -> None:
+        self._log.warning("keycloak_noop_logout_user", keycloak_user_id=keycloak_user_id)
 
     async def invite_platform_admin(
         self,
@@ -710,6 +715,24 @@ class HttpxKeycloakAdminClient:
             "DELETE",
             f"/users/{keycloak_user_id}",
             operation="delete_user",
+            expected=(204, 404),
+        )
+
+    async def logout_user(self, *, keycloak_user_id: str) -> None:
+        """End every session this user holds, including offline ones.
+
+        Disabling an account stops the *next* refresh; it does not invalidate a
+        refresh token already on a handset until that token is used. A field
+        session is issued with `offline_access` and lives for months, so when
+        access is withdrawn the sessions have to be killed explicitly rather
+        than left to expire.
+
+        404 is success: no user means no session.
+        """
+        await self._request(
+            "POST",
+            f"/users/{keycloak_user_id}/logout",
+            operation="logout_user",
             expected=(204, 404),
         )
 

@@ -90,3 +90,17 @@ export function registerDevice(token: string, farmId: string) {
     body: JSON.stringify({ token, platform: "android" }),
   });
 }
+
+/**
+ * Stop pushing to this handset. Called on sign-out, before the session is
+ * cleared — it needs the access token to authenticate, and the server scopes
+ * the delete to the caller so a token seen in a log cannot silence someone
+ * else's phone.
+ *
+ * Without this the device row keeps its previous owner until the next scout
+ * signs in and re-registers. Handsets get passed along at shift change, and a
+ * phone put back in a drawer keeps buzzing for a person who no longer holds it.
+ */
+export function revokeDevice(token: string) {
+  return request<void>(`/devices/${encodeURIComponent(token)}`, { method: "DELETE" });
+}

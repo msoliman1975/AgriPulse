@@ -24,6 +24,7 @@ export const STRINGS = {
     "visits.loadFailed": "تعذّر تحميل الزيارات.",
     "visits.claim": "أتولى المهمة",
     "visits.signOut": "خروج",
+    "visits.signingOut": "جارٍ الخروج…",
     "due.overdue": "متأخرة",
   },
   en: {
@@ -42,6 +43,7 @@ export const STRINGS = {
     "visits.loadFailed": "Could not load your visits.",
     "visits.claim": "I'll take it",
     "visits.signOut": "Sign out",
+    "visits.signingOut": "Signing out…",
     "due.overdue": "overdue",
   },
 } as const;

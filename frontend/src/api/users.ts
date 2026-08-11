@@ -11,9 +11,18 @@ export interface UserPreferences {
   notification_channels: string[];
 }
 
+/**
+ * Which handle actually identifies this person. Field workers sign in with a
+ * phone number and carry a synthetic, undeliverable address, so `email` must
+ * not be shown or written to for them. Use `displayUser` rather than reading
+ * this at each call site.
+ */
+export type IdentityKind = "email" | "phone";
+
 export interface TenantUser {
   id: string;
   email: string;
+  identity_kind: IdentityKind;
   full_name: string;
   phone: string | null;
   avatar_url: string | null;

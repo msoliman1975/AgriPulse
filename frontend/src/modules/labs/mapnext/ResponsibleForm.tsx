@@ -11,6 +11,7 @@ import { Button } from "@/components/Button";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useTenantUsers } from "@/queries/users";
 import { useCapability } from "@/rbac/useCapability";
+import { displayUser } from "@/lib/userDisplay";
 
 interface Props {
   blockId: string;
@@ -66,7 +67,7 @@ export function ResponsibleForm({ blockId, farmId, current, onSaved }: Props): R
   const nameOf = (membership: string | null): string => {
     if (membership === null) return t("responsible.none");
     const u = (users.data ?? []).find((x) => x.membership_id === membership);
-    return u?.full_name || u?.email || membership.slice(0, 8);
+    return u ? displayUser(u, membership) : membership.slice(0, 8);
   };
 
   const when = (iso: string): string =>
@@ -97,7 +98,7 @@ export function ResponsibleForm({ blockId, farmId, current, onSaved }: Props): R
           <option value="">{t("responsible.none")}</option>
           {(users.data ?? []).map((u) => (
             <option key={u.membership_id} value={u.membership_id}>
-              {u.full_name || u.email}
+              {displayUser(u, u.membership_id)}
             </option>
           ))}
         </select>
