@@ -332,6 +332,42 @@ async def test_pin_reissue_works_for_field_users_and_refuses_real_accounts(
     assert "password-reset flow" in refused.json()["detail"]
 
 
+@pytest.mark.asyncio
+async def test_audit_carries_what_the_next_action_needs(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """W1-C: the buckets are a worklist, so each row has to carry the fields
+    its action takes — the recorded phone (the username, which must not be
+    retyped) and, once enrolled, the user id that PIN reissue is keyed on."""
+    env = scouting_env
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    await admin_session.execute(
+        text(
+            "INSERT INTO resources (farm_id, kind, name, role, phone) "
+            "VALUES (CAST(:f AS uuid), 'worker', 'Ready Rania', 'Scout', '+201007654321')"
+        ),
+        {"f": env.farm_id},
+    )
+    await admin_session.commit()
+
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Enrolled Emad")
+    assert enrolled.status_code == 201, enrolled.text
+
+    async with _client(env.admin_context) as client:
+        resp = await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+    assert resp.status_code == 200, resp.text
+    audit = resp.json()
+
+    ready = {w["name"]: w for w in audit["ready_to_enrol"]}
+    assert ready["Ready Rania"]["phone"] == "+201007654321"
+    # Not yet enrolled, so there is no account to re-credential.
+    assert ready["Ready Rania"]["user_id"] is None
+
+    done = {w["name"]: w for w in audit["enrolled"]}
+    assert done["Enrolled Emad"]["user_id"] == enrolled.json()["user_id"]
+    assert done["Enrolled Emad"]["phone"] == enrolled.json()["phone"]
+
+
 # ---------------------------------------------------------------------------
 # W1-A — the farm manager, who is the person standing with the crew
 # ---------------------------------------------------------------------------

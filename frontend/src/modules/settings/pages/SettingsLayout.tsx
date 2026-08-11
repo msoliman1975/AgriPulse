@@ -35,6 +35,7 @@ export function SettingsLayout(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
   const canResources = useCapability("resource.read");
+  const canFieldEnrol = useCapability("user.field_enrol");
   // Farm-scoped grants can't be checked without a farm id, so this gates on
   // the tenant-level grant — which is who the surface is for. A farm-scoped
   // manager still assigns crops from the Farm Console.
@@ -61,6 +62,9 @@ export function SettingsLayout(): ReactNode {
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
     { to: "/settings/bulk", labelKey: "nav.bulk", show: canBulk },
     { to: "/settings/workers", labelKey: "nav.workers", show: canResources },
+    // Sits with workers because it is the same roster, asked a different
+    // question: not "who works here" but "who can open the app".
+    { to: "/settings/field-access", labelKey: "nav.fieldAccess", show: canFieldEnrol },
     { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
     // Decision Trees promoted to the top-level /decision-trees surface
     // (reached from the gear/Configs menu), no longer a Settings tab.

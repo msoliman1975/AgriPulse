@@ -1,4 +1,4 @@
-{
+﻿{
   "title": "Settings",
   "nav": {
     "org": "Organization",
@@ -9,7 +9,8 @@
     "equipment": "Equipment",
     "rules": "Rules & thresholds",
     "decisionTrees": "Decision trees",
-    "bulk": "Bulk Updates"
+    "bulk": "Bulk Updates",
+    "fieldAccess": "Field access"
   },
   "noAccess": {
     "title": "Settings",

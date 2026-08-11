@@ -1,0 +1,49 @@
+﻿{
+  "title": "Field access",
+  "subtitle": "Give the crew on this farm a phone-and-PIN sign-in for the Scout app.",
+  "pickFarm": "Farm",
+  "noFarm": "Select a farm",
+  "noFarmSelected": "Choose a farm to see who can be given the app.",
+  "loadFailed": "Could not load the worker list.",
+  "empty": "No workers recorded on this farm yet.",
+  "col": {
+    "name": "Name",
+    "role": "Job title",
+    "phone": "Phone"
+  },
+  "phone": {
+    "on": "On file",
+    "off": "Missing"
+  },
+  "pin": {
+    "heading": "PIN for {{name}}",
+    "readAloud": "Read this out to them now. There is no text message and no email — this is the whole handover.",
+    "onceOnly": "This is the only time it is shown. If it is lost, issue a new one.",
+    "dismiss": "Done"
+  },
+  "ready": {
+    "heading": "Ready for the app",
+    "hint": "These people have a phone number and a job title that can hold a sign-in.",
+    "none": "Nobody is waiting for access.",
+    "giveAccess": "Give access",
+    "working": "Working…"
+  },
+  "blocked": {
+    "heading": "Cannot sign in yet",
+    "hint": "A field worker can be put on the board but can never sign in. Promote them to Scout first.",
+    "promoteAll": "Promote {{n}} to Scout",
+    "working": "Promoting…"
+  },
+  "noPhone": {
+    "heading": "No phone number",
+    "hint": "The phone number is the username, so there is no account to create until you have one."
+  },
+  "enrolled": {
+    "heading": "Already have the app",
+    "hint": "Forgotten PINs are replaced, not looked up.",
+    "none": "Nobody on this farm has the app yet.",
+    "reissue": "New PIN",
+    "working": "Issuing…",
+    "noAccount": "This worker is linked to a member who did not get their sign-in here."
+  }
+}

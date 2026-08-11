@@ -23,6 +23,7 @@ import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enSettings from "./locales/en/settings.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import enIntegrations from "./locales/en/integrations.json";
+import enFieldAccess from "./locales/en/fieldAccess.json";
 import enResources from "./locales/en/resources.json";
 import enBoard from "./locales/en/board.json";
 import enReports from "./locales/en/reports.json";
@@ -50,6 +51,7 @@ import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arSettings from "./locales/ar/settings.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 import arIntegrations from "./locales/ar/integrations.json";
+import arFieldAccess from "./locales/ar/fieldAccess.json";
 import arResources from "./locales/ar/resources.json";
 import arBoard from "./locales/ar/board.json";
 import arReports from "./locales/ar/reports.json";
@@ -88,6 +90,7 @@ const resources = {
     settings: enSettings,
     integrationsHealth: enIntegrationsHealth,
     integrations: enIntegrations,
+    fieldAccess: enFieldAccess,
     resources: enResources,
     board: enBoard,
     reports: enReports,
@@ -117,6 +120,7 @@ const resources = {
     settings: arSettings,
     integrationsHealth: arIntegrationsHealth,
     integrations: arIntegrations,
+    fieldAccess: arFieldAccess,
     resources: arResources,
     board: arBoard,
     reports: arReports,

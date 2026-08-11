@@ -385,7 +385,14 @@ class WorkerBrief(BaseModel):
     id: UUID
     name: str
     role: str | None = None
+    # The number the farm already recorded. Returned so enrolment does not ask
+    # an operator to retype the username — a typo there mints a second account
+    # rather than failing, because the phone *is* the username.
+    phone: str | None = None
     has_phone: bool
+    # Set only for people already enrolled; PIN reissue is keyed on the user,
+    # and a worker row does not carry one.
+    user_id: UUID | None = None
 
 
 class FieldEnrolmentAuditResponse(BaseModel):

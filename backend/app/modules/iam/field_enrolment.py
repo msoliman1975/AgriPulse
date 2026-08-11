@@ -43,12 +43,21 @@ _log = get_logger(__name__)
 
 
 def _worker_brief(row: dict[str, Any]) -> dict[str, Any]:
-    """Just enough to act on — the audit is a worklist, not a directory."""
+    """Just enough to act on — the audit is a worklist, not a directory.
+
+    "Enough to act on" means the enrolment call itself: the phone is the
+    username, so a UI that could only see ``has_phone`` would have to ask the
+    operator to retype a number the farm already recorded, and any typo would
+    mint a second account under a different username. ``user_id`` is set only
+    for people already enrolled, and is what PIN reissue is keyed on.
+    """
     return {
         "id": row["id"],
         "name": row["name"],
         "role": row["role"],
+        "phone": row["phone"],
         "has_phone": bool(row["phone"]),
+        "user_id": row.get("user_id"),
     }
 
 
@@ -316,6 +325,25 @@ class FieldEnrolmentService:
             .all()
         )
         workers = [dict(r) for r in rows]
+
+        # Resolve the linked membership to a user, because PIN reissue is keyed
+        # on the user and a worker row does not carry one. Cross-schema, so it
+        # is a second query on the public session rather than a join.
+        membership_ids = [w["membership_id"] for w in workers if w["membership_id"] is not None]
+        if membership_ids:
+            owners = (
+                await self._public.execute(
+                    text(
+                        "SELECT id, user_id FROM public.tenant_memberships "
+                        "WHERE id = ANY(:ids) AND deleted_at IS NULL"
+                    ),
+                    {"ids": membership_ids},
+                )
+            ).all()
+            by_membership = {row.id: row.user_id for row in owners}
+            for w in workers:
+                w["user_id"] = by_membership.get(w["membership_id"])
+
         blocked = [w for w in workers if w["role"] == "FieldWorker"]
         no_phone = [w for w in workers if not w["phone"] and w["role"] != "FieldWorker"]
         enrolled = [w for w in workers if w["membership_id"] is not None]

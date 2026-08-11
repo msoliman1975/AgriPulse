@@ -42,6 +42,7 @@ import { BulkUpdatesPage } from "@/modules/settings/pages/BulkUpdatesPage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
+import { FieldAccessPage } from "@/modules/settings/pages/FieldAccessPage";
 import { ResourcesWorkersPage } from "@/modules/settings/pages/ResourcesWorkersPage";
 import { ResourcesEquipmentPage } from "@/modules/settings/pages/ResourcesEquipmentPage";
 import { IntegrationsLayout } from "@/modules/settings/pages/IntegrationsLayout";
@@ -266,6 +267,7 @@ export function App(): ReactNode {
                   <Route path="users" element={<UsersConfigPage />} />
                   <Route path="bulk" element={<BulkUpdatesPage />} />
                   <Route path="workers" element={<ResourcesWorkersPage />} />
+                  <Route path="field-access" element={<FieldAccessPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />
                   {/* Decision Trees moved to the top-level /decision-trees
