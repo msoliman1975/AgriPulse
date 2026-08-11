@@ -1189,11 +1189,28 @@ global:
   #   not by run conclusion and not via the packages REST API (which 404s for
   #   this repo): api sha256:cb22e4b7, workers sha256:c805a80a, frontend
   #   sha256:f07acf90. frontend again lagged api/workers by several minutes.
+  # b65f42c = the google-auth lockfile fix. FCM was enabled by bc63176 and
+  #   could not actually send: `google-auth` has been in [project]
+  #   dependencies since the Scout push work but uv.lock was never
+  #   regenerated, and the Dockerfile takes `uv sync --frozen` whenever a lock
+  #   is present -- so the runtime image never contained it. Every setting was
+  #   correct; the import was missing. Found by asking the running pod to mint
+  #   a token, not by reading config.
+  #
+  #   Backend-only. The frontend image for b65f42c is BYTE-IDENTICAL to
+  #   bc63176 (both sha256:f07acf90), so it stays on bc63176 rather than
+  #   cycling a pod to ship the same bytes under a different tag.
+  #
+  #   No migration. Plain tag revert to bc63176 is a safe rollback -- it only
+  #   returns push to the broken-but-harmless state it was already in.
+  #
+  #   Images verified by pulling on the node before this commit:
+  #   api sha256:6d0ce8ce, workers sha256:ec1410a1.
   images:
     api:
-      tag: "bc63176"
+      tag: "b65f42c"
     workers:
-      tag: "bc63176"
+      tag: "b65f42c"
     frontend:
       tag: "bc63176"
     tileServer:
