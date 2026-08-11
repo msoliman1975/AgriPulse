@@ -32,6 +32,13 @@ interface ToolbarProps {
   chips?: ReactNode;
   /** Everything else — goes behind the counted popover. */
   axes?: readonly FilterAxis[];
+  /**
+   * `popover` (default) puts every axis behind one counted "Filters" button.
+   * `inline` gives each axis its own labelled dropdown — use it when there
+   * are only a few axes and each is high-traffic, so the axis a value belongs
+   * to is readable without opening anything.
+   */
+  axisLayout?: "popover" | "inline";
   values?: FilterValues;
   onValuesChange?: (next: FilterValues) => void;
   /** Renders "Showing N of M" beside the applied-filter chips. */
@@ -59,6 +66,7 @@ export function Toolbar({
   search,
   chips,
   axes,
+  axisLayout = "popover",
   values,
   onValuesChange,
   resultCount,
@@ -121,7 +129,20 @@ export function Toolbar({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {right}
-          {hasAxes ? (
+          {hasAxes && axisLayout === "inline"
+            ? (axes ?? []).map((axis) => (
+                <FilterPopover
+                  key={axis.key}
+                  label={axis.label}
+                  axes={[axis]}
+                  values={values}
+                  activeCount={(values?.[axis.key] ?? []).length}
+                  onToggle={toggle}
+                  onClearAll={() => onValuesChange?.({ ...values, [axis.key]: [] })}
+                />
+              ))
+            : null}
+          {hasAxes && axisLayout === "popover" ? (
             <FilterPopover
               axes={axes ?? []}
               values={values}
@@ -169,12 +190,16 @@ function FilterPopover({
   activeCount,
   onToggle,
   onClearAll,
+  label,
 }: {
   axes: readonly FilterAxis[];
   values: FilterValues | undefined;
   activeCount: number;
   onToggle: (axis: FilterAxis, value: string) => void;
   onClearAll: () => void;
+  /** Trigger text. Defaults to the generic "Filters" for the combined popover;
+   *  the inline layout passes the axis name so each dropdown reads for itself. */
+  label?: string;
 }): ReactNode {
   const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
@@ -211,7 +236,7 @@ function FilterPopover({
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-2 rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm text-ap-ink hover:bg-ap-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
       >
-        {t("toolbar.filters")}
+        {label ?? t("toolbar.filters")}
         {activeCount > 0 ? (
           <span className="inline-grid h-4 min-w-4 place-items-center rounded-full bg-ap-primary px-1 text-[10px] font-semibold text-white">
             {activeCount}
@@ -228,7 +253,14 @@ function FilterPopover({
         >
           {axes.map((axis, i) => (
             <fieldset key={axis.key} className={i > 0 ? "mt-3 border-t border-ap-line pt-3" : ""}>
-              <legend className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ap-muted">
+              {/* The inline layout already names the axis on the trigger, so
+                  repeating it as a legend is noise. */}
+              <legend
+                className={clsx(
+                  "mb-1 text-[10px] font-semibold uppercase tracking-wider text-ap-muted",
+                  label !== undefined && axes.length === 1 && "sr-only",
+                )}
+              >
                 {axis.label}
               </legend>
               {axis.options.map((option) => {

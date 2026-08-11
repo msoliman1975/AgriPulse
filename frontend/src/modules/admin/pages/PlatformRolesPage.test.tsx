@@ -92,22 +92,33 @@ vi.mock("@/api/rbacMatrix", async () => {
   return { ...actual, getRbacMatrix: () => getRbacMatrix() };
 });
 
-function renderPage() {
+function renderPage(url = "/platform/roles") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       {/* DataTable calls useNavigate for row links, so a Router is required. */}
-      <MemoryRouter initialEntries={["/platform/roles"]}>
+      <MemoryRouter initialEntries={[url]}>
         <PlatformRolesPage />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-/** The permission table, addressed by its caption so KPI text can't match. */
-async function table(): Promise<HTMLElement> {
-  return waitFor(() => screen.getByRole("table"));
+/**
+ * The page stacks two tables: roles on top, that role's permissions below.
+ * Waits for real content — DataTable keeps its header mounted while loading,
+ * so simply finding two tables would match the skeleton.
+ */
+async function bothTables(): Promise<HTMLElement[]> {
+  await screen.findByText("PlatformAdmin");
+  return waitFor(() => {
+    const found = screen.getAllByRole("table");
+    expect(found).toHaveLength(2);
+    return found;
+  });
 }
+const rolesTable = () => screen.getAllByRole("table")[0];
+const permsTable = () => screen.getAllByRole("table")[1];
 
 describe("PlatformRolesPage", () => {
   beforeEach(async () => {
@@ -115,75 +126,128 @@ describe("PlatformRolesPage", () => {
     await setupTestI18n("en");
   });
 
-  it("groups roles into their three tier bands", async () => {
+  it("lists every role with its tier and holder count in one compact table", async () => {
     renderPage();
-    await waitFor(() => screen.getByText("BillingAdmin"));
-    expect(screen.getByText("Platform roles")).toBeInTheDocument();
-    expect(screen.getByText("Tenant roles")).toBeInTheDocument();
-    expect(screen.getByText("Farm roles")).toBeInTheDocument();
+    await bothTables();
+    const roleRow = within(rolesTable()).getByText("BillingAdmin").closest("tr") as HTMLElement;
+    // Tier is rendered through i18n, so it reads "Tenant", not the raw value.
+    expect(within(roleRow).getByText("Tenant")).toBeInTheDocument();
+    // 1 permission, 1 enforced, 0 pending, 7 people.
+    expect(within(roleRow).getByText("7")).toBeInTheDocument();
   });
 
   it("marks the wildcard role rather than printing a bare count", async () => {
     renderPage();
-    await waitFor(() => screen.getByText("PlatformAdmin"));
-    expect(screen.getByText("All permissions")).toBeInTheDocument();
+    await bothTables();
+    expect(within(rolesTable()).getByText("All permissions")).toBeInTheDocument();
   });
 
-  it("reports how many people hold each role", async () => {
+  it("puts the totals in the subtitle instead of a row of KPI tiles", async () => {
     renderPage();
-    await waitFor(() => screen.getByText("BillingAdmin"));
-    expect(screen.getByText("7 people hold this role")).toBeInTheDocument();
+    await bothTables();
+    expect(
+      screen.getByText(/3 roles · 4 permissions · 3 enforced · 1 not yet enforced/),
+    ).toBeInTheDocument();
   });
 
   it("defaults to the granted permissions of the first role", async () => {
     renderPage();
-    // DataTable keeps its header mounted while loading, so wait for real
-    // content before counting rows or the skeleton gets measured instead.
-    await within(await table()).findByText("farm.read");
+    await bothTables();
+    await within(permsTable()).findByText("farm.read");
     // header + PlatformAdmin's 4 granted capabilities
-    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(5);
+    expect(within(permsTable()).getAllByRole("row")).toHaveLength(5);
   });
 
-  it("narrows the table to the role that was clicked", async () => {
+  it("selects a role from the URL so a view can be handed over", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    await bothTables();
+    await waitFor(() => {
+      expect(within(permsTable()).getAllByRole("row")).toHaveLength(2);
+    });
+    expect(within(permsTable()).getByText("subscription.manage")).toBeInTheDocument();
+    expect(within(permsTable()).queryByText("farm.delete")).not.toBeInTheDocument();
+  });
+
+  it("narrows the permission table to the role that was clicked", async () => {
     renderPage();
     const user = userEvent.setup();
-    await waitFor(() => screen.getByText("BillingAdmin"));
-    await user.click(screen.getByText("Subscription and billing only."));
+    await bothTables();
+    await user.click(within(rolesTable()).getByRole("link", { name: /BillingAdmin/ }));
 
     await waitFor(() => {
-      expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(2);
+      expect(within(permsTable()).getAllByRole("row")).toHaveLength(2);
     });
-    expect(screen.getByText("subscription.manage")).toBeInTheDocument();
-    expect(screen.queryByText("farm.delete")).not.toBeInTheDocument();
+    expect(within(permsTable()).getByText("subscription.manage")).toBeInTheDocument();
   });
 
   it("flags a permission that no route enforces yet", async () => {
     renderPage();
-    await within(await table()).findByText("analytics.export");
-    // PlatformAdmin holds the stub capability, so the badge must be visible
-    // on first paint rather than hidden behind a filter.
-    expect(within(screen.getByRole("table")).getByText("Pending")).toBeInTheDocument();
+    await bothTables();
+    await within(permsTable()).findByText("analytics.export");
+    // PlatformAdmin holds the stub capability, so the badge must be visible on
+    // first paint rather than hidden behind a filter.
+    expect(within(permsTable()).getByText("Pending")).toBeInTheDocument();
+  });
+
+  it("offers scope, resource and status as three separate dropdowns", async () => {
+    renderPage();
+    await bothTables();
+    // Exact names: the column-header hint buttons are also called "Scope" and
+    // "Status", but their accessible name carries the explanation too.
+    expect(screen.getByRole("button", { name: "Scope" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resource" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Status" })).toBeInTheDocument();
+    // One combined "Filters" button would hide which axis a value belongs to.
+    expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
+  });
+
+  it("filters the table from a single axis dropdown", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("farm.read");
+
+    await user.click(screen.getByRole("button", { name: "Status" }));
+    await user.click(await screen.findByLabelText("Pending"));
+
+    await waitFor(() => {
+      expect(within(permsTable()).getAllByRole("row")).toHaveLength(2);
+    });
+    expect(within(permsTable()).getByText("analytics.export")).toBeInTheDocument();
+  });
+
+  it("explains the terms of art in the column headers", async () => {
+    renderPage();
+    await bothTables();
+    // Scope is documentation-only, which nobody would guess from the word.
+    expect(within(permsTable()).getByText(/resolver enforces the role mapping/)).toBeInTheDocument();
+    expect(within(permsTable()).getByText(/reserved for a module that has not shipped/)).toBeInTheDocument();
+    expect(
+      within(permsTable()).getByText(/a user with only this role passes the check/),
+    ).toBeInTheDocument();
   });
 
   it("shows which roles grant a permission in the by-permission view", async () => {
     renderPage();
     const user = userEvent.setup();
-    await waitFor(() => screen.getByText("BillingAdmin"));
+    await bothTables();
     await user.click(screen.getByRole("radio", { name: "By permission" }));
 
-    await within(await table()).findByText("analytics.export");
-    // Every capability is listed, not just the selected role's.
-    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(5);
-    const farmRead = within(screen.getByRole("table")).getByText("farm.read").closest("tr");
-    expect(within(farmRead as HTMLElement).getByText("Viewer")).toBeInTheDocument();
-    expect(within(farmRead as HTMLElement).getByText("PlatformAdmin")).toBeInTheDocument();
+    await within(permsTable()).findByText("analytics.export");
+    expect(within(permsTable()).getAllByRole("row")).toHaveLength(5);
+    const farmRead = within(permsTable()).getByText("farm.read").closest("tr") as HTMLElement;
+    expect(within(farmRead).getByText("Viewer")).toBeInTheDocument();
+    expect(within(farmRead).getByText("PlatformAdmin")).toBeInTheDocument();
   });
 
   it("surfaces a load failure instead of an empty table", async () => {
-    getRbacMatrix.mockImplementationOnce(() => Promise.reject(new Error("boom")));
+    getRbacMatrix.mockImplementation(() => Promise.reject(new Error("boom")));
     renderPage();
     await waitFor(() =>
-      expect(screen.getByText("Could not load the roles and permissions.")).toBeInTheDocument(),
+      expect(
+        screen.getAllByText("Could not load the roles and permissions.").length,
+      ).toBeGreaterThan(0),
     );
+    getRbacMatrix.mockImplementation(() => Promise.resolve(matrix));
   });
 });

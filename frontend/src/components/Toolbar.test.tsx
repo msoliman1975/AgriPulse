@@ -98,4 +98,56 @@ describe("Toolbar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
     expect(onValuesChange).toHaveBeenCalledWith({});
   });
+  describe("axisLayout=inline", () => {
+    it("gives each axis its own named trigger instead of one Filters button", () => {
+      render(<Toolbar axes={AXES} axisLayout="inline" values={{}} onValuesChange={vi.fn()} />);
+
+      expect(screen.getByRole("button", { name: "Location" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Soil texture" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Filters/ })).not.toBeInTheDocument();
+    });
+
+    it("badges each trigger with only its own axis's count", () => {
+      render(
+        <Toolbar
+          axes={AXES}
+          axisLayout="inline"
+          values={{ location: ["EG", "MA"], soil: [] }}
+          onValuesChange={vi.fn()}
+        />,
+      );
+
+      // The combined popover shows 2 on one button; inline must not repeat
+      // that total on the soil trigger.
+      expect(screen.getByRole("button", { name: "Location 2" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Soil texture" })).toBeInTheDocument();
+    });
+
+    it("opens each axis independently", async () => {
+      render(<Toolbar axes={AXES} axisLayout="inline" values={{}} onValuesChange={vi.fn()} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Soil texture" }));
+
+      expect(screen.getByRole("checkbox", { name: "Sandy" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "Egypt" })).not.toBeInTheDocument();
+    });
+
+    it("clears only its own axis", async () => {
+      const onValuesChange = vi.fn();
+      render(
+        <Toolbar
+          axes={AXES}
+          axisLayout="inline"
+          values={{ location: ["EG"], soil: ["loam"] }}
+          onValuesChange={onValuesChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Location 1" }));
+      // The in-menu clear belongs to this dropdown, so soil must survive.
+      await userEvent.click(screen.getAllByRole("button", { name: "Clear all" })[0]);
+
+      expect(onValuesChange).toHaveBeenCalledWith({ location: [], soil: ["loam"] });
+    });
+  });
 });
