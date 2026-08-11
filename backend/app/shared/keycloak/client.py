@@ -1089,9 +1089,20 @@ def provisioning_config_problems(settings: Settings) -> list[str]:
 
 
 def _split_full_name(full_name: str | None) -> tuple[str, str]:
-    if not full_name:
+    """Split a display name into the first/last Keycloak insists on having.
+
+    Neither half may come back empty. The realm has VERIFY_PROFILE enabled and
+    the default user profile marks both required, so an incomplete profile
+    makes Keycloak reject a **direct grant** with "Account is not fully set
+    up" — not at enrolment, not in any log, but on the scout's phone, worded
+    as though the credential were wrong.
+
+    Single-word names are ordinary here ("Majed"), so the one token stands for
+    both halves rather than leaving a hole that only shows up at sign-in.
+    """
+    if not full_name or not full_name.strip():
         return "", ""
     parts = full_name.strip().split(maxsplit=1)
     if len(parts) == 1:
-        return parts[0], ""
+        return parts[0], parts[0]
     return parts[0], parts[1]

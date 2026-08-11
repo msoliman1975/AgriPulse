@@ -38,6 +38,11 @@ class InvalidPhoneNumberError(ValueError):
     """The string given cannot be read as a phone number."""
 
 
+# +20, then a 10-digit national number beginning 1X.
+_EG_COUNTRY_CODE = "20"
+_EG_MSISDN_LENGTH = 12
+
+
 def normalise_phone(raw: str, *, country_code: str = _DEFAULT_COUNTRY_CODE) -> str:
     """Return an E.164 phone number, or raise.
 
@@ -68,6 +73,15 @@ def normalise_phone(raw: str, *, country_code: str = _DEFAULT_COUNTRY_CODE) -> s
     if not 8 <= len(digits) <= 15:
         raise InvalidPhoneNumberError(
             f"phone number must be 8-15 digits after normalisation, got {len(digits)}: {raw!r}"
+        )
+    # Country-specific length, because the generic 8-15 window is wide enough
+    # to swallow a one-digit typo — and here that does not fail, it mints a
+    # working account under a number nobody owns. The scout then cannot sign
+    # in with their real number and the error says "wrong phone or PIN".
+    if digits.startswith(_EG_COUNTRY_CODE) and len(digits) != _EG_MSISDN_LENGTH:
+        raise InvalidPhoneNumberError(
+            f"an Egyptian mobile is {_EG_MSISDN_LENGTH} digits in E.164 "
+            f"(+20 1X XXXX XXXX); got {len(digits)}: {raw!r}"
         )
     return f"+{digits}"
 

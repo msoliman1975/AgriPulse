@@ -21,11 +21,6 @@ import { PushNotifications } from "@capacitor/push-notifications";
 
 import { registerDevice, revokeDevice } from "@/api/client";
 
-// Same source App.tsx reads. Registration is farm-gated because a Scout holds
-// no tenant role, so an unset farm means a guaranteed 403 — worth saying out
-// loud, since the failure is otherwise swallowed as a warning.
-const FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
-
 let inFlight: Promise<void> | null = null;
 // The FCM token arrives in a listener rather than as a return value, so
 // sign-out has nothing to revoke unless we hold on to it here.
@@ -36,9 +31,13 @@ export function pushSupported(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("PushNotifications");
 }
 
-async function run(): Promise<void> {
-  if (!FARM_ID) {
-    console.warn("push: VITE_FARM_ID is unset; device registration would 403");
+async function run(farmId: string): Promise<void> {
+  // Registration is farm-gated: a Scout holds no tenant role, so the wrong
+  // farm is a guaranteed 403 and the phone silently never buzzes. The farm now
+  // comes from the caller, which resolved it from the token, rather than from
+  // a build-time constant that could name somebody else's farm entirely.
+  if (!farmId) {
+    console.warn("push: no farm resolved yet; skipping device registration");
     return;
   }
 
@@ -58,7 +57,7 @@ async function run(): Promise<void> {
     // return value, which is why this is wrapped rather than awaited directly.
     void PushNotifications.addListener("registration", (token) => {
       lastToken = token.value;
-      registerDevice(token.value, FARM_ID)
+      registerDevice(token.value, farmId)
         .catch((err: unknown) => console.warn("push: backend registration failed", err))
         .finally(() => resolve());
     });
@@ -74,12 +73,12 @@ async function run(): Promise<void> {
  * Idempotent per app session: several screens may call this on mount, and
  * registering twice would race two upserts for the same token.
  */
-export function ensureDeviceRegistered(): Promise<void> {
+export function ensureDeviceRegistered(farmId: string): Promise<void> {
   if (!pushSupported()) {
     console.info("push: not a native platform; skipping device registration");
     return Promise.resolve();
   }
-  inFlight ??= run().catch((err: unknown) => {
+  inFlight ??= run(farmId).catch((err: unknown) => {
     console.warn("push: registration aborted", err);
   });
   return inFlight;
