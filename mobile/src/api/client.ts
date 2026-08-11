@@ -116,6 +116,81 @@ export function startVisit(visitId: string, farmId: string) {
   return request<Visit>(`/scouting/visits/${visitId}:start?farm_id=${farmId}`, { method: "POST" });
 }
 
+export function acceptVisit(visitId: string, farmId: string) {
+  return request<Visit>(`/scouting/visits/${visitId}:accept?farm_id=${farmId}`, { method: "POST" });
+}
+
+export type VisitOutcome = "resolved" | "inconclusive" | "blocked";
+
+/**
+ * Close a visit.
+ *
+ * `observation_group_id` names observations the client has ALREADY written
+ * through the signals API. Capture and closure are two calls on purpose: a
+ * failed submit must never destroy readings a scout has already taken, which
+ * on a field connection is the likely failure.
+ *
+ * `idempotency_key` makes a retry safe — the same key replays rather than
+ * double-closing.
+ */
+export function submitVisit(
+  visitId: string,
+  farmId: string,
+  body: {
+    outcome: VisitOutcome;
+    summary_note?: string | null;
+    observation_group_id?: string | null;
+    idempotency_key?: string;
+  },
+) {
+  return request<Visit>(`/scouting/visits/${visitId}:submit?farm_id=${farmId}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** A thing a scout can record against a block. */
+export interface SignalDefinition {
+  id: string;
+  code: string;
+  name: string;
+  value_type: "numeric" | "categorical" | "event" | "boolean" | "geopoint" | null;
+  unit?: string | null;
+  allowed_values?: string[] | null;
+  attachment_allowed?: boolean | null;
+}
+
+export function listSignalDefinitions(farmId: string) {
+  return request<SignalDefinition[]>(
+    `/signals/definitions?farm_id=${encodeURIComponent(farmId)}`,
+  );
+}
+
+/**
+ * Record one observation.
+ *
+ * `location_mode` stays at the default `entity`: `point_in_entity` is enforced
+ * by a database ST_Within trigger, so GPS drift at a block edge would reject
+ * the write AFTER the scout did the work. Attaching the reading to the block
+ * is honest and always succeeds.
+ */
+export function recordObservation(
+  definitionId: string,
+  body: {
+    farm_id: string;
+    block_id?: string | null;
+    value_numeric?: number | null;
+    value_categorical?: string | null;
+    value_boolean?: boolean | null;
+    notes?: string | null;
+  },
+) {
+  return request<{ id: string }>(`/signals/definitions/${definitionId}/observations`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // `farm_id` rides along for the same reason every scouting call carries it: a
 // Scout holds no tenant role, so the capability only resolves against a farm
 // they are scoped to. Without it the backend 403s and — because a failed
