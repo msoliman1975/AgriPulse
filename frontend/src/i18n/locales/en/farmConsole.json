@@ -623,14 +623,16 @@
     }
   },
   "mapDock": {
-    "grid": "Sub-block grid",
+    "grid": "Grid lines",
     "gridUnavailable": "no block on this farm has a grid configured",
     "anomaly": "Anomaly vs baseline",
     "contrast": "Contrast view",
     "compare": "Compare two dates",
     "comingSoon": "not built yet",
     "fullscreen": "Full screen",
-    "exitFullscreen": "Exit full screen"
+    "exitFullscreen": "Exit full screen",
+    "pixels": "Index pixels",
+    "pixelsUnavailable": "no block has an image for this date"
   },
   "legend": {
     "title": "Index legend",
@@ -639,20 +641,16 @@
     "areaHeader": "Area",
     "covered": "Covered",
     "noData": "No reading",
-    "noDataHint": "Cells with no value for this scene — cloud, cloud shadow, scene edge, or an ingest that has not run. Not necessarily cloud.",
+    "noDataHint": "Area inside your blocks with no usable pixel for this scene — cloud, cloud shadow or scene edge.",
     "hint": "Better read with {{index}}",
     "collapse": "Collapse legend",
     "expand": "Expand legend",
-    "emptyNoGridTitle": "No zoned blocks on this farm",
-    "emptyNoGridBody": "The legend measures the sub-block grid. No block here has a grid configured yet, so there is nothing to measure.",
-    "emptyNoGridCta": "Configure a block grid",
-    "emptyNoSubsTitle": "No imagery subscription",
-    "emptyNoSubsBody": "Blocks need an active imagery subscription before a grid can be computed and coloured.",
+    "emptyNoSubsTitle": "No imagery yet",
+    "emptyNoSubsBody": "Blocks need an active imagery subscription before there is anything to draw.",
     "emptyNoSubsCta": "Open imagery settings",
-    "emptyOffTitle": "Grid overlay is off",
-    "emptyOffBody": "Turn the sub-block grid on to see how much area sits in each class.",
-    "band": {
+    "class": {
       "canopy": {
+        "water": "Water, snow or cloud",
         "bare": "Bare soil",
         "verySparse": "Very sparse",
         "sparse": "Sparse canopy",
@@ -661,14 +659,14 @@
         "veryDense": "Very dense"
       },
       "chlorophyll": {
-        "bare": "Bare soil",
+        "bare": "Bare or senescent",
         "low": "Low",
         "moderate": "Moderate",
         "good": "Good",
-        "high": "High"
+        "high": "High chlorophyll"
       },
       "surfaceWater": {
-        "denseCanopy": "Dense canopy",
+        "denseCanopy": "Dense canopy, dry surface",
         "vegetated": "Vegetated",
         "bareOrDamp": "Bare or damp",
         "standingWater": "Standing water",
@@ -676,12 +674,17 @@
       },
       "leafMoisture": {
         "bare": "Bare soil",
-        "severeStress": "Severe stress",
-        "stress": "Water stress",
-        "moderate": "Moderate",
-        "wellWatered": "Well watered",
-        "veryWet": "Very wet"
+        "verySparse": "Very sparse canopy",
+        "stressed": "Moderate cover, water stress",
+        "mildStress": "Good cover, mild stress",
+        "dense": "Dense canopy, no stress",
+        "veryDense": "Very dense canopy, no stress",
+        "saturated": "Saturated — check for waterlogging"
       }
-    }
+    },
+    "pixelsOffNote": "Index pixels are off — blocks are filled by their own average for this date.",
+    "relativeCaveat": "NDRE shifts with sensor and crop — compare blocks against each other on one date rather than against fixed thresholds.",
+    "emptyNoSceneTitle": "Nothing for this date",
+    "emptyNoSceneBody": "No block has a usable image for the selected pass — cloud, or an ingest that has not run. Pick another date on the timeline."
   }
 }

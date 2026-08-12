@@ -31,6 +31,8 @@ from app.modules.imagery.events import (
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
+    FarmSceneAssetRead,
+    FarmSceneAssetsResponse,
     FarmSceneRead,
     FarmScenesResponse,
     ImageryConfigEntry,
@@ -93,6 +95,10 @@ class ImageryService(Protocol):
     async def get_config(self) -> ConfigResponse: ...
 
     async def list_farm_scenes(self, *, farm_id: UUID, limit: int = 120) -> FarmScenesResponse: ...
+
+    async def list_farm_scene_assets(
+        self, *, farm_id: UUID, at: datetime | None = None
+    ) -> FarmSceneAssetsResponse: ...
 
 
 class ImageryServiceImpl:
@@ -263,6 +269,16 @@ class ImageryServiceImpl:
             farm_id=farm_id,
             items=items,
             median_gap_days=_median_gap_days([i.scene_date for i in items]),
+        )
+
+    async def list_farm_scene_assets(
+        self, *, farm_id: UUID, at: datetime | None = None
+    ) -> FarmSceneAssetsResponse:
+        rows = await self._repo.list_farm_scene_assets(farm_id=farm_id, at=at)
+        return FarmSceneAssetsResponse(
+            farm_id=farm_id,
+            at=at,
+            items=tuple(FarmSceneAssetRead.model_validate(r) for r in rows),
         )
 
     async def get_config(self) -> ConfigResponse:

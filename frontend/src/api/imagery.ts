@@ -139,6 +139,56 @@ export async function listFarmScenes(
   }
 }
 
+export interface FarmSceneAsset {
+  block_id: string;
+  product_id: string;
+  /**
+   * `provider/product/scene/aoi` — every part of the COG object key except
+   * the index code. Build a key as `${stac_item_id}/${index}.tif`; the aoi
+   * hash it ends with is why a reshaped block's old rasters cannot leak in.
+   */
+  stac_item_id: string;
+  scene_datetime: string;
+  /** Ground sample distance in metres; null when the product is unreadable. */
+  resolution_m: string | null;
+}
+
+export interface FarmSceneAssetsResponse {
+  farm_id: string;
+  at: string | null;
+  items: FarmSceneAsset[];
+}
+
+/**
+ * Which index raster to draw for each block at one pass.
+ *
+ * Blocks absent from the response have no usable raster for that pass — a
+ * cloud-skipped or failed job — and the caller must leave them to the base
+ * map rather than falling back to an older scene, which would contradict the
+ * date the timeline is parked on.
+ *
+ * Returns `null` on 404 so the console degrades to "no pixel layer" against
+ * an api that predates the route, exactly as `listFarmScenes` does.
+ */
+export async function listFarmSceneAssets(
+  farmId: string,
+  at?: string,
+): Promise<FarmSceneAssetsResponse | null> {
+  try {
+    const { data } = await apiClient.get<FarmSceneAssetsResponse>(
+      `/v1/farms/${farmId}/scene-assets`,
+      { params: { at: at ?? undefined } },
+    );
+    return data;
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const resp = (err as { response?: { status?: number } }).response;
+      if (resp?.status === 404) return null;
+    }
+    throw err;
+  }
+}
+
 export async function listScenes(
   blockId: string,
   params: ListScenesParams = {},

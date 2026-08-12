@@ -38,6 +38,9 @@ import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOver
 import { griddedBlocks } from "../mapnext/gridOverlay";
 import { LAST_FARM_KEY } from "../mapnext/constants";
 import { CONSOLE_QK } from "./constants";
+import { classify } from "./indexClasses";
+import { useIndexPixels } from "./useIndexPixels";
+import { useOptionalConfig } from "@/config/ConfigContext";
 import type { LayerState } from "../mapnext/ViewBar";
 
 export function useFarmConsole(farmId: string) {
@@ -83,6 +86,11 @@ export function useFarmConsole(farmId: string) {
   // farm so switching farms re-evaluates.
   const [showGrid, setShowGrid] = useState(false);
   const gridDefaultedFor = useRef<string | null>(null);
+  // The index pixels are the map's primary reading of the farm, so they are on
+  // by default wherever there is imagery. Separate from the grid toggle: the
+  // mesh and the pixels answer different questions, and reading fine detail
+  // means turning the mesh off over the pixels rather than losing both.
+  const [showPixels, setShowPixels] = useState(true);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [signalDefId, setSignalDefId] = useState<string | null>(null);
@@ -196,6 +204,64 @@ export function useFarmConsole(farmId: string) {
     enabled: Boolean(showGrid && gridded.length > 0),
     staleTime: 30_000,
   });
+
+  // Index pixels + the statistics that feed the legend and the block fill.
+  // Not gated on `showPixels`: the block fill and the legend read the same
+  // numbers, so turning the layer off must not empty the panel.
+  // Block extents for the pixel sources. Each COG covers one block and the
+  // tile server 404s outside it, so an unbounded source asks four times for
+  // every tile and throws away three answers.
+  const boundsByBlockId = useMemo(() => {
+    const m = new Map<string, [number, number, number, number]>();
+    for (const f of summaryQ.data?.geojson.features ?? []) {
+      let w = Infinity;
+      let s = Infinity;
+      let e = -Infinity;
+      let n = -Infinity;
+      for (const ring of f.geometry.coordinates) {
+        for (const [x, y] of ring) {
+          if (x < w) w = x;
+          if (y < s) s = y;
+          if (x > e) e = x;
+          if (y > n) n = y;
+        }
+      }
+      if (Number.isFinite(w)) m.set(f.properties.id, [w, s, e, n]);
+    }
+    return m;
+  }, [summaryQ.data]);
+
+  const { config } = useOptionalConfig();
+  const pixels = useIndexPixels({
+    farmId,
+    code: activeIndex,
+    sceneAt,
+    config,
+    boundsByBlockId,
+    enabled: Boolean(config),
+  });
+
+  // Blocks carry the colour of their own class, so the map has one colour
+  // language whether or not the pixels are drawn. Injected as a feature
+  // property rather than resolved inside MapCanvas, which stays unaware of
+  // what an index class is.
+  const geojsonWithClasses = useMemo(() => {
+    const base = summaryQ.data?.geojson;
+    if (!base) return base;
+    return {
+      ...base,
+      features: base.features.map((f) => {
+        const mean = pixels.meanByBlockId.get(f.properties.id);
+        const cls = mean === undefined ? null : classify(activeIndex, mean);
+        return cls
+          ? { ...f, properties: { ...f.properties, class_color: cls.color } }
+          : // No property at all, not a transparent colour: the paint
+            // expression keys off `has`, so an absent block reads as "no
+            // reading" rather than as a class that happens to be invisible.
+            f;
+      }),
+    };
+  }, [summaryQ.data, pixels.meanByBlockId, activeIndex]);
 
   const gridCellsFc: FeatureCollection<Polygon, GridCellProps> | null = useMemo(() => {
     if (!showGrid || !farmGridQ.data) return null;
@@ -386,6 +452,8 @@ export function useFarmConsole(farmId: string) {
     setLayers,
     showGrid,
     setShowGrid,
+    showPixels,
+    setShowPixels,
     selectedCellId,
     setSelectedCellId,
     cellClickPoint,
@@ -417,6 +485,8 @@ export function useFarmConsole(farmId: string) {
     gridProductId,
     gridded,
     gridCellsFc,
+    pixels,
+    geojsonWithClasses,
     cellMeta,
     highlightedCellIds,
     selectedCellBaseline,

@@ -4,15 +4,17 @@
 // Three things distinguish it from a colour ramp with numbers on it:
 //   * every class carries an AREA in the user's unit, because "24.1 feddan
 //     very sparse" is the sentence someone acts on;
-//   * the swatches come from the map's own ramp table (map/gridRamp.ts), so
-//     the legend cannot drift from the pixels it describes;
+//   * the swatches ARE the colours painted on the ground — both come from
+//     indexClasses.ts, one as a TiTiler interval colormap and one as these
+//     rows, so the legend cannot drift from the pixels it describes;
 //   * when there is nothing to measure it says WHY, in one compact line,
 //     rather than rendering an empty 300px panel that reads as broken.
 //
-// That last case is not an edge case. A farm with no imagery subscription on
-// any block — which is the normal state of a newly onboarded tenant — has no
-// grid, so this panel's headline feature has nothing to show. It is built
-// first here for that reason.
+// The areas are counted from PIXELS inside the current block boundary. They
+// used to be summed from sub-block cell aggregates, which reported 205.0
+// feddan of land on a 164.9-feddan farm: two blocks' grids had been
+// materialised against older, larger boundaries and never regenerated, and
+// the legend faithfully added up geometry that no longer existed.
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,26 +22,29 @@ import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { Card } from "@/components/Card";
 import { formatAreaValue, m2ToUnit } from "@/lib/units";
 import { usePrefs } from "@/prefs/PrefsContext";
-import { HEALTH_DOT, INDEX_META } from "../mapnext/constants";
+import { INDEX_META } from "../mapnext/constants";
 import {
-  BAND_VOCAB,
-  computeLegend,
+  CLASS_HINT,
+  CLASS_VOCAB,
+  classesFor,
   formatRange,
-  LEGEND_HINT,
-  type LegendGroup,
-} from "./legendBins";
+  lowerBound,
+  NO_DATA_COLOR,
+  READ_RELATIVELY,
+} from "./indexClasses";
+import type { ClassAreaSummary } from "./pixelTiles";
 
 interface Props {
-  /** Raw farm-grid groups; `undefined` while the query is idle or loading. */
-  groups: readonly LegendGroup[] | undefined;
   code: ApiIndexCode;
+  /** Per-class areas for the current scope; undefined while loading. */
+  areas: ClassAreaSummary | undefined;
   /** Narrow the totals to one block, or null for the whole farm. */
   scopeBlockId: string | null;
   scopeBlockName: string | null;
-  /** Whether the grid overlay is switched on at all. */
-  showGrid: boolean;
-  /** How many blocks on this farm carry a sub-block grid. */
-  griddedCount: number;
+  /** Whether the pixel layer is switched on at all. */
+  showPixels: boolean;
+  /** Blocks carrying an index raster for the selected scene. */
+  assetCount: number;
   /** Active imagery subscriptions across the farm; null while unknown. */
   imagerySubCount: number | null;
   loading: boolean;
@@ -48,12 +53,12 @@ interface Props {
 }
 
 export function IndexLegend({
-  groups,
   code,
+  areas,
   scopeBlockId,
   scopeBlockName,
-  showGrid,
-  griddedCount,
+  showPixels,
+  assetCount,
   imagerySubCount,
   loading,
   onOpenImagerySettings,
@@ -63,9 +68,9 @@ export function IndexLegend({
   const { unit } = usePrefs();
   const [collapsed, setCollapsed] = useState(false);
 
-  const summary = computeLegend(groups, code, scopeBlockId);
-  const vocab = BAND_VOCAB[code];
-  const hint = LEGEND_HINT[code];
+  const classes = classesFor(code);
+  const vocab = CLASS_VOCAB[code];
+  const hint = CLASS_HINT[code];
 
   const area = (m2: number): string =>
     formatAreaValue(m2ToUnit(m2, unit), { locale: i18n.language, fractionDigits: 1 });
@@ -98,8 +103,8 @@ export function IndexLegend({
     </button>
   );
 
-  // ---- nothing to measure: say which of the three reasons it is ----------
-  const diagnostic = pickDiagnostic({ showGrid, griddedCount, imagerySubCount, loading });
+  // ---- nothing to measure: say which reason it is ------------------------
+  const diagnostic = pickDiagnostic({ assetCount, imagerySubCount, loading });
   if (diagnostic) {
     return (
       <Card className={className} title={header} actions={toggle} noPadding>
@@ -126,6 +131,15 @@ export function IndexLegend({
     );
   }
 
+  // Highest VALUE first, so the range column reads monotonically downward
+  // whichever index is on. That is not the same as "best first": NDWI's scale
+  // is inverted, so its healthy end sits at the BOTTOM of the panel while its
+  // colours still run red-for-bad. The numbers and the colours each stay
+  // self-consistent; conflating them is what made the old ramp wrong.
+  const rows = classes
+    .map((cls, i) => ({ cls, lo: lowerBound(code, i), areaM2: areas?.areaM2ByClass[i] ?? 0 }))
+    .reverse();
+
   return (
     <Card className={className} title={header} actions={toggle} noPadding>
       {collapsed ? null : (
@@ -138,20 +152,27 @@ export function IndexLegend({
           </div>
 
           <ul className="max-h-56 overflow-auto py-0.5">
-            {summary.rows.map((row) => {
-              const showHint = hint?.bandKey === row.key;
+            {rows.map(({ cls, lo, areaM2 }) => {
+              const showHint = hint?.classKey === cls.key;
               return (
-                <li key={row.key} className="flex items-center gap-2 px-3 py-[3px]">
+                <li key={cls.key} className="flex items-center gap-2 px-3 py-[3px]">
                   <span
                     aria-hidden="true"
                     className="h-3 w-3 flex-none rounded-sm"
-                    style={{ backgroundColor: row.color }}
+                    style={{ backgroundColor: cls.color }}
                   />
-                  <span className="w-[74px] flex-none text-meta tabular-nums text-ap-muted">
-                    {formatRange(row, num)}
+                  {/* dir="ltr" is load-bearing under RTL: a range is two
+                      LTR runs around a dash, and the Arabic paragraph
+                      direction reorders them, so "0.20 – 0.40" renders as
+                      "0.40 – 0.20" — a different, wrong claim. */}
+                  <span
+                    dir="ltr"
+                    className="w-[74px] flex-none text-start text-meta tabular-nums text-ap-muted"
+                  >
+                    {formatRange(lo, cls.max, num)}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-meta text-ap-ink">
-                    {t(`farmConsole:legend.band.${vocab}.${row.key}`)}
+                    {t(`farmConsole:legend.class.${vocab}.${cls.key}`)}
                     {showHint ? (
                       <span className="ms-1 text-ap-accent">
                         · {t("farmConsole:legend.hint", { index: hint.suggest })}
@@ -161,30 +182,43 @@ export function IndexLegend({
                   <span
                     className={
                       "flex-none text-meta font-semibold tabular-nums " +
-                      (row.areaM2 > 0 ? "text-ap-ink" : "text-ap-muted/60")
+                      (areaM2 > 0 ? "text-ap-ink" : "text-ap-muted/60")
                     }
                   >
-                    {area(row.areaM2)}
+                    {area(areaM2)}
                   </span>
                 </li>
               );
             })}
           </ul>
 
-          <div className="flex items-center gap-3 border-t border-ap-line bg-ap-bg/60 px-3 py-1.5">
-            <span className="text-meta text-ap-muted">
-              {t("farmConsole:legend.covered")}{" "}
-              <b className="tabular-nums text-ap-ink">{area(summary.coveredM2)}</b>
-            </span>
-            {summary.noDataM2 > 0 ? (
-              <span className="text-meta text-ap-muted" title={t("farmConsole:legend.noDataHint")}>
-                <span
-                  aria-hidden="true"
-                  className="me-1 inline-block h-2 w-2 rounded-sm align-middle"
-                  style={{ backgroundColor: HEALTH_DOT.unknown }}
-                />
-                {t("farmConsole:legend.noData")}{" "}
-                <b className="tabular-nums text-ap-ink">{area(summary.noDataM2)}</b>
+          <div className="flex flex-col gap-1 border-t border-ap-line bg-ap-bg/60 px-3 py-1.5">
+            <div className="flex items-center gap-3">
+              <span className="text-meta text-ap-muted">
+                {t("farmConsole:legend.covered")}{" "}
+                <b className="tabular-nums text-ap-ink">{area(areas?.coveredM2 ?? 0)}</b>
+              </span>
+              {areas && areas.noDataM2 > 0 ? (
+                <span className="text-meta text-ap-muted" title={t("farmConsole:legend.noDataHint")}>
+                  <span
+                    aria-hidden="true"
+                    className="me-1 inline-block h-2 w-2 rounded-sm align-middle"
+                    style={{ backgroundColor: NO_DATA_COLOR }}
+                  />
+                  {t("farmConsole:legend.noData")}{" "}
+                  <b className="tabular-nums text-ap-ink">{area(areas.noDataM2)}</b>
+                </span>
+              ) : null}
+            </div>
+            {/* Two things the reader is owed, stated rather than implied. */}
+            {!showPixels ? (
+              <span className="text-meta leading-snug text-ap-muted">
+                {t("farmConsole:legend.pixelsOffNote")}
+              </span>
+            ) : null}
+            {READ_RELATIVELY.has(code) ? (
+              <span className="text-meta leading-snug text-ap-muted">
+                {t("farmConsole:legend.relativeCaveat")}
               </span>
             ) : null}
           </div>
@@ -201,25 +235,28 @@ interface Diagnostic {
 }
 
 /**
- * Which of the three "nothing to show" reasons applies. Ordered from the most
- * specific cause to the least, so the message names the thing the user would
- * actually have to fix rather than the symptom nearest the surface.
+ * Which "nothing to show" reason applies, from the most specific cause to the
+ * least, so the message names the thing the user would actually have to fix
+ * rather than the symptom nearest the surface.
+ *
+ * Note what is NOT a reason any more: the pixel layer being switched off. The
+ * classes and their areas still describe the block fills, which paint the same
+ * classes — so the panel keeps working and merely says so in its footer.
  */
 function pickDiagnostic({
-  showGrid,
-  griddedCount,
+  assetCount,
   imagerySubCount,
   loading,
 }: {
-  showGrid: boolean;
-  griddedCount: number;
+  assetCount: number;
   imagerySubCount: number | null;
   loading: boolean;
 }): Diagnostic | null {
-  if (griddedCount === 0) {
-    // No imagery anywhere is the upstream cause: a grid cannot be computed
-    // without a subscription, so saying "configure a grid" would send the
-    // user to a screen that cannot help them yet.
+  if (assetCount === 0) {
+    if (loading || imagerySubCount === null) return null;
+    // No imagery anywhere is the upstream cause: there is no raster to read
+    // without a subscription, so saying "no imagery for this date" would send
+    // the user scrubbing a timeline that can never help them.
     if (imagerySubCount === 0) {
       return {
         titleKey: "emptyNoSubsTitle",
@@ -227,14 +264,7 @@ function pickDiagnostic({
         ctaKey: "emptyNoSubsCta",
       };
     }
-    return {
-      titleKey: "emptyNoGridTitle",
-      bodyKey: "emptyNoGridBody",
-      ctaKey: "emptyNoGridCta",
-    };
+    return { titleKey: "emptyNoSceneTitle", bodyKey: "emptyNoSceneBody" };
   }
-  if (!showGrid) return { titleKey: "emptyOffTitle", bodyKey: "emptyOffBody" };
-  // Grid is on and blocks are zoned — the rows simply have not arrived yet.
-  if (loading) return null;
   return null;
 }

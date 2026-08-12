@@ -99,6 +99,44 @@ interface Props {
   // disease/pest pressure) instead of health. The features must carry
   // `risk_level`; blocks with "none" render unfilled so the base map shows.
   riskOverlay?: boolean;
+  // Index pixels (Farm Console v2). One entry per block that has a raster for
+  // the selected scene; each becomes its own MapLibre raster source pointed at
+  // the tile server. The COGs are per block and per scene, so there is no one
+  // farm-wide raster to point at — see the plan's note on mosaics.
+  //
+  // These draw ABOVE the satellite base and BELOW every vector layer, so block
+  // outlines, cell lines, labels and badges all stay legible over them.
+  pixelLayers?: PixelLayer[] | null;
+  // Opacity for the pixel layers, 0..1.
+  pixelOpacity?: number;
+  // When false, sub-block cells keep their outlines but lose their fill. The
+  // fill layer stays in the style at zero opacity rather than being hidden:
+  // MapLibre will not hit-test a layer with `visibility: none`, and hiding it
+  // would silently take the cell click — and with it the cell popup — away.
+  gridFillVisible?: boolean;
+  // Feature property holding a per-block fill colour (Farm Console v2 paints
+  // the block's own index class). Null keeps the health palette, which is what
+  // the live console still uses. Blocks without the property render unfilled
+  // so the base map shows rather than defaulting to a colour that means
+  // nothing.
+  blockFillColorProperty?: string | null;
+}
+
+export interface PixelLayer {
+  /** Stable per block: reused as the MapLibre source and layer id. */
+  id: string;
+  /** XYZ template with `{z}/{x}/{y}` intact. */
+  tileUrl: string;
+  /**
+   * The block's extent as `[west, south, east, north]`.
+   *
+   * Not an optimisation. Each COG covers ONE block, and the tile server
+   * answers 404 for anything outside it — so without a bound, every block's
+   * source is asked for every tile in the viewport and all but one 404s.
+   * That floods the console, wastes a request per block per tile, and leaves
+   * MapLibre holding sources it considers errored.
+   */
+  bounds?: [number, number, number, number];
 }
 
 export interface GridCellProps {
@@ -174,6 +212,33 @@ const BULK_COLOR_EXPR: ExpressionSpecification = [
   BULK_STATUS_COLOR.error,
   "#6b7280", // gray-500 fallback
 ];
+
+// Index-pixel raster layers (Farm Console v2). Prefixed so the sync effect can
+// find its own layers in the style without keeping a parallel list that could
+// drift from what is actually mounted.
+const PIXEL_LAYER_PREFIX = "index-pixels-";
+function pixelLayerId(blockId: string): string {
+  return `${PIXEL_LAYER_PREFIX}${blockId}`;
+}
+
+/**
+ * The first non-raster layer in the style — the insertion point that keeps
+ * pixels under every vector layer. Returns null when the style is still all
+ * raster, in which case appending on top is correct anyway.
+ */
+function firstVectorLayerId(map: MlMap): string | null {
+  for (const layer of map.getStyle().layers ?? []) {
+    if (layer.type !== "raster" && layer.type !== "background") return layer.id;
+  }
+  return null;
+}
+
+/**
+ * Opacity for a block filled by its own index class. Higher than the health
+ * fill's 0.5–0.7: a flat class colour has to read as the same colour the
+ * pixels use, and a washed-out version of it reads as a different class.
+ */
+const CLASS_FILL_OPACITY = 0.8;
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
@@ -288,6 +353,10 @@ export function MapCanvas({
   autoBlockPreview = null,
   bulkPreview = null,
   riskOverlay = false,
+  pixelLayers = null,
+  pixelOpacity = 0.85,
+  gridFillVisible = true,
+  blockFillColorProperty = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -773,37 +842,76 @@ export function MapCanvas({
     else map.once("load", apply);
   }, [geojson, fitBoundsKey, farmBoundary]);
 
-  // PR-R4b: recolour the block fill by risk_level when the risk overlay is on,
-  // else by health. Toggling swaps the FILL_LAYER paint in place (the features
-  // already carry both `health` and `risk_level`), so no extra source/layer.
+  // What colours a block polygon, in ONE place.
+  //
+  // Three effects used to write these two paint properties — the risk toggle,
+  // the opacity slider, and the initial layer definition — and whichever ran
+  // last won. That was survivable while there were two modes; it is not with
+  // three. Moving the slider while the risk overlay was on visibly reverted
+  // the fill to the health palette, which is the bug this consolidation also
+  // fixes.
+  //
+  // Precedence: an explicit per-feature colour (v2's index class) beats the
+  // risk overlay, which beats health.
+  const blockFillPaint = (): {
+    color: ExpressionSpecification | string;
+    opacity: ExpressionSpecification | number;
+  } => {
+    const mul = Math.max(0, Math.min(1, blockFillOpacity));
+    if (blockFillColorProperty) {
+      const prop = blockFillColorProperty;
+      return {
+        color: [
+          "case",
+          ["has", prop],
+          ["get", prop],
+          "rgba(0,0,0,0)",
+        ] as unknown as ExpressionSpecification,
+        // A block with no reading for this scene stays unfilled so the
+        // satellite base shows through — a colour there would have to mean
+        // something, and "we don't know" is not on the ramp.
+        opacity: [
+          "case",
+          ["!", ["has", prop]],
+          0,
+          ["==", ["get", "is_future"], true],
+          0.25 * mul,
+          CLASS_FILL_OPACITY * mul,
+        ] as unknown as ExpressionSpecification,
+      };
+    }
+    if (riskOverlay) {
+      return {
+        color: healthMatch("risk_level", RISK_FILL, RISK_FILL.none),
+        opacity: healthMatch("risk_level", RISK_FILL_OPACITY, RISK_FILL_OPACITY.none),
+      };
+    }
+    return {
+      color: healthMatch("health", HEALTH_FILL, HEALTH_FILL.unknown),
+      opacity: [
+        "case",
+        ["==", ["get", "is_future"], true],
+        0.25 * mul,
+        ["*", mul, healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown)],
+      ] as unknown as ExpressionSpecification,
+    };
+  };
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const apply = () => {
       if (!map.getLayer(FILL_LAYER)) return;
-      map.setPaintProperty(
-        FILL_LAYER,
-        "fill-color",
-        riskOverlay
-          ? healthMatch("risk_level", RISK_FILL, RISK_FILL.none)
-          : healthMatch("health", HEALTH_FILL, HEALTH_FILL.unknown),
-      );
-      map.setPaintProperty(
-        FILL_LAYER,
-        "fill-opacity",
-        riskOverlay
-          ? healthMatch("risk_level", RISK_FILL_OPACITY, RISK_FILL_OPACITY.none)
-          : ([
-              "case",
-              ["==", ["get", "is_future"], true],
-              0.25,
-              healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown),
-            ] as ExpressionSpecification),
-      );
+      const paint = blockFillPaint();
+      map.setPaintProperty(FILL_LAYER, "fill-color", paint.color);
+      map.setPaintProperty(FILL_LAYER, "fill-opacity", paint.opacity);
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [riskOverlay]);
+    // blockFillPaint is rebuilt every render by design; these are the inputs
+    // it actually reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [riskOverlay, blockFillColorProperty, blockFillOpacity]);
 
   // Push AOI data whenever the farm boundary changes.
   useEffect(() => {
@@ -994,28 +1102,82 @@ export function MapCanvas({
         map.setPaintProperty(STROKE_LAYER + "-future", "line-opacity", 0.7 * op);
       }
 
-      // Block fill opacity: multiply the per-health base by the
-      // operator's chosen multiplier. Future-dated blocks keep their
-      // own halved opacity (0.25) so the future-vs-current distinction
-      // survives the slider.
-      const fillMul = Math.max(0, Math.min(1, blockFillOpacity));
-      if (map.getLayer(FILL_LAYER)) {
-        const scaledHealth: ExpressionSpecification = [
-          "*",
-          fillMul,
-          healthMatch("health", HEALTH_FILL_OPACITY, HEALTH_FILL_OPACITY.unknown),
-        ] as unknown as ExpressionSpecification;
-        map.setPaintProperty(FILL_LAYER, "fill-opacity", [
-          "case",
-          ["==", ["get", "is_future"], true],
-          0.25 * fillMul,
-          scaledHealth,
-        ] as ExpressionSpecification);
+      // Block fill opacity is NOT set here any more — the slider is one of
+      // three inputs to the fill paint, and applying it separately is what let
+      // the last effect to run overwrite the other two. See blockFillPaint.
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, borderOpacity]);
+
+  // Index pixels: one raster source + layer per block that has a raster for
+  // the selected scene.
+  //
+  // Sources are added and removed by id rather than rebuilt wholesale, so
+  // scrubbing the timeline does not tear down and re-add every block's tiles
+  // — and a block whose tiles are already loaded keeps them on screen while
+  // its neighbours load. Each layer is inserted BENEATH the first vector
+  // layer, which keeps block outlines, cell lines and labels above the pixels
+  // without having to re-sort the whole style.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const wanted = new Map((pixelLayers ?? []).map((l) => [pixelLayerId(l.id), l]));
+      // Drop the ones no longer wanted (different scene, index, or block set).
+      for (const layer of map.getStyle().layers ?? []) {
+        if (!layer.id.startsWith(PIXEL_LAYER_PREFIX) || wanted.has(layer.id)) continue;
+        if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+        if (map.getSource(layer.id)) map.removeSource(layer.id);
+      }
+      for (const [id, layer] of wanted) {
+        const existing = map.getSource(id);
+        if (existing) {
+          // Same block, new URL (index or scene changed): swap the tiles in
+          // place. `setTiles` is the only way to repoint a raster source
+          // without dropping the layer and flashing the base map.
+          const raster = existing as maplibregl.RasterTileSource;
+          if (raster.tiles?.[0] !== layer.tileUrl) raster.setTiles([layer.tileUrl]);
+        } else {
+          map.addSource(id, {
+            type: "raster",
+            tiles: [layer.tileUrl],
+            tileSize: 256,
+            // The COG covers one block; asking beyond its native resolution
+            // buys blank tiles, so let MapLibre overzoom the last real level.
+            maxzoom: 20,
+            ...(layer.bounds ? { bounds: layer.bounds } : {}),
+          });
+          map.addLayer(
+            {
+              id,
+              type: "raster",
+              source: id,
+              paint: { "raster-opacity": pixelOpacity, "raster-resampling": "nearest" },
+            },
+            firstVectorLayerId(map) ?? undefined,
+          );
+        }
+        if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", pixelOpacity);
       }
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, borderOpacity, blockFillOpacity]);
+  }, [pixelLayers, pixelOpacity]);
+
+  // Cells as lines: drop the fill without dropping the click. See the prop's
+  // note — `visibility: none` would also remove the layer from hit-testing,
+  // taking the cell popup with it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(GRID_FILL_LAYER)) return;
+      map.setPaintProperty(GRID_FILL_LAYER, "fill-opacity", gridFillVisible ? 0.6 : 0);
+    };
+    if (map.getLayer(GRID_FILL_LAYER)) apply();
+    else map.once("load", apply);
+  }, [gridFillVisible]);
 
   // Selection highlight via filter swap.
   useEffect(() => {

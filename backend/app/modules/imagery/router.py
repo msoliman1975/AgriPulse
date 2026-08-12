@@ -33,6 +33,7 @@ from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
     CursorPage,
+    FarmSceneAssetsResponse,
     FarmScenesResponse,
     IngestionJobRead,
     RefreshResponse,
@@ -278,6 +279,36 @@ async def list_farm_scenes(
     """
     del context  # the capability check's side-effect is the only consumer
     return await service.list_farm_scenes(farm_id=farm_id, limit=limit)
+
+
+@router.get(
+    "/farms/{farm_id}/scene-assets",
+    response_model=FarmSceneAssetsResponse,
+    summary="Per-block index rasters for one pass, for the console's pixel layer.",
+)
+async def list_farm_scene_assets(
+    farm_id: UUID,
+    at: datetime | None = Query(
+        default=None,
+        description="Scene bound; each block resolves to its own latest pass at or before it. "
+        "Omit for the latest pass per block.",
+    ),
+    context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
+    service: ImageryService = Depends(_service),
+) -> FarmSceneAssetsResponse:
+    """Which raster to draw for each block, in one request.
+
+    The console paints index pixels, and the only thing standing between a
+    block and its COG is the ``stac_item_id`` recorded on the ingestion job.
+    Resolving that per block through ``/blocks/{id}/scenes`` would restore
+    exactly the fan-out the sibling farm-level routes exist to remove.
+
+    A block with no asset for the bound is simply absent — the caller draws
+    the blocks it got and leaves the rest to the base map, rather than
+    silently showing an older pass under a timeline that says otherwise.
+    """
+    del context  # the capability check's side-effect is the only consumer
+    return await service.list_farm_scene_assets(farm_id=farm_id, at=at)
 
 
 # --- Tenant config --------------------------------------------------------

@@ -229,7 +229,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         <div className="flex min-w-0 flex-1 flex-col">
           <main ref={fullscreen.ref} className="relative min-w-0 flex-1 bg-ap-bg">
             <MapCanvas
-              geojson={summary.geojson}
+              geojson={c.geojsonWithClasses ?? summary.geojson}
               farmBoundary={summary.farm.boundary}
               selectedId={c.selectedId}
               onSelect={c.select}
@@ -240,6 +240,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               showBlockLabels={c.layers.labels}
               borderOpacity={c.layers.borderOpacity}
               blockFillOpacity={c.layers.fillOpacity}
+              // The pixels ARE the reading; the cells are reference lines
+              // drawn over them, so their fill goes whenever pixels are up.
+              pixelLayers={c.showPixels ? c.pixels.layers : null}
+              gridFillVisible={false}
+              blockFillColorProperty="class_color"
               gridCells={c.gridCellsFc}
               highlightedCellIds={c.highlightedCellIds}
               selectedGridCellId={c.selectedCellId}
@@ -272,6 +277,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             {/* Zone 5 — how am I reading this: view modes, not visibility. */}
             <MapDock
               className="absolute bottom-3 end-3 z-10 bg-ap-panel/95 shadow-card"
+              showPixels={c.showPixels}
+              pixelsAvailable={c.pixels.assetCount > 0}
+              onTogglePixels={() => c.setShowPixels((s) => !s)}
               showGrid={c.showGrid}
               gridAvailable={c.gridded.length > 0}
               onToggleGrid={() => {
@@ -286,14 +294,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 it reads against the pixels it describes. */}
             <IndexLegend
               className="absolute end-3 top-3 z-10 w-[268px] bg-ap-panel/95 shadow-card"
-              groups={c.farmGridQ.data}
               code={c.activeIndex}
+              areas={c.pixels.classAreas(c.selectedId)}
               scopeBlockId={c.selectedId}
               scopeBlockName={c.selectedId ? (c.blockNameById.get(c.selectedId) ?? null) : null}
-              showGrid={c.showGrid}
-              griddedCount={c.gridded.length}
+              showPixels={c.showPixels}
+              assetCount={c.pixels.assetCount}
               imagerySubCount={c.imagerySubCount}
-              loading={c.farmGridQ.isLoading}
+              loading={c.pixels.assetsLoading || c.pixels.statsLoading}
               onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
             />
 

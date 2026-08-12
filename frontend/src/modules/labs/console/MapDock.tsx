@@ -15,6 +15,10 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/Card";
 
 interface Props {
+  showPixels: boolean;
+  onTogglePixels: () => void;
+  /** Blocks with an index raster for the selected scene. Zero disables. */
+  pixelsAvailable: boolean;
   showGrid: boolean;
   onToggleGrid: () => void;
   gridAvailable: boolean;
@@ -36,6 +40,9 @@ interface DockButton {
 }
 
 export function MapDock({
+  showPixels,
+  onTogglePixels,
+  pixelsAvailable,
   showGrid,
   onToggleGrid,
   gridAvailable,
@@ -46,9 +53,19 @@ export function MapDock({
   const { t } = useTranslation("farmConsole");
 
   const buttons: DockButton[] = [
+    // Pixels first: they are the reading, and the mesh is drawn over them.
+    {
+      key: "pixels",
+      glyph: "▦",
+      on: showPixels,
+      disabled: !pixelsAvailable,
+      onClick: onTogglePixels,
+      labelKey: "pixels",
+      hintKey: pixelsAvailable ? undefined : "pixelsUnavailable",
+    },
     {
       key: "grid",
-      glyph: "◫",
+      glyph: "⌗",
       on: showGrid,
       disabled: !gridAvailable,
       onClick: onToggleGrid,
