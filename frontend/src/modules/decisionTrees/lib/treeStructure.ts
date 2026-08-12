@@ -228,7 +228,7 @@ export function buildNodeBody(kind: NodeKind, labelEn?: string): YamlNode {
         kind: "alert",
         severity: "warning",
         text_en: "Investigate.",
-        text_ar: null,
+        text_ar: "",
       },
     };
   }
@@ -240,7 +240,7 @@ export function buildNodeBody(kind: NodeKind, labelEn?: string): YamlNode {
         kind: "recommendation",
         confidence: 0.7,
         text_en: "Suggested action.",
-        text_ar: null,
+        text_ar: "",
       },
     };
   }
@@ -251,7 +251,7 @@ export function buildNodeBody(kind: NodeKind, labelEn?: string): YamlNode {
       kind: "recommendation",
       confidence: 0.9,
       text_en: "No action.",
-      text_ar: null,
+      text_ar: "",
     },
   };
 }
@@ -524,6 +524,12 @@ export function validateTreeStructure(yaml: string): StructuralError[] {
           message: `\`on_miss\` points at unknown node "${node.on_miss}".`,
         });
       }
+      for (const field of emptyOperandRefs(node.condition)) {
+        errors.push({
+          nodeId: id,
+          message: `Condition is missing \`${field}\` — pick one before saving.`,
+        });
+      }
     } else {
       // Leaf: cleanup-time invariant — outcome must have action_type.
       if (!node.outcome?.action_type) {
@@ -535,4 +541,38 @@ export function validateTreeStructure(yaml: string): StructuralError[] {
     }
   }
   return errors;
+}
+
+/**
+ * Names of operand fields left blank in a condition — e.g. a `signals`
+ * term whose signal `code` is still `""`.
+ *
+ * Picking "Custom signal" as a source starts with no signal selected, and
+ * nothing downstream objected: the tree saved, and at evaluation time the
+ * term simply never matched. A branch that can never fire is worth
+ * catching at the point of authoring, next to every other structural
+ * error, rather than leaving the author to wonder why the tree is quiet.
+ */
+function emptyOperandRefs(condition: unknown): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const obj = value as Record<string, unknown>;
+    // An operand is any object carrying a `source`; its identifying field
+    // is named per source (code / index_code / risk_code / field / key).
+    if (typeof obj.source === "string") {
+      for (const key of ["code", "index_code", "risk_code", "field", "key"]) {
+        if (key in obj && typeof obj[key] === "string" && obj[key].trim() === "") {
+          found.push(key);
+        }
+      }
+    }
+    Object.values(obj).forEach(walk);
+  };
+  walk(condition);
+  return [...new Set(found)];
 }

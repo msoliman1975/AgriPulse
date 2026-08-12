@@ -96,4 +96,47 @@ describe("DecisionTreeCreatePage code ↔ YAML sync", () => {
     // "YAML body has code 'my_tree_v1' but the URL says 'newttt'".
     expect(payload.tree_yaml).toContain("code: newttt\n");
   });
+
+  // "Start from scratch" is a plain button, so the `pattern` on the code
+  // field — which only gates form submission — never saw it. A code with a
+  // space in it posted anyway and came back a 422.
+  it("refuses to post a code the pattern rejects, from either button", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText(/Code \(stable identifier\)/), "Bad Code!");
+    await user.click(screen.getByRole("button", { name: "pick mango" }));
+
+    expect(screen.getByRole("button", { name: "Start from scratch" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create tree" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Start from scratch" }));
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("says what a valid code looks like instead of waiting for the server", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText(/Code \(stable identifier\)/), "Bad Code!");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/lowercase letters/i);
+  });
+
+  it("stays quiet while the code field is still empty", () => {
+    renderPage();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("enables both buttons once the code is valid", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText(/Code \(stable identifier\)/), "qa_tree_v1");
+    await user.click(screen.getByRole("button", { name: "pick mango" }));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Start from scratch" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Create tree" })).toBeEnabled();
+  });
 });

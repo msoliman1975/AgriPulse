@@ -67,8 +67,14 @@ class InvalidRecommendationTransitionError(APIError):
 
 
 class DecisionTreeParseError(APIError):
-    """A YAML decision tree on disk is malformed or references unknown
-    fields. Surfaces at startup-time sync; never at request time."""
+    """A YAML decision tree *shipped with the server* is malformed or
+    references unknown fields — a deployment problem, hence 5xx.
+
+    The authoring API compiles caller-supplied YAML through the same
+    loader, so this can also be raised on a request. There it is the
+    caller's YAML that is wrong, not the server's: those call sites wrap
+    it in ``InvalidTreeYamlError`` (422) instead of letting a 500 out.
+    """
 
     def __init__(self, *, path: str, detail: str) -> None:
         super().__init__(
@@ -78,3 +84,26 @@ class DecisionTreeParseError(APIError):
             type_=f"{_TYPE_BASE}/decision-tree-parse-error",
             extras={"path": path},
         )
+        self.path = path
+        self.reason = detail
+
+
+class InvalidTreeYamlError(APIError):
+    """Caller-supplied decision-tree YAML failed to compile.
+
+    A 422 rather than the loader's 500: the request body is what's wrong.
+    The loader tags its messages with a source path (``<api:my_tree>``)
+    that means nothing to an author, so it is dropped here.
+    """
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid decision tree YAML",
+            detail=reason,
+            type_=f"{_TYPE_BASE}/invalid-tree-yaml",
+        )
+
+    @classmethod
+    def from_parse_error(cls, exc: DecisionTreeParseError) -> "InvalidTreeYamlError":
+        return cls(reason=getattr(exc, "reason", None) or (exc.detail or "malformed tree YAML"))

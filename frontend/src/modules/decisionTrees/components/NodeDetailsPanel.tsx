@@ -51,6 +51,8 @@ interface NodeDetailsPanelProps {
    *  offer only the crop attributes and risk models that can actually
    *  resolve for the blocks this tree runs on. */
   cropPaths?: string[];
+  /** Parameter names the tree declares — completions for a params ref. */
+  paramNames?: string[];
 }
 
 export function NodeDetailsPanel({
@@ -64,6 +66,7 @@ export function NodeDetailsPanel({
   onAddChild,
   onConditionChange,
   cropPaths,
+  paramNames,
 }: NodeDetailsPanelProps): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -110,6 +113,7 @@ export function NodeDetailsPanel({
           canEdit={canEdit}
           onConditionChange={onConditionChange}
           cropPaths={cropPaths}
+          paramNames={paramNames}
         />
       )}
 
@@ -228,12 +232,15 @@ function DecisionConditionSection({
   canEdit,
   onConditionChange,
   cropPaths,
+  paramNames,
 }: {
   node: PositionedNode;
   mode: "view" | "edit";
   canEdit: boolean;
   onConditionChange?: (nodeId: string, nextTree: unknown) => void;
   cropPaths?: string[];
+  /** Parameter names the tree declares — completions for a params ref. */
+  paramNames?: string[];
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
   const condition = (node.data as { condition?: { tree?: unknown } }).condition;
@@ -247,13 +254,24 @@ function DecisionConditionSection({
   return (
     <Section title={t("editor.panel.condition.heading")}>
       {mode === "edit" && canEdit && onConditionChange ? (
-        <ConditionBuilder value={editable} onChange={handleChange} cropPaths={cropPaths} />
+        <ConditionBuilder
+          value={editable}
+          onChange={handleChange}
+          cropPaths={cropPaths}
+          paramNames={paramNames}
+        />
       ) : (
         <>
           {editable.kind === "unsupported" ? (
             <p className="text-xs text-ap-muted">{t("editor.panel.condition.unsupportedNote")}</p>
           ) : null}
-          <ConditionBuilder value={editable} onChange={() => {}} cropPaths={cropPaths} readOnly />
+          <ConditionBuilder
+            value={editable}
+            onChange={() => {}}
+            cropPaths={cropPaths}
+            paramNames={paramNames}
+            readOnly
+          />
         </>
       )}
       <KeyValue

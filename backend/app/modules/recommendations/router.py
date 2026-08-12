@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.recommendations.errors import (
     DecisionTreeParseError,
+    InvalidTreeYamlError,
     RecommendationNotFoundError,
 )
 from app.modules.recommendations.schemas import (
@@ -669,8 +670,9 @@ async def create_decision_tree(
             scope=payload.scope,
             actor_user_id=context.user_id,
         )
-    except DecisionTreeParseError:
-        raise
+    except DecisionTreeParseError as exc:
+        # Caller-supplied YAML: a 422, not the loader's server-fixture 500.
+        raise InvalidTreeYamlError.from_parse_error(exc) from exc
     except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
@@ -698,8 +700,9 @@ async def append_decision_tree_version(
             notes=payload.notes,
             actor_user_id=context.user_id,
         )
-    except DecisionTreeParseError:
-        raise
+    except DecisionTreeParseError as exc:
+        # Caller-supplied YAML: a 422, not the loader's server-fixture 500.
+        raise InvalidTreeYamlError.from_parse_error(exc) from exc
     except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:
@@ -847,8 +850,9 @@ async def dry_run_decision_tree(
             tree_yaml=payload.tree_yaml,
             tenant_session=tenant_session,
         )
-    except DecisionTreeParseError:
-        raise
+    except DecisionTreeParseError as exc:
+        # Caller-supplied YAML: a 422, not the loader's server-fixture 500.
+        raise InvalidTreeYamlError.from_parse_error(exc) from exc
     except Exception as exc:
         mapped = _map_authoring_error(exc)
         if mapped is not None:

@@ -12,7 +12,7 @@
 // immediately.
 
 import { useTranslation } from "react-i18next";
-import { type ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { listCropAttributeCatalog } from "@/api/crops";
@@ -61,12 +61,27 @@ import {
   type ValueRefSource,
 } from "../lib/conditionEdit";
 
+/**
+ * Names from the tree's `parameters:` block, for the "params ref" value
+ * editor. Context rather than a prop: the editor sits six levels down a
+ * recursive node/term tree, and threading a list through every one of
+ * those signatures to reach one input is a poor trade.
+ *
+ * Empty default = "host didn't say", which renders as today's plain text
+ * box with no suggestions.
+ */
+const DeclaredParamsContext = createContext<string[]>([]);
+
 interface ConditionBuilderProps {
   value: EditableCondition;
   /** The tree's targeted crop paths, when the host knows them. Used to hide
    *  crop attributes and risk models that can never resolve for the blocks
    *  this tree runs on. */
   cropPaths?: string[];
+  /** Parameter names the tree declares. Offered as completions on a
+   *  `params ref` threshold so the author doesn't have to retype one from
+   *  memory — a mistyped ref is rejected by the backend on save. */
+  paramNames?: string[];
   /** Fires with the new condition AST ready to be written back to
    *  YAML (`condition.tree`). Caller serializes + persists. */
   onChange: (nextTree: unknown) => void;
@@ -77,6 +92,7 @@ export function ConditionBuilder({
   value,
   onChange,
   cropPaths = [],
+  paramNames = [],
   readOnly = false,
 }: ConditionBuilderProps): ReactNode {
   const { t } = useTranslation("decisionTrees");
@@ -120,18 +136,28 @@ export function ConditionBuilder({
   }
 
   return (
-    <div className="flex flex-col gap-2 text-xs">
-      <NodeEditor node={root} depth={0} readOnly={readOnly} cropPaths={cropPaths} onChange={emit} />
-      {/* A bare term or NOT at the root has nowhere to put a sibling, so
-          offer to wrap it in a group rather than making the author
-          rebuild the condition from scratch. */}
-      {!readOnly && root.kind !== "group" ? (
-        <AddButton
-          label={t("editor.condition.addTerm")}
-          onClick={() => emit({ kind: "group", mode: "all", children: [root, defaultTermNode()] })}
+    <DeclaredParamsContext.Provider value={paramNames}>
+      <div className="flex flex-col gap-2 text-xs">
+        <NodeEditor
+          node={root}
+          depth={0}
+          readOnly={readOnly}
+          cropPaths={cropPaths}
+          onChange={emit}
         />
-      ) : null}
-    </div>
+        {/* A bare term or NOT at the root has nowhere to put a sibling, so
+            offer to wrap it in a group rather than making the author
+            rebuild the condition from scratch. */}
+        {!readOnly && root.kind !== "group" ? (
+          <AddButton
+            label={t("editor.condition.addTerm")}
+            onClick={() =>
+              emit({ kind: "group", mode: "all", children: [root, defaultTermNode()] })
+            }
+          />
+        ) : null}
+      </div>
+    </DeclaredParamsContext.Provider>
   );
 }
 
@@ -1091,6 +1117,17 @@ function RightEditor({
   // The user picks between "literal" (number/string/boolean) and "ref"
   // (typically a params ref). Number is the default and most common.
   const kindLabel = value.kind === "ref" ? "params ref" : (spec?.unit ?? value.kind);
+  const declaredParams = useContext(DeclaredParamsContext);
+  const paramListId = useId();
+  // A ref naming a parameter the tree doesn't declare is rejected on save.
+  // Say so here instead of letting the author find out from a red banner
+  // after they've moved on to the next node.
+  const unknownParamRef =
+    value.kind === "ref" &&
+    value.ref.source === "params" &&
+    value.ref.name.trim() !== "" &&
+    declaredParams.length > 0 &&
+    !declaredParams.includes(value.ref.name.trim());
   // Closed vocabularies (soil texture, risk level, trend direction, …) become
   // a picker: those are exactly the comparisons an author gets wrong by
   // typing, and a wrong value fails closed with no error anywhere.
@@ -1168,16 +1205,31 @@ function RightEditor({
           <option value="false">false</option>
         </select>
       ) : (
-        <input
-          type="text"
-          disabled={readOnly}
-          placeholder="threshold_param"
-          value={value.ref.source === "params" ? value.ref.name : ""}
-          onChange={(e) =>
-            onChange({ kind: "ref", ref: { source: "params", name: e.target.value } })
-          }
-          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
-        />
+        <>
+          <input
+            type="text"
+            disabled={readOnly}
+            placeholder="threshold_param"
+            list={declaredParams.length > 0 ? paramListId : undefined}
+            value={value.ref.source === "params" ? value.ref.name : ""}
+            onChange={(e) =>
+              onChange({ kind: "ref", ref: { source: "params", name: e.target.value } })
+            }
+            className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          />
+          {declaredParams.length > 0 ? (
+            <datalist id={paramListId}>
+              {declaredParams.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          ) : null}
+          {unknownParamRef ? (
+            <span className="text-[11px] text-ap-warn">
+              {t("editor.condition.unknownParamRef")}
+            </span>
+          ) : null}
+        </>
       )}
       {/* Advisory, never blocking: a threshold outside the recorded range is
           often the point of the rule. */}

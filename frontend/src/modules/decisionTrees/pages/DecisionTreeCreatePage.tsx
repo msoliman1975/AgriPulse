@@ -6,6 +6,7 @@ import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
 import { STARTER_TREE_YAML, applyCodeToYaml } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
+import { MutationErrorBanner } from "../components/MutationErrorBanner";
 import { TreeTargetingPicker } from "../components/TreeTargetingPicker";
 import { Card } from "@/components/Card";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
@@ -63,6 +64,18 @@ nodes:
       text_ar: لا إجراء.
 `;
 
+// The shape the backend enforces on `code`. The text input carries this as
+// an HTML `pattern`, which only guards the submit button — "Start from
+// scratch" is a plain button and posted straight past it, so a code with a
+// space or a capital in it came back as an opaque 422 instead of the inline
+// "match the requested format" the other button gives you. Both paths check
+// against this now.
+//
+// Kept in sync by hand with the `pattern` attribute below: a JS regex and an
+// HTML pattern are parsed under different flags, so they can't be one string
+// (see the escaping note on the input).
+const CODE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+
 export function DecisionTreeCreatePage(): ReactNode {
   const navigate = useNavigate();
   const { t } = useTranslation("decisionTrees");
@@ -109,6 +122,11 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   // Crop targeting is required (the tree must declare at least one crop).
   const targetingReady = cropPaths.length > 0;
+  const trimmedCode = code.trim();
+  const codeValid = CODE_PATTERN.test(trimmedCode);
+  // Only complain once there is something to complain about — an empty
+  // field is "not filled in yet", not "wrong".
+  const showCodeError = trimmedCode !== "" && !codeValid;
   const targeting = {
     crop_paths: cropPaths,
     country_codes: countryCodes,
@@ -117,11 +135,11 @@ export function DecisionTreeCreatePage(): ReactNode {
   };
 
   const onStartFromScratch = (): void => {
-    if (!code.trim() || !targetingReady) return;
+    if (!codeValid || !targetingReady) return;
     const yaml = applyCodeToYaml(STARTER_TREE_YAML, code);
     create.mutate(
       {
-        code: code.trim(),
+        code: trimmedCode,
         tree_yaml: yaml,
         ...targeting,
       },
@@ -135,14 +153,14 @@ export function DecisionTreeCreatePage(): ReactNode {
 
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
-    if (!targetingReady) return;
+    if (!targetingReady || !codeValid) return;
     // Re-apply on submit as well as on keystroke: the author may have
     // hand-edited the `code:` line in the textarea, and the form field is
     // what the backend compares against.
     const yaml = applyCodeToYaml(yamlBody, code);
     create.mutate(
       {
-        code: code.trim(),
+        code: trimmedCode,
         tree_yaml: yaml,
         ...targeting,
       },
@@ -176,10 +194,16 @@ export function DecisionTreeCreatePage(): ReactNode {
                 // a syntax error. An uncompilable pattern is *ignored*, so this
                 // silently validated nothing and logged on every page load.
                 pattern="^[a-z0-9][a-z0-9_\-]*$"
+                aria-invalid={showCodeError || undefined}
                 className={`${FIELD_CONTROL_CLASS} sm:max-w-sm`}
               />
             )}
           </Field>
+          {showCodeError ? (
+            <p role="alert" className="text-xs text-ap-crit">
+              {t("create.fields.codeInvalid")}
+            </p>
+          ) : null}
         </Card>
 
         <Card noPadding className="flex flex-col gap-2 p-4">
@@ -253,12 +277,11 @@ export function DecisionTreeCreatePage(): ReactNode {
           />
         </Card>
 
+        {create.isError ? (
+          <MutationErrorBanner error={create.error} fallback={t("create.saveFailed")} />
+        ) : null}
+
         <footer className="flex flex-wrap items-center justify-end gap-2">
-          {create.isError ? (
-            <span className="text-xs text-ap-crit">
-              {create.error?.message ?? t("create.saveFailed")}
-            </span>
-          ) : null}
           <button
             type="button"
             onClick={() => navigate("/decision-trees")}
@@ -269,14 +292,14 @@ export function DecisionTreeCreatePage(): ReactNode {
           <button
             type="button"
             onClick={onStartFromScratch}
-            disabled={create.isPending || !code.trim() || !targetingReady}
+            disabled={create.isPending || !codeValid || !targetingReady}
             className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/5 disabled:opacity-60"
           >
             {create.isPending ? t("create.saving") : t("create.startFromScratch")}
           </button>
           <button
             type="submit"
-            disabled={create.isPending || !code.trim() || !yamlBody.trim() || !targetingReady}
+            disabled={create.isPending || !codeValid || !yamlBody.trim() || !targetingReady}
             className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
           >
             {create.isPending ? t("create.saving") : t("create.save")}
