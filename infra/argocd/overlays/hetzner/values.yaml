@@ -1509,13 +1509,46 @@ global:
   #   timeline should say so too -- that farm has zero subscriptions on all
   #   36 blocks, so an empty-looking console there is CORRECT. Check a farm
   #   with a configured grid to see the area column populated.
+  # 65cd0a8 = #423 Farm Console v2 pixel map: the index raster painted per
+  #   pixel in discrete classes, sub-block cells reduced to reference lines,
+  #   legend areas counted from pixel histograms. One table (indexClasses.ts)
+  #   generates both the TiTiler colormap and the legend rows, so the two
+  #   cannot drift. NDMI/SAVI/NDVI class boundaries corrected against the
+  #   published readings.
+  #
+  #   API AND FRONTEND MUST MOVE TOGETHER. This carries
+  #   TILE_SERVER_BASE_URL, which was never set for any deployed environment
+  #   — every browser has been handed the `http://localhost:8001` default
+  #   from settings.py since the tile server was deployed. The frontend alone
+  #   would ship a pixel layer pointed at the user's own machine. The api
+  #   also gains GET /farms/{id}/scene-assets, which the layer needs to know
+  #   which raster belongs to which block. No migration.
+  #
+  #   workers deliberately STAYS on f2ed5f2: the delta is one read-only API
+  #   route plus frontend, and no worker task changed.
+  #
+  #   Browser-verified before merge against real prod imagery (EN + AR/RTL),
+  #   with the api route stubbed at the boundary and its SQL run directly
+  #   against the prod database. All 10 CI checks green including
+  #   backend-integration.
+  #
+  #   Merge run 31621868538, all container jobs success. Manifests verified by
+  #   PULLING them on the node rather than from the run conclusion:
+  #   api@sha256:78245611, frontend@sha256:9ff818f0.
+  #
+  #   Watch after sync: /labs/map-v2/<farmId> on agrosina-suez. The blocks
+  #   should render as 10 m pixels in flat class colours, NOT as a smooth
+  #   gradient, and the legend total should read ~171.6 feddan rather than
+  #   205.0. AG-R02-C02 will show grid lines extending past its pixels —
+  #   that is a genuine stale-grid data problem this makes visible, not a
+  #   rendering bug.
   images:
     api:
-      tag: "f2ed5f2"
+      tag: "65cd0a8"
     workers:
       tag: "f2ed5f2"
     frontend:
-      tag: "f2ed5f2"
+      tag: "65cd0a8"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
