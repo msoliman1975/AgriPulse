@@ -11,6 +11,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import { buildAlertBadgePoints } from "./alertBadges";
+import { gridRampExpression } from "./gridRamp";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
 import type { SignalOverlayProps } from "./signalOverlay";
@@ -568,21 +569,11 @@ export function MapCanvas({
           // Null values are encoded as -1 on the FC-build side so this
           // expression never has to compare against null (MapLibre's
           // TS typing rejects `null` as an ExpressionInputType).
-          "fill-color": [
-            "interpolate",
-            ["linear"],
-            ["to-number", ["get", "value"]],
-            -1,
-            "#9ca3af", // slate-400 — "no data" sentinel
-            0.0,
-            "#dc2626", // red-600 — very low (bare/water)
-            0.3,
-            "#f59e0b", // amber-500 — stressed
-            0.6,
-            "#84cc16", // lime-500 — moderate
-            0.85,
-            "#16a34a", // green-600 — healthy
-          ],
+          //
+          // The stops live in gridRamp.ts so the index legend can draw
+          // swatches from the same table — a legend that disagrees with the
+          // pixels under it reads as a bug.
+          "fill-color": gridRampExpression(),
           "fill-opacity": 0.6,
         },
       });
