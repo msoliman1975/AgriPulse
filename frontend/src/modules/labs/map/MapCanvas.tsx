@@ -127,6 +127,16 @@ export interface PixelLayer {
   id: string;
   /** XYZ template with `{z}/{x}/{y}` intact. */
   tileUrl: string;
+  /**
+   * The block's extent as `[west, south, east, north]`.
+   *
+   * Not an optimisation. Each COG covers ONE block, and the tile server
+   * answers 404 for anything outside it — so without a bound, every block's
+   * source is asked for every tile in the viewport and all but one 404s.
+   * That floods the console, wastes a request per block per tile, and leaves
+   * MapLibre holding sources it considers errored.
+   */
+  bounds?: [number, number, number, number];
 }
 
 export interface GridCellProps {
@@ -1136,6 +1146,7 @@ export function MapCanvas({
             // The COG covers one block; asking beyond its native resolution
             // buys blank tiles, so let MapLibre overzoom the last real level.
             maxzoom: 20,
+            ...(layer.bounds ? { bounds: layer.bounds } : {}),
           });
           map.addLayer(
             {

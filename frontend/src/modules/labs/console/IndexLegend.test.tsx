@@ -89,6 +89,16 @@ describe("IndexLegend", () => {
     expect(screen.getByText(/compare blocks against each other/i)).toBeInTheDocument();
   });
 
+  it("keeps ranges left-to-right so RTL cannot reverse them", () => {
+    // Under Arabic the paragraph direction reorders the two LTR runs around
+    // the dash, and "0.20 - 0.40" renders as "0.40 - 0.20" — a different and
+    // wrong claim. Verified in the browser; pinned here.
+    const { container } = renderLegend();
+    const ranges = [...container.querySelectorAll("li span[dir='ltr']")];
+    expect(ranges).toHaveLength(classesFor("ndvi").length);
+    expect(ranges.map((r) => r.textContent)).toContain("0.20 – 0.40");
+  });
+
   it("names NDWI's healthy end without inverting its numbers", () => {
     renderLegend({ code: "ndwi", areas: areas([9.5, 168.2, 0.6, 0, 0]) });
     expect(screen.getByText("Dense canopy, dry surface")).toBeInTheDocument();

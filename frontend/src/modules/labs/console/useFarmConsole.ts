@@ -208,12 +208,36 @@ export function useFarmConsole(farmId: string) {
   // Index pixels + the statistics that feed the legend and the block fill.
   // Not gated on `showPixels`: the block fill and the legend read the same
   // numbers, so turning the layer off must not empty the panel.
+  // Block extents for the pixel sources. Each COG covers one block and the
+  // tile server 404s outside it, so an unbounded source asks four times for
+  // every tile and throws away three answers.
+  const boundsByBlockId = useMemo(() => {
+    const m = new Map<string, [number, number, number, number]>();
+    for (const f of summaryQ.data?.geojson.features ?? []) {
+      let w = Infinity;
+      let s = Infinity;
+      let e = -Infinity;
+      let n = -Infinity;
+      for (const ring of f.geometry.coordinates) {
+        for (const [x, y] of ring) {
+          if (x < w) w = x;
+          if (y < s) s = y;
+          if (x > e) e = x;
+          if (y > n) n = y;
+        }
+      }
+      if (Number.isFinite(w)) m.set(f.properties.id, [w, s, e, n]);
+    }
+    return m;
+  }, [summaryQ.data]);
+
   const { config } = useOptionalConfig();
   const pixels = useIndexPixels({
     farmId,
     code: activeIndex,
     sceneAt,
     config,
+    boundsByBlockId,
     enabled: Boolean(config),
   });
 

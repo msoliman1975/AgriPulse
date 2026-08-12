@@ -25,7 +25,10 @@ export default defineConfig({
       // :8000, which is how a new route reads as a 404 in a tree that has it.
       "/api": {
         target: process.env.VITE_API_TARGET ?? "http://127.0.0.1:8000",
-        changeOrigin: false,
+        // A remote target is routed by Host at the ingress, so the header has
+        // to be rewritten; a local backend does not care and the original
+        // Host is more useful in its logs.
+        changeOrigin: (process.env.VITE_API_TARGET ?? "").startsWith("https://"),
       },
     },
   },

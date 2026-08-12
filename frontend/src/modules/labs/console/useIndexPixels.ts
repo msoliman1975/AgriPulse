@@ -53,9 +53,11 @@ export function useIndexPixels(input: {
   code: ApiIndexCode;
   sceneAt: string | null;
   config: ConfigResponse | null;
+  /** Block extents, so each raster source is bounded to its own block. */
+  boundsByBlockId: Map<string, [number, number, number, number]>;
   enabled: boolean;
 }): IndexPixels {
-  const { farmId, code, sceneAt, config } = input;
+  const { farmId, code, sceneAt, config, boundsByBlockId } = input;
 
   const assetsQ = useQuery({
     queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt),
@@ -75,8 +77,9 @@ export function useIndexPixels(input: {
         asset,
         code,
       }),
+      bounds: boundsByBlockId.get(asset.block_id),
     }));
-  }, [assets, config, code]);
+  }, [assets, config, code, boundsByBlockId]);
 
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would

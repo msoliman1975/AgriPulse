@@ -131,9 +131,11 @@ export function IndexLegend({
     );
   }
 
-  // Highest class first: the legend reads top-down like the scale it
-  // describes. NDWI's table is already ordered by verdict rather than by
-  // value, so reversing it keeps "best at the top" true for every index.
+  // Highest VALUE first, so the range column reads monotonically downward
+  // whichever index is on. That is not the same as "best first": NDWI's scale
+  // is inverted, so its healthy end sits at the BOTTOM of the panel while its
+  // colours still run red-for-bad. The numbers and the colours each stay
+  // self-consistent; conflating them is what made the old ramp wrong.
   const rows = classes
     .map((cls, i) => ({ cls, lo: lowerBound(code, i), areaM2: areas?.areaM2ByClass[i] ?? 0 }))
     .reverse();
@@ -159,7 +161,14 @@ export function IndexLegend({
                     className="h-3 w-3 flex-none rounded-sm"
                     style={{ backgroundColor: cls.color }}
                   />
-                  <span className="w-[74px] flex-none text-meta tabular-nums text-ap-muted">
+                  {/* dir="ltr" is load-bearing under RTL: a range is two
+                      LTR runs around a dash, and the Arabic paragraph
+                      direction reorders them, so "0.20 – 0.40" renders as
+                      "0.40 – 0.20" — a different, wrong claim. */}
+                  <span
+                    dir="ltr"
+                    className="w-[74px] flex-none text-start text-meta tabular-nums text-ap-muted"
+                  >
                     {formatRange(lo, cls.max, num)}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-meta text-ap-ink">
