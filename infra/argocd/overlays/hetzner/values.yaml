@@ -1464,13 +1464,58 @@ global:
   #   a "Now" marker, and the strip should list Relative Humidity. The
   #   forward half only appears once the workers have re-derived a farm, so
   #   give the weather cadence (3h) a cycle before calling it broken.
+  # f2ed5f2 = #421. Farm Console v2 lands beside the live console.
+  #
+  #   New surface at /labs/map-v2, reached from a SECOND "Farm Management"
+  #   row in the left nav carrying a Beta badge. /labs/map is untouched and
+  #   stays the default; mapnext/FarmConsolePage.tsx is byte-for-byte
+  #   unchanged. Users will see the extra nav row immediately -- that is the
+  #   most visible thing in this promote, and it is intentional.
+  #
+  #   What it adds: an index legend that reports AREA per class (using
+  #   grid_cells.area_m2, already stored and clipped to the block boundary),
+  #   a scene timeline driven by real acquisition days with cloudy passes
+  #   struck through, diagnosed empty states, a rail filter/sort, a farm
+  #   identity strip and a map dock.
+  #
+  #   NO MIGRATION. The backend adds GET /farms/{id}/scenes (an aggregate
+  #   over imagery_ingestion_jobs) and an optional `at` bound on
+  #   /farms/{id}/grid-cells. Both read columns that already exist; both are
+  #   additive, so an old SPA against this api is unaffected.
+  #
+  #   BACKEND + FRONTEND -> api + workers + frontend all bumped; tile-server
+  #   unchanged stays 9d140cc. Plain tag revert to aa3dbfb is a clean
+  #   rollback in both directions -- nothing persists state.
+  #
+  #   TWO SHARED FILES CHANGED, so this touches the LIVE console too:
+  #   MapCanvas's grid colour ramp moved into map/gridRamp.ts (intended to be
+  #   pixel-identical, the stops are the same five control points), and
+  #   ViewBar gained two optional slot props v1 does not pass. Also fixes a
+  #   real nav bug -- SideNavItem matches with startsWith, so the bare
+  #   "/labs/map" prefix also matched "/labs/map-v2" and lit both rows.
+  #
+  #   NOT BROWSER-VERIFIED. 56 unit tests, tsc, eslint and the backend suite
+  #   are green, but nothing here has been rendered in a browser, in either
+  #   language. Promoted on an explicit call with that gap stated. If
+  #   anything looks wrong, suspect the two shared files above first.
+  #
+  #   Merge run 31561038344; all five container jobs completed success and
+  #   the manifests were verified from the jobs' own build metadata rather
+  #   than the run conclusion: api@sha256:3c373765, workers@sha256:124b0142,
+  #   frontend@sha256:e0a2b318.
+  #
+  #   Watch after sync: /labs/map-v2/<farmId>. On Bashayer the legend should
+  #   read "No imagery subscription" rather than an empty scale, and the
+  #   timeline should say so too -- that farm has zero subscriptions on all
+  #   36 blocks, so an empty-looking console there is CORRECT. Check a farm
+  #   with a configured grid to see the area column populated.
   images:
     api:
-      tag: "aa3dbfb"
+      tag: "f2ed5f2"
     workers:
-      tag: "aa3dbfb"
+      tag: "f2ed5f2"
     frontend:
-      tag: "aa3dbfb"
+      tag: "f2ed5f2"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
