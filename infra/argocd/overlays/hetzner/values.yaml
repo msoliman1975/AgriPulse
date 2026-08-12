@@ -1414,13 +1414,63 @@ global:
   #   pushed by then; verified from that run's own log rather than its
   #   conclusion: api@sha256:08f0d01d, workers@sha256:bbdfbe29,
   #   frontend@sha256:197ed7e7. This promotes d20b54f only, NOT #420.
+  # aa3dbfb = #420. The weather indices now continue past today.
+  #
+  #   Every weather index on the overview -- Relative Humidity, Rainfall <->
+  #   ET Balance, all eight -- stopped dead on the current date, which read
+  #   as "we do not forecast these". We always did: each fetch stores
+  #   Open-Meteo's 5-day horizon in `weather_forecasts`. Nothing projected
+  #   it. Four independent stops kept it off the screen (the task read only
+  #   observations; it capped targets at today; the backfill did too; the
+  #   SPA asked for `to = tomorrow`), and removing any subset of them would
+  #   have changed nothing a reader could see.
+  #
+  #   MIGRATION -- tenant 0072 adds `weather_index_daily.is_forecast`.
+  #   Additive, `NOT NULL DEFAULT false`, metadata-only on PG11+ (no table
+  #   rewrite). Applies to the two ACTIVE tenants, both verified at 0071
+  #   before this commit; agrosina-demo sits at 0052 but is archived with a
+  #   deleted_at, so migrate_tenants skips it as it already does today.
+  #
+  #   Rollback is clean in the direction that matters: a tag revert to
+  #   d20b54f leaves the column in place and the old code simply never
+  #   selects it. Do NOT run the 0072 downgrade to roll back -- it drops the
+  #   column AND deletes the forecast rows, and it exists for the case where
+  #   the column itself must go, not for a bad deploy.
+  #
+  #   Forecast rows are excluded from the climatology sample set, the "now"
+  #   strip, the decision-tree weather_index snapshot, and the observer's
+  #   coverage counts -- each would otherwise be quietly wrong rather than
+  #   loudly broken. `weather_derived_daily` stays observed-only, which is
+  #   why the reports join needed no change.
+  #
+  #   Also fixes `humidity` being absent from the summary strip: the
+  #   endpoint's index order was a hard-coded 7-tuple never updated when
+  #   public 0049 added it as the eighth index, so Relative Humidity was
+  #   computed, stored and charted but never listed. Now parity-tested
+  #   against the catalog.
+  #
+  #   BACKEND + FRONTEND -> api + workers + frontend all bumped; tile-server
+  #   unchanged stays 9d140cc. Carries d20b54f (#419) with it, already live.
+  #
+  #   The merge run (31557587428) also shows CANCELLED -- the argocd dev-tag
+  #   bump landed on main and took its tail. Unlike d20b54f, the frontend
+  #   container job here was cancelled BEFORE pushing, so frontend:aa3dbfb
+  #   genuinely did not exist; re-ran that one job. Verified by pulling all
+  #   three on the node before this commit, not by reading a conclusion:
+  #   api/workers sha256:620e2c02, frontend sha256:abab81e3.
+  #
+  #   Watch after sync: Insights -> Weather. The trend sparklines and the
+  #   drill-in chart should run ~5 days past today as a dashed segment with
+  #   a "Now" marker, and the strip should list Relative Humidity. The
+  #   forward half only appears once the workers have re-derived a farm, so
+  #   give the weather cadence (3h) a cycle before calling it broken.
   images:
     api:
-      tag: "d20b54f"
+      tag: "aa3dbfb"
     workers:
-      tag: "d20b54f"
+      tag: "aa3dbfb"
     frontend:
-      tag: "d20b54f"
+      tag: "aa3dbfb"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
