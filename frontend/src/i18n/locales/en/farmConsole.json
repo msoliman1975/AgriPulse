@@ -592,5 +592,96 @@
     "historyEmpty": "No changes recorded yet.",
     "entryFirst": "Assigned to {{to}}",
     "entryHandover": "{{from}} → {{to}}"
+  },
+  "identity": {
+    "blocks_one": "{{count}} block",
+    "blocks_other": "{{count}} blocks",
+    "pivots_one": "{{count}} pivot",
+    "pivots_other": "{{count}} pivots"
+  },
+  "timeline": {
+    "label": "Acquisition dates",
+    "nextPass": "Next pass",
+    "nextPassHint": "Expected from this farm's recent cadence. Cloud decides whether the pass is usable, so treat it as a guide, not a promise.",
+    "passOn": "{{date}} — {{count}} block(s) imaged",
+    "cloudyOn": "{{date}} — skipped, {{pct}}% cloud",
+    "empty": "No satellite passes recorded for this farm yet.",
+    "unavailable": "Scene history is not available from this API version."
+  },
+  "railTools": {
+    "filterPlaceholder": "Filter…",
+    "filterLabel": "Filter units by name or code",
+    "sortLabel": "Sort units",
+    "noMatch": "Nothing matches “{{query}}”.",
+    "hidden_one": "{{count}} hidden by the filter",
+    "hidden_other": "{{count}} hidden by the filter",
+    "sort": {
+      "name": "Name",
+      "health": "Health",
+      "alerts": "Alerts",
+      "value": "Value"
+    }
+  },
+  "mapDock": {
+    "grid": "Sub-block grid",
+    "gridUnavailable": "no block on this farm has a grid configured",
+    "anomaly": "Anomaly vs baseline",
+    "contrast": "Contrast view",
+    "compare": "Compare two dates",
+    "comingSoon": "not built yet",
+    "fullscreen": "Full screen",
+    "exitFullscreen": "Exit full screen"
+  },
+  "legend": {
+    "title": "Index legend",
+    "scopeFarm": "Whole farm",
+    "scopeBlock": "{{name}} only",
+    "areaHeader": "Area",
+    "covered": "Covered",
+    "noData": "No reading",
+    "noDataHint": "Cells with no value for this scene — cloud, cloud shadow, scene edge, or an ingest that has not run. Not necessarily cloud.",
+    "hint": "Better read with {{index}}",
+    "collapse": "Collapse legend",
+    "expand": "Expand legend",
+    "emptyNoGridTitle": "No zoned blocks on this farm",
+    "emptyNoGridBody": "The legend measures the sub-block grid. No block here has a grid configured yet, so there is nothing to measure.",
+    "emptyNoGridCta": "Configure a block grid",
+    "emptyNoSubsTitle": "No imagery subscription",
+    "emptyNoSubsBody": "Blocks need an active imagery subscription before a grid can be computed and coloured.",
+    "emptyNoSubsCta": "Open imagery settings",
+    "emptyOffTitle": "Grid overlay is off",
+    "emptyOffBody": "Turn the sub-block grid on to see how much area sits in each class.",
+    "band": {
+      "canopy": {
+        "bare": "Bare soil",
+        "verySparse": "Very sparse",
+        "sparse": "Sparse canopy",
+        "developing": "Developing",
+        "dense": "Dense canopy",
+        "veryDense": "Very dense"
+      },
+      "chlorophyll": {
+        "bare": "Bare soil",
+        "low": "Low",
+        "moderate": "Moderate",
+        "good": "Good",
+        "high": "High"
+      },
+      "surfaceWater": {
+        "denseCanopy": "Dense canopy",
+        "vegetated": "Vegetated",
+        "bareOrDamp": "Bare or damp",
+        "standingWater": "Standing water",
+        "openWater": "Open water"
+      },
+      "leafMoisture": {
+        "bare": "Bare soil",
+        "severeStress": "Severe stress",
+        "stress": "Water stress",
+        "moderate": "Moderate",
+        "wellWatered": "Well watered",
+        "veryWet": "Very wet"
+      }
+    }
   }
 }
