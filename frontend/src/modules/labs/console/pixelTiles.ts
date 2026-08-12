@@ -29,6 +29,26 @@ function trimTrailingSlash(s: string): string {
 }
 
 /**
+ * How the tile server resamples when warping a 10 m raster onto a much finer
+ * web-mercator tile — i.e. at every zoom a grower actually works at.
+ *
+ * Nearest gives literal 10 m squares, which read as a mosaic of boxes rather
+ * than as a field. Bilinear interpolates the VALUES before they are
+ * classified, so class edges follow the shape of the crop instead of the pixel
+ * grid — and because interpolation happens in value space, the output still
+ * contains ONLY class colours. Verified against prod: a tile rendered this way
+ * decodes to the same four class colours as the nearest one, no blends.
+ *
+ * Note this is `reproject`, not `resampling`: the latter governs decimation on
+ * READ and is a no-op when upsampling, which is the case here.
+ *
+ * The legend's areas are NOT affected — those come from /cog/statistics at
+ * native resolution, so the numbers still describe the measured pixels while
+ * the map draws their smoothed shape.
+ */
+const REPROJECT = "bilinear";
+
+/**
  * XYZ template for one block's index raster, for a MapLibre raster source.
  *
  * `{z}/{x}/{y}` are left intact for MapLibre to interpolate. There is
@@ -47,6 +67,7 @@ export function blockTileUrl(input: {
   const params = new URLSearchParams({
     url: assetUri(input.s3Bucket, input.asset, input.code),
     colormap: titilerColormap(input.code),
+    reproject: REPROJECT,
   });
   return `${trimTrailingSlash(input.tileServerBaseUrl)}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?${params.toString()}`;
 }

@@ -34,7 +34,15 @@ const FALLBACK_RESOLUTION_M = 10;
 export interface IndexPixels {
   /** Raster layers for MapCanvas; empty when there is nothing to draw. */
   layers: PixelLayer[];
-  /** Blocks with a raster for this scene — the pixel layer's real coverage. */
+  /**
+   * Blocks whose raster was actually READABLE for this scene.
+   *
+   * Not the number of assets the api named: an ingestion job can be recorded
+   * as succeeded, carry a stac_item_id, and still have no object behind it —
+   * older scenes on a reshaped block are the case that bit us. The api row is
+   * a claim; the statistics call is the proof, so everything downstream counts
+   * proven blocks.
+   */
   assetCount: number;
   /** Per-block pixel counts, or undefined until the statistics land. */
   counts: BlockPixelCounts[] | undefined;
@@ -66,20 +74,6 @@ export function useIndexPixels(input: {
     staleTime: 5 * 60_000,
   });
   const assets = useMemo<FarmSceneAsset[]>(() => assetsQ.data?.items ?? [], [assetsQ.data]);
-
-  const layers = useMemo<PixelLayer[]>(() => {
-    if (!config) return [];
-    return assets.map((asset) => ({
-      id: asset.block_id,
-      tileUrl: blockTileUrl({
-        tileServerBaseUrl: config.tile_server_base_url,
-        s3Bucket: config.s3_bucket,
-        asset,
-        code,
-      }),
-      bounds: boundsByBlockId.get(asset.block_id),
-    }));
-  }, [assets, config, code, boundsByBlockId]);
 
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would
@@ -119,6 +113,33 @@ export function useIndexPixels(input: {
     staleTime: 5 * 60_000,
   });
 
+  // Blocks whose statistics came back — the only ones proven to HAVE a raster.
+  // A missing object makes the tile server answer 404 for every tile of that
+  // block, which MapLibre retries per tile per zoom: 244 console errors on one
+  // scene change, and a legend of zeros presented as if the land were empty.
+  // The statistics call is a probe we already pay for, so it decides what gets
+  // drawn rather than the api's claim that an asset exists.
+  const usableBlockIds = useMemo(
+    () => new Set((statsQ.data ?? []).map((c) => c.blockId)),
+    [statsQ.data],
+  );
+
+  const layers = useMemo<PixelLayer[]>(() => {
+    if (!config) return [];
+    return assets
+      .filter((a) => usableBlockIds.has(a.block_id))
+      .map((asset) => ({
+        id: asset.block_id,
+        tileUrl: blockTileUrl({
+          tileServerBaseUrl: config.tile_server_base_url,
+          s3Bucket: config.s3_bucket,
+          asset,
+          code,
+        }),
+        bounds: boundsByBlockId.get(asset.block_id),
+      }));
+  }, [assets, config, code, boundsByBlockId, usableBlockIds]);
+
   // The block's own mean for this index and scene. Read off the same
   // statistics the tiles are drawn from rather than from the map summary,
   // which only carries three of the seven indices.
@@ -138,7 +159,7 @@ export function useIndexPixels(input: {
 
   return {
     layers,
-    assetCount: assets.length,
+    assetCount: usableBlockIds.size,
     counts: statsQ.data,
     meanByBlockId,
     classAreas,

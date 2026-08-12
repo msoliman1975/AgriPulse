@@ -1161,8 +1161,14 @@ export function MapCanvas({
         if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", pixelOpacity);
       }
     };
+    // `idle`, NOT `load`. These layers arrive well after the first paint — the
+    // statistics call decides which blocks have a readable raster — and by then
+    // `load` has already fired for good. Deferring to it means the pixels are
+    // never added at all, which is the same trap the grid-highlight effect
+    // below documents. `idle` fires every time the map goes quiet, so a style
+    // that is mid-update when this runs still gets its layers.
     if (map.isStyleLoaded()) apply();
-    else map.once("load", apply);
+    else map.once("idle", apply);
   }, [pixelLayers, pixelOpacity]);
 
   // Cells as lines: drop the fill without dropping the click. See the prop's
