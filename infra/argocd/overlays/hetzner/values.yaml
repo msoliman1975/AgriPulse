@@ -1379,13 +1379,48 @@ global:
   #
   #   Images verified by pulling on the node before this commit:
   #   api sha256:51867a36, workers sha256:917b7c31.
+  # d20b54f = #419, decision-tree authoring fixes found by an end-to-end pass
+  #   over the authoring flow on this cluster. Ten defects; two of them lose
+  #   an author's work outright:
+  #     * The editor resolved its source version as "published, else latest",
+  #       so on a published tree every draft you saved vanished the moment it
+  #       saved -- the canvas snapped back to the published YAML, and since
+  #       the next save is computed from that source, the draft in between
+  #       was dropped. The page header reads the tree row, so it showed the
+  #       new name while the form below showed the old one.
+  #     * "Load into editor" was a no-op: it set the hydrated-from id, then
+  #       the hydrate effect saw that differ from the source version and
+  #       pulled the source YAML straight back. Together these left no route
+  #       back to a saved draft through the UI at all.
+  #     * Author YAML that fails to compile (a $params ref naming an
+  #       undeclared parameter) answered 500 with an internal source path in
+  #       the message. The three authoring routes now answer 422.
+  #   Smaller: create-page code validation bypassed by "Start from scratch",
+  #   422 field errors no longer discarded, a signals condition with no
+  #   signal picked now flagged, internal error text out of the add-child
+  #   dialog, `text_ar: null` -> "", params-ref completions.
+  #
+  #   BACKEND + FRONTEND -> api + workers + frontend all bumped; tile-server
+  #   unchanged stays 9d140cc. No migration. Plain tag revert to 9b3a427
+  #   (api/workers) + c984d23 (frontend) is a clean rollback.
+  #
+  #   Watch after sync: /decision-trees/<code> -- save a draft on a published
+  #   tree and confirm the editor keeps showing what you saved. The two
+  #   hydration bugs are invisible in a screenshot (the canvas renders fine,
+  #   it is just the wrong version), so check the version, not the picture.
+  #
+  #   The merge run (31557042615) shows as CANCELLED -- #420 merged moments
+  #   later and took the tail of it with it. The images had already been
+  #   pushed by then; verified from that run's own log rather than its
+  #   conclusion: api@sha256:08f0d01d, workers@sha256:bbdfbe29,
+  #   frontend@sha256:197ed7e7. This promotes d20b54f only, NOT #420.
   images:
     api:
-      tag: "9b3a427"
+      tag: "d20b54f"
     workers:
-      tag: "9b3a427"
+      tag: "d20b54f"
     frontend:
-      tag: "c984d23"
+      tag: "d20b54f"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
