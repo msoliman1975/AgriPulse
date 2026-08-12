@@ -65,6 +65,8 @@ export interface WeatherIndexPoint {
   zscore: string | null;
   baseline_mean: string | null;
   baseline_std: string | null;
+  /** Projected from the provider's forecast, not observed. True past today. */
+  is_forecast: boolean;
 }
 
 export interface WeatherIndexTimeseriesResponse {

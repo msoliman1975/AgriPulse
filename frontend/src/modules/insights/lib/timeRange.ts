@@ -61,17 +61,34 @@ export function toIsoRange(range: TimeRange): { since?: string; until?: string }
   return out;
 }
 
+/**
+ * How far past today an open-ended weather range reaches, in days.
+ *
+ * The weather indices are now projected across the provider's forecast
+ * horizon (`weather_forecast_hours`, 5 days) as well as observed history, so
+ * an upper bound of "tomorrow" would clip off everything that was added — the
+ * series would still stop at today and look exactly as it did before.
+ *
+ * Deliberately one day past the 5-day horizon rather than matched to it: the
+ * bound is exclusive, and a horizon the backend widens later should show up
+ * without a frontend release. Asking for days the projection does not reach
+ * simply returns fewer points.
+ */
+export const FORECAST_LOOKAHEAD_DAYS = 6;
+
 /** Calendar-day bounds for the endpoints that take `from`/`to` dates. The
- * weather timeseries wants an inclusive upper bound that covers today, so an
- * open `to` resolves to tomorrow rather than being omitted. */
+ * weather timeseries wants an exclusive upper bound past the last day worth
+ * drawing, so an open `to` resolves to the end of the forecast horizon. A
+ * custom range is left exactly as the reader set it — if they picked an end
+ * date, that is the end date. */
 export function toDayRange(
   range: TimeRange,
   now: Date = new Date(),
 ): { from?: string; to: string } {
-  const tomorrow = new Date(now.getTime() + 86_400_000);
+  const ahead = new Date(now.getTime() + FORECAST_LOOKAHEAD_DAYS * 86_400_000);
   return {
     ...(range.from ? { from: range.from } : {}),
-    to: range.to ?? isoDay(tomorrow),
+    to: range.to ?? isoDay(ahead),
   };
 }
 
