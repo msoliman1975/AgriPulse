@@ -378,6 +378,7 @@ roles:
       - signal.record
       - alert.read
       - plan.read
+      - plan_activity.complete
       - plan_template.read
       - resource.read
       - irrigation.schedule.read

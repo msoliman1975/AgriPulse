@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import {
   acceptVisit,
+  completeActivity,
   getSignalTemplate,
   listSignalDefinitions,
   recordObservation,
@@ -93,8 +94,11 @@ export function WorkDetailScreen({
         <BoardActions
           lang={lang}
           farmId={farmId}
+          activityId={item.id}
           blockId={item.block_id}
           templateId={item.template_id}
+          status={status}
+          onDone={onClose}
         />
       )}
     </div>
@@ -229,18 +233,45 @@ function SubmitBar({
 function BoardActions({
   lang,
   farmId,
+  activityId,
   blockId,
   templateId,
+  status,
+  onDone,
 }: {
   lang: Lang;
   farmId: string;
+  activityId: string;
   blockId: string | null;
   templateId: string | null;
+  status: string;
+  onDone: () => void;
 }): ReactNode {
   const [capturing, setCapturing] = useState(false);
   const [count, setCount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (status === "completed" || status === "skipped") {
+    return <p className="hint">{t(lang, "work.alreadyClosed")}</p>;
+  }
+
+  async function close(state: "completed" | "skipped"): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      await completeActivity(activityId, state);
+      onDone();
+    } catch {
+      setError(t(lang, "work.actionFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="actions">
+      {error ? <p className="error">{error}</p> : null}
       <button type="button" onClick={() => setCapturing(true)}>
         {t(lang, "work.record")}
       </button>
@@ -249,9 +280,14 @@ function BoardActions({
           {t(lang, "work.recordedCount")} {count}
         </p>
       ) : null}
-      {/* Said plainly and without apology: the readings are saved against the
-          block either way, and closing the activity happens in the office. */}
-      <p className="hint">{t(lang, "work.boardNoComplete")}</p>
+      {/* Two ways to close, because "I did it" and "it did not need doing"
+          are different facts and the schedule is wrong in different ways. */}
+      <button type="button" disabled={busy} onClick={() => void close("completed")}>
+        {t(lang, "work.markDone")}
+      </button>
+      <button type="button" disabled={busy} onClick={() => void close("skipped")}>
+        {t(lang, "work.markSkipped")}
+      </button>
       {capturing ? (
         <CaptureForm
           lang={lang}

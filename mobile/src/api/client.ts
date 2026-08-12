@@ -162,6 +162,21 @@ export interface SignalDefinition {
   attachment_allowed?: boolean | null;
 }
 
+/**
+ * Close a board activity.
+ *
+ * A PATCH with `state`, not a dedicated route: the same endpoint edits
+ * metadata, and the two gate on different capabilities — `state` needs
+ * `plan_activity.complete`, metadata needs `plan.manage`. Sending only
+ * `state` keeps a scout on the side they hold.
+ */
+export function completeActivity(activityId: string, state: "completed" | "skipped") {
+  return request<{ id: string; status: string }>(`/activities/${activityId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ state }),
+  });
+}
+
 export interface TemplateMember {
   signal_definition_id: string;
   position: number;
