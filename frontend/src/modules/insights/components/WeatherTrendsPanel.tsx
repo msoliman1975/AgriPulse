@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/Skeleton";
 import i18n from "@/i18n";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
+import { splitForecastSeries } from "../lib/forecastSeries";
 import { WeatherIndexChart } from "./WeatherIndexChart";
 
 /**
@@ -94,7 +95,13 @@ interface SeriesPoint {
   date: string;
   value: number | null;
   zscore: number | null;
+  isForecast: boolean;
 }
+
+// The forward half is drawn thinner and dashed in the SAME hue as its index:
+// it is the same quantity, still unmeasured. A separate colour would read as
+// a separate series, and a legend entry per index would double the legend.
+const FORECAST_DASH = "3 3";
 
 export function WeatherTrendsPanel({
   farmId,
@@ -126,11 +133,17 @@ export function WeatherTrendsPanel({
         date: p.date,
         value: toNum(p.value),
         zscore: toNum(p.zscore),
+        isForecast: p.is_forecast,
       }));
-      const latest = [...points].reverse().find((p) => p.value !== null)?.value ?? null;
-      // Ranking datum for compare: the most recent z-score we actually have.
-      const latestZ = [...points].reverse().find((p) => p.zscore !== null)?.zscore ?? null;
-      return { idx, points, latest, latestZ };
+      // "Latest" and the compare ranking both mean the current reading, so
+      // they skip the forecast tail — otherwise the headline number beside
+      // each sparkline would be a value five days from now, and compare
+      // would rank indices by how anomalous they are predicted to become.
+      const observed = points.filter((p) => !p.isForecast);
+      const latest = [...observed].reverse().find((p) => p.value !== null)?.value ?? null;
+      const latestZ = [...observed].reverse().find((p) => p.zscore !== null)?.zscore ?? null;
+      const split = splitForecastSeries(points, (p) => p.value);
+      return { idx, points, rows: split.rows, boundary: split.lastObservedDate, latest, latestZ };
     });
   }, [indices, seriesQs]);
 
@@ -152,17 +165,29 @@ export function WeatherTrendsPanel({
   }, [series]);
 
   // One row per date so recharts can draw every z-score series from a single
-  // data prop.
+  // data prop. Each index contributes TWO keys — `code` up to today and
+  // `code__fc` beyond it — so the forward half of every compared line is
+  // dashed here for the same reason it is in the units view.
   const compareData = useMemo(() => {
     const byDate = new Map<string, Record<string, number | string | null>>();
     for (const { idx, points } of compared) {
-      for (const p of points) {
-        const row = byDate.get(p.date) ?? { date: p.date };
-        row[idx.code] = p.zscore;
-        byDate.set(p.date, row);
+      const split = splitForecastSeries(points, (p) => p.zscore);
+      for (const r of split.rows) {
+        const row = byDate.get(r.date) ?? { date: r.date };
+        row[idx.code] = r.value;
+        row[forecastKey(idx.code)] = r.forecast;
+        byDate.set(r.date, row);
       }
     }
     return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }, [compared]);
+
+  // Where "now" sits on the shared axis: the latest day any compared index
+  // still has an observed z-score for. They are all fed by the same fetch,
+  // so in practice this is one date rather than a ragged edge.
+  const compareBoundary = useMemo(() => {
+    const dates = compared.map((s) => s.boundary).filter((d): d is string => d !== null);
+    return dates.length === 0 ? null : dates.reduce((a, b) => (a > b ? a : b));
   }, [compared]);
 
   const selectedIdx = selected ? indices.find((i) => i.code === selected) : undefined;
@@ -196,6 +221,7 @@ export function WeatherTrendsPanel({
 
   const loading = seriesQs.some((q) => q.isLoading);
   const hasAnyData = series.some((s) => s.points.some((p) => p.value !== null));
+  const hasAnyForecast = series.some((s) => s.points.some((p) => p.isForecast && p.value !== null));
 
   return (
     <div>
@@ -233,6 +259,24 @@ export function WeatherTrendsPanel({
           ? t("trends.hintUnits")
           : t("trends.hintCompare", { count: compared.length })}
       </p>
+      {/* Stated once for the whole panel: the dashed convention is the same in
+          both views, and repeating it per facet would be eight copies. */}
+      {hasAnyForecast ? (
+        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-ap-muted">
+          <svg aria-hidden="true" width="20" height="6" viewBox="0 0 20 6" className="shrink-0">
+            <line
+              x1="0"
+              y1="3"
+              x2="20"
+              y2="3"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeDasharray={FORECAST_DASH}
+            />
+          </svg>
+          {t("forecast.legend")}
+        </p>
+      ) : null}
 
       {loading ? (
         <div className="mt-3 space-y-2">
@@ -243,7 +287,7 @@ export function WeatherTrendsPanel({
         <p className="py-10 text-center text-sm text-ap-muted">{t("trends.noData")}</p>
       ) : mode === "units" ? (
         <ul className="mt-3 divide-y divide-ap-line/60">
-          {series.map(({ idx, points, latest }) => (
+          {series.map(({ idx, points, rows, boundary, latest }) => (
             <li key={idx.code} className="grid grid-cols-[9rem_1fr_5rem] items-center gap-2 py-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold text-ap-ink">{nameOf(idx)}</p>
@@ -254,7 +298,7 @@ export function WeatherTrendsPanel({
                   <p className="text-[11px] text-ap-muted">{t("trends.noData")}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <LineChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                       <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" vertical={false} />
                       <XAxis
                         dataKey="date"
@@ -272,18 +316,36 @@ export function WeatherTrendsPanel({
                       />
                       <Tooltip<number, string>
                         labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
-                        formatter={(value: number): [string, string] => [
+                        formatter={(value: number, key: string): [string, string] => [
                           value === null || Number.isNaN(value)
                             ? "—"
                             : `${value.toFixed(1)} ${idx.unit}`,
-                          nameOf(idx),
+                          // The row is named for the index either way; only
+                          // the forecast half says so, so a reader hovering
+                          // the tail is told what it is.
+                          key === "forecast"
+                            ? `${nameOf(idx)} · ${t("forecast.short")}`
+                            : nameOf(idx),
                         ]}
                       />
+                      {boundary === null ? null : (
+                        <ReferenceLine x={boundary} stroke="#94a3b8" strokeDasharray="2 2" />
+                      )}
                       <Line
                         type="monotone"
                         dataKey="value"
                         stroke={colorFor(idx.code)}
                         strokeWidth={2}
+                        dot={false}
+                        connectNulls
+                        isAnimationActive={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="forecast"
+                        stroke={colorFor(idx.code)}
+                        strokeWidth={2}
+                        strokeDasharray={FORECAST_DASH}
                         dot={false}
                         connectNulls
                         isAnimationActive={false}
@@ -319,11 +381,22 @@ export function WeatherTrendsPanel({
                 />
                 {/* Zero = the seasonal normal; the only meaningful datum here. */}
                 <ReferenceLine y={0} stroke="#64748b" strokeWidth={1.5} />
+                {compareBoundary === null ? null : (
+                  <ReferenceLine
+                    x={compareBoundary}
+                    stroke="#94a3b8"
+                    strokeDasharray="2 2"
+                    label={{ value: t("forecast.boundary"), fontSize: 10, fill: "#64748b" }}
+                  />
+                )}
                 <Tooltip<number, string>
                   labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
                   formatter={(value: number, key: string): [string, string] => {
-                    const idx = indices.find((i) => i.code === key);
-                    const label = idx ? nameOf(idx) : key;
+                    const forecast = isForecastKey(key);
+                    const code = forecast ? baseKey(key) : key;
+                    const idx = indices.find((i) => i.code === code);
+                    const base = idx ? nameOf(idx) : code;
+                    const label = forecast ? `${base} · ${t("forecast.short")}` : base;
                     if (value === null || Number.isNaN(value)) return ["—", label];
                     // Signed, because the direction of the departure is the
                     // whole message here.
@@ -341,6 +414,21 @@ export function WeatherTrendsPanel({
                     dot={false}
                     connectNulls
                     isAnimationActive={false}
+                  />
+                ))}
+                {compared.map(({ idx }) => (
+                  <Line
+                    key={forecastKey(idx.code)}
+                    type="monotone"
+                    dataKey={forecastKey(idx.code)}
+                    name={`${nameOf(idx)} · ${t("forecast.short")}`}
+                    stroke={colorFor(idx.code)}
+                    strokeWidth={2}
+                    strokeDasharray={FORECAST_DASH}
+                    dot={false}
+                    connectNulls
+                    isAnimationActive={false}
+                    legendType="none"
                   />
                 ))}
               </LineChart>
@@ -371,6 +459,20 @@ export function WeatherTrendsPanel({
       )}
     </div>
   );
+}
+
+// The compare view puts every index on one `data` array, so the two halves of
+// one index need two distinct keys. Suffixed rather than prefixed so a key
+// still sorts and reads next to the code it belongs to.
+const FORECAST_SUFFIX = "__fc";
+function forecastKey(code: string): string {
+  return `${code}${FORECAST_SUFFIX}`;
+}
+function isForecastKey(key: string): boolean {
+  return key.endsWith(FORECAST_SUFFIX);
+}
+function baseKey(key: string): string {
+  return key.slice(0, -FORECAST_SUFFIX.length);
 }
 
 function toNum(v: string | null | undefined): number | null {

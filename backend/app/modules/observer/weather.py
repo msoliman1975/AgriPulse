@@ -54,6 +54,12 @@ class ObserverWeatherRepository:
         of anything stored — the point is to compare what arrived against what
         should have, and a denominator derived from the data itself could
         never show a gap.
+
+        The index counts exclude forecast rows. This ribbon exists to line
+        index rows up against the observation hours that produced them, and
+        a forecast day has no such hours — counting it would credit the
+        pipeline for a day it never observed, which is exactly the gap the
+        ribbon is here to expose.
         """
         sql = f"""
             SELECT
@@ -76,10 +82,12 @@ class ObserverWeatherRepository:
                   AND d.date < CAST({_ts(window_to)} AS date)) AS derived_days,
               (SELECT count(*) FROM weather_index_daily i
                 WHERE i.farm_id = :fid
+                  AND NOT i.is_forecast
                   AND i.date >= CAST({_ts(window_from)} AS date)
                   AND i.date < CAST({_ts(window_to)} AS date)) AS index_rows,
               (SELECT count(DISTINCT i.index_code) FROM weather_index_daily i
                 WHERE i.farm_id = :fid
+                  AND NOT i.is_forecast
                   AND i.date >= CAST({_ts(window_from)} AS date)
                   AND i.date < CAST({_ts(window_to)} AS date)) AS index_codes,
               (SELECT count(DISTINCT b.index_code) FROM weather_index_baselines b
@@ -114,7 +122,8 @@ class ObserverWeatherRepository:
               (SELECT count(*) > 0 FROM weather_derived_daily wd
                 WHERE wd.farm_id = :fid AND wd.date = d.day::date) AS has_derived,
               (SELECT count(*) FROM weather_index_daily wi
-                WHERE wi.farm_id = :fid AND wi.date = d.day::date) AS index_rows
+                WHERE wi.farm_id = :fid AND wi.date = d.day::date
+                  AND NOT wi.is_forecast) AS index_rows
               FROM (
                 SELECT date_trunc('day', o.time) AS day,
                        count(DISTINCT date_trunc('hour', o.time)) AS hours
@@ -164,9 +173,19 @@ class ObserverWeatherRepository:
         window_to: datetime,
         limit: int,
     ) -> list[dict[str, Any]]:
+        """Every projected day for one index, newest first.
+
+        Forecast rows are listed alongside observed ones and carry
+        ``is_forecast`` — unlike the coverage counts, which exclude them.
+        A row listing is where an operator goes to ask "what is this point
+        on the chart", and a forecast day legitimately has
+        ``source_hours = 0``; hiding it would just make the chart's tail
+        unexplainable from the observer.
+        """
         sql = f"""
             SELECT i.date, i.index_code, i.value, i.value_min, i.value_max,
-                   i.value_aux, i.baseline_deviation, i.computed_at,
+                   i.value_aux, i.baseline_deviation, i.is_forecast,
+                   i.computed_at,
                    (SELECT count(DISTINCT date_trunc('hour', o.time))
                       FROM weather_observations o
                      WHERE o.farm_id = i.farm_id
@@ -209,7 +228,7 @@ class ObserverWeatherRepository:
                         """
                         SELECT i.date, i.index_code, i.value, i.value_min,
                                i.value_max, i.value_aux, i.baseline_deviation,
-                               i.computed_at
+                               i.is_forecast, i.computed_at
                           FROM weather_index_daily i
                          WHERE i.farm_id = :fid AND i.index_code = :code
                            AND i.date = :day

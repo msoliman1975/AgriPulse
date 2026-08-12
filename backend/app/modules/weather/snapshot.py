@@ -98,6 +98,14 @@ async def load_index_snapshot(
     ``session`` must already be bound to the tenant schema. Returns an
     empty dict when the farm has no projected rows yet — every
     ``{source: weather_index}`` predicate then fails closed.
+
+    Observed rows only. The projection now writes days ahead as well
+    (``is_forecast``), and "latest" here means *current conditions* — a
+    decision tree firing on ``weather_index`` must be judging what the
+    farm is living through, not a prediction for four days out. The
+    forward-looking view is ``forecast_24h``/``forecast_72h``, which the
+    snapshot already carries separately and which trees opt into
+    explicitly.
     """
     rows = (
         (
@@ -108,6 +116,7 @@ async def load_index_snapshot(
                     index_code, date, value, baseline_deviation
                 FROM weather_index_daily
                 WHERE farm_id = :farm_id
+                  AND NOT is_forecast
                 ORDER BY index_code, date DESC
                 """
                 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),

@@ -119,6 +119,105 @@ async def test_summary_latest_zscore_and_trend(admin_session: AsyncSession) -> N
     assert Decimal(temp["trend_7d_delta"]) == Decimal("7")
 
 
+async def _seed_forecast(
+    admin_session: AsyncSession, schema: str, farm_id: UUID, *, days: int = 4
+) -> None:
+    """`days` of forecast temperature starting tomorrow, values 40 upward.
+
+    Far above the observed 20..29 so a forecast value showing up where an
+    observed one belongs is unmistakable rather than plausible.
+    """
+    today = datetime.now(UTC).date()
+    for offset in range(1, days + 1):
+        await admin_session.execute(
+            text(
+                f'INSERT INTO "{schema}".weather_index_daily '
+                f"(farm_id, date, index_code, value, value_aux, is_forecast) "
+                f"VALUES (:fid, :d, 'temperature', :v, '{{}}'::jsonb, TRUE)"
+            ),
+            {"fid": farm_id, "d": today + timedelta(days=offset), "v": Decimal(40 + offset)},
+        )
+    await admin_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_timeseries_carries_the_forecast_half(admin_session: AsyncSession) -> None:
+    """The series continues past today, and says which points are forecast.
+
+    This is the endpoint half of the reported gap: the projection writing
+    forward is worthless if the read surface stops at the current date or
+    hands the SPA no way to tell the two apart.
+    """
+    tenant, farm_id, app = await _bootstrap(admin_session, "wx-api-ts-fc")
+    await _seed(admin_session, tenant.schema_name, UUID(farm_id))
+    await _seed_forecast(admin_session, tenant.schema_name, UUID(farm_id))
+
+    today = datetime.now(UTC).date()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            f"/api/v1/farms/{farm_id}/weather-indices/temperature/timeseries",
+            params={"to": (today + timedelta(days=6)).isoformat()},
+        )
+    assert resp.status_code == 200, resp.text
+    points = resp.json()["points"]
+    assert len(points) == 14
+
+    forecast = [p for p in points if p["is_forecast"]]
+    observed = [p for p in points if not p["is_forecast"]]
+    assert len(forecast) == 4
+    assert len(observed) == 10
+    # Still one ascending list, with the forward half strictly after today.
+    assert [p["date"] for p in points] == sorted(p["date"] for p in points)
+    assert min(p["date"] for p in forecast) > today.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_summary_ignores_the_forecast_half(admin_session: AsyncSession) -> None:
+    """ "Now" on the strip is the last OBSERVED day, not the horizon's end.
+
+    The summary takes the last row of each series, so once the projection
+    started writing days ahead an unfiltered read would headline a value
+    four days from now as the farm's current temperature.
+    """
+    tenant, farm_id, app = await _bootstrap(admin_session, "wx-api-summary-fc")
+    await _seed(admin_session, tenant.schema_name, UUID(farm_id))
+    await _seed_forecast(admin_session, tenant.schema_name, UUID(farm_id))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/api/v1/farms/{farm_id}/weather-indices/summary")
+    assert resp.status_code == 200, resp.text
+    temp = next(e for e in resp.json()["indices"] if e["index_code"] == "temperature")
+    assert Decimal(temp["value"]) == Decimal("29")  # not 41..44
+    assert temp["latest_date"] == datetime.now(UTC).date().isoformat()
+
+
+@pytest.mark.asyncio
+async def test_summary_order_covers_every_catalog_index(admin_session: AsyncSession) -> None:
+    """The summary's hard-coded order must match the catalog exactly.
+
+    `humidity` was seeded as the eighth index by public migration 0049 and
+    never added to `_WEATHER_INDEX_ORDER`, so it was computed, stored and
+    charted but silently absent from the strip. Nothing failed — the loop
+    just never asked for it. This test is the lock-step check that makes
+    the next such addition break loudly.
+    """
+    from app.modules.weather.router import _WEATHER_INDEX_ORDER
+
+    codes = [
+        r[0]
+        for r in (
+            await admin_session.execute(
+                text(
+                    "SELECT code FROM public.weather_indices_catalog "
+                    "WHERE is_active = TRUE AND deleted_at IS NULL "
+                    "ORDER BY sort_order ASC"
+                )
+            )
+        ).all()
+    ]
+    assert list(_WEATHER_INDEX_ORDER) == codes
+
+
 @pytest.mark.asyncio
 async def test_timeseries_unknown_index_is_empty(admin_session: AsyncSession) -> None:
     tenant, farm_id, app = await _bootstrap(admin_session, "wx-api-unknown")

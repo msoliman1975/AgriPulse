@@ -56,16 +56,19 @@ describe("toIsoRange", () => {
 });
 
 describe("toDayRange", () => {
-  it("closes an open top end at tomorrow so today is included", () => {
-    // The weather timeseries takes an inclusive `to`; passing today would
-    // race the last projection of the day.
+  it("closes an open top end past the forecast horizon, not at tomorrow", () => {
+    // The exclusive `to` has to clear the last forecast day the projection
+    // writes. Stopping at tomorrow was what kept the forward half of every
+    // weather series off the chart even after the backend started storing it.
     expect(toDayRange(presetRange("7d", NOW), NOW)).toEqual({
       from: "2026-06-23",
-      to: "2026-07-01",
+      to: "2026-07-06",
     });
   });
 
   it("keeps an explicit upper bound", () => {
+    // A custom range is the reader's own choice of end date; it is not
+    // silently extended into the forecast.
     expect(toDayRange(customRange("2026-01-01", "2026-02-01"), NOW)).toEqual({
       from: "2026-01-01",
       to: "2026-02-01",
@@ -73,7 +76,7 @@ describe("toDayRange", () => {
   });
 
   it("omits from entirely for all", () => {
-    expect(toDayRange({ span: "all", from: null, to: null }, NOW)).toEqual({ to: "2026-07-01" });
+    expect(toDayRange({ span: "all", from: null, to: null }, NOW)).toEqual({ to: "2026-07-06" });
   });
 });
 

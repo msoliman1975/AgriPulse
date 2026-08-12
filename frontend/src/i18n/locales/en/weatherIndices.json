@@ -22,11 +22,18 @@
   },
   "chart": {
     "title": "{{name}} — last 90 days",
+    "titleWithForecast": "{{name}} — last 90 days and the outlook ahead",
     "band": "Seasonal normal (±1σ)",
     "normalLine": "Normal",
     "valueLine": "Observed",
     "loadFailed": "Could not load the series.",
     "empty": "No data in this window."
+  },
+  "forecast": {
+    "line": "Forecast",
+    "short": "forecast",
+    "boundary": "Now",
+    "legend": "Dashed ahead of now is forecast, projected from the provider's outlook; solid is observed."
   },
   "trends": {
     "title": "Trend",
