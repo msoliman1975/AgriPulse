@@ -1329,13 +1329,41 @@ global:
   #
   #   Images verified by pulling them on the node before this commit:
   #   api sha256:c2be1506, workers sha256:d2ec410e.
+  # c984d23 = #417, density + legibility pass on /platform/roles (#416's page).
+  #   Three changes, all presentation:
+  #     * The 10 role cards and 3 KPI tiles cost ~5 rows of vertical space
+  #       before the permission table began. Roles are now rows of a compact
+  #       table (name/tier/permissions/enforced/pending/holders), which also
+  #       makes them directly comparable -- BillingAdmin's 5 against
+  #       TenantOwner's 81 is now visible at a glance. Selection moved into
+  #       the URL (?role=...) so a view can be handed to someone else.
+  #     * The single counted "Filters" popover became three named dropdowns
+  #       (Scope / Resource / Status). Toolbar gained an opt-in
+  #       `axisLayout="inline"`; the default is unchanged, so no other page
+  #       moves -- 4 new Toolbar tests pin that.
+  #     * Column-header hints. Scope is the one that needed it: it is
+  #       documentation only, ignored by the resolver, which the word does
+  #       not convey. "Pending" likewise means no endpoint checks the
+  #       permission yet, not that work is queued.
+  #
+  #   FRONTEND-ONLY. #417 is the ONLY frontend change between f81df64 and
+  #   c984d23 (`git log f81df64..c984d23 -- frontend/`), so this ships exactly
+  #   that. api/workers stay on 43c76e8, tile-server on 9d140cc. No migration.
+  #   Plain tag revert to f81df64 is a clean rollback.
+  #
+  #   NOT browser-verified. 12 page tests, 11 Toolbar tests and the full
+  #   754-test frontend suite pass, and CI is green -- but the page has still
+  #   never been rendered in a real browser.
+  #
+  #   Image verified from the merge build's own log, not the job conclusion:
+  #   pushing manifest for frontend:c984d23@sha256:2dc1708b.
   images:
     api:
       tag: "43c76e8"
     workers:
       tag: "43c76e8"
     frontend:
-      tag: "f81df64"
+      tag: "c984d23"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
