@@ -105,5 +105,5 @@ class InvalidTreeYamlError(APIError):
         )
 
     @classmethod
-    def from_parse_error(cls, exc: DecisionTreeParseError) -> "InvalidTreeYamlError":
+    def from_parse_error(cls, exc: DecisionTreeParseError) -> InvalidTreeYamlError:
         return cls(reason=getattr(exc, "reason", None) or (exc.detail or "malformed tree YAML"))
