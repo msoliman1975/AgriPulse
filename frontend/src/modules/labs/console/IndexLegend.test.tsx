@@ -117,6 +117,18 @@ describe("IndexLegend", () => {
     expect(screen.getByText(/nothing for this date/i)).toBeInTheDocument();
   });
 
+  it("blames the scene when the api named assets but none could be read", () => {
+    // Found by smoke-testing an older pass: the ingestion job rows claimed
+    // success and carried a stac_item_id, but the objects were gone from the
+    // bucket. The panel used to render a full set of rows reading 0.0, which
+    // states that the land is empty rather than that we cannot see it.
+    // assetCount now counts PROVEN blocks, so zero of them reads as "no
+    // usable image for this date".
+    renderLegend({ assetCount: 0, imagerySubCount: 36, areas: areas([0, 0, 0, 0, 0, 0, 0]) });
+    expect(screen.getByText(/nothing for this date/i)).toBeInTheDocument();
+    expect(screen.queryByText("Sparse canopy")).not.toBeInTheDocument();
+  });
+
   it("says nothing at all while it is still loading", () => {
     // Better a moment of blank than a "no imagery" claim that turns out false.
     renderLegend({ assetCount: 0, imagerySubCount: null, loading: true });

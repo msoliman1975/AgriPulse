@@ -44,6 +44,18 @@ describe("blockTileUrl", () => {
     expect(url.startsWith("https://tiles.example.test/cog/")).toBe(true);
   });
 
+  it("smooths in value space, not colour space", () => {
+    // `reproject` interpolates the VALUES before they are classified, so the
+    // output still holds only class colours. Blending the COLOURS instead —
+    // MapLibre raster-resampling: linear — would invent shades that are in no
+    // legend row, which is the whole thing this design exists to prevent.
+    const cm = new URL(url.replace("{z}/{x}/{y}", "0/0/0"));
+    expect(cm.searchParams.get("reproject")).toBe("bilinear");
+    // `resampling` governs decimation on read and is a no-op upsampling, so
+    // sending it instead would silently change nothing.
+    expect(cm.searchParams.get("resampling")).toBeNull();
+  });
+
   it("never sends rescale, which would break the interval colormap", () => {
     // rescale stretches values to 0-255 BEFORE the colormap is applied, so
     // every class boundary would then point at the wrong data.
@@ -64,6 +76,12 @@ describe("blockStatsUrl", () => {
   it("bins the histogram on the class edges", () => {
     const bins = new URL(url).searchParams.get("histogram_bins");
     expect(bins).toBe("-3,0,0.1,0.2,0.4,0.6,0.8,3");
+  });
+
+  it("does not smooth the statistics, which must describe measured pixels", () => {
+    // The map may draw an interpolated shape; the AREAS may not be interpolated
+    // or the number stops being a measurement.
+    expect(new URL(url).searchParams.get("reproject")).toBeNull();
   });
 
   it("raises max_size above the decimating default", () => {
