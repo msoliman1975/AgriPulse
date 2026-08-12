@@ -124,6 +124,16 @@ capabilities:
     description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
     scope: platform
     status: active
+  platform.manage_rbac:
+    # Deliberately NOT folded into platform.read, which gates *viewing* the
+    # matrix. This one rewrites the authorization policy for every tenant at
+    # once, so it is the narrowest grant in the product: PlatformAdmin picks it
+    # up through its "*" wildcard and nothing else is granted it by default.
+    # PlatformSupport must not have it — support reads policy, it does not
+    # author it.
+    description: Grant or revoke capabilities on a role at runtime, overriding the shipped defaults.
+    scope: platform
+    status: active
   platform.purge_data:
     # Deliberately NOT folded into platform.manage_tenants. Purge is the only
     # irreversible delete in the product — it removes rows, object-storage

@@ -17,6 +17,11 @@ Resolution order on every request, per ARCHITECTURE.md Â§ 7:
   3. FarmScope    â€” if a scope on the matching farm_id grants it, allow.
 
 First match wins; otherwise PermissionDeniedError (HTTP 403).
+
+At each step the answer is the YAML baseline *merged with* any runtime
+override a Platform Admin has applied — see `overlay.py`. The merge is two
+dict lookups against a cached snapshot, so every caller here stays
+synchronous. `PlatformAdmin`'s wildcard is never overridable.
 """
 
 # NOTE: deliberately NO `from __future__ import annotations`. The
@@ -43,6 +48,7 @@ from app.shared.auth.context import (
     TenantRole,
 )
 from app.shared.auth.middleware import get_current_context
+from app.shared.rbac import overlay
 
 WILDCARD = "*"
 
@@ -112,10 +118,15 @@ class CapabilityRegistry:
         capabilities: dict[str, dict[str, Any]],
         role_capabilities: dict[str, frozenset[str]],
         role_descriptions: dict[str, str] | None = None,
+        overlay_provider: "Callable[[], Mapping[str, Mapping[str, bool]]] | None" = None,
     ) -> None:
         self._capabilities = capabilities
         self._role_capabilities = role_capabilities
         self._role_descriptions = role_descriptions or {}
+        # Injectable so the merge can be unit-tested against a literal dict
+        # without touching module state. Production lets it default to the
+        # process-wide cache the auth middleware keeps fresh.
+        self._overlay_provider = overlay_provider or overlay.current
 
     @classmethod
     def from_files(
@@ -188,12 +199,53 @@ class CapabilityRegistry:
     def role_description(self, role: str) -> str:
         return self._role_descriptions.get(role, "")
 
-    def role_grants(self, role: str, capability: str) -> bool:
+    def effective_capabilities(self, role: str) -> list[str]:
+        """Every capability `role` grants right now, overrides included.
+
+        Returns the literal `["*"]` for a wildcard role rather than the
+        expanded catalogue, so the frontend's existing `roleGrants` shortcut
+        keeps working and the payload stays small.
+        """
+        baseline = self._role_capabilities.get(role)
+        if baseline is None:
+            return []
+        if WILDCARD in baseline:
+            return [WILDCARD]
+        return sorted(c for c in self._capabilities if self.role_grants(role, c))
+
+    def baseline_grants(self, role: str, capability: str) -> bool:
+        """What `role_capabilities.yaml` alone says, ignoring any override.
+
+        The admin surface shows this beside the effective answer so a row can
+        be marked "modified from default" and offered a Reset.
+        """
         granted = self._role_capabilities.get(role)
         if granted is None:
             return False
         if WILDCARD in granted:
             return True
+        return capability in granted
+
+    def role_grants(self, role: str, capability: str) -> bool:
+        """The effective answer: runtime override first, then the baseline.
+
+        Synchronous and memory-only by design — see `rbac/overlay.py`. Two
+        dict lookups on the authorization hot path; never builds a merged set.
+        """
+        granted = self._role_capabilities.get(role)
+        if granted is None:
+            # An unknown role denies, and no override can rescue it. Preserves
+            # the pre-overlay contract that only the YAML names real roles.
+            return False
+        if WILDCARD in granted:
+            # PlatformAdmin. The overlay is never consulted, so no row — and no
+            # bug in the merge — can strip the platform's last way back in.
+            return True
+        role_overrides = self._overlay_provider().get(role)
+        if role_overrides is not None:
+            decided = role_overrides.get(capability)
+            if decided is not None:
+                return decided
         return capability in granted
 
     def has_capability(
@@ -246,6 +298,35 @@ def has_capability(
     Pass an explicit `registry` from tests; production code lets it default.
     """
     return (registry or get_default_registry()).has_capability(context, capability, farm_id=farm_id)
+
+
+def effective_capabilities_for(
+    context: RequestContext,
+    *,
+    registry: "CapabilityRegistry | None" = None,
+) -> dict[str, list[str]]:
+    """Effective grants per role, for the roles *this* context actually holds.
+
+    Served on `GET /v1/me` so the frontend stops resolving capabilities from a
+    compiled-in copy of the matrix. Once the matrix is editable at runtime, a
+    bundled constant is wrong by construction: an admin toggles a permission
+    and every browser keeps showing the old affordances until the next deploy.
+
+    Keyed by role rather than flattened to one list on purpose — the frontend
+    resolves platform -> tenant -> farm, and a farm-scoped grant only applies on
+    the farms that scope covers. Flattening would silently widen it to every
+    farm. Only the caller's own roles are included; there is no reason to hand
+    every user the whole policy.
+    """
+    registry = registry or get_default_registry()
+    roles: set[str] = set()
+    if context.platform_role is not None:
+        roles.add(context.platform_role.value)
+    if context.tenant_role is not None:
+        roles.add(context.tenant_role.value)
+    for scope in context.farm_scopes:
+        roles.add(scope.role.value)
+    return {role: registry.effective_capabilities(role) for role in sorted(roles)}
 
 
 def requires_capability(
