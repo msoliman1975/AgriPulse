@@ -128,9 +128,14 @@ export const WEATHER_FIELDS: Record<(typeof WEATHER_SCOPES)[number], readonly st
 // climatology. Mirrors WEATHER_INDEX_KEYS in
 // backend/app/shared/conditions/context.py.
 export const WEATHER_INDEX_KEYS = ["value", "baseline_deviation"] as const;
-// The eight catalog codes (public weather_indices_catalog). Kept as a
-// closed list so the author picks from a dropdown rather than guessing
-// a code; mirrors the migration 0037 seed + 0049 (`humidity`).
+// The catalog codes (public weather_indices_catalog). Kept as a closed list
+// so the author picks from a dropdown rather than guessing a code; mirrors
+// the migration 0037 seed + 0049 (`humidity`) + 0057 (gap-audit indices).
+//
+// Unlike INDEX_CODES above this list is load-bearing at RUNTIME, not just in
+// the picker: `parseValueRef` rejects an unknown code, which drops the whole
+// tree editor to the read-only YAML fallback. A code seeded in the migration
+// and missed here does not degrade gracefully.
 export const WEATHER_INDEX_CODES = [
   "temperature",
   "radiation",
@@ -140,6 +145,9 @@ export const WEATHER_INDEX_CODES = [
   "evapotranspiration",
   "evaporation_coeff",
   "rain_et_balance",
+  "leaf_wetness",
+  "frost_risk",
+  "heat_stress",
 ] as const;
 // Per-block weather-driven disease/pest risk fields (PR-R3). `score` is the
 // 0-100 pressure; `level` its low|moderate|high banding. Mirrors

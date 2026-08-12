@@ -50,6 +50,7 @@ def build_risk_window(
                 temp_mean_c=day.temp_mean_c if day is not None else None,
                 humidity_mean_pct=rw.humidity_mean_pct if rw is not None else None,
                 precip_mm=day.precip_mm_daily if day is not None else None,
+                leaf_wetness_hours=rw.leaf_wetness_hours if rw is not None else None,
             )
         )
     out.sort(key=lambda r: r.date)

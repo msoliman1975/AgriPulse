@@ -20,9 +20,15 @@ The architecture (registry + accumulation shape) is the contract; the
 coefficients are V1 placeholders.
 
 Resolution note: the models read *daily* aggregates (mean temp, daily mean RH,
-daily rain), not hourly leaf-wetness. That matches the data we persist today
-and the agronomic decision cadence; an hourly leaf-wetness upgrade can slot in
-behind the same signature later.
+daily rain) plus, where available, hourly-derived leaf wetness.
+
+The leaf-wetness upgrade this docstring used to describe as future work has
+landed: ``RiskWeatherDay.leaf_wetness_hours`` carries the NHRH90 hour count and
+the two foliar models now prefer it over the daily-mean-RH proxy. They read it
+in OPPOSITE directions, which is the whole point of having it — prolonged wetness
+drives anthracnose infection and suppresses powdery mildew, and a daily mean RH
+could not distinguish the two. The proxy remains as the fallback for days
+projected before the index existed, so a `None` means "not measured", never "dry".
 """
 
 from __future__ import annotations
@@ -105,6 +111,11 @@ _PM_TEMP_HI = Decimal("27")
 _PM_TEMP_TOL = Decimal("6")
 _PM_RH_MIN = Decimal("60")
 _PM_RAIN_SUPPRESS_MM = Decimal("2")  # a day wetter than this washes spores off
+# Free water suppresses this pathogen, so leaf wetness works the OPPOSITE way
+# here to anthracnose: a long wet spell is protective, not favourable. Set
+# above the anthracnose infection threshold so a moderately damp night still
+# counts as mildew-favourable while a genuinely soaking one does not.
+_PM_WET_SUPPRESS_HOURS = Decimal("10")
 _PM_SUSCEPTIBLE_STAGES = frozenset({"pre_flowering", "flowering", "fruit_set"})
 
 
@@ -117,7 +128,12 @@ def powdery_mildew(window: Sequence[RiskWeatherDay], ctx: RiskBlockContext) -> R
         temp_f = _triangular(d.temp_mean_c, _PM_TEMP_LO, _PM_TEMP_HI, _PM_TEMP_TOL)
         humid_ok = d.humidity_mean_pct >= _PM_RH_MIN
         rain = d.precip_mm if d.precip_mm is not None else Decimal(0)
-        dry_ok = rain < _PM_RAIN_SUPPRESS_MM
+        # Humid air favours this pathogen; standing water on the leaf does
+        # not. Rain was the only proxy for that until leaf wetness existed,
+        # and it missed the case that matters most in an Egyptian orchard —
+        # a heavy dew night with no rain at all.
+        soaked = d.leaf_wetness_hours is not None and d.leaf_wetness_hours >= _PM_WET_SUPPRESS_HOURS
+        dry_ok = rain < _PM_RAIN_SUPPRESS_MM and not soaked
         day_fav = temp_f if (humid_ok and dry_ok) else Decimal(0)
         favs.append(day_fav)
         if day_fav >= Decimal("0.5"):
@@ -151,19 +167,33 @@ _AN_TEMP_HI = Decimal("30")
 _AN_TEMP_TOL = Decimal("7")
 _AN_WET_RH = Decimal("90")
 _AN_WET_RAIN_MM = Decimal("1")  # measurable rain == leaf wetness
+# Hours of leaf wetness that count as a genuine infection period. Most foliar
+# pathogens need a sustained wet spell rather than a damp moment; 6h is the
+# low end of the range the literature reports for Colletotrichum.
+_AN_WET_HOURS = Decimal("6")
 _AN_SUSCEPTIBLE_STAGES = frozenset({"flowering", "fruit_set", "fruit_development"})
 
 
 def anthracnose(window: Sequence[RiskWeatherDay], ctx: RiskBlockContext) -> RiskScore | None:
     favs: list[Decimal] = []
     wet_days = 0
+    measured_wetness_days = 0
     for d in window:
         if d.temp_mean_c is None:
             continue
         temp_f = _triangular(d.temp_mean_c, _AN_TEMP_LO, _AN_TEMP_HI, _AN_TEMP_TOL)
         rain = d.precip_mm if d.precip_mm is not None else Decimal(0)
-        rh = d.humidity_mean_pct
-        wet = rain >= _AN_WET_RAIN_MM or (rh is not None and rh >= _AN_WET_RH)
+        # Prefer measured leaf-wetness hours; fall back to the daily-mean-RH
+        # proxy for days projected before that index existed. The two disagree
+        # in the case the proxy was always weakest at: a day averaging 70% RH
+        # can still hold 10 saturated hours overnight, and the mean hides it.
+        if d.leaf_wetness_hours is not None:
+            wet = d.leaf_wetness_hours >= _AN_WET_HOURS
+            measured_wetness_days += 1
+        else:
+            rh = d.humidity_mean_pct
+            wet = rh is not None and rh >= _AN_WET_RH
+        wet = wet or rain >= _AN_WET_RAIN_MM
         day_fav = temp_f if wet else Decimal(0)
         favs.append(day_fav)
         if wet:
@@ -180,6 +210,10 @@ def anthracnose(window: Sequence[RiskWeatherDay], ctx: RiskBlockContext) -> Risk
         inputs={
             "window_days": str(len(favs)),
             "wet_days": str(wet_days),
+            # Says how much of the verdict rests on measured wetness rather
+            # than the RH proxy — otherwise a score built entirely on the
+            # fallback is indistinguishable from one built on real hours.
+            "measured_wetness_days": str(measured_wetness_days),
             "mean_favorability": _f2(base),
             "stage_factor": _f2(stage_factor),
         },

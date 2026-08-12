@@ -42,6 +42,12 @@ class RiskWeatherDay:
     temp_mean_c: Decimal | None = None
     humidity_mean_pct: Decimal | None = None
     precip_mm: Decimal | None = None
+    # Hours at/above 90% RH (NHRH90). Optional and defaulted like everything
+    # else here, which matters more for this field than the rest: it only
+    # exists for days projected after the leaf-wetness work landed, so every
+    # model reading it must keep its pre-existing daily-mean-RH path as the
+    # fallback rather than treating None as "dry".
+    leaf_wetness_hours: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

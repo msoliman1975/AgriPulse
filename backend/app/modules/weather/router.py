@@ -66,6 +66,10 @@ _WEATHER_INDEX_ORDER: tuple[str, ...] = (
     "evaporation_coeff",
     "rain_et_balance",
     "humidity",  # sort_order 8 — appended by 0049, so it sorts last here too
+    # sort_order 9-11, appended by 0057 (indices-guide gap audit).
+    "leaf_wetness",
+    "frost_risk",
+    "heat_stress",
 )
 # Trailing window the farm summary scans for "latest + 7-day trend".
 _SUMMARY_WINDOW_DAYS = 45

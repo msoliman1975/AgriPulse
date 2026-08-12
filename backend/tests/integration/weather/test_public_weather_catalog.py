@@ -95,6 +95,10 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
         "evaporation_coeff",
         "rain_et_balance",
         "humidity",
+        # 0057, appended at 9-11 by the indices-guide gap audit.
+        "leaf_wetness",
+        "frost_risk",
+        "heat_stress",
     ]
     # Scope to the seeded codes — the DB is session-shared and other tests
     # (the endpoint test) commit extra rows into this table.
@@ -118,6 +122,12 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
     assert by_code["humidity"].source_kind == "observed"
     assert by_code["humidity"].unit == "%"
     assert by_code["humidity"].sort_order == 8
+    # The gap-audit trio are all derived, appended after humidity so the
+    # existing rows keep their positions on the strip.
+    for code, order in (("leaf_wetness", 9), ("frost_risk", 10), ("heat_stress", 11)):
+        assert by_code[code].source_kind == "derived", code
+        assert by_code[code].sort_order == order, code
+    assert by_code["leaf_wetness"].unit == "h"
     for r in rows:
         assert r.is_active is True
         assert r.name_en
