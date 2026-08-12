@@ -354,13 +354,20 @@ class FieldEnrolmentService:
             for w in workers:
                 w["user_id"] = by_membership.get(w["membership_id"])
 
+        # "Enrolled" means the membership is still ACTIVE, not merely that the
+        # column is set. Deleting a user archives the membership and leaves the
+        # worker row pointing at it, so testing for NOT NULL reported a deleted
+        # scout as enrolled forever — and a supervisor reading the worklist
+        # would never re-enrol somebody who cannot sign in. The user lookup
+        # above already filters to live memberships, so a resolved user_id is
+        # the honest test.
         blocked = [w for w in workers if w["role"] == "FieldWorker"]
         no_phone = [w for w in workers if not w["phone"] and w["role"] != "FieldWorker"]
-        enrolled = [w for w in workers if w["membership_id"] is not None]
+        enrolled = [w for w in workers if w.get("user_id") is not None]
         ready = [
             w
             for w in workers
-            if w["membership_id"] is None and w["phone"] and w["role"] in ENROLLABLE_ROLES
+            if w.get("user_id") is None and w["phone"] and w["role"] in ENROLLABLE_ROLES
         ]
         return {
             "total": len(workers),

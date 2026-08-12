@@ -773,3 +773,41 @@ async def test_an_untranslated_language_is_refused(scouting_env: ScoutingFixture
     """
     resp = await _enrol(scouting_env, phone="01007776655", full_name="Karim Fahmy", language="fr")
     assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_a_deleted_scout_returns_to_ready_to_enrol(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """Deleting a scout archives their membership and leaves the worker row
+    pointing at it. Testing `membership_id IS NOT NULL` therefore reported a
+    deleted person as enrolled forever, and a supervisor reading the worklist
+    would never re-enrol somebody who cannot sign in. Seen in production while
+    replacing an account keyed to a mistyped number."""
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Leaver Layth")
+    assert enrolled.status_code == 201, enrolled.text
+
+    async with _client(env.admin_context) as client:
+        before = (
+            await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+        ).json()
+    assert "Leaver Layth" in {w["name"] for w in before["enrolled"]}
+
+    # Archive the membership the way delete_user does.
+    await admin_session.execute(
+        text(
+            "UPDATE public.tenant_memberships SET status = 'archived', deleted_at = now() "
+            "WHERE id = CAST(:m AS uuid)"
+        ),
+        {"m": enrolled.json()["membership_id"]},
+    )
+    await admin_session.commit()
+
+    async with _client(env.admin_context) as client:
+        after = (
+            await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+        ).json()
+    assert "Leaver Layth" not in {w["name"] for w in after["enrolled"]}
+    # And they are offered for re-enrolment rather than disappearing.
+    assert "Leaver Layth" in {w["name"] for w in after["ready_to_enrol"]}
