@@ -5,7 +5,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
-import { hasCapability, useClaims } from "@/rbac/useCapability";
+import { hasCapability, useClaims, useServedGrants } from "@/rbac/useCapability";
 
 import { DateRangePicker } from "../components/DateRangePicker";
 import { defaultRange, type DateRange } from "../dateRange";
@@ -15,14 +15,18 @@ export function ReportsPage(): ReactNode {
   const { t } = useTranslation("reports");
   const farmId = useActiveFarmId();
   const claims = useClaims();
+  // Read once here rather than per report: `useCapability` is a hook and the
+  // catalog length is data-driven, so a hook-per-report would break the rules
+  // of hooks. Passing the served grants keeps this in step with a runtime
+  // permission change instead of resolving against the bundled mirror.
+  const served = useServedGrants();
   const [range, setRange] = useState<DateRange>(() => defaultRange());
 
-  // Capability-filter the catalog against the active farm. Done once
-  // from the decoded claims (not a hook-per-report) so the list stays
-  // dynamic without breaking the rules-of-hooks.
+  // Capability-filter the catalog against the active farm.
   const available = useMemo(
-    () => (farmId ? REPORTS.filter((r) => hasCapability(claims, r.capability, { farmId })) : []),
-    [claims, farmId],
+    () =>
+      farmId ? REPORTS.filter((r) => hasCapability(claims, r.capability, { farmId }, served)) : [],
+    [claims, farmId, served],
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);

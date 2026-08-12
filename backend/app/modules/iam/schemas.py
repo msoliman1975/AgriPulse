@@ -59,6 +59,11 @@ class MeResponse(BaseModel):
     platform_roles: list[PlatformRoleResponse]
     tenant_memberships: list[TenantMembershipResponse]
     farm_scopes: list[FarmScopeResponse]
+    #: role -> the capabilities it grants *right now*, for this caller's roles
+    #: only. Includes any runtime override a Platform Admin has applied, which
+    #: is why the frontend must resolve against this rather than its bundled
+    #: mirror of the YAML. A wildcard role is sent as the literal `["*"]`.
+    capabilities: dict[str, list[str]] = {}
 
 
 # =====================================================================
