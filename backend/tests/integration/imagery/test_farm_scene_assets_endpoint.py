@@ -159,8 +159,13 @@ async def test_scene_assets_return_one_row_per_block_honouring_the_bound(
         await admin_session.commit()
 
         # End of the acquisition day — what the timeline sends as `at`.
-        at = (base + timedelta(hours=15)).isoformat()
-        resp = await client.get(f"/api/v1/farms/{farm_id}/scene-assets?at={at}")
+        # Passed as a param, never interpolated into the URL: an ISO string
+        # carries a "+00:00" offset, and an unencoded "+" in a query string
+        # decodes to a space, which the route correctly rejects as a 422.
+        resp = await client.get(
+            f"/api/v1/farms/{farm_id}/scene-assets",
+            params={"at": (base + timedelta(hours=15)).isoformat()},
+        )
 
     assert resp.status_code == 200
     body = resp.json()
@@ -222,7 +227,8 @@ async def test_scene_assets_skip_jobs_that_wrote_nothing(
         await admin_session.commit()
 
         resp = await client.get(
-            f"/api/v1/farms/{farm_id}/scene-assets?at={(at + timedelta(hours=6)).isoformat()}"
+            f"/api/v1/farms/{farm_id}/scene-assets",
+            params={"at": (at + timedelta(hours=6)).isoformat()},
         )
 
     assert resp.status_code == 200
