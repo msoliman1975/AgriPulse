@@ -3,75 +3,76 @@
 // This used to live inline in MapCanvas's `addLayer` call, which was fine
 // while nothing else needed to know the colours. The index legend does: it
 // draws a swatch per class, and a legend whose swatches disagree with the
-// pixels underneath reads as a bug. Both now derive from GRID_RAMP_STOPS.
+// pixels underneath reads as a bug.
 //
 // It lives in `map/` rather than `console/` on purpose — it deals in
 // MapLibre expression types, which is exactly the loose-typing surface that
 // folder is ESLint-exempt for.
 //
-// KNOWN LIMITATION, pre-existing and deliberately preserved here rather than
-// silently "fixed": the ramp is index-agnostic and assumes bigger = better.
-// That is wrong for NDWI (McFeeters surface water — high means standing
-// water) and for the negative end of NDMI. Those indices' low bands sample
-// in the grey→red segment below. Changing the ramp per index is a separate,
-// visible change to the map; it is not something a legend refactor should
-// smuggle in. See the Slice 3 note in the plan.
+// PER-INDEX AS OF THE BSI/MSI WORK. The ramp used to be one index-agnostic
+// gradient (grey → red at 0.0 → amber at 0.3 → lime at 0.6 → green at 0.85)
+// that assumed bigger = better. The header here already recorded that as a
+// known bug for NDWI (McFeeters surface water: high = standing water) and for
+// NDMI's negative end, and deferred the fix as "a separate, visible change to
+// the map". This is that change, and MSI forced it: MSI is a ratio running
+// ~0.2–2.0 where HIGH is bad, so under the old ramp every real reading sat at
+// or above the 0.85 stop and a parched block rendered solid healthy green.
+//
+// Rather than add a second per-index colour table, the stops are derived from
+// INDEX_CLASSES — already the single source of truth for what a value means,
+// already ordered by verdict rather than by magnitude, and already the table
+// the pixel layer and the legend read. So the grid cells, the pixels beneath
+// them and the legend beside them now agree by construction instead of by
+// three tables being kept in step by hand.
 import type { ExpressionSpecification } from "maplibre-gl";
 
-/** Value encoded for a cell with no reading. Kept out of the real range. */
+import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import { NO_DATA_COLOR, classesFor } from "../console/indexClasses";
+
+/**
+ * Value encoded for a cell with no reading. Kept out of the real range.
+ *
+ * Caveat inherited from the FC-build side: -1 is a legal (if vanishingly
+ * rare) reading for the normalized-difference indices, so a genuine -1.0
+ * renders as "no data". Not introduced here and not worth a wire-format
+ * change on its own, but worth knowing before trusting a grey cell.
+ */
 export const GRID_NO_DATA = -1;
 
 /**
- * Ramp control points, ascending by value. MapLibre interpolates linearly
- * between them; `gridRampColor` reproduces that arithmetic for the legend.
+ * The paint expression MapCanvas installs on the grid fill layer.
+ *
+ * A `step` rather than an `interpolate`: the classes are discrete and each
+ * carries an exact colour, so blending between them would paint values that
+ * belong to no class — the same mistake the continuous ramp made, where the
+ * gradient's own stops had nothing to do with any class boundary.
+ *
+ * `step` breaks on `>=` while `classify` uses an inclusive upper bound, so a
+ * value sitting EXACTLY on a cut point lands one class higher here than in
+ * the legend. That is the same one-ulp disagreement `titilerColormap`
+ * documents for the pixel layer, and it is preferable to having the grid and
+ * the pixels round opposite ways.
+ *
+ * `code` is nullable so a caller with no index selected renders every cell as
+ * no-data grey rather than borrowing NDVI's verdict for an unknown quantity.
  */
-export const GRID_RAMP_STOPS: readonly (readonly [number, string])[] = [
-  [GRID_NO_DATA, "#9ca3af"], // no data
-  [0.0, "#dc2626"], // very low — bare or water
-  [0.3, "#f59e0b"], // stressed
-  [0.6, "#84cc16"], // moderate
-  [0.85, "#16a34a"], // healthy
-] as const;
+export function gridRampExpression(code: ApiIndexCode | null): ExpressionSpecification | string {
+  const value: ExpressionSpecification = ["to-number", ["get", "value"]];
+  const classes = code ? classesFor(code) : [];
+  // No index, no verdict: a flat colour rather than a degenerate expression,
+  // because that is exactly what it means.
+  if (classes.length === 0) return NO_DATA_COLOR;
 
-/** The paint expression MapCanvas installs on the grid fill layer. */
-export function gridRampExpression(): ExpressionSpecification {
-  return [
-    "interpolate",
-    ["linear"],
-    ["to-number", ["get", "value"]],
-    ...GRID_RAMP_STOPS.flatMap(([value, color]) => [value, color]),
-  ] as ExpressionSpecification;
-}
+  // Stops after the first: each class's lower bound is the previous class's
+  // inclusive max. The last class runs to Infinity and so contributes no stop.
+  const steps = classes
+    .slice(0, -1)
+    .flatMap((c, i) => [c.max, classes[i + 1].color] as [number, string])
+    .flat();
 
-function hexToRgb(hex: string): [number, number, number] {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+  const ramp = ["step", value, classes[0].color, ...steps] as ExpressionSpecification;
 
-function rgbToHex(r: number, g: number, b: number): string {
-  const clamp = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
-  return `#${((clamp(r) << 16) | (clamp(g) << 8) | clamp(b)).toString(16).padStart(6, "0")}`;
-}
-
-/**
- * The colour the map would paint for `value`. Mirrors MapLibre's
- * `interpolate/linear`: clamped at both ends, linear in sRGB between stops.
- */
-export function gridRampColor(value: number): string {
-  if (!Number.isFinite(value)) return GRID_RAMP_STOPS[0][1];
-  const stops = GRID_RAMP_STOPS;
-  if (value <= stops[0][0]) return stops[0][1];
-  const last = stops[stops.length - 1];
-  if (value >= last[0]) return last[1];
-  for (let i = 0; i < stops.length - 1; i += 1) {
-    const [v0, c0] = stops[i];
-    const [v1, c1] = stops[i + 1];
-    if (value >= v0 && value <= v1) {
-      const f = v1 === v0 ? 0 : (value - v0) / (v1 - v0);
-      const [r0, g0, b0] = hexToRgb(c0);
-      const [r1, g1, b1] = hexToRgb(c1);
-      return rgbToHex(r0 + (r1 - r0) * f, g0 + (g1 - g0) * f, b0 + (b1 - b0) * f);
-    }
-  }
-  return last[1];
+  // The sentinel is matched exactly rather than folded into the ramp's bottom
+  // class, so "no reading" stays visually distinct from "the worst reading".
+  return ["case", ["==", value, GRID_NO_DATA], NO_DATA_COLOR, ramp];
 }

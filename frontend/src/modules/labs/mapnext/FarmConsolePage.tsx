@@ -745,6 +745,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               borderOpacity={layers.borderOpacity}
               blockFillOpacity={layers.fillOpacity}
               gridCells={gridCellsFc}
+              gridIndexCode={activeIndex}
               highlightedCellIds={highlightedCellIds}
               selectedGridCellId={selectedCellId}
               onGridCellClick={(cellId, point) => {
