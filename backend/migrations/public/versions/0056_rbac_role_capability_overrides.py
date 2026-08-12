@@ -70,9 +70,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("now()"),
         ),
-        sa.UniqueConstraint(
-            "role", "capability", name="uq_rbac_override_role_capability"
-        ),
+        sa.UniqueConstraint("role", "capability", name="uq_rbac_override_role_capability"),
         schema="public",
     )
 

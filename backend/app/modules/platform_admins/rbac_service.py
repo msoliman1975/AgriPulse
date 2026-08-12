@@ -381,9 +381,7 @@ def validate_target(role: str, capability: str, registry: CapabilityRegistry) ->
         raise _unprocessable(f"Unknown capability: {capability!r}.", capability=capability)
 
 
-async def _current_override(
-    session: AsyncSession, *, role: str, capability: str
-) -> bool | None:
+async def _current_override(session: AsyncSession, *, role: str, capability: str) -> bool | None:
     """The stored delta for this pair, or None if there is none.
 
     Read from the table, not from `registry.role_grants`: the resolver answers

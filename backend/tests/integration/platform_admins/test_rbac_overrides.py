@@ -91,9 +91,7 @@ async def test_matrix_tells_the_caller_whether_they_may_edit() -> None:
 # ---------- the guardrails ------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "capability", ["platform.manage_rbac", "platform.manage_tenants"]
-)
+@pytest.mark.parametrize("capability", ["platform.manage_rbac", "platform.manage_tenants"])
 @pytest.mark.asyncio
 async def test_platform_admin_cannot_be_edited(capability: str) -> None:
     """Refused server-side, not merely hidden in the UI."""
