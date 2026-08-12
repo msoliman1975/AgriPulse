@@ -180,6 +180,7 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         note="FK reaches only weather_subscriptions; block_id is unenforced",
     ),
     OwnedTable("weather_risk_daily", owner_column="block_id", order=10),
+    OwnedTable("block_water_balance_daily", owner_column="block_id", order=10),
     OwnedTable(
         "grid_cells",
         where_sql="grid_config_id IN (SELECT id FROM grid_configs WHERE block_id = ANY(:ids))",
