@@ -17,16 +17,24 @@ export type TimeseriesGranularity = "daily" | "weekly";
 //
 // Mirrors backend STANDARD_INDEX_CODES; the pairing is enforced by
 // backend/tests/unit/shared/test_index_codes_frontend_parity.py.
-export type IndexCode =
-  | "ndvi"
-  | "ndwi"
-  | "evi"
-  | "savi"
-  | "ndre"
-  | "gndvi"
-  | "ndmi"
-  | "bsi"
-  | "msi";
+// A runtime array with the type derived from it, rather than a bare union.
+// Four other modules used to keep their own hardcoded copy of this list for
+// their pickers, and all four were still on the original six — which is why
+// `ndmi` was uncheckable in insights and both reports for a year after the
+// backend started computing it. They now import this.
+export const INDEX_CODES = [
+  "ndvi",
+  "ndwi",
+  "evi",
+  "savi",
+  "ndre",
+  "gndvi",
+  "ndmi",
+  "bsi",
+  "msi",
+] as const;
+
+export type IndexCode = (typeof INDEX_CODES)[number];
 
 export interface IndexTimeseriesPoint {
   time: string;

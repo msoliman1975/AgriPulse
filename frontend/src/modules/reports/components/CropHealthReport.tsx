@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { INDEX_CODES } from "@/api/indices";
 import type { CropHealthBlockRow, CropHealthStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -11,9 +12,9 @@ import type { ReportProps } from "../registry";
 import { CropPathFilter } from "./CropPathFilter";
 import { ReportShell } from "./ReportShell";
 
-// Indices the report can run on. NDVI default; the rest cover the
-// standard vegetation/moisture set the platform computes.
-const INDEX_CODES = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi"] as const;
+// Indices the report can run on: everything the platform computes. This was a
+// hardcoded copy of the original six and had gone stale — the report could not
+// be run on ndmi at all, despite the data being there.
 
 const STATUS_CHIP: Record<CropHealthStatus, string> = {
   normal: "bg-ap-primary-soft text-ap-primary",

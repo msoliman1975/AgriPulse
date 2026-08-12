@@ -12,6 +12,7 @@ import {
 
 import { isApiError } from "@/api/errors";
 import {
+  INDEX_CODES,
   getTimeseries,
   type IndexCode,
   type IndexTimeseriesPoint,
@@ -26,7 +27,9 @@ interface Props {
   initialIndex?: IndexCode;
 }
 
-const ALL_INDICES: readonly IndexCode[] = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"] as const;
+// Was a hardcoded copy of migration 0008's original six, so the combobox
+// never offered ndmi, bsi or msi. Sourced from the API module now.
+const ALL_INDICES: readonly IndexCode[] = INDEX_CODES;
 
 interface ChartPoint {
   time: number;
