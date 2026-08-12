@@ -215,11 +215,7 @@ describe("applyDeleteUnreachable", () => {
   it("is a no-op when the tree has no orphans", () => {
     const out = applyDeleteUnreachable(BASE_YAML);
     const doc = parseYamlDoc(out)!;
-    expect(Object.keys(doc.nodes!).sort()).toEqual([
-      "leaf_noop",
-      "leaf_scout",
-      "root",
-    ]);
+    expect(Object.keys(doc.nodes!).sort()).toEqual(["leaf_noop", "leaf_scout", "root"]);
   });
 });
 
@@ -262,6 +258,72 @@ nodes:
 `;
     const errors = validateTreeStructure(partial);
     expect(errors.some((e) => e.message.includes("ghost"))).toBe(true);
+  });
+
+  // Choosing "Custom signal" in the builder leaves the signal itself
+  // unpicked. That saved happily and produced a branch that could never
+  // match, with nothing anywhere saying why.
+  it("flags a signal operand with no signal picked", () => {
+    const blankSignal = `code: x
+root: root
+nodes:
+  root:
+    condition:
+      tree:
+        op: lt
+        left: { source: signals, code: "", key: value_numeric }
+        right: 0
+    on_match: leaf
+    on_miss: leaf
+  leaf:
+    outcome: { action_type: scout, kind: recommendation, text_en: ok }
+`;
+    const errors = validateTreeStructure(blankSignal);
+    expect(errors).toContainEqual({
+      nodeId: "root",
+      message: "Condition is missing `code` — pick one before saving.",
+    });
+  });
+
+  it("finds blank operands nested inside a group", () => {
+    const nested = `code: x
+root: root
+nodes:
+  root:
+    condition:
+      tree:
+        all_of:
+          - op: in
+            left: { source: weather_risk, risk_code: powdery_mildew, field: level }
+            values: [high]
+          - op: gt
+            left: { source: signals, code: "", key: value_numeric }
+            right: 3
+    on_match: leaf
+    on_miss: leaf
+  leaf:
+    outcome: { action_type: scout, kind: recommendation, text_en: ok }
+`;
+    const messages = validateTreeStructure(nested).map((e) => e.message);
+    expect(messages).toContain("Condition is missing `code` — pick one before saving.");
+  });
+
+  it("leaves a fully-specified condition alone", () => {
+    const complete = `code: x
+root: root
+nodes:
+  root:
+    condition:
+      tree:
+        op: lt
+        left: { source: signals, code: soil_moisture, key: value_numeric }
+        right: 0
+    on_match: leaf
+    on_miss: leaf
+  leaf:
+    outcome: { action_type: scout, kind: recommendation, text_en: ok }
+`;
+    expect(validateTreeStructure(complete)).toEqual([]);
   });
 });
 

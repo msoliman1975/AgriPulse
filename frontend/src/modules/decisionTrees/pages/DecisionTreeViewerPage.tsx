@@ -156,6 +156,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const draftYaml = draft.value;
   const setDraftYaml = draft.setValue;
   const [hydratedFromVersionId, setHydratedFromVersionId] = useState<string | null>(null);
+  // Set only by "Load into editor" — see the hydrate effect below.
+  const [pinnedVersionId, setPinnedVersionId] = useState<string | null>(null);
   const [addChildPending, setAddChildPending] = useState<PendingAddChild | null>(null);
   const [addChildError, setAddChildError] = useState<string | null>(null);
   const [deletePending, setDeletePending] = useState<string | null>(null);
@@ -168,16 +170,27 @@ export function DecisionTreeViewerPage(): ReactNode {
   const [dryRunMode, setDryRunMode] = useState<"draft" | "current">("draft");
   const [dryRunResult, setDryRunResult] = useState<DryRunResponse | null>(null);
 
-  // Resolve the version we hydrate from: prefer the current published
-  // version, fall back to the latest version if nothing is published.
+  // The version the editor hydrates from is always the LATEST one —
+  // `versions` comes back newest-first, so that is `versions[0]`.
+  //
+  // It used to prefer the *published* version. That silently ate work on
+  // any published tree: saving appended a draft, the editor snapped back
+  // to the published YAML, and the next save was computed from the
+  // published version again — dropping every draft in between, with no
+  // way back to them through the UI. An editor edits the newest thing;
+  // the published version is still available on its own below.
   const sourceVersion = useMemo(() => {
     const versions = detail.data?.versions ?? [];
-    if (versions.length === 0) return null;
+    return versions[0] ?? null;
+  }, [detail.data]);
+
+  // The published version stays addressable for the read-only surfaces
+  // (provenance, "test against published") that genuinely mean "live".
+  const publishedVersion = useMemo(() => {
+    const versions = detail.data?.versions ?? [];
     const currentVersionNum = detail.data?.current_version ?? null;
-    const current = currentVersionNum
-      ? versions.find((v) => v.version === currentVersionNum)
-      : null;
-    return current ?? versions[0];
+    if (!currentVersionNum) return null;
+    return versions.find((v) => v.version === currentVersionNum) ?? null;
   }, [detail.data]);
 
   const sourceYaml = sourceVersion?.tree_yaml ?? null;
@@ -187,12 +200,19 @@ export function DecisionTreeViewerPage(): ReactNode {
   // changes (e.g. after a successful append) — `onSave` resets local
   // state explicitly so the new version becomes the source-of-truth
   // without blowing away unrelated state.
+  //
+  // `pinnedVersionId` is set when the author explicitly loads a historical
+  // version from the version panel. Without it this effect fought that
+  // action: "Load into editor" set `hydratedFromVersionId` to the chosen
+  // version, the guard then saw it differ from the latest version's id and
+  // immediately re-hydrated back — making the button a no-op every time.
   useEffect(() => {
+    if (pinnedVersionId) return;
     if (sourceVersion && sourceVersion.id !== hydratedFromVersionId) {
       draft.replace(sourceVersion.tree_yaml);
       setHydratedFromVersionId(sourceVersion.id);
     }
-  }, [sourceVersion, hydratedFromVersionId, draft]);
+  }, [sourceVersion, hydratedFromVersionId, draft, pinnedVersionId]);
 
   // Hydrate the targeting buffer from the persisted tree row. Re-fires
   // after a save (onSave clears `targetingHydratedId`) so the buffer
@@ -342,8 +362,9 @@ export function DecisionTreeViewerPage(): ReactNode {
   const rootId = draftCompiled?.root ?? null;
   // Provenance reads from the published/current compiled version (the
   // authoritative normalized shape), not the in-editor draft — it's
-  // authored in raw YAML, not via the canvas.
-  const provenance = readTreeProvenance(sourceVersion?.tree_compiled);
+  // authored in raw YAML, not via the canvas. Falls back to the latest
+  // version so an unpublished tree still shows its evidence.
+  const provenance = readTreeProvenance((publishedVersion ?? sourceVersion)?.tree_compiled);
 
   const onPatch = (nodeId: string, patch: NodePatch): void => {
     setEditBuffer((buf) => patchBuffer(buf, nodeId, patch));
@@ -360,6 +381,9 @@ export function DecisionTreeViewerPage(): ReactNode {
     setParamsBuffer({});
     setMetaBuffer({});
     setTargetingHydratedId(null); // re-hydrate targeting from the row
+    // Discard means "back to the latest saved version", so drop any pin a
+    // "Load into editor" left behind.
+    setPinnedVersionId(null);
     if (sourceYaml) draft.replace(sourceYaml);
     setStructuralError(null);
     setSelectedNodeId(null);
@@ -370,6 +394,9 @@ export function DecisionTreeViewerPage(): ReactNode {
   const onLoadVersionIntoDraft = (v: DecisionTreeVersion): void => {
     draft.replace(v.tree_yaml);
     setHydratedFromVersionId(v.id);
+    // Pin so the hydrate effect doesn't pull the latest version back over
+    // the top of the one the author just asked for.
+    setPinnedVersionId(v.id);
     setEditBuffer({});
     setParamsBuffer({});
     setMetaBuffer({});
@@ -422,7 +449,7 @@ export function DecisionTreeViewerPage(): ReactNode {
       setAddChildPending(null);
       setAddChildError(null);
     } catch (err) {
-      setAddChildError(err instanceof Error ? err.message : t("editor.addChild.failed"));
+      setAddChildError(describeAddChildError(err, nodeId, t));
     }
   };
   // PR-D6: drag-to-rewire — drop a port onto a target node.
@@ -515,8 +542,10 @@ export function DecisionTreeViewerPage(): ReactNode {
     setMetaBuffer({});
     // Force re-hydration from the new latest version + row. Clearing the
     // hydrated-from ids triggers the useEffects above on the next render
-    // once the detail query refetches.
+    // once the detail query refetches. The pin goes too: the save just
+    // made a new latest version, and that is what the editor should show.
     setHydratedFromVersionId(null);
+    setPinnedVersionId(null);
     setTargetingHydratedId(null);
     setSelectedNodeId(null);
   };
@@ -710,6 +739,7 @@ export function DecisionTreeViewerPage(): ReactNode {
           signalDefsLoading={signalDefsQ.isLoading}
           signalDefsError={signalDefsQ.isError}
           structuralErrors={structuralErrors}
+          pendingPatchCount={dirtyIds.size}
         />
       ) : (
         <>
@@ -806,6 +836,7 @@ export function DecisionTreeViewerPage(): ReactNode {
                 onAddChild={canManage ? onRequestAddChild : undefined}
                 onConditionChange={canManage ? onConditionChange : undefined}
                 cropPaths={targeting.crop_paths}
+                paramNames={Object.keys(declaredParams)}
               />
             ) : (
               <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">
@@ -914,6 +945,7 @@ function YamlMode({
   signalDefsLoading,
   signalDefsError,
   structuralErrors,
+  pendingPatchCount,
 }: {
   draftYaml: string;
   onChange: (next: string) => void;
@@ -922,6 +954,8 @@ function YamlMode({
   signalDefsLoading: boolean;
   signalDefsError: boolean;
   structuralErrors: ReturnType<typeof validateTreeStructure>;
+  /** Nodes with field edits still sitting in the panel's buffer. */
+  pendingPatchCount: number;
 }): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   return (
@@ -940,6 +974,15 @@ function YamlMode({
               format="yaml"
             />
           </div>
+        ) : null}
+        {/* Label/outcome edits live in an edit buffer until save, so this
+            body genuinely does not show them yet. Reading it as "the
+            draft" and finding your own typing missing looks like lost
+            work; say where it is instead. */}
+        {pendingPatchCount > 0 ? (
+          <p className="mb-2 rounded-md border border-ap-warn/40 bg-ap-warn/5 p-2 text-xs text-ap-ink">
+            {t("workspace.yaml.pendingFieldEdits", { count: pendingPatchCount })}
+          </p>
         ) : null}
         <textarea
           value={draftYaml}
@@ -1066,6 +1109,28 @@ function VersionHistorySection({
       ) : null}
     </Card>
   );
+}
+
+/**
+ * Turn an `applyAddNode` throw into something an author can act on.
+ *
+ * Those errors are internal invariants and read like it — the id-collision
+ * one surfaced verbatim as `applyAddNode: node id "x" already exists`,
+ * function name and all, in the dialog. The collision is the only one the
+ * author can actually cause (and fix) from that dialog, so it gets real
+ * copy; anything else keeps the generic message rather than leaking a
+ * function name into the UI.
+ */
+function describeAddChildError(
+  err: unknown,
+  nodeId: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  const raw = err instanceof Error ? err.message : "";
+  if (raw.includes("already exists")) {
+    return t("editor.addChild.idTaken", { id: nodeId });
+  }
+  return t("editor.addChild.failed");
 }
 
 function Legend(): JSX.Element {

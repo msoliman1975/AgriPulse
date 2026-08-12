@@ -59,6 +59,16 @@ export function AddChildDialog({
   const { t } = useTranslation("decisionTrees");
   const [kind, setKind] = useState<NodeKind>("decision");
   const [nodeId, setNodeId] = useState(suggestedId);
+  // The id the failed submit used. A rejection ("that id is taken") stops
+  // describing the field the moment the author edits it, so the stale
+  // message is hidden rather than left sitting under a changed value.
+  const [erroredId, setErroredId] = useState<string | null>(null);
+  useEffect(() => {
+    if (error) setErroredId(nodeId.trim());
+    // Only re-latch when a new error arrives, not as the author types.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
+  const showError = error != null && erroredId === nodeId.trim();
 
   // Rebase the suggested id when the kind changes so the prefix
   // matches — but only if the user hasn't typed their own override.
@@ -161,7 +171,11 @@ export function AddChildDialog({
           </span>
         </label>
 
-        {error ? <p className="text-xs text-ap-crit">{error}</p> : null}
+        {showError ? (
+          <p role="alert" className="text-xs text-ap-crit">
+            {error}
+          </p>
+        ) : null}
 
         <div className="mt-2 flex justify-end gap-2">
           <button

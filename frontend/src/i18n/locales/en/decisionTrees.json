@@ -86,6 +86,7 @@
       "code": "Code (stable identifier)",
       "codeHint": "Used in URLs and stored on every recommendation. Cannot change later.",
       "codePlaceholder": "scout_for_stress_v1",
+      "codeInvalid": "Use lowercase letters, numbers, underscores or hyphens, starting with a letter or number.",
       "cropCode": "Crop code (optional)",
       "cropCodeHint": "From the crop catalog. Leave blank for crop-agnostic.",
       "yaml": "Tree YAML",
@@ -166,7 +167,9 @@
     "yaml": {
       "heading": "Tree YAML",
       "subtitle": "The structural source. Edits here update the canvas live; Save lands a new draft version.",
-      "ariaLabel": "Tree YAML source"
+      "ariaLabel": "Tree YAML source",
+      "pendingFieldEdits_one": "1 node has field edits that aren’t shown here yet — they are written into the YAML when you save.",
+      "pendingFieldEdits_other": "{{count}} nodes have field edits that aren’t shown here yet — they are written into the YAML when you save."
     },
     "metadata": {
       "heading": "Tree details",
@@ -310,7 +313,8 @@
       "nodeIdHint": "Stable identifier — letters, numbers, underscores. Used in YAML and audit logs.",
       "create": "Add node",
       "cancel": "Cancel",
-      "failed": "Couldn't add — try a different id."
+      "failed": "Couldn't add — try a different id.",
+      "idTaken": "That node id is already used in this tree. Pick another."
     },
     "condition": {
       "match": "Match",
@@ -335,6 +339,7 @@
       "operator": "Operator",
       "indexCode": "Index code",
       "outOfRange": "Outside the recorded range ({{min}}–{{max}}). This will still save.",
+      "unknownParamRef": "This tree doesn't declare a parameter with that name — saving will fail until you add it or pick a declared one.",
       "weatherField": "Weather field",
       "weatherIndexCode": "Weather index",
       "weatherRiskCode": "Pathogen / pest",

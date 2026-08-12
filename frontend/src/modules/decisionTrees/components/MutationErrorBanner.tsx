@@ -14,6 +14,8 @@
 
 import { type ReactNode } from "react";
 
+import { isApiError, problemFieldErrors } from "@/api/errors";
+
 interface MutationErrorBannerProps {
   /** The mutation's error, when it has one. */
   error: Error | null | undefined;
@@ -24,12 +26,25 @@ interface MutationErrorBannerProps {
 export function MutationErrorBanner({ error, fallback }: MutationErrorBannerProps): ReactNode {
   // An Error with an empty message would otherwise render an empty red bar.
   const text = error?.message?.trim() ? error.message : fallback;
+  // A 422's `detail` is a fixed sentence ("One or more request fields
+  // failed validation.") — the field and the reason live in `errors`.
+  // Without these the author is told something is wrong but not what.
+  const fieldErrors = isApiError(error) ? problemFieldErrors(error.problem) : [];
   return (
-    <p
+    <div
       role="alert"
       className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit"
     >
-      {text}
-    </p>
+      <p>{text}</p>
+      {fieldErrors.length > 0 ? (
+        <ul className="mt-1 list-disc space-y-0.5 ps-4">
+          {fieldErrors.map((line) => (
+            <li key={line} className="font-mono">
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
