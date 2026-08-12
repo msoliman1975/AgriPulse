@@ -35,6 +35,14 @@ interface Props {
   // Tenant-level create: a new farm, not a unit inside this one. Undefined
   // when the user lacks farm.create, which hides the menu entry entirely.
   onAddFarm?: () => void;
+  /**
+   * Optional slots either side of the page controls, so a caller can add
+   * chrome without forking this component. Farm Console v2 puts its farm
+   * identity strip in `leading`; the live console passes neither and renders
+   * exactly as before.
+   */
+  leading?: ReactNode;
+  trailing?: ReactNode;
 }
 
 function Chip({
@@ -88,6 +96,8 @@ export function ViewBar({
   onAutoBlock,
   onBulkUpload,
   onAddFarm,
+  leading,
+  trailing,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const indexRef = useRef<HTMLButtonElement>(null);
@@ -100,6 +110,7 @@ export function ViewBar({
 
   return (
     <header className="relative z-30 flex h-12 flex-none items-center gap-2.5 border-b border-ap-line bg-ap-panel px-3.5">
+      {leading}
       <Chip innerRef={indexRef} onClick={() => setOpen(open === "index" ? null : "index")}>
         🎨 {t("viewbar.index")}: <b>{INDEX_META[activeIndex].label}</b> ▾
       </Chip>
@@ -117,6 +128,8 @@ export function ViewBar({
       >
         📡 {activeSignalName ?? t("layers.signals")} ▾
       </Chip>
+
+      {trailing}
 
       <div className="flex-1" />
 
