@@ -111,6 +111,15 @@ export function SceneTimeline({
               const selected = s.scene_date === selectedDate;
               const cloudy = isCloudy(s);
               const pct = cloudPct(s);
+              // Ingested but never processed: the raw scene was fetched and
+              // the jobs read "succeeded", but no index raster was ever
+              // computed, so picking this pass draws nothing. Older api
+              // versions omit the field — treat unknown as processed rather
+              // than greying out a whole timeline on a stale deploy.
+              // Cloud is the more specific explanation and keeps its own
+              // treatment: a reader who sees "☁ 91%" knows both that there is
+              // nothing to draw and why, where a grey dash would lose the why.
+              const unprocessed = s.computed_count === 0 && !cloudy;
               return (
                 <button
                   key={s.scene_date}
@@ -119,22 +128,30 @@ export function SceneTimeline({
                   role="option"
                   aria-selected={selected}
                   onClick={() => onSelect(selected ? null : s.scene_date)}
+                  disabled={unprocessed}
                   title={
                     cloudy
                       ? t("timeline.cloudyOn", {
                           date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
                           pct: pct ?? "—",
                         })
-                      : t("timeline.passOn", {
-                          date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
-                          count: s.succeeded_count,
-                        })
+                      : unprocessed
+                        ? t("timeline.unprocessedOn", {
+                            date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
+                          })
+                        : t("timeline.passOn", {
+                            date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
+                            count: s.succeeded_count,
+                          })
                   }
+                  data-unprocessed={unprocessed || undefined}
                   className={
                     "flex-none rounded-md border px-1.5 py-1 text-center transition-colors " +
-                    (selected
-                      ? "border-ap-primary bg-ap-primary-soft"
-                      : "border-transparent hover:bg-ap-bg")
+                    (unprocessed
+                      ? "cursor-not-allowed border-transparent opacity-40"
+                      : selected
+                        ? "border-ap-primary bg-ap-primary-soft"
+                        : "border-transparent hover:bg-ap-bg")
                   }
                 >
                   <span
@@ -150,7 +167,7 @@ export function SceneTimeline({
                     {fmtDay.format(new Date(`${s.scene_date}T00:00:00Z`))}
                   </span>
                   <span className="mt-0.5 block text-[10px] leading-none text-ap-muted">
-                    {cloudy ? `☁ ${pct ?? "—"}%` : `${s.succeeded_count}`}
+                    {cloudy ? `☁ ${pct ?? "—"}%` : unprocessed ? "—" : `${s.succeeded_count}`}
                   </span>
                 </button>
               );

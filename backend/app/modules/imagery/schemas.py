@@ -148,6 +148,12 @@ class FarmSceneRead(BaseModel):
     block_count: int
     succeeded_count: int
     skipped_cloud_count: int
+    #: Blocks whose INDEX rasters exist for this pass — i.e. how much of the
+    #: day can actually be drawn. Ingestion and index computation are separate
+    #: tasks and a historical backfill runs only the first, so a day can be
+    #: fully "succeeded" and still render nothing. Zero means the pass was
+    #: ingested but never processed.
+    computed_count: int
     #: Mean across the jobs of the day that reported one; null if none did.
     cloud_cover_pct: Decimal | None
 

@@ -127,6 +127,8 @@ export interface PixelLayer {
   id: string;
   /** XYZ template with `{z}/{x}/{y}` intact. */
   tileUrl: string;
+  /** Tile edge in pixels; must match what the URL requests. */
+  tileSize?: number;
   /**
    * The block's extent as `[west, south, east, north]`.
    *
@@ -1142,7 +1144,9 @@ export function MapCanvas({
           map.addSource(id, {
             type: "raster",
             tiles: [layer.tileUrl],
-            tileSize: 256,
+            // Must match the `tilesize` the URL asks the server for, or
+            // MapLibre scales every tile and the pixels blur.
+            tileSize: layer.tileSize ?? 256,
             // The COG covers one block; asking beyond its native resolution
             // buys blank tiles, so let MapLibre overzoom the last real level.
             maxzoom: 20,

@@ -21,6 +21,7 @@ import { classesFor } from "./indexClasses";
 import {
   blockStatsUrl,
   blockTileUrl,
+  TILE_SIZE,
   readBlockCounts,
   summariseClassAreas,
   type BandStatistics,
@@ -30,6 +31,12 @@ import {
 
 /** Fallback ground sample distance when the product row could not be read. */
 const FALLBACK_RESOLUTION_M = 10;
+
+interface PixelStats {
+  counts: BlockPixelCounts[];
+  /** Blocks whose raster could not be read — no object behind the asset row. */
+  failedBlockIds: string[];
+}
 
 export interface IndexPixels {
   /** Raster layers for MapCanvas; empty when there is nothing to draw. */
@@ -81,9 +88,9 @@ export function useIndexPixels(input: {
   // the grid route exists — a 36-block farm must not open 36 sockets at once.
   const statsQ = useQuery({
     queryKey: CONSOLE_QK.pixelStats(farmId, code, sceneAt, assets.length),
-    queryFn: async (): Promise<BlockPixelCounts[]> => {
-      if (!config) return [];
-      const results = await mapWithConcurrency(assets, 4, async (asset) => {
+    queryFn: async (): Promise<PixelStats> => {
+      if (!config) return { counts: [], failedBlockIds: [] };
+      const results = await mapWithConcurrency(assets, 8, async (asset) => {
         const url = blockStatsUrl({
           tileServerBaseUrl: config.tile_server_base_url,
           s3Bucket: config.s3_bucket,
@@ -107,27 +114,32 @@ export function useIndexPixels(input: {
           return null;
         }
       });
-      return results.filter((r): r is BlockPixelCounts => r !== null);
+      const counts = results.filter((r): r is BlockPixelCounts => r !== null);
+      const ok = new Set(counts.map((c) => c.blockId));
+      return { counts, failedBlockIds: assets.map((a) => a.block_id).filter((id) => !ok.has(id)) };
     },
     enabled: Boolean(config) && assets.length > 0 && input.enabled,
     staleTime: 5 * 60_000,
   });
 
-  // Blocks whose statistics came back — the only ones proven to HAVE a raster.
-  // A missing object makes the tile server answer 404 for every tile of that
-  // block, which MapLibre retries per tile per zoom: 244 console errors on one
-  // scene change, and a legend of zeros presented as if the land were empty.
-  // The statistics call is a probe we already pay for, so it decides what gets
-  // drawn rather than the api's claim that an asset exists.
-  const usableBlockIds = useMemo(
-    () => new Set((statsQ.data ?? []).map((c) => c.blockId)),
+  // Blocks whose raster could NOT be read. A missing object makes the tile
+  // server answer 404 for every tile of that block, which MapLibre retries per
+  // tile per zoom — so those layers have to go.
+  //
+  // But only once we KNOW they are bad. Waiting for the statistics before
+  // drawing anything cost about 1.8s on every index switch, for an answer the
+  // tiles do not need: they are drawn optimistically and the failures are
+  // pruned when the probe lands. The scene strip greys out passes that were
+  // never processed, so the optimistic path is nearly always right.
+  const failedBlockIds = useMemo(
+    () => new Set(statsQ.data?.failedBlockIds ?? []),
     [statsQ.data],
   );
 
   const layers = useMemo<PixelLayer[]>(() => {
     if (!config) return [];
     return assets
-      .filter((a) => usableBlockIds.has(a.block_id))
+      .filter((a) => !failedBlockIds.has(a.block_id))
       .map((asset) => ({
         id: asset.block_id,
         tileUrl: blockTileUrl({
@@ -137,15 +149,16 @@ export function useIndexPixels(input: {
           code,
         }),
         bounds: boundsByBlockId.get(asset.block_id),
+        tileSize: TILE_SIZE,
       }));
-  }, [assets, config, code, boundsByBlockId, usableBlockIds]);
+  }, [assets, config, code, boundsByBlockId, failedBlockIds]);
 
   // The block's own mean for this index and scene. Read off the same
   // statistics the tiles are drawn from rather than from the map summary,
   // which only carries three of the seven indices.
   const meanByBlockId = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of statsQ.data ?? []) {
+    for (const c of statsQ.data?.counts ?? []) {
       if (c.validPixels > 0 && Number.isFinite(c.meanValue)) m.set(c.blockId, c.meanValue);
     }
     return m;
@@ -154,13 +167,13 @@ export function useIndexPixels(input: {
   const classAreas = useMemo(() => {
     const classCount = classesFor(code).length;
     return (scopeBlockId: string | null): ClassAreaSummary =>
-      summariseClassAreas(statsQ.data ?? [], classCount, scopeBlockId);
+      summariseClassAreas(statsQ.data?.counts ?? [], classCount, scopeBlockId);
   }, [statsQ.data, code]);
 
   return {
     layers,
-    assetCount: usableBlockIds.size,
-    counts: statsQ.data,
+    assetCount: statsQ.data ? statsQ.data.counts.length : assets.length,
+    counts: statsQ.data?.counts,
     meanByBlockId,
     classAreas,
     assetsLoading: assetsQ.isLoading,

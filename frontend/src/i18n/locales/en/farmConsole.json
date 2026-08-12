@@ -606,7 +606,8 @@
     "passOn": "{{date}} — {{count}} block(s) imaged",
     "cloudyOn": "{{date}} — skipped, {{pct}}% cloud",
     "empty": "No satellite passes recorded for this farm yet.",
-    "unavailable": "Scene history is not available from this API version."
+    "unavailable": "Scene history is not available from this API version.",
+    "unprocessedOn": "{{date}} — ingested but never processed, so there is nothing to draw"
   },
   "railTools": {
     "filterPlaceholder": "Filter…",

@@ -104,6 +104,7 @@ vi.mock("@/api/imagery", () => ({
           block_count: 2,
           succeeded_count: 2,
           skipped_cloud_count: 0,
+          computed_count: 2,
           cloud_cover_pct: "4.00",
         },
         {
@@ -112,6 +113,7 @@ vi.mock("@/api/imagery", () => ({
           block_count: 2,
           succeeded_count: 0,
           skipped_cloud_count: 2,
+          computed_count: 0,
           cloud_cover_pct: "91.00",
         },
       ],
