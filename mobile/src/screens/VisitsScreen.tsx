@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { claimVisit, listMyWork, listVisits, type Visit, type WorkItem } from "@/api/client";
 import { signOut } from "@/auth/session";
 import { dueIn, t, type Lang } from "@/i18n";
+import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
 import { resetLangOnSignOut } from "@/i18n/preference";
 import { releaseDevice } from "@/push/register";
 
@@ -16,13 +17,45 @@ function ordered(visits: Visit[]): Visit[] {
   });
 }
 
+/** A visit rendered as a work item, so one detail screen serves both. */
+function asWorkItem(v: Visit, farmId: string): WorkItem {
+  return {
+    kind: "scouting_visit",
+    id: v.id,
+    farm_id: farmId,
+    block_id: null,
+    title: v.title,
+    detail: v.instruction,
+    status: v.status,
+    category: v.origin,
+    severity: v.severity,
+    priority: v.priority,
+    due_at: v.due_by,
+    // The visit list does not return a template; /me/work does.
+    template_id: null,
+  };
+}
+
 function isOverdue(v: Visit): boolean {
   return Boolean(v.due_by && new Date(v.due_by).getTime() < Date.now());
 }
 
-function VisitRow({ lang, visit, onClaim }: { lang: Lang; visit: Visit; onClaim?: () => void }) {
+function VisitRow({
+  lang,
+  visit,
+  onClaim,
+  onOpen,
+}: {
+  lang: Lang;
+  visit: Visit;
+  onClaim?: () => void;
+  onOpen?: () => void;
+}) {
   return (
-    <li className={`visit sev-${visit.severity}`}>
+    <li
+      className={`visit sev-${visit.severity}${onOpen ? " tappable" : ""}`}
+      onClick={onOpen}
+    >
       <span className="ring">{dueIn(lang, visit.due_by)}</span>
       <div className="body">
         <div className="title">{visit.title}</div>
@@ -34,7 +67,15 @@ function VisitRow({ lang, visit, onClaim }: { lang: Lang; visit: Visit; onClaim?
         </div>
       </div>
       {onClaim ? (
-        <button type="button" onClick={onClaim}>
+        <button
+          type="button"
+          onClick={(e) => {
+            // The row opens the detail; the button claims. Without this the
+            // tap would do both.
+            e.stopPropagation();
+            onClaim();
+          }}
+        >
           {t(lang, "visits.claim")}
         </button>
       ) : null}
@@ -78,9 +119,25 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
   }, [farmId]);
 
   const [signingOut, setSigningOut] = useState(false);
+  const [open, setOpen] = useState<WorkItem | null>(null);
 
   const overdue = mine.filter(isOverdue);
   const current = mine.filter((v) => !isOverdue(v));
+
+  if (open) {
+    return (
+      <WorkDetailScreen
+        lang={lang}
+        farmId={farmId}
+        item={open}
+        onClose={() => {
+          setOpen(null);
+          void load();
+        }}
+        onChanged={() => void load()}
+      />
+    );
+  }
 
   return (
     <div className="screen visits">
@@ -116,7 +173,7 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
           <h2 className="section overdue">{t(lang, "visits.overdue")}</h2>
           <ul>
             {overdue.map((v) => (
-              <VisitRow key={v.id} lang={lang} visit={v} />
+              <VisitRow key={v.id} lang={lang} visit={v} onOpen={() => setOpen(asWorkItem(v, farmId))} />
             ))}
           </ul>
         </>
@@ -125,7 +182,7 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
       <h2 className="section">{t(lang, "visits.assigned")}</h2>
       <ul>
         {current.map((v) => (
-          <VisitRow key={v.id} lang={lang} visit={v} />
+          <VisitRow key={v.id} lang={lang} visit={v} onOpen={() => setOpen(asWorkItem(v, farmId))} />
         ))}
       </ul>
 
@@ -134,7 +191,7 @@ export function VisitsScreen({ lang, farmId }: { lang: Lang; farmId: string }): 
           <h2 className="section">{t(lang, "work.board")}</h2>
           <ul>
             {board.map((w) => (
-              <li key={w.id} className="visit work">
+              <li key={w.id} className="visit work tappable" onClick={() => setOpen(w)}>
                 <span className="ring">{dueIn(lang, w.due_at)}</span>
                 <div className="body">
                   <div className="title">{w.title}</div>

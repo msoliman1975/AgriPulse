@@ -74,3 +74,47 @@ body { background: var(--field); color: var(--ink); }
 /* The current language reads as chosen, not merely highlighted: this control is
    used by people who may not read the label next to it. */
 .langpick .lang.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+
+/* --- Work detail -----------------------------------------------------------
+   A scout reads this standing in a block, in sun, often one-handed. Controls
+   are full-width and finger-sized rather than compact; nothing important is
+   behind a scroll. */
+.visit.tappable { cursor: pointer; }
+/* A row that opens something has to look like it does — without this the list
+   is indistinguishable from the read-only one it used to be. */
+.visit.tappable:active { background: var(--field2); }
+
+.detail { display: flex; flex-direction: column; gap: 14px; }
+.detail header { display: flex; align-items: center; justify-content: space-between; }
+.detail h1 { font-size: 20px; line-height: 1.3; margin: 0; }
+.detail .instruction { color: var(--ink); font-size: 15px; line-height: 1.5; }
+.detail .meta { display: flex; gap: 10px; align-items: center; margin: 0; }
+.detail .hint { color: var(--muted); font-size: 13px; }
+.status { font-size: 12px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .06em; }
+
+.actions { display: flex; flex-direction: column; gap: 12px; }
+/* Every action is a full-width target: a mis-tap in a field costs a walk back. */
+.actions > button { width: 100%; padding: 15px; font-size: 16px; border-radius: 10px;
+  border: 0; background: var(--sage); color: #fff; }
+.actions > button:disabled { opacity: .55; }
+
+.capture { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; background: var(--field2); }
+.capture h2 { font-size: 15px; margin: 0 0 4px; }
+.capture label { font-size: 13px; color: var(--muted); }
+.capture input, .capture select, .capture textarea { font-size: 16px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); }
+.capture .row { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.capture .row button:first-child { flex: 1; padding: 13px; border: 0; border-radius: 8px;
+  background: var(--sage); color: #fff; font-size: 15px; }
+
+.submitbar { display: flex; flex-direction: column; gap: 8px; }
+.submitbar label { font-size: 13px; color: var(--muted); }
+.submitbar textarea { font-size: 16px; padding: 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--field); color: var(--ink); }
+/* Three outcomes side by side, not a dropdown: "found nothing" and "could not
+   get to it" are different facts and both need to be one tap away. */
+.outcomes { display: flex; flex-direction: column; gap: 8px; }
+.outcomes button { padding: 14px; font-size: 15px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--field); color: var(--ink); }

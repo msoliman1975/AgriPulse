@@ -110,7 +110,7 @@ async def _scouting_visits(
                 text(
                     f"""
                     SELECT id, farm_id, block_id, title, instruction, status,
-                           origin, severity, priority, due_by
+                           origin, severity, priority, due_by, template_id
                       FROM scouting_visits
                      WHERE {where}
                     """
@@ -134,6 +134,9 @@ async def _scouting_visits(
             "severity": r["severity"],
             "priority": r["priority"],
             "due_at": r["due_by"].isoformat() if r["due_by"] else None,
+            # Which form to put in front of the scout. A visit dispatched
+            # against a pest signal should not open the general catalogue.
+            "template_id": r["template_id"],
         }
         for r in rows
     ]
@@ -203,6 +206,9 @@ async def _plan_activities(
             # the start of that day so it sorts against visit deadlines
             # without pretending to a precision it does not have.
             "due_at": r["scheduled_date"].isoformat() if r["scheduled_date"] else None,
+            # The board carries no signal template; board work opens the
+            # full catalogue.
+            "template_id": None,
         }
         for r in rows
     ]

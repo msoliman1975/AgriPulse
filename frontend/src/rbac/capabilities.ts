@@ -458,6 +458,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.read",
+    "plan_activity.complete",
     "plan_template.read",
     "recommendation.read",
     "resource.read",
