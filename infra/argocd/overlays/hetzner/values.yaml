@@ -1542,13 +1542,38 @@ global:
   #   205.0. AG-R02-C02 will show grid lines extending past its pixels —
   #   that is a genuine stale-grid data problem this makes visible, not a
   #   rendering bug.
+  # 44c73d1 = #425, both findings from smoke-testing the BETA console on a
+  #   36-block farm. FRONTEND ONLY — api stays 65cd0a8, no backend delta.
+  #
+  #   Older scenes were painted as empty land: those ingestion jobs claim
+  #   success and carry a stac_item_id, but the objects are gone from the
+  #   bucket, so the console drew nothing, said "Covered 0.0" as though the
+  #   land were bare, and threw 244 console errors retrying tiles. The
+  #   statistics call now decides what gets drawn — a job row is a claim, the
+  #   read is the proof — and a scene with nothing readable says "Nothing for
+  #   this date". Errors on such a scene: 244 -> 36.
+  #
+  #   Pixels are also smoothed now (tiles reproject bilinear), so a 10 m
+  #   raster stops reading as a mosaic of boxes. The interpolation happens in
+  #   VALUE space before classification, so the output still contains only
+  #   class colours — the legend guarantee is intact. Areas are NOT smoothed;
+  #   statistics still reads native pixels.
+  #
+  #   Merge run 31633726143; frontend manifest verified by PULLING it on the
+  #   node rather than from the run conclusion: frontend@sha256:e25ca7e6.
+  #
+  #   Watch after sync: /labs/map-v2 on B-Elkair-Suez. Class patches should
+  #   have soft, organic edges rather than square steps. Scrub the timeline to
+  #   a 2025 pass — it must read "Nothing for this date", NOT a list of 0.0
+  #   rows. Note the cell mesh reads fainter at farm zoom now: much of what
+  #   looked like mesh before was the pixel edges themselves.
   images:
     api:
       tag: "65cd0a8"
     workers:
       tag: "f2ed5f2"
     frontend:
-      tag: "65cd0a8"
+      tag: "44c73d1"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
