@@ -198,24 +198,44 @@ The single allowed exception is `app/shared/` â€” leaf utilities used every
 
 ## 7. RBAC â€” committed
 
-### 7.1 Eight roles
+### 7.1 Ten roles
 
 | Role | Scope | Description |
 |---|---|---|
-| `PlatformAdmin` | Platform | Anthropic-equivalent: our team |
+| `PlatformAdmin` | Platform | Anthropic-equivalent: our team. Holds the `*` wildcard |
+| `PlatformSupport` | Platform | Read-only cross-tenant support |
 | `TenantOwner` | Tenant | Customer super-admin, exactly one per tenant |
 | `TenantAdmin` | Tenant | Customer admin |
+| `BillingAdmin` | Tenant | Subscription and billing only |
 | `FarmManager` | Farm-scoped | Manages farm + blocks |
 | `Agronomist` | Farm-scoped | Agronomic actions, no geometry edit |
 | `FieldOperator` | Farm-scoped | Operational records (irrigation, fertilization) |
 | `Scout` | Farm-scoped | Observations + photos only |
 | `Viewer` | Farm-scoped | Read-only |
 
+The live matrix is browsable at **`/platform/roles`** (`GET /api/v1/admin/rbac/matrix`).
+
 ### 7.2 Capabilities, not role checks
 
 - Capabilities defined in `backend/app/shared/rbac/capabilities.yaml`.
-- Roles map to capabilities in `backend/app/shared/rbac/role_capabilities.yaml`.
+- Roles map to capabilities in `backend/app/shared/rbac/role_capabilities.yaml` (the reviewed baseline).
 - Code uses `@requires_capability("alert.acknowledge", farm_id=...)` decorators or `Depends()` patterns â€” never `if role == "..."`.
+
+### 7.2.1 Runtime overrides
+
+The YAML above is the reviewed **baseline**. A Platform Admin holding
+`platform.manage_rbac` can grant or revoke a capability on a role at runtime;
+those deltas live in `public.rbac_role_capability_overrides` and the effective
+answer is the baseline merged with them. "Reset to default" deletes the row, so
+`public.rbac_change_log` keeps the append-only trail.
+
+- `app/shared/rbac/overlay.py` caches the deltas per process with a 30s TTL,
+  refreshed from `AuthMiddleware`. **`role_grants` stays synchronous.**
+- `PlatformAdmin` is immutable: refused by the write API *and* dropped by the
+  overlay loader, so no row can remove the access needed to undo a mistake.
+- Staleness is bounded at 30s per pod; the writing pod is immediate.
+- The frontend resolves capabilities from the effective grants served on
+  `GET /v1/me`, **not** from its bundled mirror of the YAML.
 
 ### 7.3 JWT claim shape
 
