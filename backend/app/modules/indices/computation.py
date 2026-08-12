@@ -7,11 +7,19 @@ and S3 writes live in the Celery task that calls these functions
 pure means the unit tests can pass tiny hand-crafted fixtures and
 assert exact expected values.
 
-Seven standard indices per ARCHITECTURE.md § 9 (the original six plus
-``ndmi``, added for the KB water-stress catalog). Their canonical
-formulas are seeded in ``public.indices_catalog`` (migration 0008 for
-the first six, 0027 for ``ndmi``); we restate them here as actual numpy
-operations.
+Nine standard indices per ARCHITECTURE.md § 9 — the original six, plus
+``ndmi`` (added for the KB water-stress catalog), plus ``bsi`` and ``msi``
+(added from the indices-guide gap audit). Their canonical formulas are
+seeded in ``public.indices_catalog`` (migration 0008 for the first six,
+0027 for ``ndmi``, 0056 for ``bsi``/``msi``); we restate them here as
+actual numpy operations.
+
+Note that not every index is a normalized difference bounded to [-1, 1]:
+``msi`` is a plain band *ratio* in roughly [0, 3], and it runs the
+opposite way to the rest (higher = more stress). Anything downstream that
+assumes a [-1, 1] range or a "higher is healthier" polarity has to special
+-case it — see ``indices_catalog.value_min/value_max`` and the frontend's
+``INDEX_BANDS`` tone table.
 
 All inputs assumed to be FLOAT32 surface-reflectance values in 0..1
 (Sentinel-2 L2A's `evalscript` already normalises to that range — see
@@ -51,10 +59,6 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
     BAND_SWIR2,
 )
 
-# Indices supported in MVP. Order matches the catalog's seeded rows.
-# ``ndmi`` (KB P2 prerequisite) was added after the original six — it is
-# the leaf/canopy-moisture index the water-stress catalog needs, distinct
-# from McFeeters ``ndwi`` (surface water) above.
 # Identifies the code that produced a stored aggregate row, recorded on every
 # `indices_calc_runs` row (tenant migration 0060).
 #
@@ -67,12 +71,29 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
 # Without it, two methodologies can share a trend line indistinguishably. The
 # pre-#288 rows are the worked example: they were averaged without SCL
 # masking, so their means run high, and nothing in the database says so.
+#
+# NOT bumped when a *new* index code is added, only when an existing one's
+# numbers move. Adding `bsi`/`msi` left every prior series byte-identical, so
+# a bump would have announced a methodology break that did not happen and
+# split seven healthy trend lines in two. `ndmi` (0027) set this precedent.
 CALC_VERSION = "idx-2026.08"
 
 # Names the SCL class set below, so a stored row records *which* masking rules
 # ran rather than just that some did.
 MASK_RULESET = "s2_scl_v1"
 
+# Indices supported today. Order matches the catalog's seeded rows.
+#
+# ``ndmi`` (KB P2 prerequisite) was added after the original six — it is the
+# leaf/canopy-moisture index the water-stress catalog needs, distinct from
+# McFeeters ``ndwi`` (surface water). ``bsi`` and ``msi`` came from the
+# indices-guide gap audit: ``bsi`` measures exposed ground between trees,
+# which nothing else here measures; ``msi`` is a second view of the same
+# moisture signal as ``ndmi`` on an unbounded, inverted scale.
+#
+# This tuple is mirrored in the frontend (``api/indices.ts``, ``conditionEdit
+# .ts``, ``MAP_INDEX_ORDER``) and the pairing is enforced by
+# ``tests/unit/shared/test_index_codes_frontend_parity.py``.
 STANDARD_INDEX_CODES: tuple[str, ...] = (
     "ndvi",
     "ndwi",
@@ -81,6 +102,8 @@ STANDARD_INDEX_CODES: tuple[str, ...] = (
     "ndre",
     "gndvi",
     "ndmi",
+    "bsi",
+    "msi",
 )
 
 
@@ -194,13 +217,63 @@ def ndmi(nir: NDArray[Any], swir1: NDArray[Any]) -> NDArray[np.float32]:
     return _safe_divide(nir - swir1, nir + swir1)
 
 
+def bsi(
+    blue: NDArray[Any],
+    red: NDArray[Any],
+    nir: NDArray[Any],
+    swir1: NDArray[Any],
+) -> NDArray[np.float32]:
+    """Bare Soil Index:
+
+    ``((SWIR1 + RED) - (NIR + BLUE)) / ((SWIR1 + RED) + (NIR + BLUE))``
+
+    Weighs the two bands where soil reflects strongly (SWIR1, red) against
+    the two where vegetation does (NIR, blue), so the value rises as bare
+    ground takes over the pixel. This is the one index here that measures
+    the *ground* rather than the canopy: it reads planting gaps, plant loss
+    and poor establishment, which NDVI can only show as "less green".
+
+    Normalized-difference form, so it shares the [-1, 1] range of ``ndvi``
+    and friends. Positive = soil-dominated, negative = canopy-dominated.
+
+    Rikimaru, Roy & Miyatake (2002), Int. J. Geoinformatics.
+    """
+    soil = swir1 + red
+    veg = nir + blue
+    return _safe_divide(soil - veg, soil + veg)
+
+
+def msi(nir: NDArray[Any], swir1: NDArray[Any]) -> NDArray[np.float32]:
+    """Moisture Stress Index: ``SWIR1 / NIR``.
+
+    ⚠️ Two things about this one break the pattern every other function in
+    this module follows, and both matter downstream:
+
+    1. **It is a ratio, not a normalized difference.** The range is roughly
+       [0, 3] for real surface reflectance, not [-1, 1]. Anything that
+       clamps, rescales or colour-ramps on a [-1, 1] assumption will be
+       wrong for ``msi`` rather than merely ugly.
+    2. **It is inverted.** Higher means *more* water stress, where every
+       other index here reads higher-is-healthier. A falling ``msi`` trend
+       is good news; a falling ``ndmi`` trend is bad news.
+
+    Carries the same physical signal as ``ndmi`` — both contrast NIR against
+    the SWIR band that liquid water absorbs — so it adds a familiar name and
+    an unbounded scale rather than independent information. The two are a
+    monotone transform of each other: ``ndmi == (1 - msi) / (1 + msi)``.
+
+    Rock et al. (1986), ERIM 4th Thematic Conference.
+    """
+    return _safe_divide(swir1, nir)
+
+
 def compute_all_indices(
     bands: Mapping[str, NDArray[Any]],
 ) -> dict[str, NDArray[np.float32]]:
-    """Compute all six standard indices from a band → array mapping.
+    """Compute every standard index from a band → array mapping.
 
-    Missing bands raise KeyError — caller is responsible for handing in
-    the full S2 L2A bandset.
+    Keys are exactly ``STANDARD_INDEX_CODES``. Missing bands raise KeyError —
+    caller is responsible for handing in the full S2 L2A bandset.
     """
     return {
         "ndvi": ndvi(bands[BAND_RED], bands[BAND_NIR]),
@@ -210,6 +283,13 @@ def compute_all_indices(
         "ndre": ndre(bands[BAND_RED_EDGE_1], bands[BAND_NIR]),
         "gndvi": gndvi(bands[BAND_GREEN], bands[BAND_NIR]),
         "ndmi": ndmi(bands[BAND_NIR], bands[BAND_SWIR1]),
+        "bsi": bsi(
+            bands[BAND_BLUE],
+            bands[BAND_RED],
+            bands[BAND_NIR],
+            bands[BAND_SWIR1],
+        ),
+        "msi": msi(bands[BAND_NIR], bands[BAND_SWIR1]),
     }
 
 

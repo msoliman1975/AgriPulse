@@ -383,7 +383,9 @@
           "savi": "Greenness corrected for bright bare soil. For young or wide-spaced plantings.",
           "ndre": "Red-edge chlorophyll and nitrogen status. Still discriminates in dense canopy.",
           "gndvi": "Green-band greenness; more sensitive to chlorophyll than NDVI.",
-          "ndmi": "Leaf and canopy water content. Falls as the canopy dries — the water-stress index."
+          "ndmi": "Leaf and canopy water content. Falls as the canopy dries — the water-stress index.",
+          "bsi": "Bare ground between plants. Rises as canopy is lost — reads planting gaps and plant loss rather than greenness.",
+          "msi": "Canopy moisture stress, SWIR/NIR. Inverted: higher means drier. Same signal as NDMI on an unbounded scale."
         },
         "indicesKey": {
           "mean": "The block's average on the latest scene. Absolute, so thresholds are crop-specific.",

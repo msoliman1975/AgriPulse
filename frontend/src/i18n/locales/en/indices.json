@@ -27,6 +27,9 @@
     "evi": "EVI",
     "savi": "SAVI",
     "ndre": "NDRE",
-    "gndvi": "GNDVI"
+    "gndvi": "GNDVI",
+    "ndmi": "NDMI",
+    "bsi": "BSI",
+    "msi": "MSI"
   }
 }

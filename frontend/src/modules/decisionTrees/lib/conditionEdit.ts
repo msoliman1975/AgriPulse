@@ -31,7 +31,17 @@ export const INDICES_KEYS = [
 // aggregates). Closed list so the author picks from a dropdown rather than
 // guessing; mirrors STANDARD_INDEX_CODES in
 // backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
-export const INDEX_CODES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"] as const;
+export const INDEX_CODES = [
+  "ndvi",
+  "ndwi",
+  "evi",
+  "savi",
+  "ndre",
+  "gndvi",
+  "ndmi",
+  "bsi",
+  "msi",
+] as const;
 export const BLOCK_FIELDS = [
   // KB P3: the block's current phenological stage, resolved from the crop
   // taxonomy and auto-advanced daily.

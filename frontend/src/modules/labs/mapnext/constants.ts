@@ -19,7 +19,17 @@ export const HEALTH_DOT: Record<Health, string> = {
 // The full index set the sub-block grid pipeline supports (what the map can
 // colour by). The block-level time-series API only serves three of these —
 // see BLOCK_LEVEL_INDICES — so only those can be charted for a whole block.
-export const MAP_INDEX_ORDER: ApiIndexCode[] = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi", "ndmi"];
+export const MAP_INDEX_ORDER: ApiIndexCode[] = [
+  "ndvi",
+  "ndre",
+  "ndwi",
+  "evi",
+  "savi",
+  "gndvi",
+  "ndmi",
+  "bsi",
+  "msi",
+];
 export const BLOCK_LEVEL_INDICES: IndexCode[] = ["ndvi", "ndre", "ndwi"];
 
 export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
@@ -36,10 +46,17 @@ export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
 // a flat pill row. The dock restores it as one tab per family.
 export type IndexFamilyKey = "vigour" | "nutrition" | "moisture";
 
+// `bsi` files under vigour and `msi` under moisture rather than earning a
+// fourth "soil" tab. The family question vigour answers is "is the canopy
+// covering the ground", and bare soil is that question inverted — but the
+// deciding constraint is FAMILY_PRIMARY below: every family needs a
+// block-level index to chart, and block-level is only ndvi/ndre/ndwi. A soil
+// family would have had no series to plot until `blocks_summary_router`
+// grows a fourth fixed column.
 export const INDEX_FAMILIES: { key: IndexFamilyKey; indices: ApiIndexCode[] }[] = [
-  { key: "vigour", indices: ["ndvi", "evi", "savi"] },
+  { key: "vigour", indices: ["ndvi", "evi", "savi", "bsi"] },
   { key: "nutrition", indices: ["ndre", "gndvi"] },
-  { key: "moisture", indices: ["ndwi", "ndmi"] },
+  { key: "moisture", indices: ["ndwi", "ndmi", "msi"] },
 ];
 
 // The one block-level index in each family — what that family's tab charts,
@@ -63,6 +80,8 @@ export const INDEX_META: Record<ApiIndexCode, { label: string; family: IndexFami
   gndvi: { label: "GNDVI", family: "nutrition" },
   ndwi: { label: "NDWI", family: "moisture" },
   ndmi: { label: "NDMI", family: "moisture" },
+  bsi: { label: "BSI", family: "vigour" },
+  msi: { label: "MSI", family: "moisture" },
 };
 
 // ---- value bands ----------------------------------------------------------
@@ -149,5 +168,34 @@ export const INDEX_BANDS: Record<ApiIndexCode, IndexBand[]> = {
     { max: 0.4, key: "moderate", tone: "watch" },
     { max: 0.6, key: "wellWatered", tone: "healthy" },
     { max: Infinity, key: "veryWet", tone: "healthy" },
+  ],
+  // Bare soil. Reads the ground rather than the canopy, so the tones run the
+  // opposite way to the vigour indices it sits beside: negative is closed
+  // canopy (good), positive is exposed ground (bad). Mid-season that means
+  // plant loss or canopy gaps; right after planting the same reading is
+  // simply "not established yet", which is what `dock.readingCaveat` is for.
+  // Boundaries deliberately identical to `console/indexClasses.ts` INDEX_CLASSES
+  // for bsi, so the dock's reading and the map's legend never name the same
+  // value differently. (The older indices predate that discipline — ndmi's two
+  // tables disagree by design-drift, not intent.)
+  bsi: [
+    { max: -0.3, key: "closedCanopy", tone: "healthy" },
+    { max: -0.1, key: "mostlyCovered", tone: "healthy" },
+    { max: 0, key: "thinning", tone: "watch" },
+    { max: 0.15, key: "patchy", tone: "watch" },
+    { max: 0.3, key: "mostlyBare", tone: "critical" },
+    { max: Infinity, key: "bare", tone: "critical" },
+  ],
+  // ⚠️ MSI is a RATIO (~0.2–2.0+), not a normalized difference, and it is
+  // INVERTED: low = well watered, high = stressed. So unlike every other
+  // entry in this table the tones descend rather than ascend. Cut points are
+  // Rock et al. (1986): <0.4 low stress, 0.4–1.0 moderate, >1.0 high.
+  msi: [
+    { max: 0.4, key: "wellWatered", tone: "healthy" },
+    { max: 0.6, key: "adequate", tone: "healthy" },
+    { max: 0.8, key: "mildStress", tone: "watch" },
+    { max: 1.0, key: "moderateStress", tone: "watch" },
+    { max: 1.6, key: "highStress", tone: "critical" },
+    { max: Infinity, key: "severeStress", tone: "critical" },
   ],
 };

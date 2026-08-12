@@ -108,12 +108,17 @@ async def test_s2_l2a_product_seeded_with_correct_bands(
         "gndvi",
         # ndmi advertised on s2_l2a (0027 + 0029 correction).
         "ndmi",
+        # bsi + msi from the indices-guide gap audit (0056). Both land in
+        # `supported_indices` and NOT in `bands` above — the mistake 0027 made
+        # and 0029 had to undo.
+        "bsi",
+        "msi",
     }
     assert row.cost_tier == "medium"
 
 
 @pytest.mark.asyncio
-async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
+async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
     rows = (
         await admin_session.execute(
             text(
@@ -123,8 +128,19 @@ async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
         )
     ).all()
     codes = [r.code for r in rows]
-    # ndmi added by 0027 (KB P2 moisture index), sorted between gndvi and ndre.
-    assert codes == ["evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"]
+    # ndmi added by 0027 (KB P2 moisture index); bsi + msi by 0056 (gap audit).
+    # Sorted by code, so bsi leads and msi sits between gndvi and ndmi.
+    assert codes == [
+        "bsi",
+        "evi",
+        "gndvi",
+        "msi",
+        "ndmi",
+        "ndre",
+        "ndvi",
+        "ndwi",
+        "savi",
+    ]
     for r in rows:
         assert r.is_standard is True
         assert r.name_en  # non-empty English label

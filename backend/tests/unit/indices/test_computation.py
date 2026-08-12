@@ -16,10 +16,13 @@ from app.modules.indices.computation import (
     BAND_SWIR1,
     BAND_SWIR2,
     S2_SCL_MASKED_CLASSES,
+    STANDARD_INDEX_CODES,
+    bsi,
     compute_aggregates,
     compute_all_indices,
     evi,
     gndvi,
+    msi,
     ndmi,
     ndre,
     ndvi,
@@ -106,18 +109,86 @@ def test_ndmi_uses_nir_and_swir1() -> None:
     assert np.isnan(result[1, 1])  # NIR + SWIR1 == 0 → masked
 
 
-def test_compute_all_indices_returns_seven_keys() -> None:
+def test_bsi_weighs_soil_bands_against_vegetation_bands() -> None:
+    """BSI = ((SWIR1+RED) - (NIR+BLUE)) / ((SWIR1+RED) + (NIR+BLUE))."""
+    swir1 = np.array([[0.30, 0.25], [0.10, 0.0]], dtype=np.float32)
+    result = bsi(BLUE, RED, NIR, swir1)
+    # (0,0) healthy canopy: NIR+BLUE (0.58) dominates SWIR1+RED (0.40) → negative.
+    assert np.isclose(result[0, 0], (0.40 - 0.58) / (0.40 + 0.58), atol=1e-5)
+    assert result[0, 0] < 0
+    # (0,1) bare-soil pixel: SWIR1+RED (0.45) beats NIR+BLUE (0.42) → positive.
+    assert np.isclose(result[0, 1], (0.45 - 0.42) / (0.45 + 0.42), atol=1e-5)
+    assert result[0, 1] > 0
+    assert np.isclose(result[1, 0], (0.15 - 0.08) / (0.15 + 0.08), atol=1e-5)
+    # (1,1) is the fixture's red+NIR == 0 pixel, which masks NDVI to NaN. BSI
+    # survives it, because blue (0.07) keeps the denominator non-zero — so the
+    # four-band form degrades to a real -1.0 where the two-band indices give up.
+    assert np.isclose(result[1, 1], -1.0, atol=1e-5)
+
+
+def test_bsi_masks_only_when_all_four_bands_vanish() -> None:
+    """The NaN case for BSI needs every contributing band at zero."""
+    zeros = np.zeros((1, 1), dtype=np.float32)
+    assert np.isnan(bsi(zeros, zeros, zeros, zeros)[0, 0])
+
+
+def test_bsi_stays_within_normalized_difference_range() -> None:
+    """BSI is a normalized difference, so it cannot leave [-1, 1]."""
+    rng = np.random.default_rng(20260812)
+    shape = (32, 32)
+    values = [rng.random(shape, dtype=np.float32) for _ in range(4)]
+    result = bsi(*values)
+    finite = result[np.isfinite(result)]
+    assert finite.min() >= -1.0
+    assert finite.max() <= 1.0
+
+
+def test_msi_is_a_ratio_not_a_normalized_difference() -> None:
+    """MSI = SWIR1 / NIR — unbounded above, and inverted vs every other index."""
+    swir1 = np.array([[0.30, 0.25], [0.10, 0.0]], dtype=np.float32)
+    result = msi(NIR, swir1)
+    assert np.isclose(result[0, 0], 0.30 / 0.50, atol=1e-5)  # 0.60
+    assert np.isclose(result[0, 1], 0.25 / 0.30, atol=1e-5)  # 0.833…
+    # (1,0) is the water pixel: NIR collapses to 0.02, so the ratio blows past
+    # 1.0. This is the case that breaks any [-1, 1] clamp downstream.
+    assert np.isclose(result[1, 0], 0.10 / 0.02, atol=1e-5)  # 5.0
+    assert result[1, 0] > 1.0
+    assert np.isnan(result[1, 1])  # NIR == 0 → masked
+
+
+def test_msi_is_the_monotone_inverse_of_ndmi() -> None:
+    """ndmi == (1 - msi) / (1 + msi).
+
+    Pins the documented relationship between the two, so that if either
+    formula is ever edited the drift shows up here rather than as two trend
+    lines that quietly disagree.
+    """
+    rng = np.random.default_rng(20260812)
+    shape = (16, 16)
+    # Offset away from zero so neither denominator is masked.
+    nir = rng.random(shape, dtype=np.float32) * 0.8 + 0.1
+    swir1 = rng.random(shape, dtype=np.float32) * 0.8 + 0.1
+
+    m = msi(nir, swir1)
+    expected_ndmi = (1.0 - m) / (1.0 + m)
+    assert np.allclose(ndmi(nir, swir1), expected_ndmi, atol=1e-5)
+
+
+def test_compute_all_indices_returns_every_standard_code() -> None:
     bands = {
         BAND_BLUE: BLUE,
         BAND_GREEN: GREEN,
         BAND_RED: RED,
         BAND_RED_EDGE_1: RED_EDGE,
         BAND_NIR: NIR,
-        BAND_SWIR1: NIR,  # only ndmi uses SWIR1
+        BAND_SWIR1: NIR,  # ndmi / bsi / msi read SWIR1
         BAND_SWIR2: NIR,
     }
     result = compute_all_indices(bands)
-    assert set(result.keys()) == {"ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi"}
+    # Tied to the constant rather than a literal list, so adding an index in
+    # one place and forgetting the other fails here.
+    assert set(result.keys()) == set(STANDARD_INDEX_CODES)
+    assert {"ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi", "bsi", "msi"} == set(result)
     for arr in result.values():
         assert arr.shape == (2, 2)
         assert arr.dtype == np.float32
