@@ -6,7 +6,7 @@ JSON keys, RFC 3339 timestamps, m² for areas, cursor-based pagination.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -128,6 +128,39 @@ class ImageryConfigEntry(BaseModel):
     product_name: str
     bands: tuple[str, ...]
     supported_indices: tuple[str, ...]
+
+
+class FarmSceneRead(BaseModel):
+    """One acquisition day for a farm — a row of the console's scene strip.
+
+    Grouped by DAY rather than by exact ``scene_datetime``. Blocks that fall
+    in different Sentinel tiles get slightly different sensing times for what
+    a grower calls "the same pass", and a strip with two entries an hour
+    apart reads as a bug rather than as precision.
+
+    ``at`` is the instant to send back as the ``at`` bound on grid-cells:
+    the end of the day, so every block's observation for that pass is at or
+    before it.
+    """
+
+    scene_date: date
+    at: datetime
+    block_count: int
+    succeeded_count: int
+    skipped_cloud_count: int
+    #: Mean across the jobs of the day that reported one; null if none did.
+    cloud_cover_pct: Decimal | None
+
+
+class FarmScenesResponse(BaseModel):
+    """GET /api/v1/farms/{farm_id}/scenes response body."""
+
+    farm_id: UUID
+    items: tuple[FarmSceneRead, ...]
+    #: Median gap between the most recent acquisitions, in days. Null when
+    #: there are too few to infer one. The UI turns it into an EXPECTED next
+    #: pass — never a promise, since cloud decides whether a pass is usable.
+    median_gap_days: float | None
 
 
 class ConfigResponse(BaseModel):

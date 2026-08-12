@@ -33,6 +33,7 @@ from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
     CursorPage,
+    FarmScenesResponse,
     IngestionJobRead,
     RefreshResponse,
     SubscriptionCreate,
@@ -43,7 +44,7 @@ from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_db_session
 from app.shared.pagination import clamp_limit
-from app.shared.rbac.check import has_capability
+from app.shared.rbac.check import has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["imagery"])
 
@@ -251,6 +252,32 @@ async def list_scenes(
         limit=clamp_limit(limit),
     )
     return {"items": list(items), "next_cursor": next_cursor}
+
+
+@router.get(
+    "/farms/{farm_id}/scenes",
+    response_model=FarmScenesResponse,
+    summary="Acquisition days across a farm, for the console's scene timeline.",
+)
+async def list_farm_scenes(
+    farm_id: UUID,
+    limit: int = Query(default=120, ge=1, le=500),
+    context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
+    service: ImageryService = Depends(_service),
+) -> FarmScenesResponse:
+    """The whole farm's acquisition history in one request.
+
+    The alternative is one ``/blocks/{id}/scenes`` call per block, which on
+    the reference farm is 36 requests each paying JWT verification and a
+    connection out of a 15-slot pool — the fan-out shape that exhausted the
+    pool in #311 and that ``/farms/{id}/grid-cells`` was introduced to undo.
+    A timeline that renders on every farm load must not reintroduce it.
+
+    RBAC is farm-scoped ``imagery.read``, declared the way the sibling
+    farm-level routes declare it, rather than resolved block-by-block.
+    """
+    del context  # the capability check's side-effect is the only consumer
+    return await service.list_farm_scenes(farm_id=farm_id, limit=limit)
 
 
 # --- Tenant config --------------------------------------------------------

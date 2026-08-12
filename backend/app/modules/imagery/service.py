@@ -12,7 +12,8 @@ service for auditability.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from collections.abc import Sequence
+from datetime import UTC, date, datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -30,6 +31,8 @@ from app.modules.imagery.events import (
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
+    FarmSceneRead,
+    FarmScenesResponse,
     ImageryConfigEntry,
     IngestionJobRead,
     SubscriptionCreate,
@@ -88,6 +91,8 @@ class ImageryService(Protocol):
     ) -> tuple[tuple[IngestionJobRead, ...], str | None]: ...
 
     async def get_config(self) -> ConfigResponse: ...
+
+    async def list_farm_scenes(self, *, farm_id: UUID, limit: int = 120) -> FarmScenesResponse: ...
 
 
 class ImageryServiceImpl:
@@ -251,6 +256,15 @@ class ImageryServiceImpl:
         next_cursor = _encode_scene_cursor(next_cursor_dt) if next_cursor_dt else None
         return items, next_cursor
 
+    async def list_farm_scenes(self, *, farm_id: UUID, limit: int = 120) -> FarmScenesResponse:
+        rows = await self._repo.list_farm_scene_days(farm_id=farm_id, limit=limit)
+        items = tuple(FarmSceneRead.model_validate(r) for r in rows)
+        return FarmScenesResponse(
+            farm_id=farm_id,
+            items=items,
+            median_gap_days=_median_gap_days([i.scene_date for i in items]),
+        )
+
     async def get_config(self) -> ConfigResponse:
         """GET /api/v1/config payload — tile-server URL + product hints."""
         from app.core.settings import get_settings
@@ -275,6 +289,36 @@ class ImageryServiceImpl:
                 for p in products
             ),
         )
+
+
+def _median_gap_days(dates: Sequence[date]) -> float | None:
+    """Median gap between consecutive acquisition days, newest first.
+
+    Median rather than mean because the tail of any real farm's history has
+    long cloud-driven gaps, and one 40-day hole would drag a mean out to a
+    number that predicts nothing.
+
+    Deliberately derived from observed history rather than from
+    ``imagery_products.revisit_days_avg``: the nominal revisit is what the
+    constellation offers, while this is what this farm's subscriptions have
+    actually delivered — including a cadence set to poll less often than the
+    satellite flies.
+    """
+    if len(dates) < 3:
+        return None
+    # Only the recent stretch: cadence changes, and old history should not
+    # keep voting on what "next" means.
+    recent = list(dates[:10])
+    gaps = [
+        (recent[i] - recent[i + 1]).days
+        for i in range(len(recent) - 1)
+        if (recent[i] - recent[i + 1]).days > 0
+    ]
+    if not gaps:
+        return None
+    gaps.sort()
+    mid = len(gaps) // 2
+    return float(gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2)
 
 
 # --- Cursor helpers (datetime-based for scene listing) ---------------------

@@ -219,6 +219,60 @@ class ImageryRepository:
 
     # ---- Ingestion jobs -----------------------------------------------
 
+    async def list_farm_scene_days(
+        self,
+        *,
+        farm_id: UUID,
+        limit: int,
+    ) -> tuple[dict[str, Any], ...]:
+        """Acquisition days for a whole farm, newest first, in one statement.
+
+        The console's scene strip spans the farm, and the only route to that
+        today is one ``/blocks/{id}/scenes`` call per block — 36 requests on
+        the reference farm, which is the same fan-out that took the
+        connection pool down in #311 and that the farm-level grid route was
+        added to remove. One aggregate query instead.
+
+        Grouped by day: blocks in different tiles carry slightly different
+        sensing times for one pass, and the grower's unit is the day.
+
+        Note this reads ingestion JOBS, not observations — a pass that was
+        skipped for cloud still produced a job row, and the strip has to show
+        it. A gap the user can see and understand ("cloudy") is worth far
+        more than a silently shorter timeline.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                            (j.scene_datetime AT TIME ZONE 'UTC')::date AS scene_date,
+                            max(j.scene_datetime)                       AS at,
+                            count(DISTINCT j.block_id)                  AS block_count,
+                            count(*) FILTER (
+                                WHERE j.status = 'succeeded'
+                            )                                           AS succeeded_count,
+                            count(*) FILTER (
+                                WHERE j.status = 'skipped_cloud'
+                            )                                           AS skipped_cloud_count,
+                            avg(j.cloud_cover_pct)                      AS cloud_cover_pct
+                        FROM imagery_ingestion_jobs j
+                        JOIN blocks b ON b.id = j.block_id
+                        WHERE b.farm_id = :farm
+                        GROUP BY 1
+                        ORDER BY 1 DESC
+                        LIMIT :limit
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id, "limit": limit},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def list_ingestion_jobs_for_block(
         self,
         *,

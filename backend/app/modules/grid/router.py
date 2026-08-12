@@ -236,6 +236,10 @@ async def get_grid_cells(
 async def get_farm_grid_cells(
     farm_id: UUID,
     index_code: str = Query(..., alias="index"),
+    at: datetime | None = Query(
+        default=None,
+        description="Bound each block to its newest scene at or before this instant.",
+    ),
     context: RequestContext = Depends(requires_capability("index.read", farm_id_param="farm_id")),
     service: GridService = Depends(_service),
 ) -> FarmGridCellsResponse:
@@ -255,7 +259,7 @@ async def get_farm_grid_cells(
     declares it.
     """
     del context  # the capability check's side-effect is the only consumer
-    return await service.get_farm_cells_with_values(farm_id=farm_id, index_code=index_code)
+    return await service.get_farm_cells_with_values(farm_id=farm_id, index_code=index_code, at=at)
 
 
 @router.get(

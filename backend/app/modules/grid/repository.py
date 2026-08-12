@@ -945,9 +945,23 @@ class GridRepository:
         *,
         farm_id: UUID,
         index_code: str,
+        at: datetime | None = None,
     ) -> tuple[dict[str, Any], ...]:
-        """Every gridded block's cells + latest values, for one farm, in
-        one statement.
+        """Every gridded block's cells + values, for one farm, in one
+        statement.
+
+        ``at`` bounds the scene each block resolves to: the newest governed
+        observation at or before that instant, rather than the newest
+        overall. It is how the console's scene timeline moves the whole farm
+        through the season together. Omitted, the behaviour is unchanged —
+        latest per block.
+
+        Note the clause is built rather than bound as a nullable parameter.
+        ``:at IS NULL OR obs.time <= :at`` reads more naturally but gives
+        asyncpg no type context for the NULL branch, and postfix casts like
+        ``:at::timestamptz`` inside ``text()`` are the exact shape that has
+        produced repeat production incidents here. Binding only when there
+        is a value to bind avoids the whole family.
 
         The map overlay wants the whole farm, and it used to get there by
         asking :meth:`list_cells_with_values` once per gridded block — 36
@@ -976,8 +990,13 @@ class GridRepository:
 
         Blocks with no observation still return their cells with NULL
         values: the overlay draws them as "no data" tiles, and dropping
-        them would silently shrink the map.
+        them would silently shrink the map. That applies equally to a
+        block with no scene at or before ``at``.
         """
+        at_clause = "AND obs.time <= :at" if at is not None else ""
+        params: dict[str, Any] = {"farm": farm_id, "code": index_code}
+        if at is not None:
+            params["at"] = at
         rows = (
             (
                 await self._session.execute(
@@ -1002,6 +1021,7 @@ class GridRepository:
                               ON lv.block_id   = obs.block_id
                              AND lv.product_id = obs.product_id
                             WHERE obs.index_code = :code
+                              {at_clause}
                               AND EXISTS (
                                   SELECT 1
                                   FROM grid_cells gc
@@ -1049,9 +1069,9 @@ class GridRepository:
                          AND obs.index_code = :code
                          AND obs.time       = d.at
                         ORDER BY d.block_id, gc.row_idx, gc.col_idx
-                        """  # noqa: S608 - only _GOVERNS_AT interpolates
+                        """  # noqa: S608 - _GOVERNS_AT + a fixed at_clause literal
                     ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
-                    {"farm": farm_id, "code": index_code},
+                    params,
                 )
             )
             .mappings()

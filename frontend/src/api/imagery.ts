@@ -94,6 +94,51 @@ export async function triggerRefresh(blockId: string): Promise<RefreshResponse> 
   return data;
 }
 
+/** One acquisition DAY across a farm — a column of the console's scene strip. */
+export interface FarmScene {
+  scene_date: string;
+  /** Instant to send as `at` on grid-cells: the last sensing time of the day. */
+  at: string;
+  block_count: number;
+  succeeded_count: number;
+  skipped_cloud_count: number;
+  /** Mean across jobs that reported one; null when none did. */
+  cloud_cover_pct: string | null;
+}
+
+export interface FarmScenesResponse {
+  farm_id: string;
+  items: FarmScene[];
+  /** Median gap between recent acquisitions, in days; null if unknowable. */
+  median_gap_days: number | null;
+}
+
+/**
+ * A farm's acquisition history in one request.
+ *
+ * Returns `null` on 404 so the console can degrade to "no timeline" while an
+ * older API is still serving — charts deploy independently, so a new frontend
+ * can meet an api that predates this route. Same contract as
+ * `getFarmGridCells`, and for the same reason.
+ */
+export async function listFarmScenes(
+  farmId: string,
+  limit = 120,
+): Promise<FarmScenesResponse | null> {
+  try {
+    const { data } = await apiClient.get<FarmScenesResponse>(`/v1/farms/${farmId}/scenes`, {
+      params: { limit },
+    });
+    return data;
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && "response" in err) {
+      const resp = (err as { response?: { status?: number } }).response;
+      if (resp?.status === 404) return null;
+    }
+    throw err;
+  }
+}
+
 export async function listScenes(
   blockId: string,
   params: ListScenesParams = {},
