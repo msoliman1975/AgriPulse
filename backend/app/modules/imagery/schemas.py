@@ -163,6 +163,34 @@ class FarmScenesResponse(BaseModel):
     median_gap_days: float | None
 
 
+class FarmSceneAssetRead(BaseModel):
+    """The index raster to render for one block at one pass.
+
+    ``stac_item_id`` is ``provider/product/scene/aoi`` — every part of the
+    asset key except the index code, which the caller appends per the index
+    it is drawing. The frontend builds ``{stac_item_id}/{index}.tif`` and
+    hands it to the tile server; nothing here needs to know about COGs.
+    """
+
+    block_id: UUID
+    product_id: UUID
+    stac_item_id: str
+    scene_datetime: datetime
+    #: Ground sample distance in metres — the legend squares it to turn a
+    #: pixel count into an area. Null when the product row is unreadable.
+    resolution_m: Decimal | None
+
+
+class FarmSceneAssetsResponse(BaseModel):
+    """GET /api/v1/farms/{farm_id}/scene-assets response body."""
+
+    farm_id: UUID
+    #: The bound that was applied, echoed back so a client can tell "latest"
+    #: apart from a specific pass it asked for.
+    at: datetime | None
+    items: tuple[FarmSceneAssetRead, ...]
+
+
 class ConfigResponse(BaseModel):
     """GET /api/v1/config response body.
 

@@ -160,7 +160,7 @@ describe("FarmConsoleV2Page", () => {
     // This fixture has no imagery subscriptions, so no block can be gridded.
     // The legend must name that upstream cause rather than "no grid" — the
     // Bashayer case, and the reason the empty state is diagnosed at all.
-    expect(screen.getByText("No imagery subscription")).toBeInTheDocument();
+    expect(screen.getByText("No imagery yet")).toBeInTheDocument();
   });
 
   it("filters the rail", async () => {
@@ -210,6 +210,6 @@ describe("FarmConsoleV2Page", () => {
     await setupTestI18n("ar");
     renderConsole();
     expect(await screen.findByText("Bashayer El Kheir")).toBeInTheDocument();
-    expect(screen.getByText("لا يوجد اشتراك تصوير")).toBeInTheDocument();
+    expect(screen.getByText("لا توجد صور بعد")).toBeInTheDocument();
   });
 });

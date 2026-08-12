@@ -273,6 +273,73 @@ class ImageryRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def list_farm_scene_assets(
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime | None,
+    ) -> tuple[dict[str, Any], ...]:
+        """One row per block: the index asset to render for a given pass.
+
+        The console paints index PIXELS, and a pixel layer needs the COG's
+        object key — which is derivable from ``stac_item_id``
+        (``provider/product/scene/aoi``) and nothing else. Without this route
+        the frontend would have to ask ``/blocks/{id}/scenes`` per block to
+        find it: the same 36-request fan-out that ``/farms/{id}/scenes`` and
+        ``/farms/{id}/grid-cells`` both exist to avoid.
+
+        ``at`` is the timeline's scene bound (end of the acquisition day), so
+        each block resolves to ITS OWN latest pass at or before that instant.
+        Blocks in different tiles are sensed minutes apart for what a grower
+        calls one pass, and pinning every block to a single timestamp would
+        drop whichever block was sensed a minute later.
+
+        Only ``succeeded`` jobs are eligible, and that is the whole guard:
+        ``mark_succeeded`` is what sets ``stac_item_id`` in the first place,
+        so a job in any other state either has no key or has one pointing at
+        assets that were never written. A cloud-skipped pass in particular
+        still leaves a job row — it belongs on the timeline, but pointing the
+        tile server at it would 404 every tile and paint an empty block.
+
+        ``resolution_m`` rides along because the legend turns a pixel COUNT
+        into an AREA, and fetching the product's resolution separately would
+        be one more request for a number this row already knows.
+        """
+        clauses = ["b.farm_id = :farm", "j.stac_item_id IS NOT NULL", "j.status = 'succeeded'"]
+        params: dict[str, Any] = {"farm": farm_id}
+        if at is not None:
+            clauses.append("j.scene_datetime <= :at")
+            params["at"] = at
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT DISTINCT ON (j.block_id)
+                            j.block_id,
+                            j.product_id,
+                            j.stac_item_id,
+                            j.scene_datetime,
+                            p.resolution_m
+                        FROM imagery_ingestion_jobs j
+                        JOIN blocks b ON b.id = j.block_id
+                        -- public, and LEFT: products are cross-schema (the
+                        -- tenant carries only a logical id), and a product row
+                        -- we cannot read must cost the caller a resolution,
+                        -- not the whole block's imagery.
+                        LEFT JOIN public.imagery_products p ON p.id = j.product_id
+                        WHERE {" AND ".join(clauses)}
+                        ORDER BY j.block_id, j.scene_datetime DESC
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def list_ingestion_jobs_for_block(
         self,
         *,

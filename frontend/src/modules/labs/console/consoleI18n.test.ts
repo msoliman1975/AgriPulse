@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
 
 import ar from "@/i18n/locales/ar/farmConsole.json";
 import en from "@/i18n/locales/en/farmConsole.json";
-import { INDEX_BANDS, MAP_INDEX_ORDER } from "../mapnext/constants";
-import { BAND_VOCAB, LEGEND_HINT } from "./legendBins";
+import { MAP_INDEX_ORDER } from "../mapnext/constants";
+import { CLASS_HINT, CLASS_VOCAB, classesFor, INDEX_CLASSES } from "./indexClasses";
 import { RAIL_SORTS } from "./railSort";
 
 const LOCALES: [string, Record<string, unknown>][] = [
@@ -30,30 +30,30 @@ function lookup(bundle: Record<string, unknown>, path: string): unknown {
 }
 
 describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
-  it("has a label for every band of every index", () => {
+  it("has a label for every class of every index", () => {
     const missing: string[] = [];
     for (const code of MAP_INDEX_ORDER) {
-      const vocab = BAND_VOCAB[code];
-      expect(vocab, `no BAND_VOCAB entry for ${code}`).toBeTruthy();
-      for (const band of INDEX_BANDS[code]) {
-        const path = `legend.band.${vocab}.${band.key}`;
+      const vocab = CLASS_VOCAB[code];
+      expect(vocab, `no CLASS_VOCAB entry for ${code}`).toBeTruthy();
+      for (const cls of classesFor(code)) {
+        const path = `legend.class.${vocab}.${cls.key}`;
         if (typeof lookup(bundle, path) !== "string") missing.push(`${code} -> ${path}`);
       }
     }
     expect(missing).toEqual([]);
   });
 
-  it("has no orphaned band labels", () => {
-    // Every key that exists must be reachable from some index's bands.
+  it("has no orphaned class labels", () => {
+    // Every key that exists must be reachable from some index's classes.
     const used = new Set<string>();
     for (const code of MAP_INDEX_ORDER) {
-      for (const band of INDEX_BANDS[code]) used.add(`${BAND_VOCAB[code]}.${band.key}`);
+      for (const cls of classesFor(code)) used.add(`${CLASS_VOCAB[code]}.${cls.key}`);
     }
-    const bands = lookup(bundle, "legend.band") as Record<string, Record<string, string>>;
+    const classes = lookup(bundle, "legend.class") as Record<string, Record<string, string>>;
     const orphans: string[] = [];
-    for (const [vocab, entries] of Object.entries(bands ?? {})) {
+    for (const [vocab, entries] of Object.entries(classes ?? {})) {
       for (const key of Object.keys(entries)) {
-        if (!used.has(`${vocab}.${key}`)) orphans.push(`legend.band.${vocab}.${key}`);
+        if (!used.has(`${vocab}.${key}`)) orphans.push(`legend.class.${vocab}.${key}`);
       }
     }
     expect(orphans).toEqual([]);
@@ -71,14 +71,13 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
       "legend.hint",
       "legend.collapse",
       "legend.expand",
-      "legend.emptyNoGridTitle",
-      "legend.emptyNoGridBody",
-      "legend.emptyNoGridCta",
       "legend.emptyNoSubsTitle",
       "legend.emptyNoSubsBody",
       "legend.emptyNoSubsCta",
-      "legend.emptyOffTitle",
-      "legend.emptyOffBody",
+      "legend.emptyNoSceneTitle",
+      "legend.emptyNoSceneBody",
+      "legend.pixelsOffNote",
+      "legend.relativeCaveat",
     ];
     const missing = required.filter((p) => typeof lookup(bundle, p) !== "string");
     expect(missing).toEqual([]);
@@ -93,6 +92,8 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
 
   it("has the map dock strings", () => {
     const required = [
+      "mapDock.pixels",
+      "mapDock.pixelsUnavailable",
       "mapDock.grid",
       "mapDock.gridUnavailable",
       "mapDock.anomaly",
@@ -108,13 +109,13 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
 });
 
 describe("legend hints", () => {
-  it("only points at a band that actually exists on that index", () => {
-    for (const [code, hint] of Object.entries(LEGEND_HINT)) {
+  it("only points at a class that actually exists on that index", () => {
+    for (const [code, hint] of Object.entries(CLASS_HINT)) {
       if (!hint) continue;
-      const bands = INDEX_BANDS[code as keyof typeof INDEX_BANDS];
+      const classes = INDEX_CLASSES[code as keyof typeof INDEX_CLASSES];
       expect(
-        bands.some((b) => b.key === hint.bandKey),
-        `LEGEND_HINT.${code} points at band "${hint.bandKey}", which ${code} does not have`,
+        classes.some((c) => c.key === hint.classKey),
+        `CLASS_HINT.${code} points at class "${hint.classKey}", which ${code} does not have`,
       ).toBe(true);
     }
   });
