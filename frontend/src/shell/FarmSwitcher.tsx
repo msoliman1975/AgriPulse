@@ -23,6 +23,7 @@ const PINNED_PREFIXES = [
   "/labs/map/",
   "/labs/map-next/",
   "/labs/map-legacy/",
+  "/labs/map-v2/",
 ];
 
 /**

@@ -132,6 +132,7 @@ class GridService(Protocol):
         *,
         farm_id: UUID,
         index_code: str,
+        at: datetime | None = None,
     ) -> FarmGridCellsResponse: ...
 
     async def get_worst_cells(
@@ -491,17 +492,22 @@ class GridServiceImpl:
         *,
         farm_id: UUID,
         index_code: str,
+        at: datetime | None = None,
     ) -> FarmGridCellsResponse:
         """Every gridded block in the farm, in one round trip.
 
-        No ``at`` parameter: the farm overlay only ever wants "latest per
-        block", and each block resolves its own scene time inside the
-        query. A caller that wants a specific scene is asking about one
-        block and should use :meth:`get_cells_with_values`.
+        ``at`` bounds each block's scene to the newest governed observation
+        at or before that instant; omitted, every block resolves its own
+        latest, which is what the overlay wanted before the console grew a
+        scene timeline. Each block still resolves independently — passes are
+        not farm-synchronous, so pinning every block to one exact timestamp
+        would blank most of them.
         """
         import json
 
-        rows = await self._repo.list_farm_cells_with_values(farm_id=farm_id, index_code=index_code)
+        rows = await self._repo.list_farm_cells_with_values(
+            farm_id=farm_id, index_code=index_code, at=at
+        )
 
         # Rows arrive ordered by (block_id, row_idx, col_idx), so grouping
         # is a single pass — no dict-of-lists shuffle for what may be

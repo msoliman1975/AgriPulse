@@ -70,7 +70,11 @@ function SideNavItem({
   // Collapsed rows carry the label in the native tooltip and keep it in the
   // accessibility tree via .sr-only, so screen readers read the same nav.
   const layout = collapsed ? "justify-center px-0" : "gap-2 px-3";
-  const text = collapsed ? <span className="sr-only">{label}</span> : <span>{label}</span>;
+  // Collapsed hides the badge, so a badged row would otherwise be
+  // indistinguishable from its unbadged twin — two links both named
+  // "Farm Management". Fold the badge into the accessible name instead.
+  const srLabel = badge ? `${label} (${badge})` : label;
+  const text = collapsed ? <span className="sr-only">{srLabel}</span> : <span>{label}</span>;
   if (disabled) {
     const hint = t("workspaceNav.pickFarm");
     return (
@@ -284,7 +288,21 @@ export function SideNav(): ReactNode {
         to={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
         label={t("common:workspaceNav.farmManagement")}
         icon={<LandUnitsIcon className="h-4 w-4" />}
-        activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
+        // No-farm case deliberately has NO prefix: a bare "/labs/map" prefix
+        // also matches "/labs/map-v2", which lit both rows at once. Falling
+        // through to the exact-match branch keeps them mutually exclusive.
+        activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : undefined}
+        collapsed={collapsed}
+      />
+      {/* Farm Console v2, running beside the default until it clears the
+          cutover bar. Delete this row (and promote the one above) at
+          cutover — see docs/proposals/farm-console-unified.html. */}
+      <SideNavItem
+        to={hasFarm ? `/labs/map-v2/${farmSegment}` : "/labs/map-v2"}
+        label={t("common:workspaceNav.farmManagement")}
+        icon={<LandUnitsIcon className="h-4 w-4" />}
+        activePathPrefix={hasFarm ? `/labs/map-v2/${farmSegment}` : undefined}
+        badge={t("common:workspaceNav.beta")}
         collapsed={collapsed}
       />
       {/* /labs/map is the single Farm-management surface in nav. The

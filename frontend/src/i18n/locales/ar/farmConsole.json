@@ -592,5 +592,96 @@
     "historyEmpty": "لا توجد تغييرات مسجّلة بعد.",
     "entryFirst": "أُسند إلى {{to}}",
     "entryHandover": "{{from}} ← {{to}}"
+  },
+  "identity": {
+    "blocks_one": "قطعة واحدة",
+    "blocks_other": "{{count}} قطعة",
+    "pivots_one": "محور واحد",
+    "pivots_other": "{{count}} محور"
+  },
+  "timeline": {
+    "label": "تواريخ الالتقاط",
+    "nextPass": "المرور القادم",
+    "nextPassHint": "متوقَّع من وتيرة هذه المزرعة الأخيرة. السحب هو ما يحدّد صلاحية المرور، فاعتبره دليلًا لا وعدًا.",
+    "passOn": "{{date}} — تم تصوير {{count}} قطعة",
+    "cloudyOn": "{{date}} — متجاوَز، سحب {{pct}}٪",
+    "empty": "لا توجد مرورات أقمار صناعية مسجّلة لهذه المزرعة بعد.",
+    "unavailable": "سجل المشاهد غير متاح في هذه النسخة من الواجهة."
+  },
+  "railTools": {
+    "filterPlaceholder": "تصفية…",
+    "filterLabel": "تصفية الوحدات بالاسم أو الرمز",
+    "sortLabel": "ترتيب الوحدات",
+    "noMatch": "لا يوجد ما يطابق «{{query}}».",
+    "hidden_one": "مخفية بالتصفية: {{count}}",
+    "hidden_other": "مخفية بالتصفية: {{count}}",
+    "sort": {
+      "name": "الاسم",
+      "health": "الحالة",
+      "alerts": "التنبيهات",
+      "value": "القيمة"
+    }
+  },
+  "mapDock": {
+    "grid": "شبكة داخل القطعة",
+    "gridUnavailable": "لا توجد قطعة في هذه المزرعة مهيّأة بشبكة",
+    "anomaly": "الشذوذ مقابل خط الأساس",
+    "contrast": "عرض التباين",
+    "compare": "مقارنة تاريخين",
+    "comingSoon": "لم يُبنَ بعد",
+    "fullscreen": "ملء الشاشة",
+    "exitFullscreen": "إنهاء ملء الشاشة"
+  },
+  "legend": {
+    "title": "مفتاح المؤشر",
+    "scopeFarm": "المزرعة كاملة",
+    "scopeBlock": "{{name}} فقط",
+    "areaHeader": "المساحة",
+    "covered": "المقيسة",
+    "noData": "بدون قراءة",
+    "noDataHint": "خلايا بلا قيمة لهذا المشهد — سحب أو ظل سحب أو حافة مشهد أو عملية استيراد لم تُنفَّذ. ليست بالضرورة سحبًا.",
+    "hint": "تُقرأ بشكل أفضل باستخدام {{index}}",
+    "collapse": "طيّ المفتاح",
+    "expand": "توسيع المفتاح",
+    "emptyNoGridTitle": "لا توجد قطع مقسّمة في هذه المزرعة",
+    "emptyNoGridBody": "يقيس المفتاح الشبكة داخل القطع. لا توجد قطعة هنا مهيّأة بشبكة بعد، فلا شيء لقياسه.",
+    "emptyNoGridCta": "تهيئة شبكة القطعة",
+    "emptyNoSubsTitle": "لا يوجد اشتراك تصوير",
+    "emptyNoSubsBody": "تحتاج القطع إلى اشتراك تصوير فعّال قبل حساب الشبكة وتلوينها.",
+    "emptyNoSubsCta": "فتح إعدادات التصوير",
+    "emptyOffTitle": "طبقة الشبكة مُطفأة",
+    "emptyOffBody": "شغّل شبكة القطع لمعرفة المساحة الواقعة في كل فئة.",
+    "band": {
+      "canopy": {
+        "bare": "تربة جرداء",
+        "verySparse": "متناثر جدًا",
+        "sparse": "غطاء متناثر",
+        "developing": "في طور النمو",
+        "dense": "غطاء كثيف",
+        "veryDense": "كثيف جدًا"
+      },
+      "chlorophyll": {
+        "bare": "تربة جرداء",
+        "low": "منخفض",
+        "moderate": "متوسط",
+        "good": "جيد",
+        "high": "مرتفع"
+      },
+      "surfaceWater": {
+        "denseCanopy": "غطاء كثيف",
+        "vegetated": "مغطى بالنبات",
+        "bareOrDamp": "جرداء أو رطبة",
+        "standingWater": "مياه راكدة",
+        "openWater": "مياه مكشوفة"
+      },
+      "leafMoisture": {
+        "bare": "تربة جرداء",
+        "severeStress": "إجهاد شديد",
+        "stress": "إجهاد مائي",
+        "moderate": "متوسط",
+        "wellWatered": "ري جيد",
+        "veryWet": "رطب جدًا"
+      }
+    }
   }
 }

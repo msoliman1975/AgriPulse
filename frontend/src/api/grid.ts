@@ -155,16 +155,13 @@ export async function getGridCells(
   indexCode: IndexCode,
   at?: string,
 ): Promise<GridCellsResponse> {
-  const { data } = await apiClient.get<GridCellsResponse>(
-    `/v1/blocks/${blockId}/grid-cells`,
-    {
-      params: {
-        product_id: productId,
-        index: indexCode,
-        at: at ?? undefined,
-      },
+  const { data } = await apiClient.get<GridCellsResponse>(`/v1/blocks/${blockId}/grid-cells`, {
+    params: {
+      product_id: productId,
+      index: indexCode,
+      at: at ?? undefined,
     },
-  );
+  });
   return data;
 }
 
@@ -196,12 +193,12 @@ export interface FarmGridCellsResponse {
 export async function getFarmGridCells(
   farmId: string,
   indexCode: IndexCode,
+  at?: string,
 ): Promise<FarmGridCellsResponse | null> {
   try {
-    const { data } = await apiClient.get<FarmGridCellsResponse>(
-      `/v1/farms/${farmId}/grid-cells`,
-      { params: { index: indexCode } },
-    );
+    const { data } = await apiClient.get<FarmGridCellsResponse>(`/v1/farms/${farmId}/grid-cells`, {
+      params: { index: indexCode, at: at ?? undefined },
+    });
     return data;
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "response" in err) {

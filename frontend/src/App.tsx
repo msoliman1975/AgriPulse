@@ -37,6 +37,7 @@ import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTr
 import { DecisionTreeTracesPage } from "@/modules/decisionTrees/pages/DecisionTreeTracesPage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
+import { FarmConsoleV2Page } from "@/modules/labs/console/FarmConsoleV2Page";
 import { PatternsPage } from "@/modules/labs/patterns/PatternsPage";
 import { BulkUpdatesPage } from "@/modules/settings/pages/BulkUpdatesPage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
@@ -168,6 +169,14 @@ export function App(): ReactNode {
                 <Route path="/labs/map-next/:farmId" element={<FarmConsolePage />} />
                 <Route path="/labs/map-legacy" element={<MapExperiencePage />} />
                 <Route path="/labs/map-legacy/:farmId" element={<MapExperiencePage />} />
+                {/* Farm Console v2 — the unified console (time spine, index
+                  legend, guided diagnosis). Runs BESIDE /labs/map, which
+                  stays the default, until it clears the cutover bar in
+                  docs/proposals/farm-console-unified.html. Named `map-v2`
+                  deliberately: AppShell pins the viewport off a
+                  `/labs/map` prefix, so this inherits it. */}
+                <Route path="/labs/map-v2" element={<FarmConsoleV2Page />} />
+                <Route path="/labs/map-v2/:farmId" element={<FarmConsoleV2Page />} />
                 {/* Page-template gallery. Every standard template in every
                   state — the reference for "what does an index page look
                   like" in code review. See

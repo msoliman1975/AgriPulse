@@ -25,7 +25,8 @@
     "settings": "Settings",
     "pickFarm": "Pick a farm to continue",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "beta": "Beta"
   },
   "shell": {
     "languageToggle": "Language",
