@@ -1357,11 +1357,33 @@ global:
   #
   #   Image verified from the merge build's own log, not the job conclusion:
   #   pushing manifest for frontend:c984d23@sha256:2dc1708b.
+  # 9b3a427 = #418. A scout can do the work from the phone, and a Scout may
+  #   now close the board work assigned to them.
+  #
+  #   The app half is the bulk of it and ships in the APK, not here. What
+  #   deploys with this bump is:
+  #     * `plan_activity.complete` granted to Scout. Farm-scoped, so it only
+  #       reaches farms they are actually on. A scout sent to a block could
+  #       record what they saw and then had to report back so somebody else
+  #       could tick the job off.
+  #     * `template_id` on GET /me/work, so the phone can show the form the
+  #       supervisor asked for rather than the whole signal catalogue.
+  #     * The enrolment audit stops calling a DELETED scout "enrolled". It
+  #       tested `membership_id IS NOT NULL`; deleting a user archives the
+  #       membership and leaves the worker row pointing at it, so the person
+  #       looked enrolled forever and would never be re-enrolled.
+  #
+  #   No migration. api + workers only — the frontend bundle is untouched by
+  #   this branch and stays on c984d23. Plain tag revert to 43c76e8 is a
+  #   clean rollback; the capability grant reverts with it.
+  #
+  #   Images verified by pulling on the node before this commit:
+  #   api sha256:51867a36, workers sha256:917b7c31.
   images:
     api:
-      tag: "43c76e8"
+      tag: "9b3a427"
     workers:
-      tag: "43c76e8"
+      tag: "9b3a427"
     frontend:
       tag: "c984d23"
     tileServer:
