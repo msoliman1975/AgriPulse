@@ -26,10 +26,30 @@ rebuild years of history without re-buying it. The merged surface covers the
 union of the blocks, not the whole farm boundary: ground that was never fetched
 stays nodata, and honestly so. New scenes fetched at the farm AOI will fill it.
 
-The merge is a plain "last one wins" over a common grid. Every block raster for
-one scene comes from the same Sentinel tile, so overlapping edge pixels hold
-the same value and the choice does not matter — but it does mean a shared
-boundary pixel is written ONCE, which is what removes the seam.
+THE BLOCKS DO NOT SHARE A GRID
+-----------------------------
+Measured on prod, three blocks of the SAME pass:
+
+    9.903 x 10.076 m   origin 464709.07, 3327497.56
+   10.036 x 10.056 m   origin 464703.99, 3328003.39
+   10.134 x  9.938 m   origin 465204.22, 3327500.58
+
+The provider returns a fixed-SIZE image fitted to each requested AOI, not a
+fixed-RESOLUTION window on a shared lattice, so every block carries its own
+pixel size and an arbitrary origin. Merging them without saying otherwise
+resamples everything onto whichever block happens to be read first — an
+arbitrary choice that would move values by up to half a pixel and vary between
+runs if the block order changed.
+
+So the merge targets an EXPLICIT grid: the product's native resolution, with
+the extent snapped to a whole multiple of it (`target_aligned_pixels`). That
+makes a farm raster deterministic, comparable between scenes, and independent
+of which block was read first.
+
+The consequence is worth stating plainly: block statistics measured on this
+grid cannot be bit-identical to the stored ones, which were computed on each
+block's own arbitrary grid. `verify_farm_raster_aggregates` exists to say how
+far apart they land, and the answer decides whether the cutover is safe.
 """
 
 from __future__ import annotations
@@ -53,6 +73,7 @@ def merge_block_rasters(
     raw_uris: list[str],
     *,
     band_names: tuple[str, ...],
+    resolution_m: float | None = None,
 ) -> tuple[dict[str, NDArray[np.float32]], NDArray[np.bool_], dict[str, Any]]:
     """Merge per-block raw rasters into one farm-wide band stack.
 
@@ -97,10 +118,19 @@ def merge_block_rasters(
                     f"{n_science + 1} (science bands {band_names!r} + optional SCL)"
                 )
 
-            # `merge` reprojects nothing — every block of one scene shares the
-            # source CRS and pixel grid, so the mosaic lands on that same grid
-            # and a pixel keeps its exact value and position.
-            mosaic, transform = rio_merge(datasets, nodata=float("nan"))
+            # Target an explicit grid rather than inheriting the first
+            # dataset's. See the module docstring: the blocks arrive on
+            # different pixel sizes and unaligned origins, so "whichever was
+            # read first" is not a grid anyone chose. Snapping the extent to a
+            # whole multiple of the resolution makes the result the same
+            # whatever order the blocks are read in.
+            res = resolution_m or _median_resolution(datasets)
+            mosaic, transform = rio_merge(
+                datasets,
+                nodata=float("nan"),
+                res=(res, res),
+                target_aligned_pixels=True,
+            )
             base_profile = datasets[0].profile.copy()
     finally:
         for ds in datasets:
@@ -129,6 +159,16 @@ def merge_block_rasters(
         "transform": transform,
     }
     return bands_arrays, cloud_mask, write_profile
+
+
+def _median_resolution(datasets: list[Any]) -> float:
+    """Fallback grid size when the product's native resolution is unknown.
+
+    The median of what the blocks actually carry, rather than the first one's:
+    a single oddly-shaped AOI should not set the grid for the whole farm.
+    """
+    sizes = sorted(abs(ds.transform.a) for ds in datasets)
+    return float(sizes[len(sizes) // 2])
 
 
 def covered_mask(bands_arrays: dict[str, NDArray[np.float32]]) -> NDArray[np.bool_]:
