@@ -353,6 +353,149 @@ class WeatherRepository:
         )
         return dict(row) if row is not None else None
 
+    async def list_farm_subscriptions(
+        self,
+        *,
+        farm_id: UUID,
+        include_inactive: bool = False,
+    ) -> tuple[dict[str, Any], ...]:
+        clauses = ["farm_id = :farm", "deleted_at IS NULL"]
+        if not include_inactive:
+            clauses.append("is_active = TRUE")
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        "SELECT * FROM weather_farm_subscriptions "
+                        f"WHERE {' AND '.join(clauses)} ORDER BY created_at ASC"
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def get_farm_subscription_by_id(self, subscription_id: UUID) -> dict[str, Any] | None:
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        "SELECT * FROM weather_farm_subscriptions "
+                        "WHERE id = :id AND deleted_at IS NULL"
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": subscription_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def upsert_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        farm_id: UUID,
+        provider_code: str,
+        cadence_hours: int | None,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Create the farm's subscription to a provider, or revive it.
+
+        Revives rather than inserting a second row: the unique index is
+        PARTIAL, covering only live rows, so a revoked subscription conflicts
+        with nothing. Reviving keeps the watermark, so re-subscribing does not
+        refetch the whole retention window.
+        """
+        existing = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT id FROM weather_farm_subscriptions
+                        WHERE farm_id = :farm AND provider_code = :provider
+                          AND deleted_at IS NULL
+                        ORDER BY is_active DESC, created_at DESC
+                        LIMIT 1
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id, "provider": provider_code},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if existing is not None:
+            await self._session.execute(
+                text(
+                    """
+                    UPDATE weather_farm_subscriptions
+                       SET cadence_hours = :cadence, is_active = TRUE,
+                           updated_by = :actor, updated_at = now()
+                     WHERE id = :id
+                    """
+                ).bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"id": existing["id"], "cadence": cadence_hours, "actor": actor_user_id},
+            )
+            revived = await self.get_farm_subscription_by_id(existing["id"])
+            assert revived is not None
+            return revived
+
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO weather_farm_subscriptions (
+                    id, farm_id, provider_code, cadence_hours,
+                    is_active, created_by, updated_by
+                )
+                VALUES (:id, :farm, :provider, :cadence, TRUE, :actor, :actor)
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": subscription_id,
+                "farm": farm_id,
+                "provider": provider_code,
+                "cadence": cadence_hours,
+                "actor": actor_user_id,
+            },
+        )
+        created = await self.get_farm_subscription_by_id(subscription_id)
+        assert created is not None
+        return created
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        changes: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        if not changes:
+            return await self.get_farm_subscription_by_id(subscription_id)
+        sets = [f"{col} = :{col}" for col in changes]
+        sets += ["updated_by = :actor", "updated_at = now()"]
+        params: dict[str, Any] = {**changes, "id": subscription_id, "actor": actor_user_id}
+        await self._session.execute(
+            text(
+                f"UPDATE weather_farm_subscriptions SET {', '.join(sets)} "
+                "WHERE id = :id AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            params,
+        )
+        return await self.get_farm_subscription_by_id(subscription_id)
+
     async def touch_farm_subscription_attempt(
         self,
         *,
