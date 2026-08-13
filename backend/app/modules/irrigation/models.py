@@ -52,7 +52,7 @@ class BlockWaterBalanceDaily(Base):
     indices gap audit. Block-keyed rather than farm-keyed like the weather
     indices because both of its distinguishing terms vary by block: Kc comes
     from the block's crop and growth stage, and irrigation volume is recorded
-    per block on ``irrigation_schedules``. Migration 0074.
+    per block on ``irrigation_schedules``. Migration 0075.
 
     No ``TimestampedMixin`` — rows are recomputed wholesale by the daily sweep
     rather than edited, so ``computed_at`` is the only time that means

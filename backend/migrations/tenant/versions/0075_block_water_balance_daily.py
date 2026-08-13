@@ -32,8 +32,8 @@ see WHY a balance is negative — whether demand was high, rain absent, or
 irrigation simply not logged — which is the difference between a number that
 can be acted on and one that has to be trusted.
 
-Revision ID: 0074
-Revises: 0073
+Revision ID: 0075
+Revises: 0074
 Create Date: 2026-08-12
 """
 
@@ -45,8 +45,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0074"
-down_revision: str | Sequence[str] | None = "0073"
+revision: str = "0075"
+down_revision: str | Sequence[str] | None = "0074"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
