@@ -35,33 +35,66 @@ defect list a human reads. If it ever starts blocking promotions, it will flake 
 
 These are real deliverables, not scaffolding. Five of the six are useful outside testing.
 
-### P1 — Clean tenant teardown *(hard blocker)*
+### P1 — Clean tenant teardown *(hard blocker)* — **BUILT, not yet proven on prod**
 
 `scripts/e2e/provision_demo.py` already carries a workaround comment: purge leaves orphaned
 `public.users` rows, forcing an email-suffix hack so re-provisioning doesn't collide. With a
 fresh tenant every run, this compounds immediately.
 
-- Extend the purge path to delete (or archive) `public.users` rows with no surviving membership.
-- Delete the corresponding Keycloak users in the `agripulse` realm.
-- Add a `verify-clean` step: after purge, assert zero rows for the slug across `public.*` and
-  zero KC users matching the run's email domain.
-- Respect the CI orphan guard already in `backend/app/modules/purge`.
+The gap turned out to be precise: `tenant_memberships` **is** in the purge manifest, but
+`public.users` cannot be — it carries no ownership column, because a user is not *owned* by a
+tenant, it is *reachable from* one, possibly from several.
 
-### P2 — Task trigger control surface
+Done:
 
-Today `recommendations.evaluate_for_tenant`, `indices.refresh_index_caggs_for_tenant`, the
-weather projection and the index projection are dispatched by name on a beat schedule. There is
-no way to say "run this now, for this tenant".
+- `delete_tenant_public` captures the tenant's members before the manifest empties
+  `tenant_memberships`, then deletes those left with no membership anywhere and no platform
+  role. Narrow in both directions: a user still in another tenant survives, and so does a
+  platform admin with no membership at all.
+- The four provenance columns (`invited_by`, `granted_by` ×3) are plain FKs with no
+  `ON DELETE`, so a surviving row in another tenant naming a purged user as its inviter would
+  have aborted the whole purge. They are blanked first.
+- The orphan scanner gained the matching check, which is what makes the **existing**
+  `GET /admin/purge/orphans` usable as the post-purge verify-clean assertion. No new endpoint
+  was needed.
+- Keycloak already deletes the tenant group's members, so the KC side was never the gap.
+
+Outstanding:
+
+- **Prove it on prod** — three consecutive provision/purge cycles with no email suffix. Proven
+  in integration tests; needs a deployed build to be proven for real.
+- Drop the `SMOKE_EMAIL_SUFFIX` workaround from `provision_demo.py` once that passes.
+
+> **Latent bug found, deliberately not fixed here.** `delete_users_and_group(slug)` deletes
+> *every* member of the tenant's Keycloak group. A user belonging to two tenants therefore
+> loses their Keycloak identity entirely when either tenant is purged, breaking their login to
+> the surviving one. It does not block the harness (which uses its own email domain) and
+> fixing it needs a per-user group lookup, so it is filed rather than folded into this change.
+
+### P2 — Task trigger control surface — **BUILT**
 
 ```
-POST /v1/platform/tasks/{task_name}:run   { "tenant_slug": "...", "params": {...} }
+GET  /api/v1/admin/tasks                -- what may be run, and the params each accepts
+POST /api/v1/admin/tasks/{name}:run     -- dispatch for one tenant, returns a Celery task id
+GET  /api/v1/admin/tasks/runs/{task_id} -- state, so the harness blocks instead of sleeping
 ```
 
-- PlatformAdmin capability only.
-- **Allowlisted task names only** — never a free-form `send_task` bridge.
-- Returns a Celery task id; a companion `GET .../{task_id}` reports state, so the harness can
-  block on completion instead of sleeping.
-- Genuinely useful in prod ops (today the only recovery for a missed sweep is waiting).
+Gated on a new `platform.run_tasks`, held only by PlatformAdmin's wildcard — deliberately not
+folded into `platform.manage_tenants`, since this reaches into the worker fleet and the tasks
+it starts write real rows.
+
+Two safety properties, both tested rather than assumed:
+
+- **No sweeps.** A `*_sweep` task walks every active tenant, so exposing one would let a run
+  against a throwaway tenant write into every other tenant on the platform. Only per-tenant
+  counterparts are allowlisted.
+- **`tenant_schema` is never caller-supplied.** The endpoint fills it in from the resolved
+  tenant; passing it in `params` is a 422. Otherwise a request could aim a task at a tenant it
+  did not name — and the audit row would record the wrong one.
+
+The allowlist is a literal in `task_registry.py`, not anything derived at runtime: dispatching
+Celery by name from an HTTP request is a remote code execution primitive unless that list
+holds. Suspended and pending-delete tenants are refused.
 
 ### P3 — Sanitising cross-tenant clone
 
@@ -276,9 +309,16 @@ Findings are advisory. Nothing blocks a promotion automatically.
 
 Each phase ends in something runnable; nothing is built on an unproven assumption.
 
-**Phase 1 — Unblock (no agents yet).** P1 clean teardown, P2 trigger endpoint. Prove by
-provisioning and purging a tenant three times consecutively with a clean verify each time.
-*This phase alone is worth shipping — both items are prod-ops improvements.*
+**Phase 1 — Unblock (no agents yet).** P1 clean teardown, P2 trigger endpoint. **Code complete
+and green in integration tests; the prod proof is outstanding** — three consecutive
+provision/purge cycles against a deployed build, with no email suffix. *This phase alone is
+worth shipping: both items are prod-ops improvements independent of any testing.*
+
+One thing Phase 1 established that changes later phases: `frontend/e2e/fixtures.ts` is **fully
+mocked** — fake JWT in sessionStorage, every `/api/v1/**` call intercepted, unmocked mutations
+answering 501. It never reaches a backend and is no use as a base for live simulation. The real
+starting point is `scripts/e2e/*.py`, which already does real Keycloak direct-grant against
+prod.
 
 **Phase 2 — Deterministic spine (no agents yet).** P3 clone tool, P4 notification sink, Acts 0–3
 fully scripted, ending with asserted non-zero recommendations and alerts. Success: a tenant that
