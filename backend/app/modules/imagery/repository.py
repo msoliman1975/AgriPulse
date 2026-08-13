@@ -256,9 +256,28 @@ class ImageryRepository:
                             count(*) FILTER (
                                 WHERE j.status = 'skipped_cloud'
                             )                                           AS skipped_cloud_count,
+                            count(DISTINCT a.block_id)                  AS computed_count,
                             avg(j.cloud_cover_pct)                      AS cloud_cover_pct
                         FROM imagery_ingestion_jobs j
                         JOIN blocks b ON b.id = j.block_id
+                        -- Did the INDEX step ever run for this pass?
+                        --
+                        -- Ingesting a scene and computing its indices are two
+                        -- different tasks, and a historical backfill runs the
+                        -- first without the second (`run_compute_indices:
+                        -- False` in the backfill service). The job row then
+                        -- says "succeeded" and carries a stac_item_id while no
+                        -- index raster was ever written — 104 of 131 days on
+                        -- the reference farm are in exactly that state.
+                        --
+                        -- An aggregate row is written by `compute_indices` and
+                        -- by nothing else, so its presence is the only honest
+                        -- answer to "can this pass be drawn?". Without it the
+                        -- console offers a date that renders nothing.
+                        LEFT JOIN block_index_aggregates a
+                               ON a.block_id = j.block_id
+                              AND a.time = j.scene_datetime
+                              AND a.index_code = 'ndvi'
                         WHERE b.farm_id = :farm
                         GROUP BY 1
                         ORDER BY 1 DESC

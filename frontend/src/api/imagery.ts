@@ -102,6 +102,13 @@ export interface FarmScene {
   block_count: number;
   succeeded_count: number;
   skipped_cloud_count: number;
+  /**
+   * Blocks whose index rasters exist for this pass — how much of the day can
+   * actually be drawn. Ingestion and index computation are separate tasks and
+   * a historical backfill runs only the first, so a day can be entirely
+   * "succeeded" and still render nothing. Zero means never processed.
+   */
+  computed_count: number;
   /** Mean across jobs that reported one; null when none did. */
   cloud_cover_pct: string | null;
 }

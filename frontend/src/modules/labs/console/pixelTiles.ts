@@ -49,6 +49,16 @@ function trimTrailingSlash(s: string): string {
 const REPROJECT = "bilinear";
 
 /**
+ * Tile edge in pixels, for both the request and the MapLibre source.
+ *
+ * 512 rather than the 256 default because the cost here is per REQUEST, not
+ * per pixel: measured against prod, one 512 tile renders in ~246ms while the
+ * four 256 tiles covering the same ground cost ~1288ms in total and three
+ * more round trips. A farm-wide view drops from ~92 tiles to ~25.
+ */
+export const TILE_SIZE = 512;
+
+/**
  * XYZ template for one block's index raster, for a MapLibre raster source.
  *
  * `{z}/{x}/{y}` are left intact for MapLibre to interpolate. There is
@@ -68,6 +78,7 @@ export function blockTileUrl(input: {
     url: assetUri(input.s3Bucket, input.asset, input.code),
     colormap: titilerColormap(input.code),
     reproject: REPROJECT,
+    tilesize: String(TILE_SIZE),
   });
   return `${trimTrailingSlash(input.tileServerBaseUrl)}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?${params.toString()}`;
 }

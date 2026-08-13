@@ -56,6 +56,14 @@ describe("blockTileUrl", () => {
     expect(cm.searchParams.get("resampling")).toBeNull();
   });
 
+  it("asks for one big tile rather than four small ones", () => {
+    // The cost is per REQUEST, not per pixel: measured on prod, one 512 tile
+    // renders in ~246ms while the four 256 tiles covering the same ground cost
+    // ~1288ms in total. A farm view drops from ~92 tiles to ~25.
+    const p = new URL(url.replace("{z}/{x}/{y}", "0/0/0")).searchParams;
+    expect(p.get("tilesize")).toBe("512");
+  });
+
   it("never sends rescale, which would break the interval colormap", () => {
     // rescale stretches values to 0-255 BEFORE the colormap is applied, so
     // every class boundary would then point at the wrong data.
