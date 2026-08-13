@@ -72,6 +72,49 @@ class SubscriptionRead(BaseModel):
     updated_at: datetime
 
 
+class FarmSubscriptionCreate(BaseModel):
+    """POST /api/v1/farms/{farm_id}/imagery/subscriptions body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: UUID
+    cadence_hours: int | None = Field(default=None, ge=1)
+    cloud_cover_max_pct: int | None = Field(default=None, ge=0, le=100)
+    #: Fetch the FARM's own boundary rather than stitching block rasters.
+    #: Defaults off: it is a second, larger provider request per pass, so
+    #: turning it on is a deliberate act with a quota consequence.
+    fetch_farm_aoi: bool = False
+
+
+class FarmSubscriptionUpdate(BaseModel):
+    """PATCH body. Omitted fields are left alone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cadence_hours: int | None = Field(default=None, ge=1)
+    cloud_cover_max_pct: int | None = Field(default=None, ge=0, le=100)
+    fetch_farm_aoi: bool | None = None
+    is_active: bool | None = None
+
+
+class FarmSubscriptionRead(BaseModel):
+    """One farm-level imagery subscription."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    farm_id: UUID
+    product_id: UUID
+    cadence_hours: int | None
+    cloud_cover_max_pct: int | None
+    is_active: bool
+    fetch_farm_aoi: bool
+    last_successful_ingest_at: datetime | None
+    last_attempted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
 # --- Ingestion / scenes -----------------------------------------------------
 
 

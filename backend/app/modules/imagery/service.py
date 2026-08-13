@@ -36,6 +36,9 @@ from app.modules.imagery.schemas import (
     FarmSceneAssetsResponse,
     FarmSceneRead,
     FarmScenesResponse,
+    FarmSubscriptionCreate,
+    FarmSubscriptionRead,
+    FarmSubscriptionUpdate,
     ImageryConfigEntry,
     IngestionJobRead,
     SubscriptionCreate,
@@ -100,6 +103,22 @@ class ImageryService(Protocol):
     async def list_farm_scene_assets(
         self, *, farm_id: UUID, at: datetime | None = None
     ) -> FarmSceneAssetsResponse: ...
+
+    async def list_farm_subscriptions(
+        self, *, farm_id: UUID, include_inactive: bool = False
+    ) -> tuple[FarmSubscriptionRead, ...]: ...
+
+    async def upsert_farm_subscription(
+        self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
+    ) -> FarmSubscriptionRead: ...
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        payload: FarmSubscriptionUpdate,
+        actor_user_id: UUID | None,
+    ) -> FarmSubscriptionRead | None: ...
 
 
 class ImageryServiceImpl:
@@ -286,6 +305,48 @@ class ImageryServiceImpl:
             farm=FarmRasterRead.model_validate(farm_row) if farm_row else None,
             items=tuple(FarmSceneAssetRead.model_validate(r) for r in rows),
         )
+
+    # ---- Farm-level subscriptions ----------------------------------------
+    #
+    # The farm is the unit imagery is actually fetched for. These replace the
+    # per-block rows as the configuration surface; the block rows stay until
+    # the cutover so a farm can be moved one at a time.
+
+    async def list_farm_subscriptions(
+        self, *, farm_id: UUID, include_inactive: bool = False
+    ) -> tuple[FarmSubscriptionRead, ...]:
+        rows = await self._repo.list_farm_subscriptions(
+            farm_id=farm_id, include_inactive=include_inactive
+        )
+        return tuple(FarmSubscriptionRead.model_validate(r) for r in rows)
+
+    async def upsert_farm_subscription(
+        self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
+    ) -> FarmSubscriptionRead:
+        row = await self._repo.upsert_farm_subscription(
+            subscription_id=uuid7(),
+            farm_id=farm_id,
+            product_id=payload.product_id,
+            cadence_hours=payload.cadence_hours,
+            cloud_cover_max_pct=payload.cloud_cover_max_pct,
+            fetch_farm_aoi=payload.fetch_farm_aoi,
+            actor_user_id=actor_user_id,
+        )
+        return FarmSubscriptionRead.model_validate(row)
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        payload: FarmSubscriptionUpdate,
+        actor_user_id: UUID | None,
+    ) -> FarmSubscriptionRead | None:
+        row = await self._repo.update_farm_subscription(
+            subscription_id=subscription_id,
+            changes=payload.model_dump(exclude_unset=True),
+            actor_user_id=actor_user_id,
+        )
+        return FarmSubscriptionRead.model_validate(row) if row is not None else None
 
     async def get_config(self) -> ConfigResponse:
         """GET /api/v1/config payload — tile-server URL + product hints."""
