@@ -96,17 +96,34 @@ class ImageryRepository:
                 await self._session.execute(
                     text(
                         """
-                    SELECT * FROM imagery_aoi_subscriptions
-                    WHERE is_active = TRUE
-                      AND deleted_at IS NULL
+                    SELECT s.* FROM imagery_aoi_subscriptions s
+                    WHERE s.is_active = TRUE
+                      AND s.deleted_at IS NULL
                       AND (
-                            last_attempted_at IS NULL
-                         OR last_attempted_at <
+                            s.last_attempted_at IS NULL
+                         OR s.last_attempted_at <
                             (:now - make_interval(
-                                hours => COALESCE(cadence_hours, :default_cadence)
+                                hours => COALESCE(s.cadence_hours, :default_cadence)
                             ))
                       )
-                    ORDER BY created_at ASC
+                      -- Skip blocks whose FARM is being fetched as one AOI.
+                      -- Gated on fetch_farm_aoi, not merely on a farm row
+                      -- existing: 0074 created a farm subscription for every
+                      -- farm that had block ones, so keying off existence
+                      -- alone would stop imagery platform-wide the moment
+                      -- this shipped. Only a farm actually switched over
+                      -- stops fetching per block.
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM imagery_farm_subscriptions f
+                          JOIN blocks b ON b.id = s.block_id
+                          WHERE f.farm_id = b.farm_id
+                            AND f.product_id = s.product_id
+                            AND f.is_active
+                            AND f.fetch_farm_aoi
+                            AND f.deleted_at IS NULL
+                      )
+                    ORDER BY s.created_at ASC
                     """
                     ).bindparams(now=now, default_cadence=default_cadence_hours)
                 )
