@@ -278,6 +278,13 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         "themselves live under the scene's aoi-hashed prefix in the bucket and "
         "are purged with the rest of a tenant's imagery objects, not row by row",
     ),
+    OwnedTable(
+        "imagery_farm_ingestion_jobs",
+        owner_column="farm_id",
+        order=10,
+        note="one job per farm-AOI fetch. Purges with the farm the same way "
+        "imagery_ingestion_jobs purges with its block",
+    ),
     OwnedTable("farm_imagery_overrides", owner_column="farm_id", order=10),
     OwnedTable("farm_imagery_template", owner_column="farm_id", order=10),
     OwnedTable("farm_weather_overrides", owner_column="farm_id", order=10),

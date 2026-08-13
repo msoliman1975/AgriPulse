@@ -22,6 +22,7 @@ const FARM: FarmRaster = {
   scene_datetime: "2026-08-10T08:41:47Z",
   resolution_m: "10.00",
   blocks_merged: 36,
+  source: "stitched",
 };
 
 const BASE = { tileServerBaseUrl: "https://tiles.example.test", s3Bucket: "bucket" };

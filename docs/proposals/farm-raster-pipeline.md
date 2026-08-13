@@ -1,8 +1,9 @@
 # One raster per farm
 
-Status: **partly built** — generation and rendering are merged, ingestion is not.
-Written 2026-08-13 while the work was in flight, so the measurements below are
-the real ones rather than estimates.
+Status: **built, switched off**. Generation, rendering and farm-AOI ingestion
+are all merged; no farm fetches its own boundary until someone sets
+`fetch_farm_aoi` on its subscription. Written 2026-08-13 while the work was in
+flight, so the measurements below are the real ones rather than estimates.
 
 ## The problem
 
@@ -36,10 +37,24 @@ file rather than 36.
 | `block_masks_on_grid` + `verify_farm_raster_aggregates` | #432 |
 | `imagery_farm_subscriptions` (+ migration from per-block) | #433 |
 | Explicit merge grid | #434 |
-| **Farm-AOI ingestion** | **not built** |
+| Farm-AOI ingestion (0076) | merged, gated off |
 
-Nothing changes for a farm until `rebuild_farm_rasters` is run against it, which
-is what makes the cutover a per-farm decision rather than a deploy.
+Nothing changes for a farm until `rebuild_farm_rasters` is run against it, or
+`fetch_farm_aoi` is set on its farm subscription. Both are per-farm decisions
+rather than deploys.
+
+## Decision taken, 2026-08-13
+
+Aggregates **stay on the per-block path**; the farm surface is display-only.
+No stored number moves, so no series steps at the cutover. The cost is two
+pipelines: an opted-in farm is fetched twice per pass — once per block for the
+aggregates, once for the farm boundary for the picture. On the reference farm
+that is roughly +44% fetched area (the farm's bounding box is 88 ha against
+61 ha of blocks), not double, because a farm request replaces 36 small ones
+rather than adding to them.
+
+That cost is exactly why `fetch_farm_aoi` defaults to FALSE. Switching a farm
+on is a deliberate act with a quota consequence.
 
 ## The grid, which was not what it looked like
 
@@ -87,13 +102,33 @@ to take it, none of them free:
   display. No numbers move at all; two pipelines to maintain, and the abandoned
   land still has no measurements behind it.
 
-## What ingestion still needs
+## How ingestion was built
 
-The fetch path is block-shaped end to end: `imagery_ingestion_jobs.block_id`, the
-AOI from `get_block_boundary`, the storage key from the block's `aoi_hash`. A
-farm-shaped path needs its own job rows (a separate table keeps the working path
-untouched), discovery driven by `imagery_farm_subscriptions`, and a fetch that
-passes the farm boundary. Until then the farm surface is only ever as wide as the
-blocks that were fetched — the 50.3 feddan stays blank, and the
-"Outside blocks · X feddan" legend line has nothing true to say, which is why it
-was deliberately left out of #431.
+The block fetch path is block-shaped end to end: `imagery_ingestion_jobs.block_id`,
+the AOI from `get_block_boundary`, the storage key from the block's `aoi_hash`.
+Rather than widen any of that, 0076 adds a parallel set:
+
+* `imagery_farm_ingestion_jobs` — its own table. The block table is the hot path
+  for every farm's daily imagery and its idempotency key is
+  `UNIQUE(subscription_id, scene_id)`; making it mean two things is how a working
+  pipeline gets broken by a feature nobody has switched on.
+* `imagery.discover_farm_scenes` / `imagery.acquire_farm_scene`, plus a beat
+  sweep that enqueues nothing until `fetch_farm_aoi` is set.
+* `farm_scene_rasters.source` — `stitched` or `fetched`. A fetched surface wins
+  over a stitched one for the same pass, because it covers ground no block was
+  drawn around; letting a later stitch replace it would silently shrink the farm
+  back to its blocks.
+
+A fetched pass writes the same outputs a stitched one does — index COGs under the
+farm's aoi hash and a `farm_scene_rasters` row — so the console draws it with no
+change at all. The difference is only that the pixels are real everywhere inside
+the boundary instead of only inside the blocks.
+
+**One limit worth knowing.** Sentinel Hub's Process API returns at most 2500 px
+per side, which at 10 m is 25 km. Farms are checked against that *before* the
+request, so a farm too large to fetch says so once with its measured size rather
+than 400-ing on every poll forever. The reference farm is 80×110 px.
+
+Once a farm is fetched rather than stitched, the 50.3 feddan outside its blocks
+finally has pixels behind it, and the "Outside blocks · X feddan" legend line
+deliberately left out of #431 has something true to say.

@@ -49,6 +49,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.imagery_discover_active_subscriptions_seconds),
         "options": {"queue": "light"},
     },
+    # The same sweep for farms that fetch their whole boundary rather than
+    # one AOI per block. It enqueues nothing until a farm sets
+    # `fetch_farm_aoi`, so this is inert until someone opts a farm in — the
+    # cutover stays a per-farm decision, not a deploy.
+    "imagery.discover_active_farm_subscriptions": {
+        "task": "imagery.discover_active_farm_subscriptions",
+        "schedule": float(_settings.imagery_discover_active_subscriptions_seconds),
+        "options": {"queue": "light"},
+    },
     # Weather sweep: enqueue `weather.fetch_weather` for every (farm,
     # provider) pair whose oldest active subscription is overdue. The
     # sweep picks up new subscriptions within one Beat cycle.

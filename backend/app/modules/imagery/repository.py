@@ -459,8 +459,9 @@ class ImageryRepository:
         scene_id: str,
         stac_item_id: str,
         aoi_hash: str,
-        blocks_merged: int,
+        blocks_merged: int | None,
         indices: list[str],
+        source: str = "stitched",
     ) -> None:
         """Note that a farm-wide raster now exists for this pass.
 
@@ -469,17 +470,26 @@ class ImageryRepository:
         API answer "is there a farm raster here?" without probing the bucket,
         and what makes the cutover per farm — a farm with rows serves one
         raster, a farm without keeps the per-block path untouched.
+
+        ``source`` says how the surface came to exist: ``stitched`` from block
+        rasters, or ``fetched`` for the farm boundary. A fetched surface merged
+        no blocks, so ``blocks_merged`` is None there rather than 0 — the count
+        does not apply rather than being zero.
+
+        A fetched surface WINS over a stitched one for the same pass: it covers
+        ground no block was ever fetched for, so replacing it with a stitch
+        would silently shrink the farm back to its blocks.
         """
         await self._session.execute(
             text(
                 """
                 INSERT INTO farm_scene_rasters (
                     farm_id, product_id, scene_datetime, scene_id,
-                    stac_item_id, aoi_hash, blocks_merged, indices
+                    stac_item_id, aoi_hash, blocks_merged, indices, source
                 )
                 VALUES (
                     :farm, :product, :at, :scene_id,
-                    :stac, :aoi_hash, :blocks, CAST(:indices AS jsonb)
+                    :stac, :aoi_hash, :blocks, CAST(:indices AS jsonb), :source
                 )
                 ON CONFLICT (farm_id, scene_datetime, aoi_hash) DO UPDATE
                 SET stac_item_id  = EXCLUDED.stac_item_id,
@@ -487,7 +497,10 @@ class ImageryRepository:
                     scene_id      = EXCLUDED.scene_id,
                     blocks_merged = EXCLUDED.blocks_merged,
                     indices       = EXCLUDED.indices,
+                    source        = EXCLUDED.source,
                     built_at      = now()
+                WHERE farm_scene_rasters.source <> 'fetched'
+                   OR EXCLUDED.source = 'fetched'
                 """
             ).bindparams(
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
@@ -502,6 +515,7 @@ class ImageryRepository:
                 "aoi_hash": aoi_hash,
                 "blocks": blocks_merged,
                 "indices": json.dumps(indices),
+                "source": source,
             },
         )
 
@@ -528,7 +542,7 @@ class ImageryRepository:
                     text(
                         f"""
                         SELECT r.scene_datetime, r.stac_item_id, r.product_id,
-                               r.blocks_merged, p.resolution_m
+                               r.blocks_merged, r.source, p.resolution_m
                         FROM farm_scene_rasters r
                         JOIN farms f ON f.id = r.farm_id
                         LEFT JOIN public.imagery_products p ON p.id = r.product_id
@@ -837,6 +851,255 @@ class ImageryRepository:
             )
         ).all()
         return {(r[0], r[1]): float(r[2]) for r in rows}
+
+    # ---- Farm-AOI ingestion ----------------------------------------------
+    #
+    # Deliberately a parallel set rather than a widening of the block methods.
+    # The block path carries every farm's daily imagery; a farm-AOI fetch is
+    # switched on one farm at a time and must not be able to break it.
+
+    async def get_farm_boundary(self, farm_id: UUID) -> dict[str, Any] | None:
+        """Read `boundary`, `boundary_utm`, `aoi_hash` for a farm.
+
+        The farm mirror of `get_block_boundary`, and the reason a farm-AOI
+        fetch can cover ground that no block was ever drawn around.
+        """
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                    SELECT
+                        f.aoi_hash,
+                        ST_AsGeoJSON(f.boundary)::text AS boundary_geojson,
+                        ST_AsGeoJSON(f.boundary_utm)::text AS boundary_utm_geojson
+                    FROM farms f
+                    WHERE f.id = :id AND f.deleted_at IS NULL
+                    """
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": farm_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if row is None or row["boundary_geojson"] is None:
+            return None
+        return {
+            "farm_id": farm_id,
+            "aoi_hash": row["aoi_hash"],
+            "boundary_geojson": json.loads(row["boundary_geojson"]),
+            "boundary_utm_geojson": json.loads(row["boundary_utm_geojson"]),
+        }
+
+    async def get_farm_subscription(self, subscription_id: UUID) -> dict[str, Any] | None:
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                    SELECT * FROM imagery_farm_subscriptions
+                    WHERE id = :id AND deleted_at IS NULL
+                    """
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": subscription_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def list_farm_subscriptions_due(
+        self,
+        *,
+        default_cadence_hours: int,
+        now: datetime,
+    ) -> tuple[dict[str, Any], ...]:
+        """Active farm subscriptions with the farm-AOI fetch switched ON.
+
+        `fetch_farm_aoi` is the gate, and it is why deploying this does
+        nothing: 0074 created an active farm subscription for every farm that
+        had block subscriptions, so without the flag every farm on the
+        platform would start fetching a second, larger AOI on the next beat.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                    SELECT * FROM imagery_farm_subscriptions
+                    WHERE is_active = TRUE
+                      AND fetch_farm_aoi = TRUE
+                      AND deleted_at IS NULL
+                      AND (
+                            last_attempted_at IS NULL
+                         OR last_attempted_at <
+                            (:now - make_interval(
+                                hours => COALESCE(cadence_hours, :default_cadence)
+                            ))
+                      )
+                    ORDER BY created_at ASC
+                    """
+                    ).bindparams(now=now, default_cadence=default_cadence_hours)
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def touch_farm_subscription_attempt(
+        self,
+        *,
+        subscription_id: UUID,
+        attempted_at: datetime,
+        ingested: bool,
+    ) -> None:
+        """Record the poll; advance the ingest watermark only if it found work.
+
+        Same contract as the block path: an empty or all-cloud poll is a
+        heartbeat, not an ingest, and bumping the watermark on one would bury
+        publication-lagged scenes.
+        """
+        sets = ["last_attempted_at = :at", "updated_at = now()"]
+        if ingested:
+            sets.append("last_successful_ingest_at = :at")
+        await self._session.execute(
+            text(
+                f"UPDATE imagery_farm_subscriptions SET {', '.join(sets)} "  # noqa: S608
+                "WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {"id": subscription_id, "at": attempted_at},
+        )
+
+    async def upsert_pending_farm_job(
+        self,
+        *,
+        job_id: UUID,
+        subscription_id: UUID,
+        farm_id: UUID,
+        product_id: UUID,
+        scene_id: str,
+        scene_datetime: datetime,
+        cloud_cover_pct: Decimal | None,
+    ) -> tuple[UUID, bool]:
+        """Insert a `pending` farm job; return (job_id, created).
+
+        Same idempotency key as the block table — UNIQUE(subscription, scene) —
+        so re-discovery of a scene already seen returns created=False.
+        """
+        result = await self._session.execute(
+            text(
+                """
+                INSERT INTO imagery_farm_ingestion_jobs (
+                    id, subscription_id, farm_id, product_id, scene_id,
+                    scene_datetime, cloud_cover_pct, status, requested_at
+                )
+                VALUES (
+                    :id, :subscription_id, :farm_id, :product_id, :scene_id,
+                    :scene_datetime, :cloud_cover_pct, 'pending', now()
+                )
+                ON CONFLICT (subscription_id, scene_id) DO NOTHING
+                RETURNING id
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("subscription_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("product_id", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": job_id,
+                "subscription_id": subscription_id,
+                "farm_id": farm_id,
+                "product_id": product_id,
+                "scene_id": scene_id,
+                "scene_datetime": scene_datetime,
+                "cloud_cover_pct": cloud_cover_pct,
+            },
+        )
+        inserted = result.scalar()
+        if inserted is not None:
+            return UUID(str(inserted)), True
+        existing = (
+            await self._session.execute(
+                text(
+                    "SELECT id FROM imagery_farm_ingestion_jobs "
+                    "WHERE subscription_id = :s AND scene_id = :scene"
+                ).bindparams(bindparam("s", type_=PG_UUID(as_uuid=True))),
+                {"s": subscription_id, "scene": scene_id},
+            )
+        ).scalar_one()
+        return UUID(str(existing)), False
+
+    async def get_farm_job(self, job_id: UUID) -> dict[str, Any] | None:
+        row = (
+            (
+                await self._session.execute(
+                    text("SELECT * FROM imagery_farm_ingestion_jobs WHERE id = :id").bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True))
+                    ),
+                    {"id": job_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def list_pending_farm_jobs(self, *, subscription_id: UUID) -> tuple[UUID, ...]:
+        rows = (
+            await self._session.execute(
+                text(
+                    "SELECT id FROM imagery_farm_ingestion_jobs "
+                    "WHERE subscription_id = :s AND status = 'pending'"
+                ).bindparams(bindparam("s", type_=PG_UUID(as_uuid=True))),
+                {"s": subscription_id},
+            )
+        ).all()
+        return tuple(UUID(str(r[0])) for r in rows)
+
+    async def set_farm_job_status(
+        self,
+        *,
+        job_id: UUID,
+        status: str,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
+        error_message: str | None = None,
+        error_code: str | None = None,
+        stac_item_id: str | None = None,
+        assets_written: list[str] | None = None,
+    ) -> None:
+        """One setter for every terminal and non-terminal transition.
+
+        The block path grew a method per status; there is no reason to repeat
+        that shape here, and one setter keeps the states visible in one place.
+        """
+        sets = ["status = :status"]
+        params: dict[str, Any] = {"id": job_id, "status": status}
+        for column, value in (
+            ("started_at", started_at),
+            ("completed_at", completed_at),
+            ("error_message", error_message),
+            ("error_code", error_code),
+            ("stac_item_id", stac_item_id),
+        ):
+            if value is not None:
+                sets.append(f"{column} = :{column}")
+                params[column] = value
+        if assets_written is not None:
+            sets.append("assets_written = CAST(:assets AS jsonb)")
+            params["assets"] = json.dumps(assets_written)
+        await self._session.execute(
+            text(
+                f"UPDATE imagery_farm_ingestion_jobs SET {', '.join(sets)} "  # noqa: S608
+                "WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            params,
+        )
+        await self._session.flush()
 
     async def get_block_boundary(self, block_id: UUID) -> dict[str, Any] | None:
         """Read `boundary`, `boundary_utm`, `aoi_hash`, `farm_id` for a block.
