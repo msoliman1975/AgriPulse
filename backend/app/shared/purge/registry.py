@@ -263,6 +263,13 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         storage_key_column="s3_key",
     ),
     OwnedTable(
+        "imagery_farm_subscriptions",
+        owner_column="farm_id",
+        order=10,
+        note="farm-level imagery intent; the per-block rows in "
+        "imagery_aoi_subscriptions are owned by their block and purge with it",
+    ),
+    OwnedTable(
         "farm_scene_rasters",
         owner_column="farm_id",
         order=10,
