@@ -1638,13 +1638,53 @@ global:
   #
   #   Watch after sync: nothing should change. /labs/map-v2 keeps drawing
   #   per-block rasters until a farm is stitched.
+  # 5ba132c — the nine computable indices from the guide gap audit (#435).
+  #
+  #   API, WORKERS AND FRONTEND ALL MOVE. The api carries public migrations
+  #   0061-0065 and tenant 0075 and serves the new water-balance read; the
+  #   workers carry the index maths, the weather projections, the water-balance
+  #   sweep and the SPI task; the frontend carries the new pickers, the dock
+  #   card and the per-index map ramp. tileServer is unchanged.
+  #
+  #   NOT INERT — two behaviour changes land on sync:
+  #
+  #   1. IRRIGATION RECOMMENDATIONS MOVE. Public 0064 is a DATA migration: it
+  #      seeds FAO-56 Kc into crops.phenology_stages. Until now the engine's
+  #      preferred Kc source was literally unreachable (PhenologyStage was
+  #      extra="forbid", so a catalog carrying a kc failed validation on read),
+  #      and most stages fell through to a generic 0.85. Mango pre_flowering —
+  #      the stress-induction period where water is withheld ON PURPOSE — was
+  #      0.85 and is now 0.35, so recommended volumes drop sharply for blocks
+  #      in that stage. That is the fix, but operators will see it immediately.
+  #   2. The sub-block grid heatmap is now coloured PER INDEX. NDWI and NDMI
+  #      were previously painted on a bigger-is-better ramp that inverted their
+  #      meaning; those two will look different, and correct, on sync.
+  #
+  #   Everything else is additive: two spectral indices (bsi, msi), four
+  #   weather indices, one new block-keyed table. CALC_VERSION is deliberately
+  #   NOT bumped — no existing index's numbers change, and a bump would split
+  #   seven healthy trend lines in two.
+  #
+  #   EXPECT drought_spi to be absent or sparse for most farms. SPI degrades in
+  #   hyper-arid climates and the task declines to emit a row rather than
+  #   fabricate a 0.0. An empty series there is the index reporting its limits.
+  #
+  #   Merge run 31687780434, CONCLUSION "cancelled" by concurrency — the
+  #   conclusion is not the evidence. All five container jobs report success
+  #   and the manifests are confirmed from the job logs:
+  #   api@sha256:d80bc9f4, workers@sha256:4f55ebf9, frontend@sha256:e3960814.
+  #
+  #   Watch after sync: alembic reaches public 0065 / tenant 0075; the weather
+  #   summary strip gains leaf_wetness, frost_risk, heat_stress; new scenes
+  #   write 9 index COGs rather than 7. Nothing writes block_water_balance_daily
+  #   until the hourly sweep runs against a block with a current crop.
   images:
     api:
-      tag: "c0abb11"
+      tag: "5ba132c"
     workers:
-      tag: "c0abb11"
+      tag: "5ba132c"
     frontend:
-      tag: "c0abb11"
+      tag: "5ba132c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
