@@ -78,13 +78,17 @@ function GrantedCell({
     );
   }
 
+  // A bare glyph in a button was indistinguishable from the read-only glyph —
+  // the page looked as though it had no editing at all. The border and hover
+  // state are what make it read as a control.
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={granted}
       aria-label={labels.toggle}
-      className={`rounded px-2 py-0.5 text-sm hover:bg-ap-line/40 ${tone}`}
+      title={labels.toggle}
+      className={`min-w-9 rounded border border-ap-line px-2 py-0.5 text-sm hover:border-ap-primary hover:bg-ap-line/40 focus-visible:ring-2 focus-visible:ring-ap-primary ${tone}`}
     >
       {glyph}
       <span className="sr-only"> {granted ? labels.yes : labels.no}</span>
@@ -114,9 +118,22 @@ export function PlatformRolesPage(): ReactNode {
   const roles = useMemo(() => data?.roles ?? [], [data]);
   const capabilities = useMemo(() => data?.capabilities ?? [], [data]);
 
-  // Falls back to the first role once loaded, so the detail table is never an
-  // empty frame waiting on a click.
-  const activeRole: RbacRole | undefined = roles.find((r) => r.name === selectedRole) ?? roles[0];
+  // Falls back to a role once loaded, so the detail table is never an empty
+  // frame waiting on a click — but *not* to `roles[0]`. The list is ordered
+  // platform-tier first by permission count, which puts PlatformAdmin on top,
+  // and PlatformAdmin is the one role that can never be edited. Landing there
+  // hid every toggle and Reset behind a role switch nobody knew to make, so
+  // the page read as though runtime editing had not shipped at all.
+  //
+  // Prefer the first editable role; fall back to the first row only when there
+  // is nothing editable (a viewer without `platform.manage_rbac`), where the
+  // old behaviour is still the right one.
+  const defaultRole = useMemo(
+    () => roles.find((r) => !r.immutable && !r.wildcard) ?? roles[0],
+    [roles],
+  );
+  const activeRole: RbacRole | undefined =
+    roles.find((r) => r.name === selectedRole) ?? defaultRole;
 
   const grantedNames = useMemo(() => new Set(activeRole?.capabilities ?? []), [activeRole]);
 
@@ -488,6 +505,14 @@ export function PlatformRolesPage(): ReactNode {
         <>
           {view === "byRole" && activeRole?.wildcard ? (
             <StatusBanner kind="info">{t("roles.edit.wildcardImmutable")}</StatusBanner>
+          ) : null}
+
+          {/* Say the feature exists. A toggle that looks like a tick is not a
+              discoverable affordance on a page that was read-only until now. */}
+          {view === "byRole" && canEditActiveRole ? (
+            <StatusBanner kind="info" detail={t("roles.edit.editableDetail")}>
+              {t("roles.edit.editableHint", { role: activeRoleName })}
+            </StatusBanner>
           ) : null}
 
           <Toolbar

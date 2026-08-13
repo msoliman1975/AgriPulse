@@ -170,11 +170,23 @@ describe("PlatformRolesPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("defaults to the granted permissions of the first role", async () => {
+  it("does not land on PlatformAdmin, the one role that can never be edited", async () => {
+    // Reported from prod: the page opened on PlatformAdmin (first row — platform
+    // tier, most permissions) which is wildcard and immutable, so every toggle
+    // and Reset was suppressed and runtime editing looked as though it had
+    // never shipped. Default to the first *editable* role instead.
     renderPage();
     await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    // header + BillingAdmin's single granted capability
+    expect(within(permsTable()).getAllByRole("row")).toHaveLength(2);
+    expect(within(permsTable()).queryByText("farm.delete")).not.toBeInTheDocument();
+  });
+
+  it("still honours an explicit PlatformAdmin selection from the URL", async () => {
+    renderPage("/platform/roles?role=PlatformAdmin");
+    await bothTables();
     await within(permsTable()).findByText("farm.read");
-    // header + PlatformAdmin's 4 granted capabilities
     expect(within(permsTable()).getAllByRole("row")).toHaveLength(5);
   });
 
@@ -201,11 +213,11 @@ describe("PlatformRolesPage", () => {
   });
 
   it("flags a permission that no route enforces yet", async () => {
-    renderPage();
+    // Pinned to PlatformAdmin: it is the only role holding the stub capability,
+    // and the page deliberately no longer *defaults* to it.
+    renderPage("/platform/roles?role=PlatformAdmin");
     await bothTables();
     await within(permsTable()).findByText("analytics.export");
-    // PlatformAdmin holds the stub capability, so the badge must be visible on
-    // first paint rather than hidden behind a filter.
     expect(within(permsTable()).getByText("Pending")).toBeInTheDocument();
   });
 
@@ -222,7 +234,9 @@ describe("PlatformRolesPage", () => {
   });
 
   it("filters the table from a single axis dropdown", async () => {
-    renderPage();
+    // PlatformAdmin grants everything, which is what makes the filter's effect
+    // measurable; the default role deliberately grants only one capability.
+    renderPage("/platform/roles?role=PlatformAdmin");
     const user = userEvent.setup();
     await bothTables();
     await within(permsTable()).findByText("farm.read");
@@ -350,6 +364,29 @@ describe("PlatformRolesPage editing", () => {
     );
     getRbacChanges.mockImplementation(() => Promise.resolve([]));
     await setupTestI18n("en");
+  });
+
+  it("opens on an editable role so the toggles are visible without hunting", async () => {
+    // The prod report was "I see no edit / modify functionalities". The cause
+    // was the landing role, so assert the *default* view offers a control.
+    renderPage();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    expect(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("says outright that the permissions can be edited", async () => {
+    renderPage();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    expect(
+      screen.getByText(/You can change what BillingAdmin is allowed to do/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Select a tick or dash in the Granted column/)).toBeInTheDocument();
   });
 
   it("turns the granted marker into a toggle for an editable role", async () => {
