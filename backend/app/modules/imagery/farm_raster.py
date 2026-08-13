@@ -39,7 +39,9 @@ from typing import Any
 import numpy as np
 import rasterio
 from numpy.typing import NDArray
+from rasterio.features import geometry_mask
 from rasterio.merge import merge as rio_merge
+from shapely.geometry import shape
 
 from app.modules.imagery._rasterio_io import _gdal_s3_env
 from app.modules.indices.computation import scl_cloud_mask
@@ -141,3 +143,31 @@ def covered_mask(bands_arrays: dict[str, NDArray[np.float32]]) -> NDArray[np.boo
     """
     first = next(iter(bands_arrays.values()))
     return np.isfinite(first)
+
+
+def block_masks_on_grid(
+    profile: dict[str, Any],
+    boundaries_utm: dict[str, dict[str, Any]],
+) -> dict[str, NDArray[np.bool_]]:
+    """Boolean masks for each block, on the FARM raster's grid.
+
+    A block aggregate over the farm surface is that surface masked to the
+    block's own polygon — the same polygon, and the same ``all_touched``
+    rule, the per-block pipeline uses when it cuts a block its own raster.
+    Keeping both identical is what makes a difference in the resulting means
+    a real finding rather than an artefact of how the pixels were selected.
+
+    The merge preserves the source pixel grid, so rasterising a block against
+    the farm transform selects exactly the pixels its own raster held.
+    """
+    out: dict[str, NDArray[np.bool_]] = {}
+    shape_hw = (int(profile["height"]), int(profile["width"]))
+    for block_id, geojson in boundaries_utm.items():
+        out[block_id] = ~geometry_mask(
+            [shape(geojson)],
+            out_shape=shape_hw,
+            transform=profile["transform"],
+            invert=False,
+            all_touched=True,
+        )
+    return out

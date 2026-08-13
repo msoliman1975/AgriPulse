@@ -1047,6 +1047,120 @@ async def _build_farm_scene_raster_async(
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.verify_farm_raster_aggregates",
+    bind=False,
+    ignore_result=False,
+    queue="heavy",
+)
+def verify_farm_raster_aggregates(farm_id: str, tenant_schema: str, at_iso: str) -> dict[str, Any]:
+    """Do block means computed from the FARM surface match the stored ones?
+
+    The whole cutover rests on one claim: measuring a block from a farm-wide
+    raster gives the same number as measuring it from its own. This checks that
+    claim against rows the per-block pipeline already wrote, and WRITES
+    NOTHING — it is evidence, not a migration.
+
+    A non-trivial difference means the two paths are not looking at the same
+    pixels, and the cutover should stop until it is understood.
+    """
+    return _run_task(
+        _verify_farm_raster_aggregates_async(
+            UUID(farm_id), tenant_schema, datetime.fromisoformat(at_iso)
+        )
+    )
+
+
+async def _verify_farm_raster_aggregates_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    at: datetime,
+) -> dict[str, Any]:
+    storage = _get_storage()
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        sources = await repo.list_farm_scene_sources(farm_id=farm_id, scene_datetime=at)
+        if sources is None:
+            return {"farm_id": str(farm_id), "at": at.isoformat(), "status": "no_sources"}
+        product = await _lookup_product(session, sources["product_id"])
+        boundaries = await repo.list_farm_block_boundaries(farm_id)
+        stored = await repo.list_block_index_means(farm_id=farm_id, scene_datetime=at)
+
+    if not stored:
+        return {"farm_id": str(farm_id), "at": at.isoformat(), "status": "no_stored_aggregates"}
+
+    import json as _json
+
+    import numpy as np
+
+    from app.modules.imagery.farm_raster import (
+        NoBlockRastersError,
+        block_masks_on_grid,
+        covered_mask,
+        merge_block_rasters,
+    )
+    from app.modules.indices.computation import compute_aggregates, compute_all_indices
+
+    bucket = storage.bucket
+    raw_uris = [f"s3://{bucket}/{stac}/raw_bands.tif" for stac in sources["stac_item_ids"]]
+    try:
+        bands_arrays, cloud_mask, profile = merge_block_rasters(
+            raw_uris, band_names=tuple(product["bands"])
+        )
+    except NoBlockRastersError:
+        return {"farm_id": str(farm_id), "at": at.isoformat(), "status": "no_readable_rasters"}
+
+    masks = block_masks_on_grid(
+        profile,
+        {str(b["block_id"]): _json.loads(b["boundary_utm_geojson"]) for b in boundaries},
+    )
+    surface = covered_mask(bands_arrays)
+    has_cloud = bool(cloud_mask.any())
+
+    deltas: list[float] = []
+    compared = 0
+    missing = 0
+    worst: dict[str, Any] | None = None
+    for index_code, raster in compute_all_indices(bands_arrays).items():
+        clouded = np.where(cloud_mask, np.float32("nan"), raster) if has_cloud else raster
+        for block_id, mask in masks.items():
+            was = stored.get((block_id, index_code))
+            if was is None:
+                missing += 1
+                continue
+            agg = compute_aggregates(clouded, mask & surface)
+            if agg.mean is None:
+                missing += 1
+                continue
+            delta = abs(float(agg.mean) - was)
+            deltas.append(delta)
+            compared += 1
+            if worst is None or delta > worst["delta"]:
+                worst = {
+                    "delta": delta,
+                    "block_id": block_id,
+                    "index": index_code,
+                    "stored": was,
+                    "from_farm": float(agg.mean),
+                }
+
+    result = {
+        "farm_id": str(farm_id),
+        "at": at.isoformat(),
+        "status": "compared",
+        "compared": compared,
+        "no_baseline": missing,
+        "max_abs_delta": max(deltas) if deltas else None,
+        "mean_abs_delta": (sum(deltas) / len(deltas)) if deltas else None,
+        "worst": worst,
+    }
+    _log.info("farm_raster_aggregate_diff", tenant_schema=tenant_schema, **result)
+    return result
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="imagery.rebuild_farm_rasters",
     bind=False,
     ignore_result=True,
