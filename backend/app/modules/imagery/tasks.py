@@ -941,6 +941,149 @@ async def _register_stac_item_async(
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.build_farm_scene_raster",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def build_farm_scene_raster(farm_id: str, tenant_schema: str, at_iso: str) -> dict[str, Any]:
+    """Stitch one farm-wide raster for one pass, from bands already stored.
+
+    Imagery is fetched per BLOCK, so a 36-block farm holds 36 rasters per pass
+    and no pixels at all between the blocks. This merges those rasters into one
+    surface and writes the per-index COGs against the FARM's aoi hash, which is
+    what lets the console draw a farm from a single tile source with no seams
+    where blocks meet.
+
+    Reads only what is already in the bucket: no provider call, no quota.
+    """
+    return _run_task(
+        _build_farm_scene_raster_async(UUID(farm_id), tenant_schema, datetime.fromisoformat(at_iso))
+    )
+
+
+async def _build_farm_scene_raster_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    at: datetime,
+) -> dict[str, Any]:
+    storage = _get_storage()
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        sources = await repo.list_farm_scene_sources(farm_id=farm_id, scene_datetime=at)
+        if sources is None:
+            return {"farm_id": str(farm_id), "at": at.isoformat(), "status": "no_sources"}
+        product = await _lookup_product(session, sources["product_id"])
+
+    # Local import: rasterio and numpy belong to the heavy worker only.
+    from app.modules.imagery._rasterio_io import compute_and_write_indices
+    from app.modules.imagery.farm_raster import (
+        NoBlockRastersError,
+        covered_mask,
+        merge_block_rasters,
+    )
+
+    bucket = storage.bucket
+    raw_uris = [f"s3://{bucket}/{stac}/raw_bands.tif" for stac in sources["stac_item_ids"]]
+    try:
+        bands_arrays, cloud_mask, profile = merge_block_rasters(
+            raw_uris, band_names=tuple(product["bands"])
+        )
+    except NoBlockRastersError:
+        # Every block of this pass claims success with no object behind it —
+        # the shape of the 3,787 orphans on prod. Nothing to build, and saying
+        # so is more useful than a raster of pure nodata.
+        return {"farm_id": str(farm_id), "at": at.isoformat(), "status": "no_readable_rasters"}
+
+    _aggregates, index_keys, _rasters = compute_and_write_indices(
+        bands_arrays=bands_arrays,
+        # The farm surface IS the union of what was fetched; anything else is
+        # nodata and must stay out of every statistic.
+        aoi_mask=covered_mask(bands_arrays),
+        profile=profile,
+        storage=storage,
+        provider_code=product["provider_code"],
+        product_code=product["code"],
+        scene_id=sources["scene_id"],
+        aoi_hash=sources["farm_aoi_hash"],
+        cloud_mask=cloud_mask,
+    )
+    stac_item_id = (
+        f"{product['provider_code']}/{product['code']}/"
+        f"{sources['scene_id']}/{sources['farm_aoi_hash']}"
+    )
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        await ImageryRepository(session).record_farm_scene_raster(
+            farm_id=farm_id,
+            product_id=sources["product_id"],
+            scene_datetime=sources["scene_datetime"],
+            scene_id=sources["scene_id"],
+            stac_item_id=stac_item_id,
+            aoi_hash=sources["farm_aoi_hash"],
+            blocks_merged=len(sources["stac_item_ids"]),
+            indices=sorted(index_keys),
+        )
+
+    _log.info(
+        "farm_raster_built",
+        tenant_schema=tenant_schema,
+        farm_id=str(farm_id),
+        at=at.isoformat(),
+        blocks_merged=len(sources["stac_item_ids"]),
+        indices=len(index_keys),
+    )
+    return {
+        "farm_id": str(farm_id),
+        "at": at.isoformat(),
+        "status": "built",
+        "blocks_merged": len(sources["stac_item_ids"]),
+        "indices": sorted(index_keys),
+        "aoi_hash": sources["farm_aoi_hash"],
+    }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.rebuild_farm_rasters",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def rebuild_farm_rasters(farm_id: str, tenant_schema: str, limit: int = 250) -> dict[str, Any]:
+    """Fan out `build_farm_scene_raster` across a farm's history.
+
+    One task per pass rather than one long task: a farm has hundreds of them,
+    and a single failure should cost one scene rather than the whole rebuild.
+    """
+    return _run_task(_rebuild_farm_rasters_async(UUID(farm_id), tenant_schema, limit))
+
+
+async def _rebuild_farm_rasters_async(
+    farm_id: UUID,
+    tenant_schema: str,
+    limit: int,
+) -> dict[str, Any]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        instants = await ImageryRepository(session).list_farm_scene_instants(
+            farm_id=farm_id, limit=limit
+        )
+    for at in instants:
+        build_farm_scene_raster.delay(str(farm_id), tenant_schema, at.isoformat())
+    _log.info(
+        "farm_raster_rebuild_queued",
+        tenant_schema=tenant_schema,
+        farm_id=str(farm_id),
+        scenes=len(instants),
+    )
+    return {"farm_id": str(farm_id), "queued": len(instants)}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="imagery.compute_indices",
     bind=False,
     ignore_result=True,

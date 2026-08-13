@@ -187,6 +187,23 @@ class FarmSceneAssetRead(BaseModel):
     resolution_m: Decimal | None
 
 
+class FarmRasterRead(BaseModel):
+    """One farm-wide raster — the whole farm as a single surface.
+
+    Same ``stac_item_id`` shape as a block asset, so a caller appends
+    ``/{index}.tif`` without caring which it is holding. When this is present
+    the client should draw THIS and ignore ``items``: it covers the same
+    ground in one file, with no seam where blocks meet.
+    """
+
+    stac_item_id: str
+    scene_datetime: datetime
+    resolution_m: Decimal | None
+    #: How many block rasters were stitched into it — a farm whose blocks are
+    #: partly missing still yields a surface, and this says how complete it is.
+    blocks_merged: int
+
+
 class FarmSceneAssetsResponse(BaseModel):
     """GET /api/v1/farms/{farm_id}/scene-assets response body."""
 
@@ -194,6 +211,10 @@ class FarmSceneAssetsResponse(BaseModel):
     #: The bound that was applied, echoed back so a client can tell "latest"
     #: apart from a specific pass it asked for.
     at: datetime | None
+    #: The farm-wide raster, when one has been stitched for this pass and the
+    #: farm has not been reshaped since. Null means this farm is still on the
+    #: per-block path — which is how the cutover runs one farm at a time.
+    farm: FarmRasterRead | None = None
     items: tuple[FarmSceneAssetRead, ...]
 
 

@@ -262,6 +262,14 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         order=10,
         storage_key_column="s3_key",
     ),
+    OwnedTable(
+        "farm_scene_rasters",
+        owner_column="farm_id",
+        order=10,
+        note="index of the farm-wide rasters stitched for each pass. The COGs "
+        "themselves live under the scene's aoi-hashed prefix in the bucket and "
+        "are purged with the rest of a tenant's imagery objects, not row by row",
+    ),
     OwnedTable("farm_imagery_overrides", owner_column="farm_id", order=10),
     OwnedTable("farm_imagery_template", owner_column="farm_id", order=10),
     OwnedTable("farm_weather_overrides", owner_column="farm_id", order=10),

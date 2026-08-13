@@ -169,6 +169,10 @@ async def test_scene_assets_return_one_row_per_block_honouring_the_bound(
 
     assert resp.status_code == 200
     body = resp.json()
+    # Nothing has been stitched for this farm, so the per-block path is what
+    # answers. `farm` stays null until a farm raster exists, which is how the
+    # cutover runs one farm at a time instead of all at once.
+    assert body["farm"] is None
     items = {i["block_id"]: i for i in body["items"]}
     assert len(body["items"]) == 2, "one row per block, not one per job"
     assert items[block_a]["stac_item_id"].endswith("NEW_A/aoihash")
