@@ -144,7 +144,37 @@ async def scan_public(session: AsyncSession) -> ScanResult:
         if n:
             orphans.append(Orphan("public", owned.table, owned.owner_column, n))
 
+    scanned += 1
+    unreachable = await _count_unreachable_users(session)
+    if unreachable:
+        orphans.append(Orphan("public", "users", "tenant_memberships", unreachable))
+
     return ScanResult(orphans=orphans, scanned_tables=scanned, schemas=["public"])
+
+
+async def _count_unreachable_users(session: AsyncSession) -> int:
+    """Users nobody can reach: no tenant membership and no platform role.
+
+    Not an ownership-column orphan — ``public.users`` has no owner — but the
+    same failure in a different shape, and the one a tenant purge used to
+    leave behind on every run. Such a row still holds the unique email, so it
+    silently blocks re-inviting that person anywhere on the platform.
+
+    Safe as a standalone audit because a user is materialised in the same
+    transaction as its membership (see the owner-provisioning path in
+    ``tenancy.service``); there is no committed window where a live user has
+    neither.
+    """
+    return await _count(
+        session,
+        """
+        SELECT count(*) FROM public.users u
+         WHERE NOT EXISTS (
+                 SELECT 1 FROM public.tenant_memberships m WHERE m.user_id = u.id)
+           AND NOT EXISTS (
+                 SELECT 1 FROM public.platform_role_assignments p WHERE p.user_id = u.id)
+        """,
+    )
 
 
 async def scan_all(session: AsyncSession) -> ScanResult:

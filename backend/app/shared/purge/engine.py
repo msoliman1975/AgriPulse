@@ -221,7 +221,30 @@ class PurgeEngine:
     # -- tenant (public-schema residue only) ---------------------------------
 
     async def preview_tenant_public(self, tenant_ids: list[UUID]) -> PurgeReport:
-        return await self._count(TENANT_PUBLIC_OWNED, tenant_ids)
+        report = await self._count(TENANT_PUBLIC_OWNED, tenant_ids)
+        n = await self._scalar(
+            text(
+                # The same set _orphaned_user_ids resolves after the delete,
+                # expressed while the memberships still exist: a user of this
+                # tenant, of no other tenant, and holding no platform role.
+                """
+                SELECT count(*) FROM public.users u
+                 WHERE EXISTS (
+                         SELECT 1 FROM public.tenant_memberships m
+                          WHERE m.user_id = u.id AND m.tenant_id = ANY(:ids))
+                   AND NOT EXISTS (
+                         SELECT 1 FROM public.tenant_memberships m2
+                          WHERE m2.user_id = u.id AND NOT (m2.tenant_id = ANY(:ids)))
+                   AND NOT EXISTS (
+                         SELECT 1 FROM public.platform_role_assignments p
+                          WHERE p.user_id = u.id)
+                """
+            ).bindparams(_IDS),
+            {"ids": tenant_ids},
+        )
+        if n:
+            report.rows["users"] = n
+        return report
 
     async def delete_tenant_public(self, tenant_ids: list[UUID]) -> PurgeReport:
         """Delete the tenant's public-schema rows, then the tenant row.
@@ -231,12 +254,89 @@ class PurgeEngine:
         """
         if not tenant_ids:
             return PurgeReport()
+        # Captured before the manifest empties tenant_memberships — afterwards
+        # there is nothing left to say who belonged to this tenant.
+        members = await self._tenant_member_ids(tenant_ids)
         report = await self._delete(TENANT_PUBLIC_OWNED, tenant_ids)
         report.rows["tenants"] = await self._rowcount(
             text("DELETE FROM public.tenants WHERE id = ANY(:ids)").bindparams(_IDS),
             {"ids": tenant_ids},
         )
+        n = await self._delete_orphaned_users(members)
+        if n:
+            report.rows["users"] = n
         return report
+
+    # -- orphaned users ------------------------------------------------------
+    #
+    # public.users carries no ownership column, so it cannot be a manifest
+    # entry: a user is not owned by a tenant, it is *reachable* from one via
+    # tenant_memberships, and it may be reachable from several. Purging a
+    # tenant therefore leaves behind every user whose only membership was in
+    # it — the residue that forced the SMOKE_EMAIL_SUFFIX workaround in
+    # scripts/e2e/provision_demo.py, because a re-provision then collides on
+    # the unique email of a user nobody can reach.
+    #
+    # The set is deliberately narrow: a user is removed only if it belonged to
+    # a tenant being purged, belongs to no surviving tenant, and holds no
+    # platform role. Platform admins routinely have no tenant membership at
+    # all, and deleting one because the last tenant it touched was purged
+    # would lock an operator out of the platform.
+
+    async def _tenant_member_ids(self, tenant_ids: list[UUID]) -> list[UUID]:
+        rows = await self._s.execute(
+            text(
+                "SELECT DISTINCT user_id FROM public.tenant_memberships "
+                "WHERE tenant_id = ANY(:ids)"
+            ).bindparams(_IDS),
+            {"ids": tenant_ids},
+        )
+        return [r[0] for r in rows]
+
+    async def _delete_orphaned_users(self, candidate_ids: list[UUID]) -> int:
+        if not candidate_ids:
+            return 0
+        rows = await self._s.execute(
+            text(
+                """
+                SELECT u.id FROM public.users u
+                 WHERE u.id = ANY(:ids)
+                   AND NOT EXISTS (
+                         SELECT 1 FROM public.tenant_memberships m WHERE m.user_id = u.id)
+                   AND NOT EXISTS (
+                         SELECT 1 FROM public.platform_role_assignments p WHERE p.user_id = u.id)
+                """
+            ).bindparams(_IDS),
+            {"ids": candidate_ids},
+        )
+        orphans = [r[0] for r in rows]
+        if not orphans:
+            return 0
+
+        # user_preferences, tenant_memberships and platform_role_assignments
+        # cascade off users.id, but the four provenance columns do not — they
+        # are plain FKs with no ON DELETE, so a surviving row in *another*
+        # tenant that this user invited or granted would make the delete fail
+        # outright. Blank the provenance instead: who granted a role is worth
+        # keeping only while the grantor still exists.
+        for table, column in (
+            ("tenant_memberships", "invited_by"),
+            ("tenant_role_assignments", "granted_by"),
+            ("farm_scopes", "granted_by"),
+            ("platform_role_assignments", "granted_by"),
+        ):
+            await self._s.execute(
+                text(
+                    f"UPDATE public.{table} SET {column} = NULL "  # noqa: S608
+                    f"WHERE {column} = ANY(:ids)"
+                ).bindparams(_IDS),
+                {"ids": orphans},
+            )
+
+        return await self._rowcount(
+            text("DELETE FROM public.users WHERE id = ANY(:ids)").bindparams(_IDS),
+            {"ids": orphans},
+        )
 
     # -- continuous aggregates ----------------------------------------------
 

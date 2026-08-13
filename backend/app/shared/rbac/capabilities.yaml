@@ -143,6 +143,15 @@ capabilities:
     description: Permanently purge a block, farm, or tenant and everything it owns.
     scope: platform
     status: active
+  platform.run_tasks:
+    # Deliberately NOT folded into platform.manage_tenants. This reaches into
+    # the worker fleet rather than the tenant record, and the tasks it can
+    # start write real rows — recommendations, alerts, baselines. Someone who
+    # administers tenant records has no need of it. PlatformSupport must not
+    # have it: support reads, it does not make the system act.
+    description: Run an allowlisted background task on demand for one tenant.
+    scope: platform
+    status: active
   platform.manage_crops:
     description: Create, edit, or retire crops, varieties, and strains in the catalog.
     scope: platform
