@@ -892,6 +892,159 @@ class ImageryRepository:
             "boundary_utm_geojson": json.loads(row["boundary_utm_geojson"]),
         }
 
+    async def list_farm_subscriptions(
+        self,
+        *,
+        farm_id: UUID,
+        include_inactive: bool = False,
+    ) -> tuple[dict[str, Any], ...]:
+        clauses = ["farm_id = :farm", "deleted_at IS NULL"]
+        if not include_inactive:
+            clauses.append("is_active = TRUE")
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"SELECT * FROM imagery_farm_subscriptions "  # noqa: S608
+                        f"WHERE {' AND '.join(clauses)} ORDER BY created_at ASC"
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def upsert_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        farm_id: UUID,
+        product_id: UUID,
+        cadence_hours: int | None,
+        cloud_cover_max_pct: int | None,
+        fetch_farm_aoi: bool,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Create the farm's subscription to a product, or revive it.
+
+        Revives rather than inserts a second row, because the unique index is
+        PARTIAL — it covers only live rows, so a revoked subscription
+        conflicts with nothing and a plain insert would leave the farm with
+        two histories for one product.
+
+        Reviving keeps the existing watermark, which is what stops
+        re-subscribing from re-fetching everything back to the discovery
+        floor.
+        """
+        existing = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT id FROM imagery_farm_subscriptions
+                        WHERE farm_id = :farm AND product_id = :product
+                          AND deleted_at IS NULL
+                        ORDER BY is_active DESC, created_at DESC
+                        LIMIT 1
+                        """
+                    ).bindparams(
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"farm": farm_id, "product": product_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if existing is not None:
+            await self._session.execute(
+                text(
+                    """
+                    UPDATE imagery_farm_subscriptions
+                       SET cadence_hours = :cadence,
+                           cloud_cover_max_pct = :cloud,
+                           fetch_farm_aoi = :fetch,
+                           is_active = TRUE,
+                           updated_by = :actor,
+                           updated_at = now()
+                     WHERE id = :id
+                    """
+                ).bindparams(
+                    bindparam("id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {
+                    "id": existing["id"],
+                    "cadence": cadence_hours,
+                    "cloud": cloud_cover_max_pct,
+                    "fetch": fetch_farm_aoi,
+                    "actor": actor_user_id,
+                },
+            )
+            revived = await self.get_farm_subscription(existing["id"])
+            assert revived is not None
+            return revived
+
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO imagery_farm_subscriptions (
+                    id, farm_id, product_id, cadence_hours, cloud_cover_max_pct,
+                    fetch_farm_aoi, is_active, created_by, updated_by
+                )
+                VALUES (
+                    :id, :farm, :product, :cadence, :cloud,
+                    :fetch, TRUE, :actor, :actor
+                )
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": subscription_id,
+                "farm": farm_id,
+                "product": product_id,
+                "cadence": cadence_hours,
+                "cloud": cloud_cover_max_pct,
+                "fetch": fetch_farm_aoi,
+                "actor": actor_user_id,
+            },
+        )
+        created = await self.get_farm_subscription(subscription_id)
+        assert created is not None
+        return created
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        changes: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        """Apply only the fields the caller named."""
+        if not changes:
+            return await self.get_farm_subscription(subscription_id)
+        sets = [f"{col} = :{col}" for col in changes]
+        sets += ["updated_by = :actor", "updated_at = now()"]
+        params: dict[str, Any] = {**changes, "id": subscription_id, "actor": actor_user_id}
+        await self._session.execute(
+            text(
+                f"UPDATE imagery_farm_subscriptions SET {', '.join(sets)} "  # noqa: S608
+                "WHERE id = :id AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            params,
+        )
+        return await self.get_farm_subscription(subscription_id)
+
     async def get_farm_subscription(self, subscription_id: UUID) -> dict[str, Any] | None:
         row = (
             (

@@ -25,7 +25,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.imagery.errors import BlockNotVisibleError
@@ -35,6 +35,9 @@ from app.modules.imagery.schemas import (
     CursorPage,
     FarmSceneAssetsResponse,
     FarmScenesResponse,
+    FarmSubscriptionCreate,
+    FarmSubscriptionRead,
+    FarmSubscriptionUpdate,
     IngestionJobRead,
     RefreshResponse,
     SubscriptionCreate,
@@ -279,6 +282,75 @@ async def list_farm_scenes(
     """
     del context  # the capability check's side-effect is the only consumer
     return await service.list_farm_scenes(farm_id=farm_id, limit=limit)
+
+
+# --- Farm-level subscriptions ----------------------------------------------
+#
+# The farm is the unit imagery is fetched for, so it is the unit the UI should
+# configure. These sit alongside the per-block routes rather than replacing
+# them, so a farm can be moved over one at a time.
+
+
+@router.get(
+    "/farms/{farm_id}/imagery/subscriptions",
+    response_model=list[FarmSubscriptionRead],
+    summary="List a farm's imagery subscriptions.",
+)
+async def list_farm_subscriptions(
+    farm_id: UUID,
+    include_inactive: bool = False,
+    context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
+    service: ImageryService = Depends(_service),
+) -> list[FarmSubscriptionRead]:
+    del context
+    rows = await service.list_farm_subscriptions(farm_id=farm_id, include_inactive=include_inactive)
+    return list(rows)
+
+
+@router.post(
+    "/farms/{farm_id}/imagery/subscriptions",
+    response_model=FarmSubscriptionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Subscribe a farm to an imagery product.",
+)
+async def create_farm_subscription(
+    farm_id: UUID,
+    payload: FarmSubscriptionCreate,
+    context: RequestContext = Depends(
+        requires_capability("imagery.subscription.manage", farm_id_param="farm_id")
+    ),
+    service: ImageryService = Depends(_service),
+) -> FarmSubscriptionRead:
+    return await service.upsert_farm_subscription(
+        farm_id=farm_id, payload=payload, actor_user_id=context.user_id
+    )
+
+
+@router.patch(
+    "/farms/{farm_id}/imagery/subscriptions/{subscription_id}",
+    response_model=FarmSubscriptionRead,
+    summary="Change a farm subscription's cadence, cloud cap, or farm-AOI fetch.",
+)
+async def update_farm_subscription(
+    farm_id: UUID,
+    subscription_id: UUID,
+    payload: FarmSubscriptionUpdate,
+    context: RequestContext = Depends(
+        requires_capability("imagery.subscription.manage", farm_id_param="farm_id")
+    ),
+    service: ImageryService = Depends(_service),
+) -> FarmSubscriptionRead:
+    row = await service.update_farm_subscription(
+        subscription_id=subscription_id,
+        payload=payload,
+        actor_user_id=context.user_id,
+    )
+    if row is None or row.farm_id != farm_id:
+        # Checking the farm matches is what stops a subscription id from one
+        # farm being edited through another farm's URL, which the capability
+        # check on farm_id would otherwise wave through.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subscription_not_found")
+    return row
 
 
 @router.get(
