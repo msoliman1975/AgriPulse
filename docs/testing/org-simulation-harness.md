@@ -115,16 +115,46 @@ what makes the tenant "born mid-season" and gives the decision trees something t
 > shape changes, seeds change silently. Mitigate by snapshotting the clone output to R2 once and
 > replaying the snapshot, rather than re-reading Bashayer every run.
 
-### P4 — Notification sink
+### P4 — Notification sink — *designed, not yet built*
 
-The swarm will trigger Brevo email and FCM pushes. On prod these reach real endpoints.
+The swarm will trigger email and FCM pushes. On prod these reach real endpoints, so this must
+land before any persona acts.
 
-- Per-tenant flag that routes all outbound notifications to a capture table plus a log line,
-  delivering nothing externally.
-- The capture table doubles as an oracle: "did the alert actually dispatch?" becomes a query
-  rather than an inbox check.
-- Note FCM is currently inert in prod (no Helm value sets `fcm_enabled`) — so the push path
-  cannot be asserted until that is fixed. Record it as a known coverage gap, don't fake a pass.
+**No capture table is needed.** `notification_dispatches` already records every attempt — one
+row per (recipient, channel) with status, rendered subject/body, and error. It is already the
+oracle this plan asked for. The work is purely to suppress *delivery* for one tenant.
+
+**The switch is a slug prefix in settings, not a column.** `notification_sink_tenant_prefix`
+(empty = disabled, set to `sim-` in the Helm values). A per-run tenant is `sim-<run_id>`, so one
+setting covers every future run with no per-run configuration, and a real tenant can never match
+a reserved prefix. No migration, and no risk of the flag being left on a real tenant.
+
+**It must be per-tenant, never process-wide.** The sim tenant lives on prod beside real
+customers, so a global kill switch would silence their alerts too.
+
+Three transports carry outbound traffic — `smtp.send_email`, `push.send_push`,
+`webhook.send_webhook`. Suppression is modelled on the precedent already in `send_push`, which
+returns `PushResult(sent=False, skipped=True)` when FCM is disabled.
+
+Two findings from reading the dispatch path:
+
+1. **Filtering the tenant's enabled channels is not sufficient.** There are three subscribers —
+   `_on_alert_opened`, `_on_recommendation_opened`, `_on_scouting_visit_assigned` — and only the
+   first two consult `_load_tenant_channels`. Scouting sends push directly, so a channel-level
+   filter would leak exactly the notifications a field-operator persona generates.
+2. **The guard has to be at the call sites, not only inside the transports.** Suppressing inside
+   `send_email` (which returns `None` on success) would leave the dispatch row saying `sent` for
+   something never sent — a lie in the table the harness reads as its oracle. Each of the six
+   call sites needs to record a distinct `suppressed` status. Guarding inside the transports as
+   well is still worth doing as a backstop, so a future call site cannot leak by omission.
+
+Fail-open on missing context is deliberate: an unset prefix delivers normally. Suppressing by
+accident would silence real customers' alerts, which is worse than a sim run that leaks a test
+email. Act 0 verifies the sink is live by dispatching one notification and asserting it was
+recorded `suppressed`.
+
+FCM is inert in prod (no Helm value sets `fcm_enabled`), so the push path cannot be asserted
+until that changes. Record it as a coverage gap; do not fake a pass.
 
 ### P5 — Per-persona browser isolation
 
