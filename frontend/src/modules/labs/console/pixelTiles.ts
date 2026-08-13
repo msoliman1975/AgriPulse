@@ -7,7 +7,6 @@
 //
 // Everything here is a pure function of (config, asset, index). No fetching,
 // so it can be unit-tested; the queries live in useIndexPixels.
-import type { FarmSceneAsset } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { histogramBins, titilerColormap } from "./indexClasses";
 
@@ -16,11 +15,18 @@ import { histogramBins, titilerColormap } from "./indexClasses";
  * bands under the scene's AOI-hashed prefix (`build_asset_key` in
  * `app/modules/imagery/storage.py`), and registers them on the pgstac item.
  */
-export function indexAssetKey(asset: FarmSceneAsset, code: ApiIndexCode): string {
+export function indexAssetKey(
+  asset: { stac_item_id: string },
+  code: ApiIndexCode,
+): string {
   return `${asset.stac_item_id}/${code}.tif`;
 }
 
-function assetUri(bucket: string, asset: FarmSceneAsset, code: ApiIndexCode): string {
+function assetUri(
+  bucket: string,
+  asset: { stac_item_id: string },
+  code: ApiIndexCode,
+): string {
   return `s3://${bucket}/${indexAssetKey(asset, code)}`;
 }
 
@@ -71,7 +77,8 @@ export const TILE_SIZE = 512;
 export function blockTileUrl(input: {
   tileServerBaseUrl: string;
   s3Bucket: string;
-  asset: FarmSceneAsset;
+  /** A block asset or a whole-farm raster — only the prefix is read. */
+  asset: { stac_item_id: string };
   code: ApiIndexCode;
 }): string {
   const params = new URLSearchParams({
@@ -94,7 +101,7 @@ export function blockTileUrl(input: {
 export function blockStatsUrl(input: {
   tileServerBaseUrl: string;
   s3Bucket: string;
-  asset: FarmSceneAsset;
+  asset: { stac_item_id: string };
   code: ApiIndexCode;
 }): string {
   const params = new URLSearchParams({

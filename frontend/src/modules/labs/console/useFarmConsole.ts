@@ -231,6 +231,29 @@ export function useFarmConsole(farmId: string) {
     return m;
   }, [summaryQ.data]);
 
+  // The farm's own extent, for the single-source path. Same reason blocks are
+  // bounded: the tile server 404s outside the raster, so an unbounded source
+  // asks for tiles that cannot exist.
+  const farmBounds = useMemo<[number, number, number, number] | null>(() => {
+    const boundary = summaryQ.data?.farm.boundary;
+    if (!boundary) return null;
+    let w = Infinity;
+    let s2 = Infinity;
+    let e = -Infinity;
+    let n = -Infinity;
+    for (const poly of boundary.coordinates) {
+      for (const ring of poly) {
+        for (const [x, y] of ring) {
+          if (x < w) w = x;
+          if (y < s2) s2 = y;
+          if (x > e) e = x;
+          if (y > n) n = y;
+        }
+      }
+    }
+    return Number.isFinite(w) ? [w, s2, e, n] : null;
+  }, [summaryQ.data]);
+
   const { config } = useOptionalConfig();
   const pixels = useIndexPixels({
     farmId,
@@ -238,6 +261,7 @@ export function useFarmConsole(farmId: string) {
     sceneAt,
     config,
     boundsByBlockId,
+    farmBounds,
     enabled: Boolean(config),
   });
 
