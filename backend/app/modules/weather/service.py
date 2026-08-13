@@ -26,6 +26,9 @@ from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.schemas import (
     DailyForecastRead,
     DerivedDailyRead,
+    FarmSubscriptionCreate,
+    FarmSubscriptionRead,
+    FarmSubscriptionUpdate,
     ForecastResponse,
     HourlyObservationRead,
     SubscriptionCreate,
@@ -54,6 +57,22 @@ class WeatherService(Protocol):
         block_id: UUID,
         include_inactive: bool = False,
     ) -> tuple[SubscriptionRead, ...]: ...
+
+    async def list_farm_subscriptions(
+        self, *, farm_id: UUID, include_inactive: bool = False
+    ) -> tuple[FarmSubscriptionRead, ...]: ...
+
+    async def upsert_farm_subscription(
+        self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
+    ) -> FarmSubscriptionRead: ...
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        payload: FarmSubscriptionUpdate,
+        actor_user_id: UUID | None,
+    ) -> FarmSubscriptionRead | None: ...
 
     async def revoke_subscription(
         self,
@@ -148,6 +167,45 @@ class WeatherServiceImpl:
             correlation_id=correlation_id,
         )
         return SubscriptionRead.model_validate(row)
+
+    # ---- Farm-level subscriptions ----------------------------------------
+    #
+    # One centroid, one provider call: the farm is the unit weather is
+    # actually fetched for, so it is the unit to configure.
+
+    async def list_farm_subscriptions(
+        self, *, farm_id: UUID, include_inactive: bool = False
+    ) -> tuple[FarmSubscriptionRead, ...]:
+        rows = await self._repo.list_farm_subscriptions(
+            farm_id=farm_id, include_inactive=include_inactive
+        )
+        return tuple(FarmSubscriptionRead.model_validate(r) for r in rows)
+
+    async def upsert_farm_subscription(
+        self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
+    ) -> FarmSubscriptionRead:
+        row = await self._repo.upsert_farm_subscription(
+            subscription_id=uuid7(),
+            farm_id=farm_id,
+            provider_code=payload.provider_code,
+            cadence_hours=payload.cadence_hours,
+            actor_user_id=actor_user_id,
+        )
+        return FarmSubscriptionRead.model_validate(row)
+
+    async def update_farm_subscription(
+        self,
+        *,
+        subscription_id: UUID,
+        payload: FarmSubscriptionUpdate,
+        actor_user_id: UUID | None,
+    ) -> FarmSubscriptionRead | None:
+        row = await self._repo.update_farm_subscription(
+            subscription_id=subscription_id,
+            changes=payload.model_dump(exclude_unset=True),
+            actor_user_id=actor_user_id,
+        )
+        return FarmSubscriptionRead.model_validate(row) if row is not None else None
 
     async def list_subscriptions(
         self,
