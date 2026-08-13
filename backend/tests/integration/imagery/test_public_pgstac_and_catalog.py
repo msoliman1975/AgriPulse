@@ -145,8 +145,17 @@ async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
         assert r.is_standard is True
         assert r.name_en  # non-empty English label
         assert r.name_ar  # non-empty Arabic label
-        assert float(r.value_min) == -1.0
-        assert float(r.value_max) == 1.0
+
+    # Every normalized-difference index shares the [-1, 1] range. `msi` does
+    # not, and that is the point of it: it is a plain SWIR/NIR ratio, so a
+    # blanket bounds assertion here would have to be relaxed into meaning
+    # nothing. Assert the two families separately instead.
+    by_code = {r.code: r for r in rows}
+    for code in ("bsi", "evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"):
+        assert float(by_code[code].value_min) == -1.0, code
+        assert float(by_code[code].value_max) == 1.0, code
+    assert float(by_code["msi"].value_min) == 0.0
+    assert float(by_code["msi"].value_max) == 3.0
 
 
 @pytest.mark.asyncio

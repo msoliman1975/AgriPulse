@@ -25,6 +25,7 @@ The mode set allowed for a crop is cross-checked against
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -103,6 +104,20 @@ class PhenologyStage(BaseModel):
     name_ar: str = Field(min_length=1, max_length=255)
     order: int = Field(ge=0)
     advance: Advance
+    # FAO-56 crop coefficient for this stage. Optional, because most catalog
+    # rows predate it and the irrigation engine falls back to a per-stage
+    # table when it is absent.
+    #
+    # It has to be declared here even though nothing in this module reads it:
+    # the model is `extra="forbid"`, so while `irrigation.engine._phenology_kc`
+    # has always documented the crop catalog as its PREFERRED Kc source, a
+    # catalog carrying one would have failed validation. The preferred path was
+    # unreachable until this field existed.
+    #
+    # Bounded rather than free: FAO-56 single crop coefficients sit roughly
+    # 0.2-1.3, so anything at or below zero is a typo and anything above 2 is
+    # almost certainly a percentage that lost its decimal point.
+    kc: Decimal | None = Field(default=None, gt=0, le=2)
 
     @field_validator("code")
     @classmethod
