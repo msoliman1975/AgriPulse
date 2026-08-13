@@ -739,5 +739,17 @@
     "relativeCaveat": "NDRE shifts with sensor and crop — compare blocks against each other on one date rather than against fixed thresholds.",
     "emptyNoSceneTitle": "Nothing for this date",
     "emptyNoSceneBody": "No block has a usable image for the selected pass — cloud, or an ingest that has not run. Pick another date on the timeline."
+  },
+  "farmSubs": {
+    "loading": "Loading subscriptions…",
+    "loadFailed": "Could not load this farm's subscriptions.",
+    "saveFailed": "Could not save that change.",
+    "cadence": "Every (h)",
+    "imageryTitle": "Satellite imagery",
+    "imageryHint": "Imagery is fetched for this farm. Turning a product on subscribes the whole farm — there is no separate step to apply it to blocks.",
+    "weatherTitle": "Weather",
+    "weatherHint": "Weather is fetched once for the farm's location and shared by every block.",
+    "wholeFarm": "Whole farm",
+    "wholeFarmHint": "Whole farm fetches the farm's own boundary instead of stitching block images together, so land outside your blocks is measured too. It costs one larger request per pass."
   }
 }

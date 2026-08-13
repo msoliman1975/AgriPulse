@@ -17,7 +17,6 @@ const PRODUCT_ID = "019eab8c-6550-7827-b10d-007109e77470";
 // over has to be created inside vi.hoisted.
 const h = vi.hoisted(() => ({
   saved: { current: { imagery: [] as unknown[], weather: [] as unknown[] } },
-  applySubscriptionsMock: vi.fn(),
   savedGrid: {
     current: { cell_size_m: null as number | null, anomaly_z_threshold: null as number | null },
   },
@@ -25,7 +24,6 @@ const h = vi.hoisted(() => ({
   applyGridCellSizeMock: vi.fn(),
   previewApplyGridMock: vi.fn(),
 }));
-const applySubscriptionsMock = h.applySubscriptionsMock;
 const applyGridMock = h.applyGridMock;
 const applyGridCellSizeMock = h.applyGridCellSizeMock;
 const previewApplyGridMock = h.previewApplyGridMock;
@@ -61,7 +59,6 @@ vi.mock("@/api/farmConfig", async () => {
         matched_blocks: 36,
       }),
     ),
-    applySubscriptions: h.applySubscriptionsMock,
     getLocks: vi.fn(() =>
       Promise.resolve({ subscriptions: false, irrigation: false, org: false, grid: false }),
     ),
@@ -83,6 +80,18 @@ vi.mock("@/api/farmConfig", async () => {
     applyGridCellSize: h.applyGridCellSizeMock,
   };
 });
+
+// The panel renders FarmSubscriptionsPanel, which loads farm-level
+// subscriptions on mount. Without this mock those calls reach jsdom's real
+// XHR and every test in the file fails on an unrelated network error.
+vi.mock("@/api/farmSubscriptions", () => ({
+  listFarmImagerySubscriptions: vi.fn(async () => []),
+  listFarmWeatherSubscriptions: vi.fn(async () => []),
+  subscribeFarmImagery: vi.fn(async () => ({})),
+  subscribeFarmWeather: vi.fn(async () => ({})),
+  updateFarmImagerySubscription: vi.fn(async () => ({})),
+  updateFarmWeatherSubscription: vi.fn(async () => ({})),
+}));
 
 vi.mock("@/api/config", () => ({
   getConfig: vi.fn(() =>
@@ -108,75 +117,10 @@ vi.mock("@/api/weather", () => ({
   listWeatherProviders: vi.fn(() => Promise.resolve([{ code: "open_meteo", name: "Open-Meteo" }])),
 }));
 
-async function renderPanel() {
-  const view = render(<BlockDefaultsPanel farmId="f1" farmName="Bashayer" />);
-  // Wait for the initial template load to settle.
-  await waitFor(() => expect(screen.getByText(/Save subscriptions template/i)).toBeTruthy());
-  return view;
-}
-
-describe("BlockDefaultsPanel — apply subscriptions", () => {
-  beforeEach(async () => {
-    await setupTestI18n("en");
-    h.saved.current = { imagery: [], weather: [] };
-    applySubscriptionsMock.mockReset();
-    applySubscriptionsMock.mockResolvedValue({
-      blocks_touched: 0,
-      imagery_added: 0,
-      imagery_updated: 0,
-      imagery_deactivated: 0,
-      weather_added: 0,
-      weather_updated: 0,
-      weather_deactivated: 0,
-    });
-  });
-
-  it("explains that an empty saved template would change nothing", async () => {
-    await renderPanel();
-    expect(screen.getByText(/saved template is empty/i)).toBeTruthy();
-  });
-
-  it("blocks Apply while the template has unsaved edits", async () => {
-    const user = userEvent.setup();
-    await renderPanel();
-
-    // Add an imagery row but deliberately do NOT save it.
-    await user.click(screen.getByRole("button", { name: /Add product/i }));
-
-    const applyBtn = screen.getByRole("button", { name: /Apply subscriptions to blocks/i });
-    expect(applyBtn).toBeDisabled();
-    expect(screen.getByText(/unsaved template changes/i)).toBeTruthy();
-  });
-
-  it("re-enables Apply once the template is saved", async () => {
-    const user = userEvent.setup();
-    await renderPanel();
-
-    await user.click(screen.getByRole("button", { name: /Add product/i }));
-    await user.click(screen.getByRole("button", { name: /Save subscriptions template/i }));
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Apply subscriptions to blocks/i })).toBeEnabled(),
-    );
-    expect(screen.queryByText(/unsaved template changes/i)).toBeNull();
-  });
-
-  it("does not offer a confirm button when every block already matches", async () => {
-    const user = userEvent.setup();
-    await renderPanel();
-
-    await user.click(screen.getByRole("button", { name: /Apply subscriptions to blocks/i }));
-
-    await waitFor(() => expect(screen.getByText(/36 of 36 blocks already match/i)).toBeTruthy());
-    expect(screen.getByRole("button", { name: /Confirm apply/i })).toBeDisabled();
-    // The whole point: the user can no longer trigger a no-op that claims success.
-    expect(applySubscriptionsMock).not.toHaveBeenCalled();
-  });
-});
-
-// The grid card inherits the same three guards, and adds a fourth concern:
-// its cell-size scope is destructive, so the confirmation must appear only
-// when live geometry would actually be retired.
+// The "apply subscriptions" tests lived here. Imagery and weather moved to
+// farm-level subscriptions, which have no template and no apply step, so the
+// behaviour they described no longer exists. Their replacement is
+// FarmSubscriptionsPanel.test.tsx.
 
 const GRID_ROWS = [
   {
