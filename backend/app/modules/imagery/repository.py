@@ -359,6 +359,192 @@ class ImageryRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def list_farm_scene_sources(
+        self,
+        *,
+        farm_id: UUID,
+        scene_datetime: datetime,
+    ) -> dict[str, Any] | None:
+        """Everything needed to stitch one farm-wide raster for one pass.
+
+        Returns the farm's own AOI hash plus every block job of that pass that
+        actually wrote raw bands — the inputs the merge consumes. ``None`` when
+        the farm has no usable job for the instant, which the caller treats as
+        "nothing to build" rather than as an error.
+
+        Jobs are matched on the exact ``scene_datetime`` rather than the day:
+        blocks in different Sentinel tiles are sensed minutes apart, and a
+        day-wide match would merge two passes into one surface.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                            j.block_id,
+                            j.product_id,
+                            j.stac_item_id,
+                            j.scene_id,
+                            j.scene_datetime,
+                            f.aoi_hash AS farm_aoi_hash
+                        FROM imagery_ingestion_jobs j
+                        JOIN blocks b ON b.id = j.block_id
+                        JOIN farms f ON f.id = b.farm_id
+                        WHERE b.farm_id = :farm
+                          AND j.scene_datetime = :at
+                          AND j.status = 'succeeded'
+                          AND j.stac_item_id IS NOT NULL
+                        ORDER BY j.block_id
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id, "at": scene_datetime},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        if not rows:
+            return None
+        first = rows[0]
+        if first["farm_aoi_hash"] is None:
+            # Pre-0073 farm row that the backfill missed; refusing here beats
+            # writing rasters under an empty prefix that nothing can find.
+            return None
+        return {
+            "farm_aoi_hash": first["farm_aoi_hash"],
+            "product_id": first["product_id"],
+            "scene_id": first["scene_id"],
+            "scene_datetime": first["scene_datetime"],
+            "stac_item_ids": [r["stac_item_id"] for r in rows],
+            "block_ids": [r["block_id"] for r in rows],
+        }
+
+    async def list_farm_scene_instants(
+        self,
+        *,
+        farm_id: UUID,
+        limit: int,
+    ) -> tuple[datetime, ...]:
+        """Distinct sensing instants for a farm, newest first.
+
+        The rebuild walks these: one farm raster per instant. Distinct on the
+        exact instant, not the day, for the same reason the source query is.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT DISTINCT j.scene_datetime
+                    FROM imagery_ingestion_jobs j
+                    JOIN blocks b ON b.id = j.block_id
+                    WHERE b.farm_id = :farm
+                      AND j.status = 'succeeded'
+                      AND j.stac_item_id IS NOT NULL
+                    ORDER BY j.scene_datetime DESC
+                    LIMIT :limit
+                    """
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                {"farm": farm_id, "limit": limit},
+            )
+        ).all()
+        return tuple(r[0] for r in rows)
+
+    async def record_farm_scene_raster(
+        self,
+        *,
+        farm_id: UUID,
+        product_id: UUID,
+        scene_datetime: datetime,
+        scene_id: str,
+        stac_item_id: str,
+        aoi_hash: str,
+        blocks_merged: int,
+        indices: list[str],
+    ) -> None:
+        """Note that a farm-wide raster now exists for this pass.
+
+        Upsert on (farm, pass, boundary): rebuilding a pass replaces the row
+        rather than accumulating history nobody reads. The row is what lets the
+        API answer "is there a farm raster here?" without probing the bucket,
+        and what makes the cutover per farm — a farm with rows serves one
+        raster, a farm without keeps the per-block path untouched.
+        """
+        await self._session.execute(
+            text(
+                """
+                INSERT INTO farm_scene_rasters (
+                    farm_id, product_id, scene_datetime, scene_id,
+                    stac_item_id, aoi_hash, blocks_merged, indices
+                )
+                VALUES (
+                    :farm, :product, :at, :scene_id,
+                    :stac, :aoi_hash, :blocks, CAST(:indices AS jsonb)
+                )
+                ON CONFLICT (farm_id, scene_datetime, aoi_hash) DO UPDATE
+                SET stac_item_id  = EXCLUDED.stac_item_id,
+                    product_id    = EXCLUDED.product_id,
+                    scene_id      = EXCLUDED.scene_id,
+                    blocks_merged = EXCLUDED.blocks_merged,
+                    indices       = EXCLUDED.indices,
+                    built_at      = now()
+                """
+            ).bindparams(
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "farm": farm_id,
+                "product": product_id,
+                "at": scene_datetime,
+                "scene_id": scene_id,
+                "stac": stac_item_id,
+                "aoi_hash": aoi_hash,
+                "blocks": blocks_merged,
+                "indices": json.dumps(indices),
+            },
+        )
+
+    async def get_farm_scene_raster(
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime | None,
+    ) -> dict[str, Any] | None:
+        """The farm-wide raster to draw for a pass, or None if there is none.
+
+        Matched against the farm's CURRENT aoi_hash: a farm reshaped since the
+        raster was stitched falls back to the per-block path rather than
+        drawing a surface cut to a boundary that no longer exists.
+        """
+        clauses = ["r.farm_id = :farm", "r.aoi_hash = f.aoi_hash"]
+        params: dict[str, Any] = {"farm": farm_id}
+        if at is not None:
+            clauses.append("r.scene_datetime <= :at")
+            params["at"] = at
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT r.scene_datetime, r.stac_item_id, r.product_id,
+                               r.blocks_merged, p.resolution_m
+                        FROM farm_scene_rasters r
+                        JOIN farms f ON f.id = r.farm_id
+                        LEFT JOIN public.imagery_products p ON p.id = r.product_id
+                        WHERE {" AND ".join(clauses)}
+                        ORDER BY r.scene_datetime DESC
+                        LIMIT 1
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return dict(rows[0]) if rows else None
+
     async def list_ingestion_jobs_for_block(
         self,
         *,

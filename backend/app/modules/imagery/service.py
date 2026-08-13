@@ -31,6 +31,7 @@ from app.modules.imagery.events import (
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
+    FarmRasterRead,
     FarmSceneAssetRead,
     FarmSceneAssetsResponse,
     FarmSceneRead,
@@ -275,9 +276,14 @@ class ImageryServiceImpl:
         self, *, farm_id: UUID, at: datetime | None = None
     ) -> FarmSceneAssetsResponse:
         rows = await self._repo.list_farm_scene_assets(farm_id=farm_id, at=at)
+        # The farm-wide raster wins when there is one: same ground, one file,
+        # no seam. The per-block items still ride along so a client that
+        # predates the field keeps working unchanged.
+        farm_row = await self._repo.get_farm_scene_raster(farm_id=farm_id, at=at)
         return FarmSceneAssetsResponse(
             farm_id=farm_id,
             at=at,
+            farm=FarmRasterRead.model_validate(farm_row) if farm_row else None,
             items=tuple(FarmSceneAssetRead.model_validate(r) for r in rows),
         )
 
