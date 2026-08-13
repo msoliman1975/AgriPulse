@@ -22,6 +22,7 @@ import {
   blockStatsUrl,
   blockTileUrl,
   TILE_SIZE,
+  farmRasterForPass,
   readBlockCounts,
   summariseClassAreas,
   type BandStatistics,
@@ -134,8 +135,18 @@ export function useIndexPixels(input: {
    * (each block's raster carries the shared boundary pixel, so drawing both
    * stacked two translucent copies of it). Null keeps the per-block path,
    * which is how the cutover runs one farm at a time.
+   *
+   * The surface is only accepted when it is the SAME pass the blocks resolved
+   * to. On prod, asking for a 2024 pass returns that pass's block rasters
+   * alongside the LATEST farm raster, which paints today's pixels under a
+   * timeline reading two years ago — a wrong answer that looks like a right
+   * one. A pass the farm has no surface for falls back to the per-block path,
+   * which is merely seamed rather than untrue.
    */
-  const farmRaster = useMemo<FarmRaster | null>(() => assetsQ.data?.farm ?? null, [assetsQ.data]);
+  const farmRaster = useMemo<FarmRaster | null>(
+    () => farmRasterForPass(assetsQ.data?.farm, assetsQ.data?.items ?? []),
+    [assetsQ.data],
+  );
 
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would

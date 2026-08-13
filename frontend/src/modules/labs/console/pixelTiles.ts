@@ -166,6 +166,26 @@ export function readBlockCounts(
   };
 }
 
+/**
+ * The farm surface to draw for a pass, or null to fall back to per-block.
+ *
+ * A farm raster is only the right thing to draw when it is the SAME pass the
+ * blocks resolved to. On prod, asking for a 2024 pass returns that pass's
+ * block rasters alongside the LATEST farm raster — which paints today's
+ * pixels under a timeline reading two years ago. That is a wrong answer
+ * wearing the shape of a right one, and the seamed per-block path is the
+ * better failure: ugly rather than untrue.
+ */
+export function farmRasterForPass<T extends { scene_datetime: string }>(
+  farm: T | null | undefined,
+  items: readonly { scene_datetime: string }[],
+): T | null {
+  if (!farm) return null;
+  // With no blocks there is no pass to disagree with.
+  if (items.length === 0) return farm;
+  return Date.parse(farm.scene_datetime) === Date.parse(items[0].scene_datetime) ? farm : null;
+}
+
 export interface ClassAreaSummary {
   /** Square metres per class, in the class table's order (lowest first). */
   areaM2ByClass: number[];
