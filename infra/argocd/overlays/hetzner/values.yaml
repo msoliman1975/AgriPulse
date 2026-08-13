@@ -1604,13 +1604,47 @@ global:
   #   Watch after sync: /labs/map-v2 on B-Elkair-Suez. Dates before 2026-05-12
   #   should be greyed out and unclickable; switching index should repaint
   #   noticeably faster and fetch ~25 tiles rather than ~92.
+  # c0abb11b = #430 #431 #432 #433 #434: one raster per FARM instead of one per
+  #   block. API, WORKERS AND FRONTEND ALL MOVE — the api carries tenant
+  #   migrations 0073/0074 and serves the new `farm` field, the WORKERS carry
+  #   the stitching tasks (this is the first workers bump since f2ed5f2), and
+  #   the frontend draws one source when a farm raster exists.
+  #
+  #   INERT until `rebuild_farm_rasters` is run against a farm. No farm changes
+  #   behaviour on sync; the cutover is a per-farm decision.
+  #
+  #   Migrations: tenant 0073 (farms.aoi_hash + farm_scene_rasters) and 0074
+  #   (imagery_farm_subscriptions, populated from the per-block rows). Both are
+  #   additive; the per-block subscription rows are untouched and still drive
+  #   ingestion, so 0074 is inert too.
+  #
+  #   Why this exists, measured on Bashier Elkhier: 41.6 of its 203.4 feddan
+  #   has NO IMAGERY AT ALL, because pixels are only ever fetched inside block
+  #   boundaries. Adjacent blocks also share a boundary pixel written into both
+  #   their rasters, which is the dark seam on the map — the blocks do not
+  #   actually overlap (4 pairs, ~0 m²).
+  #
+  #   KNOWN, NOT A REGRESSION: block rasters are each on their own pixel grid
+  #   (9.903 / 10.036 / 10.134 m, origins aligned to nothing — the provider
+  #   fits a fixed-SIZE image to each AOI). The farm raster pins an explicit
+  #   grid, so re-measuring a block off it moves its mean by ~0.7% (mean
+  #   |delta| 0.00146 NDVI, max 0.00744 over 35 blocks). Nothing writes those
+  #   numbers yet — `verify_farm_raster_aggregates` only reports them.
+  #
+  #   Merge run 31684223556; manifests verified by PULLING them on the node
+  #   rather than from the run conclusion (the 3bbf974 run was cancelled by
+  #   concurrency, which is exactly why the conclusion is not the evidence):
+  #   api@sha256:e01d7f1b, workers@sha256:554a3376, frontend@sha256:0a46c266.
+  #
+  #   Watch after sync: nothing should change. /labs/map-v2 keeps drawing
+  #   per-block rasters until a farm is stitched.
   images:
     api:
-      tag: "6317de4"
+      tag: "c0abb11"
     workers:
-      tag: "f2ed5f2"
+      tag: "c0abb11"
     frontend:
-      tag: "6317de4"
+      tag: "c0abb11"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
