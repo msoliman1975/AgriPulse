@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, select, text, update
+from sqlalchemy import ARRAY, bindparam, select, text, update
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -342,6 +342,142 @@ class IrrigationRepository:
 
             raise IrrigationScheduleNotFoundError(schedule_id)
         return after
+
+    # ---- Daily water balance (gap-audit D7) ---------------------------
+    #
+    # Deliberately set-based rather than looping `get_block_context` per
+    # block. That helper issues up to four queries for one block, which is
+    # fine for a single on-demand recommendation and quietly quadratic for a
+    # sweep over every block in a tenant — the shape that caused the map N+1
+    # and pool-exhaustion incident. These run a fixed number of queries no
+    # matter how many blocks a tenant has.
+
+    async def load_water_balance_blocks(self, *, target_date: date_type) -> list[dict[str, Any]]:
+        """Every active block with a current crop, plus that day's ET0/precip.
+
+        Blocks with no current crop are excluded by the join: without a crop
+        there is no Kc, and an ETc computed on the generic fallback for a
+        block we know to be fallow would be a fabricated demand figure.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                    SELECT b.id            AS block_id,
+                           b.farm_id       AS farm_id,
+                           bc.crop_id      AS crop_id,
+                           bc.crop_variety_id,
+                           bc.crop_variety_strain_id,
+                           bc.growth_stage AS growth_stage,
+                           wd.et0_mm_daily AS et0_mm,
+                           wd.precip_mm_daily AS precip_mm,
+                           COALESCE(irr.applied_mm, NULL) AS irrigation_mm
+                      FROM blocks b
+                      JOIN block_crops bc
+                        ON bc.block_id = b.id
+                       AND bc.is_current = TRUE
+                       AND bc.deleted_at IS NULL
+                      JOIN weather_derived_daily wd
+                        ON wd.farm_id = b.farm_id
+                       AND wd.date = :d
+                      LEFT JOIN (
+                            SELECT s.block_id, SUM(s.applied_volume_mm) AS applied_mm
+                              FROM irrigation_schedules s
+                             WHERE s.scheduled_for = :d
+                               AND s.status = 'applied'
+                               AND s.applied_volume_mm IS NOT NULL
+                             GROUP BY s.block_id
+                           ) irr ON irr.block_id = b.id
+                     WHERE b.deleted_at IS NULL
+                       AND b.status NOT IN ('archived', 'abandoned')
+                       AND wd.et0_mm_daily IS NOT NULL
+                    """
+                    ),
+                    {"d": target_date},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def load_phenology_by_crop_ids(
+        self,
+        *,
+        crop_ids: set[UUID],
+        variety_ids: set[UUID],
+        strain_ids: set[UUID],
+    ) -> dict[str, dict[UUID, Any]]:
+        """Phenology docs for the catalog rows the sweep's blocks reference.
+
+        Three queries for the whole tenant rather than three per block. Empty
+        id sets skip their query entirely — `IN ()` is a syntax error, and a
+        tenant growing one crop should not pay for the other two lookups.
+        """
+        out: dict[str, dict[UUID, Any]] = {"crop": {}, "variety": {}, "strain": {}}
+
+        async def _load(key: str, table: str, column: str, ids: set[UUID]) -> None:
+            if not ids:
+                return
+            rows = (
+                (
+                    await self._public.execute(
+                        text(
+                            f"SELECT id, {column} AS doc FROM public.{table} "  # noqa: S608
+                            "WHERE id = ANY(:ids) AND is_active = TRUE"
+                        ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+                        {"ids": list(ids)},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            out[key] = {r["id"]: r["doc"] for r in rows}
+
+        # `table`/`column` are module-local literals, never caller input, so
+        # the f-string above cannot carry untrusted SQL.
+        await _load("crop", "crops", "phenology_stages", crop_ids)
+        await _load("variety", "crop_varieties", "phenology_stages_override", variety_ids)
+        await _load("strain", "crop_variety_strains", "phenology_stages_override", strain_ids)
+        return out
+
+    async def upsert_water_balance_rows(self, rows: list[dict[str, Any]]) -> int:
+        """Write one day's balances. Idempotent on (block_id, date).
+
+        Recomputed wholesale rather than merged: a re-run after a late
+        irrigation log should replace the row, not add to it.
+        """
+        if not rows:
+            return 0
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO block_water_balance_daily (
+                    block_id, date, balance_mm, etc_mm, et0_mm,
+                    kc_used, kc_source, growth_stage,
+                    precip_mm, irrigation_mm, irrigation_logged, computed_at
+                ) VALUES (
+                    :block_id, :date, :balance_mm, :etc_mm, :et0_mm,
+                    :kc_used, :kc_source, :growth_stage,
+                    :precip_mm, :irrigation_mm, :irrigation_logged, now()
+                )
+                ON CONFLICT (block_id, date) DO UPDATE SET
+                    balance_mm = EXCLUDED.balance_mm,
+                    etc_mm = EXCLUDED.etc_mm,
+                    et0_mm = EXCLUDED.et0_mm,
+                    kc_used = EXCLUDED.kc_used,
+                    kc_source = EXCLUDED.kc_source,
+                    growth_stage = EXCLUDED.growth_stage,
+                    precip_mm = EXCLUDED.precip_mm,
+                    irrigation_mm = EXCLUDED.irrigation_mm,
+                    irrigation_logged = EXCLUDED.irrigation_logged,
+                    computed_at = now()
+                """
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            rows,
+        )
+        return len(rows)
 
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
         rows = (

@@ -123,6 +123,18 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.irrigation_generate_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # Daily crop water balance per block: precip + irrigation - ETc, the
+    # correction to finding D7 of the indices gap audit. Runs against
+    # YESTERDAY rather than today — a balance needs a whole day of ET₀,
+    # rainfall and irrigation to mean anything, and evaluated mid-morning it
+    # would report every block in deficit simply because the day is young.
+    # Idempotent on `(block_id, date)`, so the hourly cadence just keeps
+    # yesterday's row current as late irrigation logs arrive.
+    "irrigation.water_balance_sweep": {
+        "task": "irrigation.water_balance_sweep",
+        "schedule": float(_settings.irrigation_water_balance_sweep_seconds),
+        "options": {"queue": "light"},
+    },
     # Recommendations engine: walk every active block per tenant and
     # evaluate every active decision tree against the latest signals.
     # Idempotent on the partial UNIQUE `(block_id, tree_id) WHERE

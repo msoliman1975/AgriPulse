@@ -217,6 +217,12 @@ class Settings(BaseSettings):
     # re-runs within the same day from duplicating.
     irrigation_generate_sweep_seconds: int = 3600
 
+    # Cadence for `irrigation.water_balance_sweep`. Targets YESTERDAY, so
+    # the interval governs how quickly a late irrigation log is reflected
+    # rather than how fresh the reading is. Hourly keeps that responsive;
+    # the upsert is idempotent on `(block_id, date)`.
+    irrigation_water_balance_sweep_seconds: int = 3600
+
     # Cadence for `recommendations.evaluate_sweep`. Daily in production
     # â€” decision trees consume slow-moving signals (NDVI baselines).
     # Hourly in dev so a fresh aggregate triggers a recommendation
