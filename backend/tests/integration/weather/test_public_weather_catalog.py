@@ -79,7 +79,7 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
     """The catalog is append-only, and each migration proves it.
 
     0037 lands the table with 7 indices; 0049 appends `humidity` at 8; 0057
-    the gap-audit trio at 9-11; 0060 `drought_spi` at 12. Every one of them
+    the gap-audit trio at 9-11; 0065 `drought_spi` at 12. Every one of them
     leaves the earlier rows' sort_order untouched, which is what keeps the
     summary strip's ordering stable as the catalog grows."""
     present = (
@@ -98,7 +98,7 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
         "evaporation_coeff",
         "rain_et_balance",
         "humidity",
-        # 0057, appended at 9-11 by the indices-guide gap audit.
+        # 0062, appended at 9-11 by the indices-guide gap audit.
         "leaf_wetness",
         "frost_risk",
         "heat_stress",

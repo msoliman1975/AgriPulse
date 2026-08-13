@@ -22,8 +22,8 @@ Appended at sort_order 9-11; existing rows keep their positions, exactly as
 projection has run for a farm. That is correct behaviour, not a regression —
 it is the ribbon reporting a real gap.
 
-Revision ID: 0057
-Revises: 0056
+Revision ID: 0062
+Revises: 0061
 Create Date: 2026-08-12
 """
 
@@ -34,8 +34,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0057"
-down_revision: str | Sequence[str] | None = "0056"
+revision: str = "0062"
+down_revision: str | Sequence[str] | None = "0061"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -130,7 +130,7 @@ export const WEATHER_FIELDS: Record<(typeof WEATHER_SCOPES)[number], readonly st
 export const WEATHER_INDEX_KEYS = ["value", "baseline_deviation"] as const;
 // The catalog codes (public weather_indices_catalog). Kept as a closed list
 // so the author picks from a dropdown rather than guessing a code; mirrors
-// the migration 0037 seed + 0049 (`humidity`) + 0057 (gap-audit indices).
+// the migration 0037 seed + 0049 (`humidity`) + 0062 (gap-audit indices).
 //
 // Unlike INDEX_CODES above this list is load-bearing at RUNTIME, not just in
 // the picker: `parseValueRef` rejects an unknown code, which drops the whole

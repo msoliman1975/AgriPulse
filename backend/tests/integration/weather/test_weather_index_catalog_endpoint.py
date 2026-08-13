@@ -65,7 +65,7 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
 
     codes = [row["code"] for row in body]
     # Every seeded index surfaces; the inactive row does not. Order is
-    # append-only: 0049 put `humidity` at 8 and 0057 the gap-audit trio at
+    # append-only: 0049 put `humidity` at 8 and 0062 the gap-audit trio at
     # 9-11, each time leaving the earlier rows where they were.
     assert codes == [
         "temperature",

@@ -11,7 +11,7 @@ Nine standard indices per ARCHITECTURE.md § 9 — the original six, plus
 ``ndmi`` (added for the KB water-stress catalog), plus ``bsi`` and ``msi``
 (added from the indices-guide gap audit). Their canonical formulas are
 seeded in ``public.indices_catalog`` (migration 0008 for the first six,
-0027 for ``ndmi``, 0056 for ``bsi``/``msi``); we restate them here as
+0027 for ``ndmi``, 0061 for ``bsi``/``msi``); we restate them here as
 actual numpy operations.
 
 Note that not every index is a normalized difference bounded to [-1, 1]:

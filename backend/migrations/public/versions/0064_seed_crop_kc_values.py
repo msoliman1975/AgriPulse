@@ -37,8 +37,8 @@ stage is the stress-induction period (0033 names it "التصويم"), where wat
 withheld ON PURPOSE to trigger flowering. A Kc that ignored this would have
 the system recommending irrigation precisely when the grower is withholding it.
 
-Revision ID: 0059
-Revises: 0058
+Revision ID: 0064
+Revises: 0063
 Create Date: 2026-08-12
 """
 
@@ -51,8 +51,8 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0059"
-down_revision: str | Sequence[str] | None = "0058"
+revision: str = "0064"
+down_revision: str | Sequence[str] | None = "0063"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

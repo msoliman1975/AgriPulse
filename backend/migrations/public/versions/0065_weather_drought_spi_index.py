@@ -24,8 +24,8 @@ limits, not a pipeline fault.
 applies: beyond three sigma the fitted tail is extrapolation from a handful of
 observations rather than measurement.
 
-Revision ID: 0060
-Revises: 0059
+Revision ID: 0065
+Revises: 0064
 Create Date: 2026-08-12
 """
 
@@ -36,8 +36,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0060"
-down_revision: str | Sequence[str] | None = "0059"
+revision: str = "0065"
+down_revision: str | Sequence[str] | None = "0064"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

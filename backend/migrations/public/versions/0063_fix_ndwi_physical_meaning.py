@@ -17,8 +17,8 @@ canopy, when it means standing water on the block.
 
 No CALC_VERSION bump — no stored value changes, and no recompute is needed.
 
-Revision ID: 0058
-Revises: 0057
+Revision ID: 0063
+Revises: 0062
 Create Date: 2026-08-12
 """
 
@@ -29,8 +29,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0058"
-down_revision: str | Sequence[str] | None = "0057"
+revision: str = "0063"
+down_revision: str | Sequence[str] | None = "0062"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

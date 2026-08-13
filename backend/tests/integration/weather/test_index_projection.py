@@ -178,7 +178,7 @@ def test_project_indices_full_day_emits_every_defined_index() -> None:
         "evapotranspiration",
         "evaporation_coeff",
         "rain_et_balance",
-        # 0057 gap-audit trio. This day carries a minimum, a maximum and
+        # 0062 gap-audit trio. This day carries a minimum, a maximum and
         # humidity, so all three are defined.
         "leaf_wetness",
         "frost_risk",

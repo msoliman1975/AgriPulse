@@ -22,8 +22,8 @@ the raw spectral band list the COG reader consumes, while ``supported_indices``
 is the advertised index list. Writing a computed index into ``bands`` makes the
 loader look for a band that no scene contains.
 
-Revision ID: 0056
-Revises: 0055
+Revision ID: 0061
+Revises: 0056
 Create Date: 2026-08-12
 """
 
@@ -34,8 +34,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0056"
-down_revision: str | Sequence[str] | None = "0055"
+revision: str = "0061"
+down_revision: str | Sequence[str] | None = "0056"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
