@@ -568,7 +568,21 @@
     "soilFromSchedule": "Read from the irrigation schedule, not a live sensor.",
     "emergency": "Emergency irrigation",
     "cropAndPlan": "Crop & plan",
-    "noCropPlan": "No crop assigned and no season plan for this block."
+    "noCropPlan": "No crop assigned and no season plan for this block.",
+    "waterBalance": {
+      "title": "Crop water balance",
+      "asOf": "as of {{date}}",
+      "loading": "Loading…",
+      "loadFailed": "Could not load the water balance.",
+      "empty": "No water balance yet for this block. It needs a current crop and a day of weather.",
+      "cropUsed": "Crop used",
+      "rain": "Rain",
+      "irrigation": "Irrigation",
+      "kc": "Crop coefficient",
+      "kcGeneric": "generic",
+      "notLogged": "not logged",
+      "unloggedWarning": "No irrigation recorded for this day, so this shortfall may be missing bookkeeping rather than dry soil."
+    }
   },
   "soilStatus": {
     "optimal": "optimal",

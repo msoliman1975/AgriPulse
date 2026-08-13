@@ -248,6 +248,14 @@ class IrrigationServiceImpl:
             )
         return after
 
+    async def list_water_balance(
+        self, *, block_id: UUID, from_date: date_type, to_date: date_type
+    ) -> list[dict[str, Any]]:
+        """Read one block's water-balance history for the dock chart."""
+        return await self._repo.list_water_balance_for_block(
+            block_id=block_id, from_date=from_date, to_date=to_date
+        )
+
     # ---- Daily crop water balance (gap-audit finding D7) ----------------
 
     async def compute_water_balance_for_day(self, *, target_date: date_type) -> dict[str, int]:

@@ -65,3 +65,31 @@ class IrrigationApplyRequest(BaseModel):
         ),
     )
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class WaterBalanceDayResponse(BaseModel):
+    """One block-day of crop water accounting.
+
+    Carries the whole derivation, not just `balance_mm`, because the answer on
+    its own is not actionable: a deficit caused by peak crop demand, by absent
+    rain, and by irrigation nobody logged all look identical at the headline
+    and call for different responses.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date_type
+    balance_mm: Decimal
+    etc_mm: Decimal
+    et0_mm: Decimal
+    kc_used: Decimal
+    #: 'phenology' | 'stage_default' | 'generic_default' — how the crop
+    #: coefficient resolved. A balance built on the generic fallback deserves
+    #: less confidence than one built on a per-stage catalog value.
+    kc_source: str
+    growth_stage: str | None
+    precip_mm: Decimal
+    irrigation_mm: Decimal
+    #: False means no irrigation was RECORDED, not that none was applied.
+    #: The UI must not present an unlogged farm as being in deficit.
+    irrigation_logged: bool

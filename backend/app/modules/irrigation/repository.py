@@ -479,6 +479,35 @@ class IrrigationRepository:
         )
         return len(rows)
 
+    async def list_water_balance_for_block(
+        self, *, block_id: UUID, from_date: date_type, to_date: date_type
+    ) -> list[dict[str, Any]]:
+        """One block's water-balance rows over a window, oldest first.
+
+        Ascending so the caller can chart it without re-sorting; the dock reads
+        the last element for "latest" rather than issuing a second query.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                    SELECT date, balance_mm, etc_mm, et0_mm, kc_used, kc_source,
+                           growth_stage, precip_mm, irrigation_mm, irrigation_logged
+                      FROM block_water_balance_daily
+                     WHERE block_id = :block_id
+                       AND date BETWEEN :from_date AND :to_date
+                     ORDER BY date
+                    """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id, "from_date": from_date, "to_date": to_date},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
         rows = (
             await self._tenant.execute(
