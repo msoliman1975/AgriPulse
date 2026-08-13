@@ -779,6 +779,65 @@ class ImageryRepository:
         )
         await self._session.flush()
 
+    async def list_farm_block_boundaries(self, farm_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Every active block of a farm, with its UTM boundary.
+
+        Feeds the zonal step: a block aggregate over the farm surface is that
+        surface masked to this polygon. Same geometry the per-block pipeline
+        cuts its own raster with, so the two paths are measuring the same
+        ground and any difference in the numbers is real rather than
+        definitional.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT
+                            b.id AS block_id,
+                            ST_AsGeoJSON(b.boundary_utm)::text AS boundary_utm_geojson
+                        FROM blocks b
+                        WHERE b.farm_id = :farm
+                          AND b.deleted_at IS NULL
+                          AND (b.active_to IS NULL OR b.active_to > now())
+                        ORDER BY b.id
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def list_block_index_means(
+        self,
+        *,
+        farm_id: UUID,
+        scene_datetime: datetime,
+    ) -> dict[tuple[str, str], float]:
+        """Stored per-block means for one pass, keyed by (block_id, index).
+
+        The baseline the farm-raster aggregates are diffed against. These rows
+        were written by the per-block pipeline; if the farm surface is measuring
+        the same ground the numbers must land on top of each other.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT a.block_id::text, a.index_code, a.mean
+                    FROM block_index_aggregates a
+                    JOIN blocks b ON b.id = a.block_id
+                    WHERE b.farm_id = :farm AND a.time = :at AND a.mean IS NOT NULL
+                    """
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                {"farm": farm_id, "at": scene_datetime},
+            )
+        ).all()
+        return {(r[0], r[1]): float(r[2]) for r in rows}
+
     async def get_block_boundary(self, block_id: UUID) -> dict[str, Any] | None:
         """Read `boundary`, `boundary_utm`, `aoi_hash`, `farm_id` for a block.
 
