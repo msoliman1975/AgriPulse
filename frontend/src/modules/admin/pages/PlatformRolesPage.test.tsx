@@ -14,6 +14,11 @@ const matrix: RbacMatrix = {
   capability_count: 4,
   active_count: 3,
   stub_count: 1,
+  // Read-only by default, so every Phase 1 assertion below still describes the
+  // view a user without `platform.manage_rbac` gets. The editing tests build
+  // their own matrix rather than flipping this.
+  can_manage: false,
+  propagation_seconds: 30,
   capabilities: [
     {
       name: "farm.read",
@@ -59,6 +64,8 @@ const matrix: RbacMatrix = {
       active_count: 3,
       stub_count: 1,
       holders: { total: 2, platform: 2, tenant: 0, farm: 0 },
+      overrides: [],
+      immutable: true,
     },
     {
       name: "BillingAdmin",
@@ -70,6 +77,8 @@ const matrix: RbacMatrix = {
       active_count: 1,
       stub_count: 0,
       holders: { total: 7, platform: 0, tenant: 7, farm: 0 },
+      overrides: [],
+      immutable: false,
     },
     {
       name: "Viewer",
@@ -81,15 +90,26 @@ const matrix: RbacMatrix = {
       active_count: 1,
       stub_count: 0,
       holders: { total: 3, platform: 0, tenant: 1, farm: 2 },
+      overrides: [],
+      immutable: false,
     },
   ],
 };
 
 const getRbacMatrix = vi.fn(() => Promise.resolve(matrix));
+const setRbacOverride = vi.fn();
+const resetRbacOverride = vi.fn();
+const getRbacChanges = vi.fn();
 
 vi.mock("@/api/rbacMatrix", async () => {
   const actual = await vi.importActual<typeof import("@/api/rbacMatrix")>("@/api/rbacMatrix");
-  return { ...actual, getRbacMatrix: () => getRbacMatrix() };
+  return {
+    ...actual,
+    getRbacMatrix: () => getRbacMatrix(),
+    setRbacOverride: (args: unknown) => setRbacOverride(args),
+    resetRbacOverride: (args: unknown) => resetRbacOverride(args),
+    getRbacChanges: () => getRbacChanges(),
+  };
 });
 
 function renderPage(url = "/platform/roles") {
@@ -220,8 +240,12 @@ describe("PlatformRolesPage", () => {
     renderPage();
     await bothTables();
     // Scope is documentation-only, which nobody would guess from the word.
-    expect(within(permsTable()).getByText(/resolver enforces the role mapping/)).toBeInTheDocument();
-    expect(within(permsTable()).getByText(/reserved for a module that has not shipped/)).toBeInTheDocument();
+    expect(
+      within(permsTable()).getByText(/resolver enforces the role mapping/),
+    ).toBeInTheDocument();
+    expect(
+      within(permsTable()).getByText(/reserved for a module that has not shipped/),
+    ).toBeInTheDocument();
     expect(
       within(permsTable()).getByText(/a user with only this role passes the check/),
     ).toBeInTheDocument();
@@ -249,5 +273,264 @@ describe("PlatformRolesPage", () => {
       ).toBeGreaterThan(0),
     );
     getRbacMatrix.mockImplementation(() => Promise.resolve(matrix));
+  });
+
+  it("shows no editing affordance without platform.manage_rbac", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    // The marker stays a glyph. can_manage is false in the base fixture.
+    expect(
+      within(permsTable()).queryByRole("button", { name: /Revoke subscription.manage/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Phase 2 — runtime editing.
+ *
+ * The matrix here grants `can_manage` and puts BillingAdmin one override away
+ * from its shipped default, which is the state the modified-marker and Reset
+ * control exist for.
+ */
+describe("PlatformRolesPage editing", () => {
+  const editable: RbacMatrix = {
+    ...matrix,
+    can_manage: true,
+    roles: matrix.roles.map((role) =>
+      role.name === "BillingAdmin"
+        ? {
+            ...role,
+            // Granted by an override, not by the YAML — so the row must render
+            // as granted *and* modified, with a Reset.
+            capabilities: ["subscription.manage", "farm.delete"],
+            capability_count: 2,
+            active_count: 2,
+            overrides: [
+              {
+                capability: "farm.delete",
+                granted: true,
+                note: "incident 412",
+                updated_at: "2026-08-11T10:00:00Z",
+                updated_by: "11111111-1111-1111-1111-111111111111",
+              },
+            ],
+          }
+        : role,
+    ),
+  };
+
+  beforeEach(async () => {
+    getRbacMatrix.mockClear();
+    setRbacOverride.mockClear();
+    resetRbacOverride.mockClear();
+    getRbacChanges.mockClear();
+    getRbacMatrix.mockImplementation(() => Promise.resolve(editable));
+    setRbacOverride.mockImplementation(() =>
+      Promise.resolve({
+        role: "BillingAdmin",
+        capability: "farm.read",
+        baseline: false,
+        effective: true,
+        overridden: true,
+        action: "grant",
+        unchanged: false,
+      }),
+    );
+    resetRbacOverride.mockImplementation(() =>
+      Promise.resolve({
+        role: "BillingAdmin",
+        capability: "farm.delete",
+        baseline: false,
+        effective: false,
+        overridden: false,
+        action: "reset",
+        unchanged: false,
+      }),
+    );
+    getRbacChanges.mockImplementation(() => Promise.resolve([]));
+    await setupTestI18n("en");
+  });
+
+  it("turns the granted marker into a toggle for an editable role", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    expect(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves PlatformAdmin uneditable and says why", async () => {
+    renderPage("/platform/roles?role=PlatformAdmin");
+    await bothTables();
+    await within(permsTable()).findByText("farm.read");
+    expect(
+      screen.getByText(/PlatformAdmin grants every permission and cannot be edited/),
+    ).toBeInTheDocument();
+    expect(
+      within(permsTable()).queryByRole("button", { name: /Revoke farm.read/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("confirms before writing, showing the before and after", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+
+    await user.click(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Revoke this permission?")).toBeInTheDocument();
+    // Nothing is sent until the admin confirms — the toggle is not optimistic.
+    expect(setRbacOverride).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Apply change" }));
+    await waitFor(() =>
+      expect(setRbacOverride).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: "BillingAdmin",
+          capability: "subscription.manage",
+          granted: false,
+        }),
+      ),
+    );
+  });
+
+  it("passes the note through to the change log", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+
+    await user.click(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/Why/), "over-broad");
+    await user.click(within(dialog).getByRole("button", { name: "Apply change" }));
+
+    await waitFor(() =>
+      expect(setRbacOverride).toHaveBeenCalledWith(expect.objectContaining({ note: "over-broad" })),
+    );
+  });
+
+  it("states the propagation delay rather than implying it is instant", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+
+    await user.click(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/within 30 seconds/)).toBeInTheDocument();
+  });
+
+  it("warns that granting an unenforced permission changes nothing yet", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    // analytics.export is a stub and not granted, so show the not-granted rows.
+    // FilterChip renders role="switch", not a plain button.
+    await user.click(screen.getByRole("switch", { name: "Not granted" }));
+    await within(permsTable()).findByText("analytics.export");
+
+    await user.click(
+      within(permsTable()).getByRole("button", { name: "Grant analytics.export to this role" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Nothing enforces this permission yet/)).toBeInTheDocument();
+  });
+
+  it("marks a permission that differs from the shipped default and offers a reset", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("farm.delete");
+
+    const row = within(permsTable()).getByText("farm.delete").closest("tr") as HTMLElement;
+    expect(within(row).getByText("Edited")).toBeInTheDocument();
+
+    await user.click(within(row).getByRole("button", { name: "Reset" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Reset to the shipped default?")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Apply change" }));
+    await waitFor(() =>
+      expect(resetRbacOverride).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "BillingAdmin", capability: "farm.delete" }),
+      ),
+    );
+    // Reset must go through DELETE, never a PUT of the baseline value.
+    expect(setRbacOverride).not.toHaveBeenCalled();
+  });
+
+  it("does not mark an unmodified permission", async () => {
+    renderPage("/platform/roles?role=BillingAdmin");
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+    const row = within(permsTable()).getByText("subscription.manage").closest("tr") as HTMLElement;
+    expect(within(row).queryByText("Edited")).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+  });
+
+  it("shows the change log on demand, newest first", async () => {
+    getRbacChanges.mockImplementation(() =>
+      Promise.resolve([
+        {
+          id: 2,
+          role: "BillingAdmin",
+          capability: "farm.delete",
+          action: "grant",
+          previous_effective: false,
+          new_effective: true,
+          changed_by: "u1",
+          changed_by_email: "ops@agripulse.cloud",
+          note: "incident 412",
+          changed_at: "2026-08-11T10:00:00Z",
+        },
+      ]),
+    );
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+
+    await user.click(screen.getByRole("radio", { name: "Change log" }));
+    await screen.findByText("ops@agripulse.cloud");
+    expect(screen.getByText("incident 412")).toBeInTheDocument();
+    expect(screen.getByText("Granted")).toBeInTheDocument();
+  });
+
+  it("keeps the dialog open and reports a failed write", async () => {
+    setRbacOverride.mockImplementation(() => Promise.reject(new Error("boom")));
+    renderPage("/platform/roles?role=BillingAdmin");
+    const user = userEvent.setup();
+    await bothTables();
+    await within(permsTable()).findByText("subscription.manage");
+
+    await user.click(
+      within(permsTable()).getByRole("button", {
+        name: "Revoke subscription.manage from this role",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Apply change" }));
+
+    // The admin must not be left believing a change landed when it did not.
+    expect(await within(dialog).findByText(/Nothing was saved/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });

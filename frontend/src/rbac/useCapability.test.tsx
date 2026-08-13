@@ -53,3 +53,46 @@ describe("hasCapability", () => {
     expect(result.current).toBe("ok");
   });
 });
+
+/**
+ * The served grants are what make runtime permission edits visible without a
+ * redeploy. The bundled mirror stays as the pre-`/v1/me` fallback, which is
+ * why every test above still passes unchanged.
+ */
+describe("hasCapability with grants served by /v1/me", () => {
+  const claims: JwtClaims = { farm_scopes: [{ farm_id: "f1", role: "Agronomist" }] };
+
+  it("grants what the server grants but the bundled mirror does not", () => {
+    expect(hasCapability(claims, "plan.manage", { farmId: "f1" })).toBe(false);
+    expect(
+      hasCapability(claims, "plan.manage", { farmId: "f1" }, { Agronomist: ["plan.manage"] }),
+    ).toBe(true);
+  });
+
+  it("revokes what the server revokes, even though the mirror grants it", () => {
+    expect(hasCapability(claims, "alert.read", { farmId: "f1" })).toBe(true);
+    expect(
+      hasCapability(claims, "alert.read", { farmId: "f1" }, { Agronomist: ["plan.manage"] }),
+    ).toBe(false);
+  });
+
+  it("treats an empty served list as a real answer, not as missing data", () => {
+    // The dangerous misreading: falling back to the bundled defaults here would
+    // silently restore every capability the admin just removed.
+    expect(hasCapability(claims, "alert.read", { farmId: "f1" }, { Agronomist: [] })).toBe(false);
+  });
+
+  it("falls back to the mirror for a role the server did not describe", () => {
+    expect(hasCapability(claims, "alert.read", { farmId: "f1" }, { Scout: [] })).toBe(true);
+  });
+
+  it("still honours the wildcard when served", () => {
+    const admin: JwtClaims = { platform_role: "PlatformAdmin" };
+    expect(hasCapability(admin, "farm.delete", {}, { PlatformAdmin: ["*"] })).toBe(true);
+  });
+
+  it("keeps a served farm grant scoped to the matching farm", () => {
+    const served = { Agronomist: ["plan.manage"] };
+    expect(hasCapability(claims, "plan.manage", { farmId: "f2" }, served)).toBe(false);
+  });
+});

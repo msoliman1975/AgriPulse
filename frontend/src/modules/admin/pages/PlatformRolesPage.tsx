@@ -2,18 +2,21 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import type { RbacCapability, RbacRole } from "@/api/rbacMatrix";
+import type { RbacCapability, RbacChange, RbacRole } from "@/api/rbacMatrix";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { StatusBanner } from "@/components/StatusBanner";
 import { Tooltip } from "@/components/Tooltip";
 import { Toolbar, ToolbarChips, type FilterAxis, type FilterValues } from "@/components/Toolbar";
 import { mapAsyncState, queryState } from "@/components/asyncState";
-import { useRbacMatrix } from "@/queries/rbacMatrix";
+import { useRbacChanges, useRbacMatrix, useSetRbacOverride } from "@/queries/rbacMatrix";
 
-type ViewMode = "byRole" | "byCapability";
+import { RbacOverrideDialog, type PendingRbacChange } from "../components/RbacOverrideDialog";
+
+type ViewMode = "byRole" | "byCapability" | "changes";
 
 /** Order the tier bands the way authority flows, not alphabetically. */
 const TIER_ORDER = ["platform", "tenant", "farm"] as const;
@@ -42,9 +45,58 @@ function HeaderWithHint({ label, hint }: { label: string; hint: string }): React
   );
 }
 
+/**
+ * The granted marker, which becomes a control when the caller may edit.
+ *
+ * Read-only users keep exactly the Phase 1 glyph. Editors get a real
+ * `<button>` — not a checkbox — because activating it opens a confirmation
+ * rather than committing, and a checkbox that does not change state on click
+ * lies to assistive technology.
+ */
+function GrantedCell({
+  granted,
+  overridden,
+  editable,
+  labels,
+  onToggle,
+}: {
+  granted: boolean;
+  overridden: boolean;
+  editable: boolean;
+  labels: { yes: string; no: string; modified: string; toggle: string };
+  onToggle: () => void;
+}): ReactNode {
+  const glyph = granted ? "✓" : "—";
+  const tone = granted ? "text-ap-primary" : "text-ap-muted";
+
+  if (!editable) {
+    return (
+      <span className={tone} aria-label={granted ? labels.yes : labels.no}>
+        {glyph}
+        {overridden ? <span className="sr-only"> — {labels.modified}</span> : null}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={granted}
+      aria-label={labels.toggle}
+      className={`rounded px-2 py-0.5 text-sm hover:bg-ap-line/40 ${tone}`}
+    >
+      {glyph}
+      <span className="sr-only"> {granted ? labels.yes : labels.no}</span>
+    </button>
+  );
+}
+
 export function PlatformRolesPage(): ReactNode {
   const { t } = useTranslation("admin");
   const matrix = useRbacMatrix();
+  const override = useSetRbacOverride();
+  const [pendingChange, setPendingChange] = useState<PendingRbacChange | null>(null);
 
   // Selection lives in the URL so a view can be handed to someone else,
   // matching the pattern PlatformObserverPage established.
@@ -64,13 +116,28 @@ export function PlatformRolesPage(): ReactNode {
 
   // Falls back to the first role once loaded, so the detail table is never an
   // empty frame waiting on a click.
-  const activeRole: RbacRole | undefined =
-    roles.find((r) => r.name === selectedRole) ?? roles[0];
+  const activeRole: RbacRole | undefined = roles.find((r) => r.name === selectedRole) ?? roles[0];
 
-  const grantedNames = useMemo(
-    () => new Set(activeRole?.capabilities ?? []),
+  const grantedNames = useMemo(() => new Set(activeRole?.capabilities ?? []), [activeRole]);
+
+  /** Capabilities on the active role that differ from the shipped default. */
+  const overriddenNames = useMemo(
+    () => new Set((activeRole?.overrides ?? []).map((o) => o.capability)),
     [activeRole],
   );
+
+  // The server decides. `can_manage` is computed from the same capability the
+  // write endpoint enforces, so the UI cannot offer a control the API refuses.
+  // PlatformAdmin is excluded here as well as server-side — its wildcard is
+  // immutable, and rendering a dead toggle would just invite the question.
+  const canEditActiveRole = Boolean(
+    data?.can_manage && activeRole && !activeRole.immutable && !activeRole.wildcard,
+  );
+  // Captured once so the cell renderers below do not each have to re-assert
+  // that `activeRole` is present. Only read when `canEditActiveRole`, which
+  // already requires it.
+  const activeRoleName = activeRole?.name ?? "";
+  const changes = useRbacChanges(view === "changes");
 
   /** capability name -> the roles granting it, for the by-capability view. */
   const grantedBy = useMemo(() => {
@@ -138,12 +205,8 @@ export function PlatformRolesPage(): ReactNode {
       <span className="text-ap-muted">{t("roles.statusActive")}</span>
     );
 
-  const scopeHeader = (
-    <HeaderWithHint label={t("roles.colScope")} hint={t("roles.tipScope")} />
-  );
-  const statusHeader = (
-    <HeaderWithHint label={t("roles.colStatus")} hint={t("roles.tipStatus")} />
-  );
+  const scopeHeader = <HeaderWithHint label={t("roles.colScope")} hint={t("roles.tipScope")} />;
+  const statusHeader = <HeaderWithHint label={t("roles.colStatus")} hint={t("roles.tipStatus")} />;
 
   const roleColumns: Column<RbacRole>[] = [
     {
@@ -216,16 +279,72 @@ export function PlatformRolesPage(): ReactNode {
       key: "granted",
       header: <HeaderWithHint label={t("roles.colGranted")} hint={t("roles.tipGranted")} />,
       className: "text-center",
-      cell: (cap) =>
-        grantedNames.has(cap.name) ? (
-          <span className="text-ap-primary" aria-label={t("roles.grantedYes")}>
-            ✓
-          </span>
-        ) : (
-          <span className="text-ap-muted" aria-label={t("roles.grantedNo")}>
-            —
-          </span>
-        ),
+      cell: (cap) => {
+        const isGranted = grantedNames.has(cap.name);
+        return (
+          <GrantedCell
+            granted={isGranted}
+            overridden={overriddenNames.has(cap.name)}
+            editable={canEditActiveRole}
+            labels={{
+              yes: t("roles.grantedYes"),
+              no: t("roles.grantedNo"),
+              modified: t("roles.edit.modified"),
+              toggle: isGranted
+                ? t("roles.edit.toggleRevoke", { capability: cap.name })
+                : t("roles.edit.toggleGrant", { capability: cap.name }),
+            }}
+            onToggle={() =>
+              setPendingChange({
+                role: activeRoleName,
+                capability: cap,
+                from: isGranted,
+                to: !isGranted,
+                granted: !isGranted,
+              })
+            }
+          />
+        );
+      },
+    },
+    {
+      key: "default",
+      header: (
+        <HeaderWithHint label={t("roles.edit.colDefault")} hint={t("roles.edit.tipDefault")} />
+      ),
+      className: "text-center text-xs",
+      cell: (cap) => {
+        if (!overriddenNames.has(cap.name)) {
+          // Unmodified is the overwhelmingly common case; an empty cell keeps
+          // the modified ones scannable instead of drowning them in "default".
+          return <span className="sr-only">{t("roles.edit.atDefault")}</span>;
+        }
+        return (
+          <div className="flex items-center justify-center gap-1">
+            <Pill kind="info">{t("roles.edit.modified")}</Pill>
+            {canEditActiveRole ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setPendingChange({
+                    role: activeRoleName,
+                    capability: cap,
+                    from: grantedNames.has(cap.name),
+                    // Reset restores the shipped default, which — because an
+                    // override is only stored when it differs — is always the
+                    // opposite of what is in force.
+                    to: !grantedNames.has(cap.name),
+                    granted: null,
+                  })
+                }
+                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-ap-muted underline underline-offset-2 hover:text-ap-ink"
+              >
+                {t("roles.edit.reset")}
+              </button>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "scope",
@@ -267,6 +386,56 @@ export function PlatformRolesPage(): ReactNode {
     { key: "status", header: statusHeader, className: "text-xs", cell: statusCell },
   ];
 
+  const changeColumns: Column<RbacChange>[] = [
+    {
+      key: "changed_at",
+      header: t("roles.edit.colWhen"),
+      className: "text-xs whitespace-nowrap",
+      cell: (row) => new Date(row.changed_at).toLocaleString(),
+    },
+    {
+      key: "what",
+      header: t("roles.edit.colWhat"),
+      cell: (row) => (
+        <>
+          <span className="font-semibold text-ap-ink">{row.role}</span>{" "}
+          <code className="font-mono text-xs text-ap-ink">{row.capability}</code>
+        </>
+      ),
+    },
+    {
+      key: "action",
+      header: t("roles.edit.colAction"),
+      className: "text-xs",
+      cell: (row) => (
+        <Pill kind={row.action === "revoke" ? "warn" : row.action === "grant" ? "ok" : "neutral"}>
+          {t(`roles.edit.action_${row.action}`)}
+        </Pill>
+      ),
+    },
+    {
+      key: "effect",
+      header: t("roles.edit.colEffect"),
+      className: "text-xs whitespace-nowrap",
+      cell: (row) =>
+        `${row.previous_effective ? t("roles.grantedYes") : t("roles.grantedNo")} → ${
+          row.new_effective ? t("roles.grantedYes") : t("roles.grantedNo")
+        }`,
+    },
+    {
+      key: "who",
+      header: t("roles.edit.colWho"),
+      className: "text-xs",
+      cell: (row) => row.changed_by_email ?? "—",
+    },
+    {
+      key: "note",
+      header: t("roles.edit.colNote"),
+      className: "text-xs text-ap-muted",
+      cell: (row) => row.note ?? "—",
+    },
+  ];
+
   return (
     <Page>
       <PageHeader
@@ -299,56 +468,97 @@ export function PlatformRolesPage(): ReactNode {
         items={[
           { value: "byRole", label: t("roles.viewByRole") },
           { value: "byCapability", label: t("roles.viewByCapability") },
+          { value: "changes", label: t("roles.edit.viewChanges") },
         ]}
         value={view}
         onChange={setView}
         ariaLabel={t("roles.viewLabel")}
       />
 
-      <Toolbar
-        search={{
-          value: search,
-          onChange: setSearch,
-          placeholder: t("roles.searchPlaceholder"),
-          label: t("roles.searchLabel"),
-        }}
-        chips={
-          view === "byRole" ? (
-            <ToolbarChips
-              options={[
-                { value: "granted", label: t("roles.chipGranted") },
-                { value: "notGranted", label: t("roles.chipNotGranted") },
-              ]}
-              value={granted}
-              onChange={setGranted}
-              allLabel={t("roles.chipAll")}
-            />
-          ) : undefined
-        }
-        axes={axes}
-        axisLayout="inline"
-        values={filters}
-        onValuesChange={setFilters}
-        resultCount={{ shown: visible.length, total: capabilities.length }}
-      />
+      {view === "changes" ? (
+        <DataTable<RbacChange>
+          columns={changeColumns}
+          rowKey={(row) => String(row.id)}
+          state={queryState(changes)}
+          caption={t("roles.edit.tableCaptionChanges")}
+          errorMessage={t("roles.loadFailed")}
+          empty={t("roles.edit.emptyChanges")}
+        />
+      ) : (
+        <>
+          {view === "byRole" && activeRole?.wildcard ? (
+            <StatusBanner kind="info">{t("roles.edit.wildcardImmutable")}</StatusBanner>
+          ) : null}
 
-      <DataTable<RbacCapability>
-        columns={view === "byRole" ? byRoleColumns : byCapabilityColumns}
-        rowKey={(cap) => cap.name}
-        state={mapAsyncState(queryState(matrix), () => visible)}
-        filtered={filtersActive}
-        identityKey="name"
-        caption={
-          view === "byRole" && activeRole
-            ? t("roles.tableCaptionRole", {
-                role: activeRole.name,
-                description: activeRole.description,
-              })
-            : t("roles.tableCaptionAll")
-        }
-        errorMessage={t("roles.loadFailed")}
-        empty={t("roles.empty")}
-        noResults={t("roles.noResults")}
+          <Toolbar
+            search={{
+              value: search,
+              onChange: setSearch,
+              placeholder: t("roles.searchPlaceholder"),
+              label: t("roles.searchLabel"),
+            }}
+            chips={
+              view === "byRole" ? (
+                <ToolbarChips
+                  options={[
+                    { value: "granted", label: t("roles.chipGranted") },
+                    { value: "notGranted", label: t("roles.chipNotGranted") },
+                  ]}
+                  value={granted}
+                  onChange={setGranted}
+                  allLabel={t("roles.chipAll")}
+                />
+              ) : undefined
+            }
+            axes={axes}
+            axisLayout="inline"
+            values={filters}
+            onValuesChange={setFilters}
+            resultCount={{ shown: visible.length, total: capabilities.length }}
+          />
+
+          <DataTable<RbacCapability>
+            columns={view === "byRole" ? byRoleColumns : byCapabilityColumns}
+            rowKey={(cap) => cap.name}
+            state={mapAsyncState(queryState(matrix), () => visible)}
+            filtered={filtersActive}
+            identityKey="name"
+            caption={
+              view === "byRole" && activeRole
+                ? t("roles.tableCaptionRole", {
+                    role: activeRole.name,
+                    description: activeRole.description,
+                  })
+                : t("roles.tableCaptionAll")
+            }
+            errorMessage={t("roles.loadFailed")}
+            empty={t("roles.empty")}
+            noResults={t("roles.noResults")}
+          />
+        </>
+      )}
+
+      <RbacOverrideDialog
+        change={pendingChange}
+        pending={override.isPending}
+        propagationSeconds={data?.propagation_seconds ?? 30}
+        error={override.error ? t("roles.edit.saveFailed") : null}
+        onClose={() => {
+          setPendingChange(null);
+          override.reset();
+        }}
+        onConfirm={(note) => {
+          if (!pendingChange) return;
+          override.mutate(
+            {
+              role: pendingChange.role,
+              capability: pendingChange.capability.name,
+              granted: pendingChange.granted,
+              note: note || undefined,
+            },
+            { onSuccess: () => setPendingChange(null) },
+          );
+        }}
       />
     </Page>
   );

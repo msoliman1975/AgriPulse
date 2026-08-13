@@ -35,6 +35,7 @@ from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.i18n import SupportedLanguage
 from app.shared.rbac.check import (
     PermissionDeniedError,
+    effective_capabilities_for,
     has_capability,
     requires_capability,
 )
@@ -117,11 +118,16 @@ async def get_me(
     service: UserService = Depends(_service),
 ) -> MeResponse:
     try:
-        return await service.get_me(
+        me = await service.get_me(
             context.user_id,
             email=context.email,
             full_name=context.full_name,
         )
+        # Attached here rather than in the service: the effective grants derive
+        # from the *token's* roles plus the RBAC overlay, neither of which the
+        # user record knows about. This is what stops the frontend resolving
+        # capabilities from a compiled-in copy of the matrix.
+        return me.model_copy(update={"capabilities": effective_capabilities_for(context)})
     except UserNotFoundError as exc:
         raise APIError(
             status_code=status.HTTP_404_NOT_FOUND,

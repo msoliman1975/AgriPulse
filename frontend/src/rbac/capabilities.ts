@@ -60,6 +60,7 @@ export type Capability =
   | "platform.manage_crops"
   | "platform.manage_defaults"
   | "platform.manage_platform_admins"
+  | "platform.manage_rbac"
   | "platform.manage_tenant_admins"
   | "platform.manage_tenants"
   | "platform.observe_pipeline"

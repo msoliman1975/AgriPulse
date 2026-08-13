@@ -174,6 +174,19 @@ class AuthMiddleware:
             await _send_unauthorized(send, str(exc))
             return
 
+        # Refresh the RBAC override snapshot if it has aged out (30s TTL), so
+        # the synchronous `has_capability` calls downstream resolve against a
+        # current policy. Almost always a monotonic() compare and no I/O.
+        #
+        # Imported here, not at module scope: `app.shared.rbac.__init__` pulls
+        # in `check`, which imports `get_current_context` from *this* module,
+        # so a top-level import deadlocks whenever middleware is loaded first.
+        # A function-level import is a sys.modules lookup and survives an
+        # import sorter moving things around.
+        from app.shared.rbac.overlay import ensure_fresh as _ensure_rbac_fresh
+
+        await _ensure_rbac_fresh()
+
         # Suspend gate: non-platform JWTs bound to a non-active tenant fail
         # closed. Platform staff retain access so they can reactivate / purge.
         if context.tenant_id is not None and context.platform_role is None:
