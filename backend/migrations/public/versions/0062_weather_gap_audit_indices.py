@@ -33,6 +33,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0062"
 down_revision: str | Sequence[str] | None = "0061"
@@ -194,6 +195,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.get_bind().execute(
-        sa.text("DELETE FROM public.weather_indices_catalog WHERE code = ANY(:codes)"),
+        sa.text("DELETE FROM public.weather_indices_catalog WHERE code = ANY(:codes)").bindparams(
+            sa.bindparam("codes", type_=postgresql.ARRAY(sa.Text()))
+        ),
         {"codes": list(_CODES)},
     )

@@ -33,6 +33,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0061"
 down_revision: str | Sequence[str] | None = "0056"
@@ -100,19 +101,27 @@ def upgrade() -> None:
 
     # Keep the s2_l2a product's advertised index list in sync. `supported_indices`
     # — not `bands`; see the module docstring.
+    #
+    # The array bind is TYPED rather than postfix-cast. `:codes::text[]` reads
+    # naturally but dies inside `text()` — the driver sees the `::` and the
+    # statement fails with `syntax error at or near ":"`. A declared
+    # `bindparam(..., type_=ARRAY(Text))` taking a real Python list is the form
+    # that survives, and it means the value never round-trips through a
+    # hand-built `{a,b}` literal either.
+    codes_param = sa.bindparam("codes", type_=postgresql.ARRAY(sa.Text()))
     bind.execute(
         sa.text(
             """
             UPDATE public.imagery_products
-               SET supported_indices = supported_indices || :codes::text[]
+               SET supported_indices = supported_indices || :codes
              WHERE code = 's2_l2a'
                AND provider_id = (
                    SELECT id FROM public.imagery_providers WHERE code = 'sentinel_hub'
                )
-               AND NOT (supported_indices @> :codes::text[])
+               AND NOT (supported_indices @> :codes)
             """
-        ),
-        {"codes": "{" + ",".join(_CODES) + "}"},
+        ).bindparams(codes_param),
+        {"codes": list(_CODES)},
     )
 
 
@@ -133,6 +142,8 @@ def downgrade() -> None:
             {"code": code},
         )
     bind.execute(
-        sa.text("DELETE FROM public.indices_catalog WHERE code = ANY(:codes)"),
+        sa.text("DELETE FROM public.indices_catalog WHERE code = ANY(:codes)").bindparams(
+            sa.bindparam("codes", type_=postgresql.ARRAY(sa.Text()))
+        ),
         {"codes": list(_CODES)},
     )
