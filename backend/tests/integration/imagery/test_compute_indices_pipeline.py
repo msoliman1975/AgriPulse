@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.imagery import tasks as imagery_tasks
 from app.modules.imagery.providers.protocol import DiscoveredScene, FetchResult
+from app.modules.indices.computation import STANDARD_INDEX_CODES
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import TenantRole
 
@@ -326,7 +327,7 @@ async def _read_block_utm_origin(
 
 
 @pytest.mark.asyncio
-async def test_compute_indices_writes_six_aggregates_and_six_cogs(
+async def test_compute_indices_writes_one_aggregate_and_one_cog_per_index(
     admin_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -386,35 +387,22 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
     finally:
         imagery_tasks.reset_provider_factory()
 
-    # Seven index assets uploaded (ndmi added in KB P2 / #199).
+    # One index asset per standard code. Tied to the constant rather than a
+    # literal count, so adding an index does not need this number edited — and
+    # cannot pass while the pipeline silently writes fewer COGs than it claims.
     index_keys = [
         k for k in storage.uploads if k.endswith((".tif",)) and not k.endswith("/raw_bands.tif")
     ]
-    assert len(index_keys) == 7
+    assert len(index_keys) == len(STANDARD_INDEX_CODES)
     suffixes = sorted(k.rsplit("/", 1)[1] for k in index_keys)
-    assert suffixes == [
-        "evi.tif",
-        "gndvi.tif",
-        "ndmi.tif",
-        "ndre.tif",
-        "ndvi.tif",
-        "ndwi.tif",
-        "savi.tif",
-    ]
+    assert suffixes == sorted(f"{code}.tif" for code in STANDARD_INDEX_CODES)
 
-    # Result reflects seven indices computed.
+    # Result reflects every standard index computed.
     assert result["status"] == "indices_computed"
-    assert sorted(result["indices"]) == [
-        "evi",
-        "gndvi",
-        "ndmi",
-        "ndre",
-        "ndvi",
-        "ndwi",
-        "savi",
-    ]
+    assert sorted(result["indices"]) == sorted(STANDARD_INDEX_CODES)
 
-    # Seven rows in block_index_aggregates with sane stats for the veg-half
+    # One row per index in block_index_aggregates, with sane stats for the
+    # veg-half
     # of the synthetic raster (NDVI > 0.5 is roughly expected).
     rows = (
         await admin_session.execute(
@@ -424,8 +412,9 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
             )
         )
     ).all()
-    assert len(rows) == 7
+    assert len(rows) == len(STANDARD_INDEX_CODES)
     by_index = {r.index_code: r for r in rows}
+    assert set(by_index) == set(STANDARD_INDEX_CODES)
     assert by_index["ndvi"].mean is not None
     assert by_index["ndvi"].valid_pixel_count > 0
     # AOI footprint counts pixels â€” total_pixel_count is positive for at
@@ -453,7 +442,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
         )
     ).one()
     assets = item_row.content.get("assets", {})
-    assert {"raw_bands", "ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"}.issubset(assets.keys())
+    assert {"raw_bands", *STANDARD_INDEX_CODES}.issubset(assets.keys())
 
 
 @pytest.mark.asyncio
@@ -597,13 +586,13 @@ async def test_compute_indices_idempotent_on_rerun(
     finally:
         imagery_tasks.reset_provider_factory()
 
-    # Still seven aggregate rows (idempotency key prevented duplicates).
+    # Still one aggregate row per index (idempotency key prevented duplicates).
     count = (
         await admin_session.execute(
             text(f'SELECT count(*) FROM "{tenant_schema}".' "block_index_aggregates")
         )
     ).scalar_one()
-    assert count == 7
+    assert count == len(STANDARD_INDEX_CODES)
 
 
 # Suppress unused-import warning when these aren't surfaced by name.

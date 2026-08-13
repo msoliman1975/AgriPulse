@@ -41,14 +41,24 @@ import { WeatherIndexChart } from "./WeatherIndexChart";
  */
 
 // Categorical slots, assigned per index code in catalog order and never
-// cycled, so a hidden series never repaints the others. Eight slots because
-// humidity made the catalog eight indices; a seventh-slot palette silently
-// wrapped it onto temperature's blue.
+// cycled, so a hidden series never repaints the others. There must be at
+// least one slot per catalog index: the lookup wraps modulo, so a short
+// palette does not fail loudly, it silently repaints a new index in an
+// existing one's colour. That is how humidity once landed on temperature's
+// blue, and why the count is now eleven — the gap-audit indices
+// (leaf_wetness, frost_risk, heat_stress) took the catalog from eight.
 //
-// Validated for CVD separation and contrast against each mode's own surface
-// (adjacent-pair check). On the light surface three slots trip a contrast
-// WARN, which is why every series is also directly labelled and the legend is
-// unconditional — identity is never carried by colour alone.
+// The first eight were validated for CVD separation and contrast against each
+// mode's own surface (adjacent-pair check). Eleven mutually separable hues do
+// not exist, and the three added here are not claimed to be: brown, magenta
+// and slate are chosen to sit away from the existing eight rather than to
+// pass an all-pairs check.
+//
+// That is defensible only because of how the palette is actually used. In
+// `units` mode each index owns its own chart, so nothing shares an axis; in
+// `compare` mode COMPARE_LIMIT caps the view at four series, all directly
+// labelled with an unconditional legend. The palette's job here is stable
+// identity per index across renders, not simultaneous separability of eleven.
 const SERIES_LIGHT = [
   "#2a78d6",
   "#eb6834",
@@ -58,6 +68,9 @@ const SERIES_LIGHT = [
   "#008300",
   "#4a3aa7",
   "#0f9bb0",
+  "#8c5a2b",
+  "#b5379c",
+  "#5c6b7a",
 ] as const;
 const SERIES_DARK = [
   "#3987e5",
@@ -68,6 +81,9 @@ const SERIES_DARK = [
   "#008300",
   "#9085e9",
   "#14a2b8",
+  "#a9703a",
+  "#cc57b4",
+  "#8b9aa9",
 ] as const;
 
 // Eight lines on one axis is past what any categorical palette can keep

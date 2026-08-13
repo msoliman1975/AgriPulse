@@ -23,6 +23,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Coroutine
 from datetime import UTC, date, datetime, timedelta
+from datetime import date as date_type
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -58,6 +60,7 @@ from app.modules.weather.providers.protocol import WeatherProvider
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.risk import RiskBlockContext, evaluate_risks
 from app.modules.weather.risk_projection import build_risk_window
+from app.modules.weather.spi import accumulate, comparable_history, compute_spi
 from app.modules.weather.timezone import tz_for_centroid
 from app.shared import backfill_progress
 from app.shared.db.ids import uuid7
@@ -303,6 +306,17 @@ async def _fetch_weather_async(
 # ±N-day calendar window the weather-index climatology aggregates over
 # (mirrors the indices baseline window). One row per DOY needs ≥3 samples.
 _WEATHER_BASELINE_WINDOW_DAYS = 7
+
+# Indices that are ALREADY anomalies, and so must never be baselined.
+#
+# The z-score machinery asks "how far is today from the day-of-year normal".
+# For temperature or rainfall that is the whole point. For `drought_spi` it is
+# incoherent: SPI is by construction the number of standard deviations from the
+# long-run normal, so a z-score of it would be a standardisation of a
+# standardisation — a number that looks like an anomaly reading and answers no
+# question anyone asked. Excluded from both the baseline sweep and the
+# per-projection deviation so the column stays NULL rather than misleading.
+_UNBASELINED_INDEX_CODES: frozenset[str] = frozenset({"drought_spi"})
 # How far back `backfill_weather_indices` reprojects history into
 # `weather_index_daily` so the climatology sweep has something to chew on.
 _BACKFILL_WINDOW_DAYS = 400
@@ -446,8 +460,14 @@ async def _persist_day(
     doy = day.timetuple().tm_yday
     indices_written = 0
     for proj in project_indices(day, daily, radwind_by_date.get(day)):
-        baseline = await repo.read_index_baseline(
-            farm_id=farm_id, index_code=proj.index_code, day_of_year=doy
+        # See _UNBASELINED_INDEX_CODES: an index that is already an anomaly
+        # gets no deviation rather than a meaningless one.
+        baseline = (
+            None
+            if proj.index_code in _UNBASELINED_INDEX_CODES
+            else await repo.read_index_baseline(
+                farm_id=farm_id, index_code=proj.index_code, day_of_year=doy
+            )
         )
         deviation = (
             compute_baseline_deviation(
@@ -831,6 +851,8 @@ async def _recompute_weather_baselines_for_tenant_async(tenant_schema: str) -> d
     deviations_updated = 0
     pairs_processed = 0
     for farm_id, index_code in pairs:
+        if index_code in _UNBASELINED_INDEX_CODES:
+            continue
         async with factory() as session, session.begin():
             await _set_tenant_context(session, tenant_schema)
             repo = WeatherRepository(session)
@@ -1086,5 +1108,149 @@ async def _compute_weather_risk_daily_sweep_async() -> dict[str, int]:
         except ValueError:
             continue
         compute_weather_risk_for_tenant.delay(schema)
+        enqueued += 1
+    return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+
+# --- Standardized Precipitation Index --------------------------------------
+#
+# A separate task rather than another branch in `project_indices`, because SPI
+# is the only index here that needs YEARS of history rather than a rolling
+# month. Widening `derive_weather_daily`'s lookback to reach it would pull
+# years of HOURLY observations into memory on every run, to compute one number
+# — so this reads the daily `rainfall` index rows the projection already wrote
+# instead, which is ~24x less data and the canonical daily total besides.
+
+# 90 days: the WMO reference window for agricultural drought. Shorter windows
+# track meteorological dryness, longer ones hydrological — the season-scale
+# question ("has this crop cycle been short of water") is the 90-day one.
+_SPI_WINDOW_DAYS = 90
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.compute_spi_for_tenant",
+    bind=False,
+    ignore_result=True,
+)
+def compute_spi_for_tenant(tenant_schema: str, target_iso: str | None = None) -> dict[str, int]:
+    return _run_task(_compute_spi_for_tenant_async(tenant_schema, target_iso))
+
+
+async def _compute_spi_for_tenant_async(
+    tenant_schema: str, target_iso: str | None
+) -> dict[str, int]:
+    """Score each farm's 90-day rainfall against its own history.
+
+    Farms whose record cannot support a fit produce no row — see
+    `weather.spi`: too short a record, or (the case that will actually bite in
+    Egypt) a record so arid that nearly every window is bone dry. A gap in the
+    series is honest about that; a fabricated 0.0 would read as "conditions
+    perfectly normal".
+    """
+    target = (
+        date_type.fromisoformat(target_iso)
+        if target_iso
+        else datetime.now(UTC).date() - timedelta(days=1)
+    )
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = WeatherRepository(session)
+        pairs = await repo.list_distinct_weather_index_pairs()
+        farm_ids = sorted({farm_id for farm_id, code in pairs if code == "rainfall"})
+
+    scored = 0
+    skipped = 0
+    for farm_id in farm_ids:
+        async with factory() as session, session.begin():
+            await _set_tenant_context(session, tenant_schema)
+            repo = WeatherRepository(session)
+            history_rows = await repo.read_weather_index_history(
+                farm_id=farm_id, index_code="rainfall"
+            )
+            precip_by_date = {
+                r["date"]: float(r["value"]) for r in history_rows if r["value"] is not None
+            }
+
+            # Two separate reasons to skip, narrowed one at a time so the
+            # accumulation is a real float by the time it reaches the aux blob:
+            # an incomplete 90-day window, then a record too short or too dry
+            # to fit against.
+            accumulation = accumulate(precip_by_date, target, _SPI_WINDOW_DAYS)
+            if accumulation is None:
+                skipped += 1
+                continue
+            result = compute_spi(
+                accumulation,
+                comparable_history(precip_by_date, target, _SPI_WINDOW_DAYS),
+            )
+            if result is None:
+                skipped += 1
+                continue
+
+            await repo.upsert_weather_index_daily(
+                farm_id=farm_id,
+                date=target,
+                index_code="drought_spi",
+                value=Decimal(str(result.value)),
+                value_min=None,
+                value_max=None,
+                value_aux={
+                    "window_days": str(_SPI_WINDOW_DAYS),
+                    "accumulation_mm": str(round(accumulation, 2)),
+                    # The evidence, so a reader can weigh the number: an SPI
+                    # off 22 windows in a mostly-dry record deserves less
+                    # trust than one off 300 in a varied one, and they look
+                    # identical without this.
+                    "sample_size": str(result.sample_size),
+                    "dry_fraction": str(result.dry_fraction),
+                },
+                # No baseline_deviation, ever: SPI is already a z-score.
+                # See _UNBASELINED_INDEX_CODES.
+                baseline_deviation=None,
+                is_forecast=False,
+            )
+            scored += 1
+
+    _log.info(
+        "weather_spi_computed",
+        tenant_schema=tenant_schema,
+        date=target.isoformat(),
+        farms_scored=scored,
+        farms_skipped=skipped,
+    )
+    return {"farms_scored": scored, "farms_skipped": skipped}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.compute_spi_sweep",
+    bind=False,
+    ignore_result=True,
+)
+def compute_spi_sweep(target_iso: str | None = None) -> dict[str, int]:
+    return _run_task(_compute_spi_sweep_async(target_iso))
+
+
+async def _compute_spi_sweep_async(target_iso: str | None) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for schema in schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        compute_spi_for_tenant.delay(schema, target_iso)
         enqueued += 1
     return {"tenants_scanned": len(schemas), "enqueued": enqueued}

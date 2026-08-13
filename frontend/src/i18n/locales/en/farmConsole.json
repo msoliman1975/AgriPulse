@@ -460,7 +460,9 @@
       "ndre": "Canopy nitrogen (red-edge)",
       "gndvi": "Chlorophyll / greenness",
       "ndwi": "Standing surface water",
-      "ndmi": "Vegetation moisture (SWIR)"
+      "ndmi": "Vegetation moisture (SWIR)",
+      "bsi": "Bare ground between plants",
+      "msi": "Moisture stress (higher is worse)"
     },
     "definition": "Definition",
     "howToRead": "How to read it",
@@ -472,7 +474,9 @@
       "ndre": "Compares near-infrared with the red-edge band, the narrow slice where chlorophyll absorption starts to fall away. It tracks chlorophyll — and so nitrogen — deeper into the canopy than NDVI, and keeps responding at full cover once NDVI has saturated.",
       "gndvi": "NDVI with green in place of red: (NIR − Green) / (NIR + Green). Green reflectance is governed by chlorophyll concentration, so this leans towards leaf greenness and nitrogen rather than towards sheer canopy size.",
       "ndwi": "McFeeters' surface-water index, (Green − NIR) / (Green + NIR). Water reflects green and absorbs infrared, so open water sits above zero while canopy and dry soil stay negative. It finds standing water on the block — not moisture inside the leaves.",
-      "ndmi": "Compares near-infrared with shortwave infrared: (NIR − SWIR1) / (NIR + SWIR1). Leaf water absorbs shortwave infrared, so the value falls as tissue dries — usually days before the canopy visibly wilts or NDVI reacts."
+      "ndmi": "Compares near-infrared with shortwave infrared: (NIR − SWIR1) / (NIR + SWIR1). Leaf water absorbs shortwave infrared, so the value falls as tissue dries — usually days before the canopy visibly wilts or NDVI reacts.",
+      "bsi": "Weighs the two bands soil reflects strongly — shortwave infrared and red — against the two vegetation reflects: ((SWIR1 + Red) − (NIR + Blue)) / ((SWIR1 + Red) + (NIR + Blue)). It measures the ground rather than the crop, so it reads planting gaps, plant loss and thin establishment that NDVI can only show as “less green”.",
+      "msi": "The ratio SWIR1 / NIR. Because a well-hydrated leaf soaks up shortwave infrared, the ratio climbs as the canopy dries out. It carries the same signal as NDMI — the two are a monotone transform of each other — but on an unbounded scale that keeps separating dry readings after NDMI has compressed them."
     },
     "scale": {
       "ndvi": "Runs −1 to 1. Below 0.2 is effectively bare; 0.2–0.6 is a developing canopy; 0.6 and above is dense and actively growing.",
@@ -481,7 +485,9 @@
       "ndre": "Over crops it usually runs 0.1–0.6. Below 0.2 is a thin or nitrogen-short canopy; 0.3–0.45 is comfortable; above 0.45 is well fed.",
       "gndvi": "Usually 0.1–0.7 over crops. Below 0.2 is near-bare; 0.35–0.55 is a healthy green canopy; above 0.55 is dense and chlorophyll-rich.",
       "ndwi": "Runs −1 to 1, and the scale is inverted against the canopy indices: a healthy crop reads well below −0.15, and anything above 0 is standing water.",
-      "ndmi": "Runs −1 to 1. Below 0.2 is a dry, stressed canopy; 0.2–0.4 is moderate; 0.4–0.6 is well watered; above 0.6 is a very wet canopy."
+      "ndmi": "Runs −1 to 1. Below 0.2 is a dry, stressed canopy; 0.2–0.4 is moderate; 0.4–0.6 is well watered; above 0.6 is a very wet canopy.",
+      "bsi": "Runs −1 to 1, inverted against the canopy indices: a closed canopy reads below −0.1 and exposed ground sits above 0. Read it against the growth stage — bare ground just after planting is expected, the same value at full canopy is plant loss.",
+      "msi": "A ratio, not a −1 to 1 index — real readings run about 0.2 to 2.0. It is the one index here where higher is worse: below 0.4 is well watered, 0.4–1.0 is moderate stress, above 1.0 is high stress."
     },
     "band": {
       "ndvi": {
@@ -536,6 +542,22 @@
         "moderate": "Moderate canopy moisture. Comfortable while cover is still partial, on the dry side at full canopy.",
         "wellWatered": "Well-watered canopy with no sign of moisture stress.",
         "veryWet": "Very high canopy water content — a full, well-irrigated canopy. If it stays here, check drainage."
+      },
+      "bsi": {
+        "closedCanopy": "Canopy covers the ground almost completely — no meaningful bare soil showing between plants.",
+        "mostlyCovered": "Good ground cover with only small gaps. Normal for an established stand.",
+        "thinning": "Soil and canopy are roughly balanced. Expected early in the season; worth a look if the crop should be at full cover by now.",
+        "patchy": "Bare ground is winning. Patchy establishment, gaps in the stand, or canopy that has been lost.",
+        "mostlyBare": "Mostly exposed soil with sparse plants. Check for failed establishment or plant loss across this area.",
+        "bare": "Effectively bare ground. Either nothing is planted here yet, or the stand has been lost."
+      },
+      "msi": {
+        "wellWatered": "Plenty of water in the canopy — no moisture stress at this reading.",
+        "adequate": "Comfortable canopy moisture. Nothing to act on.",
+        "mildStress": "Canopy is starting to dry. Early moisture stress, ahead of anything visible on the ground.",
+        "moderateStress": "Moderate water stress. Check the irrigation schedule for this block.",
+        "highStress": "High water stress — the canopy is materially dry. Irrigate, or confirm why it has not been.",
+        "severeStress": "Severe reading. Usually a badly stressed canopy, but standing water also lands here — open water drives near-infrared toward zero and sends the ratio up. Read it alongside NDMI, which separates the two."
       }
     },
     "openFamily": "Open {{family}} →",
@@ -546,7 +568,21 @@
     "soilFromSchedule": "Read from the irrigation schedule, not a live sensor.",
     "emergency": "Emergency irrigation",
     "cropAndPlan": "Crop & plan",
-    "noCropPlan": "No crop assigned and no season plan for this block."
+    "noCropPlan": "No crop assigned and no season plan for this block.",
+    "waterBalance": {
+      "title": "Crop water balance",
+      "asOf": "as of {{date}}",
+      "loading": "Loading…",
+      "loadFailed": "Could not load the water balance.",
+      "empty": "No water balance yet for this block. It needs a current crop and a day of weather.",
+      "cropUsed": "Crop used",
+      "rain": "Rain",
+      "irrigation": "Irrigation",
+      "kc": "Crop coefficient",
+      "kcGeneric": "generic",
+      "notLogged": "not logged",
+      "unloggedWarning": "No irrigation recorded for this day, so this shortfall may be missing bookkeeping rather than dry soil."
+    }
   },
   "soilStatus": {
     "optimal": "optimal",
@@ -681,6 +717,22 @@
         "dense": "Dense canopy, no stress",
         "veryDense": "Very dense canopy, no stress",
         "saturated": "Saturated — check for waterlogging"
+      },
+      "bareSoil": {
+        "closedCanopy": "Closed canopy",
+        "mostlyCovered": "Mostly covered",
+        "thinning": "Thinning cover",
+        "patchy": "Patchy — bare gaps",
+        "mostlyBare": "Mostly bare soil",
+        "bare": "Bare ground"
+      },
+      "moistureStress": {
+        "wellWatered": "Well watered",
+        "adequate": "Adequate moisture",
+        "mildStress": "Mild stress",
+        "moderateStress": "Moderate stress",
+        "highStress": "High stress",
+        "severeStress": "Severe — or standing water"
       }
     },
     "pixelsOffNote": "Index pixels are off — blocks are filled by their own average for this date.",

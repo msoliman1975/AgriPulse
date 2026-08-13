@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-// V1 hardcoded list mirrors backend migration 0008_seed_imagery_catalog.
-// When `/v1/indices/catalog` ships, fetch dynamically with react-query
-// and fall back to this list while loading.
-export const SUPPORTED_INDICES = ["ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"] as const;
-export type IndexCode = (typeof SUPPORTED_INDICES)[number];
+import { INDEX_CODES, type IndexCode } from "@/api/indices";
+
+// Sourced from the API module rather than restated here. This list was a
+// hardcoded copy of migration 0008's original six and never learned about
+// ndmi, bsi or msi — so the picker silently offered a stale subset of what the
+// platform computes. Re-exported under its old name so callers still work.
+export { INDEX_CODES as SUPPORTED_INDICES, type IndexCode };
 
 interface Props {
   value: IndexCode;
@@ -16,11 +18,12 @@ interface Props {
 /**
  * Index selector, rendered as a chip row rather than a `<select>`.
  *
- * Six indices is a short enough list to show in full, and a dropdown hides
- * the alternatives behind a click: the reader has to already know NDRE
- * exists to go looking for it. Laid out flat, the row doubles as a menu of
- * what the farm can be asked about. Matches TimeSpanChips so the two
- * controls in this card's header read as one family.
+ * The index set is short enough to show in full, and a dropdown hides the
+ * alternatives behind a click: the reader has to already know NDRE exists to
+ * go looking for it. Laid out flat, the row doubles as a menu of what the farm
+ * can be asked about. Matches TimeSpanChips so the two controls in this card's
+ * header read as one family. The row wraps, so growth in the catalog costs a
+ * second line rather than the flat layout.
  */
 export function IndexPicker({ value, onChange, ariaLabel }: Props): ReactNode {
   const { t } = useTranslation("insights");
@@ -30,7 +33,7 @@ export function IndexPicker({ value, onChange, ariaLabel }: Props): ReactNode {
       aria-label={ariaLabel ?? t("trend.indexPicker.label")}
       className="flex flex-wrap gap-1"
     >
-      {SUPPORTED_INDICES.map((code) => {
+      {INDEX_CODES.map((code) => {
         const active = code === value;
         return (
           <button

@@ -48,6 +48,8 @@ const INDEX_LABELS: Record<IndexCode, string> = {
   ndre: "NDRE",
   gndvi: "GNDVI",
   ndmi: "NDMI",
+  bsi: "BSI",
+  msi: "MSI",
 };
 const INDEX_CODES = Object.keys(INDEX_LABELS) as IndexCode[];
 

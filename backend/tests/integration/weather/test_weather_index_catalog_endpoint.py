@@ -64,9 +64,9 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
         body = resp.json()
 
     codes = [row["code"] for row in body]
-    # The 8 seeded indices surface; the inactive row does not. `humidity`
-    # is last because migration 0049 appended it at sort_order 8, leaving
-    # the original seven in place.
+    # Every seeded index surfaces; the inactive row does not. Order is
+    # append-only: 0049 put `humidity` at 8 and 0062 the gap-audit trio at
+    # 9-11, each time leaving the earlier rows where they were.
     assert codes == [
         "temperature",
         "radiation",
@@ -76,6 +76,10 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
         "evaporation_coeff",
         "rain_et_balance",
         "humidity",
+        "leaf_wetness",
+        "frost_risk",
+        "heat_stress",
+        "drought_spi",
     ], codes
     assert "zz_inactive_idx" not in codes, codes
 

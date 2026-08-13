@@ -10,6 +10,7 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
+import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { buildAlertBadgePoints } from "./alertBadges";
 import { gridRampExpression } from "./gridRamp";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
@@ -80,6 +81,12 @@ interface Props {
   // in its properties; the heatmap color ramp reads `value`, the click
   // handler reads `cell_id`.
   gridCells?: FeatureCollection<Polygon, GridCellProps> | null;
+  // Which index `gridCells[].value` holds. The heat ramp is per-index — the
+  // classes are not interchangeable and two of them (ndwi, msi) read the
+  // opposite way to the rest — so without this the cells would be coloured
+  // against the wrong scale. `null` paints every cell as no-data grey rather
+  // than guessing.
+  gridIndexCode?: ApiIndexCode | null;
   onGridCellClick?: (cellId: string, point: { x: number; y: number }) => void;
   // G-2: cell ids to outline on the heatmap (the worst-N / alert-cited
   // cells), so a scout can see exactly where to go. Empty = none.
@@ -349,6 +356,7 @@ export function MapCanvas({
   signalOverlay = null,
   onSignalClick,
   gridCells = null,
+  gridIndexCode = null,
   onGridCellClick,
   highlightedCellIds = [],
   selectedGridCellId = null,
@@ -377,6 +385,10 @@ export function MapCanvas({
   onReshapeRef.current = onReshape;
   const onSignalClickRef = useRef(onSignalClick);
   onSignalClickRef.current = onSignalClick;
+  // Read inside the mount-only map-creation effect, which would otherwise
+  // close over the index selected on first render forever.
+  const gridIndexCodeRef = useRef(gridIndexCode);
+  gridIndexCodeRef.current = gridIndexCode;
   const onGridCellClickRef = useRef(onGridCellClick);
   onGridCellClickRef.current = onGridCellClick;
   // Tracks the farm we last fit-bounds to, so data refetches don't re-zoom.
@@ -644,7 +656,10 @@ export function MapCanvas({
           // The stops live in gridRamp.ts so the index legend can draw
           // swatches from the same table — a legend that disagrees with the
           // pixels under it reads as a bug.
-          "fill-color": gridRampExpression(),
+          //
+          // Seeded with whatever index is selected at mount; the effect below
+          // keeps it in step as the operator switches.
+          "fill-color": gridRampExpression(gridIndexCodeRef.current),
           "fill-opacity": 0.6,
         },
       });
@@ -1188,6 +1203,22 @@ export function MapCanvas({
     if (map.getLayer(GRID_FILL_LAYER)) apply();
     else map.once("load", apply);
   }, [gridFillVisible]);
+
+  // Repaint the heatmap when the operator switches index. The layer is created
+  // once on map load, so without this the cells would keep the ramp of
+  // whichever index happened to be selected first — and since the class tables
+  // are not interchangeable, that silently misreads every cell rather than
+  // failing visibly.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(GRID_FILL_LAYER)) return;
+      map.setPaintProperty(GRID_FILL_LAYER, "fill-color", gridRampExpression(gridIndexCode));
+    };
+    if (map.getLayer(GRID_FILL_LAYER)) apply();
+    else map.once("load", apply);
+  }, [gridIndexCode]);
 
   // Selection highlight via filter swap.
   useEffect(() => {

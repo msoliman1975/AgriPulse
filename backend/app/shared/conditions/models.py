@@ -17,6 +17,7 @@ from app.shared.conditions.context import (
     CROP_ATTRIBUTE_KEYS,
     GRID_FIELDS,
     SIGNAL_KEYS,
+    WATER_BALANCE_FIELDS,
     WEATHER_INDEX_KEYS,
     WEATHER_RISK_FIELDS,
     WEATHER_SCOPES,
@@ -131,6 +132,34 @@ class WeatherRiskValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class WaterBalanceValueRef:
+    """``{"source":"water_balance","field":"balance_mm"}``
+
+    Reads the block's latest ``block_water_balance_daily`` row — crop water
+    accounting, ``precipitation + irrigation - ETc``. ``field`` is one of
+    ``WATER_BALANCE_FIELDS``.
+
+    Distinct from ``{source: weather_index, index_code: rain_et_balance}``,
+    which is the FARM-level climatic balance using ET0 and ignoring
+    irrigation. This one folds in the block's crop coefficient and the water
+    actually applied, so on an irrigated orchard the two disagree by design —
+    and this is the one that answers "did the crop get what it needed".
+
+    ⚠️ ``irrigation_logged`` matters when authoring against ``balance_mm``. A
+    block whose irrigation is never recorded shows a permanent deficit that is
+    an artefact of missing bookkeeping, not of dry soil. A tree that acts on a
+    negative balance should gate on ``irrigation_logged`` being true, or it
+    will fire forever on every farm that does not use the irrigation module.
+
+    Resolves to ``None`` — fail-closed — when the sweep has written no row for
+    the block, matching every other source.
+    """
+
+    source: Literal["water_balance"]
+    field: str  # one of WATER_BALANCE_FIELDS
+
+
+@dataclass(frozen=True, slots=True)
 class SignalsValueRef:
     """``{"source":"signals","code":"soil_moisture","key":"value_numeric"}``
 
@@ -215,6 +244,7 @@ ValueRef = (
     | WeatherValueRef
     | WeatherIndexValueRef
     | WeatherRiskValueRef
+    | WaterBalanceValueRef
     | SignalsValueRef
     | GridValueRef
     | CropAttributeValueRef
@@ -265,6 +295,13 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - 
                 f"weather_risk ref 'field' must be one of {WEATHER_RISK_FIELDS}"
             )
         return WeatherRiskValueRef(source="weather_risk", risk_code=risk_code, field=field_)
+    if source == "water_balance":
+        wb_field = raw.get("field", "balance_mm")
+        if wb_field not in WATER_BALANCE_FIELDS:
+            raise ConditionParseError(
+                f"water_balance ref 'field' must be one of {WATER_BALANCE_FIELDS}"
+            )
+        return WaterBalanceValueRef(source="water_balance", field=wb_field)
     if source == "weather":
         scope = raw.get("scope")
         if scope not in WEATHER_SCOPES:

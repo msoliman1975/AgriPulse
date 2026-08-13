@@ -6,6 +6,7 @@ PATCH  /irrigation/schedules/{schedule_id}
 """
 
 from datetime import date as date_type
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from app.modules.irrigation.schemas import (
     IrrigationApplyRequest,
     IrrigationGenerateRequest,
     IrrigationScheduleResponse,
+    WaterBalanceDayResponse,
 )
 from app.modules.irrigation.service import (
     IrrigationServiceImpl,
@@ -72,6 +74,32 @@ async def list_for_farm(
         to_date=to_date,
         status_filter=tuple(status_filter or ()),
     )
+    return list(rows)
+
+
+@router.get(
+    "/blocks/{block_id}/water-balance",
+    response_model=list[WaterBalanceDayResponse],
+    summary="Daily crop water balance for one block.",
+)
+async def list_water_balance(
+    block_id: UUID,
+    from_date: date_type | None = Query(default=None, alias="from"),
+    to_date: date_type | None = Query(default=None, alias="to"),
+    context: RequestContext = Depends(requires_capability("irrigation.schedule.read")),
+    service: IrrigationServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    """Oldest first, so the caller charts it without re-sorting.
+
+    Defaults to the trailing 30 days — long enough to read a trend, short
+    enough that the dock does not pull a season on open. Gated on
+    `irrigation.schedule.read` rather than a new capability: this is the same
+    irrigation data the schedule list already exposes, re-cut per day.
+    """
+    _ensure_tenant(context)
+    end = to_date or date_type.today()
+    start = from_date or end - timedelta(days=30)
+    rows = await service.list_water_balance(block_id=block_id, from_date=start, to_date=end)
     return list(rows)
 
 

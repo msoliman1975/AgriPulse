@@ -44,11 +44,15 @@ export function buildTileUrlTemplate(input: BuildTileUrlInput): string {
 }
 
 /**
- * Pick a sensible (rescale, colormap) for one of the six standard
- * indices. Bounds are not from `indices_catalog.value_min/value_max`
- * directly — those are the theoretical full range, but a green ramp
- * over [-1, 1] looks washed out. We tighten the window to the
- * meaningful agronomic range for each index.
+ * Pick a sensible (rescale, colormap) for one of the standard indices.
+ * Bounds are not from `indices_catalog.value_min/value_max` directly —
+ * those are the theoretical full range, but a green ramp over [-1, 1]
+ * looks washed out. We tighten the window to the meaningful agronomic
+ * range for each index.
+ *
+ * The switch is deliberately exhaustive with no `default`, so adding a
+ * code to `IndexCode` fails the build here rather than silently rendering
+ * a new index with NDVI's window.
  */
 export function visualizationDefaults(indexCode: IndexCode): {
   rescaleMin: number;
@@ -71,6 +75,20 @@ export function visualizationDefaults(indexCode: IndexCode): {
     case "ndmi":
       // Moisture index (NIR/SWIR), ~[-1,1]; blues like ndwi.
       return { rescaleMin: -0.5, rescaleMax: 0.5, colormap: "blues" };
+    case "bsi":
+      // Bare soil. Normalized difference, so [-1,1] — but the agronomic
+      // action happens either side of zero (canopy vs exposed ground), so a
+      // divergent brown ramp centred on 0 reads better than a sequential one.
+      return { rescaleMin: -0.5, rescaleMax: 0.5, colormap: "brbg_r" };
+    case "msi":
+      // ⚠️ Two deviations from every case above, both deliberate:
+      //   1. Range is a RATIO (~0.2 well-watered → 2.0 severely stressed),
+      //      not [-1, 1]. Reusing a normalized-difference window here would
+      //      clamp every real pixel to one end of the ramp.
+      //   2. `_r` reverses the ramp, because high MSI is BAD. Without the
+      //      reversal a parched block renders in the same colour a healthy
+      //      one does under NDVI.
+      return { rescaleMin: 0.2, rescaleMax: 2.0, colormap: "rdylgn_r" };
   }
 }
 

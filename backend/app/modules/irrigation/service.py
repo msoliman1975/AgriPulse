@@ -16,6 +16,7 @@ from app.modules.farms.crop_thresholds import resolve_phenology_stages
 from app.modules.irrigation.engine import (
     IrrigationInputs,
     compute_recommendation,
+    compute_water_balance,
 )
 from app.modules.irrigation.errors import IrrigationScheduleNotFoundError
 from app.modules.irrigation.events import (
@@ -69,6 +70,8 @@ class IrrigationService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
+
+    async def compute_water_balance_for_day(self, *, target_date: date_type) -> dict[str, int]: ...
 
 
 class IrrigationServiceImpl:
@@ -244,6 +247,77 @@ class IrrigationServiceImpl:
                 )
             )
         return after
+
+    async def list_water_balance(
+        self, *, block_id: UUID, from_date: date_type, to_date: date_type
+    ) -> list[dict[str, Any]]:
+        """Read one block's water-balance history for the dock chart."""
+        return await self._repo.list_water_balance_for_block(
+            block_id=block_id, from_date=from_date, to_date=to_date
+        )
+
+    # ---- Daily crop water balance (gap-audit finding D7) ----------------
+
+    async def compute_water_balance_for_day(self, *, target_date: date_type) -> dict[str, int]:
+        """Recompute every block's water balance for one day.
+
+        Runs a fixed number of queries regardless of block count: one for the
+        block/weather/irrigation join, three for the phenology docs the
+        returned crops actually reference, one upsert. The per-block
+        `generate_for_block` path is the wrong shape here — it costs four
+        queries per block, which is how a nightly sweep turns into a pool
+        exhaustion incident.
+
+        Blocks whose farm has no ET0 for the day are absent from the join and
+        so produce no row: a balance without demand is not a zero balance, it
+        is an unknown one, and a gap in the series says that honestly.
+        """
+        blocks = await self._repo.load_water_balance_blocks(target_date=target_date)
+        if not blocks:
+            return {"blocks": 0, "rows_written": 0}
+
+        docs = await self._repo.load_phenology_by_crop_ids(
+            crop_ids={b["crop_id"] for b in blocks if b["crop_id"] is not None},
+            variety_ids={b["crop_variety_id"] for b in blocks if b["crop_variety_id"] is not None},
+            strain_ids={
+                b["crop_variety_strain_id"]
+                for b in blocks
+                if b["crop_variety_strain_id"] is not None
+            },
+        )
+
+        rows: list[dict[str, Any]] = []
+        for b in blocks:
+            phenology = resolve_phenology_stages(
+                crop_stages=docs["crop"].get(b["crop_id"]),
+                variety_override=docs["variety"].get(b["crop_variety_id"]),
+                strain_override=docs["strain"].get(b["crop_variety_strain_id"]),
+            )
+            balance = compute_water_balance(
+                et0_mm=b["et0_mm"],
+                precip_mm=b["precip_mm"],
+                irrigation_mm=b["irrigation_mm"],
+                growth_stage=b["growth_stage"],
+                phenology_stages=phenology,
+            )
+            rows.append(
+                {
+                    "block_id": b["block_id"],
+                    "date": target_date,
+                    "balance_mm": balance.balance_mm,
+                    "etc_mm": balance.etc_mm,
+                    "et0_mm": balance.et0_mm,
+                    "kc_used": balance.kc_used,
+                    "kc_source": balance.kc_source,
+                    "growth_stage": balance.growth_stage,
+                    "precip_mm": balance.precip_mm,
+                    "irrigation_mm": balance.irrigation_mm,
+                    "irrigation_logged": balance.irrigation_logged,
+                }
+            )
+
+        written = await self._repo.upsert_water_balance_rows(rows)
+        return {"blocks": len(blocks), "rows_written": written}
 
 
 def _efficiency_for_block_irrigation_system(

@@ -76,9 +76,12 @@ async def test_six_derived_signals_seeded(admin_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSession) -> None:
-    """Migration 0037 lands public.weather_indices_catalog + 7 indices;
-    0049 appends `humidity` as the 8th (sort_order 8, so the original
-    seven keep their positions)."""
+    """The catalog is append-only, and each migration proves it.
+
+    0037 lands the table with 7 indices; 0049 appends `humidity` at 8; 0057
+    the gap-audit trio at 9-11; 0065 `drought_spi` at 12. Every one of them
+    leaves the earlier rows' sort_order untouched, which is what keeps the
+    summary strip's ordering stable as the catalog grows."""
     present = (
         await admin_session.execute(
             text("SELECT to_regclass('public.weather_indices_catalog') IS NOT NULL")
@@ -95,6 +98,11 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
         "evaporation_coeff",
         "rain_et_balance",
         "humidity",
+        # 0062, appended at 9-11 by the indices-guide gap audit.
+        "leaf_wetness",
+        "frost_risk",
+        "heat_stress",
+        "drought_spi",
     ]
     # Scope to the seeded codes — the DB is session-shared and other tests
     # (the endpoint test) commit extra rows into this table.
@@ -118,6 +126,12 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
     assert by_code["humidity"].source_kind == "observed"
     assert by_code["humidity"].unit == "%"
     assert by_code["humidity"].sort_order == 8
+    # The gap-audit trio are all derived, appended after humidity so the
+    # existing rows keep their positions on the strip.
+    for code, order in (("leaf_wetness", 9), ("frost_risk", 10), ("heat_stress", 11)):
+        assert by_code[code].source_kind == "derived", code
+        assert by_code[code].sort_order == order, code
+    assert by_code["leaf_wetness"].unit == "h"
     for r in rows:
         assert r.is_active is True
         assert r.name_en

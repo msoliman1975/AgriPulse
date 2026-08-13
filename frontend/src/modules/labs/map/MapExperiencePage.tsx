@@ -1028,6 +1028,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
               borderOpacity={layerPrefs.borderOpacity}
               blockFillOpacity={layerPrefs.blockFillOpacity}
               gridCells={gridCellsFc}
+              gridIndexCode={gridIndex}
               highlightedCellIds={highlightedCellIds}
               selectedGridCellId={selectedCellId}
               onGridCellClick={(cellId, point) => {

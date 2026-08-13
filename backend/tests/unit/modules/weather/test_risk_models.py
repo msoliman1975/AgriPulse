@@ -26,12 +26,14 @@ def _day(
     t: float | None = None,
     rh: float | None = None,
     p: float | None = None,
+    lwd: float | None = None,
 ) -> RiskWeatherDay:
     return RiskWeatherDay(
         date=date(2026, 6, 1) + timedelta(days=i),
         temp_mean_c=_dec(t),
         humidity_mean_pct=_dec(rh),
         precip_mm=_dec(p),
+        leaf_wetness_hours=_dec(lwd),
     )
 
 
@@ -214,3 +216,57 @@ def test_registry_is_append_only_shape() -> None:
     assert len(REGISTRY) == 3
     assert all(s.crop_prefix == "mango" for s in REGISTRY)
     assert {s.kind for s in REGISTRY} == {"disease", "pest"}
+
+
+# --- leaf wetness ----------------------------------------------------------
+#
+# The two foliar models read wetness in OPPOSITE directions, which is the
+# whole reason it is worth measuring: a daily mean RH cannot distinguish
+# "damp enough for mildew" from "soaked enough to wash mildew off, and to let
+# anthracnose infect". These tests pin that opposition.
+
+
+def test_anthracnose_infects_on_measured_wetness_the_daily_mean_would_miss() -> None:
+    """A dry-looking day by mean RH can still hold a long saturated night."""
+    # 60% mean RH is well under the 90% proxy threshold, so without measured
+    # wetness this window scores zero. Ten wet hours says otherwise.
+    warm_dry_looking = _window(10, t=27, rh=60, p=0)
+    assert anthracnose(warm_dry_looking, _MANGO_FRUIT).score == 0
+
+    warm_actually_wet = _window(10, t=27, rh=60, p=0, lwd=10)
+    scored = anthracnose(warm_actually_wet, _MANGO_FRUIT)
+    assert scored.score > 0
+    # And the provenance says the verdict rests on measurement, not the proxy.
+    assert scored.inputs["measured_wetness_days"] == "10"
+
+
+def test_anthracnose_needs_a_sustained_wet_spell_not_a_damp_moment() -> None:
+    brief = _window(10, t=27, rh=60, p=0, lwd=2)
+    assert anthracnose(brief, _MANGO_FRUIT).score == 0
+
+
+def test_powdery_mildew_is_suppressed_by_the_same_wetness_that_drives_anthracnose() -> None:
+    """Free water washes conidia off, so a soaking night protects the crop."""
+    favourable = _window(10, t=24, rh=75, p=0)
+    baseline = powdery_mildew(favourable, _MANGO_FLOWER).score
+    # The suppression below is only meaningful against a non-zero baseline.
+    assert baseline > 0
+
+    soaked = _window(10, t=24, rh=75, p=0, lwd=12)
+    assert powdery_mildew(soaked, _MANGO_FLOWER).score == 0
+
+    # A merely damp night is still mildew weather — the threshold discriminates.
+    damp = _window(10, t=24, rh=75, p=0, lwd=4)
+    assert powdery_mildew(damp, _MANGO_FLOWER).score == baseline
+
+
+def test_missing_leaf_wetness_falls_back_rather_than_reading_as_dry() -> None:
+    """`None` means "not measured". Treating it as dry would invent evidence
+    of safety for every day projected before the index existed."""
+    # High mean RH with no measured wetness must still trigger anthracnose
+    # through the legacy proxy path.
+    legacy = _window(10, t=27, rh=95, p=0)
+    assert all(d.leaf_wetness_hours is None for d in legacy)
+    scored = anthracnose(legacy, _MANGO_FRUIT)
+    assert scored.score > 0
+    assert scored.inputs["measured_wetness_days"] == "0"

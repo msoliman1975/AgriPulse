@@ -143,7 +143,7 @@ def test_dry_down_missing_precip_counts_as_zero_rain() -> None:
 # --- project_indices -------------------------------------------------------
 
 
-def test_project_indices_full_day_emits_all_eight() -> None:
+def test_project_indices_full_day_emits_every_defined_index() -> None:
     on = date(2026, 6, 15)
     daily = {
         on: _day(on, tmin=18, tmax=30, tmean=24, precip=2, et0=5),
@@ -178,9 +178,18 @@ def test_project_indices_full_day_emits_all_eight() -> None:
         "evapotranspiration",
         "evaporation_coeff",
         "rain_et_balance",
+        # 0062 gap-audit trio. This day carries a minimum, a maximum and
+        # humidity, so all three are defined.
+        "leaf_wetness",
+        "frost_risk",
+        "heat_stress",
     }
     # Daily MEAN relative humidity — (50 + 70) / 2.
     assert by_code["humidity"].value == Decimal("60")
+    # Neither hour reached 90% RH, so a measured zero rather than no row.
+    assert by_code["leaf_wetness"].value == Decimal("0")
+    # A minimum of 18°C is nowhere near the 4°C watch threshold.
+    assert by_code["frost_risk"].value == Decimal("0")
     assert by_code["temperature"].value == Decimal("24")
     assert by_code["temperature"].value_min == Decimal("18")
     assert by_code["temperature"].value_max == Decimal("30")
@@ -213,5 +222,96 @@ def test_project_indices_emits_humidity_without_radiation_or_wind() -> None:
     daily = {on: _day(on, tmean=20)}
     radwind = aggregate_radiation_wind_day([_ih("2026-06-15T22:00", humidity_pct=88)])
     by_code = {p.index_code: p for p in project_indices(on, daily, radwind)}
-    assert set(by_code) == {"temperature", "humidity"}
+    # leaf_wetness rides the same humidity column, so it appears here too —
+    # at zero hours, because 88% is below the 90% wetness threshold.
+    assert set(by_code) == {"temperature", "humidity", "leaf_wetness"}
     assert by_code["humidity"].value == Decimal("88")
+    assert by_code["leaf_wetness"].value == Decimal("0")
+
+
+# --- leaf wetness ----------------------------------------------------------
+
+
+def test_leaf_wetness_counts_only_hours_at_or_above_the_threshold() -> None:
+    on = date(2026, 6, 15)
+    rows = [
+        _ih("2026-06-15T00:00", humidity_pct=95),  # wet
+        _ih("2026-06-15T01:00", humidity_pct=90),  # wet — boundary is inclusive
+        _ih("2026-06-15T02:00", humidity_pct=89.9),  # dry, just
+        _ih("2026-06-15T03:00", humidity_pct=40),  # dry
+    ]
+    radwind = aggregate_radiation_wind_day(rows)
+    assert radwind.leaf_wetness_hours == Decimal(2)
+    by_code = {p.index_code: p for p in project_indices(on, {on: _day(on, tmean=20)}, radwind)}
+    assert by_code["leaf_wetness"].value == Decimal("2")
+    assert by_code["leaf_wetness"].value_aux["rh_threshold_pct"] == "90"
+    assert by_code["leaf_wetness"].value_aux["sample_hours"] == "4"
+
+
+def test_leaf_wetness_distinguishes_a_dry_day_from_an_unmeasured_one() -> None:
+    """0 hours is a finding; None is a gap. A disease model must not confuse
+    the two — treating "we didn't measure" as "it was dry" invents evidence
+    of safety."""
+    on = date(2026, 6, 15)
+    dry = aggregate_radiation_wind_day([_ih("2026-06-15T00:00", humidity_pct=30)])
+    assert dry.leaf_wetness_hours == Decimal(0)
+
+    unmeasured = aggregate_radiation_wind_day([_ih("2026-06-15T00:00", wind_speed_m_s=3)])
+    assert unmeasured.leaf_wetness_hours is None
+    # ...and an unmeasured day emits no row at all rather than a zero.
+    codes = {p.index_code for p in project_indices(on, {on: _day(on, tmean=20)}, unmeasured)}
+    assert "leaf_wetness" not in codes
+
+
+# --- frost risk ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tmin", "expected"),
+    [
+        (-3.0, Decimal(100)),  # hard frost
+        (0.0, Decimal(100)),  # freezing — certain
+        (1.0, Decimal(75)),
+        (2.0, Decimal(50)),
+        (4.0, Decimal(0)),  # watch threshold — no score
+        (18.0, Decimal(0)),  # a warm night
+    ],
+)
+def test_frost_risk_scales_from_the_daily_minimum(tmin: float, expected: Decimal) -> None:
+    on = date(2026, 1, 10)
+    daily = {on: _day(on, tmin=tmin, tmean=tmin + 5)}
+    by_code = {p.index_code: p for p in project_indices(on, daily, None)}
+    assert by_code["frost_risk"].value == expected
+    assert by_code["frost_risk"].value_aux["temp_min_c"] == str(Decimal(str(tmin)))
+
+
+def test_frost_risk_needs_a_minimum_not_just_a_mean() -> None:
+    """A mean temperature says nothing about how cold the night got, which is
+    the entire question."""
+    on = date(2026, 1, 10)
+    codes = {p.index_code for p in project_indices(on, {on: _day(on, tmean=8)}, None)}
+    assert "frost_risk" not in codes
+
+
+# --- heat stress -----------------------------------------------------------
+
+
+def test_heat_stress_matches_the_thom_thi_formula() -> None:
+    on = date(2026, 7, 20)
+    daily = {on: _day(on, tmax=40, tmean=32)}
+    radwind = aggregate_radiation_wind_day([_ih("2026-07-20T12:00", humidity_pct=30)])
+    by_code = {p.index_code: p for p in project_indices(on, daily, radwind)}
+    # THI = (1.8*40 + 32) - (0.55 - 0.0055*30) * (1.8*40 - 26)
+    #     = 104 - (0.385 * 46) = 104 - 17.71 = 86.29
+    assert by_code["heat_stress"].value == Decimal("86.290")
+    assert by_code["heat_stress"].value_aux["temp_max_c"] == "40"
+
+
+def test_heat_stress_needs_both_temperature_and_humidity() -> None:
+    """Rather than compute a THI against an assumed humidity, emit nothing —
+    the reading would look authoritative and be half invented."""
+    on = date(2026, 7, 20)
+    daily = {on: _day(on, tmax=40, tmean=32)}
+    no_humidity = aggregate_radiation_wind_day([_ih("2026-07-20T12:00", wind_speed_m_s=2)])
+    codes = {p.index_code for p in project_indices(on, daily, no_humidity)}
+    assert "heat_stress" not in codes

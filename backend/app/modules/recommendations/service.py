@@ -55,6 +55,7 @@ from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
+from app.modules.weather.snapshot import load_water_balance_snapshot
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches
 from app.shared.db.ids import uuid7
@@ -93,6 +94,11 @@ class _BlockEvaluation:
     # here?" with the axis and both sides of the comparison.
     skipped_trees: list[tuple[dict[str, Any], TargetingVerdict]]
     param_overrides_per_tree: dict[UUID, dict[str, Any]]
+    # Defaulted, unlike its siblings: this source arrived after the dataclass
+    # and after every construction site in the tests. `None` is also the
+    # honest value for a block the water-balance sweep has not written, which
+    # is what a fail-closed predicate needs to see.
+    water_balance: Any = None
 
     def cell_context(self, cell_means: Any) -> ConditionContext:
         """Block context with this cell's imagery means swapped in."""
@@ -107,6 +113,7 @@ class _BlockEvaluation:
             weather=self.weather,
             weather_indices=self.weather_indices,
             weather_risks=self.weather_risks,
+            water_balance=self.water_balance,
             signals=self.signals,
             grid=self.grid,
             crop_attributes=self.crop_attributes,
@@ -386,6 +393,7 @@ class RecommendationsServiceImpl:
         # Per-block disease/pest risk scores (PR-R3); empty until the daily
         # risk sweep scores this block, so `{source: weather_risk}` fails closed.
         weather_risks = await load_weather_risk_snapshot(self._tenant, block_id=block_id)
+        water_balance = await load_water_balance_snapshot(self._tenant, block_id=block_id)
         signals = await load_signals_snapshot(self._tenant, block_id=block_id, farm_id=farm_id)
         # Sub-block grid spatial-anomaly verdicts (G-4). Empty for blocks
         # with no grid / no current anomaly, so `{source: grid}` predicates
@@ -414,6 +422,7 @@ class RecommendationsServiceImpl:
             weather=weather,
             weather_indices=weather_indices,
             weather_risks=weather_risks,
+            water_balance=water_balance,
             signals=signals,
             grid=grid,
             crop_attributes=crop_attributes,
@@ -459,6 +468,7 @@ class RecommendationsServiceImpl:
             weather=weather,
             weather_indices=weather_indices,
             weather_risks=weather_risks,
+            water_balance=water_balance,
             signals=signals,
             grid=grid,
             crop_attributes=crop_attributes,
@@ -2091,6 +2101,7 @@ class DecisionTreesAuthorService:
         )
         # Block-keyed, so it loads regardless of farm resolution.
         weather_risks = await load_weather_risk_snapshot(tenant_session, block_id=block_id)
+        water_balance = await load_water_balance_snapshot(tenant_session, block_id=block_id)
         signals = (
             await load_signals_snapshot(tenant_session, block_id=block_id, farm_id=farm_id)
             if farm_id is not None
@@ -2117,6 +2128,7 @@ class DecisionTreesAuthorService:
             weather=weather,
             weather_indices=weather_indices,
             weather_risks=weather_risks,
+            water_balance=water_balance,
             signals=signals,
             grid=grid,
             crop_attributes=await load_crop_attribute_snapshot(

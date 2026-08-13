@@ -17,6 +17,9 @@ Index → source mapping (codes match ``public.weather_indices_catalog``):
   * ``evapotranspiration`` — daily ET₀ total
   * ``evaporation_coeff``  — soil dry-down: rolling Σ(ET₀ - precip), 30d
   * ``rain_et_balance``    — daily water balance precip - ET₀ (flux)
+  * ``leaf_wetness``       — hours at/above 90% RH (NHRH90 model)
+  * ``frost_risk``         — 0-100 closeness to frost, from the daily minimum
+  * ``heat_stress``        — Thom THI from the daily maximum + mean humidity
 
 ``evaporation_coeff`` is the *redefined* index (a cumulative deficit
 STOCK), not the degenerate ``epan = et0/0.7`` proxy — see
@@ -44,6 +47,41 @@ _SECONDS_PER_HOUR = Decimal(3600)
 _J_PER_MJ = Decimal(1_000_000)
 _DRY_DOWN_WINDOW_DAYS = 30
 
+# --- leaf wetness ----------------------------------------------------------
+# The NHRH90 model: leaf wetness duration is the count of hours at or above
+# 90% relative humidity. Sentelhas et al. (2008), Agric. For. Meteorol. 148(3)
+# benchmarked it across multiple climates and found it matches the accuracy of
+# energy-balance models in most cases — which is what makes it worth using
+# when there is no wetness sensor in the field.
+_LEAF_WETNESS_RH_PCT = Decimal(90)
+
+# --- frost risk ------------------------------------------------------------
+# Scored 0-100 off the daily minimum rather than reported as a probability:
+# a real probability needs dew point and a local model, and we have neither.
+# The band is the common operational warning threshold — advisories fire at a
+# forecast minimum of ~3°C, and freezing damage is certain at or below 0°C.
+# Linear between the two, which is a defensible reading of "how close is this
+# night to frost" without implying precision the inputs cannot support.
+_FROST_CERTAIN_C = Decimal(0)
+_FROST_WATCH_C = Decimal(4)
+
+# --- heat stress -----------------------------------------------------------
+# Thom's (1959) Temperature-Humidity Index. Carried with a caveat the catalog
+# description repeats: THI comes from livestock science, and its direct
+# agricultural validity is weaker than the crop-specific critical-temperature-
+# at-flowering model. It is used here because it is citable, computable from
+# what we already store, and farm-level — the critical-threshold model needs
+# per-crop phenology, which is block-level and therefore belongs with the
+# block-keyed water-balance work rather than in a farm-wide index.
+#
+# Driven by the daily MAXIMUM rather than the mean: heat stress is a daytime
+# extreme, and a day that peaks at 40°C is not made safe by a cool night.
+_THI_C1 = Decimal("1.8")
+_THI_C2 = Decimal(32)
+_THI_C3 = Decimal("0.55")
+_THI_C4 = Decimal("0.0055")
+_THI_C5 = Decimal(26)
+
 
 @dataclass(frozen=True, slots=True)
 class IndexHourlyRow:
@@ -70,6 +108,14 @@ class RadiationWindDay:
     wind_max_m_s: Decimal | None
     wind_dir_mean_deg: Decimal | None
     humidity_mean_pct: Decimal | None
+    # Hours in the day at or above `_LEAF_WETNESS_RH_PCT`. Defaulted so the
+    # dataclass stays constructible from older call sites, and None-vs-0 is a
+    # real distinction here: None means no humidity readings at all, 0 means a
+    # measured dry day. A disease model must not treat those the same.
+    leaf_wetness_hours: Decimal | None = None
+    # How many hourly samples the day actually carried, so a partial day can
+    # be recognised as partial rather than read as a short one.
+    humidity_sample_hours: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +189,12 @@ def aggregate_radiation_wind_day(rows: Sequence[IndexHourlyRow]) -> RadiationWin
     rad_sum_mj = (sum(rad, start=Decimal(0)) * _SECONDS_PER_HOUR / _J_PER_MJ) if rad else None
     wind_mean = _mean(speeds)
 
+    # Leaf wetness: one hour credited per hourly sample at or above the RH
+    # threshold. `None` only when the day carried no humidity reading at all —
+    # a day of measured dry air is 0 hours, which is a finding rather than a
+    # gap, and a disease model must not treat the two the same.
+    wet_hours = Decimal(sum(1 for h in hums if h >= _LEAF_WETNESS_RH_PCT)) if hums else None
+
     return RadiationWindDay(
         radiation_mean_w_m2=rad_mean.quantize(_Q) if rad_mean is not None else None,
         radiation_sum_mj_m2=rad_sum_mj.quantize(_Q) if rad_sum_mj is not None else None,
@@ -150,7 +202,42 @@ def aggregate_radiation_wind_day(rows: Sequence[IndexHourlyRow]) -> RadiationWin
         wind_max_m_s=max(speeds).quantize(_Q) if speeds else None,
         wind_dir_mean_deg=_vector_mean_direction(dirs),
         humidity_mean_pct=(_mean(hums).quantize(_Q) if hums else None),  # type: ignore[union-attr]
+        leaf_wetness_hours=wet_hours,
+        humidity_sample_hours=len(hums),
     )
+
+
+# --- Frost + heat scoring --------------------------------------------------
+
+
+def frost_risk_score(temp_min_c: Decimal) -> Decimal:
+    """0-100 closeness-to-frost from a day's minimum air temperature.
+
+    100 at or below freezing, 0 at or above the watch threshold, linear in
+    between. Deliberately NOT called a probability: a real frost probability
+    needs dew point and a locally fitted model, and we have neither, so a
+    number presented as a probability here would be false precision.
+
+    The value is most useful on forecast days — it is the only signal in the
+    system that fires before any damage has happened.
+    """
+    if temp_min_c <= _FROST_CERTAIN_C:
+        return Decimal(100)
+    if temp_min_c >= _FROST_WATCH_C:
+        return Decimal(0)
+    span = _FROST_WATCH_C - _FROST_CERTAIN_C
+    return ((_FROST_WATCH_C - temp_min_c) / span * Decimal(100)).quantize(_Q)
+
+
+def temperature_humidity_index(temp_c: Decimal, humidity_pct: Decimal) -> Decimal:
+    """Thom (1959) THI: ``(1.8T + 32) - (0.55 - 0.0055·RH)(1.8T - 26)``.
+
+    Returned on its native (Fahrenheit-derived) scale rather than rescaled,
+    so published banding tables still apply to it unchanged.
+    """
+    f = _THI_C1 * temp_c + _THI_C2
+    correction = (_THI_C3 - _THI_C4 * humidity_pct) * (_THI_C1 * temp_c - _THI_C5)
+    return (f - correction).quantize(_Q)
 
 
 # --- Dry-down (soil water deficit STOCK) -----------------------------------
@@ -294,6 +381,70 @@ def project_indices(
             ProjectedIndex(
                 index_code="rain_et_balance",
                 value=(precip - day.et0_mm_daily).quantize(_Q),
+            )
+        )
+
+    out.extend(project_hazard_indices(day, radwind))
+    return out
+
+
+def project_hazard_indices(
+    day: DailyDerived | None,
+    radwind: RadiationWindDay | None,
+) -> list[ProjectedIndex]:
+    """The three gap-audit indices: leaf wetness, frost risk, heat stress.
+
+    Split out of :func:`project_indices` to keep that function's branch count
+    honest, but they also belong together: unlike the eight above — which
+    report a measured quantity — these three each answer "is this day
+    dangerous, and how", and each is defined by a threshold rather than by a
+    unit of measurement.
+    """
+    out: list[ProjectedIndex] = []
+
+    # leaf_wetness — hours at/above 90% RH (NHRH90). The single strongest
+    # predictor of fungal infection, because spores need free water to
+    # germinate, and the input the three pathogen models were built without.
+    if radwind is not None and radwind.leaf_wetness_hours is not None:
+        out.append(
+            ProjectedIndex(
+                index_code="leaf_wetness",
+                value=radwind.leaf_wetness_hours.quantize(_Q),
+                value_aux={
+                    "rh_threshold_pct": str(_LEAF_WETNESS_RH_PCT),
+                    "sample_hours": str(radwind.humidity_sample_hours),
+                },
+            )
+        )
+
+    # frost_risk — 0-100 from the day's minimum temperature.
+    if day is not None and day.temp_min_c is not None:
+        out.append(
+            ProjectedIndex(
+                index_code="frost_risk",
+                value=frost_risk_score(day.temp_min_c),
+                value_aux={
+                    "temp_min_c": str(day.temp_min_c),
+                    "certain_at_c": str(_FROST_CERTAIN_C),
+                    "watch_at_c": str(_FROST_WATCH_C),
+                },
+            )
+        )
+
+    # heat_stress — THI from the day's maximum temperature and mean humidity.
+    # Needs both, so a day with temperature but no humidity emits no row
+    # rather than a THI computed against an assumed humidity.
+    temp_max = day.temp_max_c if day is not None else None
+    humidity = radwind.humidity_mean_pct if radwind is not None else None
+    if temp_max is not None and humidity is not None:
+        out.append(
+            ProjectedIndex(
+                index_code="heat_stress",
+                value=temperature_humidity_index(temp_max, humidity),
+                value_aux={
+                    "temp_max_c": str(temp_max),
+                    "humidity_mean_pct": str(humidity),
+                },
             )
         )
 

@@ -246,6 +246,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               gridFillVisible={false}
               blockFillColorProperty="class_color"
               gridCells={c.gridCellsFc}
+              gridIndexCode={c.activeIndex}
               highlightedCellIds={c.highlightedCellIds}
               selectedGridCellId={c.selectedCellId}
               onGridCellClick={(cellId, point) => {

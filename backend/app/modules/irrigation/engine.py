@@ -94,12 +94,43 @@ def lookup_kc(*, growth_stage: str | None, phenology_stages: dict[str, Any] | No
       2. Built-in default in ``_DEFAULT_KC_BY_STAGE``.
       3. ``_DEFAULT_KC_BY_STAGE['default']``.
     """
+    return resolve_kc(growth_stage=growth_stage, phenology_stages=phenology_stages).value
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedKc:
+    """A Kc value plus which of the three tiers produced it.
+
+    The provenance matters downstream: a water balance built on the generic
+    0.85 fallback deserves materially less confidence than one built on a
+    per-stage catalog value, and after the fact the two numbers look
+    identical. ``lookup_kc`` stays as the value-only form for callers that
+    don't record provenance.
+    """
+
+    value: Decimal
+    source: str  # 'phenology' | 'stage_default' | 'generic_default'
+
+
+def resolve_kc(*, growth_stage: str | None, phenology_stages: dict[str, Any] | None) -> ResolvedKc:
+    """``lookup_kc`` with the resolution tier attached. Same priority order."""
     catalog_kc = _phenology_kc(growth_stage, phenology_stages)
     if catalog_kc is not None:
-        return catalog_kc
+        return ResolvedKc(catalog_kc, "phenology")
     if growth_stage and growth_stage in _DEFAULT_KC_BY_STAGE:
-        return _DEFAULT_KC_BY_STAGE[growth_stage]
-    return _DEFAULT_KC_BY_STAGE["default"]
+        return ResolvedKc(_DEFAULT_KC_BY_STAGE[growth_stage], "stage_default")
+    return ResolvedKc(_DEFAULT_KC_BY_STAGE["default"], "generic_default")
+
+
+def crop_et(kc: Decimal, et0_mm: Decimal) -> Decimal:
+    """ETc — what the crop actually transpires, as opposed to ET₀.
+
+    ET₀ is climatic demand over a reference grass surface; Kc scales it to the
+    crop and its growth stage (FAO-56 Ch. 6). One line, but extracted so the
+    irrigation recommendation and the daily block water balance cannot drift
+    into computing "the same" number two ways.
+    """
+    return (kc * et0_mm).quantize(Decimal("0.01"))
 
 
 def _phenology_kc(stage: str | None, stages_doc: dict[str, Any] | None) -> Decimal | None:
@@ -152,7 +183,7 @@ def compute_recommendation(inputs: IrrigationInputs) -> Recommendation:
         growth_stage=inputs.growth_stage,
         phenology_stages=inputs.phenology_stages,
     )
-    crop_demand = (kc * inputs.et0_mm_today).quantize(Decimal("0.01"))
+    crop_demand = crop_et(kc, inputs.et0_mm_today)
     deficit = crop_demand - inputs.recent_precip_mm
     if deficit <= 0:
         recommended = Decimal("0.00")
@@ -165,4 +196,69 @@ def compute_recommendation(inputs: IrrigationInputs) -> Recommendation:
         et0_mm_used=inputs.et0_mm_today.quantize(Decimal("0.01")),
         recent_precip_mm=inputs.recent_precip_mm.quantize(Decimal("0.01")),
         growth_stage_context=inputs.growth_stage or "unknown",
+    )
+
+
+# --- Daily crop water balance ----------------------------------------------
+#
+# The guide's Water Balance Index, finding D7 of the indices gap audit:
+#
+#     balance = precipitation + irrigation - ETc
+#
+# Distinct from `compute_recommendation` above, which answers "how much should
+# we put on today". This answers "did the water that arrived cover what the
+# crop used", which is a retrospective accounting question, and it is the one
+# the weather module's `rain_et_balance` gets wrong twice over: that index
+# substitutes ET0 for ETc and drops irrigation entirely, so on an irrigated
+# orchard it reports a deficit that was in fact covered.
+
+
+@dataclass(frozen=True, slots=True)
+class WaterBalance:
+    """One block-day of crop water accounting, ready for the daily table."""
+
+    balance_mm: Decimal
+    etc_mm: Decimal
+    et0_mm: Decimal
+    kc_used: Decimal
+    kc_source: str
+    precip_mm: Decimal
+    irrigation_mm: Decimal
+    irrigation_logged: bool
+    growth_stage: str | None
+
+
+def compute_water_balance(
+    *,
+    et0_mm: Decimal,
+    precip_mm: Decimal | None,
+    irrigation_mm: Decimal | None,
+    growth_stage: str | None,
+    phenology_stages: dict[str, Any] | None,
+) -> WaterBalance:
+    """Crop water balance for one block-day.
+
+    ``irrigation_mm`` is ``None`` when nothing was logged for the day, which is
+    NOT the same as a logged zero: the first means we do not know, the second
+    means we know none was applied. Both contribute 0 mm to the arithmetic —
+    there is nothing else they could contribute — but the distinction is
+    carried through on ``irrigation_logged`` so a reader can tell a genuine
+    deficit from an unrecorded irrigation. Without it, every farm that does not
+    use the irrigation module would show a permanent, fictitious drought.
+    """
+    kc = resolve_kc(growth_stage=growth_stage, phenology_stages=phenology_stages)
+    etc = crop_et(kc.value, et0_mm)
+    rain = precip_mm if precip_mm is not None else Decimal(0)
+    applied = irrigation_mm if irrigation_mm is not None else Decimal(0)
+
+    return WaterBalance(
+        balance_mm=(rain + applied - etc).quantize(Decimal("0.01")),
+        etc_mm=etc,
+        et0_mm=et0_mm.quantize(Decimal("0.01")),
+        kc_used=kc.value,
+        kc_source=kc.source,
+        precip_mm=rain.quantize(Decimal("0.01")),
+        irrigation_mm=applied.quantize(Decimal("0.01")),
+        irrigation_logged=irrigation_mm is not None,
+        growth_stage=growth_stage,
     )

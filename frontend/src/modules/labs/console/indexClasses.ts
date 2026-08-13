@@ -86,6 +86,8 @@ export const CLASS_VOCAB: Record<ApiIndexCode, string> = {
   gndvi: "chlorophyll",
   ndwi: "surfaceWater",
   ndmi: "leafMoisture",
+  bsi: "bareSoil",
+  msi: "moistureStress",
 };
 
 // Canopy-cover indices. Boundaries per the USGS remote-sensing-phenology and
@@ -182,6 +184,53 @@ export const INDEX_CLASSES: Record<ApiIndexCode, IndexClass[]> = {
     { max: 0.6, key: "dense", tone: "healthy", color: HEALTHY },
     { max: 0.8, key: "veryDense", tone: "healthy", color: HEALTHY_HIGH },
     { max: Infinity, key: "saturated", tone: "watch", color: SATURATED },
+  ],
+
+  // ((SWIR₁ + RED) − (NIR + BLUE)) / ((SWIR₁ + RED) + (NIR + BLUE)) —
+  // Rikimaru et al. 2002, further validated in Nguyen et al. 2021 (Land 10:231)
+  // for separating fallow from cropped land.
+  //
+  // Ordered the same way as NDWI and for the same reason: this index's healthy
+  // end is its NEGATIVE end. Negative means canopy reflectance dominates the
+  // pixel, positive means bare ground does. So the verdict ramp runs downhill
+  // as the number goes up.
+  //
+  // The reading is stage-dependent in a way the colour cannot express: bare
+  // ground three weeks after planting is expected, and the same value at peak
+  // canopy is plant loss. `dock.readingCaveat` carries that on screen rather
+  // than this table pretending to know the crop calendar.
+  bsi: [
+    { max: -0.3, key: "closedCanopy", tone: "healthy", color: HEALTHY_HIGH },
+    { max: -0.1, key: "mostlyCovered", tone: "healthy", color: HEALTHY },
+    { max: 0, key: "thinning", tone: "watch", color: WATCH_HIGH },
+    { max: 0.15, key: "patchy", tone: "watch", color: WATCH },
+    { max: 0.3, key: "mostlyBare", tone: "critical", color: CRITICAL_LOW },
+    { max: Infinity, key: "bare", tone: "critical", color: CRITICAL },
+  ],
+
+  // SWIR₁ / NIR — Rock et al. 1986. Cut points from the common reading:
+  // <0.4 high moisture content, 0.4–1.0 moderate stress, >1.0 high stress.
+  //
+  // The only RATIO in this table, and the only index whose value is not
+  // bounded to [-1, 1] — real pixels run roughly 0.2 to 2.0+, so nothing here
+  // may assume a normalized-difference range.
+  //
+  // It also runs backwards: HIGH means stressed. Because colour is a verdict
+  // rather than a quantity, the ramp is ordered exactly as it is for every
+  // other index — good at the top of the list, bad at the bottom — and it is
+  // the NUMBERS that ascend against it.
+  //
+  // Confounder named in the class copy rather than hidden: open water drives
+  // NIR toward zero, which sends the ratio very high, so standing water lands
+  // in the same top class as a parched canopy. NDMI separates the two at its
+  // low end; MSI cannot, which is a reason to read them together.
+  msi: [
+    { max: 0.4, key: "wellWatered", tone: "healthy", color: HEALTHY_HIGH },
+    { max: 0.6, key: "adequate", tone: "healthy", color: HEALTHY },
+    { max: 0.8, key: "mildStress", tone: "watch", color: WATCH_HIGH },
+    { max: 1.0, key: "moderateStress", tone: "watch", color: WATCH },
+    { max: 1.6, key: "highStress", tone: "critical", color: CRITICAL_LOW },
+    { max: Infinity, key: "severeStress", tone: "critical", color: CRITICAL },
   ],
 };
 

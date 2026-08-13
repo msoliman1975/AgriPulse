@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { INDEX_CODES } from "@/api/indices";
 import type { ZoneAnomalyBlockRow, ZoneAnomalyStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -10,7 +11,8 @@ import { useZoneAnomalyReport } from "@/queries/reports";
 import type { ReportProps } from "../registry";
 import { ReportShell } from "./ReportShell";
 
-const INDEX_CODES = ["ndvi", "ndre", "ndwi", "evi", "savi", "gndvi"] as const;
+// Everything the platform computes. Previously a hardcoded copy of the
+// original six, so ndmi was never selectable here.
 
 const STATUS_CHIP: Record<ZoneAnomalyStatus, string> = {
   anomalies: "bg-ap-crit-soft text-ap-crit",

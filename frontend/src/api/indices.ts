@@ -5,10 +5,36 @@ import { apiClient } from "./client";
 export type TimeseriesGranularity = "daily" | "weekly";
 
 // ndmi (NIR/SWIR moisture) was added backend-side after the original six
-// (migration 0027); it's computed + stored per scene/cell for SWIR-bearing
-// products (Sentinel-2). Listed here so the grid picker can surface it.
-// NB: SWIR-free products (future PlanetScope 3 m) won't carry it.
-export type IndexCode = "ndvi" | "ndwi" | "evi" | "savi" | "ndre" | "gndvi" | "ndmi";
+// (migration 0027); bsi + msi came later still from the indices-guide gap
+// audit (migration 0056). All three are computed + stored per scene/cell for
+// SWIR-bearing products (Sentinel-2).
+// NB: SWIR-free products (future PlanetScope 3 m) won't carry ndmi/bsi/msi.
+//
+// ⚠️ `msi` is the odd one out: it is a plain SWIR1/NIR ratio, so its range is
+// roughly [0, 3] rather than [-1, 1], and it reads BACKWARDS (higher = more
+// stress). Anything that rescales, clamps or colour-ramps on a [-1, 1]
+// "higher is healthier" assumption has to special-case it.
+//
+// Mirrors backend STANDARD_INDEX_CODES; the pairing is enforced by
+// backend/tests/unit/shared/test_index_codes_frontend_parity.py.
+// A runtime array with the type derived from it, rather than a bare union.
+// Four other modules used to keep their own hardcoded copy of this list for
+// their pickers, and all four were still on the original six — which is why
+// `ndmi` was uncheckable in insights and both reports for a year after the
+// backend started computing it. They now import this.
+export const INDEX_CODES = [
+  "ndvi",
+  "ndwi",
+  "evi",
+  "savi",
+  "ndre",
+  "gndvi",
+  "ndmi",
+  "bsi",
+  "msi",
+] as const;
+
+export type IndexCode = (typeof INDEX_CODES)[number];
 
 export interface IndexTimeseriesPoint {
   time: string;

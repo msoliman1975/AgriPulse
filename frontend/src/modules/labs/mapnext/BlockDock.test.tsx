@@ -7,6 +7,7 @@ import { setupTestI18n } from "@/i18n/testing";
 import type { UnitDetail } from "../map/types";
 
 import { BlockDock } from "./BlockDock";
+import { INDEX_FAMILIES } from "./constants";
 
 // The Conditions tab calls the tree-explain endpoint, which is gated on
 // `recommendation.read`. Roles without it must not see a tab that 403s.
@@ -247,12 +248,19 @@ describe("BlockDock", () => {
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /^Moisture$/ }));
 
-    // Both members are defined, including the grid-only one that has no value
-    // of its own — a definition is reference material, not a reading.
-    expect(screen.getAllByText("Definition")).toHaveLength(2);
-    expect(screen.getAllByText("How to read it")).toHaveLength(2);
+    // Every member is defined, including the grid-only ones that have no value
+    // of their own — a definition is reference material, not a reading. Tied to
+    // the family table rather than a literal count, so adding an index to a
+    // family does not silently narrow what this test checks.
+    const moistureCount = INDEX_FAMILIES.find((f) => f.key === "moisture")!.indices.length;
+    expect(moistureCount).toBeGreaterThan(1);
+    expect(screen.getAllByText("Definition")).toHaveLength(moistureCount);
+    expect(screen.getAllByText("How to read it")).toHaveLength(moistureCount);
     expect(screen.getByText(/McFeeters/)).toBeTruthy();
     expect(screen.getByText(/Leaf water absorbs shortwave infrared/)).toBeTruthy();
+    // MSI joined this family from the gap audit. It is the one index whose
+    // scale runs the other way, so the dock has to say so.
+    expect(screen.getByText(/the one index here where higher is worse/)).toBeTruthy();
     // The scale text has to warn that this family's charted index is inverted.
     expect(screen.getByText(/the scale is inverted against the canopy indices/)).toBeTruthy();
     expect(screen.getByText(/moves with the crop and its growth stage/)).toBeTruthy();

@@ -67,3 +67,39 @@ export async function generateIrrigationForBlock(
   );
   return data;
 }
+
+/** One block-day of crop water accounting: precipitation + irrigation - ETc.
+ *
+ * Carries the whole derivation rather than just `balance_mm`, because the
+ * headline alone is not actionable — peak crop demand, absent rain, and
+ * irrigation nobody logged all produce a deficit and call for different
+ * responses. Decimals arrive as strings, per the platform convention.
+ */
+export interface WaterBalanceDay {
+  date: string;
+  balance_mm: string;
+  etc_mm: string;
+  et0_mm: string;
+  kc_used: string;
+  /** How the crop coefficient resolved. A balance built on `generic_default`
+   *  deserves less confidence than one built on a per-stage catalog value. */
+  kc_source: "phenology" | "stage_default" | "generic_default";
+  growth_stage: string | null;
+  precip_mm: string;
+  irrigation_mm: string;
+  /** False means no irrigation was RECORDED, not that none was applied. A
+   *  farm that never logs irrigation shows a permanent deficit that is missing
+   *  bookkeeping, not dry soil — never present that as a shortfall. */
+  irrigation_logged: boolean;
+}
+
+export async function getWaterBalance(
+  blockId: string,
+  params: { from?: string; to?: string } = {},
+): Promise<WaterBalanceDay[]> {
+  const { data } = await apiClient.get<WaterBalanceDay[]>(
+    `/v1/blocks/${blockId}/water-balance`,
+    { params },
+  );
+  return data;
+}

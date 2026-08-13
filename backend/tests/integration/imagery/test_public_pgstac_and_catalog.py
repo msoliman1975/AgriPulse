@@ -108,12 +108,17 @@ async def test_s2_l2a_product_seeded_with_correct_bands(
         "gndvi",
         # ndmi advertised on s2_l2a (0027 + 0029 correction).
         "ndmi",
+        # bsi + msi from the indices-guide gap audit (0061). Both land in
+        # `supported_indices` and NOT in `bands` above — the mistake 0027 made
+        # and 0029 had to undo.
+        "bsi",
+        "msi",
     }
     assert row.cost_tier == "medium"
 
 
 @pytest.mark.asyncio
-async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
+async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
     rows = (
         await admin_session.execute(
             text(
@@ -123,14 +128,34 @@ async def test_six_standard_indices_seeded(admin_session: AsyncSession) -> None:
         )
     ).all()
     codes = [r.code for r in rows]
-    # ndmi added by 0027 (KB P2 moisture index), sorted between gndvi and ndre.
-    assert codes == ["evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"]
+    # ndmi added by 0027 (KB P2 moisture index); bsi + msi by 0061 (gap audit).
+    # Sorted by code, so bsi leads and msi sits between gndvi and ndmi.
+    assert codes == [
+        "bsi",
+        "evi",
+        "gndvi",
+        "msi",
+        "ndmi",
+        "ndre",
+        "ndvi",
+        "ndwi",
+        "savi",
+    ]
     for r in rows:
         assert r.is_standard is True
         assert r.name_en  # non-empty English label
         assert r.name_ar  # non-empty Arabic label
-        assert float(r.value_min) == -1.0
-        assert float(r.value_max) == 1.0
+
+    # Every normalized-difference index shares the [-1, 1] range. `msi` does
+    # not, and that is the point of it: it is a plain SWIR/NIR ratio, so a
+    # blanket bounds assertion here would have to be relaxed into meaning
+    # nothing. Assert the two families separately instead.
+    by_code = {r.code: r for r in rows}
+    for code in ("bsi", "evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"):
+        assert float(by_code[code].value_min) == -1.0, code
+        assert float(by_code[code].value_max) == 1.0, code
+    assert float(by_code["msi"].value_min) == 0.0
+    assert float(by_code["msi"].value_max) == 3.0
 
 
 @pytest.mark.asyncio

@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
+import { WaterBalanceCard } from "./WaterBalanceCard";
 import { clearDetailCache } from "../map/api";
 import type { UnitDetail, UnitIntegration } from "../map/types";
 import {
@@ -561,6 +562,10 @@ export function BlockDock({
                     ]}
                   />
                   <p className="text-xs text-ap-muted">{t("dock.soilFromSchedule")}</p>
+                </Col>
+
+                <Col title={t("dock.waterBalance.title")}>
+                  <WaterBalanceCard blockId={detail.id} />
                 </Col>
 
                 <Col title={t("inspector.weather")}>
