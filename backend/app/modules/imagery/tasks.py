@@ -1579,7 +1579,10 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             status="succeeded",
             completed_at=datetime.now(UTC),
             stac_item_id=stac_item_id,
-            assets_written=[s3_key, *sorted(index_keys)],
+            # index_keys maps code -> written key; assets_written wants the
+            # keys. Iterating the dict gives the codes, which recorded
+            # "ndvi" where an object path belonged.
+            assets_written=[s3_key, *sorted(index_keys.values())],
         )
 
     _log.info(
