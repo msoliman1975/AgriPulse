@@ -22,6 +22,7 @@ import {
   blockStatsUrl,
   blockTileUrl,
   TILE_SIZE,
+  farmRasterForPass,
   readBlockCounts,
   summariseClassAreas,
   type BandStatistics,
@@ -115,9 +116,11 @@ export function useIndexPixels(input: {
   boundsByBlockId: Map<string, [number, number, number, number]>;
   /** The farm's own extent, for the single-source path. */
   farmBounds: [number, number, number, number] | null;
+  /** The farm's surveyed area, so unread ground is measured against it. */
+  farmAreaM2: number | null;
   enabled: boolean;
 }): IndexPixels {
-  const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds } = input;
+  const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds, farmAreaM2 } = input;
 
   const assetsQ = useQuery({
     queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt),
@@ -132,8 +135,18 @@ export function useIndexPixels(input: {
    * (each block's raster carries the shared boundary pixel, so drawing both
    * stacked two translucent copies of it). Null keeps the per-block path,
    * which is how the cutover runs one farm at a time.
+   *
+   * The surface is only accepted when it is the SAME pass the blocks resolved
+   * to. On prod, asking for a 2024 pass returns that pass's block rasters
+   * alongside the LATEST farm raster, which paints today's pixels under a
+   * timeline reading two years ago — a wrong answer that looks like a right
+   * one. A pass the farm has no surface for falls back to the per-block path,
+   * which is merely seamed rather than untrue.
    */
-  const farmRaster = useMemo<FarmRaster | null>(() => assetsQ.data?.farm ?? null, [assetsQ.data]);
+  const farmRaster = useMemo<FarmRaster | null>(
+    () => farmRasterForPass(assetsQ.data?.farm, assetsQ.data?.items ?? []),
+    [assetsQ.data],
+  );
 
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would
@@ -241,8 +254,16 @@ export function useIndexPixels(input: {
   const classAreas = useMemo(() => {
     const classCount = classesFor(code).length;
     return (scopeBlockId: string | null): ClassAreaSummary =>
-      summariseClassAreas(statsQ.data?.counts ?? [], classCount, scopeBlockId);
-  }, [statsQ.data, code]);
+      summariseClassAreas(
+        statsQ.data?.counts ?? [],
+        classCount,
+        scopeBlockId,
+        // Only the whole-farm scope has a known area to measure against; a
+        // block scope falls back to masked pixels until per-block zonal
+        // statistics over the farm raster land.
+        scopeBlockId ? null : farmAreaM2,
+      );
+  }, [statsQ.data, code, farmAreaM2]);
 
   return {
     isFarmRaster: farmRaster !== null,

@@ -172,4 +172,26 @@ describe("summariseClassAreas", () => {
     const s = summariseClassAreas([counts[0]], 3, null);
     expect(s.coveredM2).toBe(300);
   });
+
+  it("measures unread ground against the farm, not the bounding box", () => {
+    // Masked pixels include everything in the COG's rectangle that the
+    // boundary misses, so raw they claim unread ground outside the farm.
+    // 600 m² of farm, 400 m² read: 200 m² unread — regardless of how much
+    // desert the bounding box happens to enclose.
+    const s = summariseClassAreas(counts, 3, null, 600);
+    expect(s.coveredM2).toBe(400);
+    expect(s.noDataM2).toBe(200);
+  });
+
+  it("never reports negative unread ground when coverage overhangs", () => {
+    // Boundary pixels are counted whole, so a fully-read farm can measure
+    // slightly larger than its surveyed area.
+    const s = summariseClassAreas(counts, 3, null, 350);
+    expect(s.noDataM2).toBe(0);
+  });
+
+  it("falls back to masked pixels when the farm area is unknown", () => {
+    expect(summariseClassAreas(counts, 3, null, null).noDataM2).toBe(200);
+    expect(summariseClassAreas(counts, 3, null, 0).noDataM2).toBe(200);
+  });
 });

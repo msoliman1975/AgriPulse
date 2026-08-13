@@ -166,12 +166,32 @@ export function readBlockCounts(
   };
 }
 
+/**
+ * The farm surface to draw for a pass, or null to fall back to per-block.
+ *
+ * A farm raster is only the right thing to draw when it is the SAME pass the
+ * blocks resolved to. On prod, asking for a 2024 pass returns that pass's
+ * block rasters alongside the LATEST farm raster — which paints today's
+ * pixels under a timeline reading two years ago. That is a wrong answer
+ * wearing the shape of a right one, and the seamed per-block path is the
+ * better failure: ugly rather than untrue.
+ */
+export function farmRasterForPass<T extends { scene_datetime: string }>(
+  farm: T | null | undefined,
+  items: readonly { scene_datetime: string }[],
+): T | null {
+  if (!farm) return null;
+  // With no blocks there is no pass to disagree with.
+  if (items.length === 0) return farm;
+  return Date.parse(farm.scene_datetime) === Date.parse(items[0].scene_datetime) ? farm : null;
+}
+
 export interface ClassAreaSummary {
   /** Square metres per class, in the class table's order (lowest first). */
   areaM2ByClass: number[];
   /** Total area carrying a reading. */
   coveredM2: number;
-  /** Area inside the blocks with no reading for this scene. */
+  /** Ground in scope with no reading for this scene. */
   noDataM2: number;
 }
 
@@ -182,15 +202,25 @@ export interface ClassAreaSummary {
  * whose statistics failed is simply absent from `counts` and contributes
  * nothing — better an area that is short by one block than one inflated by a
  * block counted with a guessed resolution.
+ *
+ * `scopeAreaM2` is the ground the scope actually occupies, and it exists
+ * because masked pixels are not it. A COG is a rectangle; the raster inside
+ * it is clipped to a polygon, so every pixel in the bounding box that the
+ * polygon misses counts as masked. Reported raw, that says a farm has
+ * unread ground where it has no ground at all — on Bashier Elkhier, 56.9
+ * feddan of "no reading" against a 203.4 feddan farm that only adds up if
+ * you include six feddan of neighbouring desert. Given the farm's own area,
+ * the honest figure is what is left of it after the readings.
  */
 export function summariseClassAreas(
   counts: readonly BlockPixelCounts[],
   classCount: number,
   scopeBlockId: string | null,
+  scopeAreaM2?: number | null,
 ): ClassAreaSummary {
   const areaM2ByClass = new Array<number>(classCount).fill(0);
   let coveredM2 = 0;
-  let noDataM2 = 0;
+  let maskedM2 = 0;
   for (const c of counts) {
     if (scopeBlockId && c.blockId !== scopeBlockId) continue;
     for (let i = 0; i < classCount; i += 1) {
@@ -198,7 +228,11 @@ export function summariseClassAreas(
       areaM2ByClass[i] += area;
       coveredM2 += area;
     }
-    noDataM2 += c.maskedPixels * c.pixelAreaM2;
+    maskedM2 += c.maskedPixels * c.pixelAreaM2;
   }
+  // Pixels straddling the boundary are counted whole, so coverage can edge
+  // past the surveyed area — clamp rather than report negative unread ground.
+  const noDataM2 =
+    scopeAreaM2 && scopeAreaM2 > 0 ? Math.max(0, scopeAreaM2 - coveredM2) : maskedM2;
   return { areaM2ByClass, coveredM2, noDataM2 };
 }

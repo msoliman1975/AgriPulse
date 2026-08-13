@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FarmRaster, FarmSceneAsset } from "@/api/imagery";
-import { blockStatsUrl, blockTileUrl, indexAssetKey } from "./pixelTiles";
+import { blockStatsUrl, blockTileUrl, farmRasterForPass, indexAssetKey } from "./pixelTiles";
 
 /**
  * A farm raster and a block asset are the same thing to the URL builders:
@@ -64,5 +64,35 @@ describe("farm raster and block asset are interchangeable", () => {
     // Same scene, different AOI hash: a farm raster can never be confused for
     // one of its blocks, which is what stops a reshape serving stale ground.
     expect(indexAssetKey(FARM, "ndvi")).not.toBe(indexAssetKey(BLOCK, "ndvi"));
+  });
+});
+
+describe("the surface must be the pass the blocks resolved to", () => {
+  it("draws the farm raster when it is the same pass", () => {
+    expect(farmRasterForPass(FARM, [BLOCK])).toBe(FARM);
+  });
+
+  it("refuses a farm raster from a different pass", () => {
+    // Reproduces what prod returns for a historical date: the requested
+    // pass's blocks alongside the LATEST farm surface. Drawing it would put
+    // today's pixels under a timeline reading two years ago.
+    const oldPass = { ...BLOCK, scene_datetime: "2024-05-17T08:41:48.000Z" };
+    expect(farmRasterForPass(FARM, [oldPass])).toBeNull();
+  });
+
+  it("accepts a farm raster when there are no blocks to disagree with", () => {
+    expect(farmRasterForPass(FARM, [])).toBe(FARM);
+  });
+
+  it("stays on the per-block path when there is no farm raster", () => {
+    expect(farmRasterForPass(null, [BLOCK])).toBeNull();
+    expect(farmRasterForPass(undefined, [BLOCK])).toBeNull();
+  });
+
+  it("compares instants, not strings", () => {
+    // The same moment written two ways is the same pass.
+    const sameMoment = { ...BLOCK, scene_datetime: "2026-08-10T09:41:47.000+01:00" };
+    const farm = { ...FARM, scene_datetime: "2026-08-10T08:41:47.000Z" };
+    expect(farmRasterForPass(farm, [sameMoment])).toBe(farm);
   });
 });
