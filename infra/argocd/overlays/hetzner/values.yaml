@@ -1680,9 +1680,9 @@ global:
   #   until the hourly sweep runs against a block with a current crop.
   images:
     api:
-      tag: "5ba132c"
+      tag: "8117a5a"
     workers:
-      tag: "5ba132c"
+      tag: "8117a5a"
     frontend:
       tag: "0852d7e"
     tileServer:
