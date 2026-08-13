@@ -412,8 +412,9 @@ async def test_compute_indices_writes_one_aggregate_and_one_cog_per_index(
             )
         )
     ).all()
-    assert len(rows) == 7
+    assert len(rows) == len(STANDARD_INDEX_CODES)
     by_index = {r.index_code: r for r in rows}
+    assert set(by_index) == set(STANDARD_INDEX_CODES)
     assert by_index["ndvi"].mean is not None
     assert by_index["ndvi"].valid_pixel_count > 0
     # AOI footprint counts pixels â€” total_pixel_count is positive for at
