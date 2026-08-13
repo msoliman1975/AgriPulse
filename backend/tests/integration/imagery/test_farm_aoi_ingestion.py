@@ -73,18 +73,35 @@ class _FakeProvider:
         pass
 
 
-def _stub_rasterio(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Replace the raster read/write with something that records the aoi hash.
+def _stub_rasterio(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    grid: dict[str, Any] | None = None,
+    index_value: float = 0.5,
+) -> list[str]:
+    """Replace the raster read/write, recording which aoi hash was used.
 
-    What matters here is which prefix the indices are written under, not the
-    arithmetic — that is covered by the merge and zonal unit tests.
+    With ``grid`` supplied the doubles hand back a REAL profile and real
+    index arrays, so the per-block zonal path downstream runs for real
+    against the farm grid. Without it they stay empty, which is enough for
+    the tests that only care about prefixes and job state.
     """
+    import numpy as np
+
     from app.modules.imagery import _rasterio_io
 
     seen_hashes: list[str] = []
+    profile: dict[str, Any] = grid or {"transform": None}
+    if grid is not None:
+        rasters = {
+            code: np.full((grid["height"], grid["width"]), index_value, dtype="float32")
+            for code in ("ndvi", "ndmi")
+        }
+    else:
+        rasters = {}
 
     def fake_load(uri: str, *, band_names: tuple[str, ...], aoi_geojson_utm36n: dict) -> tuple:
-        return ({b: None for b in band_names}, None, None, {"transform": None})
+        return ({b: None for b in band_names}, None, None, profile)
 
     def fake_compute(**kwargs: Any) -> tuple:
         seen_hashes.append(kwargs["aoi_hash"])
@@ -94,11 +111,39 @@ def _stub_rasterio(monkeypatch: pytest.MonkeyPatch) -> list[str]:
         # passed. A double that does not match the contract cannot catch the
         # bug the contract exists to prevent.
         keys = {code: f"{kwargs['aoi_hash']}/{code}.tif" for code in ("ndvi", "ndmi")}
-        return ({}, keys, {})
+        return ({}, keys, rasters)
 
     monkeypatch.setattr(_rasterio_io, "load_raw_bands_and_aggregate", fake_load)
     monkeypatch.setattr(_rasterio_io, "compute_and_write_indices", fake_compute)
     return seen_hashes
+
+
+async def _farm_grid(session: AsyncSession, schema: str, farm_id: UUID) -> dict[str, Any]:
+    """A 10 m profile covering the farm, as the real merge would produce."""
+    from rasterio.transform import from_origin
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    f"SELECT ST_XMin(e) x0, ST_YMin(e) y0, ST_XMax(e) x1, ST_YMax(e) y1 "
+                    f'FROM (SELECT ST_Envelope(boundary_utm) e FROM "{schema}".farms '
+                    "WHERE id = :id) s"
+                ),
+                {"id": farm_id},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    res = 10.0
+    width = max(1, int((row["x1"] - row["x0"]) / res) + 1)
+    height = max(1, int((row["y1"] - row["y0"]) / res) + 1)
+    return {
+        "transform": from_origin(row["x0"], row["y1"], res, res),
+        "width": width,
+        "height": height,
+    }
 
 
 async def _set_up_farm_subscription(
@@ -372,3 +417,78 @@ async def test_a_stitch_never_overwrites_a_fetched_surface(
     )
     assert row["source"] == "fetched"
     assert row["blocks_merged"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_farm_fetch_writes_the_block_numbers(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The keystone of letting the per-block FETCH stop.
+
+    Every index number in the product — Insights, alerts, recommendations,
+    baselines — reads block_index_aggregates. If a farm-AOI fetch did not
+    write those, switching a farm over would leave the map looking right
+    while every figure beside it quietly stopped moving.
+    """
+    sub_id, farm_id, schema = await _set_up_farm_subscription(
+        admin_session, slug="farm-aoi-aggs", fetch_farm_aoi=True
+    )
+    grid = await _farm_grid(admin_session, schema, farm_id)
+    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: _CaptureStorage())
+    _stub_rasterio(monkeypatch, grid=grid, index_value=0.5)
+
+    from app.modules.imagery.tasks import acquire_farm_scene
+
+    monkeypatch.setattr(acquire_farm_scene, "delay", lambda *a, **k: None)
+    try:
+        await imagery_tasks._discover_farm_scenes_async(sub_id, schema)
+        job_id = UUID(
+            str(
+                (
+                    await admin_session.execute(
+                        text(f'SELECT id FROM "{schema}".imagery_farm_ingestion_jobs')
+                    )
+                ).scalar_one()
+            )
+        )
+        result = await imagery_tasks._acquire_farm_scene_async(job_id, schema)
+        assert result["status"] == "succeeded", result
+
+        rows = (
+            (
+                await admin_session.execute(
+                    text(
+                        f'SELECT index_code, mean, stac_item_id FROM "{schema}".'
+                        "block_index_aggregates ORDER BY index_code"
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        # One row per block per index — the farm has one block in this fixture.
+        assert {r["index_code"] for r in rows} == {"ndvi", "ndmi"}
+        assert result["block_aggregates"] == len(rows) == 2
+        # The constant surface means the block mean IS that constant; anything
+        # else would mean the block mask selected the wrong pixels.
+        assert all(abs(float(r["mean"]) - 0.5) < 1e-6 for r in rows), rows
+        # Traceable to the surface the number came from, not to a per-block
+        # object that no longer exists.
+        assert all(
+            r["stac_item_id"].endswith(await _farm_hash(admin_session, schema, farm_id))
+            for r in rows
+        )
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+
+async def _farm_hash(session: AsyncSession, schema: str, farm_id: UUID) -> str:
+    return str(
+        (
+            await session.execute(
+                text(f'SELECT aoi_hash FROM "{schema}".farms WHERE id = :id'), {"id": farm_id}
+            )
+        ).scalar_one()
+    )

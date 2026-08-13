@@ -1230,6 +1230,148 @@ async def _rebuild_farm_rasters_async(
 # `fetch_farm_aoi` defaults to FALSE.
 
 
+async def _write_block_aggregates_from_farm(
+    *,
+    tenant_schema: str,
+    farm_id: UUID,
+    product_id: UUID,
+    scene_datetime: datetime,
+    stac_item_id: str,
+    cloud_cover_pct: Any,
+    index_rasters: dict[str, Any],
+    profile: dict[str, Any],
+) -> int:
+    """Measure every block off the farm surface and store the numbers.
+
+    This is what lets the per-block FETCH stop. Every index number in the
+    product — Insights, alerts, recommendations, baselines, grid cells —
+    reads `block_index_aggregates`, which until now only the per-block
+    pipeline wrote. Measuring the same block from the farm-wide raster gives
+    the same answer to about 0.001 NDVI (measured over ~1,500 comparisons
+    spanning 2.5 years), so the numbers keep their meaning.
+
+    The rows record the FARM's stac_item_id, because that is the raster the
+    numbers were actually taken from. A reader tracing a value back finds the
+    surface it came from rather than a per-block object that no longer exists.
+    """
+    import json as _json
+
+    from app.modules.grid.service import get_grid_service
+    from app.modules.grid.zonal import compute_cell_aggregates
+    from app.modules.imagery.farm_raster import block_masks_on_grid
+    from app.modules.indices.computation import compute_aggregates
+    from app.modules.indices.service import get_indices_service
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        boundaries = await ImageryRepository(session).list_farm_block_boundaries(farm_id)
+
+    if not boundaries:
+        return 0
+
+    masks = block_masks_on_grid(
+        profile,
+        {str(b["block_id"]): _json.loads(b["boundary_utm_geojson"]) for b in boundaries},
+    )
+
+    written = 0
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        indices_service = get_indices_service(tenant_session=session)
+        grid_service = get_grid_service(tenant_session=session)
+
+        for block_id, mask in masks.items():
+            for index_code, raster in index_rasters.items():
+                agg = compute_aggregates(raster, mask)
+                if agg.mean is None:
+                    # The block is entirely cloud or entirely outside what the
+                    # pass covered. Writing a row of nulls would look like a
+                    # measurement; absence is the honest record.
+                    continue
+                await indices_service.record_aggregate_row(
+                    time=scene_datetime,
+                    block_id=UUID(block_id),
+                    index_code=index_code,
+                    product_id=product_id,
+                    stac_item_id=stac_item_id,
+                    mean=agg.mean,
+                    min_value=agg.min,
+                    max_value=agg.max,
+                    p10=agg.p10,
+                    p50=agg.p50,
+                    p90=agg.p90,
+                    std_dev=agg.std_dev,
+                    valid_pixel_count=agg.valid_pixel_count,
+                    total_pixel_count=agg.total_pixel_count,
+                    cloud_cover_pct=cloud_cover_pct,
+                )
+                written += 1
+
+            # Sub-block cells, resolved at the SCENE's time rather than "the
+            # current grid" — the per-block path learned that in 0054, and
+            # gridding an old scene on a new geometry writes rows no
+            # valid-time-aware read can return.
+            cells = await grid_service.list_cells_for_scene(
+                block_id=UUID(block_id), product_id=product_id, at=scene_datetime
+            )
+            if cells:
+                per_cell_per_index = _zonal_by_cell(
+                    cells=cells,
+                    index_rasters=index_rasters,
+                    raster_transform=profile["transform"],
+                    compute_cell_aggregates=compute_cell_aggregates,
+                )
+                await grid_service.record_grid_aggregates(
+                    scene_time=scene_datetime,
+                    block_id=UUID(block_id),
+                    product_id=product_id,
+                    stac_item_id=stac_item_id,
+                    cloud_cover_pct=cloud_cover_pct,
+                    per_cell_per_index=per_cell_per_index,
+                )
+    return written
+
+
+async def _record_farm_scene_success(
+    *,
+    tenant_schema: str,
+    job: dict[str, Any],
+    job_id: UUID,
+    aoi_hash: str,
+    stac_item_id: str,
+    raw_bands_s3_key: str,
+    index_keys: dict[str, str],
+) -> None:
+    """Record the surface and close the job, in one transaction."""
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        await repo.record_farm_scene_raster(
+            farm_id=job["farm_id"],
+            product_id=job["product_id"],
+            scene_datetime=job["scene_datetime"],
+            scene_id=job["scene_id"],
+            stac_item_id=stac_item_id,
+            aoi_hash=aoi_hash,
+            # Nothing was merged — this surface was photographed as one.
+            blocks_merged=None,
+            indices=sorted(index_keys),
+            source="fetched",
+        )
+        await repo.set_farm_job_status(
+            job_id=job_id,
+            status="succeeded",
+            completed_at=datetime.now(UTC),
+            stac_item_id=stac_item_id,
+            # index_keys maps code -> written key; assets_written wants the
+            # keys. Iterating the dict gives the codes, which recorded
+            # "ndvi" where an object path belonged.
+            assets_written=[raw_bands_s3_key, *sorted(index_keys.values())],
+        )
+
+
 class _FarmJobFailed(Exception):
     """Internal: carries the message and code to one shared failure exit."""
 
@@ -1533,7 +1675,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
                 band_names=tuple(product["bands"]),
                 aoi_geojson_utm36n=farm["boundary_utm_geojson"],
             )
-            _aggregates, index_keys, _rasters = compute_and_write_indices(
+            _aggregates, index_keys, index_rasters = compute_and_write_indices(
                 bands_arrays=bands_arrays,
                 aoi_mask=aoi_mask,
                 cloud_mask=cloud_mask,
@@ -1559,31 +1701,41 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
     stac_item_id = (
         f"{product['provider_code']}/{product['code']}/{job['scene_id']}/{farm['aoi_hash']}"
     )
-    async with factory() as session, session.begin():
-        await _set_tenant_context(session, tenant_schema)
-        repo = ImageryRepository(session)
-        await repo.record_farm_scene_raster(
+
+    # Measure every block off this surface. Without it, switching a farm to
+    # farm-AOI fetching would leave Insights, alerts, recommendations and
+    # baselines with no new numbers at all — the surface would look right and
+    # every figure beside it would quietly stop moving.
+    try:
+        aggregates_written = await _write_block_aggregates_from_farm(
+            tenant_schema=tenant_schema,
             farm_id=job["farm_id"],
             product_id=job["product_id"],
             scene_datetime=job["scene_datetime"],
-            scene_id=job["scene_id"],
             stac_item_id=stac_item_id,
-            aoi_hash=farm["aoi_hash"],
-            # Nothing was merged — this surface was photographed as one.
-            blocks_merged=None,
-            indices=sorted(index_keys),
-            source="fetched",
+            cloud_cover_pct=job["cloud_cover_pct"],
+            index_rasters=index_rasters,
+            profile=profile,
         )
-        await repo.set_farm_job_status(
+    except Exception as exc:
+        await _fail_farm_job(
+            tenant_schema=tenant_schema,
             job_id=job_id,
-            status="succeeded",
-            completed_at=datetime.now(UTC),
-            stac_item_id=stac_item_id,
-            # index_keys maps code -> written key; assets_written wants the
-            # keys. Iterating the dict gives the codes, which recorded
-            # "ndvi" where an object path belonged.
-            assets_written=[s3_key, *sorted(index_keys.values())],
+            farm_id=job["farm_id"],
+            error=f"block_aggregates_failed: {exc}",
+            error_code="compute_error",
         )
+        return {"job_id": str(job_id), "status": "failed"}
+
+    await _record_farm_scene_success(
+        tenant_schema=tenant_schema,
+        job=job,
+        job_id=job_id,
+        aoi_hash=farm["aoi_hash"],
+        stac_item_id=stac_item_id,
+        raw_bands_s3_key=s3_key,
+        index_keys=index_keys,
+    )
 
     _log.info(
         "farm_scene_fetched",
@@ -1591,12 +1743,14 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
         farm_id=str(job["farm_id"]),
         scene_id=job["scene_id"],
         indices=len(index_keys),
+        block_aggregates=aggregates_written,
     )
     return {
         "job_id": str(job_id),
         "status": "succeeded",
         "indices": sorted(index_keys),
         "stac_item_id": stac_item_id,
+        "block_aggregates": aggregates_written,
     }
 
 
