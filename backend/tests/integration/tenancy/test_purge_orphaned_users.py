@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.keycloak import FakeKeycloakClient
-from app.shared.purge.scanner import scan_public
+from app.shared.purge.scanner import ScanResult, scan_public
 
 pytestmark = [pytest.mark.integration]
 
@@ -84,6 +84,10 @@ async def _add_membership(
         {"mid": membership_id, "uid": user_id, "tid": tenant_id, "inv": invited_by},
     )
     return membership_id
+
+
+def _stranded_rows(result: ScanResult) -> int:
+    return sum(o.rows for o in result.orphans if o.table == "users")
 
 
 async def _user_exists(session: AsyncSession, user_id: UUID) -> bool:
@@ -187,6 +191,7 @@ async def test_scanner_reports_unreachable_users(admin_session: AsyncSession) ->
     ``GET /admin/purge/orphans`` is built on this scan, so a user left with no
     route to it has to show up as an orphan or the check proves nothing.
     """
+    before = _stranded_rows(await scan_public(admin_session))
     user_id = uuid4()
     await admin_session.execute(
         text(
@@ -197,8 +202,49 @@ async def test_scanner_reports_unreachable_users(admin_session: AsyncSession) ->
     )
     await admin_session.commit()
 
-    result = await scan_public(admin_session)
+    try:
+        assert _stranded_rows(await scan_public(admin_session)) == before + 1
+    finally:
+        # The scan is platform-wide, so residue left here would show up in
+        # every other test that counts orphans.
+        await admin_session.execute(
+            text("DELETE FROM public.users WHERE id = :uid").bindparams(_UID),
+            {"uid": user_id},
+        )
+        await admin_session.commit()
 
-    users_orphan = next((o for o in result.orphans if o.table == "users"), None)
-    assert users_orphan is not None
-    assert users_orphan.rows >= 1
+
+@pytest.mark.asyncio
+async def test_same_email_can_be_reprovisioned_after_purge(admin_session: AsyncSession) -> None:
+    """Phase 1's exit criterion, minus the environment.
+
+    Three provision/purge cycles reusing one email address. That reuse is
+    precisely what ``SMOKE_EMAIL_SUFFIX`` exists to avoid: the old purge left
+    the user row behind, so the second cycle collided on the unique email of
+    someone nobody could reach. Each cycle also asserts the scan the harness
+    will read as its verify-clean signal.
+    """
+    email = f"repeat-{uuid4().hex[:8]}@orph.test"
+    # Relative to a baseline, not zero: the scan is platform-wide and other
+    # tests in this session strand users on purpose. What matters is that a
+    # cycle adds none.
+    baseline = _stranded_rows(await scan_public(admin_session))
+
+    for cycle in range(3):
+        tenant = await _create(admin_session)
+        user_id = uuid4()
+        await admin_session.execute(
+            text(
+                "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
+                "VALUES (:uid, :sub, :email, 'Repeat Cycle User')"
+            ).bindparams(_UID),
+            {"uid": user_id, "sub": f"kc-{user_id}", "email": email},
+        )
+        await _add_membership(admin_session, user_id=user_id, tenant_id=tenant.tenant_id)
+        await admin_session.commit()
+
+        await _purge(admin_session, tenant.tenant_id, tenant.slug)
+
+        assert not await _user_exists(admin_session, user_id), f"cycle {cycle}: user survived"
+        stranded = _stranded_rows(await scan_public(admin_session))
+        assert stranded == baseline, f"cycle {cycle} stranded {stranded - baseline} user(s)"
