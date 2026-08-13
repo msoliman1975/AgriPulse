@@ -1,0 +1,349 @@
+"""Fetching one pass for the whole farm, rather than one per block.
+
+The block path leaves ground nobody drew a block around unmeasured — 50.3 of
+203.4 feddan on the reference farm. These tests cover the path that fixes it,
+and the switch that keeps it from turning itself on:
+
+  * a farm with ``fetch_farm_aoi`` off is never swept, because 0074 created an
+    active farm subscription for EVERY farm and a sweep without the gate would
+    start fetching a second, larger AOI platform-wide;
+  * discovery is idempotent on (subscription, scene), like the block path;
+  * an acquired pass writes its raster under the FARM's aoi hash and records
+    ``source='fetched'`` with no blocks_merged;
+  * a stitched surface never overwrites a fetched one for the same pass — the
+    fetched one covers strictly more ground.
+
+The provider and the rasterio reader are stubbed; the database is real.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
+from uuid import UUID, uuid4
+
+import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.imagery import tasks as imagery_tasks
+from app.modules.imagery.providers.protocol import DiscoveredScene, FetchResult
+from app.modules.tenancy.service import get_tenant_service
+from app.shared.auth.context import TenantRole
+
+from .conftest import (
+    ASGITransport,
+    AsyncClient,
+    build_app,
+    create_user_in_tenant,
+    make_context,
+)
+from .test_ingestion_pipeline import _CaptureStorage
+from .test_subscription_crud import _create_farm_and_block, _get_s2l2a_product_id
+
+pytestmark = [pytest.mark.integration]
+
+SCENE = DiscoveredScene(
+    scene_id="S2A_FARM_AOI_20260301",
+    scene_datetime=datetime(2026, 3, 1, 8, 30, tzinfo=UTC),
+    cloud_cover_pct=Decimal("4.00"),
+    geometry_geojson={"type": "Polygon", "coordinates": []},
+)
+
+
+class _FakeProvider:
+    code = "sentinel_hub"
+
+    def __init__(self, scenes: tuple[DiscoveredScene, ...]) -> None:
+        self._scenes = scenes
+        self.fetched_aois: list[dict[str, Any]] = []
+
+    async def discover(self, **_: Any) -> tuple[DiscoveredScene, ...]:
+        return self._scenes
+
+    async def fetch(self, **kwargs: Any) -> FetchResult:
+        self.fetched_aois.append(kwargs["aoi_geojson_utm36n"])
+        return FetchResult(
+            cog_bytes=b"II*\x00fake-farm-multiband",
+            band_order=("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2"),
+        )
+
+    async def aclose(self) -> None:
+        pass
+
+
+def _stub_rasterio(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Replace the raster read/write with something that records the aoi hash.
+
+    What matters here is which prefix the indices are written under, not the
+    arithmetic — that is covered by the merge and zonal unit tests.
+    """
+    from app.modules.imagery import _rasterio_io
+
+    seen_hashes: list[str] = []
+
+    def fake_load(uri: str, *, band_names: tuple[str, ...], aoi_geojson_utm36n: dict) -> tuple:
+        return ({b: None for b in band_names}, None, None, {"transform": None})
+
+    def fake_compute(**kwargs: Any) -> tuple:
+        seen_hashes.append(kwargs["aoi_hash"])
+        keys = [f"{kwargs['aoi_hash']}/{code}.tif" for code in ("ndvi", "ndmi")]
+        return ({}, keys, {})
+
+    monkeypatch.setattr(_rasterio_io, "load_raw_bands_and_aggregate", fake_load)
+    monkeypatch.setattr(_rasterio_io, "compute_and_write_indices", fake_compute)
+    return seen_hashes
+
+
+async def _set_up_farm_subscription(
+    admin_session: AsyncSession,
+    *,
+    slug: str,
+    fetch_farm_aoi: bool,
+) -> tuple[UUID, UUID, str]:
+    """Tenant + farm + block + one farm-level subscription.
+
+    Returns ``(subscription_id, farm_id, tenant_schema)``.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(slug=slug, name=slug, contact_email=f"ops@{slug}.test")
+    user_id = uuid4()
+    await create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+    context = make_context(
+        user_id=user_id, tenant_id=tenant.tenant_id, tenant_role=TenantRole.TENANT_ADMIN
+    )
+    app = build_app(context)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        farm_id, _block_id = await _create_farm_and_block(client)
+        product_id = await _get_s2l2a_product_id(admin_session)
+
+    sub_id = uuid4()
+    # No API for farm subscriptions yet — 0074 populated them by collapsing
+    # the per-block rows, and the switch is set by an operator.
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{tenant.schema_name}".imagery_farm_subscriptions '
+            "(id, farm_id, product_id, is_active, fetch_farm_aoi) "
+            "VALUES (:id, :farm, :product, TRUE, :fetch)"
+        ),
+        {
+            "id": sub_id,
+            "farm": UUID(farm_id),
+            "product": UUID(product_id),
+            "fetch": fetch_farm_aoi,
+        },
+    )
+    await admin_session.commit()
+    return sub_id, UUID(farm_id), tenant.schema_name
+
+
+@pytest.mark.asyncio
+async def test_a_farm_without_the_switch_is_never_swept(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sub_id, _farm_id, schema = await _set_up_farm_subscription(
+        admin_session, slug="farm-aoi-off", fetch_farm_aoi=False
+    )
+    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    try:
+        due = await _due_subscription_ids(admin_session, schema)
+        assert sub_id not in due
+
+        # And calling discovery directly still refuses, because the switch can
+        # be turned off between the sweep and the task running.
+        result = await imagery_tasks._discover_farm_scenes_async(sub_id, schema)
+        assert result == {"discovered": 0, "queued": 0, "skipped_cloud": 0}
+        assert await _farm_job_count(admin_session, schema) == 0
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+
+async def _due_subscription_ids(session: AsyncSession, schema: str) -> set[UUID]:
+    rows = (
+        await session.execute(
+            text(
+                f'SELECT id FROM "{schema}".imagery_farm_subscriptions '
+                "WHERE is_active AND fetch_farm_aoi AND deleted_at IS NULL"
+            )
+        )
+    ).all()
+    return {UUID(str(r[0])) for r in rows}
+
+
+async def _farm_job_count(session: AsyncSession, schema: str) -> int:
+    return int(
+        (
+            await session.execute(
+                text(f'SELECT count(*) FROM "{schema}".imagery_farm_ingestion_jobs')
+            )
+        ).scalar_one()
+    )
+
+
+@pytest.mark.asyncio
+async def test_discovery_is_idempotent_on_the_same_scene(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sub_id, _farm_id, schema = await _set_up_farm_subscription(
+        admin_session, slug="farm-aoi-idem", fetch_farm_aoi=True
+    )
+    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    from app.modules.imagery.tasks import acquire_farm_scene
+
+    monkeypatch.setattr(acquire_farm_scene, "delay", lambda *a, **k: None)
+    try:
+        first = await imagery_tasks._discover_farm_scenes_async(sub_id, schema)
+        assert first["queued"] == 1
+        assert await _farm_job_count(admin_session, schema) == 1
+
+        second = await imagery_tasks._discover_farm_scenes_async(sub_id, schema)
+        assert second["queued"] == 0
+        assert await _farm_job_count(admin_session, schema) == 1
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+
+@pytest.mark.asyncio
+async def test_an_acquired_pass_is_recorded_as_fetched_under_the_farm_hash(
+    admin_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sub_id, farm_id, schema = await _set_up_farm_subscription(
+        admin_session, slug="farm-aoi-acquire", fetch_farm_aoi=True
+    )
+    provider = _FakeProvider((SCENE,))
+    imagery_tasks.set_provider_factory(lambda: provider)
+    capture = _CaptureStorage()
+    monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: capture)
+    seen_hashes = _stub_rasterio(monkeypatch)
+
+    from app.modules.imagery.tasks import acquire_farm_scene
+
+    monkeypatch.setattr(acquire_farm_scene, "delay", lambda *a, **k: None)
+    try:
+        await imagery_tasks._discover_farm_scenes_async(sub_id, schema)
+        job_id = UUID(
+            str(
+                (
+                    await admin_session.execute(
+                        text(f'SELECT id FROM "{schema}".imagery_farm_ingestion_jobs')
+                    )
+                ).scalar_one()
+            )
+        )
+
+        result = await imagery_tasks._acquire_farm_scene_async(job_id, schema)
+        assert result["status"] == "succeeded"
+
+        farm_hash = (
+            await admin_session.execute(
+                text(f'SELECT aoi_hash FROM "{schema}".farms WHERE id = :id'),
+                {"id": farm_id},
+            )
+        ).scalar_one()
+
+        # The raster is written under the FARM's hash, which is what makes it a
+        # different object from any of its blocks'.
+        assert seen_hashes == [farm_hash]
+        assert capture.uploads, "raw bands were never written"
+        assert farm_hash in capture.uploads[0][0]
+
+        # The fetch asked for the farm boundary, not a block's.
+        assert len(provider.fetched_aois) == 1
+
+        row = (
+            (
+                await admin_session.execute(
+                    text(
+                        f'SELECT source, blocks_merged, aoi_hash FROM "{schema}".'
+                        "farm_scene_rasters WHERE farm_id = :f"
+                    ),
+                    {"f": farm_id},
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert row["source"] == "fetched"
+        # Nothing was merged; 0 would read as "merged nothing" rather than
+        # "the question does not apply".
+        assert row["blocks_merged"] is None
+        assert row["aoi_hash"] == farm_hash
+
+        status = (
+            await admin_session.execute(
+                text(f'SELECT status FROM "{schema}".imagery_farm_ingestion_jobs WHERE id = :i'),
+                {"i": job_id},
+            )
+        ).scalar_one()
+        assert status == "succeeded"
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+
+@pytest.mark.asyncio
+async def test_a_stitch_never_overwrites_a_fetched_surface(
+    admin_session: AsyncSession,
+) -> None:
+    """The fetched surface covers ground no block was drawn around.
+
+    Letting a later stitch replace it would silently shrink the farm back to
+    its blocks — the exact hole this whole path exists to close.
+    """
+    _sub_id, farm_id, schema = await _set_up_farm_subscription(
+        admin_session, slug="farm-aoi-precedence", fetch_farm_aoi=True
+    )
+    product_id = UUID(await _get_s2l2a_product_id(admin_session))
+    at = datetime(2026, 3, 1, 8, 30, tzinfo=UTC)
+    farm_hash = (
+        await admin_session.execute(
+            text(f'SELECT aoi_hash FROM "{schema}".farms WHERE id = :id'), {"id": farm_id}
+        )
+    ).scalar_one()
+
+    from app.modules.imagery.repository import ImageryRepository
+
+    await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
+    repo = ImageryRepository(admin_session)
+    await repo.record_farm_scene_raster(
+        farm_id=farm_id,
+        product_id=product_id,
+        scene_datetime=at,
+        scene_id="SCENE_A",
+        stac_item_id="sentinel_hub/s2_l2a/SCENE_A/" + farm_hash,
+        aoi_hash=farm_hash,
+        blocks_merged=None,
+        indices=["ndvi"],
+        source="fetched",
+    )
+    await repo.record_farm_scene_raster(
+        farm_id=farm_id,
+        product_id=product_id,
+        scene_datetime=at,
+        scene_id="SCENE_A",
+        stac_item_id="sentinel_hub/s2_l2a/SCENE_A/" + farm_hash,
+        aoi_hash=farm_hash,
+        blocks_merged=36,
+        indices=["ndvi"],
+        source="stitched",
+    )
+    await admin_session.commit()
+
+    row = (
+        (
+            await admin_session.execute(
+                text(
+                    f'SELECT source, blocks_merged FROM "{schema}".farm_scene_rasters '
+                    "WHERE farm_id = :f"
+                ),
+                {"f": farm_id},
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["source"] == "fetched"
+    assert row["blocks_merged"] is None

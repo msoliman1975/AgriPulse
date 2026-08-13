@@ -52,6 +52,7 @@ from app.modules.imagery.events import (
     SceneIngestedV1,
     SceneSkippedV1,
 )
+from app.modules.imagery.farm_aoi import FarmAoiTooLargeError, check_fetchable
 from app.modules.imagery.pgstac import (
     build_item_doc,
     collection_id_for,
@@ -1213,6 +1214,432 @@ async def _rebuild_farm_rasters_async(
         scenes=len(instants),
     )
     return {"farm_id": str(farm_id), "queued": len(instants)}
+
+
+# --- farm-AOI ingestion -----------------------------------------------------
+#
+# The block path fetches one AOI per block, so ground no block was drawn around
+# is not merely uncoloured but unmeasured — 50.3 of 203.4 feddan on the
+# reference farm. Stitching those blocks inherits the hole; only fetching the
+# farm boundary fills it.
+#
+# This runs ALONGSIDE the block path rather than replacing it: block rasters
+# still produce block_index_aggregates, which is where every number in the
+# product comes from. The farm fetch produces the surface the console draws.
+# Two fetches for an opted-in farm is the cost of that decision, and it is why
+# `fetch_farm_aoi` defaults to FALSE.
+
+
+class _FarmJobFailed(Exception):
+    """Internal: carries the message and code to one shared failure exit."""
+
+    def __init__(self, message: str, code: str | None) -> None:
+        self.message = message
+        self.code = code
+        super().__init__(message)
+
+
+async def _fail_farm_job(
+    *,
+    tenant_schema: str,
+    job_id: UUID,
+    farm_id: UUID,
+    error: str,
+    error_code: str | None,
+) -> None:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        await ImageryRepository(session).set_farm_job_status(
+            job_id=job_id,
+            status="failed",
+            completed_at=datetime.now(UTC),
+            error_message=error[:1000],
+            error_code=error_code,
+        )
+    await _record_audit(
+        tenant_schema=tenant_schema,
+        event_type="imagery.ingestion_failed",
+        subject_id=job_id,
+        farm_id=farm_id,
+        details={"error": error, "scope": "farm"},
+    )
+
+
+async def _queue_farm_jobs(
+    repo: ImageryRepository,
+    *,
+    bus: Any,
+    settings: Any,
+    scenes: tuple[Any, ...],
+    subscription: dict[str, Any],
+    farm_id: UUID,
+    now: datetime,
+) -> tuple[int, int]:
+    """Insert one job per newly seen scene; return (queued, skipped_cloud).
+
+    Same shape as the block path: a scene already seen is created=False and
+    contributes to neither count, which is what makes re-discovery free.
+    """
+    queued = 0
+    skipped_cloud = 0
+    for scene in scenes:
+        new_id, created = await repo.upsert_pending_farm_job(
+            job_id=uuid7(),
+            subscription_id=subscription["id"],
+            farm_id=farm_id,
+            product_id=subscription["product_id"],
+            scene_id=scene.scene_id,
+            scene_datetime=scene.scene_datetime,
+            cloud_cover_pct=scene.cloud_cover_pct,
+        )
+        if not created:
+            continue
+        too_cloudy = (
+            scene.cloud_cover_pct is not None
+            and scene.cloud_cover_pct > settings.imagery_cloud_cover_visualization_max_pct
+        )
+        if too_cloudy:
+            await repo.set_farm_job_status(
+                job_id=new_id,
+                status="skipped",
+                completed_at=now,
+                error_message="cloud",
+            )
+            bus.publish(SceneSkippedV1(job_id=new_id, reason="cloud"))
+            skipped_cloud += 1
+        else:
+            queued += 1
+    return queued, skipped_cloud
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.discover_farm_scenes",
+    bind=False,
+    ignore_result=True,
+)
+def discover_farm_scenes(subscription_id: str, tenant_schema: str) -> dict[str, int]:
+    """Find passes over one farm's own boundary."""
+    return _run_task(_discover_farm_scenes_async(UUID(subscription_id), tenant_schema))
+
+
+async def _discover_farm_scenes_async(
+    subscription_id: UUID,
+    tenant_schema: str,
+) -> dict[str, int]:
+    settings = get_settings()
+    bus = get_default_bus()
+    empty = {"discovered": 0, "queued": 0, "skipped_cloud": 0}
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+
+        subscription = await repo.get_farm_subscription(subscription_id)
+        if subscription is None or not subscription["fetch_farm_aoi"]:
+            # The switch can be turned off between the beat sweep and here.
+            return empty
+        farm_id = subscription["farm_id"]
+        farm = await repo.get_farm_boundary(farm_id)
+        if farm is None:
+            _log.warning(
+                "imagery_discover_farm_boundary_missing",
+                subscription_id=str(subscription_id),
+                farm_id=str(farm_id),
+            )
+            return empty
+        product = await _lookup_product(session, subscription["product_id"])
+
+        # Refuse a farm the provider could not return in one request, before
+        # spending the call. Recorded as an attempt so the poll does not spin.
+        resolution_m = _product_resolution_m(product)
+        if resolution_m is not None:
+            try:
+                check_fetchable(farm["boundary_utm_geojson"], resolution_m=resolution_m)
+            except FarmAoiTooLargeError as exc:
+                _log.warning(
+                    "imagery_farm_aoi_too_large",
+                    tenant_schema=tenant_schema,
+                    farm_id=str(farm_id),
+                    width_px=exc.width_px,
+                    height_px=exc.height_px,
+                )
+                await repo.touch_farm_subscription_attempt(
+                    subscription_id=subscription_id,
+                    attempted_at=datetime.now(UTC),
+                    ingested=False,
+                )
+                return empty
+
+        now = datetime.now(UTC)
+        window_start, window_end = _resolve_discovery_window(
+            subscription=subscription,
+            settings=settings,
+            now=now,
+            window_start_override=None,
+            window_end_override=None,
+        )
+        cloud_cap = (
+            subscription["cloud_cover_max_pct"]
+            if subscription["cloud_cover_max_pct"] is not None
+            else settings.imagery_cloud_cover_visualization_max_pct
+        )
+
+        provider: ImageryProvider | None = None
+        try:
+            try:
+                provider = _provider_factory()
+                scenes = await provider.discover(
+                    aoi_geojson=farm["boundary_geojson"],
+                    product_code=product["code"],
+                    from_datetime=window_start,
+                    to_datetime=window_end,
+                    max_cloud_cover_pct=cloud_cap,
+                )
+            except SentinelHubNotConfiguredError:
+                # No synthetic marker row here: the block path already writes
+                # one per subscription and a second copy per farm would double
+                # the noise for one misconfiguration.
+                await repo.touch_farm_subscription_attempt(
+                    subscription_id=subscription_id,
+                    attempted_at=now,
+                    ingested=False,
+                )
+                return empty
+        finally:
+            if provider is not None and hasattr(provider, "aclose"):
+                await provider.aclose()
+
+        queued, skipped_cloud = await _queue_farm_jobs(
+            repo,
+            bus=bus,
+            settings=settings,
+            scenes=scenes,
+            subscription=subscription,
+            farm_id=farm_id,
+            now=now,
+        )
+
+        await repo.touch_farm_subscription_attempt(
+            subscription_id=subscription_id,
+            attempted_at=now,
+            ingested=bool(queued),
+        )
+
+    # Outside the transaction, so the rows are visible to the worker.
+    if queued:
+        async with AsyncSessionLocal()() as session2, session2.begin():
+            await _set_tenant_context(session2, tenant_schema)
+            pending = await ImageryRepository(session2).list_pending_farm_jobs(
+                subscription_id=subscription_id
+            )
+        for job_id in pending:
+            acquire_farm_scene.delay(str(job_id), tenant_schema)
+
+    return {"discovered": len(scenes), "queued": queued, "skipped_cloud": skipped_cloud}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.acquire_farm_scene",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def acquire_farm_scene(job_id: str, tenant_schema: str) -> dict[str, Any]:
+    """Fetch one pass over the whole farm and write its index rasters.
+
+    The fetched surface replaces a stitched one for the same pass: it covers
+    ground no block was drawn around, so it is strictly wider.
+    """
+    return _run_task(_acquire_farm_scene_async(UUID(job_id), tenant_schema))
+
+
+async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[str, Any]:
+    storage = _get_storage()
+    factory = AsyncSessionLocal()
+
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        job = await repo.get_farm_job(job_id)
+        if job is None:
+            return {"job_id": str(job_id), "status": "missing"}
+        if job["status"] != "pending":
+            return {"job_id": str(job_id), "status": job["status"], "noop": True}
+        farm = await repo.get_farm_boundary(job["farm_id"])
+        if farm is None:
+            await repo.set_farm_job_status(
+                job_id=job_id,
+                status="failed",
+                completed_at=datetime.now(UTC),
+                error_message="farm_missing",
+                error_code="config_error",
+            )
+            return {"job_id": str(job_id), "status": "failed"}
+        product = await _lookup_product(session, job["product_id"])
+        await repo.set_farm_job_status(
+            job_id=job_id, status="running", started_at=datetime.now(UTC)
+        )
+
+    # Every failure below lands in one place: the job is marked failed with a
+    # code, once, rather than at eight separate exits.
+    try:
+        resolution_m = _product_resolution_m(product)
+        if resolution_m is not None:
+            try:
+                check_fetchable(farm["boundary_utm_geojson"], resolution_m=resolution_m)
+            except FarmAoiTooLargeError as exc:
+                raise _FarmJobFailed(str(exc), "aoi_too_large") from exc
+
+        provider = _provider_factory()
+        try:
+            try:
+                result = await provider.fetch(
+                    scene_id=job["scene_id"],
+                    scene_datetime=job["scene_datetime"],
+                    product_code=product["code"],
+                    aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+                    bands=tuple(product["bands"]),
+                )
+            except Exception as exc:
+                raise _FarmJobFailed(
+                    str(exc) or exc.__class__.__name__, classify_error(exc)
+                ) from exc
+        finally:
+            if hasattr(provider, "aclose"):
+                await provider.aclose()
+
+        s3_key = raw_bands_key(
+            provider_code=product["provider_code"],
+            product_code=product["code"],
+            scene_id=job["scene_id"],
+            aoi_hash=farm["aoi_hash"],
+        )
+        try:
+            storage.put_object(key=s3_key, body=result.cog_bytes, content_type=result.content_type)
+        except Exception as exc:
+            raise _FarmJobFailed(f"s3_put_failed: {exc}", "storage_error") from exc
+
+        # Local import: rasterio and numpy belong to the heavy worker only.
+        from app.modules.imagery._rasterio_io import (
+            compute_and_write_indices,
+            load_raw_bands_and_aggregate,
+        )
+
+        try:
+            bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
+                f"s3://{storage.bucket}/{s3_key}",
+                band_names=tuple(product["bands"]),
+                aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+            )
+            _aggregates, index_keys, _rasters = compute_and_write_indices(
+                bands_arrays=bands_arrays,
+                aoi_mask=aoi_mask,
+                cloud_mask=cloud_mask,
+                profile=profile,
+                storage=storage,
+                provider_code=product["provider_code"],
+                product_code=product["code"],
+                scene_id=job["scene_id"],
+                aoi_hash=farm["aoi_hash"],
+            )
+        except Exception as exc:
+            raise _FarmJobFailed(f"compute_indices_failed: {exc}", "compute_error") from exc
+    except _FarmJobFailed as failure:
+        await _fail_farm_job(
+            tenant_schema=tenant_schema,
+            job_id=job_id,
+            farm_id=job["farm_id"],
+            error=failure.message,
+            error_code=failure.code,
+        )
+        return {"job_id": str(job_id), "status": "failed"}
+
+    stac_item_id = (
+        f"{product['provider_code']}/{product['code']}/{job['scene_id']}/{farm['aoi_hash']}"
+    )
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        await repo.record_farm_scene_raster(
+            farm_id=job["farm_id"],
+            product_id=job["product_id"],
+            scene_datetime=job["scene_datetime"],
+            scene_id=job["scene_id"],
+            stac_item_id=stac_item_id,
+            aoi_hash=farm["aoi_hash"],
+            # Nothing was merged — this surface was photographed as one.
+            blocks_merged=None,
+            indices=sorted(index_keys),
+            source="fetched",
+        )
+        await repo.set_farm_job_status(
+            job_id=job_id,
+            status="succeeded",
+            completed_at=datetime.now(UTC),
+            stac_item_id=stac_item_id,
+            assets_written=[s3_key, *sorted(index_keys)],
+        )
+
+    _log.info(
+        "farm_scene_fetched",
+        tenant_schema=tenant_schema,
+        farm_id=str(job["farm_id"]),
+        scene_id=job["scene_id"],
+        indices=len(index_keys),
+    )
+    return {
+        "job_id": str(job_id),
+        "status": "succeeded",
+        "indices": sorted(index_keys),
+        "stac_item_id": stac_item_id,
+    }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.discover_active_farm_subscriptions",
+    bind=False,
+    ignore_result=True,
+)
+def discover_active_farm_subscriptions() -> dict[str, int]:
+    """Beat sweep over farms with the farm-AOI fetch switched on.
+
+    Enqueues nothing until a farm sets `fetch_farm_aoi`, so shipping this
+    changes no behaviour for anyone.
+    """
+    return _run_task(_discover_active_farm_subscriptions_async())
+
+
+async def _discover_active_farm_subscriptions_async() -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    tenant_schemas = [str(r[0]) for r in rows]
+
+    enqueued = 0
+    for tenant_schema in tenant_schemas:
+        try:
+            sanitize_tenant_schema(tenant_schema)
+        except ValueError:
+            continue
+        async with AsyncSessionLocal()() as session2, session2.begin():
+            await _set_tenant_context(session2, tenant_schema)
+            due = await ImageryRepository(session2).list_farm_subscriptions_due(
+                default_cadence_hours=24,
+                now=datetime.now(UTC),
+            )
+        for row in due:
+            discover_farm_scenes.delay(str(row["id"]), tenant_schema)
+            enqueued += 1
+    return {"tenants_scanned": len(tenant_schemas), "enqueued": enqueued}
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]

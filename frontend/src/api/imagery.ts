@@ -172,8 +172,18 @@ export interface FarmRaster {
   stac_item_id: string;
   scene_datetime: string;
   resolution_m: string | null;
-  /** How many block rasters were stitched into it. */
-  blocks_merged: number;
+  /**
+   * How many block rasters were stitched into it, or null when the surface was
+   * FETCHED for the farm boundary — nothing was merged, so the count does not
+   * apply rather than being zero.
+   */
+  blocks_merged: number | null;
+  /**
+   * `stitched` from block rasters, or `fetched` for the farm boundary. A
+   * fetched surface covers ground no block was drawn around; a stitched one is
+   * only ever as wide as the blocks behind it.
+   */
+  source: "stitched" | "fetched";
 }
 
 export interface FarmSceneAssetsResponse {

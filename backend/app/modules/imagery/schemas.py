@@ -201,7 +201,13 @@ class FarmRasterRead(BaseModel):
     resolution_m: Decimal | None
     #: How many block rasters were stitched into it — a farm whose blocks are
     #: partly missing still yields a surface, and this says how complete it is.
-    blocks_merged: int
+    #: None when the surface was FETCHED for the farm boundary: nothing was
+    #: merged, so the count does not apply rather than being zero.
+    blocks_merged: int | None = None
+    #: ``stitched`` from block rasters, or ``fetched`` for the farm boundary.
+    #: A fetched surface covers ground no block was drawn around; a stitched
+    #: one is only ever as wide as the blocks behind it.
+    source: str = "stitched"
 
 
 class FarmSceneAssetsResponse(BaseModel):
