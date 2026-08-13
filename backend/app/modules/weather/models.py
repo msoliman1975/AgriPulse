@@ -112,6 +112,40 @@ class WeatherIndexCatalog(Base, TimestampedMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
+class WeatherFarmSubscription(Base, TimestampedMixin):
+    """`tenant_<id>.weather_farm_subscriptions` — per-FARM weather subscription.
+
+    Weather was always farm-shaped: one provider call per farm centroid, and
+    `weather_observations` keyed on `(time, farm_id, provider_code, …)`. The
+    per-block rows only ever decided whether a farm was subscribed and spawned
+    one identical attempt row per block. This is the subscription that matches
+    the data (migration 0077).
+    """
+
+    __tablename__ = "weather_farm_subscriptions"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider_code: Mapped[str] = mapped_column(Text, nullable=False)
+    cadence_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    last_successful_ingest_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    updated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WeatherSubscription(Base, TimestampedMixin):
     """`tenant_<id>.weather_subscriptions` — per-block weather subscription.
 
@@ -164,16 +198,13 @@ class WeatherIngestionAttempt(Base):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
-    subscription_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey(
-            "weather_subscriptions.id",
-            name="fk_weather_ingestion_attempts_subscription_id",
-            ondelete="CASCADE",
-        ),
-        nullable=False,
-    )
-    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    #: Names a row in EITHER weather_subscriptions (per block) or
+    #: weather_farm_subscriptions (per farm), so it carries no FK — 0077
+    #: dropped it. Every reader treats it as an opaque id already.
+    subscription_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    #: None for a farm-scoped attempt. One provider call covers the whole
+    #: farm, so there is no block it belongs to.
+    block_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     provider_code: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(

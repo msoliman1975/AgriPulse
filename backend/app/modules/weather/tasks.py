@@ -152,6 +152,54 @@ def fetch_weather(farm_id: str, tenant_schema: str, provider_code: str) -> dict[
     return _run_task(_fetch_weather_async(UUID(farm_id), tenant_schema, provider_code))
 
 
+async def _open_weather_attempts(
+    repo: WeatherRepository,
+    *,
+    farm_id: UUID,
+    provider_code: str,
+    started_at: datetime,
+) -> tuple[list[dict[str, Any]], tuple[UUID, ...], UUID | None]:
+    """Open the attempt rows for one fetch.
+
+    One provider call covers the whole farm, so a farm-subscribed farm gets
+    ONE attempt row. The per-block path wrote one per block — 36 rows
+    recording a single HTTP call, which is duplication rather than the
+    independent history the old comment claimed.
+
+    A farm with no farm row yet (a block subscribed after 0077 ran) keeps the
+    old shape, so it is still fetched during the cutover.
+    """
+    farm_sub = await repo.get_farm_subscription(farm_id=farm_id, provider_code=provider_code)
+    attempts: list[dict[str, Any]] = []
+    if farm_sub is not None:
+        attempt_id = uuid7()
+        await repo.open_attempt(
+            attempt_id=attempt_id,
+            subscription_id=farm_sub["id"],
+            block_id=None,
+            farm_id=farm_id,
+            provider_code=provider_code,
+            started_at=started_at,
+        )
+        return [{"id": attempt_id, "subscription_id": farm_sub["id"]}], (), farm_sub["id"]
+
+    subs = await repo.list_active_subscriptions_for_farm(
+        farm_id=farm_id, provider_code=provider_code
+    )
+    for s in subs:
+        attempt_id = uuid7()
+        await repo.open_attempt(
+            attempt_id=attempt_id,
+            subscription_id=s["id"],
+            block_id=s["block_id"],
+            farm_id=farm_id,
+            provider_code=provider_code,
+            started_at=started_at,
+        )
+        attempts.append({"id": attempt_id, "subscription_id": s["id"]})
+    return attempts, tuple(s["id"] for s in subs), None
+
+
 async def _fetch_weather_async(
     farm_id: UUID, tenant_schema: str, provider_code: str
 ) -> dict[str, Any]:
@@ -174,24 +222,12 @@ async def _fetch_weather_async(
             )
             return {"farm_id": str(farm_id), "status": "farm_missing"}
 
-        subs = await repo.list_active_subscriptions_for_farm(
-            farm_id=farm_id, provider_code=provider_code
+        attempts, subscription_ids, farm_subscription_id = await _open_weather_attempts(
+            repo,
+            farm_id=farm_id,
+            provider_code=provider_code,
+            started_at=started_at,
         )
-        # One attempt row per (subscription, fetch) — keeps each block's
-        # history independent even though the provider call is shared.
-        attempts: list[dict[str, Any]] = []
-        for s in subs:
-            attempt_id = uuid7()
-            await repo.open_attempt(
-                attempt_id=attempt_id,
-                subscription_id=s["id"],
-                block_id=s["block_id"],
-                farm_id=farm_id,
-                provider_code=provider_code,
-                started_at=started_at,
-            )
-            attempts.append({"id": attempt_id, "subscription_id": s["id"]})
-        subscription_ids = tuple(s["id"] for s in subs)
 
     # Step 2: fetch from the provider. No DB session held during HTTP IO.
     provider = _provider_factory(provider_code)
@@ -213,6 +249,12 @@ async def _fetch_weather_async(
                 for sub_id in subscription_ids:
                     await repo.touch_subscription_attempt(
                         subscription_id=sub_id, attempted_at=now, success=False
+                    )
+                if farm_subscription_id is not None:
+                    await repo.touch_farm_subscription_attempt(
+                        subscription_id=farm_subscription_id,
+                        attempted_at=now,
+                        success=False,
                     )
                 for a in attempts:
                     await repo.close_attempt(
@@ -260,6 +302,10 @@ async def _fetch_weather_async(
         for sub_id in subscription_ids:
             await repo.touch_subscription_attempt(
                 subscription_id=sub_id, attempted_at=now, success=True
+            )
+        if farm_subscription_id is not None:
+            await repo.touch_farm_subscription_attempt(
+                subscription_id=farm_subscription_id, attempted_at=now, success=True
             )
         total_rows = observations_inserted + forecasts_inserted
         for a in attempts:
