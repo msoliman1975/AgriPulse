@@ -59,6 +59,48 @@ WEATHER_RISK_FIELDS: tuple[str, ...] = (
 )
 
 
+# Allowed fields for a water-balance value-ref. `balance_mm` is the headline
+# (negative = the crop used more than arrived); the rest are the derivation, so
+# a tree can branch on WHY rather than only on the answer — high demand, absent
+# rain, and unlogged irrigation all produce a negative balance and call for
+# different actions.
+#
+# `irrigation_logged` is here precisely so a tree can refuse to act on a
+# deficit it cannot trust. See WaterBalanceValueRef.
+WATER_BALANCE_FIELDS: tuple[str, ...] = (
+    "balance_mm",
+    "etc_mm",
+    "et0_mm",
+    "kc_used",
+    "precip_mm",
+    "irrigation_mm",
+    "irrigation_logged",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class WaterBalanceEntry:
+    """Latest ``block_water_balance_daily`` row for one block.
+
+    Block-keyed like ``WeatherRiskEntry`` and for the same reason: the crop
+    coefficient and the applied irrigation both vary block to block even
+    though the weather driver is the farm centroid.
+
+    Absent for blocks the daily sweep has not written — a block with no
+    current crop, or a farm with no ET0 for the day — so ``{source:
+    water_balance}`` predicates fail closed.
+    """
+
+    date: date
+    balance_mm: Decimal | None = None
+    etc_mm: Decimal | None = None
+    et0_mm: Decimal | None = None
+    kc_used: Decimal | None = None
+    precip_mm: Decimal | None = None
+    irrigation_mm: Decimal | None = None
+    irrigation_logged: bool | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class WeatherRiskEntry:
     """Latest ``weather_risk_daily`` row for one pathogen on a block (PR-R3).
@@ -238,6 +280,9 @@ class ConditionContext:
     # Empty for blocks the daily risk sweep hasn't scored, so
     # `{source: weather_risk}` predicates fail closed.
     weather_risks: dict[str, WeatherRiskEntry] = field(default_factory=dict)
+    # None (not an empty entry) when the sweep has written nothing for this
+    # block, so a predicate fails closed rather than reading zeros as facts.
+    water_balance: WaterBalanceEntry | None = None
     signals: dict[str, SignalEntry] = field(default_factory=dict)
     # Sub-block grid spatial-anomaly verdicts keyed by index_code (G-4).
     # Populated by the recommendations driver only when the block has an
@@ -268,6 +313,7 @@ class ConditionContext:
         weather: WeatherSnapshot | None = None,
         weather_indices: dict[str, WeatherIndexEntry] | None = None,
         weather_risks: dict[str, WeatherRiskEntry] | None = None,
+        water_balance: WaterBalanceEntry | None = None,
         signals: dict[str, SignalEntry] | None = None,
         grid: dict[str, GridAnomalyEntry] | None = None,
         crop_attributes: dict[str, Any] | None = None,
@@ -301,6 +347,7 @@ class ConditionContext:
             weather=weather,
             weather_indices=weather_indices or {},
             weather_risks=weather_risks or {},
+            water_balance=water_balance,
             signals=signals or {},
             grid=grid or {},
             crop_attributes=dict(crop_attributes or {}),

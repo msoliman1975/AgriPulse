@@ -154,6 +154,27 @@ export const WEATHER_INDEX_CODES = [
 // 0-100 pressure; `level` its low|moderate|high banding. Mirrors
 // WEATHER_RISK_FIELDS in backend/app/shared/conditions/context.py.
 export const WEATHER_RISK_FIELDS = ["score", "level"] as const;
+// Per-block crop water accounting (block_water_balance_daily): precipitation +
+// irrigation - ETc. Mirrors WATER_BALANCE_FIELDS in
+// backend/app/shared/conditions/context.py.
+//
+// `balance_mm` is the headline; the rest are the derivation, so a tree can
+// branch on WHY a block is short rather than only on the fact. High demand,
+// absent rain and unlogged irrigation all produce a negative balance and call
+// for different actions.
+//
+// `irrigation_logged` exists so a tree can refuse to act on a deficit it
+// cannot trust: a farm that never records irrigation shows a permanent
+// shortfall that is a bookkeeping artefact, not dry soil.
+export const WATER_BALANCE_FIELDS = [
+  "balance_mm",
+  "etc_mm",
+  "et0_mm",
+  "kc_used",
+  "precip_mm",
+  "irrigation_mm",
+  "irrigation_logged",
+] as const;
 // The mango V1 pathogen/pest codes (weather.risk registry), each with the
 // crop path prefix its model is registered for. Mirrors REGISTRY in
 // backend/app/modules/weather/risk/registry.py — a model only ever scores
@@ -257,6 +278,7 @@ export type ValueRefSource =
   | "weather"
   | "weather_index"
   | "weather_risk"
+  | "water_balance"
   | "signals"
   | "grid"
   | "crop_attribute"
@@ -276,6 +298,7 @@ export type ValueRef =
       risk_code: (typeof WEATHER_RISK_CODES)[number];
       field: (typeof WEATHER_RISK_FIELDS)[number];
     }
+  | { source: "water_balance"; field: (typeof WATER_BALANCE_FIELDS)[number] }
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
   | { source: "crop_attribute"; code: string; key: (typeof CROP_ATTRIBUTE_KEYS)[number] }
@@ -442,6 +465,11 @@ function parseValueRef(raw: unknown): ValueRef | null {
       field: field as (typeof WEATHER_RISK_FIELDS)[number],
     };
   }
+  if (source === "water_balance") {
+    const field = (raw.field ?? "balance_mm") as string;
+    if (!(WATER_BALANCE_FIELDS as readonly string[]).includes(field)) return null;
+    return { source: "water_balance", field: field as (typeof WATER_BALANCE_FIELDS)[number] };
+  }
   if (source === "signals") {
     const code = typeof raw.code === "string" ? raw.code : "";
     const key = (raw.key ?? "value_numeric") as string;
@@ -557,6 +585,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "weather_index", index_code: ref.index_code, key: ref.key };
     case "weather_risk":
       return { source: "weather_risk", risk_code: ref.risk_code, field: ref.field };
+    case "water_balance":
+      return { source: "water_balance", field: ref.field };
     case "signals":
       return { source: "signals", code: ref.code, key: ref.key };
     case "grid":
@@ -643,6 +673,10 @@ export function leftOperandType(ref: ValueRef): OperandType {
         : "categorical";
     case "weather_risk":
       return ref.field === "level" ? "categorical" : "number";
+    case "water_balance":
+      // Every field is millimetres or a coefficient except the logged flag,
+      // which is the one a tree compares with eq/ne to gate on trustworthiness.
+      return ref.field === "irrigation_logged" ? "boolean" : "number";
     case "grid":
       return ref.field === "severity" ? "categorical" : "number";
     case "crop_attribute":
@@ -881,6 +915,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "weather_index", index_code: "temperature", key: "baseline_deviation" };
     case "weather_risk":
       return { source: "weather_risk", risk_code: "powdery_mildew", field: "score" };
+    case "water_balance":
+      return { source: "water_balance", field: "balance_mm" };
     case "signals":
       return { source: "signals", code: "", key: "value_numeric" };
     case "grid":

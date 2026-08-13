@@ -36,6 +36,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.conditions import WeatherIndexEntry, WeatherRiskEntry, WeatherSnapshot
+from app.shared.conditions.context import WaterBalanceEntry
 
 # Provider precedence: when a farm has multiple active providers, prefer
 # the operationally-canonical one. Open-Meteo is the only Slice-4
@@ -178,6 +179,57 @@ async def load_risk_snapshot(
         )
         for row in rows
     }
+
+
+async def load_water_balance_snapshot(
+    session: AsyncSession,
+    *,
+    block_id: UUID,
+) -> WaterBalanceEntry | None:
+    """Load the latest ``block_water_balance_daily`` row for one block.
+
+    Backs the ``water_balance`` condition source: per-block crop water
+    accounting, ``precipitation + irrigation - ETc``. Block-keyed like the risk
+    snapshot above, and for the same reason — the crop coefficient and the
+    applied irrigation both vary block to block even though the weather driver
+    is the farm centroid.
+
+    ``session`` must already be bound to the tenant schema. Returns ``None``
+    when the sweep has written nothing for this block (no current crop, or no
+    ET0 for the farm that day), so every ``{source: water_balance}`` predicate
+    fails closed rather than reading absent bookkeeping as a zero balance.
+    """
+    row = (
+        (
+            await session.execute(
+                text(
+                    """
+                SELECT date, balance_mm, etc_mm, et0_mm, kc_used,
+                       precip_mm, irrigation_mm, irrigation_logged
+                FROM block_water_balance_daily
+                WHERE block_id = :block_id
+                ORDER BY date DESC
+                LIMIT 1
+                """
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                {"block_id": block_id},
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    return WaterBalanceEntry(
+        date=row["date"],
+        balance_mm=row["balance_mm"],
+        etc_mm=row["etc_mm"],
+        et0_mm=row["et0_mm"],
+        kc_used=row["kc_used"],
+        precip_mm=row["precip_mm"],
+        irrigation_mm=row["irrigation_mm"],
+        irrigation_logged=row["irrigation_logged"],
+    )
 
 
 async def _pick_provider(session: AsyncSession, *, farm_id: UUID) -> str | None:

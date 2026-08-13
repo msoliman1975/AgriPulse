@@ -34,6 +34,7 @@ import {
   WEATHER_INDEX_KEYS,
   WEATHER_RISK_CODES,
   WEATHER_RISK_CROP_PREFIX,
+  WATER_BALANCE_FIELDS,
   WEATHER_RISK_FIELDS,
   WEATHER_SCOPES,
   attributePathAppliesToCrops,
@@ -574,6 +575,7 @@ function ValueRefEditor({
         "weather",
         "weather_index",
         "weather_risk",
+        "water_balance",
         "signals",
         "grid",
         "crop_attribute",
@@ -584,6 +586,7 @@ function ValueRefEditor({
         "weather",
         "weather_index",
         "weather_risk",
+        "water_balance",
         "signals",
         "grid",
         "crop_attribute",
@@ -875,6 +878,30 @@ function SourceSpecificFields({
           ))}
         </select>
         <FieldHint text={hint("riskField", value.field)} />
+      </>
+    );
+  }
+  if (value.source === "water_balance") {
+    // One block-day row, so there is nothing to pick but the field — unlike
+    // weather_risk, which needs a pathogen first.
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) =>
+            onChange({ ...value, field: e.target.value as (typeof WATER_BALANCE_FIELDS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.waterBalanceField")}
+        >
+          {WATER_BALANCE_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <FieldHint text={hint("waterBalanceField", value.field)} />
       </>
     );
   }

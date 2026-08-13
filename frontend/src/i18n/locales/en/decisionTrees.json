@@ -362,7 +362,8 @@
         "signals": "Custom signal",
         "grid": "Grid anomaly",
         "crop_attribute": "Crop field",
-        "params": "Tree parameter"
+        "params": "Tree parameter",
+        "water_balance": "Crop water balance"
       },
       "hint": {
         "source": {
@@ -467,8 +468,18 @@
           "temp_min_c": "The day's minimum temperature, °C.",
           "temp_max_c": "The day's maximum temperature, °C.",
           "temp_mean_c": "The day's mean temperature, °C."
+        },
+        "waterBalanceField": {
+          "balance_mm": "Rain plus irrigation minus what the crop used, in mm. Negative means the block ran a deficit that day.",
+          "etc_mm": "What the crop actually transpired (ET₀ × Kc), in mm. Higher than ET₀ for a crop at peak canopy.",
+          "et0_mm": "Reference demand over standard grass, in mm — the climatic driver before the crop coefficient is applied.",
+          "kc_used": "The crop coefficient used that day. Resolves from the crop's growth stage; falls back to a generic 0.85 when the stage is unknown.",
+          "precip_mm": "Rainfall that landed on the block, in mm.",
+          "irrigation_mm": "Water recorded as applied, in mm. Zero when nothing was logged — check irrigation_logged before reading a zero as 'none applied'.",
+          "irrigation_logged": "Whether any irrigation was actually recorded. Gate on this before acting on a deficit: a farm that never logs irrigation shows a permanent shortfall that is missing bookkeeping, not dry soil."
         }
-      }
+      },
+      "waterBalanceField": "Water balance field"
     },
     "delete": {
       "title": "Delete node?",
