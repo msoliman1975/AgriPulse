@@ -19,8 +19,14 @@ from app.modules.imagery.farm_aoi import (
     utm_bbox,
 )
 
-# Bashier Elkhier's real extent, in metres (EPSG:32636).
-REFERENCE_FARM = {
+# The extent of Bashier Elkhier's STITCHED raster, in metres (EPSG:32636) —
+# i.e. the union of the blocks that were fetched, not the farm.
+#
+# Worth keeping the two apart: the farm's own boundary is 80x121 px at 10 m,
+# eleven rows taller, because the farm reaches ~95 m further south than any
+# block does. That difference IS the feature — a fetched surface covers it and
+# a stitched one never could.
+BLOCK_UNION_EXTENT = {
     "type": "Polygon",
     "coordinates": [
         [
@@ -33,6 +39,20 @@ REFERENCE_FARM = {
     ],
 }
 
+# The farm boundary itself, measured off prod.
+REFERENCE_FARM = {
+    "type": "Polygon",
+    "coordinates": [
+        [
+            [464686.5, 3326795.4],
+            [465478.2, 3326795.4],
+            [465478.2, 3327996.0],
+            [464686.5, 3327996.0],
+            [464686.5, 3326795.4],
+        ]
+    ],
+}
+
 
 def _square(side_m: float) -> dict[str, object]:
     return {
@@ -41,18 +61,23 @@ def _square(side_m: float) -> dict[str, object]:
     }
 
 
-def test_reference_farm_is_the_size_the_cog_actually_was():
-    # The stitched raster for this farm measured 80x110 at 10 m; the fetch
-    # path must predict the same, or the guard is measuring something else.
-    assert aoi_size_px(REFERENCE_FARM, resolution_m=10.0) == (80, 110)
+def test_the_farm_is_taller_than_the_blocks_it_contains():
+    # Measured on prod: the stitched raster was 80x110, the fetched one 79x120.
+    # If these ever came out equal the guard would be measuring the block union
+    # rather than the farm, and the whole point of fetching would be lost.
+    blocks = aoi_size_px(BLOCK_UNION_EXTENT, resolution_m=10.0)
+    farm = aoi_size_px(REFERENCE_FARM, resolution_m=10.0)
+    assert blocks == (80, 110)
+    assert farm == (80, 121)
+    assert farm[1] > blocks[1]
 
 
 def test_reference_farm_passes():
-    assert check_fetchable(REFERENCE_FARM, resolution_m=10.0) == (80, 110)
+    assert check_fetchable(REFERENCE_FARM, resolution_m=10.0) == (80, 121)
 
 
 def test_bbox_ignores_ring_structure():
-    assert utm_bbox(REFERENCE_FARM) == (464690.0, 3326890.0, 465490.0, 3327990.0)
+    assert utm_bbox(BLOCK_UNION_EXTENT) == (464690.0, 3326890.0, 465490.0, 3327990.0)
 
 
 def test_multipolygon_spans_every_part():
