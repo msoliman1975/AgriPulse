@@ -102,16 +102,6 @@ async def ensure_fresh() -> None:
         await _load()
 
 
-async def refresh() -> None:
-    """Force a reload, ignoring the TTL. Called from the write path.
-
-    Makes an admin's own change effective in their pod immediately, so the
-    matrix they re-read after saving reflects what they just did.
-    """
-    async with _lock:
-        await _load()
-
-
 def invalidate() -> None:
     """Mark the snapshot stale so the next `ensure_fresh()` reloads.
 
@@ -124,8 +114,8 @@ def invalidate() -> None:
 
 def clear_cache() -> None:
     """Test hook — drop the snapshot and the load timestamp."""
-    global _loaded_at
-    _snapshot.clear()
+    global _loaded_at, _snapshot
+    _snapshot = {}
     _loaded_at = None
 
 
@@ -134,15 +124,14 @@ def set_snapshot_for_test(snapshot: Mapping[str, Mapping[str, bool]]) -> None:
 
     Marks it fresh so `ensure_fresh()` will not immediately overwrite it.
     """
-    global _loaded_at
-    _snapshot.clear()
-    _snapshot.update({role: dict(caps) for role, caps in snapshot.items()})
+    global _loaded_at, _snapshot
+    _snapshot = {role: dict(caps) for role, caps in snapshot.items()}
     _loaded_at = time.monotonic()
 
 
 async def _load() -> None:
     """Replace the snapshot from the database. Must be called under `_lock`."""
-    global _loaded_at
+    global _loaded_at, _snapshot
     log = get_logger(__name__)
     factory = AsyncSessionLocal()
     try:
@@ -175,8 +164,12 @@ async def _load() -> None:
             continue
         fresh.setdefault(role, {})[str(row.capability)] = bool(row.granted)
 
-    # Swap in place rather than rebinding: `current()` hands out this dict and
-    # callers may hold the reference across the swap.
-    _snapshot.clear()
-    _snapshot.update(fresh)
+    # Rebind rather than mutating in place. `requires_capability`'s `_check` is
+    # a *sync* dependency, so FastAPI runs it in a threadpool and `role_grants`
+    # genuinely executes on worker threads while this coroutine runs on the
+    # event loop. A `clear()` followed by `update()` would leave a window in
+    # which a concurrent check reads an empty overlay and silently falls back to
+    # the baseline. Rebinding is atomic, and a caller holding the previous dict
+    # sees a consistent — merely older — snapshot, which is what we want.
+    _snapshot = fresh
     _loaded_at = time.monotonic()

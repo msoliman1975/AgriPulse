@@ -251,6 +251,35 @@ def test_set_snapshot_for_test_round_trips() -> None:
     assert overlay.current() == {}
 
 
+def test_a_held_snapshot_is_never_mutated_underneath_its_reader() -> None:
+    """The reload must rebind, not clear-and-refill.
+
+    `requires_capability`'s `_check` is a *sync* dependency, so FastAPI runs it
+    in a threadpool and `role_grants` really does read this dict on a worker
+    thread while a reload runs on the event loop. A `clear()` + `update()`
+    would expose a moment where a live capability check sees an empty overlay
+    and falls back to the baseline — a permission silently flickering off.
+    """
+    overlay.clear_cache()
+    overlay.set_snapshot_for_test({"Scout": {"plan.manage": True}})
+    held = overlay.current()
+
+    overlay.set_snapshot_for_test({"Agronomist": {"alert.read": False}})
+
+    # The reader's view is older, but it is whole.
+    assert held == {"Scout": {"plan.manage": True}}
+    assert overlay.current() == {"Agronomist": {"alert.read": False}}
+    overlay.clear_cache()
+
+
+def test_clear_cache_does_not_mutate_a_held_snapshot() -> None:
+    overlay.clear_cache()
+    overlay.set_snapshot_for_test({"Scout": {"plan.manage": True}})
+    held = overlay.current()
+    overlay.clear_cache()
+    assert held == {"Scout": {"plan.manage": True}}
+
+
 def test_invalidate_marks_the_snapshot_stale_without_clearing_it() -> None:
     """The write path must not blank the policy while a reload is pending.
 
