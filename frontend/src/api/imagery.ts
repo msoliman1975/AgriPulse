@@ -160,9 +160,30 @@ export interface FarmSceneAsset {
   resolution_m: string | null;
 }
 
+/**
+ * The whole farm as ONE raster.
+ *
+ * Same `stac_item_id` shape as a block asset, so the caller appends
+ * `/{index}.tif` without caring which it holds. When this is present it
+ * covers the same ground as every entry in `items` — in one file, with no
+ * seam where blocks meet — and should be drawn INSTEAD of them.
+ */
+export interface FarmRaster {
+  stac_item_id: string;
+  scene_datetime: string;
+  resolution_m: string | null;
+  /** How many block rasters were stitched into it. */
+  blocks_merged: number;
+}
+
 export interface FarmSceneAssetsResponse {
   farm_id: string;
   at: string | null;
+  /**
+   * Null while a farm is still on the per-block path — which is how the
+   * cutover runs one farm at a time. Older APIs omit the field entirely.
+   */
+  farm?: FarmRaster | null;
   items: FarmSceneAsset[];
 }
 

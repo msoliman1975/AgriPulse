@@ -11,7 +11,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { listFarmSceneAssets, type FarmSceneAsset } from "@/api/imagery";
+import { listFarmSceneAssets, type FarmRaster, type FarmSceneAsset } from "@/api/imagery";
 import type { IndexCode as ApiIndexCode } from "@/api/indices";
 import type { ConfigResponse } from "@/api/config";
 import { mapWithConcurrency } from "../map/api";
@@ -32,6 +32,9 @@ import {
 /** Fallback ground sample distance when the product row could not be read. */
 const FALLBACK_RESOLUTION_M = 10;
 
+/** Source id for the single farm-wide surface, distinct from any block id. */
+export const FARM_SCOPE_ID = "__farm__";
+
 interface PixelStats {
   counts: BlockPixelCounts[];
   /** Blocks whose raster could not be read — no object behind the asset row. */
@@ -39,6 +42,8 @@ interface PixelStats {
 }
 
 export interface IndexPixels {
+  /** True when the whole farm is drawn from one stitched raster. */
+  isFarmRaster: boolean;
   /** Raster layers for MapCanvas; empty when there is nothing to draw. */
   layers: PixelLayer[];
   /**
@@ -63,6 +68,44 @@ export interface IndexPixels {
   unsupported: boolean;
 }
 
+/**
+ * Read one raster's class histogram. Shared by both paths so the farm surface
+ * and a single block are counted by identical arithmetic — the pilot's whole
+ * test is that block means do not move when the source changes shape.
+ *
+ * A failure returns null rather than throwing: one raster failing must not
+ * empty the legend, and a missing object is common enough on prod (3,787
+ * AOI-scenes claim success with nothing behind them) that it is a normal
+ * outcome, not an exception.
+ */
+async function readStats(input: {
+  config: ConfigResponse;
+  asset: { stac_item_id: string };
+  code: ApiIndexCode;
+  id: string;
+  resolutionM: number;
+}): Promise<BlockPixelCounts | null> {
+  const url = blockStatsUrl({
+    tileServerBaseUrl: input.config.tile_server_base_url,
+    s3Bucket: input.config.s3_bucket,
+    asset: input.asset,
+    code: input.code,
+  });
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const body = (await resp.json()) as Record<string, BandStatistics | undefined>;
+    const resolution = input.resolutionM;
+    return readBlockCounts(
+      input.id,
+      body,
+      Number.isFinite(resolution) && resolution > 0 ? resolution : FALLBACK_RESOLUTION_M,
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function useIndexPixels(input: {
   farmId: string;
   code: ApiIndexCode;
@@ -70,9 +113,11 @@ export function useIndexPixels(input: {
   config: ConfigResponse | null;
   /** Block extents, so each raster source is bounded to its own block. */
   boundsByBlockId: Map<string, [number, number, number, number]>;
+  /** The farm's own extent, for the single-source path. */
+  farmBounds: [number, number, number, number] | null;
   enabled: boolean;
 }): IndexPixels {
-  const { farmId, code, sceneAt, config, boundsByBlockId } = input;
+  const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds } = input;
 
   const assetsQ = useQuery({
     queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt),
@@ -81,44 +126,57 @@ export function useIndexPixels(input: {
     staleTime: 5 * 60_000,
   });
   const assets = useMemo<FarmSceneAsset[]>(() => assetsQ.data?.items ?? [], [assetsQ.data]);
+  /**
+   * When the farm has been stitched into one raster, that IS the layer: same
+   * ground as all 36 block rasters, one file, and no seam where blocks meet
+   * (each block's raster carries the shared boundary pixel, so drawing both
+   * stacked two translucent copies of it). Null keeps the per-block path,
+   * which is how the cutover runs one farm at a time.
+   */
+  const farmRaster = useMemo<FarmRaster | null>(() => assetsQ.data?.farm ?? null, [assetsQ.data]);
 
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would
   // otherwise have nothing to say. Bounded concurrency for the same reason
   // the grid route exists — a 36-block farm must not open 36 sockets at once.
   const statsQ = useQuery({
-    queryKey: CONSOLE_QK.pixelStats(farmId, code, sceneAt, assets.length),
+    queryKey: CONSOLE_QK.pixelStats(
+      farmId,
+      code,
+      sceneAt,
+      farmRaster ? -1 : assets.length,
+    ),
     queryFn: async (): Promise<PixelStats> => {
       if (!config) return { counts: [], failedBlockIds: [] };
-      const results = await mapWithConcurrency(assets, 8, async (asset) => {
-        const url = blockStatsUrl({
-          tileServerBaseUrl: config.tile_server_base_url,
-          s3Bucket: config.s3_bucket,
+      if (farmRaster) {
+        // One surface, one histogram. The id is the farm, not a block, so
+        // scoping the legend to a block cannot narrow it — that arrives with
+        // per-block zonal statistics over this raster.
+        const counts = await readStats({
+          config,
+          asset: farmRaster,
+          code,
+          id: FARM_SCOPE_ID,
+          resolutionM: Number(farmRaster.resolution_m),
+        });
+        return counts
+          ? { counts: [counts], failedBlockIds: [] }
+          : { counts: [], failedBlockIds: [FARM_SCOPE_ID] };
+      }
+      const results = await mapWithConcurrency(assets, 8, (asset) =>
+        readStats({
+          config,
           asset,
           code,
-        });
-        try {
-          const resp = await fetch(url);
-          if (!resp.ok) return null;
-          const body = (await resp.json()) as Record<string, BandStatistics | undefined>;
-          const resolution = Number(asset.resolution_m);
-          return readBlockCounts(
-            asset.block_id,
-            body,
-            Number.isFinite(resolution) && resolution > 0 ? resolution : FALLBACK_RESOLUTION_M,
-          );
-        } catch {
-          // One block's statistics failing must not empty the whole legend.
-          // The block is simply absent from the totals, which is visible as a
-          // smaller covered area rather than as a wrong one.
-          return null;
-        }
-      });
+          id: asset.block_id,
+          resolutionM: Number(asset.resolution_m),
+        }),
+      );
       const counts = results.filter((r): r is BlockPixelCounts => r !== null);
       const ok = new Set(counts.map((c) => c.blockId));
       return { counts, failedBlockIds: assets.map((a) => a.block_id).filter((id) => !ok.has(id)) };
     },
-    enabled: Boolean(config) && assets.length > 0 && input.enabled,
+    enabled: Boolean(config) && (assets.length > 0 || farmRaster !== null) && input.enabled,
     staleTime: 5 * 60_000,
   });
 
@@ -138,6 +196,22 @@ export function useIndexPixels(input: {
 
   const layers = useMemo<PixelLayer[]>(() => {
     if (!config) return [];
+    if (farmRaster) {
+      if (failedBlockIds.has(FARM_SCOPE_ID)) return [];
+      return [
+        {
+          id: FARM_SCOPE_ID,
+          tileUrl: blockTileUrl({
+            tileServerBaseUrl: config.tile_server_base_url,
+            s3Bucket: config.s3_bucket,
+            asset: farmRaster,
+            code,
+          }),
+          bounds: farmBounds ?? undefined,
+          tileSize: TILE_SIZE,
+        },
+      ];
+    }
     return assets
       .filter((a) => !failedBlockIds.has(a.block_id))
       .map((asset) => ({
@@ -151,7 +225,7 @@ export function useIndexPixels(input: {
         bounds: boundsByBlockId.get(asset.block_id),
         tileSize: TILE_SIZE,
       }));
-  }, [assets, config, code, boundsByBlockId, failedBlockIds]);
+  }, [assets, config, code, boundsByBlockId, failedBlockIds, farmRaster, farmBounds]);
 
   // The block's own mean for this index and scene. Read off the same
   // statistics the tiles are drawn from rather than from the map summary,
@@ -171,8 +245,9 @@ export function useIndexPixels(input: {
   }, [statsQ.data, code]);
 
   return {
+    isFarmRaster: farmRaster !== null,
     layers,
-    assetCount: statsQ.data ? statsQ.data.counts.length : assets.length,
+    assetCount: statsQ.data ? statsQ.data.counts.length : farmRaster ? 1 : assets.length,
     counts: statsQ.data?.counts,
     meanByBlockId,
     classAreas,
