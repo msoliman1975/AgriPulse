@@ -176,6 +176,9 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.platform_admins.router import (
         router as platform_admins_router,
     )
+    from app.modules.platform_admins.tasks_router import (
+        router as platform_tasks_router,
+    )
     from app.modules.platform_admins.tenant_integrations import (
         router as platform_tenant_integrations_router,
     )
@@ -225,6 +228,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(platform_tenant_integrations_router)
     app.include_router(platform_admins_self_router)
     app.include_router(platform_rbac_router)
+    app.include_router(platform_tasks_router)
     app.include_router(platform_health_rollup_router)
     app.include_router(platform_health_tenant_drill_router)
     app.include_router(observer_router)

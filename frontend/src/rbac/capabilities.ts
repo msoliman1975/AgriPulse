@@ -67,6 +67,7 @@ export type Capability =
   | "platform.purge_data"
   | "platform.read"
   | "platform.run_backfill"
+  | "platform.run_tasks"
   | "recommendation.act"
   | "recommendation.read"
   | "resource.manage"
