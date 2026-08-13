@@ -34,27 +34,29 @@ vi.mock("@/api/farmSubscriptions", () => ({
 }));
 
 vi.mock("@/api/config", () => ({
-  getConfig: vi.fn(async () => ({
-    tile_server_base_url: "https://tiles.test",
-    s3_bucket: "b",
-    cloud_cover_visualization_max_pct: 60,
-    cloud_cover_aggregation_max_pct: 30,
-    products: [
-      {
-        product_id: PRODUCT_ID,
-        product_code: "s2_l2a",
-        product_name: "Sentinel-2 L2A",
-        bands: [],
-        supported_indices: [],
-      },
-    ],
-  })),
+  getConfig: vi.fn(() =>
+    Promise.resolve({
+      tile_server_base_url: "https://tiles.test",
+      s3_bucket: "b",
+      cloud_cover_visualization_max_pct: 60,
+      cloud_cover_aggregation_max_pct: 30,
+      products: [
+        {
+          product_id: PRODUCT_ID,
+          product_code: "s2_l2a",
+          product_name: "Sentinel-2 L2A",
+          bands: [],
+          supported_indices: [],
+        },
+      ],
+    }),
+  ),
 }));
 
 vi.mock("@/api/weather", () => ({
-  listWeatherProviders: vi.fn(async () => [
-    { code: "open_meteo", name: "Open-Meteo", kind: "forecast" },
-  ]),
+  listWeatherProviders: vi.fn(() =>
+    Promise.resolve([{ code: "open_meteo", name: "Open-Meteo", kind: "forecast" }]),
+  ),
 }));
 
 function subscription(over: Record<string, unknown> = {}) {
@@ -110,9 +112,7 @@ describe("FarmSubscriptionsPanel", () => {
     h.imagery.mockResolvedValue([subscription()]);
     const user = userEvent.setup();
     render(<FarmSubscriptionsPanel farmId="f1" />);
-    await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy());
 
     await user.click(screen.getByRole("checkbox", { name: /Whole farm/i }));
 
@@ -145,9 +145,7 @@ describe("FarmSubscriptionsPanel", () => {
     h.updateImagery.mockRejectedValue(new Error("nope"));
     const user = userEvent.setup();
     render(<FarmSubscriptionsPanel farmId="f1" />);
-    await waitFor(() =>
-      expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy());
 
     await user.click(screen.getByRole("checkbox", { name: /Whole farm/i }));
 

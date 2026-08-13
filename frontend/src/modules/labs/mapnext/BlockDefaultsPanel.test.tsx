@@ -85,12 +85,12 @@ vi.mock("@/api/farmConfig", async () => {
 // subscriptions on mount. Without this mock those calls reach jsdom's real
 // XHR and every test in the file fails on an unrelated network error.
 vi.mock("@/api/farmSubscriptions", () => ({
-  listFarmImagerySubscriptions: vi.fn(async () => []),
-  listFarmWeatherSubscriptions: vi.fn(async () => []),
-  subscribeFarmImagery: vi.fn(async () => ({})),
-  subscribeFarmWeather: vi.fn(async () => ({})),
-  updateFarmImagerySubscription: vi.fn(async () => ({})),
-  updateFarmWeatherSubscription: vi.fn(async () => ({})),
+  listFarmImagerySubscriptions: vi.fn(() => Promise.resolve([])),
+  listFarmWeatherSubscriptions: vi.fn(() => Promise.resolve([])),
+  subscribeFarmImagery: vi.fn(() => Promise.resolve({})),
+  subscribeFarmWeather: vi.fn(() => Promise.resolve({})),
+  updateFarmImagerySubscription: vi.fn(() => Promise.resolve({})),
+  updateFarmWeatherSubscription: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock("@/api/config", () => ({
