@@ -327,7 +327,7 @@ async def _read_block_utm_origin(
 
 
 @pytest.mark.asyncio
-async def test_compute_indices_writes_six_aggregates_and_six_cogs(
+async def test_compute_indices_writes_one_aggregate_and_one_cog_per_index(
     admin_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -399,17 +399,10 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
 
     # Result reflects every standard index computed.
     assert result["status"] == "indices_computed"
-    assert sorted(result["indices"]) == [
-        "evi",
-        "gndvi",
-        "ndmi",
-        "ndre",
-        "ndvi",
-        "ndwi",
-        "savi",
-    ]
+    assert sorted(result["indices"]) == sorted(STANDARD_INDEX_CODES)
 
-    # Seven rows in block_index_aggregates with sane stats for the veg-half
+    # One row per index in block_index_aggregates, with sane stats for the
+    # veg-half
     # of the synthetic raster (NDVI > 0.5 is roughly expected).
     rows = (
         await admin_session.execute(
@@ -448,7 +441,7 @@ async def test_compute_indices_writes_six_aggregates_and_six_cogs(
         )
     ).one()
     assets = item_row.content.get("assets", {})
-    assert {"raw_bands", "ndvi", "ndwi", "evi", "savi", "ndre", "gndvi"}.issubset(assets.keys())
+    assert {"raw_bands", *STANDARD_INDEX_CODES}.issubset(assets.keys())
 
 
 @pytest.mark.asyncio
