@@ -1562,18 +1562,55 @@ global:
   #   Merge run 31633726143; frontend manifest verified by PULLING it on the
   #   node rather than from the run conclusion: frontend@sha256:e25ca7e6.
   #
+  #   Merge run 31653869365; manifests verified by PULLING them on the node
+  #   rather than from the run conclusion: api@sha256:410931f7,
+  #   frontend@sha256:614b18ee.
+  #
   #   Watch after sync: /labs/map-v2 on B-Elkair-Suez. Class patches should
   #   have soft, organic edges rather than square steps. Scrub the timeline to
   #   a 2025 pass — it must read "Nothing for this date", NOT a list of 0.0
   #   rows. Note the cell mesh reads fainter at farm zoom now: much of what
   #   looked like mesh before was the pixel edges themselves.
+  # 6317de4 = #427, two investigations on the 36-block reference farm.
+  #   API AND FRONTEND TOGETHER: the api gains `computed_count` on
+  #   /farms/{id}/scenes and the strip needs it. Frontend alone would leave
+  #   every date looking processed, which is the bug this fixes.
+  #
+  #   Ingesting a scene and computing its indices are separate tasks, and the
+  #   historical backfill runs the first with `run_compute_indices: False`.
+  #   Nothing ever ran the second, so the bucket holds 12,162 AOI-scenes with
+  #   raw bands and 8,375 with an ndvi raster — 104 of B-Elkair-Suez's 131
+  #   scene days were ingested and can never be drawn. An aggregate row is
+  #   written by compute_indices and nothing else, so it is now the signal:
+  #   passes with none are greyed out and unclickable. Cloud keeps its own
+  #   "☁ 91%" treatment, which says both that there is nothing to draw and why.
+  #   This does NOT recompute the missing rasters — separate decision, ~26k
+  #   COG writes.
+  #
+  #   Also cuts repaint time on index/date switches. Tiles used to wait ~1.8s
+  #   on statistics they do not need; they now draw optimistically and prune
+  #   blocks whose raster fails. And tiles are 512px: one renders in ~246ms
+  #   against ~1288ms for the four 256px tiles covering the same ground.
+  #
+  #   NOT BROWSER-VERIFIED before promote — the local dev-server auth loop
+  #   against prod Keycloak would not settle, so this is tests-only (884 pass)
+  #   plus direct measurement of the tile server. Verifying on prod right
+  #   after sync.
+  #
+  #   Merge run 31653869365; manifests verified by PULLING them on the node
+  #   rather than from the run conclusion: api@sha256:410931f7,
+  #   frontend@sha256:614b18ee.
+  #
+  #   Watch after sync: /labs/map-v2 on B-Elkair-Suez. Dates before 2026-05-12
+  #   should be greyed out and unclickable; switching index should repaint
+  #   noticeably faster and fetch ~25 tiles rather than ~92.
   images:
     api:
-      tag: "65cd0a8"
+      tag: "6317de4"
     workers:
       tag: "f2ed5f2"
     frontend:
-      tag: "44c73d1"
+      tag: "6317de4"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
