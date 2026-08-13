@@ -88,6 +88,18 @@ env:
   # Upstream ghcr.io/developmentseed/titiler image binds gunicorn to $PORT
   # (default 80). Service + probes target 8000, so pin PORT to match.
   PORT: "8000"
+  # The upstream image defaults to ONE gunicorn worker, so every tile render
+  # on the platform serialised through a single Python process. That is the
+  # dominant cost when the Farm Console repaints: a farm view asks for ~65
+  # tiles at once and they queue behind each other, which measured as ~1.6s of
+  # wall clock for 36 parallel requests against a pod using 7m of CPU. The
+  # work is mostly waiting on range reads from R2, so workers overlap well.
+  WEB_CONCURRENCY: "4"
+  # Per-PROCESS GDAL read cache, so it multiplies by WEB_CONCURRENCY. Dropped
+  # from the image's 512MB to 128MB to keep four workers at the same total
+  # cache footprint as the single worker had, well inside the 2Gi limit
+  # (observed RSS with one worker: 274Mi).
+  VSI_CACHE_SIZE: "134217728"
 
 serviceMonitor:
   enabled: true
