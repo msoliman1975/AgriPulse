@@ -1173,13 +1173,18 @@ async def _compute_spi_for_tenant_async(
                 r["date"]: float(r["value"]) for r in history_rows if r["value"] is not None
             }
 
+            # Two separate reasons to skip, narrowed one at a time so the
+            # accumulation is a real float by the time it reaches the aux blob:
+            # an incomplete 90-day window, then a record too short or too dry
+            # to fit against.
             accumulation = accumulate(precip_by_date, target, _SPI_WINDOW_DAYS)
-            result = None
-            if accumulation is not None:
-                result = compute_spi(
-                    accumulation,
-                    comparable_history(precip_by_date, target, _SPI_WINDOW_DAYS),
-                )
+            if accumulation is None:
+                skipped += 1
+                continue
+            result = compute_spi(
+                accumulation,
+                comparable_history(precip_by_date, target, _SPI_WINDOW_DAYS),
+            )
             if result is None:
                 skipped += 1
                 continue
