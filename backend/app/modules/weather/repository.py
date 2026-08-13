@@ -167,7 +167,9 @@ class WeatherRepository:
         *,
         attempt_id: UUID,
         subscription_id: UUID,
-        block_id: UUID,
+        # None for a farm-scoped attempt: one provider call covers the whole
+        # farm, so there is no block it belongs to.
+        block_id: UUID | None,
         farm_id: UUID,
         provider_code: str,
         started_at: datetime,
@@ -275,36 +277,100 @@ class WeatherRepository:
         default_cadence_hours: int,
         now: datetime,
     ) -> tuple[tuple[UUID, str], ...]:
-        """Return distinct (farm_id, provider_code) tuples whose oldest
-        active subscription is overdue.
+        """Return (farm_id, provider_code) pairs that are overdue a fetch.
 
-        Beat-sweep entry point. Dedup is done in SQL: many subscriptions
-        on the same farm collapse to one fetch per cycle.
+        Beat-sweep entry point. Reads the FARM subscriptions, and falls back to
+        the per-block rows for any (farm, provider) that has no farm row yet —
+        migration 0077 creates one per active block combination, but a block
+        subscribed after that migration ran would otherwise stop being fetched
+        entirely. The fallback keeps every farm covered during the cutover and
+        costs one extra scan of a small table.
+
+        Dedup is done in SQL: many subscriptions on one farm collapse to a
+        single fetch per cycle, which is all the provider call ever was.
         """
         rows = (
             await self._session.execute(
                 text(
                     """
-                    SELECT DISTINCT b.farm_id, s.provider_code
-                    FROM weather_subscriptions s
-                    JOIN blocks b ON b.id = s.block_id
-                    WHERE s.is_active = TRUE
-                      AND s.deleted_at IS NULL
-                      AND (
-                            s.last_attempted_at IS NULL
-                            OR s.last_attempted_at <
-                               (:now - make_interval(
-                                    hours => COALESCE(
-                                        s.cadence_hours,
-                                        :default_cadence
-                                    )
-                               ))
+                    SELECT farm_id, provider_code FROM (
+                        SELECT f.farm_id, f.provider_code, f.last_attempted_at,
+                               f.cadence_hours
+                        FROM weather_farm_subscriptions f
+                        WHERE f.is_active = TRUE AND f.deleted_at IS NULL
+
+                        UNION ALL
+
+                        SELECT b.farm_id, s.provider_code,
+                               max(s.last_attempted_at) AS last_attempted_at,
+                               min(s.cadence_hours) AS cadence_hours
+                        FROM weather_subscriptions s
+                        JOIN blocks b ON b.id = s.block_id
+                        WHERE s.is_active = TRUE
+                          AND s.deleted_at IS NULL
+                          AND b.deleted_at IS NULL
+                          AND NOT EXISTS (
+                              SELECT 1 FROM weather_farm_subscriptions f2
+                              WHERE f2.farm_id = b.farm_id
+                                AND f2.provider_code = s.provider_code
+                                AND f2.is_active AND f2.deleted_at IS NULL
                           )
+                        GROUP BY b.farm_id, s.provider_code
+                    ) due
+                    WHERE last_attempted_at IS NULL
+                       OR last_attempted_at <
+                          (:now - make_interval(
+                               hours => COALESCE(cadence_hours, :default_cadence)
+                          ))
                     """
                 ).bindparams(now=now, default_cadence=default_cadence_hours)
             )
         ).all()
         return tuple((row.farm_id, row.provider_code) for row in rows)
+
+    async def get_farm_subscription(
+        self,
+        *,
+        farm_id: UUID,
+        provider_code: str,
+    ) -> dict[str, Any] | None:
+        """The farm-level subscription for this provider, if there is one."""
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT * FROM weather_farm_subscriptions
+                        WHERE farm_id = :farm AND provider_code = :provider
+                          AND is_active AND deleted_at IS NULL
+                        """
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id, "provider": provider_code},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def touch_farm_subscription_attempt(
+        self,
+        *,
+        subscription_id: UUID,
+        attempted_at: datetime,
+        success: bool,
+    ) -> None:
+        """Heartbeat the farm subscription; advance the watermark on success."""
+        sets = ["last_attempted_at = :at", "updated_at = now()"]
+        if success:
+            sets.append("last_successful_ingest_at = :at")
+        await self._session.execute(
+            text(
+                f"UPDATE weather_farm_subscriptions SET {', '.join(sets)} "
+                "WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {"id": subscription_id, "at": attempted_at},
+        )
 
     # ---- Hypertable writers --------------------------------------------
 

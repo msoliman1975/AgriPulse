@@ -285,6 +285,13 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         note="one job per farm-AOI fetch. Purges with the farm the same way "
         "imagery_ingestion_jobs purges with its block",
     ),
+    OwnedTable(
+        "weather_farm_subscriptions",
+        owner_column="farm_id",
+        order=10,
+        note="farm-level weather intent; the per-block rows in "
+        "weather_subscriptions are owned by their block and purge with it",
+    ),
     OwnedTable("farm_imagery_overrides", owner_column="farm_id", order=10),
     OwnedTable("farm_imagery_template", owner_column="farm_id", order=10),
     OwnedTable("farm_weather_overrides", owner_column="farm_id", order=10),
