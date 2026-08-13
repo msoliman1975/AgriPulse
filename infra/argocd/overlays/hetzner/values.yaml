@@ -1680,11 +1680,11 @@ global:
   #   until the hourly sweep runs against a block with a current crop.
   images:
     api:
-      tag: "8117a5a"
+      tag: "5aba458"
     workers:
-      tag: "8117a5a"
+      tag: "5aba458"
     frontend:
-      tag: "0852d7e"
+      tag: "5aba458"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
