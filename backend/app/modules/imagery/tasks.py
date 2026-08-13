@@ -150,7 +150,7 @@ async def _lookup_product(session: AsyncSession, product_id: UUID) -> dict[str, 
         (
             await session.execute(
                 text(
-                    "SELECT id, code, bands, "
+                    "SELECT id, code, bands, resolution_m, "
                     "(SELECT code FROM public.imagery_providers p "
                     " WHERE p.id = pr.provider_id) AS provider_code "
                     "FROM public.imagery_products pr WHERE id = :id"
@@ -962,6 +962,22 @@ def build_farm_scene_raster(farm_id: str, tenant_schema: str, at_iso: str) -> di
     )
 
 
+def _product_resolution_m(product: dict[str, Any]) -> float | None:
+    """The product's native ground sample distance, if it is known.
+
+    The farm grid is pinned to this rather than to whatever grid the first
+    block happened to arrive on — see farm_raster's module docstring.
+    """
+    raw = product.get("resolution_m")
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 async def _build_farm_scene_raster_async(
     farm_id: UUID,
     tenant_schema: str,
@@ -990,7 +1006,9 @@ async def _build_farm_scene_raster_async(
     raw_uris = [f"s3://{bucket}/{stac}/raw_bands.tif" for stac in sources["stac_item_ids"]]
     try:
         bands_arrays, cloud_mask, profile = merge_block_rasters(
-            raw_uris, band_names=tuple(product["bands"])
+            raw_uris,
+            band_names=tuple(product["bands"]),
+            resolution_m=_product_resolution_m(product),
         )
     except NoBlockRastersError:
         # Every block of this pass claims success with no object behind it —

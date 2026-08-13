@@ -132,3 +132,94 @@ def test_scl_band_becomes_a_cloud_mask(tmp_path):
 
     assert set(bands) == set(BANDS)
     assert cloud.tolist() == [[True, False], [False, True]]
+
+
+def _write_at(
+    path, *, origin_x: float, origin_y: float, res: float, size: int, value: float
+) -> str:
+    """A tile on its OWN grid — the provider fits a fixed-size image to each
+    requested AOI, so real blocks arrive with different pixel sizes and
+    origins that line up with nothing."""
+    transform = from_origin(origin_x, origin_y, res, res)
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=size,
+        width=size,
+        count=len(BANDS),
+        dtype="float32",
+        crs="EPSG:32636",
+        transform=transform,
+        nodata=float("nan"),
+    ) as ds:
+        for i in range(len(BANDS)):
+            ds.write(np.full((size, size), value, dtype="float32"), i + 1)
+    return str(path)
+
+
+def test_grid_does_not_depend_on_which_block_is_read_first(tmp_path):
+    # Two blocks on genuinely different grids, as prod actually stores them:
+    # 9.9m vs 10.13m pixels, origins aligned to nothing.
+    a = _write_at(
+        tmp_path / "a.tif", origin_x=464709.07, origin_y=3327497.56, res=9.903, size=20, value=0.2
+    )
+    b = _write_at(
+        tmp_path / "b.tif", origin_x=464703.99, origin_y=3328003.39, res=10.134, size=20, value=0.6
+    )
+
+    one, _c1, p1 = merge_block_rasters([a, b], band_names=BANDS, resolution_m=10.0)
+    two, _c2, p2 = merge_block_rasters([b, a], band_names=BANDS, resolution_m=10.0)
+
+    # Same grid whichever order they arrive in. Without an explicit target the
+    # mosaic inherits the first dataset's pixel size and origin, so this would
+    # differ run to run.
+    assert (p1["width"], p1["height"]) == (p2["width"], p2["height"])
+    assert p1["transform"] == p2["transform"]
+    assert one["red"].shape == two["red"].shape
+
+
+def test_grid_is_snapped_to_whole_multiples_of_the_resolution(tmp_path):
+    # An origin on no particular lattice must still produce a grid that is,
+    # so two scenes of the same farm land on the same pixels and can be
+    # compared date to date.
+    a = _write_at(
+        tmp_path / "a.tif", origin_x=464709.07, origin_y=3327497.56, res=9.903, size=10, value=0.4
+    )
+    _bands, _cloud, profile = merge_block_rasters([a], band_names=BANDS, resolution_m=10.0)
+    t = profile["transform"]
+    assert t.a == 10.0
+    assert -t.e == 10.0
+    assert t.c % 10.0 == 0
+    assert t.f % 10.0 == 0
+
+
+def test_cloud_mask_ignores_the_gaps_between_blocks(tmp_path):
+    # A farm mosaic has NaN where no block was fetched. `scl_cloud_mask` casts
+    # to int16, and NaN casts to garbage that can land on a cloud code — so an
+    # unguarded mask claims cloud over ground with no pixels at all.
+    transform = from_origin(ORIGIN_X, ORIGIN_Y, PIXEL, PIXEL)
+    path = tmp_path / "gap.tif"
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=2,
+        width=2,
+        count=len(BANDS) + 1,
+        dtype="float32",
+        crs="EPSG:32636",
+        transform=transform,
+        nodata=float("nan"),
+    ) as ds:
+        for i in range(len(BANDS)):
+            band = np.full((2, 2), 0.3, dtype="float32")
+            band[1, 1] = np.nan  # one corner never fetched
+            ds.write(band, i + 1)
+        scl = np.array([[4, 4], [4, np.nan]], dtype="float32")
+        ds.write(scl, len(BANDS) + 1)
+
+    _bands, cloud, _profile = merge_block_rasters([str(path)], band_names=BANDS)
+
+    # Nothing is cloudy: three clear pixels and one with no data at all.
+    assert not cloud.any()
