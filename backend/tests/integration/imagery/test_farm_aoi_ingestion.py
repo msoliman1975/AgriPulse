@@ -476,10 +476,8 @@ async def test_a_farm_fetch_writes_the_block_numbers(
         assert all(abs(float(r["mean"]) - 0.5) < 1e-6 for r in rows), rows
         # Traceable to the surface the number came from, not to a per-block
         # object that no longer exists.
-        assert all(
-            r["stac_item_id"].endswith(await _farm_hash(admin_session, schema, farm_id))
-            for r in rows
-        )
+        farm_hash = await _farm_hash(admin_session, schema, farm_id)
+        assert all(r["stac_item_id"].endswith(farm_hash) for r in rows)
     finally:
         imagery_tasks.reset_provider_factory()
 

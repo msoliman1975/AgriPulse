@@ -1262,6 +1262,11 @@ async def _write_block_aggregates_from_farm(
     from app.modules.indices.computation import compute_aggregates
     from app.modules.indices.service import get_indices_service
 
+    if not index_rasters:
+        # Nothing was computed, so there is nothing to measure. Better than
+        # reaching into an empty profile and failing the whole fetch.
+        return 0
+
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
