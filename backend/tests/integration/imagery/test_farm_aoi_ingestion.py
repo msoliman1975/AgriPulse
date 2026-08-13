@@ -88,7 +88,12 @@ def _stub_rasterio(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     def fake_compute(**kwargs: Any) -> tuple:
         seen_hashes.append(kwargs["aoi_hash"])
-        keys = [f"{kwargs['aoi_hash']}/{code}.tif" for code in ("ndvi", "ndmi")]
+        # The real signature returns dict[index_code -> written key]. This
+        # double used to return a bare list, which is how a caller iterating
+        # it got index CODES where object paths belonged and the test still
+        # passed. A double that does not match the contract cannot catch the
+        # bug the contract exists to prevent.
+        keys = {code: f"{kwargs['aoi_hash']}/{code}.tif" for code in ("ndvi", "ndmi")}
         return ({}, keys, {})
 
     monkeypatch.setattr(_rasterio_io, "load_raw_bands_and_aggregate", fake_load)
@@ -272,6 +277,26 @@ async def test_an_acquired_pass_is_recorded_as_fetched_under_the_farm_hash(
         # "the question does not apply".
         assert row["blocks_merged"] is None
         assert row["aoi_hash"] == farm_hash
+
+        # The indices column holds CODES; assets_written holds object PATHS.
+        # The first live fetch recorded ["…/raw_bands.tif", "ndvi", "ndmi"] —
+        # one real key and two labels — because both read the same dict.
+        job_row = (
+            (
+                await admin_session.execute(
+                    text(
+                        f'SELECT assets_written FROM "{schema}".'
+                        "imagery_farm_ingestion_jobs WHERE id = :i"
+                    ),
+                    {"i": job_id},
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assets = job_row["assets_written"]
+        assert len(assets) == 3, assets
+        assert all("/" in a and a.endswith(".tif") for a in assets), assets
 
         status = (
             await admin_session.execute(
