@@ -192,3 +192,34 @@ def test_grid_is_snapped_to_whole_multiples_of_the_resolution(tmp_path):
     assert -t.e == 10.0
     assert t.c % 10.0 == 0
     assert t.f % 10.0 == 0
+
+
+def test_cloud_mask_ignores_the_gaps_between_blocks(tmp_path):
+    # A farm mosaic has NaN where no block was fetched. `scl_cloud_mask` casts
+    # to int16, and NaN casts to garbage that can land on a cloud code — so an
+    # unguarded mask claims cloud over ground with no pixels at all.
+    transform = from_origin(ORIGIN_X, ORIGIN_Y, PIXEL, PIXEL)
+    path = tmp_path / "gap.tif"
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=2,
+        width=2,
+        count=len(BANDS) + 1,
+        dtype="float32",
+        crs="EPSG:32636",
+        transform=transform,
+        nodata=float("nan"),
+    ) as ds:
+        for i in range(len(BANDS)):
+            band = np.full((2, 2), 0.3, dtype="float32")
+            band[1, 1] = np.nan  # one corner never fetched
+            ds.write(band, i + 1)
+        scl = np.array([[4, 4], [4, np.nan]], dtype="float32")
+        ds.write(scl, len(BANDS) + 1)
+
+    _bands, cloud, _profile = merge_block_rasters([str(path)], band_names=BANDS)
+
+    # Nothing is cloudy: three clear pixels and one with no data at all.
+    assert not cloud.any()

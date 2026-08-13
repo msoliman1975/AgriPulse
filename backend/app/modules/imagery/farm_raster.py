@@ -140,7 +140,14 @@ def merge_block_rasters(
         name: mosaic[i].astype(np.float32, copy=False) for i, name in enumerate(band_names)
     }
     if count == n_science + 1:
-        cloud_mask = scl_cloud_mask(mosaic[n_science].astype(np.float32, copy=False))
+        # Only where there is actually a scene classification to read. A farm
+        # mosaic has NaN in the gaps between blocks, and `scl_cloud_mask` casts
+        # to int16 — NaN casts to garbage, some of which lands on a cloud code,
+        # so an unguarded mask reports cloud over ground that has no pixels at
+        # all. Harmless downstream (those pixels are nodata anyway) but it
+        # inflates every "how cloudy was this pass" number computed from it.
+        scl = mosaic[n_science].astype(np.float32, copy=False)
+        cloud_mask = np.where(np.isfinite(scl), scl_cloud_mask(np.nan_to_num(scl)), False)
     else:
         cloud_mask = np.zeros(mosaic.shape[1:], dtype=bool)
 
