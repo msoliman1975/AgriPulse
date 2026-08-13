@@ -25,7 +25,7 @@ from datetime import date as date_type
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +34,9 @@ from app.modules.weather.models import WeatherIndexCatalog, WeatherProvider
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.schemas import (
     DerivedDailyRead,
+    FarmSubscriptionCreate,
+    FarmSubscriptionRead,
+    FarmSubscriptionUpdate,
     ForecastResponse,
     HourlyObservationRead,
     RefreshResponse,
@@ -352,6 +355,74 @@ async def get_weather_risk_summary(
     return WeatherRiskSummaryResponse.model_validate(
         {"farm_id": farm_id, "as_of": datetime.now(UTC), "risks": list(rows)}
     )
+
+
+# --- Farm-level subscriptions ----------------------------------------------
+#
+# Weather is fetched once per farm centroid and stored on the farm, so the
+# farm is the unit to configure. These sit alongside the per-block routes
+# until the cutover.
+
+
+@router.get(
+    "/farms/{farm_id}/weather/subscriptions",
+    response_model=list[FarmSubscriptionRead],
+    summary="List a farm's weather subscriptions.",
+)
+async def list_farm_weather_subscriptions(
+    farm_id: UUID,
+    include_inactive: bool = False,
+    context: RequestContext = Depends(requires_capability("weather.read", farm_id_param="farm_id")),
+    service: WeatherServiceImpl = Depends(_service),
+) -> list[FarmSubscriptionRead]:
+    del context
+    rows = await service.list_farm_subscriptions(farm_id=farm_id, include_inactive=include_inactive)
+    return list(rows)
+
+
+@router.post(
+    "/farms/{farm_id}/weather/subscriptions",
+    response_model=FarmSubscriptionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Subscribe a farm to a weather provider.",
+)
+async def create_farm_weather_subscription(
+    farm_id: UUID,
+    payload: FarmSubscriptionCreate,
+    context: RequestContext = Depends(
+        requires_capability("weather.subscription.manage", farm_id_param="farm_id")
+    ),
+    service: WeatherServiceImpl = Depends(_service),
+) -> FarmSubscriptionRead:
+    return await service.upsert_farm_subscription(
+        farm_id=farm_id, payload=payload, actor_user_id=context.user_id
+    )
+
+
+@router.patch(
+    "/farms/{farm_id}/weather/subscriptions/{subscription_id}",
+    response_model=FarmSubscriptionRead,
+    summary="Change a farm weather subscription's cadence, or pause it.",
+)
+async def update_farm_weather_subscription(
+    farm_id: UUID,
+    subscription_id: UUID,
+    payload: FarmSubscriptionUpdate,
+    context: RequestContext = Depends(
+        requires_capability("weather.subscription.manage", farm_id_param="farm_id")
+    ),
+    service: WeatherServiceImpl = Depends(_service),
+) -> FarmSubscriptionRead:
+    row = await service.update_farm_subscription(
+        subscription_id=subscription_id,
+        payload=payload,
+        actor_user_id=context.user_id,
+    )
+    if row is None or row.farm_id != farm_id:
+        # The capability authorises the FARM, so without this a subscription
+        # id from one farm could be edited through another farm's path.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subscription_not_found")
+    return row
 
 
 # --- Subscriptions ---------------------------------------------------------

@@ -52,6 +52,44 @@ class SubscriptionRead(BaseModel):
     updated_at: datetime
 
 
+class FarmSubscriptionCreate(BaseModel):
+    """POST /api/v1/farms/{farm_id}/weather/subscriptions body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider_code: str = Field(..., min_length=1, max_length=64)
+    cadence_hours: int | None = Field(default=None, ge=1)
+
+
+class FarmSubscriptionUpdate(BaseModel):
+    """PATCH body. Omitted fields are left alone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cadence_hours: int | None = Field(default=None, ge=1)
+    is_active: bool | None = None
+
+
+class FarmSubscriptionRead(BaseModel):
+    """One farm-level weather subscription.
+
+    The farm is the unit weather is actually fetched for — one centroid, one
+    provider call — so this is the subscription that matches the data.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    farm_id: UUID
+    provider_code: str
+    cadence_hours: int | None
+    is_active: bool
+    last_successful_ingest_at: datetime | None
+    last_attempted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class WeatherProviderRead(BaseModel):
     """One row of `public.weather_providers` — catalog of active providers.
 
