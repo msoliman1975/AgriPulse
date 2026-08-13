@@ -159,6 +159,11 @@ class IntegrationsHealthService:
                     await self._tenant.execute(
                         text(
                             """
+                        -- A farm with its own weather subscription is
+                        -- monitored through that row; its block rows are
+                        -- skipped so one stale farm does not report once per
+                        -- block. Farms with no farm row still report per
+                        -- block, which is what keeps the cutover gradual.
                         SELECT ws.id AS subscription_id,
                                ws.block_id,
                                b.farm_id,
@@ -169,12 +174,36 @@ class IntegrationsHealthService:
                         WHERE ws.is_active
                           AND ws.deleted_at IS NULL
                           AND b.deleted_at IS NULL
+                          AND NOT EXISTS (
+                              SELECT 1 FROM weather_farm_subscriptions wfs
+                              WHERE wfs.farm_id = b.farm_id
+                                AND wfs.provider_code = ws.provider_code
+                                AND wfs.is_active AND wfs.deleted_at IS NULL
+                          )
                           AND (ws.last_successful_ingest_at IS NULL
                                OR ws.last_successful_ingest_at <
                                   now() - make_interval(
                                     hours => COALESCE(ws.cadence_hours,
                                                       :default_cadence)))
-                        ORDER BY ws.last_successful_ingest_at NULLS FIRST
+
+                        UNION ALL
+
+                        SELECT wfs.id AS subscription_id,
+                               NULL::uuid AS block_id,
+                               wfs.farm_id,
+                               wfs.provider_code,
+                               wfs.last_successful_ingest_at AS since
+                        FROM weather_farm_subscriptions wfs
+                        JOIN farms f ON f.id = wfs.farm_id
+                        WHERE wfs.is_active
+                          AND wfs.deleted_at IS NULL
+                          AND f.deleted_at IS NULL
+                          AND (wfs.last_successful_ingest_at IS NULL
+                               OR wfs.last_successful_ingest_at <
+                                  now() - make_interval(
+                                    hours => COALESCE(wfs.cadence_hours,
+                                                      :default_cadence)))
+                        ORDER BY since NULLS FIRST
                         """
                         ),
                         {"default_cadence": default_weather_cadence_hours},
@@ -231,6 +260,13 @@ class IntegrationsHealthService:
                     await self._tenant.execute(
                         text(
                             """
+                        -- Block subscriptions, and FARM ones for farms that
+                        -- have cut over. Without the second half, switching a
+                        -- farm to farm-AOI fetching would drop it out of this
+                        -- scan entirely: the block rows go inactive, nothing
+                        -- replaces them, and the farm reads as healthy while
+                        -- its imagery quietly stops. A monitoring blind spot
+                        -- is worse than a false alarm.
                         SELECT ias.id AS subscription_id,
                                ias.block_id,
                                b.farm_id,
@@ -247,7 +283,27 @@ class IntegrationsHealthService:
                                   now() - make_interval(
                                     hours => COALESCE(ias.cadence_hours,
                                                       :default_cadence)))
-                        ORDER BY ias.last_successful_ingest_at NULLS FIRST
+
+                        UNION ALL
+
+                        SELECT ifs.id AS subscription_id,
+                               NULL::uuid AS block_id,
+                               ifs.farm_id,
+                               (SELECT ip.code FROM public.imagery_products ip
+                                WHERE ip.id = ifs.product_id) AS provider_code,
+                               ifs.last_successful_ingest_at AS since
+                        FROM imagery_farm_subscriptions ifs
+                        JOIN farms f ON f.id = ifs.farm_id
+                        WHERE ifs.is_active
+                          AND ifs.fetch_farm_aoi
+                          AND ifs.deleted_at IS NULL
+                          AND f.deleted_at IS NULL
+                          AND (ifs.last_successful_ingest_at IS NULL
+                               OR ifs.last_successful_ingest_at <
+                                  now() - make_interval(
+                                    hours => COALESCE(ifs.cadence_hours,
+                                                      :default_cadence)))
+                        ORDER BY since NULLS FIRST
                         """
                         ),
                         {"default_cadence": default_imagery_cadence_hours},
