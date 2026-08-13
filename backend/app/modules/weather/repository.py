@@ -366,8 +366,7 @@ class WeatherRepository:
             sets.append("last_successful_ingest_at = :at")
         await self._session.execute(
             text(
-                f"UPDATE weather_farm_subscriptions SET {', '.join(sets)} "
-                "WHERE id = :id"
+                f"UPDATE weather_farm_subscriptions SET {', '.join(sets)} " "WHERE id = :id"
             ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": subscription_id, "at": attempted_at},
         )
