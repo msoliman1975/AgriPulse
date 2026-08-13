@@ -79,6 +79,7 @@ async def test_lists_active_indices_ordered_by_sort_order(admin_session: AsyncSe
         "leaf_wetness",
         "frost_risk",
         "heat_stress",
+        "drought_spi",
     ], codes
     assert "zz_inactive_idx" not in codes, codes
 

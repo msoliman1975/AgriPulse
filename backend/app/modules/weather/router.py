@@ -70,6 +70,7 @@ _WEATHER_INDEX_ORDER: tuple[str, ...] = (
     "leaf_wetness",
     "frost_risk",
     "heat_stress",
+    "drought_spi",  # sort_order 12 — 0060
 )
 # Trailing window the farm summary scans for "latest + 7-day trend".
 _SUMMARY_WINDOW_DAYS = 45

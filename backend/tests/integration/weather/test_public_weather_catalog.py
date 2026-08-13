@@ -76,9 +76,12 @@ async def test_six_derived_signals_seeded(admin_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSession) -> None:
-    """Migration 0037 lands public.weather_indices_catalog + 7 indices;
-    0049 appends `humidity` as the 8th (sort_order 8, so the original
-    seven keep their positions)."""
+    """The catalog is append-only, and each migration proves it.
+
+    0037 lands the table with 7 indices; 0049 appends `humidity` at 8; 0057
+    the gap-audit trio at 9-11; 0060 `drought_spi` at 12. Every one of them
+    leaves the earlier rows' sort_order untouched, which is what keeps the
+    summary strip's ordering stable as the catalog grows."""
     present = (
         await admin_session.execute(
             text("SELECT to_regclass('public.weather_indices_catalog') IS NOT NULL")
@@ -99,6 +102,7 @@ async def test_weather_indices_catalog_present_and_seeded(admin_session: AsyncSe
         "leaf_wetness",
         "frost_risk",
         "heat_stress",
+        "drought_spi",
     ]
     # Scope to the seeded codes — the DB is session-shared and other tests
     # (the endpoint test) commit extra rows into this table.

@@ -135,6 +135,16 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.irrigation_water_balance_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # SPI-90 per farm, scored against that farm's own rainfall history. Far
+    # cheaper than it sounds — it reads the daily `rainfall` index rows rather
+    # than years of hourly observations — but there is no reason to run it
+    # more than daily: a 90-day accumulation barely moves in an hour, and
+    # farms too arid to fit are skipped outright.
+    "weather.compute_spi_sweep": {
+        "task": "weather.compute_spi_sweep",
+        "schedule": float(_settings.weather_spi_sweep_seconds),
+        "options": {"queue": "light"},
+    },
     # Recommendations engine: walk every active block per tenant and
     # evaluate every active decision tree against the latest signals.
     # Idempotent on the partial UNIQUE `(block_id, tree_id) WHERE

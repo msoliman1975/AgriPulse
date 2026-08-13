@@ -148,6 +148,7 @@ export const WEATHER_INDEX_CODES = [
   "leaf_wetness",
   "frost_risk",
   "heat_stress",
+  "drought_spi",
 ] as const;
 // Per-block weather-driven disease/pest risk fields (PR-R3). `score` is the
 // 0-100 pressure; `level` its low|moderate|high banding. Mirrors

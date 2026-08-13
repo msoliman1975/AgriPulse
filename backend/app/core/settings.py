@@ -223,6 +223,11 @@ class Settings(BaseSettings):
     # the upsert is idempotent on `(block_id, date)`.
     irrigation_water_balance_sweep_seconds: int = 3600
 
+    # Cadence for `weather.compute_spi_sweep`. Daily: a 90-day rainfall
+    # accumulation does not move meaningfully within a day, and the task
+    # rescores the previous day rather than a partial one.
+    weather_spi_sweep_seconds: int = 86400
+
     # Cadence for `recommendations.evaluate_sweep`. Daily in production
     # â€” decision trees consume slow-moving signals (NDVI baselines).
     # Hourly in dev so a fresh aggregate triggers a recommendation
