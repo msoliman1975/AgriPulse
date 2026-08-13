@@ -115,9 +115,11 @@ export function useIndexPixels(input: {
   boundsByBlockId: Map<string, [number, number, number, number]>;
   /** The farm's own extent, for the single-source path. */
   farmBounds: [number, number, number, number] | null;
+  /** The farm's surveyed area, so unread ground is measured against it. */
+  farmAreaM2: number | null;
   enabled: boolean;
 }): IndexPixels {
-  const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds } = input;
+  const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds, farmAreaM2 } = input;
 
   const assetsQ = useQuery({
     queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt),
@@ -241,8 +243,16 @@ export function useIndexPixels(input: {
   const classAreas = useMemo(() => {
     const classCount = classesFor(code).length;
     return (scopeBlockId: string | null): ClassAreaSummary =>
-      summariseClassAreas(statsQ.data?.counts ?? [], classCount, scopeBlockId);
-  }, [statsQ.data, code]);
+      summariseClassAreas(
+        statsQ.data?.counts ?? [],
+        classCount,
+        scopeBlockId,
+        // Only the whole-farm scope has a known area to measure against; a
+        // block scope falls back to masked pixels until per-block zonal
+        // statistics over the farm raster land.
+        scopeBlockId ? null : farmAreaM2,
+      );
+  }, [statsQ.data, code, farmAreaM2]);
 
   return {
     isFarmRaster: farmRaster !== null,

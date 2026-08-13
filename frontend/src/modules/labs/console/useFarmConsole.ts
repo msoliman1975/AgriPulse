@@ -262,6 +262,7 @@ export function useFarmConsole(farmId: string) {
     config,
     boundsByBlockId,
     farmBounds,
+    farmAreaM2: summaryQ.data?.farm.area_m2 ?? null,
     enabled: Boolean(config),
   });
 
