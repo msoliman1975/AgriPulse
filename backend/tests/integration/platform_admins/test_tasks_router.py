@@ -10,20 +10,20 @@ by the caller.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import install_exception_handlers
 from app.modules.platform_admins.tasks_router import router as tasks_router
-from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import PlatformRole
-from app.shared.keycloak import FakeKeycloakClient
 
 from .conftest import StubAuth, make_context
 
@@ -68,14 +68,41 @@ def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
-async def _tenant(session: AsyncSession):
-    service = get_tenant_service(session, keycloak_client=FakeKeycloakClient())
-    return await service.create_tenant(
-        slug=f"task-{uuid4().hex[:8]}",
-        name="Task Trigger Test",
-        contact_email="ops@task.test",
-        actor_user_id=uuid4(),
+@dataclass(frozen=True)
+class _Tenant:
+    tenant_id: UUID
+    slug: str
+    schema_name: str
+
+
+async def _tenant(session: AsyncSession, *, status: str = "active") -> _Tenant:
+    """A tenants row, deliberately without a tenant schema behind it.
+
+    ``create_tenant`` would run all 76 tenant migrations, and this endpoint
+    never touches the tenant schema — it reads ``public.tenants`` and hands the
+    schema name to a Celery dispatch that these tests stub out. Provisioning a
+    real tenant per test added minutes to the CI job for no extra coverage.
+    """
+    tenant_id = uuid4()
+    slug = f"task-{uuid4().hex[:8]}"
+    schema_name = f"tenant_{slug.replace('-', '_')}"
+    await session.execute(
+        text(
+            "INSERT INTO public.tenants "
+            "(id, slug, name, contact_email, schema_name, status) "
+            "VALUES (:id, :slug, :name, :email, :schema, :status)"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {
+            "id": tenant_id,
+            "slug": slug,
+            "name": "Task Trigger Test",
+            "email": "ops@task.test",
+            "schema": schema_name,
+            "status": status,
+        },
     )
+    await session.commit()
+    return _Tenant(tenant_id=tenant_id, slug=slug, schema_name=schema_name)
 
 
 @pytest.mark.asyncio
@@ -97,7 +124,6 @@ async def test_dispatches_with_schema_from_the_resolved_tenant(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         response = await client.post(
@@ -127,7 +153,6 @@ async def test_caller_cannot_supply_tenant_schema(
     row would record the wrong one.
     """
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         response = await client.post(
@@ -147,7 +172,6 @@ async def test_unknown_task_is_refused(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         response = await client.post(
@@ -164,7 +188,6 @@ async def test_missing_required_param_is_refused(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         response = await client.post(
@@ -182,7 +205,6 @@ async def test_optional_param_is_forwarded(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         response = await client.post(
@@ -202,7 +224,6 @@ async def test_requires_exactly_one_tenant_identifier(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     tenant = await _tenant(admin_session)
-    await admin_session.commit()
 
     async with _client() as client:
         neither = await client.post(
@@ -223,12 +244,7 @@ async def test_suspended_tenant_is_refused(
     admin_session: AsyncSession, celery_stub: _FakeCelery
 ) -> None:
     """A tenant taken out of service must not have work written into it."""
-    tenant = await _tenant(admin_session)
-    await admin_session.execute(
-        text("UPDATE public.tenants SET status = 'suspended' WHERE id = :id"),
-        {"id": tenant.tenant_id},
-    )
-    await admin_session.commit()
+    tenant = await _tenant(admin_session, status="suspended")
 
     async with _client() as client:
         response = await client.post(
