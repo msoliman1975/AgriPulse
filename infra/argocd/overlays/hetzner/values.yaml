@@ -1761,6 +1761,19 @@ env:
   # key arrives as FCM_SERVICE_ACCOUNT_JSON in agripulse-app-secrets.
   FCM_ENABLED: "true"
   FCM_PROJECT_ID: "agripulse-scout"
+  # Notification sink for the org simulation harness. The harness runs a
+  # throwaway tenant on PROD, beside real customers, so suppression is keyed on
+  # the tenant slug rather than a process-wide switch — anything else would
+  # silence real tenants' mail. Tenants whose slug starts with this prefix get
+  # every email/push/webhook recorded as `skipped` with a reason and nothing
+  # leaves the system; every other tenant is untouched.
+  #
+  # The code (app/modules/notifications/sink.py) has been live since f3b978a
+  # but ships inert — the default is "" — so until this key exists a spine run
+  # mails whatever addresses the cloned seed carries. MUST equal
+  # SIM_TENANT_PREFIX in scripts/sim/.sim.env; Act 3 asserts on the dispatch
+  # rows to prove suppression actually happened.
+  NOTIFICATION_SINK_TENANT_PREFIX: "sim-"
 # Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
 # single shared overlay applies to every service chart, so api/workers/tile
 # all load both — harmless (same R2 account creds; unused keys are ignored).
