@@ -35,14 +35,20 @@ interface Props {
 }
 
 /** A number input that reports null for "leave it to the default". */
-function CadenceField({
+function NumberField({
   value,
   onCommit,
   label,
+  min = 1,
+  max,
+  width = "w-20",
 }: {
   value: number | null;
   onCommit: (next: number | null) => void;
   label: string;
+  min?: number;
+  max?: number;
+  width?: string;
 }): ReactNode {
   const [draft, setDraft] = useState(value === null ? "" : String(value));
   useEffect(() => {
@@ -53,7 +59,8 @@ function CadenceField({
       {label}
       <input
         type="number"
-        min={1}
+        min={min}
+        max={max}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
@@ -61,13 +68,16 @@ function CadenceField({
           const next = trimmed === "" ? null : Number(trimmed);
           // A blank box means "use the tenant default", which is a real
           // choice — not the same as zero, and not a reason to reject.
-          if (next !== null && (!Number.isFinite(next) || next < 1)) {
+          const outOfRange =
+            next !== null &&
+            (!Number.isFinite(next) || next < min || (max !== undefined && next > max));
+          if (outOfRange) {
             setDraft(value === null ? "" : String(value));
             return;
           }
           if (next !== value) onCommit(next);
         }}
-        className={inputCls + " w-20"}
+        className={inputCls + " " + width}
       />
     </label>
   );
@@ -156,12 +166,26 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                 </label>
                 {on && sub ? (
                   <>
-                    <CadenceField
+                    <NumberField
                       label={t("farmSubs.cadence")}
                       value={sub.cadence_hours}
                       onCommit={(next) =>
                         void run(sub.id, () =>
                           updateFarmImagerySubscription(farmId, sub.id, { cadence_hours: next }),
+                        )
+                      }
+                    />
+                    <NumberField
+                      label={t("farmSubs.cloudCap")}
+                      value={sub.cloud_cover_max_pct}
+                      min={0}
+                      max={100}
+                      width="w-16"
+                      onCommit={(next) =>
+                        void run(sub.id, () =>
+                          updateFarmImagerySubscription(farmId, sub.id, {
+                            cloud_cover_max_pct: next,
+                          }),
                         )
                       }
                     />
@@ -214,7 +238,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                   {prov.name}
                 </label>
                 {on && sub ? (
-                  <CadenceField
+                  <NumberField
                     label={t("farmSubs.cadence")}
                     value={sub.cadence_hours}
                     onCommit={(next) =>
