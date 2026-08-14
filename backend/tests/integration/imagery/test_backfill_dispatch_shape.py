@@ -223,7 +223,7 @@ async def test_a_farm_backfill_does_not_move_the_live_watermark(
         fetch_farm_aoi=True,
     )
 
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     monkeypatch.setattr(imagery_tasks.acquire_farm_scene, "delay", lambda *a, **k: None)
     try:
         result = await imagery_tasks._discover_farm_scenes_async(
@@ -275,7 +275,7 @@ async def test_the_live_poll_still_moves_its_own_watermark(
         fetch_farm_aoi=True,
     )
 
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     monkeypatch.setattr(imagery_tasks.acquire_farm_scene, "delay", lambda *a, **k: None)
     before = datetime.now(UTC) - timedelta(seconds=1)
     try:
