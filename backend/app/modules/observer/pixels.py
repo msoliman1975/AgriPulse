@@ -71,6 +71,12 @@ FORMULA_TOKEN_TO_BAND: dict[str, str] = {
     "NIR": "nir",
     "SWIR1": "swir1",
     "SWIR2": "swir2",
+    # Landsat thermal (`landsat_c2_l2_st`). Arrives in kelvin, so `lst`'s
+    # catalog formula is just the unit conversion. A Sentinel-2 scene has
+    # no such band, so `substitute_formula` returns None there — which is
+    # the same "this product cannot compute this index" path NDMI takes on
+    # PlanetScope.
+    "LWIR11": "lwir11",
 }
 
 # Longest first, so "SWIR1" is not consumed by a shorter prefix and "RedEdge"
