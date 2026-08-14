@@ -27,13 +27,13 @@ global:
   # bumped by hand until that's fixed.
   images:
     api:
-      tag: "7ba7513"
+      tag: "51cebeb"
     workers:
-      tag: "7ba7513"
+      tag: "51cebeb"
     frontend:
-      tag: "7ba7513"
+      tag: "51cebeb"
     tileServer:
-      tag: "7ba7513"
+      tag: "51cebeb"
 # Per-env env-var overrides. Top-level `env:` merges into each chart's
 # own env map (api + workers both consume it; harmless for charts that
 # don't read these keys).
@@ -78,7 +78,7 @@ keycloak:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
   image:
-    tag: "7ba7513"
+    tag: "51cebeb"
 # ExternalDNS + cert-manager IRSA ARNs come from `terraform output
 # iam_role_arns` (keys: external_dns, cert_manager). Filled in by the
 # bootstrap step in CD-10.
