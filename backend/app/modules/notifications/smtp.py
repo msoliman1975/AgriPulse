@@ -38,6 +38,16 @@ def send_email(
     Raises ``SmtpSendError`` on connection / send failure. Returns
     silently on success.
     """
+    # Backstop, not the primary guard: subscribers check `is_suppressed` before
+    # they get here so the dispatch row can record `suppressed`. Reaching this
+    # means a call site forgot, and failing loudly is the safe direction --
+    # send_email returns None on success, so silently returning would leave the
+    # dispatch reading `sent` for a mail that was never sent.
+    from app.modules.notifications.sink import OutboundSuppressedError, is_suppressed
+
+    if is_suppressed():
+        raise OutboundSuppressedError(f"outbound email to {to_address} suppressed for this tenant")
+
     settings = get_settings()
     msg = EmailMessage()
     msg["From"] = settings.smtp_from

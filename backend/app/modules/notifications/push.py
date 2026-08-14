@@ -125,6 +125,13 @@ def send_push(
     data: dict[str, str],
 ) -> PushResult:
     """Deliver one data message to one device token."""
+    # Backstop; the subscriber checks `is_suppressed` first so the dispatch row
+    # can say `suppressed`. See smtp.send_email for why this raises.
+    from app.modules.notifications.sink import OutboundSuppressedError, is_suppressed
+
+    if is_suppressed():
+        raise OutboundSuppressedError("outbound push suppressed for this tenant")
+
     settings = get_settings()
     if not getattr(settings, "fcm_enabled", False):
         _log.info("push_skipped_disabled", token_suffix=token[-8:])

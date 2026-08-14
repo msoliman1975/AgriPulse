@@ -65,6 +65,13 @@ def send_webhook(
     the same way so the caller stores a single ``status='failed'``
     row with a useful message.
     """
+    # Backstop; the subscriber checks `is_suppressed` first so the dispatch row
+    # can say `suppressed`. See smtp.send_email for why this raises.
+    from app.modules.notifications.sink import OutboundSuppressedError, is_suppressed
+
+    if is_suppressed():
+        raise OutboundSuppressedError(f"outbound webhook to {url} suppressed for this tenant")
+
     serialised = json.dumps(body, sort_keys=True, default=str).encode("utf-8")
     signature = sign_body(secret=secret, body=serialised)
     headers = {

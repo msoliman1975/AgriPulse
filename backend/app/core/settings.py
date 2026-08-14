@@ -384,6 +384,16 @@ class Settings(BaseSettings):
     webhook_dev_secret: str = "dev-only-not-for-prod"
     webhook_timeout_seconds: float = 5.0
 
+    # --- Notification sink (simulation harness) ---------------------------
+    # Tenants whose slug starts with this prefix have every outbound
+    # notification suppressed: email, push and webhook are recorded as
+    # dispatched-but-suppressed and nothing leaves the system. The simulation
+    # harness runs a throwaway tenant on production beside real customers, so
+    # this must stay per-tenant — a process-wide switch would silence theirs.
+    # Empty (the default) disables suppression entirely, which is correct for
+    # every environment that does not host simulation runs.
+    notification_sink_tenant_prefix: str = ""
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 

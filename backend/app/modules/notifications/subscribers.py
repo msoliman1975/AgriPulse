@@ -34,6 +34,12 @@ from app.core.settings import get_settings
 from app.modules.alerts.events import AlertOpenedV1
 from app.modules.notifications.events import InboxItemCreatedV1
 from app.modules.notifications.push import PushSendError, send_push
+from app.modules.notifications.sink import (
+    SUPPRESSED_REASON,
+    activate_for_tenant,
+    is_suppressed,
+    resets_outbound,
+)
 from app.modules.notifications.smtp import SmtpSendError, send_email
 from app.modules.notifications.templates import render
 from app.modules.notifications.webhook import WebhookSendError, send_webhook
@@ -85,6 +91,19 @@ def _resolve_tenant_id(session: Session, schema_name: str) -> UUID | None:
         {"s": schema_name},
     ).first()
     return row.id if row is not None else None
+
+
+def _activate_sink_for_schema(session: Session, schema: str) -> None:
+    """Decide outbound suppression for a handler that has only the schema.
+
+    ``_on_scouting_visit_assigned`` never needed the tenant id: it targets one
+    named assignee and never consults the tenant's channel settings. That is
+    precisely why it is the leak a channel-level filter would miss, so it
+    resolves the tenant purely to decide suppression.
+    """
+    tenant_id = _resolve_tenant_id(session, schema)
+    if tenant_id is not None:
+        activate_for_tenant(session, tenant_id)
 
 
 def _load_block_and_farm(
@@ -521,6 +540,22 @@ def _send_webhook_channel(
         "signal_snapshot": event.signal_snapshot or {},
     }
 
+    if is_suppressed():
+        _insert_dispatch(
+            session,
+            alert_id=event.alert_id,
+            template_code="alert_opened",
+            locale=locale,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=url,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=rendered,
+            error=SUPPRESSED_REASON,
+        )
+        return
+
     try:
         result = send_webhook(
             url=url,
@@ -760,9 +795,12 @@ def _send_push_channel(
     for token in tokens:
         status_value, error = "sent", None
         try:
-            result = send_push(token=token, title=subject, body=body, data=data)
-            if result.skipped:
-                status_value, error = "skipped", "push channel disabled"
+            if is_suppressed():
+                status_value, error = "skipped", SUPPRESSED_REASON
+            else:
+                result = send_push(token=token, title=subject, body=body, data=data)
+                if result.skipped:
+                    status_value, error = "skipped", "push channel disabled"
         except PushSendError as exc:
             status_value, error = "failed", str(exc)
             if exc.unregistered:
@@ -823,6 +861,22 @@ def _send_email_channel(
         )
         return
 
+    if is_suppressed():
+        _insert_dispatch(
+            session,
+            alert_id=event.alert_id,
+            template_code="alert_opened",
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=address,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=SUPPRESSED_REASON,
+        )
+        return
+
     try:
         send_email(
             to_address=address,
@@ -867,6 +921,7 @@ def _send_email_channel(
     )
 
 
+@resets_outbound
 def _on_alert_opened(event: AlertOpenedV1) -> None:
     """Fan out an opened alert to every (user, channel) pair the tenant
     has subscribed to.
@@ -892,6 +947,7 @@ def _on_alert_opened(event: AlertOpenedV1) -> None:
         if tenant_id is None:
             _log.warning("alert_opened_tenant_not_found", schema=schema)
             return
+        activate_for_tenant(session, tenant_id)
 
         # Build the alert dict from the event payload — the alerts row
         # itself isn't committed yet on this separate connection.
@@ -1174,6 +1230,22 @@ def _send_rec_email_channel(
         )
         return
 
+    if is_suppressed():
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=address,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=SUPPRESSED_REASON,
+        )
+        return
+
     try:
         send_email(
             to_address=address,
@@ -1324,6 +1396,22 @@ def _dispatch_rec_webhook_once(
         "evaluation_snapshot": event.evaluation_snapshot or {},
     }
 
+    if is_suppressed():
+        _insert_dispatch(
+            session,
+            recommendation_id=event.recommendation_id,
+            template_code="recommendation_opened",
+            locale=_DEFAULT_LOCALE,
+            channel="webhook",
+            recipient_user_id=None,
+            recipient_address=webhook_url,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=rendered,
+            error=SUPPRESSED_REASON,
+        )
+        return
+
     try:
         result = send_webhook(
             url=webhook_url,
@@ -1369,6 +1457,7 @@ def _dispatch_rec_webhook_once(
     )
 
 
+@resets_outbound
 def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
     """Fan out an opened recommendation to every (user, channel) pair
     the tenant has subscribed to. Mirrors ``_on_alert_opened``."""
@@ -1401,6 +1490,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
         if tenant_id is None:
             _log.warning("recommendation_opened_tenant_not_found", schema=schema)
             return
+        activate_for_tenant(session, tenant_id)
 
         names = _load_block_and_farm(session, block_id=event.block_id, farm_id=event.farm_id) or {}
         rec: dict[str, Any] = {
@@ -1507,6 +1597,7 @@ def register_subscribers(bus: EventBus) -> None:
 # ---------- Scouting: announce an assigned visit ----------------------------
 
 
+@resets_outbound
 def _on_scouting_visit_assigned(event: ScoutingVisitAssignedV1) -> None:
     """Tell one scout that a visit is theirs.
 
@@ -1532,6 +1623,7 @@ def _on_scouting_visit_assigned(event: ScoutingVisitAssignedV1) -> None:
     factory = _session_factory()
     with factory() as session:
         session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+        _activate_sink_for_schema(session, schema)
         recipient = (
             session.execute(
                 text(
@@ -1623,9 +1715,12 @@ def _on_scouting_visit_assigned(event: ScoutingVisitAssignedV1) -> None:
         for token in tokens:
             status_value, error = "sent", None
             try:
-                result = send_push(token=token, title=subject, body=body, data=data)
-                if result.skipped:
-                    status_value, error = "skipped", "push channel disabled"
+                if is_suppressed():
+                    status_value, error = "skipped", SUPPRESSED_REASON
+                else:
+                    result = send_push(token=token, title=subject, body=body, data=data)
+                    if result.skipped:
+                        status_value, error = "skipped", "push channel disabled"
             except PushSendError as exc:
                 status_value, error = "failed", str(exc)
                 if exc.unregistered:
