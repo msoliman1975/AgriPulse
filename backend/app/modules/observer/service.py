@@ -184,6 +184,7 @@ class ObserverService:
             # a `**kwargs` unpack against these signatures, and a silent
             # mismatch here would be a wrong number rather than a crash.
             jobs = await self._repo.job_stage_counts(
+                farm_id=farm_id,
                 block_ids=blocks,
                 product_id=product_id,
                 window_from=window_from,
