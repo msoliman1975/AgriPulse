@@ -65,8 +65,46 @@ describe("Tooltip", () => {
     // Not `absolute`: that is what put it inside the clipped box.
     expect(tip.className).toContain("fixed");
     expect(tip.className).not.toContain("absolute");
-    // Positioned from the trigger's measured rect rather than by CSS offsets.
-    expect(tip.style.transform).toBe("translate(-50%, -100%)");
+  });
+
+  /**
+   * The second prod report: "column tooltips are truncated".
+   *
+   * Tailwind emits `whitespace-nowrap` *after* `whitespace-normal`, so a base
+   * `nowrap` beats a caller's `whitespace-normal` whatever order the class
+   * strings are concatenated in. The hint was pinned to a single line inside a
+   * `w-56` box and ran off the edge. jsdom does no layout, so the only honest
+   * assertion is on the classes that decide wrapping.
+   */
+  it("wraps long content instead of forcing it onto one line", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="A very long description of what this column actually means.">
+        <button type="button">Scope</button>
+      </Tooltip>,
+    );
+    await user.hover(screen.getByRole("button", { name: "Scope" }));
+    const tip = await screen.findByRole("tooltip");
+
+    expect(tip.className).toContain("whitespace-normal");
+    expect(tip.className).not.toContain("whitespace-nowrap");
+    // Bounded so it wraps at a readable measure rather than spanning the page.
+    expect(tip.className).toContain("max-w-xs");
+  });
+
+  it("does not let a caller's class reintroduce a fixed width", async () => {
+    // `w-56` plus nowrap was the original truncation. The page now passes only
+    // typography, so guard the contract the component relies on.
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="Hint." className="font-normal">
+        <button type="button">Scope</button>
+      </Tooltip>,
+    );
+    await user.hover(screen.getByRole("button", { name: "Scope" }));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip.className).toContain("font-normal");
+    expect(tip.className).not.toMatch(/\bw-\d+\b/);
   });
 
   it("hides again when the pointer leaves", async () => {

@@ -30,8 +30,11 @@ const TIER_ORDER = ["platform", "tenant", "farm"] as const;
  * Tooltip is visual and does not wire aria-describedby.
  */
 function HeaderWithHint({ label, hint }: { label: string; hint: string }): ReactNode {
+  // No width or whitespace utility passed here: Tooltip already wraps at
+  // max-w-xs and clamps itself into the viewport. A fixed `w-56` alongside the
+  // base `whitespace-nowrap` is exactly what truncated these hints in prod.
   return (
-    <Tooltip content={hint} className="w-56 whitespace-normal text-start font-normal">
+    <Tooltip content={hint} className="font-normal">
       {/* A real button: it is focusable by keyboard and reveals the hint, which
           a bare span with tabIndex is not. */}
       <button
