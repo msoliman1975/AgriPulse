@@ -14,6 +14,7 @@ import { getFarm, updateFarm, type FarmUpdatePayload, type WaterSource } from "@
 import { Card } from "@/components/Card";
 import { BlockDefaultsPanel } from "../mapnext/BlockDefaultsPanel";
 import { FarmSubscriptionsPanel } from "../mapnext/FarmSubscriptionsPanel";
+import { FarmZonesPanel } from "../mapnext/FarmZonesPanel";
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { inputCls } from "../mapnext/ui";
 import { CONSOLE_QK, isConsoleQueryKey } from "./constants";
@@ -115,6 +116,7 @@ export function SettingsDrawer({
                   which is the one place a farm-level setting is guaranteed not
                   to be looked for. */}
               <FarmSubscriptionsPanel farmId={farmId} />
+              <FarmZonesPanel farmId={farmId} farmName={farmName} />
             </div>
           ) : null}
           {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} farmName={farmName} /> : null}

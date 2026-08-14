@@ -118,12 +118,44 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
     void load();
   }, [load]);
 
-  async function run(key: string, fn: () => Promise<unknown>): Promise<void> {
+  /** Fold one mutation's answer back into state.
+   *
+   * Deliberately does NOT re-run `load()`. Refetching all four endpoints
+   * flipped `loading` back on, so the whole panel unmounted and rebuilt on
+   * every click — a checkbox toggle read as a page reload. The mutation
+   * already returns the updated row, so patching it in is both correct and
+   * invisible.
+   */
+  function upsert<T extends { id: string }>(rows: T[], updated: T): T[] {
+    const i = rows.findIndex((r) => r.id === updated.id);
+    return i === -1 ? [...rows, updated] : rows.map((r) => (r.id === updated.id ? updated : r));
+  }
+
+  async function runImagery(
+    key: string,
+    fn: () => Promise<FarmImagerySubscription>,
+  ): Promise<void> {
     setBusy(key);
     setError(null);
     try {
-      await fn();
-      await load();
+      const updated = await fn();
+      setImagery((rows) => upsert(rows, updated));
+    } catch (err: unknown) {
+      setError(isApiError(err) ? (err.problem.detail ?? err.message) : t("farmSubs.saveFailed"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runWeather(
+    key: string,
+    fn: () => Promise<FarmWeatherSubscription>,
+  ): Promise<void> {
+    setBusy(key);
+    setError(null);
+    try {
+      const updated = await fn();
+      setWeather((rows) => upsert(rows, updated));
     } catch (err: unknown) {
       setError(isApiError(err) ? (err.problem.detail ?? err.message) : t("farmSubs.saveFailed"));
     } finally {
@@ -155,7 +187,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                     checked={on}
                     disabled={busy !== null}
                     onChange={() =>
-                      void run(p.product_id, () =>
+                      void runImagery(p.product_id, () =>
                         sub
                           ? updateFarmImagerySubscription(farmId, sub.id, { is_active: !on })
                           : subscribeFarmImagery(farmId, { product_id: p.product_id }),
@@ -170,7 +202,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                       label={t("farmSubs.cadence")}
                       value={sub.cadence_hours}
                       onCommit={(next) =>
-                        void run(sub.id, () =>
+                        void runImagery(sub.id, () =>
                           updateFarmImagerySubscription(farmId, sub.id, { cadence_hours: next }),
                         )
                       }
@@ -182,7 +214,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                       max={100}
                       width="w-16"
                       onCommit={(next) =>
-                        void run(sub.id, () =>
+                        void runImagery(sub.id, () =>
                           updateFarmImagerySubscription(farmId, sub.id, {
                             cloud_cover_max_pct: next,
                           }),
@@ -195,7 +227,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                         checked={sub.fetch_farm_aoi}
                         disabled={busy !== null}
                         onChange={() =>
-                          void run(sub.id, () =>
+                          void runImagery(sub.id, () =>
                             updateFarmImagerySubscription(farmId, sub.id, {
                               fetch_farm_aoi: !sub.fetch_farm_aoi,
                             }),
@@ -228,7 +260,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                     checked={on}
                     disabled={busy !== null}
                     onChange={() =>
-                      void run(prov.code, () =>
+                      void runWeather(prov.code, () =>
                         sub
                           ? updateFarmWeatherSubscription(farmId, sub.id, { is_active: !on })
                           : subscribeFarmWeather(farmId, { provider_code: prov.code }),
@@ -242,7 +274,7 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                     label={t("farmSubs.cadence")}
                     value={sub.cadence_hours}
                     onCommit={(next) =>
-                      void run(sub.id, () =>
+                      void runWeather(sub.id, () =>
                         updateFarmWeatherSubscription(farmId, sub.id, { cadence_hours: next }),
                       )
                     }

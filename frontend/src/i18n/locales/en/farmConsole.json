@@ -752,5 +752,31 @@
     "wholeFarm": "Whole farm",
     "wholeFarmHint": "Whole farm fetches the farm's own boundary instead of stitching block images together, so land outside your blocks is measured too. It costs one larger request per pass.",
     "cloudCap": "Max cloud %"
+  },
+  "farmZones": {
+    "title": "Zones (sub-block grid)",
+    "intro": "Cell size and sensitivity are set for the farm and applied to every block that has imagery.",
+    "loading": "Loading zone settings…",
+    "loadFailed": "Could not load zone settings.",
+    "saveFailed": "Could not save that change.",
+    "sensitivity": "Anomaly sensitivity (z)",
+    "sensitivityHint": "Lower is more sensitive. Takes effect on the next detection sweep — nothing is reprocessed.",
+    "sensitivityApplied": "Applied to {{touched}} of {{total}} block(s).",
+    "cellSize": "Cell size (m)",
+    "cellSizeHint": "Changing cell size redraws the zones. Existing scenes keep their old zones until they are reprocessed, so this asks for confirmation and states the cost first.",
+    "cellSizeInvalid": "Cell size must be a positive number, or blank to leave it unset.",
+    "previewRezone": "Preview changes",
+    "previewSummary": "{{changed}} block(s) would change — {{create}} new grid(s), {{rezone}} rezoned, {{skipped}} skipped.",
+    "nothingWouldChange": "Nothing would change: every block already matches this cell size.",
+    "blockedRows": "{{blocked}} block(s) refused this cell size — see the reason on each.",
+    "scenesAffected": "{{scenes}} existing scene(s) would need reprocessing to be readable under the new zones.",
+    "typeFarmName": "Type {{name}} to confirm",
+    "confirmRezone": "Apply to blocks",
+    "cancel": "Cancel",
+    "rezoneApplied": "Rezoned {{touched}} of {{total}} block(s). Existing scenes keep their old zones until reprocessed.",
+    "backfillBudget": "Backfill budget (scenes)",
+    "backfillBudgetAll": "All affected",
+    "resetToInherited": "Reset blocks to the inherited default",
+    "inheritApplied": "{{touched}} of {{total}} block(s) now inherit the default again."
   }
 }
