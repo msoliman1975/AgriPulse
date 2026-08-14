@@ -36,6 +36,32 @@ export const INDEX_CODES = [
 
 export type IndexCode = (typeof INDEX_CODES)[number];
 
+// The THERMAL indices, from a different product (`landsat_c2_l2_st`,
+// Landsat 8/9 surface temperature) with a disjoint band set. Kept in
+// their own list rather than folded into INDEX_CODES above, because a
+// farm can carry the optical product alone — most do — and offering
+// these where no thermal scene exists yields a picker entry with
+// nothing behind it.
+//
+// ⚠️ `lst` is degrees Celsius, the only index in either list with a
+// UNIT. Its catalog bounds are a temperature range (0-60), not the
+// [-1, 1] the normalized differences share, so anything that rescales
+// or colour-ramps on that assumption is wrong for it. Read the unit
+// from `getIndexCatalog()`, and format via `@/lib/indexFormat`.
+//
+// ⚠️ Thermal is 100 m native resampled to a 30 m grid — a FARM-scale
+// signal. Do not present a block value at the same visual confidence
+// as a 10 m optical index.
+//
+// Mirrors backend THERMAL_INDEX_CODES; the pairing is enforced by
+// backend/tests/unit/shared/test_index_codes_frontend_parity.py.
+export const THERMAL_INDEX_CODES = ["lst", "cwsi", "smi"] as const;
+
+export type ThermalIndexCode = (typeof THERMAL_INDEX_CODES)[number];
+
+/** Every index code either product can produce. */
+export type AnyIndexCode = IndexCode | ThermalIndexCode;
+
 export interface IndexTimeseriesPoint {
   time: string;
   mean: string | null;
@@ -73,5 +99,42 @@ export async function getTimeseries(
       },
     },
   );
+  return data;
+}
+
+// --- Catalog ---------------------------------------------------------------
+
+/**
+ * One row of `public.indices_catalog`, from `GET /v1/indices/catalog`.
+ *
+ * Mirrors backend/app/modules/indices/schemas.py::IndexCatalogEntry.
+ *
+ * Read this rather than hardcoding index metadata. A hardcoded copy is
+ * how `msi`'s [0, 3] range and `ndmi`'s existence both went missing from
+ * pickers that had drifted from the backend.
+ */
+export interface IndexCatalogEntry {
+  id: string;
+  code: string;
+  name_en: string;
+  name_ar: string | null;
+  formula_text: string;
+  // Decimal-as-string, like every other NUMERIC the API returns.
+  value_min: string;
+  value_max: string;
+  /**
+   * Display symbol, empty for the dimensionless majority.
+   *
+   * `lst` is degrees Celsius; everything else is a ratio. A formatter
+   * that assumes one shape cannot be right for both — see
+   * `@/lib/indexFormat`.
+   */
+  unit: string;
+  physical_meaning: string | null;
+  is_standard: boolean;
+}
+
+export async function getIndexCatalog(): Promise<IndexCatalogEntry[]> {
+  const { data } = await apiClient.get<IndexCatalogEntry[]>("/v1/indices/catalog");
   return data;
 }
