@@ -115,6 +115,13 @@ def _make_provider(provider_code: str) -> ImageryProvider:
     """
     if provider_code == "sentinel_hub":
         return SentinelHubProvider()
+    if provider_code == "landsat_pc":
+        # Imported lazily: the Landsat adapter pulls in rasterio/shapely,
+        # and `imagery/service.py` imports this module from an API
+        # request path. Same discipline as `_rasterio_io`.
+        from app.modules.imagery.providers.landsat_pc import LandsatPlanetaryComputerProvider
+
+        return LandsatPlanetaryComputerProvider()
     raise ValueError(f"Unsupported imagery provider_code: {provider_code!r}")
 
 

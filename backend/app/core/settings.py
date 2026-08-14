@@ -160,6 +160,19 @@ class Settings(BaseSettings):
     sentinel_hub_catalog_url: str = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/search"
     sentinel_hub_process_url: str = "https://services.sentinel-hub.com/api/v1/process"
 
+    # --- Microsoft Planetary Computer (Landsat C2 L2 thermal) ------------
+    # Anonymous: the STAC search needs no auth at all, and the SAS token
+    # endpoint issues a ~1h read token for the blob container without an
+    # account. That's why there are no credential settings here — if PC
+    # ever gates this, the same files are in AWS `s3://usgs-landsat/`
+    # (requester-pays), which is a credentials change, not a rewrite.
+    planetary_computer_stac_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
+    planetary_computer_sas_url: str = "https://planetarycomputer.microsoft.com/api/sas/v1/token"
+    # Landsat C2 L2 is delivered on a 30 m grid (the thermal band is
+    # 100 m native, resampled up by USGS). Keep the fetch on the native
+    # grid — resampling to 10 m would fake precision we do not have.
+    landsat_native_resolution_m: float = 30.0
+
     # --- Open-Meteo (weather provider) -----------------------------------
     # Free public endpoints; no auth required. Override via env if you
     # ever stand up the commercial / self-hosted variant.
