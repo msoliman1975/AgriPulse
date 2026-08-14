@@ -1678,11 +1678,40 @@ global:
   #   summary strip gains leaf_wetness, frost_risk, heat_stress; new scenes
   #   write 9 index COGs rather than 7. Nothing writes block_water_balance_daily
   #   until the hourly sweep runs against a block with a current crop.
+  # f8708b8 — the Observer stops under-reporting farm-AOI farms (#462, #460).
+  #
+  #   API AND WORKERS ONLY. No migrations. frontend and tileServer stay where
+  #   they are.
+  #
+  #   THE BUG THIS FIXES IS ALREADY LIVE. Bashier Elkhier fetches its own AOI,
+  #   so it writes no per-block ingestion jobs — and the Observer read only the
+  #   block tables. It therefore UNDER-reports: the console says the pipeline
+  #   stopped while indices keep landing. "Indices from nowhere" reads as a
+  #   broken pipeline rather than a gap in the observer, which is how an
+  #   operator ends up debugging a healthy farm. Five reads move: the stage
+  #   ribbon, the farm-list scene range, blocks_with_imagery_sub, the weather
+  #   subscribed flag, and the product picker.
+  #
+  #   Ribbon counts for a cut-over farm will JUMP on sync. That is the fix
+  #   landing, not a new event — the acquisitions were always happening.
+  #
+  #   Also carried: #460, simulation harness Phase 2. INERT here — the
+  #   notification sink gates on notification_sink_tenant_prefix, which is
+  #   unset in this overlay, and resolve_for_tenant answers False on an empty
+  #   prefix. Nothing is suppressed until that value is deliberately set.
+  #
+  #   Merge run 31818202620; both container jobs report success AND the
+  #   manifests were confirmed by PULLING them on the node:
+  #   api@sha256:e7cf32e8, workers@sha256:e23a003f.
+  #
+  #   Watch after sync: Observer > a cut-over farm shows a non-zero acquired
+  #   count and a scene range; its weather lane stops claiming the farm has no
+  #   subscription.
   images:
     api:
-      tag: "ea8fe1e"
+      tag: "f8708b8"
     workers:
-      tag: "ea8fe1e"
+      tag: "f8708b8"
     frontend:
       tag: "cf5c2d7"
     tileServer:
