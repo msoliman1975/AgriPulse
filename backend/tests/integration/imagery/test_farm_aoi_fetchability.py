@@ -241,7 +241,7 @@ async def test_a_farm_that_grew_too_large_falls_back_to_its_blocks(
     # state in which the farm was receiving nothing from either path.
     assert await _due_block_count(admin_session, env["schema"]) == 0
 
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     monkeypatch.setattr(imagery_tasks.acquire_farm_scene, "delay", lambda *a, **k: None)
     try:
         result = await imagery_tasks._discover_farm_scenes_async(sub_id, env["schema"])
@@ -263,7 +263,7 @@ async def test_a_fetchable_farm_is_left_switched_on(
     env = await _setup(admin_session, "aoi-fit-stayon", boundary_wkt=_SMALL)
     sub_id = await _add_farm_subscription(admin_session, env, fetch_farm_aoi=True)
 
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     monkeypatch.setattr(imagery_tasks.acquire_farm_scene, "delay", lambda *a, **k: None)
     try:
         result = await imagery_tasks._discover_farm_scenes_async(sub_id, env["schema"])
