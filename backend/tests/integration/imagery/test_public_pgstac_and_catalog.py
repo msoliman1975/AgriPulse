@@ -128,18 +128,23 @@ async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
         )
     ).all()
     codes = [r.code for r in rows]
-    # ndmi added by 0027 (KB P2 moisture index); bsi + msi by 0061 (gap audit).
-    # Sorted by code, so bsi leads and msi sits between gndvi and ndmi.
+    # ndmi added by 0027 (KB P2 moisture index); bsi + msi by 0061 (gap
+    # audit); cwsi + lst + smi by 0066 (the thermal gap, a different
+    # product entirely). Sorted by code, so the three thermal ones scatter
+    # through the list rather than trailing it.
     assert codes == [
         "bsi",
+        "cwsi",
         "evi",
         "gndvi",
+        "lst",
         "msi",
         "ndmi",
         "ndre",
         "ndvi",
         "ndwi",
         "savi",
+        "smi",
     ]
     for r in rows:
         assert r.is_standard is True
@@ -149,13 +154,23 @@ async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
     # Every normalized-difference index shares the [-1, 1] range. `msi` does
     # not, and that is the point of it: it is a plain SWIR/NIR ratio, so a
     # blanket bounds assertion here would have to be relaxed into meaning
-    # nothing. Assert the two families separately instead.
+    # nothing. Assert the families separately instead.
     by_code = {r.code: r for r in rows}
     for code in ("bsi", "evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"):
         assert float(by_code[code].value_min) == -1.0, code
         assert float(by_code[code].value_max) == 1.0, code
     assert float(by_code["msi"].value_min) == 0.0
     assert float(by_code["msi"].value_max) == 3.0
+
+    # The thermal family (0066). `lst` is the first index in this catalog
+    # carrying a UNIT: its bounds are degrees Celsius, not a ratio, so
+    # anything that assumes [-1, 1] renders it as a flat line pinned to
+    # the top of the axis. `cwsi` and `smi` are 0-1 by construction.
+    assert float(by_code["lst"].value_min) == 0.0
+    assert float(by_code["lst"].value_max) == 60.0
+    for code in ("cwsi", "smi"):
+        assert float(by_code[code].value_min) == 0.0, code
+        assert float(by_code[code].value_max) == 1.0, code
 
 
 @pytest.mark.asyncio

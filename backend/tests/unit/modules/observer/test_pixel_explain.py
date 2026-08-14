@@ -94,11 +94,43 @@ def test_a_present_but_unreadable_band_is_also_not_rendered() -> None:
     assert substitute_formula("(NIR - Red) / (NIR + Red)", {"nir": 0.3, "red": None}) is None
 
 
+# Two seeded formulas are deliberately NOT pure per-pixel band arithmetic,
+# so no band substitution can render them and the pixel-explain feature
+# cannot explain those indices:
+#
+#   * `cwsi` needs air temperature, which comes from the weather feed
+#     interpolated to the overpass minute — it is not in the raster.
+#   * `smi` needs dry/wet edges fitted across the whole AOI, so no single
+#     pixel's value is derivable from that pixel alone.
+#
+# Listed literally rather than by index code so that editing either
+# formula fails this test and forces a decision, instead of silently
+# widening the exemption.
+_NOT_PURE_BAND_ARITHMETIC: tuple[str, ...] = (
+    "(LST - Tair) / (dT_dry - dT_wet)",
+    "(LST_max - LST) / (LST_max - LST_min) at equal NDVI",
+)
+
+
+def test_the_non_substitutable_formulas_are_still_the_ones_we_expect() -> None:
+    """Guards the exemption: it must name formulas that actually exist."""
+    catalog = _catalog_formulas()
+    for formula in _NOT_PURE_BAND_ARITHMETIC:
+        assert formula in catalog, f"exempted formula no longer in the catalog: {formula}"
+
+
 def test_every_catalog_formula_is_fully_substitutable() -> None:
-    """No seeded formula may contain a token this module cannot resolve."""
+    """No seeded formula may contain a token this module cannot resolve.
+
+    Excludes the two indices that are not per-pixel band arithmetic at
+    all — see `_NOT_PURE_BAND_ARITHMETIC`. Everything else, including the
+    thermal `lst`, must render completely.
+    """
     values = {band: 0.5 for band in FORMULA_TOKEN_TO_BAND.values()}
     unresolved: list[str] = []
     for formula in _catalog_formulas():
+        if formula in _NOT_PURE_BAND_ARITHMETIC:
+            continue
         rendered = substitute_formula(formula, values)
         assert rendered is not None, formula
         # Any surviving capital-letter run is a band name we failed to map.
@@ -106,6 +138,16 @@ def test_every_catalog_formula_is_fully_substitutable() -> None:
         if leftovers:
             unresolved.append(f"{formula} -> {leftovers}")
     assert not unresolved, f"unmapped band tokens in catalog formulas: {unresolved}"
+
+
+def test_lst_renders_but_only_where_the_thermal_band_exists() -> None:
+    """A Sentinel-2 scene has no `lwir11`, so LST cannot be explained there.
+
+    Same path NDMI takes on PlanetScope: return None rather than print an
+    expression with a band name still in it.
+    """
+    assert substitute_formula("LWIR11 - 273.15", {"lwir11": 300.0}) == "300.0000 - 273.15"
+    assert substitute_formula("LWIR11 - 273.15", {"nir": 0.3, "red": 0.1}) is None
 
 
 def test_catalog_formulas_were_actually_found() -> None:
