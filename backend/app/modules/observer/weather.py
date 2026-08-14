@@ -330,6 +330,14 @@ class ObserverWeatherRepository:
                           JOIN blocks b ON b.id = w.block_id
                          WHERE b.farm_id = :fid
                            AND w.deleted_at IS NULL
+                    ) OR EXISTS (
+                        -- Weather is farm-shaped now. A farm subscribed only
+                        -- at farm level would otherwise read as "never
+                        -- subscribed", and the ribbon's zeros would be
+                        -- explained by the wrong cause.
+                        SELECT 1 FROM weather_farm_subscriptions wf
+                         WHERE wf.farm_id = :fid
+                           AND wf.deleted_at IS NULL
                     )
                     """
                 ),

@@ -129,13 +129,26 @@ class ObserverRepository:
                       f.code,
                       (SELECT count(*) FROM blocks b
                         WHERE b.farm_id = f.id AND b.deleted_at IS NULL) AS block_count,
-                      (SELECT count(DISTINCT s.block_id)
-                         FROM imagery_aoi_subscriptions s
-                         JOIN blocks b ON b.id = s.block_id
-                        WHERE b.farm_id = f.id
-                          AND b.deleted_at IS NULL
-                          AND s.is_active = TRUE
-                          AND s.deleted_at IS NULL) AS blocks_with_imagery_sub,
+                      -- A farm fetching its own AOI covers every one of its
+                      -- blocks with a single subscription, so counting only
+                      -- per-block rows would show a cut-over farm as having
+                      -- no imagery at all.
+                      (CASE WHEN EXISTS (
+                              SELECT 1 FROM imagery_farm_subscriptions fs
+                               WHERE fs.farm_id = f.id
+                                 AND fs.is_active = TRUE
+                                 AND fs.fetch_farm_aoi = TRUE
+                                 AND fs.deleted_at IS NULL)
+                            THEN (SELECT count(*) FROM blocks b
+                                   WHERE b.farm_id = f.id AND b.deleted_at IS NULL)
+                            ELSE (SELECT count(DISTINCT s.block_id)
+                                    FROM imagery_aoi_subscriptions s
+                                    JOIN blocks b ON b.id = s.block_id
+                                   WHERE b.farm_id = f.id
+                                     AND b.deleted_at IS NULL
+                                     AND s.is_active = TRUE
+                                     AND s.deleted_at IS NULL)
+                       END) AS blocks_with_imagery_sub,
                       (SELECT count(DISTINCT g.block_id)
                          FROM grid_configs g
                          JOIN blocks b ON b.id = g.block_id
@@ -143,17 +156,34 @@ class ObserverRepository:
                           AND b.deleted_at IS NULL
                           AND g.retired_at IS NULL
                           AND g.deleted_at IS NULL) AS blocks_with_grid,
-                      EXISTS (SELECT 1 FROM weather_subscriptions w
-                               JOIN blocks b ON b.id = w.block_id
-                              WHERE b.farm_id = f.id
-                                AND w.is_active = TRUE
-                                AND w.deleted_at IS NULL) AS has_weather_sub,
-                      (SELECT min(j.scene_datetime) FROM imagery_ingestion_jobs j
-                         JOIN blocks b ON b.id = j.block_id
-                        WHERE b.farm_id = f.id) AS first_scene_at,
-                      (SELECT max(j.scene_datetime) FROM imagery_ingestion_jobs j
-                         JOIN blocks b ON b.id = j.block_id
-                        WHERE b.farm_id = f.id) AS last_scene_at
+                      (EXISTS (SELECT 1 FROM weather_subscriptions w
+                                JOIN blocks b ON b.id = w.block_id
+                               WHERE b.farm_id = f.id
+                                 AND w.is_active = TRUE
+                                 AND w.deleted_at IS NULL)
+                       OR EXISTS (SELECT 1 FROM weather_farm_subscriptions wf
+                                   WHERE wf.farm_id = f.id
+                                     AND wf.is_active = TRUE
+                                     AND wf.deleted_at IS NULL)) AS has_weather_sub,
+                      -- Scene range spans both acquisition paths, or a farm
+                      -- cut over to farm-AOI fetching reads as never having
+                      -- had a scene.
+                      (SELECT min(t) FROM (
+                          SELECT j.scene_datetime AS t FROM imagery_ingestion_jobs j
+                            JOIN blocks b ON b.id = j.block_id
+                           WHERE b.farm_id = f.id
+                          UNION ALL
+                          SELECT fj.scene_datetime FROM imagery_farm_ingestion_jobs fj
+                           WHERE fj.farm_id = f.id
+                       ) x) AS first_scene_at,
+                      (SELECT max(t) FROM (
+                          SELECT j.scene_datetime AS t FROM imagery_ingestion_jobs j
+                            JOIN blocks b ON b.id = j.block_id
+                           WHERE b.farm_id = f.id
+                          UNION ALL
+                          SELECT fj.scene_datetime FROM imagery_farm_ingestion_jobs fj
+                           WHERE fj.farm_id = f.id
+                       ) x) AS last_scene_at
                     FROM farms f
                    WHERE f.deleted_at IS NULL
                    ORDER BY f.name
@@ -187,6 +217,17 @@ class ObserverRepository:
                          WHERE b.farm_id = :fid
                            AND b.deleted_at IS NULL
                            AND s.deleted_at IS NULL
+                        UNION
+                        -- The farm path, or the product picker would offer
+                        -- nothing for a farm that only ever fetched its AOI —
+                        -- and an empty picker reads as "no data".
+                        SELECT DISTINCT fj.product_id
+                          FROM imagery_farm_ingestion_jobs fj
+                         WHERE fj.farm_id = :fid
+                        UNION
+                        SELECT DISTINCT fs.product_id
+                          FROM imagery_farm_subscriptions fs
+                         WHERE fs.farm_id = :fid AND fs.deleted_at IS NULL
                     )
                     SELECT p.id, p.code, p.name, p.resolution_m,
                            p.bands, p.supported_indices,
@@ -207,31 +248,62 @@ class ObserverRepository:
     async def job_stage_counts(
         self,
         *,
+        farm_id: UUID,
         block_ids: list[UUID],
         product_id: UUID | None,
         window_from: datetime,
         window_to: datetime,
     ) -> dict[str, int]:
-        """Counts for the first three ribbon stages, in one pass."""
-        prod = "AND j.product_id = :pid" if product_id else ""
+        """Counts for the first three ribbon stages, in one pass.
+
+        Counts BOTH acquisition paths. A farm fetching its own AOI writes no
+        per-block jobs at all, so reading only `imagery_ingestion_jobs` would
+        report zero scenes acquired for a cut-over farm while its indices
+        kept appearing — "indices from nowhere", which reads as a defect in
+        the pipeline rather than a gap in the observer.
+
+        The two tables do not share a status vocabulary: a block job skips as
+        `skipped_cloud` / `skipped_duplicate`, a farm job simply as
+        `skipped`. Both are folded into the same bucket here, because to a
+        reader of the ribbon they are the same event.
+
+        A farm job is one acquisition covering every block, where the block
+        path wrote one per block. The counts are therefore acquisitions, not
+        block-scenes — which is what the ribbon has always meant.
+        """
+        prod_block = "AND j.product_id = :pid" if product_id else ""
+        prod_farm = "AND f.product_id = :pid" if product_id else ""
         sql = f"""
+            WITH acquisitions AS (
+                SELECT j.status, j.stac_item_id
+                  FROM imagery_ingestion_jobs j
+                 WHERE j.block_id IN :bids
+                   {prod_block}
+                   AND j.scene_datetime >= {_ts(window_from)}
+                   AND j.scene_datetime < {_ts(window_to)}
+
+                UNION ALL
+
+                SELECT f.status, f.stac_item_id
+                  FROM imagery_farm_ingestion_jobs f
+                 WHERE f.farm_id = :fid
+                   {prod_farm}
+                   AND f.scene_datetime >= {_ts(window_from)}
+                   AND f.scene_datetime < {_ts(window_to)}
+            )
             SELECT
               count(*) AS discovered,
               count(*) FILTER (
-                WHERE j.status = 'succeeded' AND j.stac_item_id IS NOT NULL
+                WHERE status = 'succeeded' AND stac_item_id IS NOT NULL
               ) AS acquired,
-              count(*) FILTER (WHERE j.status = 'failed') AS failed,
-              count(*) FILTER (WHERE j.status IN ('pending', 'running')) AS in_flight,
+              count(*) FILTER (WHERE status = 'failed') AS failed,
+              count(*) FILTER (WHERE status IN ('pending', 'running')) AS in_flight,
               count(*) FILTER (
-                WHERE j.status IN ('skipped_cloud', 'skipped_duplicate')
+                WHERE status IN ('skipped_cloud', 'skipped_duplicate', 'skipped')
               ) AS skipped
-              FROM imagery_ingestion_jobs j
-             WHERE j.block_id IN :bids
-               {prod}
-               AND j.scene_datetime >= {_ts(window_from)}
-               AND j.scene_datetime < {_ts(window_to)}
-        """
-        row = await self._one(sql, block_ids=block_ids, product_id=product_id)
+              FROM acquisitions
+        """  # noqa: S608
+        row = await self._one(sql, block_ids=block_ids, product_id=product_id, farm_id=farm_id)
         return {k: int(v) for k, v in row.items()}
 
     async def scenes_with_indices(
@@ -801,17 +873,33 @@ class ObserverRepository:
 
     # ---- plumbing --------------------------------------------------------
 
-    async def _all(self, sql: str, *, block_ids: list[UUID], product_id: UUID | None) -> list[Any]:
+    async def _all(
+        self,
+        sql: str,
+        *,
+        block_ids: list[UUID],
+        product_id: UUID | None,
+        farm_id: UUID | None = None,
+    ) -> list[Any]:
         stmt = text(sql).bindparams(bindparam("bids", expanding=True))
         params: dict[str, Any] = {"bids": [str(b) for b in block_ids]}
         if product_id:
             params["pid"] = str(product_id)
+        # Only bound when the query mentions it — a query without :fid would
+        # otherwise fail on an unused parameter.
+        if farm_id is not None:
+            params["fid"] = str(farm_id)
         return list((await self._s.execute(stmt, params)).mappings())
 
     async def _one(
-        self, sql: str, *, block_ids: list[UUID], product_id: UUID | None
+        self,
+        sql: str,
+        *,
+        block_ids: list[UUID],
+        product_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> dict[str, Any]:
-        rows = await self._all(sql, block_ids=block_ids, product_id=product_id)
+        rows = await self._all(sql, block_ids=block_ids, product_id=product_id, farm_id=farm_id)
         return dict(rows[0])
 
     async def cells_for_scene(

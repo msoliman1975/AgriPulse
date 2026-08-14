@@ -22,6 +22,8 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.auth.context import PlatformRole, TenantRole
 
@@ -184,6 +186,73 @@ async def test_ribbon_counts_match_the_seeded_pipeline(scenario: Scenario) -> No
         assert s["indices"]["expected"] == 6
         assert s["indices"]["detail"]["aggregate_rows"] == 35  # 5 scenes x 7 indices
         assert s["indices"]["detail"]["index_codes"] == 7
+
+
+@pytest.mark.asyncio
+async def test_a_farm_fetched_pass_is_counted_even_with_no_block_jobs(
+    scenario: Scenario,
+    admin_session: AsyncSession,
+) -> None:
+    """The blind spot the farm-AOI cutover opened.
+
+    A farm fetching its own boundary writes NO per-block ingestion jobs. Read
+    only `imagery_ingestion_jobs` and such a farm reports zero scenes acquired
+    while its indices keep appearing — "indices from nowhere", which reads as
+    a broken pipeline rather than a gap in the observer.
+    """
+    schema = scenario.tenant_schema
+    before = await _acquired(scenario)
+
+    sub_id = uuid4()
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{schema}".imagery_farm_subscriptions '
+            "(id, farm_id, product_id, is_active, fetch_farm_aoi) "
+            "VALUES (:s, :f, :p, TRUE, TRUE) ON CONFLICT DO NOTHING"
+        ),
+        {"s": sub_id, "f": scenario.farm_id, "p": scenario.product_id},
+    )
+    # 0074 may already have given this farm a row; either way, use the live one.
+    sub_id = (
+        await admin_session.execute(
+            text(
+                f'SELECT id FROM "{schema}".imagery_farm_subscriptions '
+                "WHERE farm_id = :f AND product_id = :p ORDER BY is_active DESC LIMIT 1"
+            ),
+            {"f": scenario.farm_id, "p": scenario.product_id},
+        )
+    ).scalar_one()
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{schema}".imagery_farm_ingestion_jobs '
+            "(id, subscription_id, farm_id, product_id, scene_id, scene_datetime,"
+            " status, stac_item_id) "
+            "VALUES (:i, :s, :f, :p, 'S2_FARM_ONLY', :dt, 'succeeded', 'prov/prod/scene/hash')"
+        ),
+        {
+            "i": uuid4(),
+            "s": sub_id,
+            "f": scenario.farm_id,
+            "p": scenario.product_id,
+            # Inside the observer window, or the count would not move for a
+            # reason that has nothing to do with the fix.
+            "dt": WINDOW_FROM + timedelta(days=5),
+        },
+    )
+    await admin_session.commit()
+
+    # One more acquisition, from a pass that no block job describes.
+    assert await _acquired(scenario) == before + 1
+
+
+async def _acquired(scenario: Scenario) -> int:
+    async with _platform_client() as client:
+        r = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/overview",
+            params={"farm_id": str(scenario.farm_id), **_window()},
+        )
+        assert r.status_code == 200, r.text
+        return int(_stages(r.json())["acquired"]["count"])
 
 
 @pytest.mark.asyncio
