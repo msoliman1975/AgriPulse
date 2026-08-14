@@ -1053,6 +1053,8 @@
       "colWhen": "When",
       "colWho": "Changed by",
       "confirm": "Apply change",
+      "editableDetail": "Select a tick or dash in the Granted column to grant or revoke a permission. Every change is confirmed first and recorded in the change log.",
+      "editableHint": "You can change what {{role}} is allowed to do.",
       "emptyChanges": "No permissions have been changed. Every role is at its shipped default.",
       "grantTitle": "Grant this permission?",
       "modified": "Edited",
