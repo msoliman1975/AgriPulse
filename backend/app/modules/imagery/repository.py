@@ -257,47 +257,133 @@ class ImageryRepository:
         skipped for cloud still produced a job row, and the strip has to show
         it. A gap the user can see and understand ("cloudy") is worth far
         more than a silently shorter timeline.
+
+        Counts BOTH acquisition paths, for the reason #462 taught the
+        observer: a farm fetching its own AOI writes no per-block job at all,
+        so reading only `imagery_ingestion_jobs` left a cut-over farm with an
+        almost empty strip while its indices kept landing. That is the worst
+        shape this bug can take — the strip is what SELECTS a pass, so no
+        date offered means no pixels drawn, on a farm whose rasters and
+        aggregates are all present and correct.
+
+        The two tables do not share a status vocabulary: a block job skips as
+        `skipped_cloud`, a farm job simply as `skipped` (cloud is the only
+        reason the farm path skips one). Both fold into `skipped_cloud_count`
+        so the strip can still say "cloudy" rather than greying the day out
+        as unprocessed and losing the why.
+
+        A farm job is ONE row covering every block, where the block path
+        wrote one row per block. The per-block counts a farm pass reports are
+        therefore the blocks its surface was measured against — the same
+        live-block predicate `block_masks_for_farm` cuts the zonal step with,
+        so the number under a date keeps meaning "blocks in this pass" across
+        the cutover instead of dropping to 1.
+
+        A day carrying both paths (the cutover day itself) takes the LARGER
+        of the two rather than their sum, which no farm can exceed its own
+        block count by.
         """
         rows = (
             (
                 await self._session.execute(
                     text(
                         """
+                        WITH live_blocks AS (
+                            SELECT count(*)::bigint AS n
+                              FROM blocks b
+                             WHERE b.farm_id = :farm
+                               AND b.deleted_at IS NULL
+                               AND (b.active_to IS NULL OR b.active_to > now())
+                        ),
+                        block_days AS (
+                            SELECT
+                                (j.scene_datetime AT TIME ZONE 'UTC')::date AS scene_date,
+                                max(j.scene_datetime)                       AS at,
+                                count(DISTINCT j.block_id)                  AS block_count,
+                                count(*) FILTER (
+                                    WHERE j.status = 'succeeded'
+                                )                                           AS succeeded_count,
+                                count(*) FILTER (
+                                    WHERE j.status = 'skipped_cloud'
+                                )                                           AS skipped_cloud_count,
+                                count(DISTINCT a.block_id)                  AS computed_count,
+                                avg(j.cloud_cover_pct)                      AS cloud_cover_pct
+                            FROM imagery_ingestion_jobs j
+                            JOIN blocks b ON b.id = j.block_id
+                            -- Did the INDEX step ever run for this pass?
+                            --
+                            -- Ingesting a scene and computing its indices are
+                            -- two different tasks, and a historical backfill
+                            -- runs the first without the second
+                            -- (`run_compute_indices: False` in the backfill
+                            -- service). The job row then says "succeeded" and
+                            -- carries a stac_item_id while no index raster was
+                            -- ever written — 104 of 131 days on the reference
+                            -- farm are in exactly that state.
+                            --
+                            -- An aggregate row is written by `compute_indices`
+                            -- and by nothing else, so its presence is the only
+                            -- honest answer to "can this pass be drawn?".
+                            -- Without it the console offers a date that
+                            -- renders nothing.
+                            LEFT JOIN block_index_aggregates a
+                                   ON a.block_id = j.block_id
+                                  AND a.time = j.scene_datetime
+                                  AND a.index_code = 'ndvi'
+                            WHERE b.farm_id = :farm
+                            GROUP BY 1
+                        ),
+                        farm_passes AS (
+                            SELECT
+                                (fj.scene_datetime AT TIME ZONE 'UTC')::date AS scene_date,
+                                max(fj.scene_datetime)                       AS at,
+                                bool_or(fj.status = 'succeeded')             AS any_succeeded,
+                                bool_or(fj.status = 'skipped')               AS any_skipped,
+                                avg(fj.cloud_cover_pct)                      AS cloud_cover_pct
+                            FROM imagery_farm_ingestion_jobs fj
+                            WHERE fj.farm_id = :farm
+                            GROUP BY 1
+                        ),
+                        farm_days AS (
+                            SELECT
+                                p.scene_date,
+                                p.at,
+                                l.n AS block_count,
+                                CASE WHEN p.any_succeeded
+                                     THEN l.n ELSE 0::bigint END AS succeeded_count,
+                                CASE WHEN p.any_skipped
+                                     THEN l.n ELSE 0::bigint END AS skipped_cloud_count,
+                                -- Matched on the exact instant, the same way
+                                -- the block branch is, and specifically on
+                                -- `p.at` — the instant the frontend goes on to
+                                -- send as `at` for grid-cells and scene
+                                -- assets. So "can this pass be drawn?" is
+                                -- answered about the pass it will actually
+                                -- ask for.
+                                (SELECT count(DISTINCT a.block_id)
+                                   FROM block_index_aggregates a
+                                   JOIN blocks ab ON ab.id = a.block_id
+                                  WHERE ab.farm_id = :farm
+                                    AND a.index_code = 'ndvi'
+                                    AND a.time = p.at)          AS computed_count,
+                                p.cloud_cover_pct
+                            FROM farm_passes p CROSS JOIN live_blocks l
+                        )
                         SELECT
-                            (j.scene_datetime AT TIME ZONE 'UTC')::date AS scene_date,
-                            max(j.scene_datetime)                       AS at,
-                            count(DISTINCT j.block_id)                  AS block_count,
-                            count(*) FILTER (
-                                WHERE j.status = 'succeeded'
-                            )                                           AS succeeded_count,
-                            count(*) FILTER (
-                                WHERE j.status = 'skipped_cloud'
-                            )                                           AS skipped_cloud_count,
-                            count(DISTINCT a.block_id)                  AS computed_count,
-                            avg(j.cloud_cover_pct)                      AS cloud_cover_pct
-                        FROM imagery_ingestion_jobs j
-                        JOIN blocks b ON b.id = j.block_id
-                        -- Did the INDEX step ever run for this pass?
-                        --
-                        -- Ingesting a scene and computing its indices are two
-                        -- different tasks, and a historical backfill runs the
-                        -- first without the second (`run_compute_indices:
-                        -- False` in the backfill service). The job row then
-                        -- says "succeeded" and carries a stac_item_id while no
-                        -- index raster was ever written — 104 of 131 days on
-                        -- the reference farm are in exactly that state.
-                        --
-                        -- An aggregate row is written by `compute_indices` and
-                        -- by nothing else, so its presence is the only honest
-                        -- answer to "can this pass be drawn?". Without it the
-                        -- console offers a date that renders nothing.
-                        LEFT JOIN block_index_aggregates a
-                               ON a.block_id = j.block_id
-                              AND a.time = j.scene_datetime
-                              AND a.index_code = 'ndvi'
-                        WHERE b.farm_id = :farm
-                        GROUP BY 1
-                        ORDER BY 1 DESC
+                            scene_date,
+                            max(at)                  AS at,
+                            max(block_count)         AS block_count,
+                            max(succeeded_count)     AS succeeded_count,
+                            max(skipped_cloud_count) AS skipped_cloud_count,
+                            max(computed_count)      AS computed_count,
+                            avg(cloud_cover_pct)     AS cloud_cover_pct
+                        FROM (
+                            SELECT * FROM block_days
+                            UNION ALL
+                            SELECT * FROM farm_days
+                        ) u
+                        GROUP BY scene_date
+                        ORDER BY scene_date DESC
                         LIMIT :limit
                         """
                     ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
