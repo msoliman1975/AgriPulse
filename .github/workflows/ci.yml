@@ -97,8 +97,22 @@ jobs:
     # `argocd-sync.yml`'s workflow_run trigger fire on every green
     # main merge.
     name: backend-integration
+    # 35, not 20. The suite's median is 13-16 min and the old cap killed runs
+    # at exactly 20m16s with every test passing and the log ending
+    # `##[error]The operation was canceled.` partway through the files. That
+    # reads as a failure, costs a full re-run, and has now happened on
+    # 2026-08-11 (main + #414) and 2026-08-14 (#466).
+    #
+    # The margin only gets worse: every feature that adds integration tests
+    # moves the median toward the cap, so this was a coin flip that each merge
+    # made less fair. 35 leaves real headroom while still killing a genuinely
+    # hung job well short of an hour.
+    #
+    # Telling a timeout from a concurrency cancel: a timeout runs the FULL cap
+    # (20m16s against a 20 min limit) and shows zero FAILED/ERROR lines; a
+    # concurrency cancel lands at an arbitrary short time (5-9 min observed).
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     continue-on-error: true
     defaults:
       run:
