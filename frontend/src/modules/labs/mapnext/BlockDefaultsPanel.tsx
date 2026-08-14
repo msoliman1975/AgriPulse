@@ -10,7 +10,6 @@ import { useTranslation } from "react-i18next";
 
 import { isApiError } from "@/api/errors";
 
-import { FarmSubscriptionsPanel } from "./FarmSubscriptionsPanel";
 import {
   applyGrid,
   applyGridCellSize,
@@ -156,12 +155,6 @@ export function BlockDefaultsPanel({ farmId, farmName }: Props): ReactNode {
       <p className="rounded-lg bg-ap-primary-soft px-3 py-2 text-xs text-ap-ink">
         {t("blockDefaults.intro")}
       </p>
-
-      {/* Imagery and weather are configured on the FARM: both are fetched
-          once per farm, so there is nothing to reconcile onto blocks. The
-          template/apply flow below still governs irrigation, tags and grid,
-          which genuinely are per-block settings. */}
-      <FarmSubscriptionsPanel farmId={farmId} />
 
       <Card title={t("blockDefaults.irrigation")} lock={lockChip("irrigation")}>
         {irrigation ? (

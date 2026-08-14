@@ -1010,22 +1010,37 @@ async def _discover_due_subscriptions_async() -> dict[str, int]:
     tenant_schemas = [str(r[0]) for r in rows]
 
     enqueued = 0
+    failed = 0
     for tenant_schema in tenant_schemas:
         try:
             sanitize_tenant_schema(tenant_schema)
         except ValueError:
             continue
-        async with factory() as session, session.begin():
-            await _set_tenant_context(session, tenant_schema)
-            repo = WeatherRepository(session)
-            due = await repo.list_due_farm_provider_pairs(
-                default_cadence_hours=settings.weather_default_cadence_hours,
-                now=datetime.now(UTC),
-            )
+        # One tenant must not be able to end the sweep for the others. A
+        # schema mid-creation, or behind on migrations, raises here — and
+        # without this every remaining tenant silently stops being polled.
+        # Each tenant gets its own session, so a failed one cannot poison a
+        # transaction the next tenant would reuse.
+        try:
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, tenant_schema)
+                repo = WeatherRepository(session)
+                due = await repo.list_due_farm_provider_pairs(
+                    default_cadence_hours=settings.weather_default_cadence_hours,
+                    now=datetime.now(UTC),
+                )
+        except Exception:
+            _log.exception("weather_due_sweep_tenant_failed", tenant_schema=tenant_schema)
+            failed += 1
+            continue
         for farm_id, provider_code in due:
             fetch_weather.delay(str(farm_id), tenant_schema, provider_code)
             enqueued += 1
-    return {"tenants_scanned": len(tenant_schemas), "enqueued": enqueued}
+    return {
+        "tenants_scanned": len(tenant_schemas),
+        "enqueued": enqueued,
+        "tenants_failed": failed,
+    }
 
 
 # --- compute_weather_risk (Phase 2) ----------------------------------------

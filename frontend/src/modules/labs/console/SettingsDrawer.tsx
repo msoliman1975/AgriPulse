@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { getFarm, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
 import { Card } from "@/components/Card";
 import { BlockDefaultsPanel } from "../mapnext/BlockDefaultsPanel";
+import { FarmSubscriptionsPanel } from "../mapnext/FarmSubscriptionsPanel";
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { inputCls } from "../mapnext/ui";
 import { CONSOLE_QK, isConsoleQueryKey } from "./constants";
@@ -100,14 +101,21 @@ export function SettingsDrawer({
         </div>
         <div className="flex-1 overflow-auto p-5">
           {tab === "farm" ? (
-            <FarmEditTab
-              farmId={farmId}
-              canInactivate={canInactivate}
-              onInactivateFarm={onInactivateFarm}
-              onReactivateFarm={onReactivateFarm}
-              reactivating={reactivating}
-              reactivateError={reactivateError}
-            />
+            <div className="space-y-5">
+              <FarmEditTab
+                farmId={farmId}
+                canInactivate={canInactivate}
+                onInactivateFarm={onInactivateFarm}
+                onReactivateFarm={onReactivateFarm}
+                reactivating={reactivating}
+                reactivateError={reactivateError}
+              />
+              {/* Imagery and weather are subscribed per FARM, so they live on
+                  the farm tab. They spent one release under "Block defaults",
+                  which is the one place a farm-level setting is guaranteed not
+                  to be looked for. */}
+              <FarmSubscriptionsPanel farmId={farmId} />
+            </div>
           ) : null}
           {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} farmName={farmName} /> : null}
           {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}

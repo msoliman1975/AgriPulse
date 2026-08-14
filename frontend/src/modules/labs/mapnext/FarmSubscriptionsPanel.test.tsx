@@ -120,6 +120,38 @@ describe("FarmSubscriptionsPanel", () => {
     expect(h.updateImagery).toHaveBeenCalledWith("f1", "sub-1", { fetch_farm_aoi: true });
   });
 
+  it("lets the cloud cap be set, not just the cadence", async () => {
+    // The old template exposed this and the first version of this panel did
+    // not, so a farm could be subscribed with no way to tune the one setting
+    // that decides which passes are usable.
+    h.imagery.mockResolvedValue([subscription()]);
+    const user = userEvent.setup();
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+    const boxes = await screen.findAllByRole("spinbutton");
+    expect(boxes).toHaveLength(2);
+
+    const cloud = boxes[1];
+    await user.clear(cloud);
+    await user.type(cloud, "45");
+    await user.tab();
+
+    await waitFor(() => expect(h.updateImagery).toHaveBeenCalledTimes(1));
+    expect(h.updateImagery).toHaveBeenCalledWith("f1", "sub-1", { cloud_cover_max_pct: 45 });
+  });
+
+  it("refuses a cloud cap outside 0-100 rather than sending it", async () => {
+    h.imagery.mockResolvedValue([subscription()]);
+    const user = userEvent.setup();
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+    const boxes = await screen.findAllByRole("spinbutton");
+
+    await user.clear(boxes[1]);
+    await user.type(boxes[1], "150");
+    await user.tab();
+
+    expect(h.updateImagery).not.toHaveBeenCalled();
+  });
+
   it("names the cost of the whole-farm fetch", async () => {
     render(<FarmSubscriptionsPanel farmId="f1" />);
     // An operator turning this on is spending provider quota; the screen has
@@ -131,7 +163,8 @@ describe("FarmSubscriptionsPanel", () => {
     h.imagery.mockResolvedValue([subscription()]);
     const user = userEvent.setup();
     render(<FarmSubscriptionsPanel farmId="f1" />);
-    const box = await screen.findByRole("spinbutton");
+    // Two number inputs now: cadence first, cloud cap second.
+    const box = (await screen.findAllByRole("spinbutton"))[0];
 
     await user.clear(box);
     await user.tab();

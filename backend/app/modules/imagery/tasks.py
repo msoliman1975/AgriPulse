@@ -1792,12 +1792,16 @@ async def _discover_active_farm_subscriptions_async() -> dict[str, int]:
             sanitize_tenant_schema(tenant_schema)
         except ValueError:
             continue
-        async with AsyncSessionLocal()() as session2, session2.begin():
-            await _set_tenant_context(session2, tenant_schema)
-            due = await ImageryRepository(session2).list_farm_subscriptions_due(
-                default_cadence_hours=24,
-                now=datetime.now(UTC),
-            )
+        try:
+            async with AsyncSessionLocal()() as session2, session2.begin():
+                await _set_tenant_context(session2, tenant_schema)
+                due = await ImageryRepository(session2).list_farm_subscriptions_due(
+                    default_cadence_hours=24,
+                    now=datetime.now(UTC),
+                )
+        except Exception:
+            _log.exception("imagery_farm_sweep_tenant_failed", tenant_schema=tenant_schema)
+            continue
         for row in due:
             discover_farm_scenes.delay(str(row["id"]), tenant_schema)
             enqueued += 1
@@ -2253,13 +2257,20 @@ async def _discover_active_subscriptions_async() -> dict[str, int]:
             sanitize_tenant_schema(tenant_schema)
         except ValueError:
             continue
-        async with AsyncSessionLocal()() as session2, session2.begin():
-            await _set_tenant_context(session2, tenant_schema)
-            repo = ImageryRepository(session2)
-            due = await repo.list_active_subscriptions_due(
-                default_cadence_hours=24,  # fallback; per-row cadence applies first
-                now=datetime.now(UTC),
-            )
+        # One tenant must not end the sweep for the others — a schema
+        # mid-creation or behind on migrations raises here, and without this
+        # every remaining tenant silently stops being polled.
+        try:
+            async with AsyncSessionLocal()() as session2, session2.begin():
+                await _set_tenant_context(session2, tenant_schema)
+                repo = ImageryRepository(session2)
+                due = await repo.list_active_subscriptions_due(
+                    default_cadence_hours=24,  # fallback; per-row cadence applies first
+                    now=datetime.now(UTC),
+                )
+        except Exception:
+            _log.exception("imagery_due_sweep_tenant_failed", tenant_schema=tenant_schema)
+            continue
         for row in due:
             discover_scenes.delay(str(row["id"]), tenant_schema)
             enqueued += 1

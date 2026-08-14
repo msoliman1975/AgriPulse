@@ -750,6 +750,7 @@
     "weatherTitle": "Weather",
     "weatherHint": "Weather is fetched once for the farm's location and shared by every block.",
     "wholeFarm": "Whole farm",
-    "wholeFarmHint": "Whole farm fetches the farm's own boundary instead of stitching block images together, so land outside your blocks is measured too. It costs one larger request per pass."
+    "wholeFarmHint": "Whole farm fetches the farm's own boundary instead of stitching block images together, so land outside your blocks is measured too. It costs one larger request per pass.",
+    "cloudCap": "Max cloud %"
   }
 }
