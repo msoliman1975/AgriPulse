@@ -115,7 +115,13 @@ what makes the tenant "born mid-season" and gives the decision trees something t
 > shape changes, seeds change silently. Mitigate by snapshotting the clone output to R2 once and
 > replaying the snapshot, rather than re-reading Bashayer every run.
 
-### P4 — Notification sink — *designed, not yet built*
+### P4 — Notification sink — **BUILT**
+
+> Set `NOTIFICATION_SINK_TENANT_PREFIX=sim-` in the Helm values before a run. It is empty by
+> default, so an unset value delivers normally — Act 0 must verify the sink is live rather than
+> assume it, by dispatching one notification and asserting the row came back `skipped` with
+> `error = "outbound suppressed for simulation tenant"`.
+
 
 The swarm will trigger email and FCM pushes. On prod these reach real endpoints, so this must
 land before any persona acts.
