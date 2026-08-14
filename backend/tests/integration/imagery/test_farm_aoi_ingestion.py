@@ -91,6 +91,7 @@ def _stub_rasterio(
     from app.modules.imagery import _rasterio_io
 
     seen_hashes: list[str] = []
+    seen_product_codes: list[str] = []
     profile: dict[str, Any] = grid or {"transform": None}
     if grid is not None:
         rasters = {
@@ -100,7 +101,18 @@ def _stub_rasterio(
     else:
         rasters = {}
 
-    def fake_load(uri: str, *, band_names: tuple[str, ...], aoi_geojson_utm36n: dict) -> tuple:
+    def fake_load(
+        uri: str,
+        *,
+        band_names: tuple[str, ...],
+        aoi_geojson_utm36n: dict,
+        product_code: str = "s2_l2a",
+    ) -> tuple:
+        # `product_code` mirrors the real signature: it selects which
+        # masking rules the trailing quality band follows. Accepting it
+        # here rather than swallowing kwargs keeps this double honest —
+        # see the note on `fake_compute` below.
+        seen_product_codes.append(product_code)
         return ({b: None for b in band_names}, None, None, profile)
 
     def fake_compute(**kwargs: Any) -> tuple:

@@ -6,8 +6,6 @@ hand-built fixtures rather than shapes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import numpy as np
 import pytest
 
@@ -21,7 +19,6 @@ from app.modules.indices.computation import (
     compute_indices_for_product,
     compute_thermal_indices,
     cwsi,
-    interpolate_air_temp_c,
     landsat_qa_pixel_mask,
     lst,
     quality_band_mask,
@@ -311,69 +308,6 @@ def test_thermal_indices_come_back_in_catalog_order() -> None:
     }
     out = compute_indices_for_product("landsat_c2_l2_st", bands, air_temp_c=28.0)
     assert tuple(out) == THERMAL_INDEX_CODES
-
-
-# -- Air temperature interpolation --------------------------------------
-
-
-def test_air_temp_interpolates_between_hourly_samples() -> None:
-    samples = [
-        (datetime(2026, 8, 14, 8, 0, tzinfo=UTC), 26.0),
-        (datetime(2026, 8, 14, 9, 0, tzinfo=UTC), 30.0),
-    ]
-    # Landsat crosses at ~08:17 — a quarter of the way through the hour.
-    at = datetime(2026, 8, 14, 8, 15, tzinfo=UTC)
-    assert interpolate_air_temp_c(samples, at) == pytest.approx(27.0, abs=1e-6)
-
-
-def test_air_temp_returns_an_exact_sample_unchanged() -> None:
-    samples = [
-        (datetime(2026, 8, 14, 8, 0, tzinfo=UTC), 26.0),
-        (datetime(2026, 8, 14, 9, 0, tzinfo=UTC), 30.0),
-    ]
-    at = datetime(2026, 8, 14, 8, 0, tzinfo=UTC)
-    assert interpolate_air_temp_c(samples, at) == pytest.approx(26.0)
-
-
-def test_air_temp_skips_null_readings() -> None:
-    samples = [
-        (datetime(2026, 8, 14, 8, 0, tzinfo=UTC), None),
-        (datetime(2026, 8, 14, 9, 0, tzinfo=UTC), 30.0),
-    ]
-    at = datetime(2026, 8, 14, 8, 30, tzinfo=UTC)
-    # Only one usable sample and it is after `at` — take it rather than
-    # dropping CWSI for the scene.
-    assert interpolate_air_temp_c(samples, at) == pytest.approx(30.0)
-
-
-def test_air_temp_falls_back_to_the_nearest_end_of_the_window() -> None:
-    samples = [
-        (datetime(2026, 8, 14, 6, 0, tzinfo=UTC), 22.0),
-        (datetime(2026, 8, 14, 7, 0, tzinfo=UTC), 24.0),
-    ]
-    after_window = datetime(2026, 8, 14, 8, 20, tzinfo=UTC)
-    assert interpolate_air_temp_c(samples, after_window) == pytest.approx(24.0)
-
-
-def test_air_temp_is_none_when_nothing_is_usable() -> None:
-    assert interpolate_air_temp_c([], datetime(2026, 8, 14, 8, tzinfo=UTC)) is None
-    assert (
-        interpolate_air_temp_c(
-            [(datetime(2026, 8, 14, 8, tzinfo=UTC), None)],
-            datetime(2026, 8, 14, 8, tzinfo=UTC),
-        )
-        is None
-    )
-
-
-def test_air_temp_handles_unsorted_input() -> None:
-    """`read_observations` orders ascending, but do not rely on it."""
-    samples = [
-        (datetime(2026, 8, 14, 9, 0, tzinfo=UTC), 30.0),
-        (datetime(2026, 8, 14, 8, 0, tzinfo=UTC), 26.0),
-    ]
-    at = datetime(2026, 8, 14, 8, 30, tzinfo=UTC)
-    assert interpolate_air_temp_c(samples, at) == pytest.approx(28.0)
 
 
 def test_dispatch_rejects_an_unknown_product() -> None:

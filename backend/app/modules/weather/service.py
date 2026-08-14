@@ -22,6 +22,7 @@ from app.modules.weather.errors import (
     BlockNotVisibleError,
     WeatherSubscriptionNotFoundError,
 )
+from app.modules.weather.interpolation import interpolate_air_temp_c
 from app.modules.weather.repository import WeatherRepository
 from app.modules.weather.schemas import (
     DailyForecastRead,
@@ -37,6 +38,12 @@ from app.modules.weather.schemas import (
 from app.modules.weather.timezone import tz_for_centroid, tz_name_for_centroid
 from app.shared.db.ids import uuid7
 
+# How far either side of a moment to look for hourly samples. The feed is
+# hourly, so one hour would always bracket it — two absorbs a missed fetch
+# without widening far enough to interpolate across a gap that no longer
+# describes the moment asked about.
+_AIR_TEMP_WINDOW = timedelta(hours=2)
+
 
 class WeatherService(Protocol):
     """Public contract for the `weather` module."""
@@ -50,6 +57,14 @@ class WeatherService(Protocol):
         tenant_schema: str,
         correlation_id: UUID | None = None,
     ) -> SubscriptionRead: ...
+
+    async def air_temp_at(
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime,
+        window: timedelta = _AIR_TEMP_WINDOW,
+    ) -> float | None: ...
 
     async def list_subscriptions(
         self,
@@ -133,6 +148,36 @@ class WeatherServiceImpl:
         self._repo = WeatherRepository(tenant_session)
         self._audit = audit_service or get_audit_service()
         self._log = get_logger(__name__)
+
+    # ---- Readings --------------------------------------------------------
+
+    async def air_temp_at(
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime,
+        window: timedelta = _AIR_TEMP_WINDOW,
+    ) -> float | None:
+        """Air temperature at a moment, interpolated from the hourly feed.
+
+        Public because CWSI needs it: the index is a canopy-to-air
+        temperature difference, and the satellite crosses at ~08:17-08:24
+        UTC, so the reading almost never lands on one of the hourly
+        samples. `imagery` may not reach into `weather.repository`
+        (import contract), and it should not have to know the feed is
+        hourly either — that is this module's business.
+
+        Returns None when the window holds nothing usable. The caller
+        then omits CWSI rather than inventing a value; LST and SMI need
+        no weather and still compute.
+        """
+        rows = await self._repo.read_observations(
+            farm_id=farm_id,
+            provider_code=None,
+            since=at - window,
+            until=at + window,
+        )
+        return interpolate_air_temp_c([(r["time"], r["air_temp_c"]) for r in rows], at)
 
     # ---- Subscriptions ---------------------------------------------------
 
