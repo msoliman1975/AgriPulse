@@ -97,7 +97,12 @@ class EstimateRequest(BaseModel):
 class EstimateResponse(BaseModel):
     days: int
     blocks: int
+    # Provider fetches the run will dispatch, in whatever shape: block AOIs,
+    # plus one per whole-farm subscription on a farm that has cut over.
     subscriptions: int
+    # How many of those are whole-farm fetches. Non-zero changes what the run
+    # does, not just its size, so the console reports it separately.
+    farm_aoi_subscriptions: int
     estimated_scenes: int
     estimated_units: int
     # False would mean "this is a real quota reading". It never is today —
@@ -106,7 +111,8 @@ class EstimateResponse(BaseModel):
     units_estimated: bool
     weather_hours: int
     # Lets the console warn before submitting that a source has nothing
-    # configured to fetch from.
+    # configured to fetch from. One weather fetch per provider the farm
+    # resolves to, so this is the length of `weather_providers`.
     weather_subscriptions: int
     weather_providers: list[str]
 

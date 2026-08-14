@@ -400,6 +400,7 @@
       "title": "Before you run this",
       "body": "{{days}} days · {{blocks}} blocks · {{subscriptions}} subscriptions · about {{scenes}} scenes",
       "units": "Roughly {{units}} processing units. This is an estimate, not a quota reading.",
+      "farmAoi": "This farm is fetched as one whole-farm area, so the imagery run pulls one surface per pass and measures every block off it — the same shape as its live data.",
       "noImagerySubs": "This farm has no active imagery subscriptions — an imagery backfill would fetch nothing. Configure them on the farm first.",
       "noWeatherSubs": "This farm has no active weather subscriptions — a weather backfill would fetch nothing. Configure them on the farm first."
     },

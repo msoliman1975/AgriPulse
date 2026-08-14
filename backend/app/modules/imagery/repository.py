@@ -1119,6 +1119,71 @@ class ImageryRepository:
         )
         return tuple(dict(r) for r in rows)
 
+    async def list_farm_subscriptions_fetching_aoi(self, farm_id: UUID) -> tuple[UUID, ...]:
+        """Farm subscriptions on one farm with the farm-AOI fetch switched ON.
+
+        The backfill dispatcher's half of the cutover gate. Same predicate as
+        `list_farm_subscriptions_due` minus the cadence clause: a backfill is
+        operator-driven and takes an explicit window, so "is it due?" does not
+        apply.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT id FROM imagery_farm_subscriptions
+                    WHERE farm_id = :farm
+                      AND is_active = TRUE
+                      AND fetch_farm_aoi = TRUE
+                      AND deleted_at IS NULL
+                    ORDER BY created_at ASC
+                    """
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                {"farm": farm_id},
+            )
+        ).all()
+        return tuple(r[0] for r in rows)
+
+    async def list_block_subscriptions_for_backfill(self, farm_id: UUID) -> tuple[UUID, ...]:
+        """Block subscriptions on one farm that a backfill should still fetch.
+
+        Mirrors the live sweep's exclusion in `list_active_subscriptions_due`
+        exactly, and for the same reason: on a cut-over farm one whole-farm
+        fetch already covers this block, so fetching it separately pays the
+        provider twice for the same ground — and lands the result in the block
+        tables, giving that farm a history shaped unlike its live data.
+
+        The exclusion is keyed on `fetch_farm_aoi`, never on a farm
+        subscription merely existing: 0074 created one for every farm that had
+        block subscriptions, so the existence predicate would silently turn
+        every backfill on the platform into a no-op.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT s.id FROM imagery_aoi_subscriptions s
+                    JOIN blocks b ON b.id = s.block_id
+                    WHERE b.farm_id = :farm
+                      AND s.is_active = TRUE
+                      AND s.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM imagery_farm_subscriptions f
+                          WHERE f.farm_id = b.farm_id
+                            AND f.product_id = s.product_id
+                            AND f.is_active
+                            AND f.fetch_farm_aoi
+                            AND f.deleted_at IS NULL
+                      )
+                    ORDER BY s.created_at ASC
+                    """
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                {"farm": farm_id},
+            )
+        ).all()
+        return tuple(r[0] for r in rows)
+
     async def touch_farm_subscription_attempt(
         self,
         *,

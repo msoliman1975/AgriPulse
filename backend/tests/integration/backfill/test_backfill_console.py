@@ -96,7 +96,12 @@ async def _first_tenant_and_farm(client: AsyncClient) -> tuple[str, str] | None:
             # precondition — the estimate exposes them precisely so the console
             # can warn before submitting. A 200 alone proves nothing: estimate
             # happily costs a farm that has nothing to fetch.
-            if body["subscriptions"] > 0 or body["weather_subscriptions"] > 0:
+            # BOTH, not either: every caller below submits `imagery` AND
+            # `weather`, and the run is refused unless the farm has each. With
+            # `or` this held only by luck — no module had yet seeded a farm
+            # configured for one source — and the first one that did turned
+            # these tests red for a reason nowhere near the code under test.
+            if body["subscriptions"] > 0 and body["weather_subscriptions"] > 0:
                 return t["id"], farm["id"]
     return None
 

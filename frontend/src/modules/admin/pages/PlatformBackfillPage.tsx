@@ -456,6 +456,12 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
               {t("backfill.estimate.units", { units: estimate.estimated_units })}
             </div>
           ) : null}
+          {/* A cut-over farm is fetched as one AOI, so the block count above
+              no longer describes what this run will do. Say which shape it
+              takes before the operator spends the units. */}
+          {form.imagery && estimate.farm_aoi_subscriptions > 0 ? (
+            <div className="mt-1">{t("backfill.estimate.farmAoi")}</div>
+          ) : null}
           {/* A source with no subscription would fetch nothing. Say so here,
               even though the API also refuses the run, so the operator is
               never surprised by a rejection after filling in the form. */}
