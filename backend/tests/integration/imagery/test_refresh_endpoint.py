@@ -161,7 +161,7 @@ async def test_discover_scenes_creates_pending_jobs(
             geometry_geojson={"type": "Polygon", "coordinates": []},
         ),
     )
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(fake_scenes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(fake_scenes))
     from app.modules.imagery.tasks import acquire_scene
 
     original_delay = acquire_scene.delay
@@ -224,7 +224,7 @@ async def test_discover_scenes_marks_high_cloud_as_skipped(
             geometry_geojson={"type": "Polygon", "coordinates": []},
         ),
     )
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(cloudy))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(cloudy))
     from app.modules.imagery.tasks import acquire_scene
 
     original_delay = acquire_scene.delay
@@ -283,7 +283,7 @@ async def test_discover_scenes_idempotent_on_rerun(
             geometry_geojson={"type": "Polygon", "coordinates": []},
         ),
     )
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(scenes))
     from app.modules.imagery.tasks import acquire_scene
 
     original_delay = acquire_scene.delay

@@ -196,7 +196,7 @@ async def test_a_farm_without_the_switch_is_never_swept(
     sub_id, _farm_id, schema = await _set_up_farm_subscription(
         admin_session, slug="farm-aoi-off", fetch_farm_aoi=False
     )
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     try:
         due = await _due_subscription_ids(admin_session, schema)
         assert sub_id not in due
@@ -240,7 +240,7 @@ async def test_discovery_is_idempotent_on_the_same_scene(
     sub_id, _farm_id, schema = await _set_up_farm_subscription(
         admin_session, slug="farm-aoi-idem", fetch_farm_aoi=True
     )
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     from app.modules.imagery.tasks import acquire_farm_scene
 
     monkeypatch.setattr(acquire_farm_scene, "delay", lambda *a, **k: None)
@@ -265,7 +265,7 @@ async def test_an_acquired_pass_is_recorded_as_fetched_under_the_farm_hash(
         admin_session, slug="farm-aoi-acquire", fetch_farm_aoi=True
     )
     provider = _FakeProvider((SCENE,))
-    imagery_tasks.set_provider_factory(lambda: provider)
+    imagery_tasks.set_provider_factory(lambda _code: provider)
     capture = _CaptureStorage()
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: capture)
     seen_hashes = _stub_rasterio(monkeypatch)
@@ -435,7 +435,7 @@ async def test_a_farm_fetch_writes_the_block_numbers(
         admin_session, slug="farm-aoi-aggs", fetch_farm_aoi=True
     )
     grid = await _farm_grid(admin_session, schema, farm_id)
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider((SCENE,)))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider((SCENE,)))
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: _CaptureStorage())
     _stub_rasterio(monkeypatch, grid=grid, index_value=0.5)
 

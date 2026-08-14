@@ -130,7 +130,7 @@ def _patch_provider_and_storage(
     scenes: tuple[DiscoveredScene, ...],
 ) -> _CaptureStorage:
     capture = _CaptureStorage()
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(scenes))
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: capture)
     return capture
 
@@ -354,7 +354,7 @@ async def test_discovery_window_applies_lookback_buffer(
     await admin_session.commit()
 
     provider = _CapturingProvider(())
-    imagery_tasks.set_provider_factory(lambda: provider)
+    imagery_tasks.set_provider_factory(lambda _code: provider)
     try:
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
     finally:
@@ -381,7 +381,7 @@ async def test_empty_poll_does_not_advance_ingest_watermark(
     )
     assert before_ingest is None
 
-    imagery_tasks.set_provider_factory(lambda: _CapturingProvider(()))
+    imagery_tasks.set_provider_factory(lambda _code: _CapturingProvider(()))
     try:
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
     finally:
@@ -416,7 +416,7 @@ async def test_successful_poll_advances_both_timestamps(
     from app.modules.imagery.tasks import acquire_scene
 
     monkeypatch.setattr(acquire_scene, "delay", lambda *a, **k: None)
-    imagery_tasks.set_provider_factory(lambda: _CapturingProvider(scenes))
+    imagery_tasks.set_provider_factory(lambda _code: _CapturingProvider(scenes))
     try:
         await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
     finally:
