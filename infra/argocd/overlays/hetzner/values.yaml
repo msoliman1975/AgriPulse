@@ -1684,7 +1684,7 @@ global:
     workers:
       tag: "ea8fe1e"
     frontend:
-      tag: "ea8fe1e"
+      tag: "03129e3"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
