@@ -23,13 +23,16 @@ export interface BackfillFarm {
 export interface BackfillEstimate {
   days: number;
   blocks: number;
+  /** Provider fetches the run will dispatch, block AOIs and whole-farm ones together. */
   subscriptions: number;
+  /** How many of those are whole-farm fetches — non-zero means this farm has cut over. */
+  farm_aoi_subscriptions: number;
   estimated_scenes: number;
   estimated_units: number;
   /** Always true today: there is no CDSE metering, so this is an approximation. */
   units_estimated: boolean;
   weather_hours: number;
-  /** Active weather subscriptions on the farm. Zero means nothing to fetch. */
+  /** Weather fetches the run will dispatch — one per provider. Zero means nothing to fetch. */
   weather_subscriptions: number;
   /** Provider codes the farm is actually subscribed to, e.g. ["open_meteo"]. */
   weather_providers: string[];

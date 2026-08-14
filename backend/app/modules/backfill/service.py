@@ -8,6 +8,8 @@ process does not need the worker's task modules loaded to queue work.
 Task names dispatched here (all already live in production since #303):
 
   imagery.backfill_farm_scenes   raw Sentinel-2 scenes for a farm's subs
+                                 (it decides per subscription whether that
+                                 means block AOIs or the whole farm)
   weather.backfill_weather       raw hourly observations from the archive
   imagery.backfill_farm_indices   reproject a farm's stored scenes
   weather.backfill_weather_indices  project stored obs into daily indices
@@ -60,10 +62,11 @@ class NoIntegrationConfigError(Exception):
     """A requested source has no active subscription on this farm.
 
     Without this guard the run would be accepted, dispatch a task, and do
-    nothing — the provider work is driven entirely by the farm's block
-    subscriptions, so zero subscriptions means zero fetches. That reads as
-    a silent success, which is the worst possible outcome for an operator
-    who thinks they just loaded a year of history.
+    nothing — the provider work is driven entirely by the farm's
+    subscriptions (block ones, or a whole-farm one once it has cut over), so
+    zero of both means zero fetches. That reads as a silent success, which is
+    the worst possible outcome for an operator who thinks they just loaded a
+    year of history.
     """
 
     def __init__(self, missing: list[str]) -> None:
@@ -148,12 +151,20 @@ class BackfillService:
                          JOIN blocks b ON b.id = s.block_id
                         WHERE b.farm_id = :fid
                           AND s.is_active = TRUE
-                          AND s.deleted_at IS NULL) AS subscriptions,
-                      (SELECT count(*) FROM weather_subscriptions s
-                         JOIN blocks b ON b.id = s.block_id
-                        WHERE b.farm_id = :fid
-                          AND s.is_active = TRUE
-                          AND s.deleted_at IS NULL) AS weather_subscriptions
+                          AND s.deleted_at IS NULL
+                          AND NOT EXISTS (
+                              SELECT 1 FROM imagery_farm_subscriptions f
+                              WHERE f.farm_id = b.farm_id
+                                AND f.product_id = s.product_id
+                                AND f.is_active
+                                AND f.fetch_farm_aoi
+                                AND f.deleted_at IS NULL
+                          )) AS subscriptions,
+                      (SELECT count(*) FROM imagery_farm_subscriptions f
+                        WHERE f.farm_id = :fid
+                          AND f.is_active = TRUE
+                          AND f.fetch_farm_aoi = TRUE
+                          AND f.deleted_at IS NULL) AS farm_aoi_subscriptions
                     """
                     ),
                     {"fid": str(farm_id)},
@@ -166,13 +177,26 @@ class BackfillService:
         await self._reset_search_path()
 
         days = max((window_to - window_from).days + 1, 0)
-        subs = int(row["subscriptions"])
-        wx_subs = int(row["weather_subscriptions"])
+        block_subs = int(row["subscriptions"])
+        farm_subs = int(row["farm_aoi_subscriptions"])
+        # Weather dispatches one task per provider the farm resolves to, so
+        # that list IS the count. Counting block rows instead reported zero —
+        # "nothing to fetch" — for a farm whose weather moved to the farm row.
+        wx_subs = len(providers)
+        # One provider fetch per subscription the run will actually dispatch,
+        # whatever its shape. A cut-over farm's whole-farm subscription counts
+        # once here where its blocks used to count N times — which is the
+        # saving the cutover exists to make, so the estimate has to show it.
+        subs = block_subs + farm_subs
         scenes = int(round(subs * days * _SCENES_PER_SUB_PER_DAY)) if imagery else 0
         return {
             "days": days,
             "blocks": int(row["blocks"]),
             "subscriptions": subs,
+            # Non-zero means the imagery half of this run fetches whole-farm
+            # surfaces, so the console can say so rather than reporting a
+            # block count that no longer describes what will happen.
+            "farm_aoi_subscriptions": farm_subs,
             "estimated_scenes": scenes,
             "estimated_units": round(scenes * _UNITS_PER_SCENE),
             # There is no CDSE metering in the app, so this is an informed
@@ -371,11 +395,15 @@ class BackfillService:
     ) -> list[str]:
         """Distinct provider codes this farm actually subscribes to.
 
-        Mirrors how the normal refresh resolves providers
-        (`WeatherService.refresh_block`): weather subscriptions are
-        per-block, so a farm's providers are the distinct codes across its
-        blocks' active subscriptions. Returning [] means the farm has no
-        weather integration configured at all.
+        Mirrors how the beat sweep resolves them
+        (`WeatherRepository.list_due_farm_providers`): the FARM rows are
+        authoritative, with the per-block rows as a fallback for any
+        (farm, provider) pair that has no farm row yet. Reading only the block
+        rows — as this did — misses a farm whose block subscriptions were
+        deactivated after 0077 collapsed them, and reports it as having no
+        weather integration at all.
+
+        Returning [] means the farm really has none.
         """
         if not already_scoped:
             await self._set_search_path(tenant_schema)
@@ -383,13 +411,28 @@ class BackfillService:
             await self._s.execute(
                 text(
                     """
-                    SELECT DISTINCT s.provider_code
+                    SELECT f.provider_code
+                      FROM weather_farm_subscriptions f
+                     WHERE f.farm_id = :fid
+                       AND f.is_active = TRUE
+                       AND f.deleted_at IS NULL
+
+                     UNION
+
+                    SELECT s.provider_code
                       FROM weather_subscriptions s
                       JOIN blocks b ON b.id = s.block_id
                      WHERE b.farm_id = :fid
                        AND s.is_active = TRUE
                        AND s.deleted_at IS NULL
-                     ORDER BY s.provider_code
+                       AND NOT EXISTS (
+                           SELECT 1 FROM weather_farm_subscriptions f2
+                            WHERE f2.farm_id = b.farm_id
+                              AND f2.provider_code = s.provider_code
+                              AND f2.is_active
+                              AND f2.deleted_at IS NULL
+                       )
+                     ORDER BY 1
                     """
                 ),
                 {"fid": str(farm_id)},
@@ -400,6 +443,13 @@ class BackfillService:
         return [r[0] for r in rows]
 
     async def _has_imagery_subs(self, tenant_schema: str, farm_id: UUID) -> bool:
+        """Is there anything for an imagery run to fetch — in either shape?
+
+        A farm cut over to whole-farm fetching may have had its block
+        subscriptions deactivated, so asking only about those would reject the
+        run as unconfigured on exactly the farms the cutover is furthest along
+        on.
+        """
         await self._set_search_path(tenant_schema)
         row = (
             await self._s.execute(
@@ -411,6 +461,12 @@ class BackfillService:
                          WHERE b.farm_id = :fid
                            AND s.is_active = TRUE
                            AND s.deleted_at IS NULL
+                    ) OR EXISTS (
+                        SELECT 1 FROM imagery_farm_subscriptions f
+                         WHERE f.farm_id = :fid
+                           AND f.is_active = TRUE
+                           AND f.fetch_farm_aoi = TRUE
+                           AND f.deleted_at IS NULL
                     ) AS present
                     """
                 ),

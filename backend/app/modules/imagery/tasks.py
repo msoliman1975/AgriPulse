@@ -500,12 +500,16 @@ def backfill_farm_scenes(
     run_compute_indices: bool = False,
     run_id: str | None = None,
 ) -> dict[str, int]:
-    """Fan out `backfill_scenes` to every active imagery subscription on a farm.
+    """Fan out a historical fetch over one farm's active imagery subscriptions.
 
     One-shot historical backfill entry point. ``from_iso``/``to_iso`` are
     ISO-8601 datetimes (naive is treated as UTC). ``run_compute_indices``
-    defaults to False so the backfill lands raw bands + STAC only — indices
-    can be computed later.
+    defaults to False so the block path lands raw bands + STAC only — indices
+    can be computed later. (It has no farm-path equivalent: a whole-farm
+    acquisition computes its indices inline, as the live path does.)
+
+    Which shape the fan-out takes is decided per subscription, exactly as the
+    live sweep decides it — see `_backfill_farm_scenes_async`.
     """
     # Same guard as backfill_farm_indices: an unreported crash leaves the
     # run waiting on this source forever.
@@ -532,37 +536,45 @@ async def _backfill_farm_scenes_async(
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
-        rows = (
-            await session.execute(
-                text(
-                    "SELECT s.id FROM imagery_aoi_subscriptions s "
-                    "JOIN blocks b ON b.id = s.block_id "
-                    "WHERE b.farm_id = :farm AND s.is_active = TRUE"
-                ),
-                {"farm": farm_id},
-            )
-        ).all()
-    sub_ids = [r[0] for r in rows]
+        repo = ImageryRepository(session)
+        # A cut-over farm is backfilled the way it is fetched live: one
+        # whole-farm surface per pass, with the per-block numbers measured off
+        # it. The two lists are disjoint by product — a farm can be cut over
+        # for Sentinel-2 and still fetch another product per block — so both
+        # are dispatched rather than one branch winning outright.
+        farm_sub_ids = await repo.list_farm_subscriptions_fetching_aoi(farm_id)
+        block_sub_ids = await repo.list_block_subscriptions_for_backfill(farm_id)
+
     # This task only fans out — the per-subscription children do the real
     # work and finish long after it returns. So it reports the shape of the
     # job rather than a completion, and settles the source immediately;
     # the console shows scenes landing through the subscription counters.
     # (mark_running already fired in the task wrapper, before this ran.)
-    for sid in sub_ids:
+    for fsid in farm_sub_ids:
+        backfill_farm_aoi_scenes.delay(str(fsid), tenant_schema, from_iso, to_iso)
+    for sid in block_sub_ids:
         backfill_scenes.delay(str(sid), tenant_schema, from_iso, to_iso, run_compute_indices)
     _log.info(
         "imagery_backfill_farm_enqueued",
         farm_id=str(farm_id),
-        subscriptions=len(sub_ids),
+        subscriptions=len(block_sub_ids),
+        farm_subscriptions=len(farm_sub_ids),
         run_id=run_id,
     )
     backfill_progress.finish(
         run_id,
         "imagery",
-        counters={"subscriptions": len(sub_ids), "dispatched": True},
+        counters={
+            "subscriptions": len(block_sub_ids),
+            "farm_subscriptions": len(farm_sub_ids),
+            "dispatched": True,
+        },
         failed=False,
     )
-    return {"subscriptions_enqueued": len(sub_ids)}
+    return {
+        "subscriptions_enqueued": len(block_sub_ids),
+        "farm_subscriptions_enqueued": len(farm_sub_ids),
+    }
 
 
 # --- farm-wide index recomputation (console "Compute indices") ---------------
@@ -1474,6 +1486,26 @@ async def _queue_farm_jobs(
     return queued, skipped_cloud
 
 
+async def _touch_farm_if_live(
+    repo: ImageryRepository,
+    *,
+    subscription_id: UUID,
+    now: datetime,
+    ingested: bool,
+    bump_watermark: bool,
+) -> None:
+    """Farm-path twin of `_touch_if_live`.
+
+    A backfill (``bump_watermark=False``) reaches back over old passes, so
+    letting it move `last_successful_ingest_at` forward would make the next
+    live poll start after scenes it has never seen.
+    """
+    if bump_watermark:
+        await repo.touch_farm_subscription_attempt(
+            subscription_id=subscription_id, attempted_at=now, ingested=ingested
+        )
+
+
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="imagery.discover_farm_scenes",
     bind=False,
@@ -1487,6 +1519,10 @@ def discover_farm_scenes(subscription_id: str, tenant_schema: str) -> dict[str, 
 async def _discover_farm_scenes_async(
     subscription_id: UUID,
     tenant_schema: str,
+    *,
+    window_start_override: datetime | None = None,
+    window_end_override: datetime | None = None,
+    bump_watermark: bool = True,
 ) -> dict[str, int]:
     settings = get_settings()
     bus = get_default_bus()
@@ -1526,10 +1562,12 @@ async def _discover_farm_scenes_async(
                     width_px=exc.width_px,
                     height_px=exc.height_px,
                 )
-                await repo.touch_farm_subscription_attempt(
+                await _touch_farm_if_live(
+                    repo,
                     subscription_id=subscription_id,
-                    attempted_at=datetime.now(UTC),
+                    now=datetime.now(UTC),
                     ingested=False,
+                    bump_watermark=bump_watermark,
                 )
                 return empty
 
@@ -1538,8 +1576,8 @@ async def _discover_farm_scenes_async(
             subscription=subscription,
             settings=settings,
             now=now,
-            window_start_override=None,
-            window_end_override=None,
+            window_start_override=window_start_override,
+            window_end_override=window_end_override,
         )
         cloud_cap = (
             subscription["cloud_cover_max_pct"]
@@ -1562,10 +1600,12 @@ async def _discover_farm_scenes_async(
                 # No synthetic marker row here: the block path already writes
                 # one per subscription and a second copy per farm would double
                 # the noise for one misconfiguration.
-                await repo.touch_farm_subscription_attempt(
+                await _touch_farm_if_live(
+                    repo,
                     subscription_id=subscription_id,
-                    attempted_at=now,
+                    now=now,
                     ingested=False,
+                    bump_watermark=bump_watermark,
                 )
                 return empty
         finally:
@@ -1582,10 +1622,12 @@ async def _discover_farm_scenes_async(
             now=now,
         )
 
-        await repo.touch_farm_subscription_attempt(
+        await _touch_farm_if_live(
+            repo,
             subscription_id=subscription_id,
-            attempted_at=now,
+            now=now,
             ingested=bool(queued),
+            bump_watermark=bump_watermark,
         )
 
     # Outside the transaction, so the rows are visible to the worker.
@@ -1599,6 +1641,45 @@ async def _discover_farm_scenes_async(
             acquire_farm_scene.delay(str(job_id), tenant_schema)
 
     return {"discovered": len(scenes), "queued": queued, "skipped_cloud": skipped_cloud}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.backfill_farm_aoi_scenes",
+    bind=False,
+    ignore_result=True,
+)
+def backfill_farm_aoi_scenes(
+    subscription_id: str,
+    tenant_schema: str,
+    from_iso: str,
+    to_iso: str,
+) -> dict[str, int]:
+    """Discover + acquire whole-farm passes over an explicit window.
+
+    The farm-path twin of `backfill_scenes`. Same contract: the cold-start
+    floor and the live watermark are bypassed, the watermark is NOT advanced,
+    and re-running is free because (subscription_id, scene_id) is UNIQUE.
+
+    Backfilling a cut-over farm this way is what keeps its history the same
+    shape as its live data — one farm surface per pass, with block aggregates
+    measured off it — instead of a second, block-shaped history sitting
+    beside it in different tables.
+    """
+    start = datetime.fromisoformat(from_iso)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=UTC)
+    end = datetime.fromisoformat(to_iso)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=UTC)
+    return _run_task(
+        _discover_farm_scenes_async(
+            UUID(subscription_id),
+            tenant_schema,
+            window_start_override=start,
+            window_end_override=end,
+            bump_watermark=False,
+        )
+    )
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]

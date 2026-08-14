@@ -26,6 +26,7 @@ vi.mock("@/api/backfill", async () => {
         days: 366,
         blocks: 37,
         subscriptions: 35,
+        farm_aoi_subscriptions: 0,
         estimated_scenes: 2562,
         estimated_units: 2562,
         units_estimated: true,
