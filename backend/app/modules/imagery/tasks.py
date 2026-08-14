@@ -52,7 +52,11 @@ from app.modules.imagery.events import (
     SceneIngestedV1,
     SceneSkippedV1,
 )
-from app.modules.imagery.farm_aoi import FarmAoiTooLargeError, check_fetchable
+from app.modules.imagery.farm_aoi import (
+    FarmAoiTooLargeError,
+    check_fetchable,
+    product_resolution_m,
+)
 from app.modules.imagery.pgstac import (
     build_item_doc,
     collection_id_for,
@@ -195,7 +199,7 @@ def _assert_farm_aoi_fetchable(farm: dict[str, Any], product: dict[str, Any]) ->
     cap where a single block never would, so this is checked before the
     fetch rather than discovered as an opaque provider error.
     """
-    resolution_m = _product_resolution_m(product)
+    resolution_m = product_resolution_m(product)
     if resolution_m is None:
         return
     try:
@@ -1034,22 +1038,6 @@ def build_farm_scene_raster(farm_id: str, tenant_schema: str, at_iso: str) -> di
     )
 
 
-def _product_resolution_m(product: dict[str, Any]) -> float | None:
-    """The product's native ground sample distance, if it is known.
-
-    The farm grid is pinned to this rather than to whatever grid the first
-    block happened to arrive on — see farm_raster's module docstring.
-    """
-    raw = product.get("resolution_m")
-    if raw is None:
-        return None
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        return None
-    return value if value > 0 else None
-
-
 async def _build_farm_scene_raster_async(
     farm_id: UUID,
     tenant_schema: str,
@@ -1080,7 +1068,7 @@ async def _build_farm_scene_raster_async(
         bands_arrays, cloud_mask, profile = merge_block_rasters(
             raw_uris,
             band_names=tuple(product["bands"]),
-            resolution_m=_product_resolution_m(product),
+            resolution_m=product_resolution_m(product),
         )
     except NoBlockRastersError:
         # Every block of this pass claims success with no object behind it —
@@ -1595,7 +1583,7 @@ async def _discover_farm_scenes_async(
 
         # Refuse a farm the provider could not return in one request, before
         # spending the call. Recorded as an attempt so the poll does not spin.
-        resolution_m = _product_resolution_m(product)
+        resolution_m = product_resolution_m(product)
         if resolution_m is not None:
             try:
                 check_fetchable(farm["boundary_utm_geojson"], resolution_m=resolution_m)
@@ -1607,6 +1595,12 @@ async def _discover_farm_scenes_async(
                     width_px=exc.width_px,
                     height_px=exc.height_px,
                 )
+                # Fall back to the block path instead of returning empty
+                # forever. `fetch_farm_aoi` is what excludes this farm's blocks
+                # from the block sweep, so leaving it on while refusing to
+                # fetch the farm means the farm gets NO imagery from either
+                # path — the flag has to come off for the blocks to resume.
+                await repo.disable_farm_aoi_fetch(subscription_id=subscription_id)
                 await _touch_farm_if_live(
                     repo,
                     subscription_id=subscription_id,
@@ -1614,6 +1608,11 @@ async def _discover_farm_scenes_async(
                     ingested=False,
                     bump_watermark=bump_watermark,
                 )
+                # Logged, not audited. The audit service opens its own session,
+                # and taking a second connection while this transaction is open
+                # is the shape that exhausted the pool before — every other
+                # audit in this module is written after its transaction closes,
+                # and there is no such point on this path.
                 return empty
 
         now = datetime.now(UTC)

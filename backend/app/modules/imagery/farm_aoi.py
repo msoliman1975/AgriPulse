@@ -13,7 +13,7 @@ that says what to do about it.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 #: Sentinel Hub Process API output limit, per side, in pixels.
 PROCESS_API_MAX_PX_PER_SIDE = 2500
@@ -88,3 +88,58 @@ def check_fetchable(
     if width > max_px_per_side or height > max_px_per_side:
         raise FarmAoiTooLargeError(width_px=width, height_px=height, max_px=max_px_per_side)
     return width, height
+
+
+def product_resolution_m(product: dict[str, Any]) -> float | None:
+    """The product's native ground sample distance, if it is known.
+
+    The farm grid is pinned to this rather than to whatever grid the first
+    block happened to arrive on — see farm_raster's module docstring. It lives
+    here beside the size check because the API needs the same number to tell an
+    operator whether a farm can be fetched at all, and the API must not import
+    the worker's task module to get it.
+    """
+    raw = product.get("resolution_m")
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+class FarmAoiFit(NamedTuple):
+    """Whether one farm fits in one provider request, and by how much."""
+
+    fits: bool
+    width_px: int | None
+    height_px: int | None
+    max_px: int
+
+
+def measure_fit(
+    boundary_utm_geojson: dict[str, Any] | None,
+    *,
+    resolution_m: float | None,
+    max_px_per_side: int = PROCESS_API_MAX_PX_PER_SIDE,
+) -> FarmAoiFit:
+    """Non-raising twin of `check_fetchable`, for read paths.
+
+    Returns ``fits=True`` with no measurement when the inputs are unknown: a
+    missing boundary or an unpublished resolution is not evidence that the farm
+    is too big, and reporting it as too big would tell an operator to redraw a
+    farm that is fine.
+    """
+    if boundary_utm_geojson is None or resolution_m is None:
+        return FarmAoiFit(True, None, None, max_px_per_side)
+    try:
+        width, height = aoi_size_px(boundary_utm_geojson, resolution_m=resolution_m)
+    except ValueError:
+        return FarmAoiFit(True, None, None, max_px_per_side)
+    return FarmAoiFit(
+        width <= max_px_per_side and height <= max_px_per_side,
+        width,
+        height,
+        max_px_per_side,
+    )

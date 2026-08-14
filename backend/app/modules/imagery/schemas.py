@@ -13,6 +13,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.imagery.farm_aoi import PROCESS_API_MAX_PX_PER_SIDE
+
 # Allowed values for imagery_ingestion_jobs.status — kept here so the
 # router and tests share one source of truth.
 IngestionJobStatus = Literal[
@@ -113,6 +115,15 @@ class FarmSubscriptionRead(BaseModel):
     last_attempted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+    # Whether this farm CAN be fetched as one AOI, measured on read rather
+    # than stored: a farm's boundary can be redrawn at any time, and a stored
+    # verdict would go stale silently. `fetch_farm_aoi` says which path the
+    # farm is on; these say which paths are available to it and why.
+    farm_aoi_fetchable: bool = True
+    farm_aoi_width_px: int | None = None
+    farm_aoi_height_px: int | None = None
+    farm_aoi_max_px: int = PROCESS_API_MAX_PX_PER_SIDE
 
 
 # --- Ingestion / scenes -----------------------------------------------------
