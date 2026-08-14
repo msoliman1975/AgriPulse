@@ -63,7 +63,9 @@ from app.modules.imagery.providers.protocol import ImageryProvider
 from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.storage import raw_bands_key
+from app.modules.indices.computation import MASK_RULESET, PRODUCT_MASK_RULESETS
 from app.modules.integrations_health.error_codes import classify_error
+from app.modules.weather.service import get_weather_service
 from app.shared import backfill_progress
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
@@ -157,6 +159,49 @@ async def _set_tenant_context(session: AsyncSession, tenant_schema: str) -> None
         text("SELECT set_config('app.tenant_collection_prefix', :v, TRUE)"),
         {"v": f"{safe}__%"},
     )
+
+
+async def _air_temp_at_overpass(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    scene_time: datetime,
+) -> float | None:
+    """Air temperature at the satellite overpass minute, or None.
+
+    CWSI is a canopy-to-air temperature difference, and the reading it
+    needs almost never lands on one of the hourly samples. The lookup and
+    the interpolation both live in the weather module: `imagery` may not
+    import `weather.repository` (import contract — module internals are
+    private), and it should not have to know the feed is hourly either.
+
+    Never raises: weather is an input to one of three indices, so a
+    weather-side failure must not fail an imagery job. Returning None
+    costs CWSI alone; LST and SMI still land.
+    """
+    try:
+        return await get_weather_service(tenant_session=session).air_temp_at(
+            farm_id=farm_id, at=scene_time
+        )
+    except Exception as exc:  # weather must not fail an imagery job — see docstring
+        _log.warning("imagery_air_temp_lookup_failed", farm_id=str(farm_id), error=str(exc))
+        return None
+
+
+def _assert_farm_aoi_fetchable(farm: dict[str, Any], product: dict[str, Any]) -> None:
+    """Raise `_FarmJobFailed` if the farm AOI is too large for the product.
+
+    A whole-farm AOI at 10 m can exceed the provider's per-request pixel
+    cap where a single block never would, so this is checked before the
+    fetch rather than discovered as an opaque provider error.
+    """
+    resolution_m = _product_resolution_m(product)
+    if resolution_m is None:
+        return
+    try:
+        check_fetchable(farm["boundary_utm_geojson"], resolution_m=resolution_m)
+    except FarmAoiTooLargeError as exc:
+        raise _FarmJobFailed(str(exc), "aoi_too_large") from exc
 
 
 async def _lookup_product(session: AsyncSession, product_id: UUID) -> dict[str, Any]:
@@ -1720,6 +1765,14 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             )
             return {"job_id": str(job_id), "status": "failed"}
         product = await _lookup_product(session, job["product_id"])
+        # Only the thermal product needs it, and only for CWSI.
+        farm_air_temp_c = (
+            await _air_temp_at_overpass(
+                session, farm_id=job["farm_id"], scene_time=job["scene_datetime"]
+            )
+            if product["code"] == "landsat_c2_l2_st"
+            else None
+        )
         await repo.set_farm_job_status(
             job_id=job_id, status="running", started_at=datetime.now(UTC)
         )
@@ -1727,12 +1780,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
     # Every failure below lands in one place: the job is marked failed with a
     # code, once, rather than at eight separate exits.
     try:
-        resolution_m = _product_resolution_m(product)
-        if resolution_m is not None:
-            try:
-                check_fetchable(farm["boundary_utm_geojson"], resolution_m=resolution_m)
-            except FarmAoiTooLargeError as exc:
-                raise _FarmJobFailed(str(exc), "aoi_too_large") from exc
+        _assert_farm_aoi_fetchable(farm, product)
 
         provider = _provider_factory(product["provider_code"])
         try:
@@ -1774,6 +1822,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
                 f"s3://{storage.bucket}/{s3_key}",
                 band_names=tuple(product["bands"]),
                 aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+                product_code=product["code"],
             )
             _aggregates, index_keys, index_rasters = compute_and_write_indices(
                 bands_arrays=bands_arrays,
@@ -1785,6 +1834,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
                 product_code=product["code"],
                 scene_id=job["scene_id"],
                 aoi_hash=farm["aoi_hash"],
+                air_temp_c=farm_air_temp_c,
             )
         except Exception as exc:
             raise _FarmJobFailed(f"compute_indices_failed: {exc}", "compute_error") from exc
@@ -1943,6 +1993,15 @@ async def _compute_indices_async(
         if block is None:
             return {"job_id": str(job_id), "status": "block_missing"}
         product = await _lookup_product(session, job["product_id"])
+        # Read inside the same session as the rest of step 1. Only the
+        # thermal product needs it, and only for CWSI.
+        air_temp_c = (
+            await _air_temp_at_overpass(
+                session, farm_id=block["farm_id"], scene_time=job["scene_datetime"]
+            )
+            if product["code"] == "landsat_c2_l2_st"
+            else None
+        )
 
     # Step 2: read raw COG, compute indices, write per-index COGs.
     # Local import â€” pulls rasterio/numpy only into the heavy worker.
@@ -1963,6 +2022,7 @@ async def _compute_indices_async(
             raw_uri,
             band_names=tuple(product["bands"]),
             aoi_geojson_utm36n=block["boundary_utm_geojson"],
+            product_code=product["code"],
         )
         aoi_pixel_count, masked_pixel_count = _mask_counts(aoi_mask, cloud_mask)
         index_aggregates, index_keys, index_rasters = compute_and_write_indices(
@@ -1975,6 +2035,7 @@ async def _compute_indices_async(
             product_code=product["code"],
             scene_id=job["scene_id"],
             aoi_hash=block["aoi_hash"],
+            air_temp_c=air_temp_c,
         )
         raster_transform = profile["transform"]
     except Exception as exc:
@@ -2294,6 +2355,11 @@ async def _record_calc_run(
                 aoi_pixel_count=aoi_pixel_count,
                 masked_pixel_count=masked_pixel_count,
                 per_index=per_index,
+                # Which rules actually ran, not just that some did. Landsat's
+                # quality band is a bitmask and Sentinel-2's SCL a class enum,
+                # so a row that only said "masked" would be ambiguous between
+                # two genuinely different methodologies.
+                mask_ruleset=PRODUCT_MASK_RULESETS.get(product["code"], MASK_RULESET),
                 # `backfill` vs `live` is not distinguishable from inside this
                 # task — both arrive as the same call. The backfill path can
                 # start passing its own trigger when it needs to.

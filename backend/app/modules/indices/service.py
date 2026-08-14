@@ -88,6 +88,7 @@ class IndicesService(Protocol):
         error: str | None,
         started_at: datetime,
         completed_at: datetime,
+        mask_ruleset: str = MASK_RULESET,
     ) -> None: ...
 
     async def recompute_block_index_baselines(
@@ -219,6 +220,7 @@ class IndicesServiceImpl:
         error: str | None,
         started_at: datetime,
         completed_at: datetime,
+        mask_ruleset: str = MASK_RULESET,
     ) -> None:
         """Append one lineage row for a `compute_indices` execution.
 
@@ -239,7 +241,7 @@ class IndicesServiceImpl:
             grid_config_id=grid_config_id,
             cell_count=cell_count,
             calc_version=CALC_VERSION,
-            mask_ruleset=MASK_RULESET,
+            mask_ruleset=mask_ruleset,
             band_order=band_order,
             aoi_pixel_count=aoi_pixel_count,
             masked_pixel_count=masked_pixel_count,

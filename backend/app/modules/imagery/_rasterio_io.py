@@ -37,8 +37,8 @@ from app.modules.imagery.storage import build_asset_key
 from app.modules.indices.computation import (
     IndexAggregates,
     compute_aggregates,
-    compute_all_indices,
-    scl_cloud_mask,
+    compute_indices_for_product,
+    quality_band_mask,
 )
 from app.shared.storage import StorageClient
 
@@ -90,6 +90,7 @@ def load_raw_bands_and_aggregate(
     *,
     band_names: tuple[str, ...],
     aoi_geojson_utm36n: dict[str, Any],
+    product_code: str = "s2_l2a",
 ) -> tuple[
     dict[str, NDArray[np.float32]],
     NDArray[np.bool_],
@@ -103,25 +104,33 @@ def load_raw_bands_and_aggregate(
     COG write profile (count=1, dtype=float32).
 
     ``band_names`` lists the *science* bands. A raw COG may carry one extra
-    trailing band — the SCL scene-classification band the provider appends
-    when cloud masking is enabled. When present, ``cloud_mask`` is True over
-    cloud/shadow/cirrus/snow/invalid pixels; otherwise it is all-False, so
-    pre-SCL COGs (and masking-disabled fetches) aggregate exactly as before.
+    trailing band — the quality band the provider appends when cloud masking
+    is enabled (SCL for Sentinel-2, QA_PIXEL for Landsat). When present,
+    ``cloud_mask`` is True over cloud/shadow/cirrus/snow/invalid pixels;
+    otherwise it is all-False, so pre-SCL COGs (and masking-disabled
+    fetches) aggregate exactly as before.
+
+    ``product_code`` selects which masking rules that trailing band follows.
+    It defaults to ``s2_l2a`` so existing callers are unchanged, but the two
+    encodings are not interchangeable: SCL is a class enum and QA_PIXEL is a
+    bitmask, so reading one with the other's rules produces a
+    plausible-looking mask that is entirely wrong.
     """
     n_science = len(band_names)
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
         if ds.count not in (n_science, n_science + 1):
             raise ValueError(
                 f"raw COG has {ds.count} bands; expected {n_science} or "
-                f"{n_science + 1} (science bands {band_names!r} + optional SCL)"
+                f"{n_science + 1} (science bands {band_names!r} + optional "
+                f"quality band)"
             )
         bands_arrays = {
             name: ds.read(idx + 1).astype(np.float32, copy=False)
             for idx, name in enumerate(band_names)
         }
         if ds.count == n_science + 1:
-            scl = ds.read(n_science + 1).astype(np.float32, copy=False)
-            cloud_mask = scl_cloud_mask(scl)
+            quality = ds.read(n_science + 1).astype(np.float32, copy=False)
+            cloud_mask = quality_band_mask(product_code, quality)
         else:
             cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
         geom = shape(aoi_geojson_utm36n)
@@ -163,27 +172,36 @@ def compute_and_write_indices(
     scene_id: str,
     aoi_hash: str,
     cloud_mask: NDArray[np.bool_] | None = None,
+    air_temp_c: float | None = None,
 ) -> tuple[
     dict[str, IndexAggregates],
     dict[str, str],
     dict[str, NDArray[np.float32]],
 ]:
-    """Compute six indices, upload each as a COG, return aggregates + keys
-    + the AOI-masked rasters themselves.
+    """Compute the product's indices, upload each as a COG, return
+    aggregates + keys + the AOI-masked rasters themselves.
+
+    Which indices get computed follows ``product_code``: the nine
+    Sentinel-2 ones for ``s2_l2a``, the three thermal ones for
+    ``landsat_c2_l2_st``.
 
     The third return value (``index_rasters``) is the AOI-masked
     per-index arrays kept in memory so the caller can run additional
     zonal stats (sub-block grid cells, custom AOIs) without re-reading
     from S3. Outside the AOI is NaN — matches what was written to the
-    COG. Order matches the catalog (ndvi → gndvi).
+    COG. Order matches the catalog (ndvi → gndvi; lst → smi).
 
-    ``cloud_mask`` (True over cloud/shadow/etc., from the SCL band) turns
-    those pixels into NaN *before* aggregation and writing. They stay inside
-    the AOI footprint (``total_pixel_count``) but drop out of
+    ``cloud_mask`` (True over cloud/shadow/etc., from the quality band)
+    turns those pixels into NaN *before* aggregation and writing. They stay
+    inside the AOI footprint (``total_pixel_count``) but drop out of
     ``valid_pixel_count``, so ``valid_pixel_pct`` reflects the real clear
     fraction, and per-cell grid stats inherit the masking for free.
+
+    ``air_temp_c`` is only read for the thermal product, where CWSI needs
+    it. Leaving it None there costs CWSI alone — LST and SMI still
+    compute, so a missing weather hour does not cost the whole scene.
     """
-    indices = compute_all_indices(bands_arrays)
+    indices = compute_indices_for_product(product_code, bands_arrays, air_temp_c=air_temp_c)
     has_cloud = cloud_mask is not None and bool(cloud_mask.any())
     aggregates: dict[str, IndexAggregates] = {}
     written_keys: dict[str, str] = {}
