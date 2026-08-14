@@ -102,19 +102,26 @@ def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
 # --- DI seams (overridable in tests) ---------------------------------------
 
 
-def _make_provider() -> ImageryProvider:
-    """Construct the provider for this task invocation.
+def _make_provider(provider_code: str) -> ImageryProvider:
+    """Construct a provider for the given code.
+
+    The code comes from `public.imagery_providers.code` via
+    `_lookup_product`, so adding a provider is one branch here plus a
+    catalog row â€” everything downstream (storage keys, pgstac collection
+    ids, band order) is already parameterised by product.
 
     SentinelHubProvider raises SentinelHubNotConfiguredError when the
     creds are empty. Tests inject a fake via `set_provider_factory`.
     """
-    return SentinelHubProvider()
+    if provider_code == "sentinel_hub":
+        return SentinelHubProvider()
+    raise ValueError(f"Unsupported imagery provider_code: {provider_code!r}")
 
 
-_provider_factory: Callable[[], ImageryProvider] = _make_provider
+_provider_factory: Callable[[str], ImageryProvider] = _make_provider
 
 
-def set_provider_factory(factory: Callable[[], ImageryProvider]) -> None:
+def set_provider_factory(factory: Callable[[str], ImageryProvider]) -> None:
     """Test seam: swap in a mock ImageryProvider builder."""
     global _provider_factory
     _provider_factory = factory
@@ -309,7 +316,7 @@ async def _discover_scenes_async(
         provider: ImageryProvider | None = None
         try:
             try:
-                provider = _provider_factory()
+                provider = _provider_factory(product["provider_code"])
                 scenes = await provider.discover(
                     aoi_geojson=block["boundary_geojson"],
                     product_code=product["code"],
@@ -747,7 +754,7 @@ async def _acquire_scene_async(
         await repo.mark_running(job_id=job_id, started_at=datetime.now(UTC))
 
     # Step 2: fetch from the provider.
-    provider = _provider_factory()
+    provider = _provider_factory(product["provider_code"])
     try:
         try:
             result = await provider.fetch(
@@ -1536,7 +1543,7 @@ async def _discover_farm_scenes_async(
         provider: ImageryProvider | None = None
         try:
             try:
-                provider = _provider_factory()
+                provider = _provider_factory(product["provider_code"])
                 scenes = await provider.discover(
                     aoi_geojson=farm["boundary_geojson"],
                     product_code=product["code"],
@@ -1639,7 +1646,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             except FarmAoiTooLargeError as exc:
                 raise _FarmJobFailed(str(exc), "aoi_too_large") from exc
 
-        provider = _provider_factory()
+        provider = _provider_factory(product["provider_code"])
         try:
             try:
                 result = await provider.fetch(

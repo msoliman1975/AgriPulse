@@ -347,7 +347,7 @@ async def test_compute_indices_writes_one_aggregate_and_one_cog_per_index(
         ),
     )
     storage = _S3DictStorage()
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes, cog_bytes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(scenes, cog_bytes))
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: storage)
     _patch_rasterio_open_to_in_memory(monkeypatch, storage=storage)
 
@@ -472,7 +472,7 @@ async def test_compute_indices_applies_scl_cloud_mask(
         ),
     )
     storage = _S3DictStorage()
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes, cog_bytes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(scenes, cog_bytes))
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: storage)
     _patch_rasterio_open_to_in_memory(monkeypatch, storage=storage)
 
@@ -548,7 +548,7 @@ async def test_compute_indices_idempotent_on_rerun(
         ),
     )
     storage = _S3DictStorage()
-    imagery_tasks.set_provider_factory(lambda: _FakeProvider(scenes, cog_bytes))
+    imagery_tasks.set_provider_factory(lambda _code: _FakeProvider(scenes, cog_bytes))
     monkeypatch.setattr(imagery_tasks, "_get_storage", lambda: storage)
     _patch_rasterio_open_to_in_memory(monkeypatch, storage=storage)
 
