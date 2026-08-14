@@ -74,6 +74,15 @@ charts/*.tgz
 .env
 .env.*
 !.env.example
+# The simulation harness's credentials file holds a PlatformAdmin login and
+# the Keycloak master admin password. `.sim.env` is NOT matched by the two
+# rules above — `.env` matches only that exact name, `.env.*` only that
+# prefix — so it needs naming outright. Same for the older smoke files, and
+# for `runs/`, whose ledgers carry the throwaway tenant's passwords.
+scripts/sim/.sim.env
+scripts/e2e/.smoke.env
+scripts/e2e/.smoke.state.json
+runs/
 # .env.development + .env.production carry committed dev-cluster
 # defaults so Vite has values to inline at build time. They contain
 # only public hostnames/client_ids, no secrets.

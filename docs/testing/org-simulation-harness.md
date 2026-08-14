@@ -240,6 +240,14 @@ Two farms, deliberately asymmetric so they don't test the same thing twice.
 - Subscribe blocks to weather and imagery products.
 - Assign a plan template to Farm B's blocks.
 
+> **Acts 0–3 are BUILT.** `python scripts/sim/spine.py --snapshot snap.json`. Config in
+> `scripts/sim/.sim.env` (gitignored — it holds a PlatformAdmin login and the Keycloak master
+> password). Per-run ledger and state land in `runs/<run_id>/`, also gitignored.
+>
+> `SIM_TENANT_PREFIX` **must** equal the deployed `NOTIFICATION_SINK_TENANT_PREFIX`. Act 0
+> cannot read the deployed setting and does not pretend to; Act 3 fires a real alert and fails
+> the run if any dispatch row says `sent`.
+
 ### Act 3 — History injection · *harness, not an agent*
 
 Deterministic and scripted, because this is the part that must be identical run to run.
@@ -350,11 +358,16 @@ and green in integration tests; the prod proof is outstanding** — three consec
 provision/purge cycles against a deployed build, with no email suffix. *This phase alone is
 worth shipping: both items are prod-ops improvements independent of any testing.*
 
-One thing Phase 1 established that changes later phases: `frontend/e2e/fixtures.ts` is **fully
-mocked** — fake JWT in sessionStorage, every `/api/v1/**` call intercepted, unmocked mutations
-answering 501. It never reaches a backend and is no use as a base for live simulation. The real
-starting point is `scripts/e2e/*.py`, which already does real Keycloak direct-grant against
-prod.
+Two things Phase 1 established that change later phases:
+
+- `frontend/e2e/fixtures.ts` is **fully mocked** — fake JWT in sessionStorage, every
+  `/api/v1/**` call intercepted, unmocked mutations answering 501. It never reaches a backend
+  and is no use as a base for live simulation.
+- **`scripts/e2e/` is mostly uncommitted.** Only `identity_smoke.py` is in git;
+  `provision_demo.py`, `mint_oidc.py`, `setup_demo_data.py`, `finish_demo_setup.py` and
+  `rbac_sweep.py` exist solely in one working directory and would vanish with it. The spine is
+  therefore self-contained and depends on none of them — `identity_smoke.py` was the reference
+  for the proven tenant-create and direct-grant calls.
 
 **Phase 2 — Deterministic spine (no agents yet).** P3 clone tool, P4 notification sink, Acts 0–3
 fully scripted, ending with asserted non-zero recommendations and alerts. Success: a tenant that
