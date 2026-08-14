@@ -14,24 +14,34 @@ seeded in ``public.indices_catalog`` (migration 0008 for the first six,
 0027 for ``ndmi``, 0061 for ``bsi``/``msi``); we restate them here as
 actual numpy operations.
 
+Plus three **thermal** indices — ``lst``, ``cwsi``, ``smi`` — which come
+from a different product (`landsat_c2_l2_st`, public migration 0066) with
+a disjoint band set. They are kept in their own tuple and reached through
+``compute_indices_for_product``; ``compute_all_indices`` still means the
+Sentinel-2 set and would raise KeyError on Landsat bands.
+
 Note that not every index is a normalized difference bounded to [-1, 1]:
 ``msi`` is a plain band *ratio* in roughly [0, 3], and it runs the
-opposite way to the rest (higher = more stress). Anything downstream that
-assumes a [-1, 1] range or a "higher is healthier" polarity has to special
--case it — see ``indices_catalog.value_min/value_max`` and the frontend's
-``INDEX_BANDS`` tone table.
+opposite way to the rest (higher = more stress); ``lst`` is a physical
+temperature in **degrees Celsius**, the only index here with a unit at
+all. Anything downstream that assumes a [-1, 1] range or a "higher is
+healthier" polarity has to special-case both — see
+``indices_catalog.value_min/value_max`` and the frontend's ``INDEX_BANDS``
+tone table.
 
-All inputs assumed to be FLOAT32 surface-reflectance values in 0..1
-(Sentinel-2 L2A's `evalscript` already normalises to that range — see
-``providers/sentinel_hub.py``). Division-by-zero is masked rather
-than raising: the resulting index pixel becomes ``NaN`` and is dropped
-from the valid-pixel count downstream.
+Spectral inputs are FLOAT32 surface-reflectance values in 0..1 (both
+adapters normalise to that range — see ``providers/sentinel_hub.py`` and
+``providers/landsat_pc.py``). The one exception is ``lwir11``, which
+arrives in **kelvin**. Division-by-zero is masked rather than raising:
+the resulting index pixel becomes ``NaN`` and is dropped from the
+valid-pixel count downstream.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -76,10 +86,19 @@ S2_L2A_BAND_ORDER: tuple[str, ...] = (
 # numbers move. Adding `bsi`/`msi` left every prior series byte-identical, so
 # a bump would have announced a methodology break that did not happen and
 # split seven healthy trend lines in two. `ndmi` (0027) set this precedent.
+#
+# Adding `lst`/`cwsi`/`smi` and the `landsat_qa_pixel_v1` ruleset followed the
+# same reasoning and did NOT bump: they are a new product's index set on a new
+# band set, reached through a separate code path, and no Sentinel-2 formula,
+# band set or masking rule changed. Every existing series is byte-identical,
+# so a bump would have split nine healthy trend lines for a methodology break
+# that did not happen.
 CALC_VERSION = "idx-2026.08"
 
 # Names the SCL class set below, so a stored row records *which* masking rules
-# ran rather than just that some did.
+# ran rather than just that some did. `PRODUCT_MASK_RULESETS` maps each product
+# to its own name — Landsat's quality band is a bitmask, not a class enum, so
+# it needs a different ruleset rather than a different class list.
 MASK_RULESET = "s2_scl_v1"
 
 # Indices supported today. Order matches the catalog's seeded rows.
@@ -124,6 +143,104 @@ def scl_cloud_mask(scl: NDArray[Any]) -> NDArray[np.bool_]:
     """
     codes = np.rint(scl).astype(np.int16, copy=False)
     return np.isin(codes, S2_SCL_MASKED_CLASSES)
+
+
+# --- Landsat thermal (product `landsat_c2_l2_st`) --------------------------
+
+# Landsat's quality band is a *bitmask*, not a class enum — a different
+# encoding from Sentinel-2's SCL, so `S2_SCL_MASKED_CLASSES` does not
+# transfer and the two need separate rulesets. Collection-2 QA_PIXEL bits:
+#
+#   0 fill · 1 dilated cloud · 2 cirrus · 3 cloud · 4 cloud shadow
+#   5 snow · 6 clear · 7 water · 8-15 per-class confidence pairs
+#
+# We drop bits 0-5 and keep water (bit 7), matching the SCL ruleset above
+# which keeps class 6 (water) and class 2 (dark area).
+#
+# Measured over the Bashier Elkhier farm across 12 months (86 scenes,
+# L8 43 + L9 43), sampling 22 of them and masking with the rules below:
+#
+#   farm >= 90% clear pixels ............... 19/22  (86%)
+#   scene-level eo:cloud_cover <= 10% ...... 15/22  (68%)
+#   median farm clear fraction ............. 100%
+#
+# The scene-level number is the one the study quoted as a usable-cadence
+# floor, and it IS a floor: 4 of the 22 scenes carry >10% scene cloud yet
+# are >=90% clear over the farm — one at 37.8% scene cloud is 100% clear
+# here. `eo:cloud_cover` describes a 185 km scene, and our farm is 85 ha.
+#
+# Operational consequence: do NOT set a tight `cloud_cover_max_pct` on a
+# thermal subscription. It discards scenes that are perfectly usable over
+# the AOI, and it does not even protect against the converse — two
+# sampled scenes with modest scene cloud (16.6%, 43.0%) were 0% clear
+# over the farm. Per-pixel QA is the only honest filter.
+LANDSAT_QA_MASKED_BITS: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
+
+_LANDSAT_QA_MASK = sum(1 << bit for bit in LANDSAT_QA_MASKED_BITS)
+
+
+def landsat_qa_pixel_mask(qa_pixel: NDArray[Any]) -> NDArray[np.bool_]:
+    """Boolean mask, True where the Landsat QA_PIXEL bits say unusable.
+
+    Like ``scl_cloud_mask``, ``qa_pixel`` arrives as FLOAT32 because the
+    multi-band COG is a single dtype. uint16 is exactly representable in
+    float32 (16 bits < 24-bit mantissa), so the bit patterns survive the
+    round-trip and only need rounding back to an integer before masking.
+
+    Note the polarity trap: bit 6 means *clear*, so testing "is any bit
+    set" would mask every good pixel. Only bits 0-5 are failure bits.
+    """
+    codes = np.rint(qa_pixel).astype(np.uint16, copy=False)
+    return (codes & np.uint16(_LANDSAT_QA_MASK)) != 0
+
+
+# Absolute zero, for the Collection-2 Level-2 kelvin -> Celsius step.
+_KELVIN_OFFSET = 273.15
+
+# Canopy-to-air temperature difference bounds for the simplified CWSI.
+#
+# A canopy transpiring freely evaporatively cools itself *below* air
+# temperature; one that has closed its stomata runs above it. These two
+# numbers are the 0 and 1 ends of the scale.
+#
+# ⚠️ KNOWN DEBT: a rigorous CWSI derives the lower bound from a
+# crop- and site-specific non-water-stressed baseline (Idso's VPD
+# regression), not a constant. These are literature values for a
+# well-coupled orchard canopy and have NOT been calibrated for Egyptian
+# mango. Read the output as a relative signal over time, not an absolute
+# stress threshold — the same species of debt the indices guide flags for
+# LAI. Calibrating this is what would make CWSI actionable for irrigation
+# volumes; until then it must not drive them.
+CWSI_DT_WET_C = -2.0
+CWSI_DT_DRY_C = 6.0
+
+# The LST-NDVI triangle degenerates when every pixel has the same
+# greenness: the dry and wet edges collapse onto each other and their
+# fitted slopes become noise. A uniform mango block is exactly that case,
+# so below this NDVI span `smi` falls back to a plain LST normalisation
+# and says so rather than reporting a fitted edge it cannot support.
+SMI_MIN_NDVI_SPAN = 0.20
+SMI_NDVI_BINS = 20
+SMI_MIN_BIN_PIXELS = 5
+
+# Thermal indices, in catalog order. Kept separate from
+# ``STANDARD_INDEX_CODES`` because they come from a different product with
+# a different band set — a farm can carry both, or the optical one alone.
+THERMAL_INDEX_CODES: tuple[str, ...] = ("lst", "cwsi", "smi")
+
+# Which index set each product produces, and which masking rules its
+# quality band follows. Dispatching on the product code keeps the
+# pipeline honest: `compute_all_indices` would raise KeyError if handed a
+# Landsat band set, and a stored aggregate row records *which* rules ran.
+PRODUCT_INDEX_CODES: dict[str, tuple[str, ...]] = {
+    "s2_l2a": STANDARD_INDEX_CODES,
+    "landsat_c2_l2_st": THERMAL_INDEX_CODES,
+}
+
+PRODUCT_MASK_RULESETS: dict[str, str] = {
+    "s2_l2a": MASK_RULESET,
+    "landsat_c2_l2_st": "landsat_qa_pixel_v1",
+}
 
 
 # --- Aggregate result -----------------------------------------------------
@@ -265,6 +382,265 @@ def msi(nir: NDArray[Any], swir1: NDArray[Any]) -> NDArray[np.float32]:
     Rock et al. (1986), ERIM 4th Thematic Conference.
     """
     return _safe_divide(swir1, nir)
+
+
+# --- Thermal index formulas ------------------------------------------------
+
+
+def lst(lwir11: NDArray[Any]) -> NDArray[np.float32]:
+    """Land Surface Temperature in **degrees Celsius**.
+
+    ``lwir11`` arrives in kelvin: the provider adapter has already applied
+    Collection-2's ``DN * 0.00341802 + 149.0`` and turned fill pixels into
+    NaN, so this is only the unit conversion.
+
+    ⚠️ This is the first index in this module that is not dimensionless.
+    Everything that assumes a [-1, 1] range or a "higher is healthier"
+    polarity is wrong for it on both counts — see ``msi`` for the other
+    exception, and ``indices_catalog.value_min/value_max``.
+    """
+    values = lwir11.astype(np.float32, copy=False)
+    return (values - np.float32(_KELVIN_OFFSET)).astype(np.float32, copy=False)
+
+
+def cwsi(lst_c: NDArray[Any], air_temp_c: float) -> NDArray[np.float32]:
+    """Crop Water Stress Index, simplified temperature-difference form.
+
+    ``(dT - dT_wet) / (dT_dry - dT_wet)`` where ``dT = LST - Tair``.
+
+    0 is a freely transpiring canopy, 1 a fully stressed one. Clipped to
+    that range: the bounds are literature constants, so a pixel outside
+    them means the constants are off for this site, not that stress is
+    negative.
+
+    ``air_temp_c`` is a scalar for the whole AOI — the hourly weather feed
+    interpolated to the satellite overpass minute. Using air temperature
+    rather than the AOI's own spread is what keeps this independent of
+    ``smi``: normalise the AOI twice and the two indices are just each
+    other's inverse, carrying no separate information.
+
+    See ``CWSI_DT_WET_C`` for the calibration debt this carries.
+    """
+    delta = lst_c.astype(np.float32, copy=False) - np.float32(air_temp_c)
+    span = np.float32(CWSI_DT_DRY_C - CWSI_DT_WET_C)
+    raw = (delta - np.float32(CWSI_DT_WET_C)) / span
+    return np.clip(raw, 0.0, 1.0).astype(np.float32, copy=False)
+
+
+def smi(lst_c: NDArray[Any], ndvi_values: NDArray[Any]) -> NDArray[np.float32]:
+    """Soil Moisture Index from the LST-NDVI triangle.
+
+    For a given greenness, wetter ground runs cooler, so the spread of
+    temperature at equal NDVI maps to moisture. We fit a dry edge (hottest
+    pixel per NDVI bin) and a wet edge (coolest), then place each pixel
+    between them: 1 on the wet edge, 0 on the dry one.
+
+    ``ndvi_values`` MUST come from the same scene as ``lst_c`` — the
+    Landsat red/nir08 bands, not our 10 m Sentinel-2 stack. The triangle
+    is only valid when both surfaces are the same ground at the same
+    moment; pairing a morning Landsat LST with a different day's S2 NDVI
+    silently fits edges to two unrelated surfaces.
+
+    Falls back to a plain LST normalisation when the NDVI span is too
+    narrow to define edges (see ``SMI_MIN_NDVI_SPAN``) — the usual case
+    for a uniform block, where a fitted slope would be pure noise.
+    """
+    temps = lst_c.astype(np.float32, copy=False)
+    greens = ndvi_values.astype(np.float32, copy=False)
+    usable = np.isfinite(temps) & np.isfinite(greens)
+    if not usable.any():
+        return np.full(temps.shape, np.float32("nan"), dtype=np.float32)
+
+    edges = _fit_triangle_edges(temps[usable], greens[usable])
+    if edges is None:
+        return _normalise_inverted(temps, usable)
+
+    (dry_intercept, dry_slope), (wet_intercept, wet_slope) = edges
+    dry = dry_intercept + dry_slope * greens
+    wet = wet_intercept + wet_slope * greens
+    span = dry - wet
+    with np.errstate(divide="ignore", invalid="ignore"):
+        raw = np.where(span > 0, (dry - temps) / span, np.nan)
+    return np.clip(raw, 0.0, 1.0).astype(np.float32, copy=False)
+
+
+def _fit_triangle_edges(
+    temps: NDArray[np.float32], greens: NDArray[np.float32]
+) -> tuple[tuple[float, float], tuple[float, float]] | None:
+    """Least-squares dry/wet edges over NDVI bins, or None if degenerate.
+
+    Returns ``((dry_intercept, dry_slope), (wet_intercept, wet_slope))``.
+    None means the triangle could not be supported — too narrow an NDVI
+    span, or too few populated bins to fit a line through.
+    """
+    ndvi_min = float(greens.min())
+    ndvi_max = float(greens.max())
+    if ndvi_max - ndvi_min < SMI_MIN_NDVI_SPAN:
+        return None
+
+    bin_edges = np.linspace(ndvi_min, ndvi_max, SMI_NDVI_BINS + 1)
+    # `- 1` maps the value back to a 0-based bin; `clip` folds the
+    # rightmost edge into the last bin instead of its own empty one.
+    membership = np.clip(np.digitize(greens, bin_edges) - 1, 0, SMI_NDVI_BINS - 1)
+
+    centres: list[float] = []
+    hottest: list[float] = []
+    coolest: list[float] = []
+    for index in range(SMI_NDVI_BINS):
+        in_bin = membership == index
+        if int(np.count_nonzero(in_bin)) < SMI_MIN_BIN_PIXELS:
+            continue
+        centres.append(float((bin_edges[index] + bin_edges[index + 1]) / 2.0))
+        hottest.append(float(temps[in_bin].max()))
+        coolest.append(float(temps[in_bin].min()))
+
+    # Two points minimum for a line, and `polyfit` on two identical NDVI
+    # centres would be singular — the span check above rules that out.
+    if len(centres) < 2:
+        return None
+
+    x = np.asarray(centres, dtype=np.float64)
+    dry_slope, dry_intercept = np.polyfit(x, np.asarray(hottest, dtype=np.float64), 1)
+    wet_slope, wet_intercept = np.polyfit(x, np.asarray(coolest, dtype=np.float64), 1)
+    return (
+        (float(dry_intercept), float(dry_slope)),
+        (float(wet_intercept), float(wet_slope)),
+    )
+
+
+def _normalise_inverted(
+    temps: NDArray[np.float32], usable: NDArray[np.bool_]
+) -> NDArray[np.float32]:
+    """Fallback SMI: place each pixel between the AOI's own hot/cold ends.
+
+    Coarser than the triangle — it ignores the NDVI dependence entirely —
+    but on a uniform canopy that dependence is what could not be measured
+    in the first place.
+    """
+    values = temps[usable]
+    hottest = float(values.max())
+    coolest = float(values.min())
+    if hottest - coolest <= 0:
+        # Isothermal AOI: no moisture gradient to report.
+        return np.where(usable, np.float32(0.5), np.float32("nan")).astype(np.float32)
+    raw = (hottest - temps) / np.float32(hottest - coolest)
+    return np.clip(np.where(usable, raw, np.nan), 0.0, 1.0).astype(np.float32, copy=False)
+
+
+def compute_thermal_indices(
+    bands: Mapping[str, NDArray[Any]],
+    *,
+    air_temp_c: float | None,
+) -> dict[str, NDArray[np.float32]]:
+    """Compute LST / CWSI / SMI from the Landsat C2 L2 band set.
+
+    Missing bands raise KeyError — the caller hands in the full
+    `landsat_c2_l2_st` band set.
+
+    NDVI here is deliberately recomputed from the Landsat ``red`` and
+    ``nir08`` bands rather than read from our Sentinel-2 series: SMI's
+    triangle needs both surfaces to be the same ground at the same
+    moment. The 10 m S2 NDVI stays the one we chart.
+
+    ``air_temp_c is None`` means the weather feed had no usable reading
+    to interpolate to the overpass minute. CWSI is then **omitted from
+    the result** rather than returned as NaN or zero: a missing key
+    leaves a gap in the series, which is true, where a fabricated value
+    would read as "no stress". LST and SMI still compute — they need no
+    weather — so one missing hour of weather does not cost the whole
+    scene.
+    """
+    surface_c = lst(bands["lwir11"])
+    landsat_ndvi = ndvi(bands["red"], bands["nir08"])
+    computed: dict[str, NDArray[np.float32]] = {
+        "lst": surface_c,
+        "smi": smi(surface_c, landsat_ndvi),
+    }
+    if air_temp_c is not None:
+        computed["cwsi"] = cwsi(surface_c, air_temp_c)
+    # Catalog order, so downstream writes and charts stay stable.
+    return {code: computed[code] for code in THERMAL_INDEX_CODES if code in computed}
+
+
+def interpolate_air_temp_c(
+    samples: Sequence[tuple[datetime, float | None]],
+    at: datetime,
+) -> float | None:
+    """Linearly interpolate hourly air temperature to the overpass minute.
+
+    The weather feed is hourly and Landsat crosses at ~08:17-08:24 UTC,
+    so the reading CWSI needs almost never lands on a sample. Returns
+    None when there is nothing usable to interpolate between — the
+    caller then omits CWSI rather than inventing a value.
+
+    Exact hits and out-of-range times both resolve to the nearest usable
+    sample when one bracket is missing, so a scene at the very edge of
+    the fetched window still gets a value rather than silently losing
+    CWSI.
+    """
+    usable = sorted(
+        ((time, float(value)) for time, value in samples if value is not None),
+        key=lambda pair: pair[0],
+    )
+    if not usable:
+        return None
+
+    before: tuple[datetime, float] | None = None
+    after: tuple[datetime, float] | None = None
+    for sample in usable:
+        if sample[0] <= at:
+            before = sample
+        else:
+            after = sample
+            break
+
+    if before is None:
+        return after[1] if after is not None else None
+    if after is None:
+        return before[1]
+    if before[0] == at:
+        return before[1]
+
+    span = (after[0] - before[0]).total_seconds()
+    if span <= 0:
+        return before[1]
+    weight = (at - before[0]).total_seconds() / span
+    return before[1] + weight * (after[1] - before[1])
+
+
+def compute_indices_for_product(
+    product_code: str,
+    bands: Mapping[str, NDArray[Any]],
+    *,
+    air_temp_c: float | None = None,
+) -> dict[str, NDArray[np.float32]]:
+    """Compute the index set belonging to `product_code`.
+
+    The pipeline is otherwise fully product-parameterised; this is the
+    one place the maths itself differs, because the two products carry
+    disjoint band sets.
+    """
+    if product_code == "s2_l2a":
+        return compute_all_indices(bands)
+    if product_code == "landsat_c2_l2_st":
+        # `air_temp_c is None` costs CWSI only — see compute_thermal_indices.
+        return compute_thermal_indices(bands, air_temp_c=air_temp_c)
+    raise ValueError(f"No index set defined for product {product_code!r}")
+
+
+def quality_band_mask(product_code: str, quality_band: NDArray[Any]) -> NDArray[np.bool_]:
+    """Mask unusable pixels using the ruleset belonging to `product_code`.
+
+    Sentinel-2's SCL is a class enum; Landsat's QA_PIXEL is a bitmask.
+    Applying one product's rules to the other's quality band produces a
+    plausible-looking mask that is entirely wrong, so this dispatches
+    rather than guessing from the values.
+    """
+    if product_code == "s2_l2a":
+        return scl_cloud_mask(quality_band)
+    if product_code == "landsat_c2_l2_st":
+        return landsat_qa_pixel_mask(quality_band)
+    raise ValueError(f"No mask ruleset defined for product {product_code!r}")
 
 
 def compute_all_indices(
