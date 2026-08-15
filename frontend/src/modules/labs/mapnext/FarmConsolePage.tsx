@@ -50,6 +50,7 @@ import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
+import { FarmSubscriptionsPanel } from "./FarmSubscriptionsPanel";
 import { usePrefs } from "@/prefs/PrefsContext";
 import { useCapability } from "@/rbac/useCapability";
 import { LAST_FARM_KEY } from "./constants";
@@ -1110,14 +1111,23 @@ function SettingsDrawer({
         </div>
         <div className="flex-1 overflow-auto p-5">
           {tab === "farm" ? (
-            <FarmEditTab
-              farmId={farmId}
-              canInactivate={canInactivate}
-              onInactivateFarm={onInactivateFarm}
-              onReactivateFarm={onReactivateFarm}
-              reactivating={reactivating}
-              reactivateError={reactivateError}
-            />
+            <div className="space-y-5">
+              <FarmEditTab
+                farmId={farmId}
+                canInactivate={canInactivate}
+                onInactivateFarm={onInactivateFarm}
+                onReactivateFarm={onReactivateFarm}
+                reactivating={reactivating}
+                reactivateError={reactivateError}
+              />
+              {/* Imagery and weather are subscribed per FARM, so they belong on
+                  the farm tab. This panel shipped into the v2 console only, and
+                  v2 sits behind a beta row in the nav — so for every operator
+                  who clicks the default "Farm management", there has been no
+                  way to subscribe a farm to imagery or weather at all. Same
+                  component as v2 mounts, so the two consoles cannot drift. */}
+              <FarmSubscriptionsPanel farmId={farmId} />
+            </div>
           ) : null}
           {tab === "defaults" ? <BlockDefaultsPanel farmId={farmId} farmName={farmName} /> : null}
           {tab === "members" ? <FarmMembersTab farmId={farmId} /> : null}
