@@ -715,6 +715,34 @@ async def _backfill_farm_indices_async(
             )
         ).all()
 
+        # The farm-AOI half. `imagery_ingestion_jobs` above is keyed per
+        # BLOCK, so it cannot see a scene fetched for the whole farm — and
+        # a cut-over farm has nothing else. Querying only that table made
+        # this task report success having recomputed none of the farm's
+        # actual scenes: on the reference farm it found 1038 pre-cutover
+        # block jobs and zero of the 21 thermal ones. Silent, and worse
+        # than an error because it looks like work.
+        farm_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT j.id
+                      FROM imagery_farm_ingestion_jobs j
+                     WHERE j.farm_id = :farm
+                       AND j.status = 'succeeded'
+                       AND j.scene_datetime >= CAST(:window_from AS date)
+                       AND j.scene_datetime <  CAST(:window_to AS date) + INTERVAL '1 day'
+                     ORDER BY j.scene_datetime ASC
+                    """
+                ),
+                {
+                    "farm": farm_id,
+                    "window_from": _as_date(from_iso),
+                    "window_to": _as_date(to_iso),
+                },
+            )
+        ).all()
+
     # (mark_running already fired in the task wrapper, before the query.)
     for job_id, scene_id, aoi_hash, product_code, provider_code in rows:
         compute_indices.delay(
@@ -727,16 +755,121 @@ async def _backfill_farm_indices_async(
                 aoi_hash=aoi_hash,
             ),
         )
+    for (farm_job_id,) in farm_rows:
+        recompute_farm_scene_indices.delay(str(farm_job_id), tenant_schema)
+
     _log.info(
         "imagery_farm_indices_enqueued",
         farm_id=str(farm_id),
         scenes=len(rows),
+        farm_scenes=len(farm_rows),
         run_id=run_id,
     )
     backfill_progress.finish(
-        run_id, "imagery", counters={"scenes": len(rows), "dispatched": True}, failed=False
+        run_id,
+        "imagery",
+        counters={
+            "scenes": len(rows),
+            # Reported separately, not folded into `scenes`. A cut-over farm
+            # has both shapes in its history, and one number could not say
+            # which half a run actually touched.
+            "farm_scenes": len(farm_rows),
+            "dispatched": True,
+        },
+        failed=False,
     )
-    return {"scenes_enqueued": len(rows)}
+    return {"scenes_enqueued": len(rows), "farm_scenes_enqueued": len(farm_rows)}
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.recompute_farm_scene_indices",
+    bind=False,
+    ignore_result=True,
+    queue="heavy",
+)
+def recompute_farm_scene_indices(job_id: str, tenant_schema: str) -> dict[str, Any]:
+    """Recompute indices for one already-fetched farm-AOI scene.
+
+    The farm-path counterpart to `compute_indices`. That task keys on
+    `imagery_ingestion_jobs` (per block); this one keys on
+    `imagery_farm_ingestion_jobs`, whose scenes it could never see.
+
+    Re-reads the raw COG already in object storage — no provider call, no
+    quota, nothing refetched.
+    """
+    return _run_task(_recompute_farm_scene_indices_async(UUID(job_id), tenant_schema))
+
+
+async def _recompute_farm_scene_indices_async(job_id: UUID, tenant_schema: str) -> dict[str, Any]:
+    storage = _get_storage()
+    factory = AsyncSessionLocal()
+
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        repo = ImageryRepository(session)
+        job = await repo.get_farm_job(job_id)
+        if job is None:
+            return {"job_id": str(job_id), "status": "missing"}
+        # Only a scene that actually landed has a raster to read back.
+        if job["status"] != "succeeded":
+            return {"job_id": str(job_id), "status": job["status"], "noop": True}
+        farm = await repo.get_farm_boundary(job["farm_id"])
+        if farm is None:
+            return {"job_id": str(job_id), "status": "farm_missing"}
+        product = await _lookup_product(session, job["product_id"])
+        air_temp_c = (
+            await _air_temp_at_overpass(
+                session, farm_id=job["farm_id"], scene_time=job["scene_datetime"]
+            )
+            if product["code"] == "landsat_c2_l2_st"
+            else None
+        )
+
+    s3_key = raw_bands_key(
+        provider_code=product["provider_code"],
+        product_code=product["code"],
+        scene_id=job["scene_id"],
+        aoi_hash=farm["aoi_hash"],
+    )
+    try:
+        index_keys, _stac_item_id, aggregates_written = await _compute_farm_scene_indices(
+            tenant_schema=tenant_schema,
+            job=job,
+            farm=farm,
+            product=product,
+            storage=storage,
+            s3_key=s3_key,
+            air_temp_c=air_temp_c,
+        )
+    except _FarmJobFailed as failure:
+        # Deliberately does NOT flip the job to failed. The scene was
+        # fetched and stored successfully; only this recompute failed, and
+        # rewriting history to say the acquisition failed would lose that.
+        _log.warning(
+            "farm_scene_indices_recompute_failed",
+            tenant_schema=tenant_schema,
+            job_id=str(job_id),
+            scene_id=job["scene_id"],
+            error=failure.message,
+            error_code=failure.code,
+        )
+        return {"job_id": str(job_id), "status": "failed", "error": failure.message}
+
+    _log.info(
+        "farm_scene_indices_recomputed",
+        tenant_schema=tenant_schema,
+        farm_id=str(job["farm_id"]),
+        scene_id=job["scene_id"],
+        product=product["code"],
+        indices=len(index_keys),
+        block_aggregates=aggregates_written,
+    )
+    return {
+        "job_id": str(job_id),
+        "status": "succeeded",
+        "indices": sorted(index_keys),
+        "block_aggregates": aggregates_written,
+    }
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -1289,6 +1422,86 @@ async def _rebuild_farm_rasters_async(
 # `fetch_farm_aoi` defaults to FALSE.
 
 
+async def _compute_farm_scene_indices(
+    *,
+    tenant_schema: str,
+    job: dict[str, Any],
+    farm: dict[str, Any],
+    product: dict[str, Any],
+    storage: StorageClient,
+    s3_key: str,
+    air_temp_c: float | None,
+) -> tuple[dict[str, str], str, int]:
+    """Compute one farm scene's indices from its stored raw COG.
+
+    Everything after the fetch: read the raster back, compute the
+    product's index set, write each index COG, and measure every block
+    off that surface.
+
+    Shared by the two callers deliberately. `_acquire_farm_scene_async`
+    runs it right after storing the bytes; `_recompute_farm_scene_indices
+    _async` runs it against a scene fetched days ago. They had every
+    reason to drift apart — one has a provider in hand and the other does
+    not — and a farm-path recompute that computed indices slightly
+    differently from the live path would be nearly impossible to spot,
+    because both produce plausible numbers.
+
+    Returns ``(index_keys, stac_item_id, block_aggregates_written)``.
+    Raises `_FarmJobFailed` with the same error codes the live path used.
+    """
+    # Local import: rasterio and numpy belong to the heavy worker only.
+    from app.modules.imagery._rasterio_io import (
+        compute_and_write_indices,
+        load_raw_bands_and_aggregate,
+    )
+
+    try:
+        bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
+            f"s3://{storage.bucket}/{s3_key}",
+            band_names=tuple(product["bands"]),
+            aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+            product_code=product["code"],
+        )
+        _aggregates, index_keys, index_rasters = compute_and_write_indices(
+            bands_arrays=bands_arrays,
+            aoi_mask=aoi_mask,
+            cloud_mask=cloud_mask,
+            profile=profile,
+            storage=storage,
+            provider_code=product["provider_code"],
+            product_code=product["code"],
+            scene_id=job["scene_id"],
+            aoi_hash=farm["aoi_hash"],
+            air_temp_c=air_temp_c,
+        )
+    except Exception as exc:
+        raise _FarmJobFailed(f"compute_indices_failed: {exc}", "compute_error") from exc
+
+    stac_item_id = (
+        f"{product['provider_code']}/{product['code']}/{job['scene_id']}/{farm['aoi_hash']}"
+    )
+
+    # Measure every block off this surface. Without it, switching a farm to
+    # farm-AOI fetching would leave Insights, alerts, recommendations and
+    # baselines with no new numbers at all — the surface would look right and
+    # every figure beside it would quietly stop moving.
+    try:
+        aggregates_written = await _write_block_aggregates_from_farm(
+            tenant_schema=tenant_schema,
+            farm_id=job["farm_id"],
+            product_id=job["product_id"],
+            scene_datetime=job["scene_datetime"],
+            stac_item_id=stac_item_id,
+            cloud_cover_pct=job["cloud_cover_pct"],
+            index_rasters=index_rasters,
+            profile=profile,
+        )
+    except Exception as exc:
+        raise _FarmJobFailed(f"block_aggregates_failed: {exc}", "compute_error") from exc
+
+    return index_keys, stac_item_id, aggregates_written
+
+
 async def _write_block_aggregates_from_farm(
     *,
     tenant_schema: str,
@@ -1810,33 +2023,15 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
         except Exception as exc:
             raise _FarmJobFailed(f"s3_put_failed: {exc}", "storage_error") from exc
 
-        # Local import: rasterio and numpy belong to the heavy worker only.
-        from app.modules.imagery._rasterio_io import (
-            compute_and_write_indices,
-            load_raw_bands_and_aggregate,
+        index_keys, stac_item_id, aggregates_written = await _compute_farm_scene_indices(
+            tenant_schema=tenant_schema,
+            job=job,
+            farm=farm,
+            product=product,
+            storage=storage,
+            s3_key=s3_key,
+            air_temp_c=farm_air_temp_c,
         )
-
-        try:
-            bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
-                f"s3://{storage.bucket}/{s3_key}",
-                band_names=tuple(product["bands"]),
-                aoi_geojson_utm36n=farm["boundary_utm_geojson"],
-                product_code=product["code"],
-            )
-            _aggregates, index_keys, index_rasters = compute_and_write_indices(
-                bands_arrays=bands_arrays,
-                aoi_mask=aoi_mask,
-                cloud_mask=cloud_mask,
-                profile=profile,
-                storage=storage,
-                provider_code=product["provider_code"],
-                product_code=product["code"],
-                scene_id=job["scene_id"],
-                aoi_hash=farm["aoi_hash"],
-                air_temp_c=farm_air_temp_c,
-            )
-        except Exception as exc:
-            raise _FarmJobFailed(f"compute_indices_failed: {exc}", "compute_error") from exc
     except _FarmJobFailed as failure:
         await _fail_farm_job(
             tenant_schema=tenant_schema,
@@ -1844,35 +2039,6 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             farm_id=job["farm_id"],
             error=failure.message,
             error_code=failure.code,
-        )
-        return {"job_id": str(job_id), "status": "failed"}
-
-    stac_item_id = (
-        f"{product['provider_code']}/{product['code']}/{job['scene_id']}/{farm['aoi_hash']}"
-    )
-
-    # Measure every block off this surface. Without it, switching a farm to
-    # farm-AOI fetching would leave Insights, alerts, recommendations and
-    # baselines with no new numbers at all — the surface would look right and
-    # every figure beside it would quietly stop moving.
-    try:
-        aggregates_written = await _write_block_aggregates_from_farm(
-            tenant_schema=tenant_schema,
-            farm_id=job["farm_id"],
-            product_id=job["product_id"],
-            scene_datetime=job["scene_datetime"],
-            stac_item_id=stac_item_id,
-            cloud_cover_pct=job["cloud_cover_pct"],
-            index_rasters=index_rasters,
-            profile=profile,
-        )
-    except Exception as exc:
-        await _fail_farm_job(
-            tenant_schema=tenant_schema,
-            job_id=job_id,
-            farm_id=job["farm_id"],
-            error=f"block_aggregates_failed: {exc}",
-            error_code="compute_error",
         )
         return {"job_id": str(job_id), "status": "failed"}
 

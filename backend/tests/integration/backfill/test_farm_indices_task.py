@@ -86,7 +86,9 @@ async def test_window_binds_as_an_iso_date(farm_env: dict[str, Any]) -> None:
     result = await imagery_tasks._backfill_farm_indices_async(
         farm_env["farm_id"], farm_env["schema"], window_from, date.today().isoformat(), None
     )
-    assert result == {"scenes_enqueued": 0}
+    # Both shapes are reported separately: a cut-over farm carries both in
+    # its history, and one combined number could not say which half ran.
+    assert result == {"scenes_enqueued": 0, "farm_scenes_enqueued": 0}
 
 
 @pytest.mark.asyncio
@@ -99,7 +101,9 @@ async def test_window_also_accepts_a_full_iso_datetime(farm_env: dict[str, Any])
         "2026-07-30T00:00:00+00:00",
         None,
     )
-    assert result == {"scenes_enqueued": 0}
+    # Both shapes are reported separately: a cut-over farm carries both in
+    # its history, and one combined number could not say which half ran.
+    assert result == {"scenes_enqueued": 0, "farm_scenes_enqueued": 0}
 
 
 @pytest.mark.asyncio
