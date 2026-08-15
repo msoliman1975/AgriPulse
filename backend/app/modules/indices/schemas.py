@@ -27,6 +27,11 @@ class IndexCatalogEntry(BaseModel):
     formula_text: str
     value_min: Decimal
     value_max: Decimal
+    # Display symbol, empty for the dimensionless majority. `lst` is the
+    # only index carrying one today, and the reason this field exists:
+    # a chart printing `31.85` with no `°C` is ambiguous against every
+    # other index on the same screen.
+    unit: str
     physical_meaning: str | None
     is_standard: bool
 

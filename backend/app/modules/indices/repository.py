@@ -337,7 +337,7 @@ class IndicesRepository:
                 await self._session.execute(
                     text(
                         "SELECT id, code, name_en, name_ar, formula_text, "
-                        "value_min, value_max, physical_meaning, is_standard "
+                        "value_min, value_max, unit, physical_meaning, is_standard "
                         "FROM public.indices_catalog "
                         "WHERE deleted_at IS NULL "
                         "ORDER BY code"

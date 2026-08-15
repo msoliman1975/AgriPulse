@@ -8,6 +8,13 @@ if they drifted: the band list must exclude the quality band, the
 supported-index list must name the three thermal indices, and LST's
 bounds must be a temperature range rather than the [-1, 1] every other
 index uses.
+
+There is deliberately no downgrade test here. `test_seed_migration_
+idempotent` in test_public_pgstac_and_catalog.py already downgrades the
+whole public chain to 0007 and back up to head, so 0066's downgrade is
+executed there with far better coverage than a hand-written check — and
+a hand-written one has to take write locks on platform-wide catalog rows
+that roughly 800 other tests read.
 """
 
 from __future__ import annotations
@@ -101,81 +108,6 @@ async def test_thermal_indices_seeded(admin_session: AsyncSession) -> None:
     for code in ("cwsi", "smi"):
         assert float(rows[code].value_min) == 0.0
         assert float(rows[code].value_max) == 1.0
-
-
-@pytest.mark.asyncio
-async def test_downgrade_sql_removes_exactly_its_own_rows(
-    admin_session: AsyncSession,
-) -> None:
-    """Exercise 0066's downgrade statements, then roll back.
-
-    The migration's own upgrade is proven by every other test in this
-    file (the conftest runs migrations to head). The downgrade is not
-    otherwise executed anywhere, so its SQL — in particular the typed
-    array bind, since a postfix `:codes::text[]` cast dies inside
-    `text()` — would go unverified until someone needed it.
-
-    Everything happens inside a transaction that is rolled back, so the
-    session-scoped catalog is left untouched for other tests.
-    """
-    from sqlalchemy import bindparam
-    from sqlalchemy.dialects import postgresql
-    from sqlalchemy.types import Text
-
-    trans = await admin_session.begin()
-    try:
-        await admin_session.execute(
-            text("DELETE FROM public.indices_catalog WHERE code = ANY(:codes)").bindparams(
-                bindparam("codes", type_=postgresql.ARRAY(Text()))
-            ),
-            {"codes": ["lst", "cwsi", "smi"]},
-        )
-        await admin_session.execute(
-            text(
-                """
-                DELETE FROM public.imagery_products
-                 WHERE code = :code
-                   AND provider_id = (
-                       SELECT id FROM public.imagery_providers WHERE code = :provider_code
-                   )
-                """
-            ),
-            {"code": "landsat_c2_l2_st", "provider_code": "landsat_pc"},
-        )
-        await admin_session.execute(
-            text("DELETE FROM public.imagery_providers WHERE code = :code"),
-            {"code": "landsat_pc"},
-        )
-
-        # The thermal rows are gone...
-        assert (
-            await admin_session.execute(
-                text(
-                    "SELECT count(*) FROM public.indices_catalog "
-                    "WHERE code IN ('lst','cwsi','smi')"
-                )
-            )
-        ).scalar_one() == 0
-        # ...and the Sentinel-2 catalog is untouched.
-        assert (
-            await admin_session.execute(
-                text("SELECT count(*) FROM public.imagery_products WHERE code = 's2_l2a'")
-            )
-        ).scalar_one() == 1
-        assert (
-            await admin_session.execute(
-                text("SELECT count(*) FROM public.indices_catalog WHERE code = 'ndvi'")
-            )
-        ).scalar_one() == 1
-    finally:
-        await trans.rollback()
-
-    # Rolled back: the seed is still there for whatever runs next.
-    assert (
-        await admin_session.execute(
-            text("SELECT count(*) FROM public.imagery_providers WHERE code = 'landsat_pc'")
-        )
-    ).scalar_one() == 1
 
 
 @pytest.mark.asyncio

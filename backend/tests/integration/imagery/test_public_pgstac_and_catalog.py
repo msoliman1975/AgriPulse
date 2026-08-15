@@ -181,6 +181,15 @@ async def test_seed_migration_idempotent(admin_session: AsyncSession) -> None:
         await admin_session.execute(text("SELECT count(*) FROM public.indices_catalog"))
     ).scalar_one()
 
+    # Release this session's read transaction BEFORE running migrations on
+    # another connection. The SELECT above leaves an open transaction
+    # holding ACCESS SHARE on `indices_catalog`; any downgrade in the chain
+    # that does DDL on that table needs ACCESS EXCLUSIVE and will wait on
+    # it forever. Public 0067 (`ALTER TABLE ... DROP COLUMN unit`) is the
+    # first such migration, and it hung CI for the full job timeout with
+    # no error — a lock wait looks exactly like a slow test.
+    await admin_session.rollback()
+
     # Reapply by running the seed SQL paths that 0008 issues.
     from pathlib import Path
 
