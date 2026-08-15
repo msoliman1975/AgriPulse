@@ -149,6 +149,22 @@ describe("FarmSubscriptionsPanel", () => {
     expect(screen.getByText(/limit 2500/)).toBeTruthy();
   });
 
+  it("does not call a farm too large just because the api has not shipped yet", async () => {
+    // Each chart is its own ArgoCD app, so the frontend can reach prod before
+    // the api that answers `farm_aoi_fetchable`. Read as a bare falsy check,
+    // an absent field reports EVERY farm as too large, sized "undefined".
+    const { farm_aoi_fetchable, farm_aoi_width_px, farm_aoi_height_px, ...old } = subscription();
+    void farm_aoi_fetchable;
+    void farm_aoi_width_px;
+    void farm_aoi_height_px;
+    h.imagery.mockResolvedValue([old]);
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+
+    await waitFor(() => expect(screen.getByText(/Fetched per block/i)).toBeTruthy());
+    expect(screen.queryByText(/too large/i)).toBeNull();
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
+
   it("lets the cloud cap be set, not just the cadence", async () => {
     // The old template exposed this and the first version of this panel did
     // not, so a farm could be subscribed with no way to tune the one setting

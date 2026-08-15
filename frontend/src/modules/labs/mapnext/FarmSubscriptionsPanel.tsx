@@ -97,7 +97,11 @@ function FetchScope({ sub }: { sub: FarmImagerySubscription }): ReactNode {
   if (sub.fetch_farm_aoi) {
     return <span className="text-xs text-ap-muted">{t("farmSubs.scope.wholeFarm")}</span>;
   }
-  if (!sub.farm_aoi_fetchable) {
+  // `=== false`, not `!`: each chart is its own ArgoCD app, so the frontend can
+  // reach prod before the api that answers this field. Absent must mean "not
+  // measured", or a frontend-first promote reports every farm on the platform
+  // as too large, with undefined for the numbers.
+  if (sub.farm_aoi_fetchable === false) {
     return (
       <span className="text-xs text-ap-warn">
         {t("farmSubs.scope.tooLarge", {
