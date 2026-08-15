@@ -23,13 +23,16 @@ existing hourly detector (``farms/consistency_check.py``) only reports.
 from __future__ import annotations
 
 import logging
+import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
-from app.shared.db.session import sanitize_tenant_schema
+from app.shared.db.session import get_engine, sanitize_tenant_schema
 from app.shared.purge.registry import (
     BLOCK_OWNED,
     FARM_OWNED,
@@ -38,6 +41,57 @@ from app.shared.purge.registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: Anything that can run a read: a Session, or the scan's own Connection.
+Executor = AsyncSession | AsyncConnection
+
+#: Chunks per counting statement.
+#:
+#: The tenant history tables are TimescaleDB hypertables, and a query against a
+#: hypertable takes an AccessShareLock on **every chunk and every chunk index**
+#: it might read — the planner opens them all, so neither a WHERE nor a LIMIT
+#: reduces it. Prod measures 1371 chunks and 8158 chunk indexes: one sweep of
+#: every tenant is ~9,500 relation locks.
+#:
+#: That is checked against a *global* pool of
+#: ``max_locks_per_transaction * max_connections`` entries — 64 * 200 = 12,800
+#: here — shared by every backend, NOT a per-transaction allowance. So the old
+#: single-transaction sweep sat at ~74% of the whole cluster's lock table and
+#: died with "out of shared memory" whenever anything else was running. That is
+#: also why it looked intermittent.
+#:
+#: 25 chunks * (1 table + ~3 indexes) is ~100 locks per statement, held only for
+#: that statement. Raising this trades safety margin for round trips; it must
+#: stay far below the pool, because the pool is shared.
+_CHUNK_BATCH = 25
+
+#: Chunk identifiers come from the TimescaleDB catalog, never from a caller,
+#: but they are interpolated into SQL, so they are checked all the same.
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+@asynccontextmanager
+async def _scan_connection() -> AsyncIterator[AsyncConnection]:
+    """A dedicated AUTOCOMMIT connection for the lock-heavy counting.
+
+    Two reasons this cannot run on the caller's session. Locks are released
+    only when a transaction ends, and every caller hands us a session already
+    inside ``session.begin()`` — so accumulating a whole sweep's locks there is
+    exactly the bug. And we cannot simply roll back between batches to release
+    them: the request session carries ``SET LOCAL search_path``, which a
+    rollback would discard, and it would leave the caller's ``begin()`` block
+    on a closed transaction.
+
+    AUTOCOMMIT gives every statement its own transaction, so each batch's locks
+    are gone the moment it returns. Read-only throughout.
+    """
+    engine = get_engine()
+    conn = await engine.connect()
+    try:
+        yield await conn.execution_options(isolation_level="AUTOCOMMIT")
+    finally:
+        await conn.close()
+
 
 # owner column -> (parent table, whether the parent lives in public)
 _PARENTS: dict[str, tuple[str, bool]] = {
@@ -84,32 +138,97 @@ class ScanResult:
 
 
 async def scan_tenant_schema(session: AsyncSession, tenant_schema: str) -> ScanResult:
-    """Scan one tenant schema for rows whose block/farm owner is gone."""
+    """Scan one tenant schema for rows whose block/farm owner is gone.
+
+    ``session`` is accepted for the caller's convenience but deliberately not
+    used for the counting: see :func:`_scan_connection`. The reads are of
+    committed state either way — every caller already gives the scanner its own
+    session precisely so it does not hold locks on a purge's transaction.
+    """
+    del session
     safe = sanitize_tenant_schema(tenant_schema)
     orphans: list[Orphan] = []
     scanned = 0
 
-    for owned in _tenant_scoped(BLOCK_OWNED + FARM_OWNED):
-        parent, _ = _PARENTS[str(owned.owner_column)]
-        if not await _table_exists(session, safe, owned.table):
-            continue
-        scanned += 1
-        # `safe` is sanitize_tenant_schema output; table/column/parent come only
-        # from the hardcoded manifest. Nothing here is user input.
-        n = await _count(
-            session,
-            f"""
-            SELECT count(*) FROM "{safe}"."{owned.table}" t
-             WHERE t.{owned.owner_column} IS NOT NULL
-               AND NOT EXISTS (
-                   SELECT 1 FROM "{safe}"."{parent}" p WHERE p.id = t.{owned.owner_column}
-               )
-            """,  # noqa: S608
-        )
-        if n:
-            orphans.append(Orphan(safe, owned.table, str(owned.owner_column), n))
+    async with _scan_connection() as conn:
+        for owned in _tenant_scoped(BLOCK_OWNED + FARM_OWNED):
+            parent, _ = _PARENTS[str(owned.owner_column)]
+            if not await _table_exists(conn, safe, owned.table):
+                continue
+            scanned += 1
+            n = await _count_owner_orphans(
+                conn, schema=safe, table=owned.table, column=str(owned.owner_column), parent=parent
+            )
+            if n:
+                orphans.append(Orphan(safe, owned.table, str(owned.owner_column), n))
 
     return ScanResult(orphans=orphans, scanned_tables=scanned, schemas=[safe])
+
+
+async def _count_owner_orphans(
+    conn: AsyncConnection, *, schema: str, table: str, column: str, parent: str
+) -> int:
+    """Rows whose owner is gone, counted without locking the world.
+
+    A plain table is one statement. A hypertable is counted chunk by chunk in
+    batches of :data:`_CHUNK_BATCH`, because a single statement against the
+    hypertable would lock all of its chunks and indexes at once — 495 chunks on
+    the largest table here.
+
+    Summing per-chunk counts is exact: chunks partition the hypertable, so
+    every row is counted once. `schema`/`parent` are sanitize_tenant_schema
+    output, table/column come from the hardcoded manifest, and chunk names are
+    catalog values checked against `_IDENT`.
+    """
+    predicate = (
+        f'WHERE t."{column}" IS NOT NULL '  # noqa: S608
+        f'AND NOT EXISTS (SELECT 1 FROM "{schema}"."{parent}" p WHERE p.id = t."{column}")'
+    )
+
+    chunks = await _chunks_of(conn, schema, table)
+    if not chunks:
+        return await _count(
+            conn,
+            f'SELECT count(*) FROM "{schema}"."{table}" t {predicate}',  # noqa: S608
+        )
+
+    total = 0
+    for start in range(0, len(chunks), _CHUNK_BATCH):
+        batch = chunks[start : start + _CHUNK_BATCH]
+        union = " UNION ALL ".join(
+            f'SELECT count(*) AS n FROM "{cs}"."{cn}" t {predicate}'  # noqa: S608
+            for cs, cn in batch
+        )
+        total += await _count(conn, f"SELECT coalesce(sum(n), 0) FROM ({union}) s")  # noqa: S608
+    return total
+
+
+async def _chunks_of(conn: AsyncConnection, schema: str, table: str) -> list[tuple[str, str]]:
+    """(chunk_schema, chunk_name) for a hypertable; empty for a plain table.
+
+    Returns empty when TimescaleDB is absent, so the caller falls back to a
+    single whole-table count.
+    """
+    installed = (
+        await conn.execute(text("SELECT to_regclass('timescaledb_information.chunks')"))
+    ).scalar_one_or_none()
+    if installed is None:
+        return []
+    rows = await conn.execute(
+        text(
+            "SELECT chunk_schema, chunk_name FROM timescaledb_information.chunks "
+            "WHERE hypertable_schema = :s AND hypertable_name = :t "
+            "ORDER BY chunk_name"
+        ),
+        {"s": schema, "t": table},
+    )
+    out: list[tuple[str, str]] = []
+    for chunk_schema, chunk_name in rows:
+        if _IDENT.match(chunk_schema) and _IDENT.match(chunk_name):
+            out.append((chunk_schema, chunk_name))
+        else:  # pragma: no cover - defensive; TimescaleDB does not emit these
+            logger.warning("skipping_suspicious_chunk", extra={"chunk": chunk_name})
+    return out
 
 
 async def scan_public(session: AsyncSession) -> ScanResult:
@@ -279,7 +398,7 @@ async def _count_orphan_farm_refs(
     )
 
 
-async def _table_exists(session: AsyncSession, schema: str, table: str) -> bool:
+async def _table_exists(session: Executor, schema: str, table: str) -> bool:
     return bool(
         (
             await session.execute(
@@ -293,5 +412,5 @@ async def _table_exists(session: AsyncSession, schema: str, table: str) -> bool:
     )
 
 
-async def _count(session: AsyncSession, sql: str) -> int:
+async def _count(session: Executor, sql: str) -> int:
     return int((await session.execute(text(sql))).scalar_one_or_none() or 0)

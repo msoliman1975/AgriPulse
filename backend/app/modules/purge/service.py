@@ -524,9 +524,15 @@ async def _run_external_phase(
 
 
 async def _verify(schema: str) -> dict[str, Any]:
-    """Independent re-scan. A purge that leaves orphans reports itself failed."""
+    """Independent re-scan. A purge that leaves orphans reports itself failed.
+
+    No ``begin()``: the scanner runs its counting on its own AUTOCOMMIT
+    connection so each batch's chunk locks are released immediately, and
+    wrapping the call in a transaction here would only hold a second, idle one
+    open for the length of the scan.
+    """
     factory = AsyncSessionLocal()
-    async with factory() as pub, pub.begin():
+    async with factory() as pub:
         return (await scan_tenant_schema(pub, schema)).as_dict()
 
 
