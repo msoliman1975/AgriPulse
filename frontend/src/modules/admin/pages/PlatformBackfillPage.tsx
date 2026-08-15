@@ -66,6 +66,7 @@ interface FormState {
   to: string;
   imagery: boolean;
   weather: boolean;
+  thermal: boolean;
 }
 
 function useRunForm(defaultFrom: string): [FormState, (patch: Partial<FormState>) => void] {
@@ -76,6 +77,10 @@ function useRunForm(defaultFrom: string): [FormState, (patch: Partial<FormState>
     to: today(),
     imagery: true,
     weather: true,
+    // Off by default. Most farms have no thermal subscription, and a source
+    // with nothing to fetch is exactly the silent no-op the pre-flight
+    // warnings exist to prevent.
+    thermal: false,
   });
   const patch = (p: Partial<FormState>): void => setState((s) => ({ ...s, ...p }));
   return [state, patch];
@@ -358,7 +363,9 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
   const [done, setDone] = useState<string | null>(null);
   const createRun = useCreateBackfillRun();
 
-  const ready = Boolean(form.tenantId && form.farmId && (form.imagery || form.weather));
+  const ready = Boolean(
+    form.tenantId && form.farmId && (form.imagery || form.weather || form.thermal),
+  );
 
   const runEstimate = async (): Promise<void> => {
     setError(null);
@@ -371,6 +378,7 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
           window_to: form.to,
           imagery: form.imagery,
           weather: form.weather,
+          thermal: form.thermal,
         }),
       );
     } catch (err) {
@@ -392,6 +400,7 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
           window_to: form.to,
           imagery: form.imagery,
           weather: form.weather,
+          thermal: form.thermal,
           kind,
         },
       });
@@ -428,6 +437,12 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
           onChange={(v) => patch({ imagery: v })}
           title={isIndices ? t("backfill.source.imageryIndices") : t("backfill.source.imagery")}
           hint={isIndices ? t("backfill.hint.imageryIndices") : t("backfill.hint.imagery")}
+        />
+        <SourceCheck
+          checked={form.thermal}
+          onChange={(v) => patch({ thermal: v })}
+          title={isIndices ? t("backfill.source.thermalIndices") : t("backfill.source.thermal")}
+          hint={isIndices ? t("backfill.hint.thermalIndices") : t("backfill.hint.thermal")}
         />
         <SourceCheck
           checked={form.weather}
@@ -473,6 +488,21 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
           {form.weather && estimate.weather_subscriptions === 0 ? (
             <div className="mt-1.5 font-semibold text-ap-crit">
               {t("backfill.estimate.noWeatherSubs")}
+            </div>
+          ) : null}
+          {/* Thermal is counted on its own cadence and costs nothing, so it
+              gets its own line rather than being folded into the scene total
+              above — which is Sentinel-2-shaped. */}
+          {form.thermal && estimate.thermal_subscriptions > 0 ? (
+            <div className="mt-1 tabular-nums">
+              {t("backfill.estimate.thermal", {
+                scenes: estimate.estimated_thermal_scenes,
+              })}
+            </div>
+          ) : null}
+          {form.thermal && estimate.thermal_subscriptions === 0 ? (
+            <div className="mt-1.5 font-semibold text-ap-crit">
+              {t("backfill.estimate.noThermalSubs")}
             </div>
           ) : null}
         </div>

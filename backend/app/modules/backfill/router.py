@@ -74,11 +74,15 @@ class RunRequest(BaseModel):
     window_to: date
     imagery: bool = False
     weather: bool = False
+    # Its own source, not part of `imagery`: different satellite, cadence,
+    # cost and failure modes, so a thermal failure must not hide inside the
+    # imagery counter.
+    thermal: bool = False
     kind: Literal["backfill", "indices"] = "backfill"
 
     @model_validator(mode="after")
     def _check(self) -> RunRequest:
-        if not (self.imagery or self.weather):
+        if not (self.imagery or self.weather or self.thermal):
             raise ValueError("pick at least one source")
         if self.window_to < self.window_from:
             raise ValueError("window_to must be on or after window_from")
@@ -92,6 +96,7 @@ class EstimateRequest(BaseModel):
     window_to: date
     imagery: bool = True
     weather: bool = True
+    thermal: bool = True
 
 
 class EstimateResponse(BaseModel):
@@ -115,6 +120,12 @@ class EstimateResponse(BaseModel):
     # resolves to, so this is the length of `weather_providers`.
     weather_subscriptions: int
     weather_providers: list[str]
+    # Thermal, counted on its own cadence. Landsat 8+9 nominal revisit is
+    # 8 days against Sentinel-2's 5, and Planetary Computer serves it free —
+    # so `estimated_thermal_units` is 0 and staying 0 is the point.
+    thermal_subscriptions: int
+    estimated_thermal_scenes: int
+    estimated_thermal_units: int
 
 
 class RunRow(BaseModel):
@@ -177,6 +188,7 @@ async def estimate(
         window_to=body.window_to,
         imagery=body.imagery,
         weather=body.weather,
+        thermal=body.thermal,
     )
 
 

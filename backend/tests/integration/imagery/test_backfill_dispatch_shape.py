@@ -471,3 +471,148 @@ async def test_a_farm_scene_outside_the_window_is_not_recomputed(
     )
 
     assert result["farm_scenes_enqueued"] == 0
+
+
+# --- thermal is its own source ----------------------------------------------
+
+
+async def _thermal_product_id(admin_session: AsyncSession) -> UUID:
+    row = (
+        await admin_session.execute(
+            text("SELECT id FROM public.imagery_products WHERE code = 'landsat_c2_l2_st'")
+        )
+    ).one()
+    return row[0]
+
+
+@pytest.mark.asyncio
+async def test_a_thermal_run_fetches_only_thermal(
+    admin_session: AsyncSession, dispatched: _Dispatched
+) -> None:
+    """Selecting thermal must not drag Sentinel-2 along.
+
+    Both products sit in `imagery_farm_subscriptions`, so an unfiltered
+    fan-out would fetch S2 as well and report it under the thermal
+    counter — an operator would see thermal "succeed" having spent
+    Sentinel-2 quota.
+    """
+    schema, farm_id, s2_product, _sub = await _setup(admin_session, "bf-thermal-only")
+    thermal_product = await _thermal_product_id(admin_session)
+    await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=s2_product, fetch_farm_aoi=True
+    )
+    thermal_sub = await _add_farm_subscription(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=thermal_product,
+        fetch_farm_aoi=True,
+    )
+
+    result = await imagery_tasks._backfill_farm_scenes_async(
+        farm_id,
+        schema,
+        WINDOW_FROM,
+        WINDOW_TO,
+        False,
+        product_codes=["landsat_c2_l2_st"],
+        progress_source="thermal",
+    )
+
+    assert result["farm_subscriptions_enqueued"] == 1
+    assert [a[0] for a in dispatched.farm] == [str(thermal_sub)]
+
+
+@pytest.mark.asyncio
+async def test_an_imagery_run_does_not_fetch_thermal(
+    admin_session: AsyncSession, dispatched: _Dispatched
+) -> None:
+    """The converse, and the one that costs money if it breaks."""
+    schema, farm_id, s2_product, _sub = await _setup(admin_session, "bf-optical-only")
+    thermal_product = await _thermal_product_id(admin_session)
+    s2_sub = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=s2_product, fetch_farm_aoi=True
+    )
+    await _add_farm_subscription(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=thermal_product,
+        fetch_farm_aoi=True,
+    )
+
+    result = await imagery_tasks._backfill_farm_scenes_async(
+        farm_id, schema, WINDOW_FROM, WINDOW_TO, False, product_codes=["s2_l2a"]
+    )
+
+    assert result["farm_subscriptions_enqueued"] == 1
+    assert [a[0] for a in dispatched.farm] == [str(s2_sub)]
+
+
+@pytest.mark.asyncio
+async def test_no_product_filter_still_fetches_everything(
+    admin_session: AsyncSession, dispatched: _Dispatched
+) -> None:
+    """None means every product — what the live sweep wants."""
+    schema, farm_id, s2_product, _sub = await _setup(admin_session, "bf-all-products")
+    thermal_product = await _thermal_product_id(admin_session)
+    await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=s2_product, fetch_farm_aoi=True
+    )
+    await _add_farm_subscription(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=thermal_product,
+        fetch_farm_aoi=True,
+    )
+
+    result = await _run_dispatcher(farm_id, schema)
+
+    assert result["farm_subscriptions_enqueued"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_thermal_indices_run_recomputes_only_thermal_scenes(
+    admin_session: AsyncSession, index_dispatched: _IndexDispatched
+) -> None:
+    schema, farm_id, s2_product, _sub = await _setup(admin_session, "bf-idx-thermal")
+    thermal_product = await _thermal_product_id(admin_session)
+    s2_fsid = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=s2_product, fetch_farm_aoi=True
+    )
+    th_fsid = await _add_farm_subscription(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=thermal_product,
+        fetch_farm_aoi=True,
+    )
+    await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=s2_product,
+        subscription_id=s2_fsid,
+        scene_id="S2_ONE",
+    )
+    thermal_job = await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=thermal_product,
+        subscription_id=th_fsid,
+        scene_id="LC09_ONE",
+    )
+
+    result = await imagery_tasks._backfill_farm_indices_async(
+        farm_id,
+        schema,
+        WINDOW_FROM,
+        WINDOW_TO,
+        product_codes=["landsat_c2_l2_st"],
+        progress_source="thermal",
+    )
+
+    assert result["farm_scenes_enqueued"] == 1
+    assert [a[0] for a in index_dispatched.farm] == [str(thermal_job)]
