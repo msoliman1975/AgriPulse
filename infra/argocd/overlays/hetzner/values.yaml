@@ -1805,13 +1805,32 @@ global:
   # carry a real measurement, and Bashier Elkhier / testmeplz still read
   # "Fetched as one farm area". No farm should flip path on its own — if one
   # does, its boundary genuinely exceeds the cap and the self-heal fired.
+  # frontend 800f3da -> 94a21fa (2026-08-15). FRONTEND ONLY — #480 changes no
+  # backend file, so moving api/workers to the same SHA would restart three
+  # deployments for a byte-identical image.
+  #
+  # #480: farm-level imagery/weather subscriptions were mounted in the v2
+  # console's drawer only. The side nav lists TWO rows both labelled "Farm
+  # management" — the default /labs/map and a beta-badged /labs/map-v2 — so
+  # every operator who clicked the first one had NO way to subscribe a farm to
+  # imagery or weather. Nothing failed and nothing logged; the control was
+  # simply absent. This mounts the same component in the default console.
+  #
+  # No migration. Image CONFIRMED by pulling it on the node BEFORE this bump —
+  # a tag that does not exist yet is how you get ImagePullBackOff.
+  # Forward-only: `git merge-base --is-ancestor 800f3da 94a21fab`.
+  #
+  # Watch after sync: /labs/map -> settings -> Farm tab now shows the imagery
+  # and weather subscription lists under the farm-edit form, with a
+  # fetch-scope line per product. FarmZonesPanel is still v2-only — same
+  # drift, not fixed here.
   images:
     api:
       tag: "800f3da"
     workers:
       tag: "800f3da"
     frontend:
-      tag: "800f3da"
+      tag: "94a21fa"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
