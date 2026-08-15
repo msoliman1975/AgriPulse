@@ -83,6 +83,38 @@ function NumberField({
   );
 }
 
+/** Which AOI this farm is fetched on — reported, never set here.
+ *
+ * This was a "Whole farm" checkbox. It read as a preference and behaved like a
+ * migration switch with teeth: `fetch_farm_aoi` is also what excludes a farm's
+ * blocks from the block sweep, so ticking it on a farm the provider cannot
+ * return in one request left that farm with no imagery from either path. The
+ * cutover is driven platform-side; what an operator needs here is which path
+ * this farm is on, and — when it is stuck on blocks — why.
+ */
+function FetchScope({ sub }: { sub: FarmImagerySubscription }): ReactNode {
+  const { t } = useTranslation("farmConsole");
+  if (sub.fetch_farm_aoi) {
+    return <span className="text-xs text-ap-muted">{t("farmSubs.scope.wholeFarm")}</span>;
+  }
+  // `=== false`, not `!`: each chart is its own ArgoCD app, so the frontend can
+  // reach prod before the api that answers this field. Absent must mean "not
+  // measured", or a frontend-first promote reports every farm on the platform
+  // as too large, with undefined for the numbers.
+  if (sub.farm_aoi_fetchable === false) {
+    return (
+      <span className="text-xs text-ap-warn">
+        {t("farmSubs.scope.tooLarge", {
+          width: sub.farm_aoi_width_px,
+          height: sub.farm_aoi_height_px,
+          max: sub.farm_aoi_max_px,
+        })}
+      </span>
+    );
+  }
+  return <span className="text-xs text-ap-muted">{t("farmSubs.scope.perBlock")}</span>;
+}
+
 export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [products, setProducts] = useState<ImageryConfigEntry[]>([]);
@@ -221,28 +253,14 @@ export function FarmSubscriptionsPanel({ farmId }: Props): ReactNode {
                         )
                       }
                     />
-                    <label className="flex items-center gap-1 text-xs text-ap-muted">
-                      <input
-                        type="checkbox"
-                        checked={sub.fetch_farm_aoi}
-                        disabled={busy !== null}
-                        onChange={() =>
-                          void runImagery(sub.id, () =>
-                            updateFarmImagerySubscription(farmId, sub.id, {
-                              fetch_farm_aoi: !sub.fetch_farm_aoi,
-                            }),
-                          )
-                        }
-                      />
-                      {t("farmSubs.wholeFarm")}
-                    </label>
+                    <FetchScope sub={sub} />
                   </>
                 ) : null}
               </li>
             );
           })}
         </ul>
-        <p className="mt-2 text-xs text-ap-muted">{t("farmSubs.wholeFarmHint")}</p>
+        <p className="mt-2 text-xs text-ap-muted">{t("farmSubs.fetchScopeHint")}</p>
       </section>
 
       <section className="rounded-xl border border-ap-line bg-ap-bg/40 p-4">

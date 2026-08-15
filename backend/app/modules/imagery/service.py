@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,12 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.imagery.errors import (
+    FarmAoiNotFetchableError,
     SubscriptionNotFoundError,
 )
 from app.modules.imagery.events import (
     SubscriptionCreatedV1,
     SubscriptionRevokedV1,
 )
+from app.modules.imagery.farm_aoi import FarmAoiFit, measure_fit, product_resolution_m
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
@@ -318,11 +320,24 @@ class ImageryServiceImpl:
         rows = await self._repo.list_farm_subscriptions(
             farm_id=farm_id, include_inactive=include_inactive
         )
-        return tuple(FarmSubscriptionRead.model_validate(r) for r in rows)
+        if not rows:
+            return ()
+        # One boundary read and one product read for the whole list, rather
+        # than a pair per row.
+        farm = await self._repo.get_farm_boundary(farm_id)
+        resolutions = await self._repo.product_resolutions()
+        return tuple(
+            FarmSubscriptionRead.model_validate(
+                {**r, **self._fit_fields(self._measure(farm, resolutions.get(r["product_id"])))}
+            )
+            for r in rows
+        )
 
     async def upsert_farm_subscription(
         self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
     ) -> FarmSubscriptionRead:
+        if payload.fetch_farm_aoi:
+            await self._require_fetchable(farm_id=farm_id, product_id=payload.product_id)
         row = await self._repo.upsert_farm_subscription(
             subscription_id=uuid7(),
             farm_id=farm_id,
@@ -332,7 +347,7 @@ class ImageryServiceImpl:
             fetch_farm_aoi=payload.fetch_farm_aoi,
             actor_user_id=actor_user_id,
         )
-        return FarmSubscriptionRead.model_validate(row)
+        return await self._read_with_fit(row)
 
     async def update_farm_subscription(
         self,
@@ -341,12 +356,59 @@ class ImageryServiceImpl:
         payload: FarmSubscriptionUpdate,
         actor_user_id: UUID | None,
     ) -> FarmSubscriptionRead | None:
+        changes = payload.model_dump(exclude_unset=True)
+        if changes.get("fetch_farm_aoi"):
+            # Read the row first: the caller gives a subscription id, and the
+            # farm and product are what decide whether the fetch can happen.
+            existing = await self._repo.get_farm_subscription(subscription_id)
+            if existing is not None:
+                await self._require_fetchable(
+                    farm_id=existing["farm_id"], product_id=existing["product_id"]
+                )
         row = await self._repo.update_farm_subscription(
             subscription_id=subscription_id,
-            changes=payload.model_dump(exclude_unset=True),
+            changes=changes,
             actor_user_id=actor_user_id,
         )
-        return FarmSubscriptionRead.model_validate(row) if row is not None else None
+        return await self._read_with_fit(row) if row is not None else None
+
+    # ---- farm-AOI fetchability -------------------------------------------
+    #
+    # Measured on every read instead of stored. A farm's boundary can be
+    # redrawn at any time, so a persisted verdict would be wrong with nothing
+    # to notice it — and this is cheap: a bbox over a geometry we already read.
+
+    @staticmethod
+    def _measure(farm: dict[str, Any] | None, resolution_raw: Any) -> FarmAoiFit:
+        return measure_fit(
+            farm["boundary_utm_geojson"] if farm else None,
+            resolution_m=product_resolution_m({"resolution_m": resolution_raw}),
+        )
+
+    @staticmethod
+    def _fit_fields(fit: FarmAoiFit) -> dict[str, Any]:
+        return {
+            "farm_aoi_fetchable": fit.fits,
+            "farm_aoi_width_px": fit.width_px,
+            "farm_aoi_height_px": fit.height_px,
+            "farm_aoi_max_px": fit.max_px,
+        }
+
+    async def _fit_for(self, *, farm_id: UUID, product_id: UUID) -> FarmAoiFit:
+        farm = await self._repo.get_farm_boundary(farm_id)
+        resolutions = await self._repo.product_resolutions()
+        return self._measure(farm, resolutions.get(product_id))
+
+    async def _require_fetchable(self, *, farm_id: UUID, product_id: UUID) -> None:
+        fit = await self._fit_for(farm_id=farm_id, product_id=product_id)
+        if not fit.fits:
+            raise FarmAoiNotFetchableError(
+                width_px=fit.width_px, height_px=fit.height_px, max_px=fit.max_px
+            )
+
+    async def _read_with_fit(self, row: dict[str, Any]) -> FarmSubscriptionRead:
+        fit = await self._fit_for(farm_id=row["farm_id"], product_id=row["product_id"])
+        return FarmSubscriptionRead.model_validate({**row, **self._fit_fields(fit)})
 
     async def get_config(self) -> ConfigResponse:
         """GET /api/v1/config payload — tile-server URL + product hints."""

@@ -19,13 +19,22 @@ export interface FarmImagerySubscription {
   cloud_cover_max_pct: number | null;
   is_active: boolean;
   /**
-   * Fetch the farm's own boundary rather than stitching block rasters.
+   * Which path this farm is fetched on: its own boundary, or block rasters
+   * stitched together.
    *
-   * Off by default, and worth leaving off until someone wants it: it is a
-   * second, larger provider request per pass. What it buys is pixels over
-   * ground no block was ever drawn around — a quarter of the reference farm.
+   * Not a user setting — it is the cutover switch, driven platform-side. The
+   * UI reports it and never writes it: turning it on for a farm the provider
+   * cannot return in one request stops that farm's imagery entirely, because
+   * this same flag excludes its blocks from the block sweep.
    */
   fetch_farm_aoi: boolean;
+  /** False when the farm is too big for one provider request. Measured per read. */
+  farm_aoi_fetchable: boolean;
+  /** The measurement behind `farm_aoi_fetchable`; null when it could not be taken. */
+  farm_aoi_width_px: number | null;
+  farm_aoi_height_px: number | null;
+  /** Provider limit per side, for the message. 2500 for Sentinel Hub's Process API. */
+  farm_aoi_max_px: number;
   last_successful_ingest_at: string | null;
   last_attempted_at: string | null;
   created_at: string;

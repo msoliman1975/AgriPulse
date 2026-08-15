@@ -68,6 +68,10 @@ function subscription(over: Record<string, unknown> = {}) {
     cloud_cover_max_pct: 30,
     is_active: true,
     fetch_farm_aoi: false,
+    farm_aoi_fetchable: true,
+    farm_aoi_width_px: 420,
+    farm_aoi_height_px: 380,
+    farm_aoi_max_px: 2500,
     last_successful_ingest_at: null,
     last_attempted_at: null,
     created_at: "2026-01-01T00:00:00Z",
@@ -101,23 +105,64 @@ describe("FarmSubscriptionsPanel", () => {
     expect(h.subscribeImagery).toHaveBeenCalledWith("f1", { product_id: PRODUCT_ID });
   });
 
-  it("shows the whole-farm option only once the product is on", async () => {
+  it("shows the fetch scope only once the product is on", async () => {
     render(<FarmSubscriptionsPanel farmId="f1" />);
     await waitFor(() => expect(screen.getByText("Sentinel-2 L2A")).toBeTruthy());
-    // Nothing subscribed yet, so there is nothing to fetch the whole farm for.
-    expect(screen.queryByRole("checkbox", { name: /Whole farm/i })).toBeNull();
+    // Nothing subscribed yet, so there is no fetch to describe.
+    expect(screen.queryByText(/Fetched per block/i)).toBeNull();
   });
 
-  it("toggles the whole-farm fetch on an existing subscription", async () => {
+  it("reports the fetch scope without offering to change it", async () => {
+    // It was a checkbox, and it read as a preference. It is the cutover
+    // switch: `fetch_farm_aoi` also excludes the farm's blocks from the block
+    // sweep, so ticking it on a farm too big to fetch left that farm with no
+    // imagery at all. The only control that cannot do that is no control.
     h.imagery.mockResolvedValue([subscription()]);
-    const user = userEvent.setup();
     render(<FarmSubscriptionsPanel farmId="f1" />);
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy());
 
-    await user.click(screen.getByRole("checkbox", { name: /Whole farm/i }));
+    await waitFor(() => expect(screen.getByText(/Fetched per block/i)).toBeTruthy());
+    // The product's own on/off box is the only checkbox left in the row.
+    expect(screen.queryByRole("checkbox", { name: /whole farm/i })).toBeNull();
+    expect(h.updateImagery).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(h.updateImagery).toHaveBeenCalledTimes(1));
-    expect(h.updateImagery).toHaveBeenCalledWith("f1", "sub-1", { fetch_farm_aoi: true });
+  it("says a farm is fetched as one area when it has cut over", async () => {
+    h.imagery.mockResolvedValue([subscription({ fetch_farm_aoi: true })]);
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+    await waitFor(() => expect(screen.getByText(/Fetched as one farm area/i)).toBeTruthy());
+  });
+
+  it("says WHY a farm is stuck on per-block fetching, with the measurement", async () => {
+    // Without the numbers this reads as an arbitrary refusal. With them, an
+    // operator can see how far over the limit the farm is.
+    h.imagery.mockResolvedValue([
+      subscription({
+        farm_aoi_fetchable: false,
+        farm_aoi_width_px: 3100,
+        farm_aoi_height_px: 1800,
+      }),
+    ]);
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+
+    await waitFor(() => expect(screen.getByText(/too large for one request/i)).toBeTruthy());
+    expect(screen.getByText(/3100×1800 px/)).toBeTruthy();
+    expect(screen.getByText(/limit 2500/)).toBeTruthy();
+  });
+
+  it("does not call a farm too large just because the api has not shipped yet", async () => {
+    // Each chart is its own ArgoCD app, so the frontend can reach prod before
+    // the api that answers `farm_aoi_fetchable`. Read as a bare falsy check,
+    // an absent field reports EVERY farm as too large, sized "undefined".
+    const { farm_aoi_fetchable, farm_aoi_width_px, farm_aoi_height_px, ...old } = subscription();
+    void farm_aoi_fetchable;
+    void farm_aoi_width_px;
+    void farm_aoi_height_px;
+    h.imagery.mockResolvedValue([old]);
+    render(<FarmSubscriptionsPanel farmId="f1" />);
+
+    await waitFor(() => expect(screen.getByText(/Fetched per block/i)).toBeTruthy());
+    expect(screen.queryByText(/too large/i)).toBeNull();
+    expect(screen.queryByText(/undefined/)).toBeNull();
   });
 
   it("lets the cloud cap be set, not just the cadence", async () => {
@@ -178,9 +223,11 @@ describe("FarmSubscriptionsPanel", () => {
     h.updateImagery.mockRejectedValue(new Error("nope"));
     const user = userEvent.setup();
     render(<FarmSubscriptionsPanel farmId="f1" />);
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Whole farm/i })).toBeTruthy());
+    const cloud = (await screen.findAllByRole("spinbutton"))[1];
 
-    await user.click(screen.getByRole("checkbox", { name: /Whole farm/i }));
+    await user.clear(cloud);
+    await user.type(cloud, "45");
+    await user.tab();
 
     await waitFor(() => expect(screen.getByText(/Could not save that change/i)).toBeTruthy());
   });

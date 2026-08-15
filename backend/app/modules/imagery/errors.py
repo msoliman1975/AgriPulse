@@ -84,6 +84,29 @@ class SubscriptionAlreadyExistsError(APIError):
         )
 
 
+class FarmAoiNotFetchableError(APIError):
+    """422 when whole-farm fetching is asked for on a farm too big for it.
+
+    Refused at the write rather than discovered at the next poll, because
+    `fetch_farm_aoi` is also what excludes the farm's blocks from the block
+    sweep: accepting it here would stop this farm's imagery entirely until
+    someone noticed an overdue row in integration health.
+    """
+
+    def __init__(self, *, width_px: int | None, height_px: int | None, max_px: int) -> None:
+        size = f"{width_px}x{height_px} px" if width_px and height_px else "too large"
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Farm is too large to fetch in one request",
+            detail=(
+                f"This farm measures {size} at the product's resolution, over the "
+                f"{max_px} px per side the provider can return in one request. "
+                "It stays on the per-block path."
+            ),
+            type_="https://agripulse.cloud/problems/imagery/farm-aoi-too-large",
+        )
+
+
 class BlockNotVisibleError(APIError):
     """404 surfaced by imagery routes when the caller has no scope on the block.
 

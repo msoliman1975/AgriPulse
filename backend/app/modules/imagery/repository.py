@@ -995,6 +995,20 @@ class ImageryRepository:
             "boundary_utm_geojson": json.loads(row["boundary_utm_geojson"]),
         }
 
+    async def product_resolutions(self) -> dict[UUID, Any]:
+        """`{product_id: resolution_m}` over every product, active or not.
+
+        Not filtered to active products: a subscription can outlive the
+        product's retirement, and answering "unknown resolution" for one would
+        report a farm as fetchable when nothing has measured it.
+        """
+        rows = (
+            await self._session.execute(
+                text("SELECT id, resolution_m FROM public.imagery_products")
+            )
+        ).all()
+        return {r[0]: r[1] for r in rows}
+
     async def list_farm_subscriptions(
         self,
         *,
@@ -1204,6 +1218,22 @@ class ImageryRepository:
             .all()
         )
         return tuple(dict(r) for r in rows)
+
+    async def disable_farm_aoi_fetch(self, *, subscription_id: UUID) -> None:
+        """Switch one farm back to the block path.
+
+        Called when the provider could not return this farm in one request.
+        It is a fallback, not a preference: `fetch_farm_aoi` is also what
+        excludes the farm's blocks from the block sweep, so a farm left ON
+        while unfetchable is a farm receiving no imagery at all.
+        """
+        await self._session.execute(
+            text(
+                "UPDATE imagery_farm_subscriptions "
+                "SET fetch_farm_aoi = FALSE, updated_at = now() WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {"id": subscription_id},
+        )
 
     async def list_farm_subscriptions_fetching_aoi(self, farm_id: UUID) -> tuple[UUID, ...]:
         """Farm subscriptions on one farm with the farm-AOI fetch switched ON.

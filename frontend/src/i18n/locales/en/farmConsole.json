@@ -749,8 +749,12 @@
     "imageryHint": "Imagery is fetched for this farm. Turning a product on subscribes the whole farm — there is no separate step to apply it to blocks.",
     "weatherTitle": "Weather",
     "weatherHint": "Weather is fetched once for the farm's location and shared by every block.",
-    "wholeFarm": "Whole farm",
-    "wholeFarmHint": "Whole farm fetches the farm's own boundary instead of stitching block images together, so land outside your blocks is measured too. It costs one larger request per pass.",
+    "scope": {
+      "wholeFarm": "Fetched as one farm area",
+      "perBlock": "Fetched per block",
+      "tooLarge": "Fetched per block — too large for one request ({{width}}×{{height}} px, limit {{max}})"
+    },
+    "fetchScopeHint": "Fetching the farm as one area measures land outside your blocks too, and costs one larger request per pass instead of one per block. Farms are moved over centrally; a farm wider than the provider's per-request limit stays on per-block fetching.",
     "cloudCap": "Max cloud %"
   },
   "farmZones": {
