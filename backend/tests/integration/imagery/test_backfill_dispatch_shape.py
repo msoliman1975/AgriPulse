@@ -299,3 +299,175 @@ async def test_the_live_poll_still_moves_its_own_watermark(
     assert row["last_attempted_at"] is not None
     assert row["last_attempted_at"] >= before
     assert row["last_successful_ingest_at"] is not None
+
+
+# --- "Compute indices" on a cut-over farm ------------------------------------
+
+
+class _IndexDispatched:
+    """The two recompute fan-outs, captured not queued."""
+
+    def __init__(self) -> None:
+        self.block: list[tuple[Any, ...]] = []
+        self.farm: list[tuple[Any, ...]] = []
+
+
+@pytest.fixture
+def index_dispatched(monkeypatch: pytest.MonkeyPatch) -> _IndexDispatched:
+    calls = _IndexDispatched()
+    monkeypatch.setattr(
+        imagery_tasks.compute_indices, "delay", lambda *a, **k: calls.block.append(a)
+    )
+    monkeypatch.setattr(
+        imagery_tasks.recompute_farm_scene_indices,
+        "delay",
+        lambda *a, **k: calls.farm.append(a),
+    )
+    return calls
+
+
+async def _farm_job(
+    admin_session: AsyncSession,
+    *,
+    schema: str,
+    farm_id: UUID,
+    product_id: UUID,
+    subscription_id: UUID,
+    scene_id: str = "LC09_TEST_20260115",
+    status: str = "succeeded",
+    at: datetime | None = None,
+) -> UUID:
+    """One farm-AOI scene row. `subscription_id` is NOT NULL on this table."""
+    job_id = uuid4()
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{schema}".imagery_farm_ingestion_jobs '
+            "(id, subscription_id, farm_id, product_id, scene_id, scene_datetime, "
+            " status, requested_at) "
+            "VALUES (:id, :sub, :farm, :product, :scene, :at, :status, :at)"
+        ),
+        {
+            "id": job_id,
+            "sub": subscription_id,
+            "farm": farm_id,
+            "product": product_id,
+            "scene": scene_id,
+            "status": status,
+            "at": at or datetime(2026, 1, 15, 8, 17, tzinfo=UTC),
+        },
+    )
+    await admin_session.commit()
+    return job_id
+
+
+@pytest.mark.asyncio
+async def test_compute_indices_reaches_farm_aoi_scenes(
+    admin_session: AsyncSession, index_dispatched: _IndexDispatched
+) -> None:
+    """The gap this closes: farm-path scenes were invisible to the recompute.
+
+    `imagery_ingestion_jobs` is keyed per BLOCK, so a farm fetched as one
+    AOI had nothing in it. The task reported success having recomputed
+    none of that farm's actual scenes — on the reference farm it found
+    1038 pre-cutover block jobs and zero of the 21 thermal ones.
+    """
+    schema, farm_id, product_id, _sub = await _setup(admin_session, "bf-idx-farm")
+    fsid = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=product_id, fetch_farm_aoi=True
+    )
+    job_id = await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=product_id,
+        subscription_id=fsid,
+    )
+
+    result = await imagery_tasks._backfill_farm_indices_async(
+        farm_id, schema, WINDOW_FROM, WINDOW_TO
+    )
+
+    assert result["farm_scenes_enqueued"] == 1
+    assert [a[0] for a in index_dispatched.farm] == [str(job_id)]
+
+
+@pytest.mark.asyncio
+async def test_compute_indices_counts_the_two_shapes_separately(
+    admin_session: AsyncSession, index_dispatched: _IndexDispatched
+) -> None:
+    """A cut-over farm carries both shapes in its history.
+
+    One combined number could not say which half a run actually touched,
+    which is the ambiguity that let the farm half go missing unnoticed.
+    """
+    schema, farm_id, product_id, _sub = await _setup(admin_session, "bf-idx-both")
+    fsid = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=product_id, fetch_farm_aoi=True
+    )
+    await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=product_id,
+        subscription_id=fsid,
+    )
+
+    result = await imagery_tasks._backfill_farm_indices_async(
+        farm_id, schema, WINDOW_FROM, WINDOW_TO
+    )
+
+    assert "scenes_enqueued" in result
+    assert "farm_scenes_enqueued" in result
+    assert result["farm_scenes_enqueued"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_pending_farm_scene_is_not_recomputed(
+    admin_session: AsyncSession, index_dispatched: _IndexDispatched
+) -> None:
+    """Only a scene that landed has a raster to read back."""
+    schema, farm_id, product_id, _sub = await _setup(admin_session, "bf-idx-pending")
+    fsid = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=product_id, fetch_farm_aoi=True
+    )
+    await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=product_id,
+        subscription_id=fsid,
+        scene_id="PENDING_ONE",
+        status="pending",
+    )
+
+    result = await imagery_tasks._backfill_farm_indices_async(
+        farm_id, schema, WINDOW_FROM, WINDOW_TO
+    )
+
+    assert result["farm_scenes_enqueued"] == 0
+    assert index_dispatched.farm == []
+
+
+@pytest.mark.asyncio
+async def test_a_farm_scene_outside_the_window_is_not_recomputed(
+    admin_session: AsyncSession, index_dispatched: _IndexDispatched
+) -> None:
+    schema, farm_id, product_id, _sub = await _setup(admin_session, "bf-idx-window")
+    fsid = await _add_farm_subscription(
+        admin_session, schema=schema, farm_id=farm_id, product_id=product_id, fetch_farm_aoi=True
+    )
+    await _farm_job(
+        admin_session,
+        schema=schema,
+        farm_id=farm_id,
+        product_id=product_id,
+        subscription_id=fsid,
+        scene_id="OUTSIDE",
+        at=datetime(2026, 6, 1, 8, 17, tzinfo=UTC),
+    )
+
+    result = await imagery_tasks._backfill_farm_indices_async(
+        farm_id, schema, WINDOW_FROM, WINDOW_TO
+    )
+
+    assert result["farm_scenes_enqueued"] == 0
